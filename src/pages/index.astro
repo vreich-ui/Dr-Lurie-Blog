@@ -1,399 +1,239 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
 
-import Hero from '~/components/widgets/Hero.astro';
-import Note from '~/components/widgets/Note.astro';
-import Features from '~/components/widgets/Features.astro';
-import Features2 from '~/components/widgets/Features2.astro';
-import Steps from '~/components/widgets/Steps.astro';
-import Content from '~/components/widgets/Content.astro';
-import BlogLatestPosts from '~/components/widgets/BlogLatestPosts.astro';
-import FAQs from '~/components/widgets/FAQs.astro';
-import Stats from '~/components/widgets/Stats.astro';
-import CallToAction from '~/components/widgets/CallToAction.astro';
-
 const metadata = {
-  title: 'AstroWind — Free template for creating websites with Astro + Tailwind CSS',
+  title: 'Science-led education for aging skin changes',
   ignoreTitleTemplate: true,
 };
 ---
 
 <Layout metadata={metadata}>
-  <!-- Hero Widget ******************* -->
+  <section class="px-4 sm:px-6 py-14 sm:py-20 mx-auto max-w-6xl">
+    <p class="text-sm font-medium text-accent mb-4">Science-led education for skin changes after 60</p>
+    <h1 class="text-3xl sm:text-5xl font-bold tracking-tight text-heading max-w-4xl">
+      This Is Not About Hygiene. This Is About What Changes in Your Skin After 60.
+    </h1>
+    <p class="mt-6 text-lg text-muted max-w-3xl">
+      Most people try to fix surface symptoms. But aging skin behaves differently — at a biological level.
+    </p>
+    <p class="mt-6 text-sm font-medium text-default/90">
+      MD, PhD in Biophysics | 30+ Years in Pharmaceutical R&amp;D | Delivery Systems Innovator
+    </p>
+    <div class="mt-8 flex flex-col sm:flex-row gap-3">
+      <a class="btn-primary" href="#guide">Get the Free Guide</a>
+      <a class="btn-secondary" href="#education">Start Here</a>
+    </div>
+  </section>
 
-  <Hero
-    actions={[
-      {
-        variant: 'primary',
-        text: 'Get template',
-        href: 'https://github.com/arthelokyo/astrowind',
-        target: '_blank',
-        icon: 'tabler:download',
-      },
-      { text: 'Learn more', href: '#features' },
-    ]}
-    image={{ src: '~/assets/images/hero-image.png', alt: 'AstroWind Hero Image' }}
-  >
-    <Fragment slot="title">
-      Free template for <span class="hidden xl:inline">creating websites with</span>
-      <span class="text-accent dark:text-white"> Astro 5.0</span> + Tailwind CSS
-    </Fragment>
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">A Different Way to Think About Skin</h2>
+    <p class="mt-4 text-muted max-w-3xl">
+      Most cosmetic advice treats skin like a surface. But skin is not passive. It is a dynamic biological system that
+      changes with age.
+    </p>
+    <ul class="mt-6 space-y-2 text-default">
+      <li>• This is not a cleanliness issue</li>
+      <li>• This is not about “stronger products”</li>
+      <li>• This is about how biology shifts over time</li>
+    </ul>
+  </section>
 
-    <Fragment slot="subtitle">
-      <span class="hidden sm:inline">
-        <span class="font-semibold">AstroWind</span> is a free, customizable and production-ready template for Astro 5.0
-        + Tailwind CSS.</span
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+    <h2 class="sr-only">Entry points</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <article class="rounded-2xl border border-gray-200 dark:border-gray-800 p-6 bg-white dark:bg-slate-900">
+        <h3 class="text-xl font-semibold">Understand What’s Happening</h3>
+        <p class="mt-3 text-muted">Articles and education for understanding how skin changes with age.</p>
+        <a class="mt-5 inline-flex font-medium text-primary hover:text-secondary" href="#insights">Start Learning →</a>
+      </article>
+      <article class="rounded-2xl border border-gray-200 dark:border-gray-800 p-6 bg-white dark:bg-slate-900">
+        <h3 class="text-xl font-semibold">Find What Actually Works</h3>
+        <p class="mt-3 text-muted">Future solutions designed around aging skin behavior.</p>
+        <a class="mt-5 inline-flex font-medium text-primary hover:text-secondary" href="#early-access"
+          >See the Approach →</a
+        >
+      </article>
+      <article class="rounded-2xl border border-gray-200 dark:border-gray-800 p-6 bg-white dark:bg-slate-900">
+        <h3 class="text-xl font-semibold">Follow a Structured Approach</h3>
+        <p class="mt-3 text-muted">A guided way to understand changes, options, and next steps.</p>
+        <a class="mt-5 inline-flex font-medium text-primary hover:text-secondary" href="#guide">Explore the System →</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">You may be doing everything right…</h2>
+    <ul class="mt-5 space-y-2">
+      <li>• You shower regularly</li>
+      <li>• You use quality products</li>
+      <li>• You follow hygiene routines</li>
+    </ul>
+    <p class="mt-6 font-semibold">And yet…</p>
+    <ul class="mt-3 space-y-2">
+      <li>• Your skin feels different</li>
+      <li>• Products stop working</li>
+      <li>• Something changes — quietly</li>
+    </ul>
+    <p class="mt-6 text-lg font-medium">Most people never realize why.</p>
+  </section>
+
+  <section id="education" class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div>
+        <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">What Actually Changes With Age</h2>
+        <ul class="mt-5 space-y-2 text-default">
+          <li>• Lipid composition shifts</li>
+          <li>• Microbial environment changes</li>
+          <li>• Compound formation changes, including age-related scent compounds such as 2-nonenal</li>
+          <li>• Barrier function declines</li>
+        </ul>
+        <a class="mt-6 inline-flex font-medium text-primary hover:text-secondary" href="#guide"
+          >Get the full explanation in the free guide →</a
+        >
+      </div>
+      <aside
+        class="rounded-2xl border border-gray-200 dark:border-gray-800 p-5 bg-gray-50 dark:bg-slate-900"
+        aria-label="Skin system layers"
       >
-      <span class="block mb-1 sm:hidden font-bold text-blue-600">AstroWind: Production-ready.</span>
-      Suitable for Startups, Small Business, SaaS websites, Professional Portfolios, Marketing websites, Landing Pages &
-      Blogs.
-    </Fragment>
-  </Hero>
+        <h3 class="text-lg font-semibold">Skin System Layers (Simplified)</h3>
+        <ol class="mt-4 space-y-3">
+          <li class="rounded-lg bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-gray-700">
+            Surface
+          </li>
+          <li class="rounded-lg bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-gray-700">
+            Lipid layer
+          </li>
+          <li class="rounded-lg bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-gray-700">
+            Microbial environment
+          </li>
+          <li class="rounded-lg bg-white dark:bg-slate-800 px-4 py-3 border border-gray-200 dark:border-gray-700">
+            Barrier function
+          </li>
+        </ol>
+      </aside>
+    </div>
+  </section>
 
-  <!-- Note Widget ******************* -->
+  <section id="guide" class="px-4 sm:px-6 py-12 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">The Senior’s Guide to Aging Skin &amp; Body Odor</h2>
+    <ul class="mt-5 space-y-2">
+      <li>• Why skin behaves differently after 60</li>
+      <li>• What most products ignore</li>
+      <li>• The truth about age-related scent changes</li>
+      <li>• What actually helps — and what doesn’t</li>
+    </ul>
+    <form class="mt-8 max-w-xl" aria-label="Free guide signup form">
+      <label for="guide-email" class="block text-sm font-medium">Email address</label>
+      <input
+        id="guide-email"
+        name="email"
+        type="email"
+        required
+        autocomplete="email"
+        class="mt-2 py-3 px-4 block w-full text-md rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900"
+        placeholder="you@example.com"
+      />
+      <button type="submit" class="btn-primary mt-4">Download Free Guide</button>
+    </form>
+  </section>
 
-  <Note title="Philosophy:" description="Simplicity, Best Practices and High Performance" />
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">A Different Kind of Solution</h2>
+    <p class="mt-4 text-muted">If the system has changed, then the solution must change too.</p>
+    <ul class="mt-5 space-y-2">
+      <li>• Works with biological function</li>
+      <li>• Designed for aging skin behavior</li>
+      <li>• Built on delivery system science</li>
+    </ul>
+  </section>
 
-  <!-- Features Widget *************** -->
+  <section id="early-access" class="px-4 sm:px-6 py-12 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Currently in Development</h2>
+    <p class="mt-4 text-lg font-medium">Deodorant cream for aging-related odor.</p>
+    <p class="mt-3 text-muted max-w-3xl">
+      Not a stronger deodorant. A different approach to how scent forms in aging skin.
+    </p>
+    <a class="btn-primary mt-6" href="#guide">Join Early Access List</a>
+  </section>
 
-  <Features
-    id="features"
-    tagline="Features"
-    title="What you get with AstroWind"
-    subtitle="One of the most professional and comprehensive templates currently on the market. Most starred & forked Astro theme in 2022, 2023 and 2024."
-    items={[
-      {
-        title: 'Astro + Tailwind CSS Integration',
-        description:
-          'A seamless integration between two great frameworks that offer high productivity, performance and versatility.',
-        icon: 'tabler:brand-tailwind',
-      },
-      {
-        title: 'Ready-to-use Components',
-        description:
-          'Widgets made with Tailwind CSS ready to be used in Marketing Websites, SaaS, Blogs, Personal Profiles, Small Business...',
-        icon: 'tabler:components',
-      },
-      {
-        title: 'Best Practices',
-        description:
-          'Creating secure, efficient, and user-friendly websites that deliver exceptional experiences and lasting value.',
-        icon: 'tabler:list-check',
-      },
-      {
-        title: 'Excellent Page Speed',
-        description:
-          'Having a good page speed impacts organic search ranking, improves user experience (UI/UX) and increase conversion rates.',
-        icon: 'tabler:rocket',
-      },
-      {
-        title: 'Search Engine Optimization (SEO)',
-        description:
-          "SEO lies in its ability to enhance a website's visibility, driving organic traffic and enabling it to reach a wider audience.",
-        icon: 'tabler:arrows-right-left',
-      },
-      {
-        title: 'Open to new ideas and contributions',
-        description:
-          'Embracing a culture that is open to new ideas and contributions is integral fostering innovation, collaboration, and a dynamic user experience.',
-        icon: 'tabler:bulb',
-      },
-    ]}
-  />
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Built on Medical &amp; Scientific Systems Thinking</h2>
+    <ul class="mt-5 space-y-2">
+      <li>• MD + PhD in Biophysics</li>
+      <li>• 30+ years in pharmaceutical R&amp;D</li>
+      <li>• Developed patented delivery systems</li>
+      <li>• Experience from concept → clinical → product</li>
+    </ul>
+    <p class="mt-5 text-sm text-muted">Educational content only. Not medical advice.</p>
+  </section>
 
-  <!-- Content Widget **************** -->
+  <section id="insights" class="px-4 sm:px-6 py-12 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Start With These Insights</h2>
+    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {
+        [
+          'Why Body Odor Changes After 60',
+          'What Is 2-Nonenal — And Why It Matters',
+          'Why ‘Stronger’ Products Often Fail',
+          'The Truth About Anti-Aging Claims',
+          'What Your Skin Is Actually Doing Now',
+        ].map((title) => (
+          <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-4 bg-white dark:bg-slate-900">
+            <h3 class="font-semibold">{title}</h3>
+          </article>
+        ))
+      }
+    </div>
+    <a class="mt-6 inline-flex font-medium text-primary hover:text-secondary" href="/blog">Read More Insights →</a>
+  </section>
 
-  <Content
-    isReversed
-    tagline="Inside template"
-    title="AstroWind's Blueprint: Fun Meets Functionality!"
-    items={[
-      {
-        title: 'Built on top of Astro 5.0',
-        description:
-          'Benefiting from the performance and developer-friendly features of this modern static site generator.',
-      },
-      {
-        title: 'Styled using Tailwind CSS',
-        description:
-          'Facilitating rapid design and consistent styling with this highly popular utility-first CSS framework.',
-      },
-      {
-        title: 'Cross-browser compatibility',
-        description:
-          'Ensure your website looks and functions consistently across various web browsers, delivering a seamless experience to all users.',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      alt: 'Colorful Image',
-    }}
-  >
-    <Fragment slot="content">
-      <h3 class="text-2xl font-bold tracking-tight dark:text-white sm:text-3xl mb-2">Building on modern foundations</h3>
-      Gain a competitive advantage by incorporating industry leading practices
-    </Fragment>
+  <section id="quiz" class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">What Is Your Skin Trying to Tell You?</h2>
+    <p class="mt-4 text-muted max-w-3xl">
+      Take a short quiz to identify which changes may be most relevant to you. Results will require email.
+    </p>
+    <a class="btn-secondary mt-6" href="#guide">Take the 2-Minute Quiz</a>
+  </section>
 
-    <Fragment slot="bg">
-      <div class="absolute inset-0 bg-blue-50 dark:bg-transparent"></div>
-    </Fragment>
-  </Content>
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">What People Notice First</h2>
+    <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-slate-900">
+        <p>“A more confident daily routine.”</p>
+      </article>
+      <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-slate-900">
+        <p>“A cleaner-feeling approach.”</p>
+      </article>
+      <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-slate-900">
+        <p>“A subtle but meaningful change.”</p>
+      </article>
+    </div>
+  </section>
 
-  <!-- Content Widget **************** -->
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Understand Your Skin — Step by Step</h2>
+    <p class="mt-3 text-muted">Weekly insights from Dr. Lurié.</p>
+    <form class="mt-6 max-w-xl" aria-label="Newsletter signup form">
+      <label for="newsletter-email" class="block text-sm font-medium">Email address</label>
+      <input
+        id="newsletter-email"
+        name="email"
+        type="email"
+        required
+        autocomplete="email"
+        class="mt-2 py-3 px-4 block w-full text-md rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900"
+        placeholder="you@example.com"
+      />
+      <button type="submit" class="btn-primary mt-4">Join the Newsletter</button>
+    </form>
+  </section>
 
-  <Content
-    isAfterContent
-    items={[
-      {
-        title: 'High level of customization',
-        description: `Tailor the template effortlessly to match your brand's identity and requirements, making your website distinct and saving you time.`,
-      },
-      {
-        title: 'Multiple layout possibilities',
-        description:
-          'Explore various layout options to find the structure that best presents your content, enhancing user engagement and navigation.',
-      },
-      {
-        title: 'Fully responsive design',
-        description:
-          "Ensure your website's optimal performance on various devices and screen sizes, providing a consistent and enjoyable user experience.",
-      },
-      {
-        title: 'Integration of media',
-        description:
-          'Seamlessly incorporate images, videos, and multimedia elements that enhance your content and engage visitors effectively.',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1600132806370-bf17e65e942f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2194&q=80',
-      alt: 'Blueprint Image',
-    }}
-  >
-    <Fragment slot="content">Ensure your online presence truly represents you.</Fragment>
-
-    <Fragment slot="bg">
-      <div class="absolute inset-0 bg-blue-50 dark:bg-transparent"></div>
-    </Fragment>
-  </Content>
-
-  <!-- Content Widget **************** -->
-
-  <Content
-    isReversed
-    isAfterContent
-    items={[
-      {
-        title: 'Enhanced user engagement',
-        description:
-          'Captivate your audience with interactive elements, intuitive navigation, and visually appealing layouts, encouraging longer visits.',
-      },
-      {
-        title: 'Continuous improvement',
-        description:
-          'Ensure your website stays aligned with the latest trends and technologies through regular updates and enhancements.',
-      },
-      {
-        title: 'Time and resource efficiency',
-        description:
-          'Skip the time-consuming process of building a website from scratch and launch your online presence sooner with AstroWind.',
-      },
-      {
-        title: 'Community support',
-        description: `Join the growing AstroWind community for insights, resources, and assistance, ensuring you're never alone on your web development journey.`,
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1611462985358-60d3498e0364?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      alt: 'Astronauts Image',
-    }}
-  >
-    <Fragment slot="content">Designed to foster growth and success.</Fragment>
-
-    <Fragment slot="bg">
-      <div class="absolute inset-0 bg-blue-50 dark:bg-transparent"></div>
-    </Fragment>
-  </Content>
-
-  <!-- Steps Widget ****************** -->
-
-  <Steps
-    title="Get your dream website up and running in no time with AstroWind."
-    items={[
-      {
-        title: 'Step 1: <span class="font-medium">Download</span>',
-        description:
-          "Kickstart with GitHub! Either fork the AstroWind template or simply click 'Use this template'. Your canvas awaits, ready for your digital masterpiece. In just a few clicks, you've already set the foundation.",
-        icon: 'tabler:package',
-      },
-      {
-        title: 'Step 2: <span class="font-medium">Add content</span>',
-        description:
-          "Pour your vision into it. Add images, text, and all that jazz to breathe life into your digital space. Remember, it's the content that tells your story, so make it captivating.",
-        icon: 'tabler:letter-case',
-      },
-      {
-        title: 'Step 3: <span class="font-medium">Customize styles</span>',
-        description:
-          'Give it your personal touch. Tailor colors, fonts, and layouts until it feels just right. Your unique flair, amplified by AstroWind! Precision in design ensures a seamless user experience.',
-        icon: 'tabler:paint',
-      },
-      {
-        title: 'Ready!',
-        icon: 'tabler:check',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1616198814651-e71f960c3180?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=987&q=80',
-      alt: 'Steps image',
-    }}
-  />
-
-  <!-- Features2 Widget ************** -->
-
-  <Features2
-    title="Most used widgets"
-    subtitle="Provides frequently used components for building websites using Tailwind CSS"
-    tagline="Components"
-    items={[
-      {
-        title: 'Headers',
-        description: "Ever tried driving without GPS? Boom! That's why websites need headers for direction.",
-        icon: 'flat-color-icons:template',
-      },
-      {
-        title: 'Heros',
-        description:
-          "Picture a superhero landing – epic, right? That's the job of a Hero section, making grand entrances!",
-        icon: 'flat-color-icons:gallery',
-      },
-      {
-        title: 'Features',
-        description:
-          'Where websites strut their stuff and show off superpowers. No holding back on the bragging rights here!',
-        icon: 'flat-color-icons:approval',
-      },
-      {
-        title: 'Content',
-        description:
-          "Dive into the meat and potatoes of a site; without it, you'd just be window shopping. Content is king.",
-        icon: 'flat-color-icons:document',
-      },
-      {
-        title: 'Call-to-Action',
-        description:
-          'That enthusiastic friend who\'s always urging, "Do it! Do it!"? Yeah, that\'s this button nudging you towards adventure.',
-        icon: 'flat-color-icons:advertising',
-      },
-      {
-        title: 'Pricing',
-        description: 'Behold the dessert menu of the website world. Tempting choices await, can you resist?',
-        icon: 'flat-color-icons:currency-exchange',
-      },
-      {
-        title: 'Testimonial',
-        description: 'Step into the gossip corner! Here, other visitors spill the beans and share the juicy details.',
-        icon: 'flat-color-icons:voice-presentation',
-      },
-      {
-        title: 'Contact',
-        description:
-          'Like a digital mailbox, but faster! Drop a line, ask a question, or send a virtual high-five. Ding! Message in.',
-        icon: 'flat-color-icons:business-contact',
-      },
-      {
-        title: 'Footers',
-        description: "The footer's like the credits of a movie but sprinkled with easter eggs. Time to hunt!",
-        icon: 'flat-color-icons:database',
-      },
-    ]}
-  >
-    <Fragment slot="bg">
-      <div class="absolute inset-0 bg-blue-50 dark:bg-transparent"></div>
-    </Fragment>
-  </Features2>
-
-  <!-- HighlightedPosts Widget ******* -->
-
-  <BlogLatestPosts
-    title="Find out more content in our Blog"
-    information={`The blog is used to display AstroWind documentation.
-                        Each new article will be an important step that you will need to know to be an expert in creating a website using Astro + Tailwind CSS.
-                        Astro is a very interesting technology. Thanks.
-                `}
-  />
-
-  <!-- FAQs Widget ******************* -->
-
-  <FAQs
-    title="Frequently Asked Questions"
-    subtitle="Dive into the following questions to gain insights into the powerful features that AstroWind offers and how it can elevate your web development journey."
-    tagline="FAQs"
-    classes={{ container: 'max-w-6xl' }}
-    items={[
-      {
-        title: 'Why AstroWind?',
-        description:
-          "Michael Knight a young loner on a crusade to champion the cause of the innocent. The helpless. The powerless in a world of criminals who operate above the law. Here he comes Here comes Speed Racer. He's a demon on wheels.",
-      },
-      {
-        title: 'What do I need to start?',
-        description:
-          'Space, the final frontier. These are the voyages of the Starship Enterprise. Its five-year mission: to explore strange new worlds. Many say exploration is part of our destiny, but it’s actually our duty to future generations.',
-      },
-      {
-        title: 'How to install the Astro + Tailwind CSS template?',
-        description:
-          "Well, the way they make shows is, they make one show. That show's called a pilot. Then they show that show to the people who make shows, and on the strength of that one show they decide if they're going to make more shows.",
-      },
-      {
-        title: "What's something that you don't understand?",
-        description:
-          "A flower in my garden, a mystery in my panties. Heart attack never stopped old Big Bear. I didn't even know we were calling him Big Bear.",
-      },
-      {
-        title: 'What is something that you would like to try again?',
-        description:
-          "A business big enough that it could be listed on the NASDAQ goes belly up. Disappears! It ceases to exist without me. No, you clearly don't know who you're talking to, so let me clue you in.",
-      },
-      {
-        title: 'If you could only ask one question to each person you meet, what would that question be?',
-        description:
-          "This is not about revenge. This is about justice. A lot of things can change in twelve years, Admiral. Well, that's certainly good to know. About four years. I got tired of hearing how young I looked.",
-      },
-    ]}
-  />
-
-  <!-- Stats Widget ****************** -->
-
-  <Stats
-    stats={[
-      { title: 'Downloads', amount: '132K' },
-      { title: 'Stars', amount: '24.8K' },
-      { title: 'Forks', amount: '10.3K' },
-      { title: 'Users', amount: '48.4K' },
-    ]}
-  />
-
-  <!-- CallToAction Widget *********** -->
-
-  <CallToAction
-    actions={[
-      {
-        variant: 'primary',
-        text: 'Get template',
-        href: 'https://github.com/arthelokyo/astrowind',
-        target: '_blank',
-        icon: 'tabler:download',
-      },
-    ]}
-  >
-    <Fragment slot="title">
-      Astro&nbsp;+&nbsp;<br class="block sm:hidden" /><span class="sm:whitespace-nowrap">Tailwind CSS</span>
-    </Fragment>
-
-    <Fragment slot="subtitle">
-      Be very surprised by these huge fake numbers you are seeing on this page. <br class="hidden md:inline" />Don't
-      waste more time! :P
-    </Fragment>
-  </CallToAction>
+  <section class="px-4 sm:px-6 py-14 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="sr-only">Final close</h2>
+    <p class="text-lg sm:text-xl font-medium max-w-4xl">
+      Most people try to fix the surface. But the system has already changed. Once you understand that, everything else
+      becomes clearer.
+    </p>
+    <a class="btn-primary mt-8" href="#guide">Get the Free Guide</a>
+  </section>
 </Layout>
