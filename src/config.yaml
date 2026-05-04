@@ -11,7 +11,7 @@ metadata:
   title:
     default: Dr. Lurié
     template: '%s — Dr. Lurié'
-  description: "Science-led education on aging skin, age-related scent changes, and future age-aware skincare solutions."
+  description: 'Science-led education on aging skin, age-related scent changes, and future age-aware skincare solutions.'
   robots:
     index: true
     follow: true
