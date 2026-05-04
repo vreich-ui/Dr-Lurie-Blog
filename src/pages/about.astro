@@ -1,228 +1,131 @@
 ---
-import Features2 from '~/components/widgets/Features2.astro';
-import Features3 from '~/components/widgets/Features3.astro';
-import Hero from '~/components/widgets/Hero.astro';
-import Stats from '~/components/widgets/Stats.astro';
-import Steps2 from '~/components/widgets/Steps2.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 const metadata = {
-  title: 'About us',
+  title: 'About Dr. Leonid Lurie',
 };
 ---
 
 <Layout metadata={metadata}>
-  <!-- Hero Widget ******************* -->
+  <section class="px-4 sm:px-6 py-14 sm:py-20 mx-auto max-w-6xl">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
+      <div>
+        <p class="text-sm font-medium text-accent">About</p>
+        <h1 class="mt-3 text-3xl sm:text-5xl font-bold tracking-tight">About Dr. Leonid Lurie</h1>
+        <p class="mt-4 text-lg text-muted">Physician–scientist, biophysicist, and formulation technology developer.</p>
+        <p class="mt-5 text-muted max-w-2xl">
+          Dr. Leonid Lurie works at the intersection of medicine, biophysics, and advanced delivery systems, developing
+          science-led formulation platforms for health, hygiene, and skin-related applications.
+        </p>
+      </div>
+      <div>
+        <div
+          class="rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden bg-gray-50 dark:bg-slate-900"
+        >
+          <img
+            src="/images/dr-lurie-portrait.jpg"
+            alt="Portrait of Dr. Leonid Lurie"
+            class="w-full h-auto object-cover"
+            loading="lazy"
+            onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+          />
+          <div class="hidden items-center justify-center min-h-[420px] p-8 text-center text-muted">
+            Add portrait image at <code class="mx-1">public/images/dr-lurie-portrait.jpg</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <Hero
-    tagline="About us"
-    image={{
-      src: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      alt: 'Caos Image',
-    }}
-  >
-    <Fragment slot="title">
-      Elevate your online presence with our <br />
-      <span class="text-accent dark:text-white"> Beautiful Website Templates</span>
-    </Fragment>
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-4xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Core Positioning</h2>
+    <p class="mt-4 text-muted">
+      Dr. Lurie’s contribution is not limited to individual formulas. His work emphasizes a structured methodology for
+      delivery systems that can be translated into targeted, scalable, real-world products.
+    </p>
+  </section>
 
-    <Fragment slot="subtitle">
-      Donec efficitur, ipsum quis congue luctus, mauris magna convallis mauris, eu auctor nisi lectus non augue. Donec
-      quis lorem non massa vulputate efficitur ac at turpis. Sed tincidunt ex a nunc convallis, et lobortis nisi tempus.
-      Suspendisse vitae nisi eget tortor luctus maximus sed non lectus.
-    </Fragment>
-  </Hero>
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-4xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Scientific and Medical Approach</h2>
+    <p class="mt-4 text-muted">
+      <strong class="text-default">The skin is not a passive surface. It is a dynamic biological system.</strong> This principle
+      informs how problems are defined, how active compounds are selected, and how formulation design is executed for better
+      biological relevance.
+    </p>
+  </section>
 
-  <!-- Stats Widget ****************** -->
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-4xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Technology Platform and Delivery Systems</h2>
+    <p class="mt-4 text-muted">
+      The platform approach is based on structured carrier systems and lipid-oriented architectures designed to improve
+      functional performance in practical use.
+    </p>
+    <ul class="mt-5 list-disc pl-5 space-y-2 text-default">
+      <li>Targeted interaction with biological sites</li>
+      <li>Controlled release of active compounds</li>
+      <li>Protection of active ingredients through delivery</li>
+      <li>Enhanced penetration support without invasive methods</li>
+    </ul>
+  </section>
 
-  <Stats
-    title="Statistics about us"
-    stats={[
-      { title: 'Offices', amount: '4' },
-      { title: 'Employees', amount: '248' },
-      { title: 'Templates', amount: '12' },
-      { title: 'Awards', amount: '24' },
-    ]}
-  />
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-4xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Credibility</h2>
+    <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-slate-900">
+        <h3 class="font-semibold">Education</h3>
+        <ul class="mt-3 list-disc pl-5 space-y-1 text-sm text-muted">
+          <li>M.D.</li>
+          <li>Ph.D. in biophysics</li>
+          <li>Weizmann Institute of Science background</li>
+        </ul>
+      </article>
+      <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-slate-900">
+        <h3 class="font-semibold">Professional Experience</h3>
+        <ul class="mt-3 list-disc pl-5 space-y-1 text-sm text-muted">
+          <li>30+ years in pharmaceutical and biotechnology development</li>
+          <li>CTO / Executive Director of Formulation roles</li>
+          <li>R&amp;D leadership, clinical and regulatory development experience</li>
+        </ul>
+      </article>
+      <article class="rounded-xl border border-gray-200 dark:border-gray-800 p-5 bg-white dark:bg-slate-900">
+        <h3 class="font-semibold">Innovation</h3>
+        <ul class="mt-3 list-disc pl-5 space-y-1 text-sm text-muted">
+          <li>Multiple international patents</li>
+          <li>Modular delivery-system platform</li>
+        </ul>
+      </article>
+    </div>
+  </section>
 
-  <!-- Features3 Widget ************** -->
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-4xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Applications and Case Experience</h2>
+    <ul class="mt-5 list-disc pl-5 space-y-2 text-default">
+      <li>Medical and para-medical delivery systems</li>
+      <li>Hygiene and public-health applications</li>
+      <li>Cosmeceutical and skin-related applications</li>
+      <li>Licensing, co-development, and technology collaboration models</li>
+    </ul>
+  </section>
 
-  <Features3
-    title="Our templates"
-    subtitle="Etiam scelerisque, enim eget vestibulum luctus, nibh mauris blandit nulla, nec vestibulum risus justo ut enim. Praesent lacinia diam et ante imperdiet euismod."
-    columns={3}
-    isBeforeContent={true}
-    items={[
-      {
-        title: 'Educational',
-        description:
-          'Morbi faucibus luctus quam, sit amet aliquet felis tempor id. Cras augue massa, ornare quis dignissim a, molestie vel nulla.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Interior Design',
-        description:
-          'Vivamus porttitor, tortor convallis aliquam pretium, turpis enim consectetur elit, vitae egestas purus erat ac nunc nulla.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Photography',
-        description:
-          'Duis sed lectus in nisl vehicula porttitor eget quis odio. Aliquam erat volutpat. Nulla eleifend nulla id sem fermentum.',
-        icon: 'tabler:template',
-      },
-    ]}
-  />
+  <section class="px-4 sm:px-6 py-12 mx-auto max-w-4xl">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Philosophy and Vision</h2>
+    <p class="mt-4 text-muted">
+      <strong class="text-default"
+        >Effective products emerge from the alignment of science, formulation, and real-world use.</strong
+      >
+      Formulation is the interface between scientific understanding and everyday human experience.
+    </p>
+  </section>
 
-  <!-- Features3 Widget ************** -->
-
-  <Features3
-    columns={3}
-    isAfterContent={true}
-    items={[
-      {
-        title: 'E-commerce',
-        description:
-          'Rutrum non odio at vehicula. Proin ipsum justo, dignissim in vehicula sit amet, dignissim id quam. Sed ac tincidunt sapien.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Blog',
-        description:
-          'Nullam efficitur volutpat sem sed fringilla. Suspendisse et enim eu orci volutpat laoreet ac vitae libero.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Business',
-        description:
-          'Morbi et elit finibus, facilisis justo ut, pharetra ipsum. Donec efficitur, ipsum quis congue luctus, mauris magna.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Branding',
-        description:
-          'Suspendisse vitae nisi eget tortor luctus maximus sed non lectus. Cras malesuada pretium placerat. Nullam venenatis dolor a ante rhoncus.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Medical',
-        description:
-          'Vestibulum malesuada lacus id nibh posuere feugiat. Nam volutpat nulla a felis ultrices, id suscipit mauris congue. In hac habitasse platea dictumst.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Fashion Design',
-        description:
-          'Maecenas eu tellus eget est scelerisque lacinia et a diam. Aliquam velit lorem, vehicula id fermentum et, rhoncus et purus.',
-        icon: 'tabler:template',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80',
-      alt: 'Colorful Image',
-    }}
-  />
-
-  <!-- Steps2 Widget ****************** -->
-
-  <Steps2
-    title="Our values"
-    subtitle="Maecenas eu tellus eget est scelerisque lacinia et a diam. Aliquam velit lorem, vehicula id fermentum et, rhoncus et purus. Nulla facilisi. Vestibulum malesuada lacus."
-    items={[
-      {
-        title: 'Customer-centric approach',
-        description:
-          'Donec id nibh neque. Quisque et fermentum tortor. Fusce vitae dolor a mauris dignissim commodo. Ut eleifend luctus condimentum.',
-      },
-      {
-        title: 'Constant Improvement',
-        description:
-          'Phasellus laoreet fermentum venenatis. Vivamus dapibus pulvinar arcu eget mattis. Fusce eget mauris leo.',
-      },
-      {
-        title: 'Ethical Practices',
-        description:
-          'Vestibulum imperdiet libero et lectus molestie, et maximus augue porta. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.',
-      },
-    ]}
-  />
-
-  <!-- Steps2 Widget ****************** -->
-
-  <Steps2
-    title="Achievements"
-    subtitle="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi sagittis, quam nec venenatis lobortis, mi risus tempus nulla, sed porttitor est nibh at nulla."
-    isReversed={true}
-    callToAction={{
-      text: 'See more',
-      href: '/',
-    }}
-    items={[
-      {
-        title: 'Global reach',
-        description: 'Nam malesuada urna in enim imperdiet tincidunt. Phasellus non tincidunt nisi, at elementum mi.',
-        icon: 'tabler:globe',
-      },
-      {
-        title: 'Positive customer feedback and reviews',
-        description:
-          'Cras semper nulla leo, eget laoreet erat cursus sed. Praesent faucibus massa in purus iaculis dictum.',
-        icon: 'tabler:message-star',
-      },
-      {
-        title: 'Awards and recognition as industry experts',
-        description:
-          'Phasellus lacinia cursus velit, eu malesuada magna pretium eu. Etiam aliquet tellus purus, blandit lobortis ex rhoncus vitae.',
-        icon: 'tabler:award',
-      },
-    ]}
-  />
-
-  <!-- Features2 Widget ************** -->
-
-  <Features2
-    title="Our locations"
-    tagline="Find us"
-    columns={4}
-    items={[
-      {
-        title: 'EE.UU',
-        description: '1234 Lorem Ipsum St, 12345, Miami',
-      },
-      {
-        title: 'Spain',
-        description: '5678 Lorem Ipsum St, 56789, Madrid',
-      },
-      {
-        title: 'Australia',
-        description: '9012 Lorem Ipsum St, 90123, Sydney',
-      },
-      {
-        title: 'Brazil',
-        description: '3456 Lorem Ipsum St, 34567, São Paulo',
-      },
-    ]}
-  />
-
-  <!-- Features2 Widget ************** -->
-
-  <Features2
-    title="Technical Support"
-    tagline="Contact us"
-    columns={2}
-    items={[
-      {
-        title: 'Chat with us',
-        description:
-          'Integer luctus laoreet libero, auctor varius purus rutrum sit amet. Ut nec molestie nisi, quis eleifend mi.',
-        icon: 'tabler:messages',
-      },
-      {
-        title: 'Call us',
-        description:
-          'Mauris faucibus finibus orci, in posuere elit viverra non. In hac habitasse platea dictumst. Cras lobortis metus a hendrerit congue.',
-        icon: 'tabler:headset',
-      },
-    ]}
-  />
+  <section class="px-4 sm:px-6 py-14 mx-auto max-w-6xl border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Start With the Science</h2>
+    <p class="mt-4 text-muted max-w-3xl">
+      Explore how aging skin changes, why common approaches often fall short, and what a delivery-system approach makes
+      possible.
+    </p>
+    <div class="mt-8 flex flex-col sm:flex-row gap-3">
+      <a class="btn-primary" href="/blog">Read the Insights</a>
+      <a class="btn-secondary" href="/#guide">Get the Free Guide</a>
+    </div>
+  </section>
 </Layout>

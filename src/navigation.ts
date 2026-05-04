@@ -7,6 +7,10 @@ export const headerData = {
       href: getPermalink('/'),
     },
     {
+      text: 'About',
+      href: getPermalink('/about'),
+    },
+    {
       text: 'Education',
       href: getBlogPermalink(),
     },
@@ -28,6 +32,7 @@ export const footerData = {
       title: 'Explore',
       links: [
         { text: 'Home', href: getPermalink('/') },
+        { text: 'About', href: getPermalink('/about') },
         { text: 'Education', href: getBlogPermalink() },
         { text: 'Early Access', href: getPermalink('/#early-access') },
         { text: 'Free Guide', href: getPermalink('/#guide') },
