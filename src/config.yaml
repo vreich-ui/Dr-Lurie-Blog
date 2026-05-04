@@ -1,6 +1,6 @@
 site:
-  name: AstroWind
-  site: 'https://astrowind.vercel.app'
+  name: Dr. Lurié
+  site: 'https://wonderful-figolla-fb5ae7.netlify.app'
   base: '/'
   trailingSlash: false
 
@@ -9,22 +9,22 @@ site:
 # Default SEO metadata
 metadata:
   title:
-    default: AstroWind
-    template: '%s — AstroWind'
-  description: "\U0001F680 Suitable for Startups, Small Business, Sass Websites, Professional Portfolios, Marketing Websites, Landing Pages & Blogs."
+    default: Dr. Lurié
+    template: '%s — Dr. Lurié'
+  description: "Science-led education on aging skin, age-related scent changes, and future age-aware skincare solutions."
   robots:
     index: true
     follow: true
   openGraph:
-    site_name: AstroWind
+    site_name: Dr. Lurié
     images:
       - url: '~/assets/images/default.png'
         width: 1200
         height: 628
     type: website
   twitter:
-    handle: '@arthelokyo'
-    site: '@arthelokyo'
+    handle: '@drlurie'
+    site: '@drlurie'
     cardType: summary_large_image
 
 i18n:
