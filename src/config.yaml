@@ -1,6 +1,6 @@
 site:
   name: Dr. Lurié
-  site: 'https://wonderful-figolla-fb5ae7.netlify.app'
+  site: 'https://drluriescience.netlify.app'
   base: '/'
   trailingSlash: false
 
