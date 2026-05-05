@@ -1,7 +1,7 @@
 {
-  "name": "@onwidget/astrowind",
+  "name": "dr-lurie-blog",
   "version": "1.0.0-beta.52",
-  "description": "AstroWind: A free template using Astro 5.0 and Tailwind CSS. Astro starter theme.",
+  "description": "Dr. Lurié website and science-led educational blog built with Astro and Tailwind CSS.",
   "type": "module",
   "private": true,
   "engines": {
