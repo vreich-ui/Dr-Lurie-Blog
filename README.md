@@ -50,6 +50,16 @@
 
 <br>
 
+## Dr. Lurié Media Source
+
+Project media files for Dr. Lurié pages are hosted in a dedicated Netlify/GitHub media repo:
+
+- Base URL: `https://kugelmedia.netlify.app/drlurieblog/`
+- Repository path concept: `kugelmedia/drlurieblog/`
+- Example file: `https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg`
+
+When placing new images in this project, reference them by filename from that base URL unless a file already exists locally in this repo.
+
 ## Demo
 
 📌 [https://astrowind.vercel.app/](https://astrowind.vercel.app/)
