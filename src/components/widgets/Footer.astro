@@ -26,17 +26,27 @@ export interface Props {
 const { socialLinks = [], secondaryLinks = [], links = [], footNote = '', theme = 'light' } = Astro.props;
 ---
 
-<footer class:list={[{ dark: theme === 'dark' }, 'relative border-t border-gray-200 dark:border-slate-800 not-prose']}>
+<footer
+  class:list={[
+    { dark: theme === 'dark' },
+    'relative border-t border-gray-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950 not-prose',
+  ]}
+>
   <div class="dark:bg-dark absolute inset-0 pointer-events-none" aria-hidden="true"></div>
   <div
     class="relative max-w-7xl mx-auto px-4 sm:px-6 dark:text-slate-300 intersect-once intersect-quarter intersect-no-queue motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade"
   >
-    <div class="grid grid-cols-12 gap-4 gap-y-8 sm:gap-8 py-8 md:py-12">
-      <div class="col-span-12 lg:col-span-4">
-        <div class="mb-2">
-          <a class="inline-block font-bold text-xl" href={getHomePermalink()}>{SITE?.name}</a>
+    <div class="grid grid-cols-12 gap-4 gap-y-8 sm:gap-8 py-10 md:py-14">
+      <div class="col-span-12 lg:col-span-5">
+        <div class="mb-3">
+          <a class="inline-block font-heading font-bold text-2xl tracking-tight" href={getHomePermalink()}
+            >{SITE?.name}</a
+          >
         </div>
-        <div class="text-sm text-muted flex gap-1">
+        <p class="max-w-sm text-sm leading-6 text-muted">
+          Science-led education for aging skin changes, age-related scent, and future age-aware skincare solutions.
+        </p>
+        <div class="mt-5 text-sm text-muted flex gap-1">
           {
             secondaryLinks.map(({ text, href }, index) => (
               <>
@@ -54,7 +64,7 @@ const { socialLinks = [], secondaryLinks = [], links = [], footNote = '', theme 
       {
         links.map(({ title, links }) => (
           <div class="col-span-6 md:col-span-3 lg:col-span-2">
-            <div class="dark:text-gray-300 font-medium mb-2">{title}</div>
+            <div class="dark:text-gray-300 font-semibold mb-3 text-default">{title}</div>
             {links && Array.isArray(links) && links.length > 0 && (
               <ul class="text-sm">
                 {links.map(({ text, href, ariaLabel }) => (
@@ -96,7 +106,7 @@ const { socialLinks = [], secondaryLinks = [], links = [], footNote = '', theme 
         )
       }
 
-      <div class="text-sm mr-4 dark:text-muted">
+      <div class="text-sm mr-4 text-muted dark:text-muted">
         <Fragment set:html={footNote} />
       </div>
     </div>
