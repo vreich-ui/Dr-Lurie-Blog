@@ -2,7 +2,7 @@
 publishDate: 2023-08-09T00:00:00Z
 title: Useful tools and resources to create a professional website
 excerpt: Explore vital tools and resources for a sleek website. From design to functionality, our guide elevates your online presence.
-image: https://kugelmedia.netlify.app/dr-lurie-research-notes.jpg
+image: https://kugelmedia.netlify.app/drlurieblog/dr-lurie-research-notes.jpg
 tags:
   - front-end
   - tools
