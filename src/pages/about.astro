@@ -1,228 +1,155 @@
 ---
-import Features2 from '~/components/widgets/Features2.astro';
-import Features3 from '~/components/widgets/Features3.astro';
-import Hero from '~/components/widgets/Hero.astro';
-import Stats from '~/components/widgets/Stats.astro';
-import Steps2 from '~/components/widgets/Steps2.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 const metadata = {
-  title: 'About us',
+  title: 'About Dr. Leonid Lurie',
 };
 ---
 
 <Layout metadata={metadata}>
-  <!-- Hero Widget ******************* -->
+  <section class="dl-section">
+    <div class="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+      <div class="dl-reading">
+        <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">About Dr. Leonid Lurie</h1>
+        <p class="mt-6 text-lg text-muted">Let’s keep this simple.</p>
+        <p class="mt-4 text-lg text-muted">
+          If you’ve ever tried a health or skincare product that <em>promised everything</em>… and delivered very
+          little—you’re not alone.
+        </p>
+        <p class="mt-4 text-lg text-muted">And there’s a reason for that.</p>
+        <p class="mt-4 text-lg text-muted">
+          Most products focus on <strong>what’s inside the bottle</strong>. Dr. Leonid Lurie focuses on
+          <strong>whether it actually works in your body</strong>.
+        </p>
+      </div>
+      <div class="dl-card overflow-hidden">
+        <img
+          src="https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg"
+          alt="Portrait of Dr. Leonid Lurie"
+          class="w-full h-auto object-cover rounded-lg"
+          loading="lazy"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div class="hidden items-center justify-center min-h-[360px] p-8 text-center text-muted">
+          Portrait image unavailable
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <Hero
-    tagline="About us"
-    image={{
-      src: 'https://images.unsplash.com/photo-1559136555-9303baea8ebd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      alt: 'Caos Image',
-    }}
-  >
-    <Fragment slot="title">
-      Elevate your online presence with our <br />
-      <span class="text-accent dark:text-white"> Beautiful Website Templates</span>
-    </Fragment>
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <div class="dl-reading">
+      <h2 class="text-3xl sm:text-4xl">A Different Way of Thinking About Health</h2>
+      <p class="mt-5 text-lg text-muted">
+        Dr. Lurie is a physician, scientist, and developer with more than 30 years of experience in medical and
+        pharmaceutical research.
+      </p>
+      <p class="mt-4 text-lg text-muted">But what makes his work different is this:</p>
+      <p class="mt-4 text-lg text-muted">He doesn’t treat the body—especially the skin—as something passive.</p>
+      <p class="mt-4 text-lg text-muted">He sees it as a <strong>living, active system</strong>.</p>
+      <p class="mt-4 text-lg text-muted">
+        And that changes everything. Because when you understand how the body really functions, you stop guessing… and
+        start designing solutions that actually make a difference.
+      </p>
+    </div>
+  </section>
 
-    <Fragment slot="subtitle">
-      Donec efficitur, ipsum quis congue luctus, mauris magna convallis mauris, eu auctor nisi lectus non augue. Donec
-      quis lorem non massa vulputate efficitur ac at turpis. Sed tincidunt ex a nunc convallis, et lobortis nisi tempus.
-      Suspendisse vitae nisi eget tortor luctus maximus sed non lectus.
-    </Fragment>
-  </Hero>
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <div class="dl-reading">
+      <h2 class="text-3xl sm:text-4xl">Why Most Products Fall Short</h2>
+      <p class="mt-5 text-lg text-muted">Here’s the uncomfortable truth:</p>
+      <p class="mt-4 text-lg text-muted">
+        Even the best ingredients are useless if your body can’t absorb or use them properly.
+      </p>
+      <p class="mt-4 text-lg text-muted">
+        That’s why so many creams, treatments, and health products give <strong
+          >temporary or disappointing results</strong
+        >.
+      </p>
+      <p class="mt-4 text-lg text-muted">Dr. Lurie built his career solving that exact problem.</p>
+    </div>
+  </section>
 
-  <!-- Stats Widget ****************** -->
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <div class="dl-reading">
+      <h2 class="text-3xl sm:text-4xl">The Science Behind Real Results</h2>
+      <p class="mt-5 text-lg text-muted">
+        Over decades of research, Dr. Lurie developed advanced delivery systems designed to help active ingredients:
+      </p>
+      <ul class="mt-5 list-disc pl-5 space-y-2 text-lg">
+        <li>Reach the right place in the body</li>
+        <li>Work over time—not just for a few minutes</li>
+        <li>Stay stable and effective</li>
+        <li>Support the body without unnecessary stress</li>
+      </ul>
+      <p class="mt-5 text-lg text-muted">
+        In practical terms, this means products that are designed to <strong>work with your body—not against it</strong
+        >.
+      </p>
+    </div>
+  </section>
 
-  <Stats
-    title="Statistics about us"
-    stats={[
-      { title: 'Offices', amount: '4' },
-      { title: 'Employees', amount: '248' },
-      { title: 'Templates', amount: '12' },
-      { title: 'Awards', amount: '24' },
-    ]}
-  />
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <div class="dl-reading">
+      <h2 class="text-3xl sm:text-4xl">From Research to Real Life</h2>
+      <p class="mt-5 text-lg text-muted">This isn’t abstract science.</p>
+      <p class="mt-4 text-lg text-muted">Dr. Lurie’s work has been applied in areas such as:</p>
+      <ul class="mt-5 list-disc pl-5 space-y-2 text-lg">
+        <li>Skin health and aging</li>
+        <li>Inflammation and healing</li>
+        <li>Hygiene and long-lasting protection</li>
+        <li>Professional-grade skincare used in clinics</li>
+      </ul>
+      <p class="mt-5 text-lg text-muted">
+        The focus is always the same: <strong
+          >Create solutions that people can actually use—and actually benefit from.</strong
+        >
+      </p>
+    </div>
+  </section>
 
-  <!-- Features3 Widget ************** -->
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <div class="dl-reading">
+      <h2 class="text-3xl sm:text-4xl">Why This Blog Exists</h2>
+      <p class="mt-5 text-lg text-muted">This site isn’t here to overwhelm you with complex science.</p>
+      <p class="mt-4 text-lg text-muted">It’s here to help you:</p>
+      <ul class="mt-5 list-disc pl-5 space-y-2 text-lg">
+        <li>Better understand how your body works</li>
+        <li>Make smarter decisions about products and treatments</li>
+        <li>Avoid common mistakes that waste time and money</li>
+        <li>Discover approaches grounded in real science—not marketing hype</li>
+      </ul>
+      <p class="mt-5 text-lg text-muted">
+        Over time, you’ll also find carefully developed resources, products, and insights designed to support your
+        health in a practical, realistic way.
+      </p>
+    </div>
+  </section>
 
-  <Features3
-    title="Our templates"
-    subtitle="Etiam scelerisque, enim eget vestibulum luctus, nibh mauris blandit nulla, nec vestibulum risus justo ut enim. Praesent lacinia diam et ante imperdiet euismod."
-    columns={3}
-    isBeforeContent={true}
-    items={[
-      {
-        title: 'Educational',
-        description:
-          'Morbi faucibus luctus quam, sit amet aliquet felis tempor id. Cras augue massa, ornare quis dignissim a, molestie vel nulla.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Interior Design',
-        description:
-          'Vivamus porttitor, tortor convallis aliquam pretium, turpis enim consectetur elit, vitae egestas purus erat ac nunc nulla.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Photography',
-        description:
-          'Duis sed lectus in nisl vehicula porttitor eget quis odio. Aliquam erat volutpat. Nulla eleifend nulla id sem fermentum.',
-        icon: 'tabler:template',
-      },
-    ]}
-  />
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <div class="dl-reading">
+      <h2 class="text-3xl sm:text-4xl">A Personal Note</h2>
+      <p class="mt-5 text-lg text-muted">After decades in research, Dr. Lurie has seen what works—and what doesn’t.</p>
+      <p class="mt-4 text-lg text-muted">
+        This blog is a way to share that knowledge directly, without filters, trends, or shortcuts.
+      </p>
+      <p class="mt-4 text-lg text-muted">Because when it comes to your health, you deserve more than promises.</p>
+      <p class="mt-4 text-lg text-muted">
+        <strong>You deserve solutions that make sense—and make a difference.</strong>
+      </p>
+      <p class="mt-6 text-xl font-medium">If that’s what you’re looking for, you’re in the right place.</p>
+    </div>
+  </section>
 
-  <!-- Features3 Widget ************** -->
-
-  <Features3
-    columns={3}
-    isAfterContent={true}
-    items={[
-      {
-        title: 'E-commerce',
-        description:
-          'Rutrum non odio at vehicula. Proin ipsum justo, dignissim in vehicula sit amet, dignissim id quam. Sed ac tincidunt sapien.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Blog',
-        description:
-          'Nullam efficitur volutpat sem sed fringilla. Suspendisse et enim eu orci volutpat laoreet ac vitae libero.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Business',
-        description:
-          'Morbi et elit finibus, facilisis justo ut, pharetra ipsum. Donec efficitur, ipsum quis congue luctus, mauris magna.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Branding',
-        description:
-          'Suspendisse vitae nisi eget tortor luctus maximus sed non lectus. Cras malesuada pretium placerat. Nullam venenatis dolor a ante rhoncus.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Medical',
-        description:
-          'Vestibulum malesuada lacus id nibh posuere feugiat. Nam volutpat nulla a felis ultrices, id suscipit mauris congue. In hac habitasse platea dictumst.',
-        icon: 'tabler:template',
-      },
-      {
-        title: 'Fashion Design',
-        description:
-          'Maecenas eu tellus eget est scelerisque lacinia et a diam. Aliquam velit lorem, vehicula id fermentum et, rhoncus et purus.',
-        icon: 'tabler:template',
-      },
-    ]}
-    image={{
-      src: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1740&q=80',
-      alt: 'Colorful Image',
-    }}
-  />
-
-  <!-- Steps2 Widget ****************** -->
-
-  <Steps2
-    title="Our values"
-    subtitle="Maecenas eu tellus eget est scelerisque lacinia et a diam. Aliquam velit lorem, vehicula id fermentum et, rhoncus et purus. Nulla facilisi. Vestibulum malesuada lacus."
-    items={[
-      {
-        title: 'Customer-centric approach',
-        description:
-          'Donec id nibh neque. Quisque et fermentum tortor. Fusce vitae dolor a mauris dignissim commodo. Ut eleifend luctus condimentum.',
-      },
-      {
-        title: 'Constant Improvement',
-        description:
-          'Phasellus laoreet fermentum venenatis. Vivamus dapibus pulvinar arcu eget mattis. Fusce eget mauris leo.',
-      },
-      {
-        title: 'Ethical Practices',
-        description:
-          'Vestibulum imperdiet libero et lectus molestie, et maximus augue porta. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus.',
-      },
-    ]}
-  />
-
-  <!-- Steps2 Widget ****************** -->
-
-  <Steps2
-    title="Achievements"
-    subtitle="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi sagittis, quam nec venenatis lobortis, mi risus tempus nulla, sed porttitor est nibh at nulla."
-    isReversed={true}
-    callToAction={{
-      text: 'See more',
-      href: '/',
-    }}
-    items={[
-      {
-        title: 'Global reach',
-        description: 'Nam malesuada urna in enim imperdiet tincidunt. Phasellus non tincidunt nisi, at elementum mi.',
-        icon: 'tabler:globe',
-      },
-      {
-        title: 'Positive customer feedback and reviews',
-        description:
-          'Cras semper nulla leo, eget laoreet erat cursus sed. Praesent faucibus massa in purus iaculis dictum.',
-        icon: 'tabler:message-star',
-      },
-      {
-        title: 'Awards and recognition as industry experts',
-        description:
-          'Phasellus lacinia cursus velit, eu malesuada magna pretium eu. Etiam aliquet tellus purus, blandit lobortis ex rhoncus vitae.',
-        icon: 'tabler:award',
-      },
-    ]}
-  />
-
-  <!-- Features2 Widget ************** -->
-
-  <Features2
-    title="Our locations"
-    tagline="Find us"
-    columns={4}
-    items={[
-      {
-        title: 'EE.UU',
-        description: '1234 Lorem Ipsum St, 12345, Miami',
-      },
-      {
-        title: 'Spain',
-        description: '5678 Lorem Ipsum St, 56789, Madrid',
-      },
-      {
-        title: 'Australia',
-        description: '9012 Lorem Ipsum St, 90123, Sydney',
-      },
-      {
-        title: 'Brazil',
-        description: '3456 Lorem Ipsum St, 34567, São Paulo',
-      },
-    ]}
-  />
-
-  <!-- Features2 Widget ************** -->
-
-  <Features2
-    title="Technical Support"
-    tagline="Contact us"
-    columns={2}
-    items={[
-      {
-        title: 'Chat with us',
-        description:
-          'Integer luctus laoreet libero, auctor varius purus rutrum sit amet. Ut nec molestie nisi, quis eleifend mi.',
-        icon: 'tabler:messages',
-      },
-      {
-        title: 'Call us',
-        description:
-          'Mauris faucibus finibus orci, in posuere elit viverra non. In hac habitasse platea dictumst. Cras lobortis metus a hendrerit congue.',
-        icon: 'tabler:headset',
-      },
-    ]}
-  />
+  <section class="dl-section border-t border-gray-200 dark:border-gray-800">
+    <h2 class="text-3xl sm:text-4xl font-bold tracking-tight">Start With the Science</h2>
+    <p class="mt-4 text-lg text-muted dl-reading">
+      Explore how aging skin changes, why common approaches often fall short, and what a delivery-system approach makes
+      possible.
+    </p>
+    <div class="mt-8 flex flex-col sm:flex-row gap-3">
+      <a class="btn-primary w-full sm:w-auto" href="/blog">Read the Insights</a>
+      <a class="btn-secondary w-full sm:w-auto" href="/#guide">Get the Free Guide</a>
+    </div>
+  </section>
 </Layout>
