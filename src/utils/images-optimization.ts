@@ -32,7 +32,7 @@ export type ImagesOptimizer = (
   width?: number,
   height?: number,
   format?: string
-) => Promise<Array<{ src: string; width: number }>>;
+) => Promise<Array<{ src: string; width: number; height?: number }>>;
 
 /* ******* */
 const config = {
@@ -225,7 +225,7 @@ export const astroAssetsOptimizer: ImagesOptimizer = async (
 
   return Promise.all(
     breakpoints.map(async (w: number) => {
-      const result = await getImage({ src: image, width: w, inferSize: true, ...(format ? { format: format } : {}) });
+      const result = await getImage({ src: image, width: w, ...(format ? { format: format } : {}) });
 
       return {
         src: result?.src,
