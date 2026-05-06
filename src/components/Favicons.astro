@@ -1,11 +1,7 @@
 ---
-import favIcon from '~/assets/favicons/favicon.ico';
-import favIconSvg from '~/assets/favicons/favicon.svg';
-import appleTouchIcon from '~/assets/favicons/apple-touch-icon.png';
+const favIcon = 'https://kugelmedia.netlify.app/favicon.png';
 ---
 
-<link rel="icon" type="image/png" href="/favicon.png" />
+<link rel="icon" type="image/png" href={favIcon} />
 <link rel="shortcut icon" href={favIcon} />
-<link rel="icon" type="image/svg+xml" href={favIconSvg.src} />
-<link rel="mask-icon" href={favIconSvg.src} color="#5E8C8A" />
-<link rel="apple-touch-icon" sizes="180x180" href={appleTouchIcon.src} />
+<link rel="apple-touch-icon" sizes="180x180" href={favIcon} />
