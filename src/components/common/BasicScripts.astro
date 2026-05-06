@@ -42,6 +42,7 @@ import { UI } from 'astrowind:config';
 
   const onLoad = function () {
     let lastKnownScrollPosition = window.scrollY;
+    let previousScrollPosition = window.scrollY;
     let ticking = true;
 
     attachEvent('#header nav', 'click', function () {
@@ -122,11 +123,21 @@ import { UI } from 'astrowind:config';
     function applyHeaderStylesOnScroll() {
       const header = document.querySelector('#header[data-aw-sticky-header]');
       if (!header) return;
+
+      const menuIsExpanded = header.classList.contains('expanded');
       if (lastKnownScrollPosition > 60 && !header.classList.contains('scroll')) {
         header.classList.add('scroll');
       } else if (lastKnownScrollPosition <= 60 && header.classList.contains('scroll')) {
         header.classList.remove('scroll');
       }
+
+      if (!menuIsExpanded && lastKnownScrollPosition > 120 && lastKnownScrollPosition > previousScrollPosition) {
+        header.classList.add('aw-hidden');
+      } else {
+        header.classList.remove('aw-hidden');
+      }
+
+      previousScrollPosition = Math.max(lastKnownScrollPosition, 0);
       ticking = false;
     }
     applyHeaderStylesOnScroll();
@@ -151,6 +162,7 @@ import { UI } from 'astrowind:config';
     document.body.classList.remove('overflow-hidden');
     document.getElementById('header')?.classList.remove('h-screen');
     document.getElementById('header')?.classList.remove('expanded');
+    document.getElementById('header')?.classList.remove('aw-hidden');
     document.querySelector('#header nav')?.classList.add('hidden');
   };
 

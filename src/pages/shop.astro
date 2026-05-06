@@ -1,0 +1,142 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+
+const productImages = [
+  {
+    src: 'https://kugelmedia.netlify.app/dr-lurie-product-hero.jpg',
+    alt: 'Dr. Lurié age-aware skincare product bottle preview',
+  },
+  {
+    src: 'https://kugelmedia.netlify.app/dr-lurie-product-texture.jpg',
+    alt: 'Dr. Lurié skincare texture preview',
+  },
+];
+
+const metadata = {
+  title: 'Shop Preview',
+  description: 'Preview the age-aware skincare direction from Dr. Lurié and join early access for product updates.',
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="shop-hero mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
+    <p class="shop-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">
+      Built around what aging skin needs now.
+    </p>
+    <h1 class="shop-title max-w-3xl text-4xl font-bold sm:text-5xl lg:text-6xl">Age-aware skincare is coming.</h1>
+
+    <div class="shop-images grid gap-3 sm:grid-cols-2 lg:col-start-2 lg:row-span-4 lg:row-start-1">
+      {
+        productImages.map((image, index) => (
+          <figure
+            class:list={[
+              'overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900',
+              index === 1 ? 'hidden sm:block lg:translate-y-8' : '',
+            ]}
+          >
+            <img
+              class="h-full min-h-[220px] w-full object-cover"
+              src={image.src}
+              alt={image.alt}
+              loading={index === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+            />
+          </figure>
+        ))
+      }
+    </div>
+
+    <div class="shop-copy max-w-2xl text-lg text-muted lg:max-w-xl">
+      <p>
+        Dr. Lurié products are being shaped around the biology of aging skin: barrier changes, lipid shifts, comfort,
+        and ingredients that respect a changing skin environment.
+      </p>
+      <p class="mt-4">
+        The first releases are not live yet. Join early access to receive research notes, product previews, and launch
+        updates.
+      </p>
+    </div>
+
+    <div class="shop-cta flex flex-col gap-3 sm:flex-row">
+      <a class="btn-primary" href="/#early-access">Join Early Access</a>
+      <a class="btn-secondary" href="/topics">Explore the Science</a>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  @media (min-width: 1024px) {
+    .shop-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1fr);
+      column-gap: 4rem;
+      align-items: center;
+    }
+
+    .shop-kicker {
+      grid-column: 1;
+    }
+
+    .shop-title {
+      grid-column: 1;
+      margin-top: 1rem;
+    }
+
+    .shop-copy {
+      grid-column: 1;
+      margin-top: 1.75rem;
+    }
+
+    .shop-cta {
+      grid-column: 1;
+      margin-top: 2rem;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .shop-hero {
+      padding-top: 24px;
+      padding-bottom: 48px;
+    }
+
+    .shop-kicker {
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 10px;
+    }
+
+    .shop-title {
+      margin-bottom: 14px;
+      font-size: clamp(2.15rem, 11vw, 3rem);
+      line-height: 0.98;
+    }
+
+    .shop-images {
+      margin-bottom: 22px;
+    }
+
+    .shop-images figure:first-child img {
+      min-height: 190px;
+      max-height: 220px;
+    }
+
+    .shop-copy {
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+
+    .shop-copy p {
+      margin: 0;
+    }
+
+    .shop-copy p + p {
+      margin-top: 0.75rem;
+    }
+
+    .shop-cta {
+      margin-top: 18px;
+    }
+  }
+</style>

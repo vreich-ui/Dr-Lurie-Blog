@@ -1,0 +1,56 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+import { fetchPosts } from '~/utils/blog';
+import { getPermalink } from '~/utils/permalinks';
+
+const posts = await fetchPosts();
+const topicMap = new Map<string, { title: string; slug: string; count: number; excerpts: Array<string> }>();
+
+posts.forEach((post) => {
+  post.tags?.forEach((tag) => {
+    const current = topicMap.get(tag.slug) ?? { title: tag.title, slug: tag.slug, count: 0, excerpts: [] };
+    current.count += 1;
+    if (post.excerpt && current.excerpts.length < 2) current.excerpts.push(post.excerpt);
+    topicMap.set(tag.slug, current);
+  });
+});
+
+const topics = Array.from(topicMap.values()).sort((a, b) => a.title.localeCompare(b.title));
+
+const metadata = {
+  title: 'Topics',
+  description: 'Browse Dr. Lurié articles by aging skin, body odor, barrier function, and skincare education topics.',
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="dl-section">
+    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Education library</p>
+    <div class="mt-3 max-w-3xl">
+      <h1 class="text-4xl font-bold sm:text-5xl">Topics</h1>
+      <p class="mt-5 text-lg text-muted">
+        Follow the themes that matter most as skin biology changes with age — from barrier function and lipids to
+        age-related scent compounds and practical skincare decisions.
+      </p>
+    </div>
+
+    <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        topics.map((topic) => (
+          <article class="dl-card flex min-h-full flex-col">
+            <div class="text-sm font-semibold text-accent">
+              {topic.count} {topic.count === 1 ? 'article' : 'articles'}
+            </div>
+            <h2 class="mt-2 text-2xl font-bold capitalize">{topic.title}</h2>
+            <p class="mt-4 flex-1 text-muted">
+              {topic.excerpts[0] ?? 'Explore practical, science-led education from Dr. Lurié on this topic.'}
+            </p>
+            <a class="btn-secondary btn-sm mt-6 self-start" href={getPermalink(`/topics/${topic.slug}`)}>
+              View topic
+            </a>
+          </article>
+        ))
+      }
+    </div>
+  </section>
+</Layout>

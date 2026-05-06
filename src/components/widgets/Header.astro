@@ -14,6 +14,7 @@ interface Link {
   href?: string;
   ariaLabel?: string;
   icon?: string;
+  description?: string;
 }
 
 interface MenuLink extends Link {
@@ -50,7 +51,7 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
 <header
   class:list={[
     { sticky: isSticky, relative: !isSticky, dark: isDark },
-    'top-0 z-40 flex-none mx-auto w-full border-b border-gray-50/0 transition-[opacity] ease-in-out',
+    'top-0 z-40 flex-none mx-auto w-full border-b border-gray-50/0 transition-[transform,opacity] duration-300 ease-in-out',
   ]}
   {...isSticky ? { 'data-aw-sticky-header': true } : {}}
   {...id ? { id } : {}}
@@ -97,21 +98,28 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                     {text}{' '}
                     <Icon name="tabler:chevron-down" class="w-3.5 h-3.5 ml-0.5 rtl:ml-0 rtl:mr-0.5 hidden md:inline" />
                   </button>
-                  <ul class="dropdown-menu md:backdrop-blur-md dark:md:bg-dark rounded md:absolute pl-4 md:pl-0 md:hidden font-medium md:bg-white/90 md:min-w-[200px] drop-shadow-xl">
-                    {links.map(({ text: text2, href: href2 }) => (
-                      <li>
-                        <a
-                          class:list={[
-                            'first:rounded-t last:rounded-b md:hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-gray-700 py-2 px-5 block whitespace-no-wrap',
-                            { 'aw-link-active': href2 === currentPath },
-                          ]}
-                          href={href2}
-                        >
-                          {text2}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
+                  <div class="dropdown-menu mega-menu md:backdrop-blur-xl dark:md:bg-dark rounded-2xl md:absolute md:left-1/2 md:-translate-x-1/2 pl-4 md:pl-0 md:hidden font-medium md:bg-white/95 md:min-w-[520px] md:max-w-[min(680px,calc(100vw-2rem))] md:p-3 md:ring-1 md:ring-gray-200/80 dark:md:ring-slate-700/80 drop-shadow-xl">
+                    <ul class="grid gap-1 md:grid-cols-2">
+                      {links.map(({ text: text2, href: href2, description }) => (
+                        <li>
+                          <a
+                            class:list={[
+                              'group rounded-xl py-3 px-4 block whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90',
+                              { 'aw-link-active': href2 === currentPath },
+                            ]}
+                            href={href2}
+                          >
+                            <span class="block font-semibold">{text2}</span>
+                            {description && (
+                              <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                {description}
+                              </span>
+                            )}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </>
               ) : (
                 <a
