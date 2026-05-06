@@ -1,4 +1,4 @@
-import { isUnpicCompatible, unpicOptimizer, astroAssetsOptimizer } from './images-optimization';
+import { astroAssetsOptimizer } from './images-optimization';
 import type { ImageMetadata } from 'astro';
 import type { OpenGraph } from '@astrolib/seo';
 import type { ImagesOptimizer } from './images-optimization';
@@ -78,10 +78,13 @@ export const adaptOpenGraphImages = async (
 
         if (
           typeof resolvedImage === 'string' &&
-          (resolvedImage.startsWith('http://') || resolvedImage.startsWith('https://')) &&
-          isUnpicCompatible(resolvedImage)
+          (resolvedImage.startsWith('http://') || resolvedImage.startsWith('https://'))
         ) {
-          _image = (await unpicOptimizer(resolvedImage, [defaultWidth], defaultWidth, defaultHeight, 'jpg'))[0];
+          _image = {
+            src: resolvedImage,
+            width: defaultWidth,
+            height: defaultHeight,
+          };
         } else if (resolvedImage) {
           const dimensions =
             typeof resolvedImage !== 'string' && resolvedImage?.width <= defaultWidth
