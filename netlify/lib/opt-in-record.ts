@@ -26,6 +26,17 @@ export type OptInRecord = {
   consent?: string;
 };
 
+export type ParseBodyFailure = {
+  ok: false;
+  reason: 'malformed-json';
+};
+
+export type ParseBodyResult = OptInInput | ParseBodyFailure | undefined;
+
+export const isParseBodyFailure = (result: ParseBodyResult): result is ParseBodyFailure => {
+  return Boolean(result && 'ok' in result && result.ok === false);
+};
+
 export const getHeader = (headers: LambdaEvent['headers'], name: string) => {
   const normalizedName = name.toLowerCase();
   const match = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
@@ -43,7 +54,7 @@ const toStringValue = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-export const parseBody = (event: LambdaEvent): OptInInput | undefined => {
+export const parseBody = (event: LambdaEvent): ParseBodyResult => {
   if (!event.body) {
     return undefined;
   }
@@ -52,7 +63,13 @@ export const parseBody = (event: LambdaEvent): OptInInput | undefined => {
   const contentType = getHeader(event.headers, 'content-type') ?? '';
 
   if (contentType.includes('application/json')) {
-    const parsed = JSON.parse(body) as unknown;
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(body) as unknown;
+    } catch {
+      return { ok: false, reason: 'malformed-json' };
+    }
 
     return parsed && typeof parsed === 'object' ? (parsed as OptInInput) : undefined;
   }

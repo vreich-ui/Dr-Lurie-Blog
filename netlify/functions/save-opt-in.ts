@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { connectLambda, getStore } from '@netlify/blobs';
 
-import { buildRecord, getHeader, parseBody } from '../lib/opt-in-record';
+import { buildRecord, getHeader, isParseBodyFailure, parseBody } from '../lib/opt-in-record';
 
 type LambdaEvent = {
   blobs?: string;
@@ -25,18 +25,27 @@ export const handler = async (event: LambdaEvent) => {
     };
   }
 
+  const input = parseBody(event);
+
+  if (isParseBodyFailure(input)) {
+    return {
+      statusCode: 400,
+      headers: jsonHeaders,
+      body: JSON.stringify({ error: 'Invalid request body' }),
+    };
+  }
+
+  const record = input ? buildRecord(input, getHeader(event.headers, 'user-agent')) : undefined;
+
+  if (!record) {
+    return {
+      statusCode: 400,
+      headers: jsonHeaders,
+      body: JSON.stringify({ error: 'A formName is required to save opt-in metadata.' }),
+    };
+  }
+
   try {
-    const input = parseBody(event);
-    const record = input ? buildRecord(input, getHeader(event.headers, 'user-agent')) : undefined;
-
-    if (!record) {
-      return {
-        statusCode: 400,
-        headers: jsonHeaders,
-        body: JSON.stringify({ error: 'A formName is required to save opt-in metadata.' }),
-      };
-    }
-
     connectLambda(event);
 
     const date = record.submittedAt.slice(0, 10);

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildRecord, parseBody } from '../../netlify/lib/opt-in-record.js';
+import { buildRecord, isParseBodyFailure, parseBody } from '../../netlify/lib/opt-in-record.js';
 
 test('URL-encoded Netlify form-name payload builds a valid opt-in record', () => {
   const input = parseBody({
@@ -15,9 +15,15 @@ test('URL-encoded Netlify form-name payload builds a valid opt-in record', () =>
     }).toString(),
   });
 
-  assert.deepEqual(input?.['form-name'], 'free-guide');
+  assert.ok(input);
 
-  const record = input ? buildRecord(input, 'node-test-agent') : undefined;
+  if (isParseBodyFailure(input)) {
+    assert.fail('Expected a parsed URL-encoded input object.');
+  }
+
+  assert.deepEqual(input['form-name'], 'free-guide');
+
+  const record = buildRecord(input, 'node-test-agent');
 
   assert.ok(record);
   assert.equal(record.formName, 'free-guide');
@@ -39,9 +45,25 @@ test('JSON formName payload remains the preferred contract', () => {
     }),
   });
 
-  const record = input ? buildRecord(input) : undefined;
+  assert.ok(input);
+
+  if (isParseBodyFailure(input)) {
+    assert.fail('Expected a parsed JSON input object.');
+  }
+
+  const record = buildRecord(input);
 
   assert.ok(record);
   assert.equal(record.formName, 'newsletter');
   assert.equal(record.email, 'json@example.com');
+});
+
+test('malformed JSON returns a typed parse failure without throwing', () => {
+  const input = parseBody({
+    headers: { 'content-type': 'application/json' },
+    body: '{not json',
+  });
+
+  assert.deepEqual(input, { ok: false, reason: 'malformed-json' });
+  assert.equal(isParseBodyFailure(input), true);
 });
