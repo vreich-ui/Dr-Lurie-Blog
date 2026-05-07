@@ -10,9 +10,17 @@ const {
   description = '',
   formName = 'contact',
   action,
+  thankYouKey,
+  thankYouMessage,
 } = Astro.props;
 
-const formAction = action || undefined;
+const thankYouParams = new URLSearchParams({ form: thankYouKey || formName });
+
+if (thankYouMessage) {
+  thankYouParams.set('message', thankYouMessage);
+}
+
+const formAction = action || `/thank-you?${thankYouParams.toString()}`;
 ---
 
 <form name={formName} method="post" action={formAction} data-netlify="true">
