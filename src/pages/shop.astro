@@ -15,6 +15,15 @@ const productImages = [
 const metadata = {
   title: 'Shop Preview',
   description: 'Preview the age-aware skincare direction from Dr. Lurié and join early access for product updates.',
+  openGraph: {
+    images: [
+      {
+        url: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-shop-social-preview.jpg',
+        width: 1200,
+        height: 630,
+      },
+    ],
+  },
 };
 ---
 
@@ -30,7 +39,8 @@ const metadata = {
         productImages.map((image, index) => (
           <figure
             class:list={[
-              'overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900',
+              'overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm ' +
+                'dark:border-slate-800 dark:bg-slate-900',
               index === 1 ? 'hidden sm:block lg:translate-y-8' : '',
             ]}
           >
@@ -95,34 +105,49 @@ const metadata = {
 
   @media (max-width: 767px) {
     .shop-hero {
-      padding-top: 24px;
+      display: flex;
+      flex-direction: column;
+      padding-top: 20px;
       padding-bottom: 48px;
+      row-gap: 0;
     }
 
     .shop-kicker {
+      order: 1;
       line-height: 1.25;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-bottom: 10px;
+      margin: 0 0 10px;
     }
 
     .shop-title {
-      margin-bottom: 14px;
+      order: 2;
+      margin: 0 0 12px;
       font-size: clamp(2.15rem, 11vw, 3rem);
       line-height: 0.98;
     }
 
     .shop-images {
+      order: 3;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
       margin-bottom: 22px;
+    }
+
+    .shop-images figure:nth-child(n + 2) {
+      display: none;
     }
 
     .shop-images figure:first-child img {
       min-height: 190px;
+      height: clamp(180px, 48vw, 220px);
       max-height: 220px;
     }
 
     .shop-copy {
+      order: 4;
+      margin-top: 0;
       font-size: 1rem;
       line-height: 1.55;
     }
@@ -136,6 +161,7 @@ const metadata = {
     }
 
     .shop-cta {
+      order: 5;
       margin-top: 18px;
     }
   }

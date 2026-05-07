@@ -19,9 +19,11 @@
     "check:prettier": "prettier --check .",
     "fix": "npm run fix:eslint && npm run fix:prettier",
     "fix:eslint": "eslint --fix .",
-    "fix:prettier": "prettier -w ."
+    "fix:prettier": "prettier -w .",
+    "test:opt-in": "rm -rf .tmp/save-opt-in-test; tsc netlify/lib/opt-in-record.ts tests/netlify/save-opt-in.test.ts --module NodeNext --moduleResolution NodeNext --target ES2022 --outDir .tmp/save-opt-in-test --skipLibCheck --types node && node --test .tmp/save-opt-in-test/tests/netlify/save-opt-in.test.js; status=$?; rm -rf .tmp/save-opt-in-test; exit $status"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.0",
     "@astrojs/rss": "^4.0.12",
     "@astrojs/sitemap": "^3.4.2",
     "@astrolib/analytics": "^0.6.1",

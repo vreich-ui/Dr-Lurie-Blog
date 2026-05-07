@@ -20,6 +20,15 @@ const topics = Array.from(topicMap.values()).sort((a, b) => a.title.localeCompar
 const metadata = {
   title: 'Topics',
   description: 'Browse Dr. Lurié articles by aging skin, body odor, barrier function, and skincare education topics.',
+  openGraph: {
+    images: [
+      {
+        url: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-topics-social-preview.jpg',
+        width: 1200,
+        height: 630,
+      },
+    ],
+  },
 };
 ---
 

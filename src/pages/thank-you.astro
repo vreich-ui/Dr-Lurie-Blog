@@ -1,0 +1,77 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+
+const metadata = {
+  title: 'Thank You',
+  description: 'Thank you for connecting with Dr. Lurié.',
+};
+
+const fallbackTitle = 'Thank you for connecting with Dr. Lurié.';
+const fallbackMessage =
+  'Your submission has been received. We appreciate your interest in age-aware skin education and will follow up when appropriate.';
+
+const thankYouMessages = {
+  contact: {
+    title: 'Thank you for reaching out.',
+    message: 'Your message has been received. The Dr. Lurié team will review it and follow up when appropriate.',
+  },
+  'free-guide': {
+    title: 'Your free guide request is in.',
+    message:
+      'Thank you for requesting the Senior’s Guide to Aging Skin & Body Odor. Please check your inbox for next steps.',
+  },
+  newsletter: {
+    title: 'You’re on the list.',
+    message:
+      'Thank you for joining Dr. Lurié updates. We’ll send practical, science-led notes about aging skin changes.',
+  },
+} as const;
+---
+
+<Layout metadata={metadata}>
+  <section class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
+    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Submission received</p>
+    <h1 id="thank-you-title" class="mt-4 text-3xl font-bold tracking-tight text-heading sm:text-5xl">
+      {fallbackTitle}
+    </h1>
+    <p id="thank-you-message" class="mx-auto mt-6 max-w-2xl text-lg text-muted">
+      {fallbackMessage}
+    </p>
+
+    <noscript>
+      <p class="mx-auto mt-4 max-w-2xl text-sm text-muted">
+        If you expected form-specific instructions, JavaScript is required to show them on this static confirmation
+        page.
+      </p>
+    </noscript>
+
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <a class="btn-primary" href="/">Return Home</a>
+      <a class="btn-secondary" href="/topics">Explore Skin Science</a>
+    </div>
+  </section>
+</Layout>
+
+<script is:inline define:vars={{ thankYouMessages, fallbackTitle, fallbackMessage }}>
+  const params = new URLSearchParams(window.location.search);
+  const formKey = params.get('form') || '';
+  const passedMessage = params.get('message') || '';
+  const knownMessage = thankYouMessages[formKey];
+  const titleElement = document.getElementById('thank-you-title');
+  const messageElement = document.getElementById('thank-you-message');
+
+  const getSafePassedMessage = (message) => {
+    const trimmedMessage = message.trim();
+
+    if (!trimmedMessage) {
+      return '';
+    }
+
+    return trimmedMessage.length > 240 ? `${trimmedMessage.slice(0, 237)}...` : trimmedMessage;
+  };
+
+  if (titleElement && messageElement) {
+    titleElement.textContent = knownMessage?.title || fallbackTitle;
+    messageElement.textContent = getSafePassedMessage(passedMessage) || knownMessage?.message || fallbackMessage;
+  }
+</script>
