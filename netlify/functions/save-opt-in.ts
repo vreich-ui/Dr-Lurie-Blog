@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { connectLambda, getStore } from '@netlify/blobs';
 
-import { buildRecord, getHeader, parseBody } from './opt-in-record';
+import { buildRecord, getHeader, parseBody } from '../lib/opt-in-record';
 
 type LambdaEvent = {
   blobs?: string;

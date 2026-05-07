@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildRecord, parseBody } from './opt-in-record.js';
+import { buildRecord, parseBody } from '../../netlify/lib/opt-in-record.js';
 
 test('URL-encoded Netlify form-name payload builds a valid opt-in record', () => {
   const input = parseBody({
