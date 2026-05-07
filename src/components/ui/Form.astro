@@ -23,15 +23,18 @@ if (!formName || !thankYouKey || !thankYouMessage) {
   throw new Error('Form.astro requires formName, thankYouKey, and thankYouMessage for Netlify form submissions.');
 }
 
-const formAction =
-  action || `/thank-you/?form=${encodeURIComponent(thankYouKey)}&message=${encodeURIComponent(thankYouMessage)}`;
+const thankYouParams = new URLSearchParams({ form: thankYouKey });
+
+thankYouParams.set('message', thankYouMessage);
+
+const formAction = action || `/thank-you/?${thankYouParams.toString()}`;
 ---
 
 <!-- All Netlify forms must use this component so future forms inherit the thank-you redirect. -->
 <form name={formName} method="post" action={formAction} data-netlify="true" class={formClass} aria-label={ariaLabel}>
   <input type="hidden" name="form-name" value={formName} />
-  <input type="hidden" name="thankYouKey" value={thankYouKey} />
-  <input type="hidden" name="thankYouMessage" value={thankYouMessage} />
+  <input type="hidden" name="thank-you-key" value={thankYouKey} />
+  <input type="hidden" name="thank-you-message" value={thankYouMessage} />
   {
     inputs &&
       inputs.map(
