@@ -14,6 +14,7 @@ type LambdaEvent = {
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
+  'Cache-Control': 'no-store',
 };
 
 export const handler = async (event: LambdaEvent) => {
