@@ -15,7 +15,7 @@ const {
 const formAction = action || undefined;
 ---
 
-<form name={formName} method="post" action={formAction} data-netlify="true">
+<form name={formName} method="post" action={formAction} data-netlify="true" data-store-opt-in="true">
   <input type="hidden" name="form-name" value={formName} />
   {
     inputs &&
