@@ -78,6 +78,18 @@
 
     fetch(endpoint, {
       body: JSON.stringify(payload),
+      source: window.location.href,
+      pathname: window.location.pathname,
+    };
+    const body = JSON.stringify(payload);
+
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+      return;
+    }
+
+    fetch(endpoint, {
+      body,
       headers: { 'Content-Type': 'application/json' },
       keepalive: true,
       method: 'POST',
