@@ -11,3 +11,19 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+# Clerk account pages are Astro routes. Keep direct/deep links on Netlify resolving to the page shell.
+[[redirects]]
+  from = "/sign-in/*"
+  to = "/sign-in"
+  status = 200
+
+[[redirects]]
+  from = "/sign-up/*"
+  to = "/sign-up"
+  status = 200
+
+[[redirects]]
+  from = "/account/*"
+  to = "/account"
+  status = 200

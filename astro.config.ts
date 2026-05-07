@@ -3,12 +3,14 @@ import { fileURLToPath } from 'url';
 
 import { defineConfig, passthroughImageService } from 'astro/config';
 
+import netlify from '@astrojs/netlify';
 import sitemap from '@astrojs/sitemap';
 import tailwind from '@astrojs/tailwind';
 import mdx from '@astrojs/mdx';
 import partytown from '@astrojs/partytown';
 import icon from 'astro-icon';
 import compress from 'astro-compress';
+import clerk from '@clerk/astro';
 import type { AstroIntegration } from 'astro';
 
 import astrowind from './vendor/integration';
@@ -22,11 +24,20 @@ const whenExternalScripts = (items: (() => AstroIntegration) | (() => AstroInteg
   hasExternalScripts ? (Array.isArray(items) ? items.map((item) => item()) : [items()]) : [];
 
 export default defineConfig({
-  output: 'static',
+  output: 'hybrid',
+  adapter: netlify({
+    edgeMiddleware: false,
+  }),
 
   integrations: [
     tailwind({
       applyBaseStyles: false,
+    }),
+    clerk({
+      signInUrl: '/sign-in',
+      signUpUrl: '/sign-up',
+      signInFallbackRedirectUrl: '/members',
+      signUpFallbackRedirectUrl: '/members',
     }),
     sitemap(),
     mdx(),

@@ -300,3 +300,85 @@ Initially created by **Arthelokyo** and maintained by a community of [contributo
 ## License
 
 **AstroWind** is licensed under the MIT license — see the [LICENSE](./LICENSE.md) file for details.
+
+## Clerk authentication on Netlify
+
+This site uses Clerk for public member authentication through the official `@clerk/astro` SDK. Netlify Identity is not used for the public login system; the existing Decap CMS admin screen may still rely on Netlify Identity/git-gateway only for content-management access.
+
+The Astro build runs in `hybrid` output mode with the Netlify adapter so normal marketing/blog pages can remain prerendered while auth pages and `/members` are rendered on the server. Server rendering is required for `/members` because Clerk middleware must redirect signed-out users before protected content is served.
+
+### Required environment variables
+
+Set these in `.env` for local development and in **Netlify → Site configuration → Environment variables** for production:
+
+```bash
+PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_or_pk_live_...
+CLERK_SECRET_KEY=sk_test_or_sk_live_...
+```
+
+`PUBLIC_CLERK_PUBLISHABLE_KEY` is safe for browser use. `CLERK_SECRET_KEY` is server-only and must not be embedded in Astro pages, public JavaScript, or any client-side bundle.
+
+For Netlify Functions that verify session tokens without an extra network call, you may also set Clerk's JWKS public key from the Clerk Dashboard:
+
+```bash
+CLERK_JWT_KEY='-----BEGIN PUBLIC KEY-----...-----END PUBLIC KEY-----'
+CLERK_AUTHORIZED_PARTIES=https://drluriescience.netlify.app,http://localhost:4321
+```
+
+`CLERK_JWT_KEY` is optional when `CLERK_SECRET_KEY` is available. `CLERK_AUTHORIZED_PARTIES` is recommended so server-side verification accepts only tokens minted for the expected frontend origins.
+
+### Local development
+
+1. Create a Clerk application in the Clerk Dashboard.
+2. Add these Clerk redirect URLs in the Dashboard:
+   - Sign-in URL: `http://localhost:4321/sign-in`
+   - Sign-up URL: `http://localhost:4321/sign-up`
+   - After sign-in URL: `http://localhost:4321/members`
+   - After sign-up URL: `http://localhost:4321/members`
+   - After sign-out URL: `http://localhost:4321/`
+3. Create `.env` locally and add `PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
+4. Run the site:
+
+```bash
+npm install
+npm run dev
+```
+
+Visit `/sign-in`, `/sign-up`, and `/members`. Signed-out visitors to `/members` are redirected by `src/middleware.ts` before the protected server-rendered page returns content.
+
+### Netlify deployment
+
+1. In Clerk, add production URLs for `https://drluriescience.netlify.app`:
+   - Sign-in URL: `https://drluriescience.netlify.app/sign-in`
+   - Sign-up URL: `https://drluriescience.netlify.app/sign-up`
+   - After sign-in URL: `https://drluriescience.netlify.app/members`
+   - After sign-up URL: `https://drluriescience.netlify.app/members`
+   - After sign-out URL: `https://drluriescience.netlify.app/`
+2. Add `PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to Netlify environment variables. Use Clerk production keys for the production Netlify domain to avoid preview/development-domain redirect loops.
+3. Optionally add `CLERK_JWT_KEY` and `CLERK_AUTHORIZED_PARTIES` for the protected Netlify Function boundary.
+4. Deploy with the existing Netlify build command:
+
+```bash
+npm run build
+```
+
+The Netlify redirects in `netlify.toml` keep Clerk account-route deep links resolving to the correct Astro page shell.
+
+### Static, hybrid, and server output tradeoffs
+
+- `static` output is fastest and simplest, but it cannot protect `/members` before content is served because there is no server-rendered request boundary for that page.
+- `hybrid` output is the chosen setup: public pages stay prerendered, while `prerender = false` auth/member pages run on Netlify serverless functions where Clerk middleware can validate sessions. The Netlify adapter is configured with edge middleware disabled because Clerk documents Netlify Edge middleware caveats for Astro.
+- `server` output would render every route on the server. That is useful for app-heavy sites, but it is unnecessary here and would give up some static-site performance for public education/marketing pages.
+
+### Future paid-member checks with Stripe
+
+The `/members` page is a protected member shell, but do not rely on frontend hiding for premium content. Private or paid content must be served through a server-side boundary such as a Netlify Function or Edge Function.
+
+The starter function at `netlify/functions/member-content.ts` demonstrates the intended pattern:
+
+1. Read the Clerk session token from `Authorization: Bearer <token>` or the `__session` cookie.
+2. Validate the Clerk token server-side with Clerk's official `verifyToken()` helper in `netlify/lib/clerk-session.ts`.
+3. Use the verified Clerk user ID (`claims.sub`) to look up a Stripe customer, subscription, or entitlement.
+4. Return paid content only when both the Clerk session and Stripe entitlement are valid.
+
+Frontend code may request paid content after sign-in, but the function must be the place where Clerk and Stripe are trusted.

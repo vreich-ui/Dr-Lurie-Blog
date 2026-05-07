@@ -54,6 +54,11 @@ export const headerData = {
           href: getPermalink('/#early-access'),
           description: 'Join updates as research-led solutions become available.',
         },
+        {
+          text: 'Members',
+          href: getPermalink('/members'),
+          description: 'Sign in for protected member resources and account access.',
+        },
       ],
     },
   ],

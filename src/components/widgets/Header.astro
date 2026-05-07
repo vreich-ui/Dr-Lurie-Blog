@@ -4,6 +4,7 @@ import Logo from '~/components/Logo.astro';
 import ToggleTheme from '~/components/common/ToggleTheme.astro';
 import ToggleMenu from '~/components/common/ToggleMenu.astro';
 import Button from '~/components/ui/Button.astro';
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/astro/components';
 
 import { getHomePermalink } from '~/utils/permalinks';
 import { trimSlash, getAsset } from '~/utils/permalinks';
@@ -158,9 +159,23 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
             )
           }
         </div>
+        <div class="ml-4 rtl:ml-0 rtl:mr-4 flex min-h-10 items-center justify-end gap-2" aria-live="polite">
+          <SignedOut>
+            <SignInButton asChild fallbackRedirectUrl="/members" signUpFallbackRedirectUrl="/members">
+              <a class="btn-secondary px-4 py-2 text-sm font-semibold" href="/sign-in">Log in</a>
+            </SignInButton>
+            <SignUpButton asChild fallbackRedirectUrl="/members">
+              <a class="btn-primary px-4 py-2 text-sm font-semibold" href="/sign-up">Sign up</a>
+            </SignUpButton>
+          </SignedOut>
+          <SignedIn>
+            <a class="btn-secondary mr-2 px-4 py-2 text-sm font-semibold" href="/members">Members</a>
+            <UserButton userProfileMode="navigation" userProfileUrl="/account" />
+          </SignedIn>
+        </div>
         {
           actions?.length ? (
-            <span class="ml-4 rtl:ml-0 rtl:mr-4">
+            <span class="ml-2 rtl:ml-0 rtl:mr-2">
               {actions.map((btnProps) => (
                 <Button {...btnProps} class="ml-2 py-2.5 px-5.5 md:px-6 font-semibold shadow-none text-sm w-auto" />
               ))}
