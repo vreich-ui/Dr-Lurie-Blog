@@ -81,8 +81,11 @@
     const body = JSON.stringify(payload);
 
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
-      return;
+      const beaconQueued = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+
+      if (beaconQueued) {
+        return;
+      }
     }
 
     fetch(endpoint, {
