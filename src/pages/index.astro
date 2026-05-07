@@ -122,7 +122,14 @@ const metadata = {
       <li>The truth about age-related scent changes</li>
       <li>What actually helps — and what doesn’t</li>
     </ul>
-    <form name="free-guide" method="post" data-netlify="true" class="mt-8 max-w-xl" aria-label="Free guide signup form">
+    <form
+      name="free-guide"
+      method="post"
+      action="/thank-you?form=free-guide"
+      data-netlify="true"
+      class="mt-8 max-w-xl"
+      aria-label="Free guide signup form"
+    >
       <input type="hidden" name="form-name" value="free-guide" />
       <label for="guide-email" class="block text-sm font-medium">Email address</label>
       <input
@@ -214,7 +221,14 @@ const metadata = {
   <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
     <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Understand Your Skin — Step by Step</h2>
     <p class="mt-3 text-muted">Weekly insights from Dr. Lurié.</p>
-    <form name="newsletter" method="post" data-netlify="true" class="mt-6 max-w-xl" aria-label="Newsletter signup form">
+    <form
+      name="newsletter"
+      method="post"
+      action="/thank-you?form=newsletter"
+      data-netlify="true"
+      class="mt-6 max-w-xl"
+      aria-label="Newsletter signup form"
+    >
       <input type="hidden" name="form-name" value="newsletter" />
       <label for="newsletter-email" class="block text-sm font-medium">Email address</label>
       <input
