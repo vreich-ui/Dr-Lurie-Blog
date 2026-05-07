@@ -2,10 +2,21 @@
 import type { Form as Props } from '~/types';
 import Button from '~/components/ui/Button.astro';
 
-const { inputs, textarea, disclaimer, button = 'Contact us', description = '' } = Astro.props;
+const {
+  inputs,
+  textarea,
+  disclaimer,
+  button = 'Contact us',
+  description = '',
+  formName = 'contact',
+  action,
+} = Astro.props;
+
+const formAction = action || undefined;
 ---
 
-<form>
+<form name={formName} method="post" action={formAction} data-netlify="true">
+  <input type="hidden" name="form-name" value={formName} />
   {
     inputs &&
       inputs.map(
