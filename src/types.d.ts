@@ -212,6 +212,10 @@ export interface Form {
   description?: string;
   formName?: string;
   action?: string;
+  /** Optional key used by /thank-you to select locally managed, form-specific confirmation copy. */
+  thankYouKey?: string;
+  /** Optional direct confirmation copy; Form.astro URL-encodes it when building the default action. */
+  thankYouMessage?: string;
 }
 
 // WIDGETS

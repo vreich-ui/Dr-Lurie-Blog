@@ -62,7 +62,7 @@ export const adaptOpenGraphImages = async (
 
   const images = openGraph.images;
   const defaultWidth = 1200;
-  const defaultHeight = 626;
+  const defaultHeight = 630;
 
   const adaptedImages = await Promise.all(
     images.map(async (image) => {
@@ -82,8 +82,8 @@ export const adaptOpenGraphImages = async (
         ) {
           _image = {
             src: resolvedImage,
-            width: defaultWidth,
-            height: defaultHeight,
+            width: image.width ?? defaultWidth,
+            height: image.height ?? defaultHeight,
           };
         } else if (resolvedImage) {
           const dimensions =
