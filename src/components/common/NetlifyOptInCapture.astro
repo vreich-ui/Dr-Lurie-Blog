@@ -1,0 +1,98 @@
+<script>
+  const endpoint = '/.netlify/functions/save-opt-in';
+  const storeOptInSelector = 'form[data-store-opt-in="true"]';
+
+  const getFieldValue = (form, names) => {
+    for (const name of names) {
+      const field = form.elements.namedItem(name);
+
+      if (field instanceof RadioNodeList) {
+        const value = field.value.trim();
+
+        if (value) {
+          return value;
+        }
+      }
+
+      if (
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLTextAreaElement ||
+        field instanceof HTMLSelectElement
+      ) {
+        const value = field.value.trim();
+
+        if (value) {
+          return value;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  const getFieldLabel = (form, field) => {
+    if (field.id) {
+      const label = form.querySelector(`label[for="${CSS.escape(field.id)}"]`);
+
+      if (label?.textContent?.trim()) {
+        return label.textContent.trim();
+      }
+    }
+
+    return field.closest('label')?.textContent?.trim();
+  };
+
+  const getConsentValue = (form) => {
+    const explicitConsent = getFieldValue(form, ['consentText', 'consentType', 'consent', 'optIn', 'opt-in']);
+
+    if (explicitConsent) {
+      return explicitConsent;
+    }
+
+    const checkedConsent = form.querySelector(
+      'input[type="checkbox"][name*="consent" i]:checked, input[type="checkbox"][name*="opt" i]:checked, input[type="checkbox"][name*="disclaimer" i]:checked'
+    );
+
+    if (!(checkedConsent instanceof HTMLInputElement)) {
+      return undefined;
+    }
+
+    return getFieldLabel(form, checkedConsent) || checkedConsent.value || checkedConsent.name;
+  };
+
+  const submitOptInMetadata = (form) => {
+    const formName = getFieldValue(form, ['form-name']) || form.getAttribute('name');
+
+    if (!formName) {
+      return;
+    }
+
+    const payload = {
+      consent: getConsentValue(form),
+      email: getFieldValue(form, ['email']),
+      formName,
+      name: getFieldValue(form, ['name', 'full-name', 'fullname']),
+      pathname: window.location.pathname,
+      submittedAt: new Date().toISOString(),
+    };
+
+    fetch(endpoint, {
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      method: 'POST',
+    }).catch(() => undefined);
+  };
+
+  document.addEventListener(
+    'submit',
+    (event) => {
+      if (!(event.target instanceof HTMLFormElement) || !event.target.matches(storeOptInSelector)) {
+        return;
+      }
+
+      submitOptInMetadata(event.target);
+    },
+    { capture: true }
+  );
+</script>
