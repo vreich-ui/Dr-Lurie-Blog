@@ -1,0 +1,38 @@
+---
+import Form from '~/components/ui/Form.astro';
+
+interface Props {
+  formName: string;
+  thankYouKey: string;
+  thankYouMessage: string;
+  button: string;
+  emailId: string;
+  ariaLabel: string;
+  class?: string;
+}
+
+const { formName, thankYouKey, thankYouMessage, button, emailId, ariaLabel, class: className = '' } = Astro.props;
+---
+
+<Form
+  formName={formName}
+  thankYouKey={thankYouKey}
+  thankYouMessage={thankYouMessage}
+  ariaLabel={ariaLabel}
+  formClass={className}
+  inputClass="mt-2 py-3 px-4 block w-full text-md rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-slate-900"
+  inputWrapperClass=""
+  buttonWrapperClass="mt-4"
+  button={button}
+  inputs={[
+    {
+      id: emailId,
+      name: 'email',
+      type: 'email',
+      required: true,
+      autocomplete: 'email',
+      label: 'Email address',
+      placeholder: 'you@example.com',
+    },
+  ]}
+/>

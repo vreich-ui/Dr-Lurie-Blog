@@ -12,6 +12,8 @@ test('URL-encoded Netlify form-name payload builds a valid opt-in record', () =>
       name: 'Reader',
       pathname: '/free-guide',
       consentText: 'I agree to receive updates.',
+      'thank-you-key': 'free-guide',
+      'thank-you-message': 'Thanks — your free guide request was received.',
     }).toString(),
   });
 
@@ -32,6 +34,8 @@ test('URL-encoded Netlify form-name payload builds a valid opt-in record', () =>
   assert.equal(record.source, '/free-guide');
   assert.equal(record.consent, 'I agree to receive updates.');
   assert.equal(record.userAgent, 'node-test-agent');
+  assert.equal(record.thankYouKey, 'free-guide');
+  assert.equal(record.thankYouMessage, 'Thanks — your free guide request was received.');
   assert.match(record.submittedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
@@ -42,6 +46,8 @@ test('JSON formName payload remains the preferred contract', () => {
       formName: 'newsletter',
       'form-name': 'free-guide',
       email: 'json@example.com',
+      thankYouKey: 'newsletter',
+      thankYouMessage: 'Thanks for joining.',
     }),
   });
 
@@ -56,6 +62,26 @@ test('JSON formName payload remains the preferred contract', () => {
   assert.ok(record);
   assert.equal(record.formName, 'newsletter');
   assert.equal(record.email, 'json@example.com');
+  assert.equal(record.thankYouKey, 'newsletter');
+  assert.equal(record.thankYouMessage, 'Thanks for joining.');
+});
+
+test('opt-in record requires formName and thank-you copy', () => {
+  assert.equal(
+    buildRecord({
+      formName: 'newsletter',
+      thankYouKey: 'newsletter',
+    }),
+    undefined
+  );
+
+  assert.equal(
+    buildRecord({
+      thankYouKey: 'newsletter',
+      thankYouMessage: 'Thanks for joining.',
+    }),
+    undefined
+  );
 });
 
 test('malformed JSON returns a typed parse failure without throwing', () => {

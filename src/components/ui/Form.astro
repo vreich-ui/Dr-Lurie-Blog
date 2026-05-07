@@ -8,33 +8,49 @@ const {
   disclaimer,
   button = 'Contact us',
   description = '',
-  formName = 'contact',
+  formName,
+  thankYouKey,
+  thankYouMessage,
   action,
-} = Astro.props;
+  ariaLabel,
+  formClass,
+  inputClass = 'py-3 px-4 block w-full text-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900',
+  inputWrapperClass = 'mb-6',
+  buttonWrapperClass = 'mt-10 grid',
+} = Astro.props as Props;
 
-const formAction = action || undefined;
+if (!formName || !thankYouKey || !thankYouMessage) {
+  throw new Error('Form.astro requires formName, thankYouKey, and thankYouMessage for Netlify form submissions.');
+}
+
+const formAction =
+  action || `/thank-you/?form=${encodeURIComponent(thankYouKey)}&message=${encodeURIComponent(thankYouMessage)}`;
 ---
 
-<form name={formName} method="post" action={formAction} data-netlify="true">
+<!-- All Netlify forms must use this component so future forms inherit the thank-you redirect. -->
+<form name={formName} method="post" action={formAction} data-netlify="true" class={formClass} aria-label={ariaLabel}>
   <input type="hidden" name="form-name" value={formName} />
+  <input type="hidden" name="thankYouKey" value={thankYouKey} />
+  <input type="hidden" name="thankYouMessage" value={thankYouMessage} />
   {
     inputs &&
       inputs.map(
-        ({ type = 'text', name, label = '', autocomplete = 'on', placeholder = '' }) =>
+        ({ type = 'text', name, label = '', id = name, autocomplete = 'on', placeholder = '', required = false }) =>
           name && (
-            <div class="mb-6">
+            <div class={inputWrapperClass}>
               {label && (
-                <label for={name} class="block text-sm font-medium">
+                <label for={id} class="block text-sm font-medium">
                   {label}
                 </label>
               )}
               <input
                 type={type}
                 name={name}
-                id={name}
+                id={id}
                 autocomplete={autocomplete}
                 placeholder={placeholder}
-                class="py-3 px-4 block w-full text-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900"
+                required={required}
+                class={inputClass}
               />
             </div>
           )
@@ -52,7 +68,7 @@ const formAction = action || undefined;
           name={textarea.name ? textarea.name : 'message'}
           rows={textarea.rows ? textarea.rows : 4}
           placeholder={textarea.placeholder}
-          class="py-3 px-4 block w-full text-md rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-slate-900"
+          class={inputClass}
         />
       </div>
     )
@@ -80,7 +96,7 @@ const formAction = action || undefined;
 
   {
     button && (
-      <div class="mt-10 grid">
+      <div class={buttonWrapperClass}>
         <Button variant="primary" type="submit">
           {button}
         </Button>

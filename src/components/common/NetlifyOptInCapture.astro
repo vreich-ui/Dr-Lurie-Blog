@@ -77,6 +77,8 @@
       name: getFieldValue(form, ['name', 'full-name', 'fullname']),
       source: window.location.href,
       pathname: window.location.pathname,
+      thankYouKey: getFieldValue(form, ['thankYouKey', 'thank-you-key']),
+      thankYouMessage: getFieldValue(form, ['thankYouMessage', 'thank-you-message']),
     };
     const body = JSON.stringify(payload);
 

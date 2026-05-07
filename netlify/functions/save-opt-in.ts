@@ -42,7 +42,9 @@ export const handler = async (event: LambdaEvent) => {
     return {
       statusCode: 400,
       headers: jsonHeaders,
-      body: JSON.stringify({ error: 'A formName is required to save opt-in metadata.' }),
+      body: JSON.stringify({
+        error: 'A formName, thankYouKey, and thankYouMessage are required to save opt-in metadata.',
+      }),
     };
   }
 

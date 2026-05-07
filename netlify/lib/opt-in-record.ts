@@ -14,6 +14,10 @@ export type OptInInput = {
   name?: unknown;
   pathname?: unknown;
   source?: unknown;
+  thankYouKey?: unknown;
+  'thank-you-key'?: unknown;
+  thankYouMessage?: unknown;
+  'thank-you-message'?: unknown;
 };
 
 export type OptInRecord = {
@@ -24,6 +28,8 @@ export type OptInRecord = {
   name?: string;
   source?: string;
   consent?: string;
+  thankYouKey: string;
+  thankYouMessage: string;
 };
 
 export type ParseBodyFailure = {
@@ -85,8 +91,10 @@ export const parseBody = (event: LambdaEvent): ParseBodyResult => {
 
 export const buildRecord = (input: OptInInput, userAgent?: string): OptInRecord | undefined => {
   const formName = toStringValue(input.formName) ?? toStringValue(input['form-name']);
+  const thankYouKey = toStringValue(input.thankYouKey) ?? toStringValue(input['thank-you-key']);
+  const thankYouMessage = toStringValue(input.thankYouMessage) ?? toStringValue(input['thank-you-message']);
 
-  if (!formName) {
+  if (!formName || !thankYouKey || !thankYouMessage) {
     return undefined;
   }
 
@@ -95,6 +103,8 @@ export const buildRecord = (input: OptInInput, userAgent?: string): OptInRecord 
   const record: OptInRecord = {
     formName,
     submittedAt: new Date().toISOString(),
+    thankYouKey,
+    thankYouMessage,
   };
 
   const email = toStringValue(input.email);

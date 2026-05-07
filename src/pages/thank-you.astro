@@ -1,0 +1,28 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+
+const metadata = {
+  title: 'Thank you',
+};
+
+const defaultMessage = 'Thank you. Your submission was received.';
+---
+
+<Layout metadata={metadata}>
+  <section class="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24 text-center">
+    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Submission received</p>
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-heading sm:text-5xl">Thank you</h1>
+    <p id="thank-you-message" class="mt-6 text-lg text-muted">{defaultMessage}</p>
+    <a class="btn-primary mt-8" href="/">Return home</a>
+  </section>
+
+  <script is:inline define:vars={{ defaultMessage }}>
+    const params = new URLSearchParams(window.location.search);
+    const message = params.get('message') || defaultMessage;
+    const messageElement = document.getElementById('thank-you-message');
+
+    if (messageElement) {
+      messageElement.textContent = message;
+    }
+  </script>
+</Layout>

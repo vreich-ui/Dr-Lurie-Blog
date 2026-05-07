@@ -165,8 +165,10 @@ export interface Input {
   type: HTMLInputTypeAttribute;
   name: string;
   label?: string;
+  id?: string;
   autocomplete?: string;
   placeholder?: string;
+  required?: boolean;
 }
 
 export interface Textarea {
@@ -210,8 +212,15 @@ export interface Form {
   disclaimer?: Disclaimer;
   button?: string;
   description?: string;
-  formName?: string;
+  formName: string;
+  thankYouKey: string;
+  thankYouMessage: string;
   action?: string;
+  ariaLabel?: string;
+  formClass?: string;
+  inputClass?: string;
+  inputWrapperClass?: string;
+  buttonWrapperClass?: string;
 }
 
 // WIDGETS
