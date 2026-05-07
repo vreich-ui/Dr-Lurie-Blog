@@ -1,0 +1,93 @@
+<script>
+  const endpoint = '/.netlify/functions/save-opt-in';
+
+  const getFieldValue = (form, names) => {
+    for (const name of names) {
+      const field = form.elements.namedItem(name);
+
+      if (field instanceof RadioNodeList) {
+        const value = field.value.trim();
+
+        if (value) {
+          return value;
+        }
+      }
+
+      if (
+        field instanceof HTMLInputElement ||
+        field instanceof HTMLTextAreaElement ||
+        field instanceof HTMLSelectElement
+      ) {
+        const value = field.value.trim();
+
+        if (value) {
+          return value;
+        }
+      }
+    }
+
+    return undefined;
+  };
+
+  const getConsentValue = (form) => {
+    const explicitConsent = getFieldValue(form, ['consentText', 'consentType', 'consent']);
+
+    if (explicitConsent) {
+      return explicitConsent;
+    }
+
+    const checkedConsent = form.querySelector(
+      'input[type="checkbox"][name*="consent" i]:checked, input[type="checkbox"][name*="disclaimer" i]:checked'
+    );
+
+    if (!(checkedConsent instanceof HTMLInputElement)) {
+      return undefined;
+    }
+
+    const label = checkedConsent.id ? form.querySelector(`label[for="${CSS.escape(checkedConsent.id)}"]`) : undefined;
+
+    return label?.textContent?.trim() || checkedConsent.name;
+  };
+
+  const submitOptInMetadata = (form) => {
+    const formName = getFieldValue(form, ['form-name']) || form.getAttribute('name');
+
+    if (!formName) {
+      return;
+    }
+
+    const payload = {
+      consent: getConsentValue(form),
+      email: getFieldValue(form, ['email']),
+      formName,
+      name: getFieldValue(form, ['name', 'full-name', 'fullname']),
+      source: window.location.href,
+      pathname: window.location.pathname,
+    };
+    const body = JSON.stringify(payload);
+
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+      return;
+    }
+
+    fetch(endpoint, {
+      body,
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      method: 'POST',
+    }).catch(() => undefined);
+  };
+
+  document.addEventListener(
+    'submit',
+    (event) => {
+      if (!(event.target instanceof HTMLFormElement) || !event.target.matches('form[data-netlify="true"]')) {
+        return;
+      }
+
+      submitOptInMetadata(event.target);
+    },
+    { capture: true }
+  );
+</script>

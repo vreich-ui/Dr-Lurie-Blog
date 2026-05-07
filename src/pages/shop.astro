@@ -30,7 +30,8 @@ const metadata = {
         productImages.map((image, index) => (
           <figure
             class:list={[
-              'overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900',
+              'overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm ' +
+                'dark:border-slate-800 dark:bg-slate-900',
               index === 1 ? 'hidden sm:block lg:translate-y-8' : '',
             ]}
           >
@@ -95,6 +96,8 @@ const metadata = {
 
   @media (max-width: 767px) {
     .shop-hero {
+      display: flex;
+      flex-direction: column;
       padding-top: 24px;
       padding-bottom: 48px;
     }
