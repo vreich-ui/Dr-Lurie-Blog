@@ -15,6 +15,15 @@ const productImages = [
 const metadata = {
   title: 'Shop Preview',
   description: 'Preview the age-aware skincare direction from Dr. Lurié and join early access for product updates.',
+  openGraph: {
+    images: [
+      {
+        url: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-shop-social-preview.jpg',
+        width: 1200,
+        height: 630,
+      },
+    ],
+  },
 };
 ---
 
@@ -121,11 +130,18 @@ const metadata = {
 
     .shop-images {
       order: 3;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
       margin-bottom: 22px;
+    }
+
+    .shop-images figure:nth-child(n + 2) {
+      display: none;
     }
 
     .shop-images figure:first-child img {
       min-height: 190px;
+      height: clamp(180px, 48vw, 220px);
       max-height: 220px;
     }
 
