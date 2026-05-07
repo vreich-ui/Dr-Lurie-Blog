@@ -93,15 +93,21 @@
     }).catch(() => undefined);
   };
 
-  document.addEventListener(
-    'submit',
-    (event) => {
-      if (!(event.target instanceof HTMLFormElement) || !event.target.matches('form[data-netlify="true"]')) {
-        return;
-      }
+  const windowWithOptInGuard = window as Window & { netlifyOptInCaptureInitialized?: boolean };
 
-      submitOptInMetadata(event.target);
-    },
-    { capture: true }
-  );
+  if (!windowWithOptInGuard.netlifyOptInCaptureInitialized) {
+    document.addEventListener(
+      'submit',
+      (event) => {
+        if (!(event.target instanceof HTMLFormElement) || !event.target.matches('form[data-netlify="true"]')) {
+          return;
+        }
+
+        submitOptInMetadata(event.target);
+      },
+      { capture: true }
+    );
+
+    windowWithOptInGuard.netlifyOptInCaptureInitialized = true;
+  }
 </script>
