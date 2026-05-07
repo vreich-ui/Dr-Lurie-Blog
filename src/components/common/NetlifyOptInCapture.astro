@@ -1,7 +1,7 @@
 <script>
   const endpoint = '/.netlify/functions/save-opt-in';
 
-  const getFieldValue = (form, names) => {
+  const getFieldValue = (form: HTMLFormElement, names: string[]) => {
     for (const name of names) {
       const field = form.elements.namedItem(name);
 
@@ -13,11 +13,25 @@
         }
       }
 
-      if (
-        field instanceof HTMLInputElement ||
-        field instanceof HTMLTextAreaElement ||
-        field instanceof HTMLSelectElement
-      ) {
+      if (field instanceof HTMLInputElement) {
+        if (field.type === 'checkbox' || field.type === 'radio') {
+          const value = field.checked ? field.value.trim() : '';
+
+          if (value) {
+            return value;
+          }
+
+          continue;
+        }
+
+        const value = field.value.trim();
+
+        if (value) {
+          return value;
+        }
+      }
+
+      if (field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
         const value = field.value.trim();
 
         if (value) {
@@ -29,7 +43,7 @@
     return undefined;
   };
 
-  const getConsentValue = (form) => {
+  const getConsentValue = (form: HTMLFormElement) => {
     const explicitConsent = getFieldValue(form, ['consentText', 'consentType', 'consent']);
 
     if (explicitConsent) {
@@ -49,7 +63,7 @@
     return label?.textContent?.trim() || checkedConsent.name;
   };
 
-  const submitOptInMetadata = (form) => {
+  const submitOptInMetadata = (form: HTMLFormElement) => {
     const formName = getFieldValue(form, ['form-name']) || form.getAttribute('name');
 
     if (!formName) {
