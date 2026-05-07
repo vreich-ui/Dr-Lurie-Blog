@@ -1,8 +1,14 @@
 declare module '@netlify/blobs' {
   type BlobMetadata = Record<string, string>;
 
+  type SetOptions = {
+    metadata?: BlobMetadata;
+    type?: string;
+  };
+
   type NetlifyBlobStore = {
-    setJSON: (key: string, value: unknown, options?: { metadata?: BlobMetadata }) => Promise<void>;
+    set: (key: string, value: Buffer | ArrayBuffer | Blob | string, options?: SetOptions) => Promise<void>;
+    setJSON: (key: string, value: unknown, options?: SetOptions) => Promise<void>;
   };
 
   export const connectLambda: (event: unknown) => void;
