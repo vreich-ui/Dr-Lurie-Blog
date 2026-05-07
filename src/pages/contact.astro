@@ -12,13 +12,13 @@ const metadata = {
 <Layout metadata={metadata}>
   <!-- HeroText Widget ******************* -->
 
-  <HeroText tagline="Contact" title="Let's Connect!" />
+  <HeroText tagline="Contact" title="Connect with Dr. Lurié" />
 
   <ContactUs
     id="form"
     formName="contact"
-    title="Drop us a message today!"
-    subtitle="For quicker answers, explore our FAQs section. You may find the solution you're looking  for right there! If not, our support team is delighted to help you."
+    title="Send a note to the Dr. Lurié team"
+    subtitle="Use this form for education questions, early-access and product-update requests, or media and partnership inquiries. We do not provide medical advice through this form."
     inputs={[
       {
         type: 'text',
@@ -36,44 +36,49 @@ const metadata = {
     }}
     disclaimer={{
       label:
-        'By submitting this contact form, you acknowledge and agree to the collection of your personal information.',
+        'By submitting this contact form, you acknowledge and agree to the collection of your personal information as described in the Privacy Policy.',
     }}
-    description="Our support team typically responds within 24 business hours."
+    description="We review messages submitted through the website contact form and respond when appropriate."
   />
 
   <!-- Features2 Widget ************** -->
 
   <Features2
-    title="We are here to help!"
+    title="How we can help"
     items={[
       {
-        title: 'General support',
-        description: `Chat with us for inquiries related to account management, website navigation, payment issues, accessing purchased templates or general questions about the website's functionality.`,
-      },
-      {
-        title: 'Contact sales',
+        title: 'Education questions',
         description:
-          'Chat with us for questions about purchases, customization options, licensing for commercial use, inquiries about specific template, etc.',
+          'Ask about Dr. Lurié educational content on aging skin, age-related scent changes, barrier function, and skincare science. This is educational only and not medical advice.',
+        icon: 'tabler:school',
       },
       {
-        title: 'Technical support',
+        title: 'Early access and product updates',
         description:
-          'Chat with us when facing issues like template installation, problems editing difficulties, compatibility issues with software or download errors, or other technical challenges related to using the templates.',
+          'Request updates on research notes, guide availability, product previews, and future age-aware skincare launch announcements.',
+        icon: 'tabler:sparkles',
       },
       {
-        title: 'Phone',
-        description: '+1 (234) 567-890',
-        icon: 'tabler:headset',
+        title: 'Media inquiries',
+        description:
+          'Reach out for interview requests, expert commentary, podcast opportunities, or citation questions related to Dr. Lurié topics.',
+        icon: 'tabler:microphone-2',
       },
       {
-        title: 'Email',
-        description: 'contact@support.com',
-        icon: 'tabler:mail',
+        title: 'Partnership inquiries',
+        description:
+          'Contact us about aligned education, research, product-development, or distribution conversations.',
+        icon: 'tabler:heart-handshake',
       },
       {
-        title: 'Location',
-        description: '1234 Lorem Ipsum St, 12345, Miami, EEUU',
-        icon: 'tabler:map-pin',
+        title: 'Primary contact',
+        description: 'Please use the contact form on this page so your message reaches the right Dr. Lurié workflow.',
+        icon: 'tabler:message-circle',
+      },
+      {
+        title: 'Website',
+        description: 'https://drluriescience.netlify.app',
+        icon: 'tabler:world',
       },
     ]}
   />
