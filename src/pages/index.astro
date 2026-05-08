@@ -1,18 +1,37 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
-import Header from '~/components/widgets/Header.astro';
-import type { CallToAction } from '~/types';
+import Footer from '~/components/widgets/Footer.astro';
+import { getAsset, getBlogPermalink, getPermalink } from '~/utils/permalinks';
 
-const homeHeaderData = {
-  logoText: 'Dr. Lurié Skin Care',
+const homeFooterData = {
+  brand: 'Dr. Lurié Skin Care',
+  descriptor: 'Healthy Skin for Skincare Newcomers',
   links: [
-    { text: 'Start Here', href: '/#start-here' },
-    { text: 'Beginner Guides', href: '/blog' },
-    { text: 'Healthy Aging', href: '/topics' },
-    { text: 'Skin Barrier Health', href: '/topics' },
-    { text: 'About', href: '/about' },
+    {
+      title: 'Start learning',
+      links: [
+        { text: 'Start Here', href: getPermalink('/#start-here') },
+        { text: 'Beginner Guides', href: getBlogPermalink() },
+        { text: 'Healthy Aging', href: getPermalink('/topics') },
+        { text: 'Skin Barrier Health', href: getPermalink('/topics') },
+      ],
+    },
+    {
+      title: 'Connect',
+      links: [
+        { text: 'About', href: getPermalink('/about') },
+        { text: 'Newsletter', href: getPermalink('/#newsletter') },
+      ],
+    },
   ],
-  actions: [{ text: 'Join Newsletter', href: '/#newsletter', variant: 'primary' } satisfies CallToAction],
+  secondaryLinks: [
+    { text: 'Terms', href: getPermalink('/terms') },
+    { text: 'Privacy', href: getPermalink('/privacy') },
+  ],
+  socialLinks: [{ ariaLabel: 'RSS', icon: 'tabler:rss', href: getAsset('/rss.xml') }],
+  footNote: `
+    Educational content only — not medical advice. © Dr. Lurié.
+  `,
 };
 
 const metadata = {
@@ -186,4 +205,8 @@ const trustNotes = [
       <p class="mt-4 text-sm text-muted">No overwhelm, no trend chasing — just clear education for healthier skin.</p>
     </div>
   </section>
+
+  <Fragment slot="footer">
+    <Footer {...homeFooterData} descriptor="Healthy Skin for Skincare Newcomers" />
+  </Fragment>
 </Layout>
