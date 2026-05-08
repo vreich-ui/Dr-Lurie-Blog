@@ -1,5 +1,38 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import Footer from '~/components/widgets/Footer.astro';
+import { getAsset, getBlogPermalink, getPermalink } from '~/utils/permalinks';
+
+const homeFooterData = {
+  brand: 'Dr. Lurié Skin Care',
+  descriptor: 'Healthy Skin for Skincare Newcomers',
+  links: [
+    {
+      title: 'Start learning',
+      links: [
+        { text: 'Start Here', href: getPermalink('/#start-here') },
+        { text: 'Beginner Guides', href: getBlogPermalink() },
+        { text: 'Healthy Aging', href: getPermalink('/topics') },
+        { text: 'Skin Barrier Health', href: getPermalink('/topics') },
+      ],
+    },
+    {
+      title: 'Connect',
+      links: [
+        { text: 'About', href: getPermalink('/about') },
+        { text: 'Newsletter', href: getPermalink('/#newsletter') },
+      ],
+    },
+  ],
+  secondaryLinks: [
+    { text: 'Terms', href: getPermalink('/terms') },
+    { text: 'Privacy', href: getPermalink('/privacy') },
+  ],
+  socialLinks: [{ ariaLabel: 'RSS', icon: 'tabler:rss', href: getAsset('/rss.xml') }],
+  footNote: `
+    Educational content only — not medical advice. © Dr. Lurié.
+  `,
+};
 
 const metadata = {
   title: 'Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers',
@@ -172,4 +205,8 @@ const trustNotes = [
       <p class="mt-4 text-sm text-muted">No overwhelm, no trend chasing — just clear education for healthier skin.</p>
     </div>
   </section>
+
+  <Fragment slot="footer">
+    <Footer {...homeFooterData} descriptor="Healthy Skin for Skincare Newcomers" />
+  </Fragment>
 </Layout>
