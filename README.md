@@ -305,7 +305,7 @@ Initially created by **Arthelokyo** and maintained by a community of [contributo
 
 This site uses Clerk for public member authentication through the official `@clerk/astro` SDK. Netlify Identity is not used for the public login system; the existing Decap CMS admin screen may still rely on Netlify Identity/git-gateway only for content-management access.
 
-The Astro build runs in `hybrid` output mode with the Netlify adapter so normal marketing/blog pages can remain prerendered while auth pages and `/members` are rendered on the server. Server rendering is required for `/members` because Clerk middleware must redirect signed-out users before protected content is served.
+The Astro build uses Astro v5-compatible hybrid behavior with `output: "static"` and the Netlify adapter. Public marketing/blog pages remain prerendered by default, while auth-sensitive routes opt into server rendering with `export const prerender = false;`. Server rendering is required for `/members` and `/account` because Clerk middleware and page-level server checks must redirect signed-out users before protected content is served.
 
 ### Required environment variables
 
@@ -344,7 +344,7 @@ npm install
 npm run dev
 ```
 
-Visit `/sign-in`, `/sign-up`, and `/members`. Signed-out visitors to `/members` are redirected by `src/middleware.ts` before the protected server-rendered page returns content.
+Visit `/sign-in`, `/sign-up`, `/members`, and `/account`. Signed-out visitors to `/members` and `/account` are redirected by `src/middleware.ts` before the protected server-rendered pages return content.
 
 ### Netlify deployment
 
@@ -364,10 +364,11 @@ npm run build
 
 The Netlify redirects in `netlify.toml` keep Clerk account-route deep links resolving to the correct Astro page shell.
 
-### Static, hybrid, and server output tradeoffs
+### Astro v5 hybrid behavior
 
-- `static` output is fastest and simplest, but it cannot protect `/members` before content is served because there is no server-rendered request boundary for that page.
-- `hybrid` output is the chosen setup: public pages stay prerendered, while `prerender = false` auth/member pages run on Netlify serverless functions where Clerk middleware can validate sessions. The Netlify adapter is configured with edge middleware disabled because Clerk documents Netlify Edge middleware caveats for Astro.
+- `output: "static"` is the Astro v5-compatible way this project keeps public pages static while still allowing selected server-rendered pages.
+- Routes that require request-time Clerk state, such as `/members` and `/account`, must include `export const prerender = false;` so Netlify renders them through serverless functions instead of emitting static HTML.
+- The Netlify adapter remains configured with edge middleware disabled, and the redirects/headers in `netlify.toml` continue to handle static asset caching plus Clerk deep links for `/sign-in/*`, `/sign-up/*`, and `/account/*`.
 - `server` output would render every route on the server. That is useful for app-heavy sites, but it is unnecessary here and would give up some static-site performance for public education/marketing pages.
 
 ### Future paid-member checks with Stripe
