@@ -1,0 +1,578 @@
+---
+const pageTitle = 'Dr. Lurié Science Admin';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <link rel="icon" href="https://kugelmedia.netlify.app/favicon.png" />
+    <style is:inline>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #25302b;
+        background: #f7f3ec;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f7f3ec;
+      }
+
+      a {
+        color: #496d5a;
+      }
+
+      .page {
+        width: min(100% - 32px, 900px);
+        margin: 0 auto;
+        padding: 32px 0;
+      }
+
+      .admin-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .admin-header h1 {
+        margin: 0;
+        font-size: clamp(1.6rem, 4vw, 2.2rem);
+        line-height: 1.15;
+      }
+
+      .logout-link {
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      .surface,
+      .panel {
+        border: 1px solid #e4ddd0;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 12px 28px rgb(38 34 27 / 0.06);
+      }
+
+      .surface {
+        padding: 24px;
+      }
+
+      .field {
+        margin-bottom: 18px;
+      }
+
+      label,
+      .field-title {
+        display: block;
+        margin-bottom: 7px;
+        font-weight: 700;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid #d8d0c3;
+        border-radius: 10px;
+        padding: 11px 12px;
+        color: #25302b;
+        background: #fffdf9;
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 420px;
+        resize: vertical;
+        line-height: 1.55;
+      }
+
+      .hint {
+        margin: 7px 0 0;
+        color: #6f766f;
+        font-size: 0.92rem;
+      }
+
+      .image-list {
+        display: grid;
+        gap: 8px;
+        margin: 10px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .image-list li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border: 1px solid #eee8dd;
+        border-radius: 10px;
+        padding: 10px;
+        background: #fffaf2;
+      }
+
+      .filename {
+        overflow-wrap: anywhere;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.9rem;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      button {
+        cursor: pointer;
+        border: 1px solid #cfc7b7;
+        border-radius: 999px;
+        padding: 11px 18px;
+        font: inherit;
+        font-weight: 800;
+        color: #26312c;
+        background: #fff7e8;
+      }
+
+      button:hover,
+      button:focus-visible {
+        border-color: #8a6a2f;
+        outline: none;
+      }
+
+      .copy-button {
+        flex: 0 0 auto;
+        padding: 8px 12px;
+        font-size: 0.88rem;
+      }
+
+      .publish-button {
+        border-color: #24583a;
+        color: #fff;
+        background: #2f6f49;
+        box-shadow: 0 8px 16px rgb(47 111 73 / 0.2);
+      }
+
+      .panel {
+        margin-top: 22px;
+        padding: 22px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 1.25rem;
+      }
+
+      .preview-box,
+      .output-box {
+        border: 1px solid #e4ddd0;
+        border-radius: 10px;
+        padding: 16px;
+        background: #fffdf9;
+      }
+
+      .preview-box h3 {
+        margin-top: 0;
+      }
+
+      .preview-image-path,
+      .suggestion {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        overflow-wrap: anywhere;
+      }
+
+      .markdown-preview {
+        margin-top: 16px;
+        line-height: 1.65;
+      }
+
+      .markdown-preview h1,
+      .markdown-preview h2,
+      .markdown-preview h3 {
+        margin: 1rem 0 0.5rem;
+      }
+
+      .markdown-preview p {
+        margin: 0 0 0.8rem;
+      }
+
+      .markdown-preview code {
+        border-radius: 5px;
+        padding: 2px 5px;
+        background: #f0eadf;
+      }
+
+      .output-markdown {
+        min-height: 260px;
+        margin-top: 12px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        font-size: 0.9rem;
+      }
+
+      .mvp-message {
+        margin: 12px 0 0;
+        font-weight: 800;
+        color: #7a5520;
+      }
+
+      .status {
+        min-height: 1.3em;
+        margin: 12px 0 0;
+        color: #496d5a;
+        font-weight: 700;
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          width: min(100% - 20px, 900px);
+          padding: 18px 0;
+        }
+
+        .surface,
+        .panel {
+          padding: 16px;
+        }
+
+        .admin-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .image-list li {
+          align-items: stretch;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="admin-header" aria-label="Admin header">
+        <h1>{pageTitle}</h1>
+        <a class="logout-link" href="/">Logout</a>
+      </header>
+
+      <section class="surface" aria-label="Publishing form">
+        <form id="publish-form">
+          <div class="field">
+            <label for="title">Title</label>
+            <input id="title" name="title" type="text" autocomplete="off" />
+          </div>
+
+          <div class="field">
+            <label for="slug">Slug</label>
+            <input id="slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
+          </div>
+
+          <div class="field">
+            <label for="content">Markdown content</label>
+            <textarea
+              id="content"
+              name="content"
+              placeholder="Paste article content here. Markdown is supported."></textarea>
+          </div>
+
+          <div class="field">
+            <label for="image-upload">Image upload</label>
+            <input id="image-upload" type="file" multiple accept="image/*" />
+            <p class="hint">Selected images are listed below for Markdown copy helpers. No files are uploaded by this MVP.</p>
+            <ul id="image-list" class="image-list" aria-live="polite"></ul>
+          </div>
+
+          <div class="field">
+            <label for="featured-image">Featured image</label>
+            <select id="featured-image" name="featuredImage">
+              <option value="">Select an uploaded image</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="video-link">Optional video link</label>
+            <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
+          </div>
+
+          <div class="field">
+            <label for="cta-link">Optional CTA link</label>
+            <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+          </div>
+
+          <div class="field">
+            <label for="seo-description">Optional SEO description</label>
+            <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
+          </div>
+
+          <div class="actions">
+            <button id="save-draft" type="button">Save Draft</button>
+            <button id="preview" type="button">Preview</button>
+            <button id="publish" class="publish-button" type="button">Publish</button>
+          </div>
+          <p id="status" class="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="panel" aria-labelledby="preview-heading">
+        <h2 id="preview-heading">Preview</h2>
+        <div class="preview-box">
+          <h3 id="preview-title">Untitled article</h3>
+          <p>
+            Featured image path:
+            <span id="preview-featured-image" class="preview-image-path">None selected</span>
+          </p>
+          <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="publish-output-heading">
+        <h2 id="publish-output-heading">Publish output</h2>
+        <p>
+          Suggested filename: <span id="suggested-filename" class="suggestion">slug.md</span><br />
+          Suggested location: <span id="suggested-location" class="suggestion">/src/content/articles/slug.md</span>
+        </p>
+        <button id="copy-output" class="copy-button" type="button">Copy Markdown</button>
+        <textarea id="output-markdown" class="output-markdown" readonly></textarea>
+        <p class="mvp-message">MVP only: copy this Markdown into the GitHub content folder.</p>
+      </section>
+    </main>
+
+    <script is:inline>
+      const draftKey = 'dr-lurie-admin-draft';
+      const uploadPath = '/images/uploads/';
+      const fields = {
+        title: document.querySelector('#title'),
+        slug: document.querySelector('#slug'),
+        content: document.querySelector('#content'),
+        imageUpload: document.querySelector('#image-upload'),
+        imageList: document.querySelector('#image-list'),
+        featuredImage: document.querySelector('#featured-image'),
+        videoLink: document.querySelector('#video-link'),
+        ctaLink: document.querySelector('#cta-link'),
+        seoDescription: document.querySelector('#seo-description'),
+        status: document.querySelector('#status'),
+        previewTitle: document.querySelector('#preview-title'),
+        previewFeaturedImage: document.querySelector('#preview-featured-image'),
+        markdownPreview: document.querySelector('#markdown-preview'),
+        suggestedFilename: document.querySelector('#suggested-filename'),
+        suggestedLocation: document.querySelector('#suggested-location'),
+        outputMarkdown: document.querySelector('#output-markdown'),
+      };
+
+      let imageNames = [];
+
+      const escapeHtml = (value) =>
+        String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+
+      const escapeYaml = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+
+      const slugify = (value) =>
+        String(value)
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+      const getFeaturedImagePath = () => (fields.featuredImage.value ? `${uploadPath}${fields.featuredImage.value}` : '');
+
+      const getDraft = () => ({
+        title: fields.title.value,
+        slug: fields.slug.value,
+        content: fields.content.value,
+        imageNames,
+        featuredImage: fields.featuredImage.value,
+        videoLink: fields.videoLink.value,
+        ctaLink: fields.ctaLink.value,
+        seoDescription: fields.seoDescription.value,
+      });
+
+      const setStatus = (message) => {
+        fields.status.textContent = message;
+        if (message) {
+          window.setTimeout(() => {
+            if (fields.status.textContent === message) fields.status.textContent = '';
+          }, 2500);
+        }
+      };
+
+      const copyText = async (text, successMessage) => {
+        if (!text) return;
+
+        try {
+          await navigator.clipboard.writeText(text);
+          setStatus(successMessage);
+        } catch (error) {
+          fields.outputMarkdown.value = text;
+          fields.outputMarkdown.focus();
+          fields.outputMarkdown.select();
+          setStatus('Clipboard unavailable. Text selected for manual copy.');
+        }
+      };
+
+      const renderImages = () => {
+        fields.imageList.innerHTML = '';
+        fields.featuredImage.innerHTML = '<option value="">Select an uploaded image</option>';
+
+        imageNames.forEach((name) => {
+          const option = document.createElement('option');
+          option.value = name;
+          option.textContent = name;
+          fields.featuredImage.append(option);
+
+          const item = document.createElement('li');
+          const filename = document.createElement('span');
+          const copyButton = document.createElement('button');
+
+          filename.className = 'filename';
+          filename.textContent = name;
+          copyButton.className = 'copy-button';
+          copyButton.type = 'button';
+          copyButton.textContent = 'Copy Markdown';
+          copyButton.addEventListener('click', () => {
+            copyText(`![Alt text](${uploadPath}${name})`, `Copied Markdown for ${name}.`);
+          });
+
+          item.append(filename, copyButton);
+          fields.imageList.append(item);
+        });
+      };
+
+      const renderMarkdownPreview = (markdown) => {
+        if (!markdown.trim()) return 'Preview will appear here.';
+
+        return markdown
+          .split(/\n{2,}/)
+          .map((block) => {
+            const text = block.trim();
+            if (!text) return '';
+            if (text.startsWith('### ')) return `<h3>${escapeHtml(text.slice(4))}</h3>`;
+            if (text.startsWith('## ')) return `<h2>${escapeHtml(text.slice(3))}</h2>`;
+            if (text.startsWith('# ')) return `<h1>${escapeHtml(text.slice(2))}</h1>`;
+            if (text.startsWith('![')) return `<p><code>${escapeHtml(text)}</code></p>`;
+
+            const inline = escapeHtml(text)
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+              .replace(/`([^`]+)`/g, '<code>$1</code>')
+              .replace(/\n/g, '<br />');
+            return `<p>${inline}</p>`;
+          })
+          .join('');
+      };
+
+      const updatePreview = () => {
+        const featuredPath = getFeaturedImagePath();
+        fields.previewTitle.textContent = fields.title.value || 'Untitled article';
+        fields.previewFeaturedImage.textContent = featuredPath || 'None selected';
+        fields.markdownPreview.innerHTML = renderMarkdownPreview(fields.content.value);
+      };
+
+      const buildMarkdown = () => {
+        const slug = slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+        const featuredPath = getFeaturedImagePath();
+        const frontmatter = [
+          '---',
+          `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
+          `slug: "${escapeYaml(slug)}"`,
+          ...(fields.seoDescription.value ? [`description: "${escapeYaml(fields.seoDescription.value)}"`] : []),
+          ...(featuredPath ? [`featuredImage: "${escapeYaml(featuredPath)}"`] : []),
+          ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
+          ...(fields.ctaLink.value ? [`cta: "${escapeYaml(fields.ctaLink.value)}"`] : []),
+          '---',
+          '',
+        ];
+
+        return {
+          slug,
+          markdown: `${frontmatter.join('\n')}${fields.content.value.trim()}\n`,
+        };
+      };
+
+      const updatePublishOutput = () => {
+        const { slug, markdown } = buildMarkdown();
+        fields.suggestedFilename.textContent = `${slug}.md`;
+        fields.suggestedLocation.textContent = `/src/content/articles/${slug}.md`;
+        fields.outputMarkdown.value = markdown;
+      };
+
+      const saveDraft = () => {
+        localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+        setStatus('Draft saved.');
+      };
+
+      const loadDraft = () => {
+        const saved = localStorage.getItem(draftKey);
+        if (!saved) return;
+
+        try {
+          const draft = JSON.parse(saved);
+          fields.title.value = draft.title || '';
+          fields.slug.value = draft.slug || '';
+          fields.content.value = draft.content || '';
+          fields.videoLink.value = draft.videoLink || '';
+          fields.ctaLink.value = draft.ctaLink || '';
+          fields.seoDescription.value = draft.seoDescription || '';
+          imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
+          renderImages();
+          fields.featuredImage.value = draft.featuredImage || '';
+        } catch (error) {
+          localStorage.removeItem(draftKey);
+        }
+      };
+
+      fields.title.addEventListener('input', () => {
+        if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
+      });
+
+      fields.imageUpload.addEventListener('change', () => {
+        imageNames = Array.from(fields.imageUpload.files || []).map((file) => file.name);
+        const previousFeaturedImage = fields.featuredImage.value;
+        renderImages();
+        if (imageNames.includes(previousFeaturedImage)) fields.featuredImage.value = previousFeaturedImage;
+        updatePreview();
+        updatePublishOutput();
+      });
+
+      document.querySelector('#save-draft').addEventListener('click', saveDraft);
+      document.querySelector('#preview').addEventListener('click', () => {
+        updatePreview();
+        setStatus('Preview updated.');
+      });
+      document.querySelector('#publish').addEventListener('click', () => {
+        updatePreview();
+        updatePublishOutput();
+        setStatus('Publish Markdown generated.');
+      });
+      document.querySelector('#copy-output').addEventListener('click', () => {
+        updatePublishOutput();
+        copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
+      });
+
+      ['input', 'change'].forEach((eventName) => {
+        document.querySelector('#publish-form').addEventListener(eventName, () => {
+          updatePreview();
+          updatePublishOutput();
+        });
+      });
+
+      loadDraft();
+      updatePreview();
+      updatePublishOutput();
+    </script>
+  </body>
+</html>
