@@ -1,0 +1,554 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+
+const pageTitle = 'Dr. Lurié Science Admin';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="admin-page mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14">
+    <header class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+      <div>
+        <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">Publishing workspace</p>
+        <h1 class="mt-2 font-heading text-4xl font-bold tracking-tight text-default sm:text-5xl">{pageTitle}</h1>
+      </div>
+      <a class="admin-logout btn-secondary btn-sm w-fit" href="/">Logout</a>
+    </header>
+
+    <section class="admin-card" aria-label="Publishing form">
+      <form id="publish-form" class="admin-form">
+        <div class="field">
+          <label for="title">Title</label>
+          <input id="title" name="title" type="text" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="slug">Slug</label>
+          <input id="slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
+        </div>
+
+        <div class="field">
+          <label for="content">Markdown content</label>
+          <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="image-upload">Image upload</label>
+          <input id="image-upload" type="file" multiple accept="image/*" />
+          <p class="hint">Selected images are listed below for Markdown copy helpers. No files are uploaded by this MVP.</p>
+          <ul id="image-list" class="image-list" aria-live="polite"></ul>
+        </div>
+
+        <div class="field">
+          <label for="featured-image">Featured image</label>
+          <select id="featured-image" name="featuredImage">
+            <option value="">Select an uploaded image</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="video-link">Optional video link</label>
+          <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
+        </div>
+
+        <div class="field">
+          <label for="cta-link">Optional CTA link</label>
+          <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+        </div>
+
+        <div class="field">
+          <label for="seo-description">Optional SEO description</label>
+          <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
+        </div>
+
+        <div class="actions">
+          <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
+          <button id="preview" class="btn-secondary" type="button">Preview</button>
+          <button id="publish" class="btn-primary publish-button" type="button">Publish</button>
+        </div>
+        <p id="status" class="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="admin-card admin-panel" aria-labelledby="preview-heading">
+      <h2 id="preview-heading">Preview</h2>
+      <div class="preview-box">
+        <h3 id="preview-title">Untitled article</h3>
+        <p>
+          Featured image path:
+          <span id="preview-featured-image" class="preview-image-path">None selected</span>
+        </p>
+        <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
+      </div>
+    </section>
+
+    <section class="admin-card admin-panel" aria-labelledby="publish-output-heading">
+      <h2 id="publish-output-heading">Publish output</h2>
+      <p>
+        Suggested filename: <span id="suggested-filename" class="suggestion">slug.md</span><br />
+        Suggested location: <span id="suggested-location" class="suggestion">/src/content/articles/slug.md</span>
+      </p>
+      <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown</button>
+      <textarea id="output-markdown" class="output-markdown" readonly></textarea>
+      <p class="mvp-message">MVP only: copy this Markdown into the GitHub content folder.</p>
+    </section>
+  </section>
+</Layout>
+
+<style>
+  .admin-page {
+    color: var(--aw-color-text-default);
+  }
+
+  .admin-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.5rem;
+    background: rgb(255 255 255 / 84%);
+    box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 6%);
+    padding: 1.5rem;
+  }
+
+  :global(.dark) .admin-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 72%);
+    box-shadow: none;
+  }
+
+  .admin-panel {
+    margin-top: 1.5rem;
+  }
+
+  .admin-panel h2 {
+    margin: 0 0 0.9rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.35rem, 3vw, 1.7rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .field {
+    margin-bottom: 1.15rem;
+  }
+
+  label,
+  .field-title {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: var(--aw-color-text-heading);
+    font-weight: 700;
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.85rem;
+    padding: 0.78rem 0.9rem;
+    color: var(--aw-color-text-default);
+    background: var(--aw-color-bg-page);
+    font: inherit;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
+
+  :global(.dark) input,
+  :global(.dark) select,
+  :global(.dark) textarea {
+    border-color: rgb(51 65 85);
+    background: rgb(2 6 23 / 70%);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 3px rgb(94 140 138 / 18%);
+    outline: none;
+  }
+
+  textarea {
+    min-height: 420px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  .hint {
+    margin: 0.45rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.92rem;
+  }
+
+  .image-list {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0.8rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .image-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.75rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  :global(.dark) .image-list li {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 72%);
+  }
+
+  .filename,
+  .preview-image-path,
+  .suggestion {
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  }
+
+  .filename {
+    font-size: 0.9rem;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.4rem;
+  }
+
+  .publish-button {
+    box-shadow: 0 0.9rem 1.8rem rgb(46 111 149 / 20%);
+  }
+
+  .copy-button {
+    margin-bottom: 0.8rem;
+  }
+
+  .preview-box,
+  .output-box {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.dark) .preview-box,
+  :global(.dark) .output-box {
+    border-color: rgb(30 41 59);
+  }
+
+  .preview-box h3 {
+    margin: 0 0 0.75rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 700;
+  }
+
+  .markdown-preview {
+    margin-top: 1rem;
+    line-height: 1.7;
+  }
+
+  .markdown-preview h1,
+  .markdown-preview h2,
+  .markdown-preview h3 {
+    margin: 1rem 0 0.5rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+  }
+
+  .markdown-preview p {
+    margin: 0 0 0.8rem;
+  }
+
+  .markdown-preview code {
+    border-radius: 0.4rem;
+    padding: 0.12rem 0.32rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  .output-markdown {
+    min-height: 260px;
+    margin-top: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.9rem;
+  }
+
+  .mvp-message {
+    margin: 0.85rem 0 0;
+    color: var(--aw-color-secondary);
+    font-weight: 800;
+  }
+
+  .status {
+    min-height: 1.3em;
+    margin: 0.9rem 0 0;
+    color: var(--aw-color-accent);
+    font-weight: 700;
+  }
+
+  @media (max-width: 640px) {
+    .admin-page {
+      padding-top: 1.5rem;
+      padding-bottom: 2.5rem;
+    }
+
+    .admin-card {
+      border-radius: 1.1rem;
+      padding: 1rem;
+    }
+
+    .image-list li {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .actions > button,
+    .admin-logout {
+      width: 100%;
+    }
+  }
+</style>
+
+<script is:inline>
+  const draftKey = 'dr-lurie-admin-draft';
+  const uploadPath = '/images/uploads/';
+  const fields = {
+    title: document.querySelector('#title'),
+    slug: document.querySelector('#slug'),
+    content: document.querySelector('#content'),
+    imageUpload: document.querySelector('#image-upload'),
+    imageList: document.querySelector('#image-list'),
+    featuredImage: document.querySelector('#featured-image'),
+    videoLink: document.querySelector('#video-link'),
+    ctaLink: document.querySelector('#cta-link'),
+    seoDescription: document.querySelector('#seo-description'),
+    status: document.querySelector('#status'),
+    previewTitle: document.querySelector('#preview-title'),
+    previewFeaturedImage: document.querySelector('#preview-featured-image'),
+    markdownPreview: document.querySelector('#markdown-preview'),
+    suggestedFilename: document.querySelector('#suggested-filename'),
+    suggestedLocation: document.querySelector('#suggested-location'),
+    outputMarkdown: document.querySelector('#output-markdown'),
+  };
+
+  let imageNames = [];
+
+  const escapeHtml = (value) =>
+    String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+  const escapeYaml = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+
+  const slugify = (value) =>
+    String(value)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const getFeaturedImagePath = () => (fields.featuredImage.value ? `${uploadPath}${fields.featuredImage.value}` : '');
+
+  const getDraft = () => ({
+    title: fields.title.value,
+    slug: fields.slug.value,
+    content: fields.content.value,
+    imageNames,
+    featuredImage: fields.featuredImage.value,
+    videoLink: fields.videoLink.value,
+    ctaLink: fields.ctaLink.value,
+    seoDescription: fields.seoDescription.value,
+  });
+
+  const setStatus = (message) => {
+    fields.status.textContent = message;
+    if (message) {
+      window.setTimeout(() => {
+        if (fields.status.textContent === message) fields.status.textContent = '';
+      }, 2500);
+    }
+  };
+
+  const copyText = async (text, successMessage) => {
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus(successMessage);
+    } catch (error) {
+      fields.outputMarkdown.value = text;
+      fields.outputMarkdown.focus();
+      fields.outputMarkdown.select();
+      setStatus('Clipboard unavailable. Text selected for manual copy.');
+    }
+  };
+
+  const renderImages = () => {
+    fields.imageList.innerHTML = '';
+    fields.featuredImage.innerHTML = '<option value="">Select an uploaded image</option>';
+
+    imageNames.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      fields.featuredImage.append(option);
+
+      const item = document.createElement('li');
+      const filename = document.createElement('span');
+      const copyButton = document.createElement('button');
+
+      filename.className = 'filename';
+      filename.textContent = name;
+      copyButton.className = 'btn-secondary btn-sm copy-button';
+      copyButton.type = 'button';
+      copyButton.textContent = 'Copy Markdown';
+      copyButton.addEventListener('click', () => {
+        copyText(`![Alt text](${uploadPath}${name})`, `Copied Markdown for ${name}.`);
+      });
+
+      item.append(filename, copyButton);
+      fields.imageList.append(item);
+    });
+  };
+
+  const renderMarkdownPreview = (markdown) => {
+    if (!markdown.trim()) return 'Preview will appear here.';
+
+    return markdown
+      .split(/\n{2,}/)
+      .map((block) => {
+        const text = block.trim();
+        if (!text) return '';
+        if (text.startsWith('### ')) return `<h3>${escapeHtml(text.slice(4))}</h3>`;
+        if (text.startsWith('## ')) return `<h2>${escapeHtml(text.slice(3))}</h2>`;
+        if (text.startsWith('# ')) return `<h1>${escapeHtml(text.slice(2))}</h1>`;
+        if (text.startsWith('![')) return `<p><code>${escapeHtml(text)}</code></p>`;
+
+        const inline = escapeHtml(text)
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\n/g, '<br />');
+        return `<p>${inline}</p>`;
+      })
+      .join('');
+  };
+
+  const updatePreview = () => {
+    const featuredPath = getFeaturedImagePath();
+    fields.previewTitle.textContent = fields.title.value || 'Untitled article';
+    fields.previewFeaturedImage.textContent = featuredPath || 'None selected';
+    fields.markdownPreview.innerHTML = renderMarkdownPreview(fields.content.value);
+  };
+
+  const buildMarkdown = () => {
+    const slug = slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+    const featuredPath = getFeaturedImagePath();
+    const frontmatter = [
+      '---',
+      `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
+      `slug: "${escapeYaml(slug)}"`,
+      ...(fields.seoDescription.value ? [`description: "${escapeYaml(fields.seoDescription.value)}"`] : []),
+      ...(featuredPath ? [`featuredImage: "${escapeYaml(featuredPath)}"`] : []),
+      ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
+      ...(fields.ctaLink.value ? [`cta: "${escapeYaml(fields.ctaLink.value)}"`] : []),
+      '---',
+      '',
+    ];
+
+    return {
+      slug,
+      markdown: `${frontmatter.join('\n')}${fields.content.value.trim()}\n`,
+    };
+  };
+
+  const updatePublishOutput = () => {
+    const { slug, markdown } = buildMarkdown();
+    fields.suggestedFilename.textContent = `${slug}.md`;
+    fields.suggestedLocation.textContent = `/src/content/articles/${slug}.md`;
+    fields.outputMarkdown.value = markdown;
+  };
+
+  const saveDraft = () => {
+    localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+    setStatus('Draft saved.');
+  };
+
+  const loadDraft = () => {
+    const saved = localStorage.getItem(draftKey);
+    if (!saved) return;
+
+    try {
+      const draft = JSON.parse(saved);
+      fields.title.value = draft.title || '';
+      fields.slug.value = draft.slug || '';
+      fields.content.value = draft.content || '';
+      fields.videoLink.value = draft.videoLink || '';
+      fields.ctaLink.value = draft.ctaLink || '';
+      fields.seoDescription.value = draft.seoDescription || '';
+      imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
+      renderImages();
+      fields.featuredImage.value = draft.featuredImage || '';
+    } catch (error) {
+      localStorage.removeItem(draftKey);
+    }
+  };
+
+  fields.title.addEventListener('input', () => {
+    if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
+  });
+
+  fields.imageUpload.addEventListener('change', () => {
+    imageNames = Array.from(fields.imageUpload.files || []).map((file) => file.name);
+    const previousFeaturedImage = fields.featuredImage.value;
+    renderImages();
+    if (imageNames.includes(previousFeaturedImage)) fields.featuredImage.value = previousFeaturedImage;
+    updatePreview();
+    updatePublishOutput();
+  });
+
+  document.querySelector('#save-draft').addEventListener('click', saveDraft);
+  document.querySelector('#preview').addEventListener('click', () => {
+    updatePreview();
+    setStatus('Preview updated.');
+  });
+  document.querySelector('#publish').addEventListener('click', () => {
+    updatePreview();
+    updatePublishOutput();
+    setStatus('Publish Markdown generated.');
+  });
+  document.querySelector('#copy-output').addEventListener('click', () => {
+    updatePublishOutput();
+    copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
+  });
+
+  ['input', 'change'].forEach((eventName) => {
+    document.querySelector('#publish-form').addEventListener(eventName, () => {
+      updatePreview();
+      updatePublishOutput();
+    });
+  });
+
+  loadDraft();
+  updatePreview();
+  updatePublishOutput();
+</script>
