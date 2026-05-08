@@ -1,9 +1,13 @@
 ---
+export interface Props {
+  text?: string;
+}
 
+const { text = 'DR. LURIÉ SCIENCE' } = Astro.props;
 ---
 
 <span
   class="self-center ml-2 rtl:ml-0 rtl:mr-2 text-xl md:text-lg font-semibold tracking-[0.22em] text-gray-900 whitespace-nowrap dark:text-white"
 >
-  DR. LURIÉ SCIENCE
+  {text}
 </span>
