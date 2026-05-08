@@ -21,9 +21,19 @@ export interface Props {
   socialLinks: Array<Link>;
   footNote?: string;
   theme?: string;
+  brand?: string;
+  descriptor?: string;
 }
 
-const { socialLinks = [], secondaryLinks = [], links = [], footNote = '', theme = 'light' } = Astro.props;
+const {
+  socialLinks = [],
+  secondaryLinks = [],
+  links = [],
+  footNote = '',
+  theme = 'light',
+  brand = SITE?.name,
+  descriptor = 'Science-led education for aging skin changes, age-related scent, and future age-aware skincare solutions.',
+} = Astro.props;
 ---
 
 <footer
@@ -40,11 +50,11 @@ const { socialLinks = [], secondaryLinks = [], links = [], footNote = '', theme 
       <div class="col-span-12 lg:col-span-5">
         <div class="mb-3">
           <a class="inline-block font-heading font-bold text-2xl tracking-tight" href={getHomePermalink()}
-            >{SITE?.name}</a
+            >{brand}</a
           >
         </div>
         <p class="max-w-sm text-sm leading-6 text-muted">
-          Science-led education for aging skin changes, age-related scent, and future age-aware skincare solutions.
+          {descriptor}
         </p>
         <div class="mt-5 text-sm text-muted flex gap-1">
           {

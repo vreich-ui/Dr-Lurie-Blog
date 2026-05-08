@@ -1,5 +1,38 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import Footer from '~/components/widgets/Footer.astro';
+import { getAsset, getBlogPermalink, getPermalink } from '~/utils/permalinks';
+
+const homeFooterData = {
+  brand: 'Dr. Lurié Skin Care',
+  descriptor: 'Healthy Skin for Skincare Newcomers',
+  links: [
+    {
+      title: 'Start learning',
+      links: [
+        { text: 'Start Here', href: getPermalink('/#start-here') },
+        { text: 'Beginner Guides', href: getBlogPermalink() },
+        { text: 'Healthy Aging', href: getPermalink('/topics') },
+        { text: 'Skin Barrier Health', href: getPermalink('/topics') },
+      ],
+    },
+    {
+      title: 'Connect',
+      links: [
+        { text: 'About', href: getPermalink('/about') },
+        { text: 'Newsletter', href: getPermalink('/#newsletter') },
+      ],
+    },
+  ],
+  secondaryLinks: [
+    { text: 'Terms', href: getPermalink('/terms') },
+    { text: 'Privacy', href: getPermalink('/privacy') },
+  ],
+  socialLinks: [{ ariaLabel: 'RSS', icon: 'tabler:rss', href: getAsset('/rss.xml') }],
+  footNote: `
+    Educational content only — not medical advice. © Dr. Lurié.
+  `,
+};
 
 const metadata = {
   title: 'Science-led education for aging skin changes',
@@ -17,7 +50,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section class="px-4 sm:px-6 py-14 sm:py-20 mx-auto max-w-6xl">
+  <section id="start-here" class="px-4 sm:px-6 py-14 sm:py-20 mx-auto max-w-6xl">
     <p class="text-sm font-medium text-accent mb-4">Science-led education for skin changes after 60</p>
     <h1 class="text-3xl sm:text-5xl font-bold tracking-tight text-heading max-w-4xl">
       This Is Not About Hygiene. This Is About What Changes in Your Skin After 60.
@@ -227,7 +260,7 @@ const metadata = {
     </div>
   </section>
 
-  <section class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
+  <section id="newsletter" class="px-4 sm:px-6 py-12 mx-auto max-w-6xl">
     <h2 class="text-2xl sm:text-3xl font-bold tracking-tight">Understand Your Skin — Step by Step</h2>
     <p class="mt-3 text-muted">Weekly insights from Dr. Lurié.</p>
     <form
@@ -261,4 +294,8 @@ const metadata = {
     </p>
     <a class="btn-primary mt-8" href="#guide">Get the Free Guide</a>
   </section>
+
+  <Fragment slot="footer">
+    <Footer {...homeFooterData} descriptor="Healthy Skin for Skincare Newcomers" />
+  </Fragment>
 </Layout>
