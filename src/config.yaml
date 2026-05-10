@@ -18,7 +18,7 @@ metadata:
   openGraph:
     site_name: Dr. Lurié
     images:
-      - url: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-social-preview.jpg'
+      - url: '/social-preview.svg'
         width: 1200
         height: 630
     type: website

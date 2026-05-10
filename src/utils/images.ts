@@ -76,12 +76,9 @@ export const adaptOpenGraphImages = async (
 
         let _image: OptimizedImage | undefined;
 
-        if (
-          typeof resolvedImage === 'string' &&
-          (resolvedImage.startsWith('http://') || resolvedImage.startsWith('https://'))
-        ) {
+        if (typeof resolvedImage === 'string') {
           _image = {
-            src: resolvedImage,
+            src: String(new URL(resolvedImage, astroSite)),
             width: image.width ?? defaultWidth,
             height: image.height ?? defaultHeight,
           };

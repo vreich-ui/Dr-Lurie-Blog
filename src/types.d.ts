@@ -82,7 +82,10 @@ export interface MetaDataImage {
 
 export interface MetaDataOpenGraph {
   url?: string;
+  title?: string;
+  description?: string;
   siteName?: string;
+  site_name?: string;
   images?: Array<MetaDataImage>;
   locale?: string;
   type?: string;
@@ -92,6 +95,9 @@ export interface MetaDataTwitter {
   handle?: string;
   site?: string;
   cardType?: string;
+  title?: string;
+  description?: string;
+  image?: string;
 }
 
 export interface Image {
