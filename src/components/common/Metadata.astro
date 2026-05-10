@@ -1,11 +1,8 @@
 ---
 import merge from 'lodash.merge';
-import { AstroSeo } from '@astrolib/seo';
-
-import type { Props as AstroSeoProps } from '@astrolib/seo';
 
 import { SITE, METADATA, I18N } from 'astrowind:config';
-import type { MetaData } from '~/types';
+import type { MetaData, MetaDataImage } from '~/types';
 import { getCanonical } from '~/utils/permalinks';
 
 import { adaptOpenGraphImages } from '~/utils/images';
@@ -13,6 +10,16 @@ import { adaptOpenGraphImages } from '~/utils/images';
 export interface Props extends MetaData {
   dontUseTitleTemplate?: boolean;
 }
+
+const FALLBACK_TITLE = METADATA?.title?.default || SITE?.name || 'Dr. Lurié';
+const FALLBACK_DESCRIPTION =
+  METADATA?.description ||
+  'Science-led education on aging skin, age-related scent changes, and future age-aware skincare solutions.';
+const FALLBACK_IMAGE: MetaDataImage = {
+  url: '/social-preview.svg',
+  width: 1200,
+  height: 630,
+};
 
 const {
   title,
@@ -24,45 +31,79 @@ const {
   twitter = {},
 } = Astro.props;
 
-const seoProps: AstroSeoProps = merge(
+const siteUrl = Astro.site ?? new URL(SITE?.site || 'https://drluriescience.netlify.app');
+const resolvedTitle = title || FALLBACK_TITLE;
+const resolvedDescription = description || FALLBACK_DESCRIPTION;
+const titleTemplate = ignoreTitleTemplate ? '%s' : METADATA?.title?.template || '%s';
+const pageTitle = titleTemplate.includes('%s') ? titleTemplate.replace('%s', resolvedTitle) : resolvedTitle;
+const noindex = typeof robots?.index !== 'undefined' ? !robots.index : METADATA?.robots?.index === false;
+const nofollow = typeof robots?.follow !== 'undefined' ? !robots.follow : METADATA?.robots?.follow === false;
+
+const mergedOpenGraph = merge(
   {
-    title: '',
-    titleTemplate: '%s',
-    canonical: canonical,
-    noindex: true,
-    nofollow: true,
-    description: undefined,
-    openGraph: {
-      url: canonical,
-      site_name: SITE?.name,
-      images: [],
-      locale: I18N?.language || 'en',
-      type: 'website',
-    },
-    twitter: {
-      cardType: openGraph?.images?.length ? 'summary_large_image' : 'summary',
-    },
+    url: canonical,
+    site_name: SITE?.name,
+    title: pageTitle,
+    description: resolvedDescription,
+    images: [FALLBACK_IMAGE],
+    locale: I18N?.language || 'en',
+    type: 'website',
   },
+  METADATA?.openGraph || {},
   {
-    title: METADATA?.title?.default,
-    titleTemplate: METADATA?.title?.template,
-    noindex: typeof METADATA?.robots?.index !== 'undefined' ? !METADATA.robots.index : undefined,
-    nofollow: typeof METADATA?.robots?.follow !== 'undefined' ? !METADATA.robots.follow : undefined,
-    description: METADATA?.description,
-    openGraph: METADATA?.openGraph,
-    twitter: METADATA?.twitter,
+    url: canonical,
+    title: pageTitle,
+    description: resolvedDescription,
   },
+  openGraph || {}
+);
+
+const adaptedOpenGraph = await adaptOpenGraphImages(mergedOpenGraph, siteUrl);
+const primaryImage = adaptedOpenGraph?.images?.find((image) => image?.url) || FALLBACK_IMAGE;
+const absoluteImageUrl = String(new URL(primaryImage.url, siteUrl));
+const imageWidth = primaryImage.width || FALLBACK_IMAGE.width;
+const imageHeight = primaryImage.height || FALLBACK_IMAGE.height;
+const ogType = adaptedOpenGraph?.type || 'website';
+const ogSiteName = adaptedOpenGraph?.site_name || adaptedOpenGraph?.siteName || SITE?.name;
+const ogLocale = adaptedOpenGraph?.locale || I18N?.language || 'en';
+
+const mergedTwitter = merge(
   {
-    title: title,
-    titleTemplate: ignoreTitleTemplate ? '%s' : undefined,
-    canonical: canonical,
-    noindex: typeof robots?.index !== 'undefined' ? !robots.index : undefined,
-    nofollow: typeof robots?.follow !== 'undefined' ? !robots.follow : undefined,
-    description: description,
-    openGraph: { url: canonical, ...openGraph },
-    twitter: twitter,
+    cardType: 'summary_large_image',
+    title: pageTitle,
+    description: resolvedDescription,
+    image: absoluteImageUrl,
+  },
+  METADATA?.twitter || {},
+  twitter || {},
+  {
+    title: twitter?.title || pageTitle,
+    description: twitter?.description || resolvedDescription,
+    image: twitter?.image || absoluteImageUrl,
   }
 );
+
+const robotsContent = [noindex ? 'noindex' : 'index', nofollow ? 'nofollow' : 'follow'].join(', ');
 ---
 
-<AstroSeo {...{ ...seoProps, openGraph: await adaptOpenGraphImages(seoProps?.openGraph, Astro.site) }} />
+<title>{pageTitle}</title>
+<meta name="description" content={resolvedDescription} />
+<meta name="robots" content={robotsContent} />
+<link rel="canonical" href={canonical} />
+
+<meta property="og:title" content={adaptedOpenGraph?.title || pageTitle} />
+<meta property="og:description" content={adaptedOpenGraph?.description || resolvedDescription} />
+<meta property="og:type" content={ogType} />
+<meta property="og:url" content={adaptedOpenGraph?.url || canonical} />
+<meta property="og:image" content={absoluteImageUrl} />
+<meta property="og:image:width" content={String(imageWidth)} />
+<meta property="og:image:height" content={String(imageHeight)} />
+{ogSiteName && <meta property="og:site_name" content={ogSiteName} />}
+{ogLocale && <meta property="og:locale" content={ogLocale} />}
+
+<meta name="twitter:card" content={mergedTwitter.cardType || 'summary_large_image'} />
+<meta name="twitter:title" content={mergedTwitter.title || pageTitle} />
+<meta name="twitter:description" content={mergedTwitter.description || resolvedDescription} />
+<meta name="twitter:image" content={mergedTwitter.image || absoluteImageUrl} />
+{mergedTwitter.site && <meta name="twitter:site" content={mergedTwitter.site} />}
+{mergedTwitter.handle && <meta name="twitter:creator" content={mergedTwitter.handle} />}

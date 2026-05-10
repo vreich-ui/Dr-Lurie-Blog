@@ -1,0 +1,10 @@
+# Canonical no-trailing-slash redirects for public HTML routes.
+/about/ /about 301!
+/blog/ /blog 301!
+/contact/ /contact 301!
+/privacy/ /privacy 301!
+/services/ /services 301!
+/shop/ /shop 301!
+/terms/ /terms 301!
+/topics/ /topics 301!
+/thank-you/ /thank-you 301!
