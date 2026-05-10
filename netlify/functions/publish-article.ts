@@ -1,3 +1,5 @@
+import { verifyToken } from '@clerk/backend';
+
 type LambdaEvent = {
   body?: string | null;
   headers?: Record<string, string | undefined>;
@@ -112,6 +114,38 @@ const getHeader = (headers: LambdaEvent['headers'], name: string) => {
   const match = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
 
   return match?.[1] ?? '';
+};
+
+const getBearerToken = (authorization: string) => {
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || undefined;
+};
+
+const verifyClerkSession = async (event: LambdaEvent) => {
+  const token = getBearerToken(getHeader(event.headers, 'authorization'));
+
+  if (!token) {
+    return jsonResponse(401, { error: 'A Clerk session token is required to publish articles.' });
+  }
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!secretKey) {
+    return jsonResponse(500, { error: 'Publishing authentication is not configured.' });
+  }
+
+  try {
+    const verifiedToken = await verifyToken(token, { secretKey });
+
+    if (!verifiedToken.sub) {
+      return jsonResponse(401, { error: 'Invalid Clerk session token.' });
+    }
+  } catch (error) {
+    console.warn('Rejected publish request with invalid Clerk session token.', error);
+    return jsonResponse(401, { error: 'Invalid Clerk session token.' });
+  }
+
+  return undefined;
 };
 
 const parseBody = (event: LambdaEvent): PublishInput | undefined => {
@@ -233,6 +267,12 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
+  }
+
+  const authResponse = await verifyClerkSession(event);
+
+  if (authResponse) {
+    return authResponse;
   }
 
   let input: PublishInput | undefined;
