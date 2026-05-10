@@ -29,6 +29,11 @@ const metadata = {
       </div>
     </header>
 
+    <section id="auth-panel" class="admin-card auth-panel" aria-label="Admin sign in" hidden>
+      <div id="clerk-sign-in" class="clerk-sign-in"></div>
+      <p id="auth-help" class="hint">Sign in with Clerk to publish articles.</p>
+    </section>
+
     <section class="admin-card" aria-label="Publishing form">
       <form id="publish-form" class="admin-form">
         <div class="field">
@@ -183,6 +188,20 @@ const metadata = {
 
   .admin-panel {
     margin-top: 1.5rem;
+  }
+
+  .auth-panel {
+    margin-bottom: 1.5rem;
+  }
+
+  .clerk-sign-in {
+    display: grid;
+    place-items: center;
+    min-height: 20rem;
+  }
+
+  .clerk-sign-in:empty {
+    display: none;
   }
 
   .admin-auth {
@@ -509,17 +528,13 @@ const metadata = {
 
   const adminPage = document.querySelector('.admin-page');
   const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+  const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
   let clerkLoadPromise;
+  let signInMounted = false;
 
-  const getClerkDomain = (publishableKey) => {
-    const encodedDomain = publishableKey.replace(/^pk_(test|live)_/, '');
-    const paddedDomain = encodedDomain.padEnd(encodedDomain.length + ((4 - (encodedDomain.length % 4)) % 4), '=');
-    return atob(paddedDomain.replaceAll('-', '+').replaceAll('_', '/')).replace(/\$$/, '');
-  };
-
-  const loadClerkScript = (src, publishableKey) =>
+  const loadClerkScript = () =>
     new Promise((resolve, reject) => {
-      const existingScript = document.querySelector(`script[src="${src}"]`);
+      const existingScript = document.querySelector(`script[src="${clerkJsScriptSrc}"]`);
 
       if (window.Clerk) {
         resolve();
@@ -530,21 +545,34 @@ const metadata = {
         existingScript.addEventListener('load', resolve, { once: true });
         existingScript.addEventListener(
           'error',
-          () => reject(new Error('Clerk authentication could not be loaded.')),
+          (event) => {
+            console.error('ClerkJS script failed to load from existing script tag.', {
+              src: clerkJsScriptSrc,
+              event,
+            });
+            reject(new Error('Clerk authentication could not be loaded.'));
+          },
           { once: true }
         );
         return;
       }
 
       const script = document.createElement('script');
-      script.src = src;
+      script.src = clerkJsScriptSrc;
       script.async = true;
       script.crossOrigin = 'anonymous';
-      script.dataset.clerkPublishableKey = publishableKey;
+      script.dataset.clerkPublishableKey = clerkPublishableKey;
       script.addEventListener('load', resolve, { once: true });
       script.addEventListener(
         'error',
-        () => reject(new Error('Clerk authentication could not be loaded.')),
+        (event) => {
+          console.error('ClerkJS script failed to load.', {
+            src: clerkJsScriptSrc,
+            hasPublishableKey: Boolean(clerkPublishableKey),
+            event,
+          });
+          reject(new Error('Clerk authentication could not be loaded.'));
+        },
         { once: true }
       );
       document.head.append(script);
@@ -556,13 +584,16 @@ const metadata = {
     }
 
     clerkLoadPromise ||= (async () => {
-      const clerkDomain = getClerkDomain(clerkPublishableKey);
-      await loadClerkScript(
-        `https://${clerkDomain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
-        clerkPublishableKey
-      );
-      await window.Clerk.load();
-      return window.Clerk;
+      await loadClerkScript();
+
+      if (!window.Clerk) {
+        console.error('ClerkJS script loaded, but window.Clerk is unavailable.', { src: clerkJsScriptSrc });
+        throw new Error('Clerk authentication could not be initialized.');
+      }
+
+      const clerk = typeof window.Clerk === 'function' ? new window.Clerk(clerkPublishableKey) : window.Clerk;
+      await clerk.load({ publishableKey: clerkPublishableKey });
+      return clerk;
     })();
 
     return clerkLoadPromise;
