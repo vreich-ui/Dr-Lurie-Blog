@@ -143,6 +143,14 @@ Any static assets, like images, can be placed in the `public/` directory if they
 
 <br>
 
+### Netlify Blobs opt-in storage
+
+The opt-in capture Function uses Netlify Blobs when `@netlify/blobs` is installed. The package is intentionally listed in `optionalDependencies` so `npm install` can still complete in restricted CI or proxy environments that cannot fetch scoped Netlify packages. In non-Netlify local development, the Function falls back to a tiny file-backed stub under `.netlify/local-blobs/`.
+
+Production Netlify deploys that need real Blob storage must be able to install `@netlify/blobs`. Configure npm registry/auth access with Netlify environment variables such as an npm token or `.npmrc` content generated at build time; do **not** commit tokens or secrets to the repository.
+
+Install troubleshooting: `astro` depends on the public npm package `unstorage`, so a `403 Forbidden` for `https://registry.npmjs.org/unstorage` is not caused by this app's Netlify Blobs fallback and should not be handled by making `unstorage` optional. In Codex-style proxy environments, first check proxy/network policy and npm registry access; on normal npm registry access, `unstorage` must install for Astro to run.
+
 ### Commands
 
 All commands are run from the root of the project, from a terminal:

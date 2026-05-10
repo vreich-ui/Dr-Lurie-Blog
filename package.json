@@ -20,10 +20,9 @@
     "fix": "npm run fix:eslint && npm run fix:prettier",
     "fix:eslint": "eslint --fix .",
     "fix:prettier": "prettier -w .",
-    "test:opt-in": "rm -rf .tmp/save-opt-in-test; tsc netlify/lib/opt-in-record.ts tests/netlify/save-opt-in.test.ts --module NodeNext --moduleResolution NodeNext --target ES2022 --outDir .tmp/save-opt-in-test --skipLibCheck --types node && node --test .tmp/save-opt-in-test/tests/netlify/save-opt-in.test.js; status=$?; rm -rf .tmp/save-opt-in-test; exit $status"
+    "test:opt-in": "rm -rf .tmp/save-opt-in-test; tsc -p tests/netlify/tsconfig.json && node --test .tmp/save-opt-in-test/tests/netlify/save-opt-in.test.js; status=$?; rm -rf .tmp/save-opt-in-test; exit $status"
   },
   "dependencies": {
-    "@netlify/blobs": "^10.7.0",
     "@astrojs/rss": "^4.0.12",
     "@astrojs/sitemap": "^3.4.2",
     "@astrolib/analytics": "^0.6.1",
@@ -48,6 +47,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/lodash.merge": "^4.6.9",
     "@types/mdx": "^2.0.13",
+    "@types/node": "^22.13.14",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
     "astro-compress": "2.3.8",
@@ -66,5 +66,8 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.39.0",
     "unist-util-visit": "^5.0.0"
+  },
+  "optionalDependencies": {
+    "@netlify/blobs": "^10.7.0"
   }
 }
