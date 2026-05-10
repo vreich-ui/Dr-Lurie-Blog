@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "strictNullChecks": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "outDir": "../../.tmp/save-opt-in-test",
+    "rootDir": "../..",
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": false
+  },
+  "include": ["../../netlify/**/*.ts", "../../src/netlify-blobs.d.ts", "./**/*.ts"]
+}

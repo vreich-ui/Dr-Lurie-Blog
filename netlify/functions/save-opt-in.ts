@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
-import { connectLambda, getStore } from '@netlify/blobs';
-
-import { buildRecord, getHeader, isParseBodyFailure, parseBody } from '../lib/opt-in-record';
+import { getOptInBlobStore } from '../lib/blob-store.js';
+import { buildRecord, getHeader, isParseBodyFailure, parseBody } from '../lib/opt-in-record.js';
 
 type LambdaEvent = {
   blobs?: string;
@@ -47,11 +46,9 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   try {
-    connectLambda(event);
-
     const date = record.submittedAt.slice(0, 10);
     const key = `opt-ins/${date}/${randomUUID()}.json`;
-    const store = getStore('opt-ins');
+    const store = await getOptInBlobStore(event);
 
     await store.setJSON(key, record, {
       metadata: {
