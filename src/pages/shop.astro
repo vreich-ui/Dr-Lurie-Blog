@@ -103,11 +103,12 @@ const metadata = {
     }
   }
 
+  /* Mobile-first override: keep the title and first product image above the first natural scroll. */
   @media (max-width: 767px) {
     .shop-hero {
       display: flex;
       flex-direction: column;
-      padding-top: 20px;
+      padding-top: 18px;
       padding-bottom: 48px;
       row-gap: 0;
     }
@@ -123,7 +124,7 @@ const metadata = {
 
     .shop-title {
       order: 2;
-      margin: 0 0 12px;
+      margin: 0 0 14px;
       font-size: clamp(2.15rem, 11vw, 3rem);
       line-height: 0.98;
     }
@@ -142,7 +143,7 @@ const metadata = {
 
     .shop-images figure:first-child img {
       min-height: 190px;
-      height: clamp(180px, 48vw, 220px);
+      height: clamp(190px, 50vw, 220px);
       max-height: 220px;
     }
 
