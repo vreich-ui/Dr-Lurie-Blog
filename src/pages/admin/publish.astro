@@ -34,6 +34,46 @@ const metadata = {
         </div>
 
         <div class="field">
+          <label for="excerpt">Excerpt</label>
+          <textarea
+            id="excerpt"
+            name="excerpt"
+            rows="3"
+            maxlength="300"
+            placeholder="Short list-card and topic summary copy."
+          ></textarea>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="publish-date">Publish date</label>
+            <input id="publish-date" name="publishDate" type="datetime-local" />
+          </div>
+
+          <div class="field">
+            <label for="author">Author</label>
+            <input id="author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurié" />
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label for="category">Category</label>
+            <input id="category" name="category" type="text" autocomplete="off" placeholder="Aging skin" />
+          </div>
+
+          <div class="field">
+            <label for="tags">Tags</label>
+            <input id="tags" name="tags" type="text" autocomplete="off" placeholder="barrier function, lipids" />
+          </div>
+        </div>
+
+        <div class="field checkbox-field">
+          <input id="draft" name="draft" type="checkbox" />
+          <label for="draft">Save as draft</label>
+        </div>
+
+        <div class="field">
           <label for="content">Markdown content</label>
           <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."></textarea>
         </div>
@@ -41,7 +81,9 @@ const metadata = {
         <div class="field">
           <label for="image-upload">Image upload</label>
           <input id="image-upload" type="file" multiple accept="image/*" />
-          <p class="hint">Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.</p>
+          <p class="hint">
+            Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.
+          </p>
           <ul id="image-list" class="image-list" aria-live="polite"></ul>
         </div>
 
@@ -57,9 +99,16 @@ const metadata = {
           <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
         </div>
 
-        <div class="field">
-          <label for="cta-link">Optional CTA link</label>
-          <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+        <div class="field-grid">
+          <div class="field">
+            <label for="cta-link">Optional CTA link</label>
+            <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+          </div>
+
+          <div class="field">
+            <label for="cta-text">Optional CTA text</label>
+            <input id="cta-text" name="ctaText" type="text" placeholder="Learn more" />
+          </div>
         </div>
 
         <div class="field">
@@ -96,8 +145,7 @@ const metadata = {
     <section class="admin-card admin-panel" aria-labelledby="publish-output-heading">
       <h2 id="publish-output-heading">Publish output</h2>
       <p>
-        Article file: <span id="suggested-filename" class="suggestion">slug.md</span><br />
-        Commit target: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
+        Suggested destination: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
       </p>
       <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button>
       <textarea id="output-markdown" class="output-markdown" readonly></textarea>
@@ -140,6 +188,17 @@ const metadata = {
 
   .field {
     margin-bottom: 1.15rem;
+  }
+
+  .field-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .field-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
   }
 
   label,
@@ -350,19 +409,25 @@ const metadata = {
   const fields = {
     title: document.querySelector('#title'),
     slug: document.querySelector('#slug'),
+    excerpt: document.querySelector('#excerpt'),
+    publishDate: document.querySelector('#publish-date'),
+    author: document.querySelector('#author'),
+    category: document.querySelector('#category'),
+    tags: document.querySelector('#tags'),
+    draft: document.querySelector('#draft'),
     content: document.querySelector('#content'),
     imageUpload: document.querySelector('#image-upload'),
     imageList: document.querySelector('#image-list'),
     featuredImage: document.querySelector('#featured-image'),
     videoLink: document.querySelector('#video-link'),
     ctaLink: document.querySelector('#cta-link'),
+    ctaText: document.querySelector('#cta-text'),
     seoDescription: document.querySelector('#seo-description'),
     overwrite: document.querySelector('#overwrite-slug'),
     status: document.querySelector('#status'),
     previewTitle: document.querySelector('#preview-title'),
     previewFeaturedImage: document.querySelector('#preview-featured-image'),
     markdownPreview: document.querySelector('#markdown-preview'),
-    suggestedFilename: document.querySelector('#suggested-filename'),
     suggestedLocation: document.querySelector('#suggested-location'),
     outputMarkdown: document.querySelector('#output-markdown'),
   };
@@ -379,6 +444,20 @@ const metadata = {
       .replaceAll("'", '&#039;');
 
   const escapeYaml = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+
+  const formatDateTimeLocal = (date) => {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - offset * 60000);
+    return localDate.toISOString().slice(0, 16);
+  };
+
+  const getPublishDate = () => (fields.publishDate.value ? new Date(fields.publishDate.value) : new Date());
+
+  const parseTags = (value) =>
+    String(value)
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
 
   const slugify = (value) =>
     String(value)
@@ -404,11 +483,18 @@ const metadata = {
   const getDraft = () => ({
     title: fields.title.value,
     slug: fields.slug.value,
+    excerpt: fields.excerpt.value,
+    publishDate: fields.publishDate.value,
+    author: fields.author.value,
+    category: fields.category.value,
+    tags: fields.tags.value,
+    draft: fields.draft.checked,
     content: fields.content.value,
     imageNames,
     featuredImage: fields.featuredImage.value,
     videoLink: fields.videoLink.value,
     ctaLink: fields.ctaLink.value,
+    ctaText: fields.ctaText.value,
     seoDescription: fields.seoDescription.value,
     overwrite: fields.overwrite.checked,
   });
@@ -497,12 +583,21 @@ const metadata = {
   const buildMarkdown = () => {
     const slug = getCurrentSlug();
     const featuredPath = getFeaturedImagePath();
+    const tags = parseTags(fields.tags.value);
+    const publishDate = getPublishDate().toISOString();
     const frontmatter = [
       '---',
       `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
-      `publishDate: ${new Date().toISOString()}`,
-      ...(fields.seoDescription.value ? [`excerpt: "${escapeYaml(fields.seoDescription.value)}"`] : []),
+      `publishDate: ${publishDate}`,
+      ...(fields.draft.checked ? ['draft: true'] : []),
+      ...(fields.excerpt.value ? [`excerpt: "${escapeYaml(fields.excerpt.value)}"`] : []),
       ...(featuredPath ? [`image: "${escapeYaml(featuredPath)}"`] : []),
+      ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
+      ...(fields.ctaLink.value ? [`ctaLink: "${escapeYaml(fields.ctaLink.value)}"`] : []),
+      ...(fields.ctaText.value ? [`ctaText: "${escapeYaml(fields.ctaText.value)}"`] : []),
+      ...(fields.category.value ? [`category: "${escapeYaml(fields.category.value)}"`] : []),
+      ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
+      ...(fields.author.value ? [`author: "${escapeYaml(fields.author.value)}"`] : []),
       ...(fields.seoDescription.value
         ? ['metadata:', `  description: "${escapeYaml(fields.seoDescription.value)}"`]
         : []),
@@ -518,7 +613,6 @@ const metadata = {
 
   const updatePublishOutput = () => {
     const { slug, markdown } = buildMarkdown();
-    fields.suggestedFilename.textContent = `${slug}.md`;
     fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
     fields.outputMarkdown.value = markdown;
   };
@@ -536,9 +630,16 @@ const metadata = {
       const draft = JSON.parse(saved);
       fields.title.value = draft.title || '';
       fields.slug.value = draft.slug || '';
+      fields.excerpt.value = draft.excerpt || '';
+      fields.publishDate.value = draft.publishDate || formatDateTimeLocal(new Date());
+      fields.author.value = draft.author || '';
+      fields.category.value = draft.category || '';
+      fields.tags.value = draft.tags || '';
+      fields.draft.checked = Boolean(draft.draft);
       fields.content.value = draft.content || '';
       fields.videoLink.value = draft.videoLink || '';
       fields.ctaLink.value = draft.ctaLink || '';
+      fields.ctaText.value = draft.ctaText || '';
       fields.seoDescription.value = draft.seoDescription || '';
       fields.overwrite.checked = Boolean(draft.overwrite);
       imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
@@ -607,11 +708,18 @@ const metadata = {
         body: JSON.stringify({
           title: fields.title.value,
           slug,
+          excerpt: fields.excerpt.value,
+          publishDate: getPublishDate().toISOString(),
+          author: fields.author.value,
+          category: fields.category.value,
+          tags: parseTags(fields.tags.value),
+          draft: fields.draft.checked,
           content: fields.content.value,
           featuredImage: fields.featuredImage.value,
           seoDescription: fields.seoDescription.value,
           videoLink: fields.videoLink.value,
           ctaLink: fields.ctaLink.value,
+          ctaText: fields.ctaText.value,
           overwrite: fields.overwrite.checked,
           files,
         }),
@@ -648,6 +756,7 @@ const metadata = {
     });
   });
 
+  if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
   loadDraft();
   updatePreview();
   updatePublishOutput();

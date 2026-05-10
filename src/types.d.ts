@@ -22,6 +22,12 @@ export interface Post {
   excerpt?: string;
   /**  */
   image?: ImageMetadata | string;
+  /** Optional embedded video URL for article media. */
+  video?: string;
+  /** Optional article CTA URL. */
+  ctaLink?: string;
+  /** Optional article CTA label. */
+  ctaText?: string;
 
   /**  */
   category?: Taxonomy;

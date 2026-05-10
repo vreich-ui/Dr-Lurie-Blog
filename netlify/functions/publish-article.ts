@@ -41,6 +41,8 @@ type PublishInput = {
   category?: unknown;
   content?: unknown;
   ctaLink?: unknown;
+  ctaText?: unknown;
+  draft?: unknown;
   excerpt?: unknown;
   files?: unknown;
   featuredImage?: unknown;
@@ -89,6 +91,8 @@ const sanitizeFilename = (value: string) => {
 
 const escapeYaml = (value: string) => value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 
+const toBooleanValue = (value: unknown) => value === true || value === 'true' || value === 'on';
+
 const parseTags = (value: unknown) => {
   if (Array.isArray(value)) {
     return value.map((tag) => toStringValue(tag)).filter((tag): tag is string => Boolean(tag));
@@ -134,6 +138,8 @@ const buildFrontmatter = ({
   category,
   content,
   ctaLink,
+  ctaText,
+  draft,
   excerpt,
   imagePath,
   publishDate,
@@ -146,6 +152,8 @@ const buildFrontmatter = ({
   category?: string;
   content: string;
   ctaLink?: string;
+  ctaText?: string;
+  draft?: boolean;
   excerpt?: string;
   imagePath?: string;
   publishDate: string;
@@ -158,19 +166,16 @@ const buildFrontmatter = ({
     '---',
     `publishDate: ${publishDate}`,
     `title: "${escapeYaml(title)}"`,
+    ...(draft ? ['draft: true'] : []),
     ...(excerpt ? [`excerpt: "${escapeYaml(excerpt)}"`] : []),
     ...(imagePath ? [`image: "${escapeYaml(imagePath)}"`] : []),
+    ...(videoLink ? [`video: "${escapeYaml(videoLink)}"`] : []),
+    ...(ctaLink ? [`ctaLink: "${escapeYaml(ctaLink)}"`] : []),
+    ...(ctaText ? [`ctaText: "${escapeYaml(ctaText)}"`] : []),
     ...(category ? [`category: "${escapeYaml(category)}"`] : []),
-    ...(tags.length ? ['tags:', ...tags.map((tag) => `  - ${escapeYaml(tag)}`)] : []),
+    ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
     ...(author ? [`author: "${escapeYaml(author)}"`] : []),
-    ...(seoDescription || videoLink || ctaLink
-      ? [
-          'metadata:',
-          ...(seoDescription ? [`  description: "${escapeYaml(seoDescription)}"`] : []),
-          ...(videoLink ? [`  openGraph:`, `    url: "${escapeYaml(videoLink)}"`] : []),
-          ...(ctaLink ? [`  canonical: "${escapeYaml(ctaLink)}"`] : []),
-        ]
-      : []),
+    ...(seoDescription ? ['metadata:', `  description: "${escapeYaml(seoDescription)}"`] : []),
     '---',
     '',
   ];
@@ -322,6 +327,8 @@ export const handler = async (event: LambdaEvent) => {
       category: toStringValue(input.category),
       content,
       ctaLink: toStringValue(input.ctaLink),
+      ctaText: toStringValue(input.ctaText),
+      draft: toBooleanValue(input.draft),
       excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
       imagePath,
       publishDate,
