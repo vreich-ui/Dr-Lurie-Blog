@@ -3,8 +3,6 @@ import { fileURLToPath } from 'url';
 
 import { defineConfig, passthroughImageService } from 'astro/config';
 
-import netlify from '@astrojs/netlify';
-import clerk from '@clerk/astro';
 import sitemap from '@astrojs/sitemap';
 import tailwind from '@astrojs/tailwind';
 import mdx from '@astrojs/mdx';
@@ -24,11 +22,9 @@ const whenExternalScripts = (items: (() => AstroIntegration) | (() => AstroInteg
   hasExternalScripts ? (Array.isArray(items) ? items.map((item) => item()) : [items()]) : [];
 
 export default defineConfig({
-  output: 'server',
-  adapter: netlify(),
+  output: 'static',
 
   integrations: [
-    clerk(),
     tailwind({
       applyBaseStyles: false,
     }),
