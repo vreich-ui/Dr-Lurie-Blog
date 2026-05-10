@@ -41,7 +41,7 @@ const metadata = {
         <div class="field">
           <label for="image-upload">Image upload</label>
           <input id="image-upload" type="file" multiple accept="image/*" />
-          <p class="hint">Selected images are listed below for Markdown copy helpers. No files are uploaded by this MVP.</p>
+          <p class="hint">Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.</p>
           <ul id="image-list" class="image-list" aria-live="polite"></ul>
         </div>
 
@@ -65,6 +65,11 @@ const metadata = {
         <div class="field">
           <label for="seo-description">Optional SEO description</label>
           <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
+        </div>
+
+        <div class="field checkbox-field">
+          <input id="overwrite-slug" name="overwrite" type="checkbox" />
+          <label for="overwrite-slug">Overwrite an existing article with this slug</label>
         </div>
 
         <div class="actions">
@@ -91,12 +96,12 @@ const metadata = {
     <section class="admin-card admin-panel" aria-labelledby="publish-output-heading">
       <h2 id="publish-output-heading">Publish output</h2>
       <p>
-        Suggested filename: <span id="suggested-filename" class="suggestion">slug.md</span><br />
-        Suggested location: <span id="suggested-location" class="suggestion">/src/content/articles/slug.md</span>
+        Article file: <span id="suggested-filename" class="suggestion">slug.md</span><br />
+        Commit target: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
       </p>
-      <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown</button>
+      <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button>
       <textarea id="output-markdown" class="output-markdown" readonly></textarea>
-      <p class="mvp-message">MVP only: copy this Markdown into the GitHub content folder.</p>
+      <p class="publish-message">Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.</p>
     </section>
   </section>
 </Layout>
@@ -289,10 +294,25 @@ const metadata = {
     font-size: 0.9rem;
   }
 
-  .mvp-message {
+  .publish-message {
     margin: 0.85rem 0 0;
     color: var(--aw-color-secondary);
     font-weight: 800;
+  }
+
+  .checkbox-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .checkbox-field input {
+    width: auto;
+    margin-top: 0.25rem;
+  }
+
+  .checkbox-field label {
+    margin-bottom: 0;
   }
 
   .status {
@@ -327,7 +347,6 @@ const metadata = {
 
 <script is:inline>
   const draftKey = 'dr-lurie-admin-draft';
-  const uploadPath = '/images/uploads/';
   const fields = {
     title: document.querySelector('#title'),
     slug: document.querySelector('#slug'),
@@ -338,6 +357,7 @@ const metadata = {
     videoLink: document.querySelector('#video-link'),
     ctaLink: document.querySelector('#cta-link'),
     seoDescription: document.querySelector('#seo-description'),
+    overwrite: document.querySelector('#overwrite-slug'),
     status: document.querySelector('#status'),
     previewTitle: document.querySelector('#preview-title'),
     previewFeaturedImage: document.querySelector('#preview-featured-image'),
@@ -348,6 +368,7 @@ const metadata = {
   };
 
   let imageNames = [];
+  let selectedFiles = [];
 
   const escapeHtml = (value) =>
     String(value)
@@ -366,7 +387,19 @@ const metadata = {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-  const getFeaturedImagePath = () => (fields.featuredImage.value ? `${uploadPath}${fields.featuredImage.value}` : '');
+  const sanitizeFilename = (value) =>
+    String(value)
+      .split(/[\\/]/)
+      .pop()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'upload';
+
+  const getCurrentSlug = () => slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+
+  const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
+
+  const getFeaturedImagePath = () => (fields.featuredImage.value ? getUploadPath(fields.featuredImage.value) : '');
 
   const getDraft = () => ({
     title: fields.title.value,
@@ -377,11 +410,12 @@ const metadata = {
     videoLink: fields.videoLink.value,
     ctaLink: fields.ctaLink.value,
     seoDescription: fields.seoDescription.value,
+    overwrite: fields.overwrite.checked,
   });
 
-  const setStatus = (message) => {
+  const setStatus = (message, autoClear = true) => {
     fields.status.textContent = message;
-    if (message) {
+    if (message && autoClear) {
       window.setTimeout(() => {
         if (fields.status.textContent === message) fields.status.textContent = '';
       }, 2500);
@@ -422,7 +456,7 @@ const metadata = {
       copyButton.type = 'button';
       copyButton.textContent = 'Copy Markdown';
       copyButton.addEventListener('click', () => {
-        copyText(`![Alt text](${uploadPath}${name})`, `Copied Markdown for ${name}.`);
+        copyText(`![Alt text](${getUploadPath(name)})`, `Copied Markdown for ${name}.`);
       });
 
       item.append(filename, copyButton);
@@ -461,16 +495,17 @@ const metadata = {
   };
 
   const buildMarkdown = () => {
-    const slug = slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+    const slug = getCurrentSlug();
     const featuredPath = getFeaturedImagePath();
     const frontmatter = [
       '---',
       `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
-      `slug: "${escapeYaml(slug)}"`,
-      ...(fields.seoDescription.value ? [`description: "${escapeYaml(fields.seoDescription.value)}"`] : []),
-      ...(featuredPath ? [`featuredImage: "${escapeYaml(featuredPath)}"`] : []),
-      ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
-      ...(fields.ctaLink.value ? [`cta: "${escapeYaml(fields.ctaLink.value)}"`] : []),
+      `publishDate: ${new Date().toISOString()}`,
+      ...(fields.seoDescription.value ? [`excerpt: "${escapeYaml(fields.seoDescription.value)}"`] : []),
+      ...(featuredPath ? [`image: "${escapeYaml(featuredPath)}"`] : []),
+      ...(fields.seoDescription.value
+        ? ['metadata:', `  description: "${escapeYaml(fields.seoDescription.value)}"`]
+        : []),
       '---',
       '',
     ];
@@ -484,7 +519,7 @@ const metadata = {
   const updatePublishOutput = () => {
     const { slug, markdown } = buildMarkdown();
     fields.suggestedFilename.textContent = `${slug}.md`;
-    fields.suggestedLocation.textContent = `/src/content/articles/${slug}.md`;
+    fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
     fields.outputMarkdown.value = markdown;
   };
 
@@ -505,6 +540,7 @@ const metadata = {
       fields.videoLink.value = draft.videoLink || '';
       fields.ctaLink.value = draft.ctaLink || '';
       fields.seoDescription.value = draft.seoDescription || '';
+      fields.overwrite.checked = Boolean(draft.overwrite);
       imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
       renderImages();
       fields.featuredImage.value = draft.featuredImage || '';
@@ -518,7 +554,8 @@ const metadata = {
   });
 
   fields.imageUpload.addEventListener('change', () => {
-    imageNames = Array.from(fields.imageUpload.files || []).map((file) => file.name);
+    selectedFiles = Array.from(fields.imageUpload.files || []);
+    imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
     const previousFeaturedImage = fields.featuredImage.value;
     renderImages();
     if (imageNames.includes(previousFeaturedImage)) fields.featuredImage.value = previousFeaturedImage;
@@ -531,11 +568,74 @@ const metadata = {
     updatePreview();
     setStatus('Preview updated.');
   });
-  document.querySelector('#publish').addEventListener('click', () => {
+  const fileToBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        const result = String(reader.result || '');
+        resolve(result.includes(',') ? result.split(',').pop() : result);
+      });
+      reader.addEventListener('error', () => reject(reader.error));
+      reader.readAsDataURL(file);
+    });
+
+  const publishArticle = async () => {
     updatePreview();
     updatePublishOutput();
-    setStatus('Publish Markdown generated.');
-  });
+
+    const { slug } = buildMarkdown();
+    if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
+      setStatus('Title, slug, and Markdown content are required before publishing.', false);
+      return;
+    }
+
+    const publishButton = document.querySelector('#publish');
+    publishButton.disabled = true;
+    setStatus('Publishing article to GitHub…', false);
+
+    try {
+      const files = await Promise.all(
+        selectedFiles.map(async (file) => ({
+          base64: await fileToBase64(file),
+          name: sanitizeFilename(file.name),
+          type: file.type,
+        }))
+      );
+      const response = await fetch('/.netlify/functions/publish-article', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: fields.title.value,
+          slug,
+          content: fields.content.value,
+          featuredImage: fields.featuredImage.value,
+          seoDescription: fields.seoDescription.value,
+          videoLink: fields.videoLink.value,
+          ctaLink: fields.ctaLink.value,
+          overwrite: fields.overwrite.checked,
+          files,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const message = result.error || `Publish failed with status ${response.status}.`;
+        setStatus(response.status === 409 ? `${message} Check overwrite to replace it.` : message, false);
+        return;
+      }
+
+      setStatus(
+        `Published ${result.path || `src/data/post/${slug}.md`} in commit ${String(result.commit || '').slice(0, 7)}.`,
+        false
+      );
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
+    } finally {
+      publishButton.disabled = false;
+    }
+  };
+
+  document.querySelector('#publish').addEventListener('click', publishArticle);
   document.querySelector('#copy-output').addEventListener('click', () => {
     updatePublishOutput();
     copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
