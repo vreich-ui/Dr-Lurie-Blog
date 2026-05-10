@@ -58,6 +58,7 @@ export const headerData = {
     },
   ],
   actions: [
+    { text: 'Admin', href: getPermalink('/admin/publish'), variant: 'secondary' } satisfies CallToAction,
     { text: 'Join Early Access', href: getPermalink('/#early-access'), variant: 'primary' } satisfies CallToAction,
   ],
 };
