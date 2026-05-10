@@ -53,6 +53,8 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
     tags: rawTags = [],
     category: rawCategory,
     author,
+    video,
+    cta,
     draft = false,
     metadata = {},
   } = data;
@@ -88,6 +90,8 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
     category: category,
     tags: tags,
     author: author,
+    video: video,
+    cta: cta,
 
     draft: draft,
 

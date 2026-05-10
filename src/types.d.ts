@@ -29,6 +29,10 @@ export interface Post {
   tags?: Taxonomy[];
   /**  */
   author?: string;
+  /** Optional video embed URL for a post. */
+  video?: string;
+  /** Optional post call to action. */
+  cta?: PostCallToAction;
 
   /**  */
   metadata?: MetaData;
@@ -47,6 +51,11 @@ export interface Post {
 export interface Taxonomy {
   slug: string;
   title: string;
+}
+
+export interface PostCallToAction {
+  text: string;
+  href?: string;
 }
 
 export interface MetaData {

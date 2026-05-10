@@ -61,6 +61,14 @@ const postCollection = defineCollection({
     tags: z.array(z.string()).optional(),
     author: z.string().optional(),
 
+    video: z.string().url().optional(),
+    cta: z
+      .object({
+        text: z.string(),
+        href: z.string().url().optional(),
+      })
+      .optional(),
+
     metadata: metadataDefinition(),
   }),
 });

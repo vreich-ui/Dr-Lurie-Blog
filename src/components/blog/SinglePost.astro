@@ -90,11 +90,40 @@ const { post, url } = Astro.props;
         )
       }
     </header>
+    {
+      post.video && (
+        <div class="mx-auto mt-8 max-w-3xl px-6 sm:px-6">
+          <div class="aspect-video overflow-hidden rounded-md bg-gray-200 shadow-lg dark:bg-slate-800">
+            <iframe
+              src={post.video}
+              title={`${post.title} video`}
+              class="h-full w-full"
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+            />
+          </div>
+        </div>
+      )
+    }
     <div
       class="mx-auto px-6 sm:px-6 max-w-3xl prose prose-md lg:prose-xl dark:prose-invert dark:prose-headings:text-slate-300 prose-headings:font-heading prose-headings:leading-tighter prose-headings:tracking-tighter prose-headings:font-bold prose-a:text-primary dark:prose-a:text-blue-400 prose-img:rounded-md prose-img:shadow-lg mt-8 prose-headings:scroll-mt-[80px] prose-li:my-0"
     >
       <slot />
     </div>
+    {
+      post.cta && (
+        <aside class="mx-auto mt-8 max-w-3xl rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+          {post.cta.href ? (
+            <a class="btn-primary" href={post.cta.href}>
+              {post.cta.text}
+            </a>
+          ) : (
+            <p class="font-heading text-2xl font-bold text-heading">{post.cta.text}</p>
+          )}
+        </aside>
+      )
+    }
     <div class="mx-auto px-6 sm:px-6 max-w-3xl mt-8 flex justify-between flex-col sm:flex-row">
       <PostTags tags={post.tags} class="mr-5 rtl:mr-0 rtl:ml-5" />
       <SocialShare url={url} text={post.title} class="mt-5 sm:mt-1 align-middle text-gray-500 dark:text-slate-600" />
