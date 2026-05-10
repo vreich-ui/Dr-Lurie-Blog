@@ -89,6 +89,27 @@ const { post, url } = Astro.props;
           </div>
         )
       }
+      {post.video && (
+        <div class="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <div class="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <iframe
+              class="aspect-video w-full"
+              src={post.video}
+              title={`${post.title} video`}
+              loading="lazy"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+            />
+          </div>
+        </div>
+      )}
+      {post.ctaLink && (
+        <div class="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+          <a class="btn-primary" href={post.ctaLink}>
+            {post.ctaText || 'Learn more'}
+          </a>
+        </div>
+      )}
     </header>
     <div
       class="mx-auto px-6 sm:px-6 max-w-3xl prose prose-md lg:prose-xl dark:prose-invert dark:prose-headings:text-slate-300 prose-headings:font-heading prose-headings:leading-tighter prose-headings:tracking-tighter prose-headings:font-bold prose-a:text-primary dark:prose-a:text-blue-400 prose-img:rounded-md prose-img:shadow-lg mt-8 prose-headings:scroll-mt-[80px] prose-li:my-0"
