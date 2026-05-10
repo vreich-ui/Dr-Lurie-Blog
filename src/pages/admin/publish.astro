@@ -80,13 +80,13 @@ const metadata = {
         <div class="field">
           <label for="image-upload">Image upload</label>
           <input id="image-upload" type="file" multiple accept="image/*" />
-          <p class="hint">Selected images are listed below for Markdown copy helpers. No files are uploaded by this MVP.</p>
+          <p class="hint">Selected images are uploaded to GitHub with this post and listed below for Markdown copy helpers.</p>
           <ul id="image-list" class="image-list" aria-live="polite"></ul>
         </div>
 
         <div class="field">
           <label for="post-image">Post image</label>
-          <select id="post-image" name="image">
+          <select id="post-image" name="postImage">
             <option value="">Select an uploaded image</option>
           </select>
         </div>
@@ -116,7 +116,7 @@ const metadata = {
         <div class="actions">
           <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
           <button id="preview" class="btn-secondary" type="button">Preview</button>
-          <button id="publish" class="btn-primary publish-button" type="button">Publish</button>
+          <button id="publish" class="btn-primary publish-button" type="button">Publish to GitHub</button>
         </div>
         <p id="status" class="status" aria-live="polite"></p>
       </form>
@@ -142,7 +142,7 @@ const metadata = {
       </p>
       <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown</button>
       <textarea id="output-markdown" class="output-markdown" readonly></textarea>
-      <p class="mvp-message">MVP only: copy this Markdown into the GitHub content folder.</p>
+      <p class="mvp-message">Publishing submits this Markdown and selected images to GitHub; copy remains available as a fallback.</p>
     </section>
   </section>
 </Layout>
@@ -402,7 +402,7 @@ const metadata = {
 
 <script is:inline>
   const draftKey = 'dr-lurie-admin-draft';
-  const uploadPath = '/images/uploads/';
+  const publishEndpoint = '/.netlify/functions/publish-post';
   const fields = {
     title: document.querySelector('#title'),
     slug: document.querySelector('#slug'),
@@ -429,7 +429,7 @@ const metadata = {
     outputMarkdown: document.querySelector('#output-markdown'),
   };
 
-  let imageNames = [];
+  let selectedFiles = [];
 
   const escapeHtml = (value) =>
     String(value)
@@ -456,7 +456,31 @@ const metadata = {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
 
-  const getPostImagePath = () => (fields.postImage.value ? `${uploadPath}${fields.postImage.value}` : '');
+  const sanitizeFilename = (value) => {
+    const filename = String(value).split(/[\\/]/).pop() || 'image';
+    const dotIndex = filename.lastIndexOf('.');
+    const rawName = dotIndex > 0 ? filename.slice(0, dotIndex) : filename;
+    const rawExtension = dotIndex > 0 ? filename.slice(dotIndex + 1) : '';
+    const safeName = slugify(rawName) || 'image';
+    const safeExtension = rawExtension.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    return safeExtension ? `${safeName}.${safeExtension}` : safeName;
+  };
+
+  const getCurrentSlug = () => slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+
+  const getUploadPath = (filename) => `/images/uploads/${getCurrentSlug()}/${sanitizeFilename(filename)}`;
+
+  const getRepoUploadPath = (filename) => `public${getUploadPath(filename)}`;
+
+  const getPostImagePath = () => fields.postImage.value;
+
+  const getPostPath = () => `src/data/post/${getCurrentSlug()}.md`;
+
+  const getSelectedFilenameFromPostImage = () => {
+    const path = getPostImagePath();
+    return path ? path.split('/').pop() : '';
+  };
 
   const getDraft = () => ({
     title: fields.title.value,
@@ -468,7 +492,7 @@ const metadata = {
     publishDate: fields.publishDate.value,
     draft: fields.draft.checked,
     content: fields.content.value,
-    imageNames,
+    imageNames: selectedFiles.map(({ filename }) => filename),
     postImage: fields.postImage.value,
     videoLink: fields.videoLink.value,
     ctaLink: fields.ctaLink.value,
@@ -476,12 +500,12 @@ const metadata = {
     seoDescription: fields.seoDescription.value,
   });
 
-  const setStatus = (message) => {
+  const setStatus = (message, persist = false) => {
     fields.status.textContent = message;
-    if (message) {
+    if (message && !persist) {
       window.setTimeout(() => {
         if (fields.status.textContent === message) fields.status.textContent = '';
-      }, 2500);
+      }, 3500);
     }
   };
 
@@ -500,31 +524,38 @@ const metadata = {
   };
 
   const renderImages = () => {
+    const previousFilename = getSelectedFilenameFromPostImage();
     fields.imageList.innerHTML = '';
     fields.postImage.innerHTML = '<option value="">Select an uploaded image</option>';
 
-    imageNames.forEach((name) => {
+    selectedFiles.forEach(({ filename }) => {
+      const uploadPath = getUploadPath(filename);
       const option = document.createElement('option');
-      option.value = name;
-      option.textContent = name;
+      option.value = uploadPath;
+      option.textContent = filename;
       fields.postImage.append(option);
 
       const item = document.createElement('li');
-      const filename = document.createElement('span');
+      const fileLabel = document.createElement('span');
       const copyButton = document.createElement('button');
 
-      filename.className = 'filename';
-      filename.textContent = name;
+      fileLabel.className = 'filename';
+      fileLabel.textContent = filename;
       copyButton.className = 'btn-secondary btn-sm copy-button';
       copyButton.type = 'button';
       copyButton.textContent = 'Copy Markdown';
       copyButton.addEventListener('click', () => {
-        copyText(`![Alt text](${uploadPath}${name})`, `Copied Markdown for ${name}.`);
+        copyText(`![Alt text](${uploadPath})`, `Copied Markdown for ${filename}.`);
       });
 
-      item.append(filename, copyButton);
+      item.append(fileLabel, copyButton);
       fields.imageList.append(item);
     });
+
+    if (previousFilename) {
+      const matchingOption = Array.from(fields.postImage.options).find((option) => option.textContent === previousFilename);
+      if (matchingOption) fields.postImage.value = matchingOption.value;
+    }
   };
 
   const renderMarkdownPreview = (markdown) => {
@@ -558,7 +589,7 @@ const metadata = {
   };
 
   const buildMarkdown = () => {
-    const slug = slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+    const slug = getCurrentSlug();
     const imagePath = getPostImagePath();
     const tags = parseTags(fields.tags.value);
     const frontmatter = [
@@ -589,19 +620,87 @@ const metadata = {
     return {
       slug,
       markdown: `${frontmatter.join('\n')}${fields.content.value.trim()}\n`,
+      postPath: getPostPath(),
     };
   };
 
   const updatePublishOutput = () => {
-    const { slug, markdown } = buildMarkdown();
+    const { slug, markdown, postPath } = buildMarkdown();
     fields.suggestedFilename.textContent = `${slug}.md`;
-    fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
+    fields.suggestedLocation.textContent = postPath;
     fields.outputMarkdown.value = markdown;
   };
 
   const saveDraft = () => {
     localStorage.setItem(draftKey, JSON.stringify(getDraft()));
-    setStatus('Draft saved.');
+    setStatus('Draft saved. Re-select images before publishing if you reload this page.');
+  };
+
+  const readFileAsBase64 = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        const result = String(reader.result || '');
+        resolve(result.includes(',') ? result.split(',').pop() : result);
+      });
+      reader.addEventListener('error', () => reject(reader.error));
+      reader.readAsDataURL(file);
+    });
+
+  const getUploadPayload = async () =>
+    Promise.all(
+      selectedFiles
+        .filter(({ file }) => file)
+        .map(async ({ file, filename }) => ({
+          path: getRepoUploadPath(filename),
+          content: await readFileAsBase64(file),
+          encoding: 'base64',
+        }))
+    );
+
+  const submitPublish = async ({ overwrite = false } = {}) => {
+    const { slug, markdown, postPath } = buildMarkdown();
+    const payload = {
+      slug,
+      postPath,
+      markdown,
+      postImage: getPostImagePath(),
+      overwrite,
+      files: await getUploadPayload(),
+    };
+
+    setStatus(overwrite ? 'Overwriting existing post…' : 'Publishing post…', true);
+
+    const response = await fetch(publishEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    let result = {};
+    try {
+      result = await response.json();
+    } catch (error) {
+      result = {};
+    }
+
+    if (response.status === 409) {
+      const shouldOverwrite = window.confirm(
+        `A post already exists at ${postPath}. Do you want to overwrite it on the main branch?`
+      );
+      if (shouldOverwrite) return submitPublish({ overwrite: true });
+      setStatus('Publish canceled. Existing post was not overwritten.', true);
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Publishing failed.');
+    }
+
+    setStatus(`Published ${postPath} to GitHub.`, true);
+    localStorage.removeItem(draftKey);
   };
 
   const loadDraft = () => {
@@ -623,7 +722,9 @@ const metadata = {
       fields.ctaLink.value = draft.ctaLink || '';
       fields.ctaText.value = draft.ctaText || '';
       fields.seoDescription.value = draft.seoDescription || '';
-      imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
+      selectedFiles = Array.isArray(draft.imageNames)
+        ? draft.imageNames.map((filename) => ({ filename: sanitizeFilename(filename) }))
+        : [];
       renderImages();
       fields.postImage.value = draft.postImage || '';
     } catch (error) {
@@ -633,13 +734,19 @@ const metadata = {
 
   fields.title.addEventListener('input', () => {
     if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
+    renderImages();
+  });
+
+  fields.slug.addEventListener('input', () => {
+    renderImages();
   });
 
   fields.imageUpload.addEventListener('change', () => {
-    imageNames = Array.from(fields.imageUpload.files || []).map((file) => file.name);
-    const previousPostImage = fields.postImage.value;
+    selectedFiles = Array.from(fields.imageUpload.files || []).map((file) => ({
+      file,
+      filename: sanitizeFilename(file.name),
+    }));
     renderImages();
-    if (imageNames.includes(previousPostImage)) fields.postImage.value = previousPostImage;
     updatePreview();
     updatePublishOutput();
   });
@@ -649,10 +756,15 @@ const metadata = {
     updatePreview();
     setStatus('Preview updated.');
   });
-  document.querySelector('#publish').addEventListener('click', () => {
+  document.querySelector('#publish').addEventListener('click', async () => {
     updatePreview();
     updatePublishOutput();
-    setStatus('Publish Markdown generated.');
+
+    try {
+      await submitPublish();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Publishing failed.', true);
+    }
   });
   document.querySelector('#copy-output').addEventListener('click', () => {
     updatePublishOutput();
