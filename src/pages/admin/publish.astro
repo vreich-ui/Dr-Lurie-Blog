@@ -520,9 +520,6 @@ const metadata = {
     signIn: document.querySelector('#sign-in'),
     signOut: document.querySelector('#sign-out'),
     publish: document.querySelector('#publish'),
-    authPanel: document.querySelector('#auth-panel'),
-    authHelp: document.querySelector('#auth-help'),
-    clerkSignIn: document.querySelector('#clerk-sign-in'),
   };
 
   let imageNames = [];
@@ -608,39 +605,6 @@ const metadata = {
     return email || name || 'Clerk user';
   };
 
-  const unmountSignIn = (clerk) => {
-    if (signInMounted && typeof clerk.unmountSignIn === 'function') {
-      clerk.unmountSignIn(fields.clerkSignIn);
-    }
-
-    signInMounted = false;
-    fields.clerkSignIn.replaceChildren();
-    fields.authPanel.hidden = true;
-  };
-
-  const mountSignIn = (clerk) => {
-    fields.authPanel.hidden = false;
-
-    if (typeof clerk.mountSignIn !== 'function') {
-      fields.authHelp.textContent = 'Use the Sign in button to authenticate with Clerk before publishing.';
-      fields.signIn.hidden = false;
-      return;
-    }
-
-    fields.signIn.hidden = true;
-
-    if (!signInMounted) {
-      fields.clerkSignIn.replaceChildren();
-      clerk.mountSignIn(fields.clerkSignIn, {
-        afterSignInUrl: window.location.href,
-        redirectUrl: window.location.href,
-      });
-      signInMounted = true;
-    }
-
-    fields.authHelp.textContent = 'Sign in with Clerk to publish articles.';
-  };
-
   const setAuthState = (state, message) => {
     fields.authStatus.textContent = message;
     fields.authStatus.dataset.state = state;
@@ -653,12 +617,10 @@ const metadata = {
   const renderAuthState = (clerk) => {
     if (clerk.isSignedIn && clerk.session) {
       setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
-      unmountSignIn(clerk);
       return;
     }
 
     setAuthState('signed-out', 'Signed out — sign in to publish');
-    mountSignIn(clerk);
   };
 
   const initializeClerkAuth = async () => {
@@ -672,11 +634,8 @@ const metadata = {
         clerk.addListener(() => renderAuthState(clerk));
       }
     } catch (error) {
-      console.error('Clerk authentication initialization failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
       setAuthState('error', message);
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = message;
       setStatus(message, false);
     }
   };
