@@ -21,7 +21,10 @@ const metadataDefinition = () =>
       openGraph: z
         .object({
           url: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
           siteName: z.string().optional(),
+          site_name: z.string().optional(),
           images: z
             .array(
               z.object({
@@ -41,6 +44,9 @@ const metadataDefinition = () =>
           handle: z.string().optional(),
           site: z.string().optional(),
           cardType: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          image: z.string().optional(),
         })
         .optional(),
     })

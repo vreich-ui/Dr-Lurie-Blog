@@ -22,3 +22,7 @@ pnpm-debug.log*
 pnpm-lock.yaml
 
 .astro
+
+# generated social preview image
+public/social-preview.png
+public/social-preview.jpg

@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
+    "generate:social-preview": "node scripts/generate-social-preview.mjs",
+    "prebuild": "npm run generate:social-preview",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
