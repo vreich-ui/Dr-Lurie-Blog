@@ -2,10 +2,7 @@
 publishDate: 2026-05-10T14:59:37.539Z
 title: "A skincare company that cares about skin"
 image: "~/assets/images/uploads/skincare-company/dr-lurie-lab-formulation.jpg"
-metadata:
-  openGraph:
-    url: "https://www.youtube.com"
-  canonical: "https://www.youtube.com"
+excerpt: "A look at why science-based skincare depends on careful formulation, production, and testing before product claims."
 ---
 It's an open industry secret that almost every skincare brand outsources the formulation and production of their products.
 
