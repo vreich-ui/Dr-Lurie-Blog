@@ -24,6 +24,7 @@ const whenExternalScripts = (items: (() => AstroIntegration) | (() => AstroInteg
 export default defineConfig({
   site: 'https://drluriescience.netlify.app',
   output: 'static',
+  trailingSlash: 'never',
 
   integrations: [
     tailwind({
