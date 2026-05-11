@@ -29,12 +29,16 @@ const metadata = {
       </div>
     </header>
 
-    <section id="auth-panel" class="admin-card auth-panel" aria-label="Admin sign in" hidden>
+    <section id="auth-panel" class="admin-card auth-panel" aria-label="Admin authentication" aria-live="polite">
+      <div id="auth-loading" class="auth-loading" role="status">
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <p>Checking sign-in…</p>
+      </div>
       <div id="clerk-sign-in" class="clerk-sign-in"></div>
-      <p id="auth-help" class="hint">Sign in with Clerk to publish articles.</p>
+      <p id="auth-help" class="hint">Checking Clerk authentication before showing the publishing workspace.</p>
     </section>
 
-    <section class="admin-card" aria-label="Publishing form">
+    <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
       <form id="publish-form" class="admin-form">
         <div class="field">
           <label for="title">Title</label>
@@ -143,7 +147,7 @@ const metadata = {
       </form>
     </section>
 
-    <section class="admin-card admin-panel" aria-labelledby="preview-heading">
+    <section class="admin-card admin-panel" aria-labelledby="preview-heading" data-auth-gated hidden>
       <h2 id="preview-heading">Preview</h2>
       <div class="preview-box">
         <h3 id="preview-title">Untitled article</h3>
@@ -155,7 +159,7 @@ const metadata = {
       </div>
     </section>
 
-    <section class="admin-card admin-panel" aria-labelledby="publish-output-heading">
+    <section class="admin-card admin-panel" aria-labelledby="publish-output-heading" data-auth-gated hidden>
       <h2 id="publish-output-heading">Publish output</h2>
       <p>
         Suggested destination: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
@@ -192,6 +196,35 @@ const metadata = {
 
   .auth-panel {
     margin-bottom: 1.5rem;
+  }
+
+  .auth-loading {
+    display: grid;
+    justify-items: center;
+    gap: 0.85rem;
+    padding: 2.5rem 1rem;
+    color: var(--aw-color-text-muted);
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .auth-loading p {
+    margin: 0;
+  }
+
+  .auth-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgb(209 213 219);
+    border-top-color: var(--aw-color-accent);
+    border-radius: 999px;
+    animation: auth-spin 900ms linear infinite;
+  }
+
+  @keyframes auth-spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   .clerk-sign-in {
@@ -532,30 +565,47 @@ const metadata = {
   const adminPage = document.querySelector('.admin-page');
   const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
   const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+  const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
   let clerkLoadPromise;
-  let signInMounted = false;
 
-  const getPublishableKeyPrefix = (key) => key.match(/^pk_(test|live)_/)?.[0] || 'missing';
+  const setGatedContentVisible = (visible) => {
+    gatedContent.forEach((element) => {
+      element.hidden = !visible;
+    });
+  };
+
+  const setAuthLoadingVisible = (visible) => {
+    const loading = document.querySelector('#auth-loading');
+    if (loading) loading.hidden = !visible;
+  };
 
   const loadClerkScript = () =>
     new Promise((resolve, reject) => {
-      const existingScript = document.querySelector(`script[src="${clerkJsScriptSrc}"]`);
-
       if (window.Clerk) {
+        console.info('Clerk script loaded');
         resolve();
         return;
       }
 
+      const resolveWhenClerkExists = () => {
+        if (!window.Clerk) {
+          reject(new Error('Clerk authentication could not be initialized.'));
+          return;
+        }
+
+        console.info('Clerk script loaded');
+        resolve();
+      };
+
+      const existingScript = document.querySelector(
+        `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+      );
       if (existingScript) {
-        existingScript.addEventListener('load', resolve, { once: true });
+        existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
         existingScript.addEventListener(
           'error',
           (event) => {
-            console.error('ClerkJS script failed to load from existing script tag.', {
-              src: clerkJsScriptSrc,
-              publishableKeyPrefix: getPublishableKeyPrefix(clerkPublishableKey),
-              event,
-            });
+            console.error('ClerkJS script failed to load from existing script tag.', event);
             reject(new Error('Clerk authentication could not be loaded.'));
           },
           { once: true }
@@ -568,16 +618,13 @@ const metadata = {
       script.async = true;
       script.crossOrigin = 'anonymous';
       script.type = 'text/javascript';
+      script.dataset.drLurieClerkjs = 'true';
       script.dataset.clerkPublishableKey = clerkPublishableKey;
-      script.addEventListener('load', resolve, { once: true });
+      script.addEventListener('load', resolveWhenClerkExists, { once: true });
       script.addEventListener(
         'error',
         (event) => {
-          console.error('ClerkJS script failed to load.', {
-            src: clerkJsScriptSrc,
-            publishableKeyPrefix: getPublishableKeyPrefix(clerkPublishableKey),
-            event,
-          });
+          console.error('ClerkJS script failed to load.', event);
           reject(new Error('Clerk authentication could not be loaded.'));
         },
         { once: true }
@@ -587,22 +634,24 @@ const metadata = {
 
   const getClerk = async () => {
     if (!clerkPublishableKey) {
-      throw new Error('Publishing authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+      throw new Error(
+        'Publishing authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.'
+      );
     }
 
     clerkLoadPromise ||= (async () => {
       await loadClerkScript();
 
       if (!window.Clerk) {
-        console.error('ClerkJS script loaded, but window.Clerk is unavailable.', {
-          src: clerkJsScriptSrc,
-          publishableKeyPrefix: getPublishableKeyPrefix(clerkPublishableKey),
-        });
         throw new Error('Clerk authentication could not be initialized.');
       }
 
       const clerk = window.Clerk;
       await clerk.load();
+      console.info('Clerk initialized', {
+        status: clerk.status,
+        isSignedIn: Boolean(clerk.isSignedIn),
+      });
       return clerk;
     })();
 
@@ -615,57 +664,47 @@ const metadata = {
     return email || name || 'Clerk user';
   };
 
-  const unmountSignIn = (clerk) => {
-    if (signInMounted && typeof clerk.unmountSignIn === 'function') {
-      clerk.unmountSignIn(fields.clerkSignIn);
-    }
-
-    signInMounted = false;
+  const showSignedOutPanel = () => {
+    fields.authPanel.hidden = false;
     fields.clerkSignIn.replaceChildren();
-    fields.authPanel.hidden = true;
+    fields.authHelp.textContent = 'Use the Sign in button to authenticate with Clerk before publishing.';
+    setAuthLoadingVisible(false);
   };
 
-  const mountSignIn = (clerk) => {
-    fields.authPanel.hidden = false;
-
-    if (typeof clerk.mountSignIn !== 'function') {
-      fields.authHelp.textContent = 'Use the Sign in button to authenticate with Clerk before publishing.';
-      fields.signIn.hidden = false;
-      return;
-    }
-
-    fields.signIn.hidden = true;
-
-    if (!signInMounted) {
-      fields.clerkSignIn.replaceChildren();
-      clerk.mountSignIn(fields.clerkSignIn, {
-        afterSignInUrl: window.location.href,
-        redirectUrl: window.location.href,
-      });
-      signInMounted = true;
-    }
-
-    fields.authHelp.textContent = 'Sign in with Clerk to publish articles.';
+  const hideAuthPanel = () => {
+    fields.clerkSignIn.replaceChildren();
+    fields.authPanel.hidden = true;
+    setAuthLoadingVisible(false);
   };
 
   const setAuthState = (state, message) => {
     fields.authStatus.textContent = message;
     fields.authStatus.dataset.state = state;
     isSignedIn = state === 'signed-in';
-    fields.signIn.hidden = isSignedIn || state === 'checking';
+    fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
     fields.signOut.hidden = !isSignedIn;
     fields.publish.disabled = !isSignedIn;
+    setGatedContentVisible(isSignedIn);
+
+    if (state === 'checking') {
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'Checking Clerk authentication before showing the publishing workspace.';
+      setAuthLoadingVisible(true);
+    }
   };
 
   const renderAuthState = (clerk) => {
-    if (clerk.isSignedIn && clerk.session) {
+    const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+    console.info('Clerk signed-in state', { isSignedIn: signedIn });
+
+    if (signedIn) {
       setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
-      unmountSignIn(clerk);
+      hideAuthPanel();
       return;
     }
 
     setAuthState('signed-out', 'Signed out — sign in to publish');
-    mountSignIn(clerk);
+    showSignedOutPanel();
   };
 
   const initializeClerkAuth = async () => {
@@ -679,14 +718,13 @@ const metadata = {
         clerk.addListener(() => renderAuthState(clerk));
       }
     } catch (error) {
-      console.error(error);
-      console.error('Clerk authentication initialization failed.', {
-        publishableKeyPrefix: getPublishableKeyPrefix(clerkPublishableKey),
-      });
+      console.error('Clerk authentication initialization failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
       setAuthState('error', message);
       fields.authPanel.hidden = false;
       fields.authHelp.textContent = message;
+      fields.clerkSignIn.replaceChildren();
+      setAuthLoadingVisible(false);
       setStatus(message, false);
     }
   };
@@ -1036,8 +1074,12 @@ const metadata = {
 
       await clerk.redirectToSignIn({ redirectUrl: window.location.href });
     } catch (error) {
+      console.error('Clerk sign-in failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
       setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
       setStatus(message, false);
     }
   });
@@ -1050,8 +1092,12 @@ const metadata = {
       await clerk.signOut();
       renderAuthState(clerk);
     } catch (error) {
+      console.error('Clerk sign-out failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
       setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
       setStatus(message, false);
     }
   });
