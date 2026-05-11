@@ -34,8 +34,8 @@ const metadata = {
         <span class="auth-spinner" aria-hidden="true"></span>
         <p>Checking sign-in…</p>
       </div>
-      <div id="clerk-sign-in" class="clerk-sign-in"></div>
       <p id="auth-help" class="hint">Checking Clerk authentication before showing the publishing workspace.</p>
+      <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden>Sign in with Clerk</button>
     </section>
 
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
@@ -227,14 +227,8 @@ const metadata = {
     }
   }
 
-  .clerk-sign-in {
-    display: grid;
-    place-items: center;
-    min-height: 20rem;
-  }
-
-  .clerk-sign-in:empty {
-    display: none;
+  .auth-panel-button {
+    margin-top: 1rem;
   }
 
   .admin-auth {
@@ -555,7 +549,7 @@ const metadata = {
     publish: document.querySelector('#publish'),
     authPanel: document.querySelector('#auth-panel'),
     authHelp: document.querySelector('#auth-help'),
-    clerkSignIn: document.querySelector('#clerk-sign-in'),
+    panelSignIn: document.querySelector('#auth-panel-sign-in'),
   };
 
   let imageNames = [];
@@ -666,13 +660,11 @@ const metadata = {
 
   const showSignedOutPanel = () => {
     fields.authPanel.hidden = false;
-    fields.clerkSignIn.replaceChildren();
-    fields.authHelp.textContent = 'Use the Sign in button to authenticate with Clerk before publishing.';
+    fields.authHelp.textContent = 'Sign in with Clerk to access the publishing workspace.';
     setAuthLoadingVisible(false);
   };
 
   const hideAuthPanel = () => {
-    fields.clerkSignIn.replaceChildren();
     fields.authPanel.hidden = true;
     setAuthLoadingVisible(false);
   };
@@ -682,6 +674,7 @@ const metadata = {
     fields.authStatus.dataset.state = state;
     isSignedIn = state === 'signed-in';
     fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
+    fields.panelSignIn.hidden = fields.signIn.hidden;
     fields.signOut.hidden = !isSignedIn;
     fields.publish.disabled = !isSignedIn;
     setGatedContentVisible(isSignedIn);
@@ -723,7 +716,6 @@ const metadata = {
       setAuthState('error', message);
       fields.authPanel.hidden = false;
       fields.authHelp.textContent = message;
-      fields.clerkSignIn.replaceChildren();
       setAuthLoadingVisible(false);
       setStatus(message, false);
     }
@@ -1060,19 +1052,31 @@ const metadata = {
     }
   };
 
-  fields.signIn.addEventListener('click', async () => {
+  const redirectToHostedSignIn = async (clerk) => {
+    if (typeof clerk.redirectToSignIn !== 'function') {
+      throw new Error('Clerk hosted sign-in redirect is unavailable.');
+    }
+
+    await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+  };
+
+  const openSignIn = async () => {
     setAuthState('checking', 'Opening Clerk sign-in…');
 
     try {
       const clerk = await getClerk();
 
       if (typeof clerk.openSignIn === 'function') {
-        clerk.openSignIn();
-        renderAuthState(clerk);
-        return;
+        try {
+          await clerk.openSignIn();
+          renderAuthState(clerk);
+          return;
+        } catch (error) {
+          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+        }
       }
 
-      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+      await redirectToHostedSignIn(clerk);
     } catch (error) {
       console.error('Clerk sign-in failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
@@ -1082,7 +1086,10 @@ const metadata = {
       setAuthLoadingVisible(false);
       setStatus(message, false);
     }
-  });
+  };
+
+  fields.signIn.addEventListener('click', openSignIn);
+  fields.panelSignIn.addEventListener('click', openSignIn);
 
   fields.signOut.addEventListener('click', async () => {
     setAuthState('checking', 'Signing out…');
