@@ -604,6 +604,10 @@ export const handler = async (event: LambdaEvent) => {
       return jsonResponse(error.statusCode, { error: error.message });
     }
 
+    if (error instanceof PublishError) {
+      return jsonResponse(error.statusCode, { error: error.message });
+    }
+
     return jsonResponse(500, {
       error: error instanceof Error ? error.message : 'Article could not be published.',
     });
