@@ -78,7 +78,9 @@ export const adaptOpenGraphImages = async (
 
         if (
           typeof resolvedImage === 'string' &&
-          (resolvedImage.startsWith('http://') || resolvedImage.startsWith('https://'))
+          (resolvedImage.startsWith('http://') ||
+            resolvedImage.startsWith('https://') ||
+            resolvedImage.startsWith('/'))
         ) {
           _image = {
             src: resolvedImage,
