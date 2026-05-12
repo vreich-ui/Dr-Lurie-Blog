@@ -151,6 +151,23 @@ Production Netlify deploys that need real Blob storage must be able to install `
 
 Install troubleshooting: `astro` depends on the public npm package `unstorage`, so a `403 Forbidden` for `https://registry.npmjs.org/unstorage` is not caused by this app's Netlify Blobs fallback and should not be handled by making `unstorage` optional. In Codex-style proxy environments, first check proxy/network policy and npm registry access; on normal npm registry access, `unstorage` must install for Astro to run.
 
+### Article publishing environment
+
+The `netlify/functions/publish-article.ts` Function supports two server-side publish paths: Clerk-authenticated admin UI requests and non-interactive Agent Builder requests that send an `x-publish-key` header. Keep `PUBLISH_SECRET` only in Netlify/server environments; do not prefix it with `PUBLIC_` or expose it to browser code.
+
+Required Netlify environment variables for publishing are:
+
+- `PUBLISH_SECRET`
+- `GITHUB_CONTENT_TOKEN`
+- `GITHUB_REPOSITORY`
+- `GITHUB_BRANCH`
+- `CLERK_SECRET_KEY`
+- `PUBLIC_CLERK_PUBLISHABLE_KEY`
+
+Agent Builder JSON must use the exact top-level shape `slug`, `articlePath`, `markdown`, `images`, and `commitMessage`. The Agent SDK deploy tool should POST that JSON to `https://<site-domain>/.netlify/functions/publish-article` with `Content-Type: application/json` and `x-publish-key: <PUBLISH_SECRET>`. The `markdown` value must already be fully rendered Markdown with frontmatter before sending. Article paths must resolve to `src/data/post/{slug}.md`, and image `repoPath` values must resolve to `src/assets/images/uploads/{slug}/{filename}`; Markdown frontmatter image paths should use `~/assets/images/uploads/{slug}/{filename}`.
+
+Use `npm run agent:publish:dry-run` to print a local verification payload without network access. Use `AGENT_PUBLISH_BASE_URL=https://<site-domain> PUBLISH_SECRET=... npm run agent:publish` to send the same payload shape to the Netlify Function.
+
 ### Commands
 
 All commands are run from the root of the project, from a terminal:

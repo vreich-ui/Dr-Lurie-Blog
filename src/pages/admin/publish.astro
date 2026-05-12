@@ -1042,7 +1042,7 @@ const metadata = {
       }
 
       setStatus(
-        `Published ${result.path || `src/data/post/${slug}.md`} in commit ${String(result.commit || '').slice(0, 7)}.`,
+        `Published ${result.articlePath || result.path || `src/data/post/${slug}.md`} in commit ${String(result.commit || '').slice(0, 7)}.`,
         false
       );
     } catch (error) {
