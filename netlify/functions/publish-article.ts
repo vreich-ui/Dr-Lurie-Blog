@@ -488,6 +488,7 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const overwrite = input.overwrite === true || input.overwrite === 'true';
+  let publishImagePaths: string[] = [];
 
   try {
     const duplicateArticle = await githubExists(repo, branch, articlePath, token);
@@ -501,6 +502,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const mediaEntries = getMediaEntries(input, slug);
+    publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
     const selectedFeatured = featuredImage ? sanitizeFilename(featuredImage) : undefined;
     const imagePath = selectedFeatured
@@ -576,7 +578,7 @@ export const handler = async (event: LambdaEvent) => {
       body: JSON.stringify({ force: false, sha: newCommit.sha }),
     });
 
-    const imagePaths = mediaEntries.map((entry) => entry.path);
+    const imagePaths = publishImagePaths;
     const message = `Article publish queued for ${articlePath}.`;
 
     return jsonResponse(201, {
@@ -591,7 +593,16 @@ export const handler = async (event: LambdaEvent) => {
       path: articlePath,
     });
   } catch (error) {
-    console.error('Failed to publish article.', error);
+    console.error('Failed to publish article.', {
+      articlePath,
+      slug,
+      imagePaths: publishImagePaths,
+      error,
+    });
+
+    if (error instanceof PublishError) {
+      return jsonResponse(error.statusCode, { error: error.message });
+    }
 
     if (error instanceof PublishError) {
       return jsonResponse(error.statusCode, { error: error.message });

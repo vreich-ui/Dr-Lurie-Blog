@@ -164,7 +164,9 @@ Required Netlify environment variables for publishing are:
 - `CLERK_SECRET_KEY`
 - `PUBLIC_CLERK_PUBLISHABLE_KEY`
 
-Agent Builder JSON should include `slug`, `articlePath`, `markdown`, optional `images`, and `commitMessage`. Article paths must resolve to `src/data/post/{slug}.md`, and image `repoPath` values must stay under `src/assets/images/uploads/{slug}/`; Markdown frontmatter image paths should use `~/assets/images/uploads/{slug}/{filename}`.
+Agent Builder JSON must use the exact top-level shape `slug`, `articlePath`, `markdown`, `images`, and `commitMessage`. The Agent SDK deploy tool should POST that JSON to `https://<site-domain>/.netlify/functions/publish-article` with `Content-Type: application/json` and `x-publish-key: <PUBLISH_SECRET>`. The `markdown` value must already be fully rendered Markdown with frontmatter before sending. Article paths must resolve to `src/data/post/{slug}.md`, and image `repoPath` values must resolve to `src/assets/images/uploads/{slug}/{filename}`; Markdown frontmatter image paths should use `~/assets/images/uploads/{slug}/{filename}`.
+
+Use `npm run agent:publish:dry-run` to print a local verification payload without network access. Use `AGENT_PUBLISH_BASE_URL=https://<site-domain> PUBLISH_SECRET=... npm run agent:publish` to send the same payload shape to the Netlify Function.
 
 ### Commands
 
