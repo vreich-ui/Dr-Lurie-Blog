@@ -155,7 +155,7 @@ Install troubleshooting: `astro` depends on the public npm package `unstorage`, 
 
 The `netlify/functions/publish-article.ts` Function supports two server-side publish paths: Clerk-authenticated admin UI requests and non-interactive Agent Builder requests that send an `x-publish-key` header. Keep `PUBLISH_SECRET` only in Netlify/server environments; do not prefix it with `PUBLIC_` or expose it to browser code.
 
-Required Netlify environment variables for publishing are:
+Required Netlify environment variables for the existing publish endpoint are:
 
 - `PUBLISH_SECRET`
 - `GITHUB_CONTENT_TOKEN`
@@ -163,6 +163,14 @@ Required Netlify environment variables for publishing are:
 - `GITHUB_BRANCH`
 - `CLERK_SECRET_KEY`
 - `PUBLIC_CLERK_PUBLISHABLE_KEY`
+
+The server-side OpenAI Agents SDK runner lives at `netlify/functions/run-publisher-agent.ts`. It accepts approved article JSON (`title`, `slug`, `markdown`, `images`, and optional `overwrite`), normalizes the slug to kebab-case, runs the publisher agent, and calls the existing publish endpoint through a code-defined tool. Configure these additional Netlify environment variables for the runner:
+
+- `OPENAI_API_KEY`
+- `NETLIFY_PUBLISH_ENDPOINT` (for example, `https://<site-domain>/.netlify/functions/publish-article`)
+- `NETLIFY_PUBLISH_SECRET`
+
+`NETLIFY_PUBLISH_SECRET` and `PUBLISH_SECRET` should contain the same secret value in Netlify, but the code intentionally keeps the names separate so the existing publish endpoint secret behavior remains intact. Do not expose either variable to browser code.
 
 Agent Builder JSON must use the exact top-level shape `slug`, `articlePath`, `markdown`, `images`, and `commitMessage`. The Agent SDK deploy tool should POST that JSON to `https://<site-domain>/.netlify/functions/publish-article` with `Content-Type: application/json` and `x-publish-key: <PUBLISH_SECRET>`. The `markdown` value must already be fully rendered Markdown with frontmatter before sending. Article paths must resolve to `src/data/post/{slug}.md`, and image `repoPath` values must resolve to `src/assets/images/uploads/{slug}/{filename}`; Markdown frontmatter image paths should use `~/assets/images/uploads/{slug}/{filename}`.
 
@@ -190,9 +198,9 @@ Basic configuration file: `./src/config.yaml`
 
 ```yaml
 site:
-  name: 'Example'
-  site: 'https://example.com'
-  base: '/' # Change this if you need to deploy to Github Pages, for example
+  name: "Example"
+  site: "https://example.com"
+  base: "/" # Change this if you need to deploy to Github Pages, for example
   trailingSlash: false # Generate permalinks with or without "/" at the end
 
   googleSiteVerificationId: false # Or some value,
@@ -200,22 +208,22 @@ site:
 # Default SEO metadata
 metadata:
   title:
-    default: 'Example'
-    template: '%s — Example'
-  description: 'This is the default meta description of Example website'
+    default: "Example"
+    template: "%s — Example"
+  description: "This is the default meta description of Example website"
   robots:
     index: true
     follow: true
   openGraph:
-    site_name: 'Example'
+    site_name: "Example"
     images:
-      - url: '~/assets/images/default.png'
+      - url: "~/assets/images/default.png"
         width: 1200
         height: 628
     type: website
   twitter:
-    handle: '@twitter_user'
-    site: '@twitter_user'
+    handle: "@twitter_user"
+    site: "@twitter_user"
     cardType: summary_large_image
 
 i18n:
@@ -229,25 +237,25 @@ apps:
 
     post:
       isEnabled: true
-      permalink: '/blog/%slug%' # Variables: %slug%, %year%, %month%, %day%, %hour%, %minute%, %second%, %category%
+      permalink: "/blog/%slug%" # Variables: %slug%, %year%, %month%, %day%, %hour%, %minute%, %second%, %category%
       robots:
         index: true
 
     list:
       isEnabled: true
-      pathname: 'blog' # Blog main path, you can change this to "articles" (/articles)
+      pathname: "blog" # Blog main path, you can change this to "articles" (/articles)
       robots:
         index: true
 
     category:
       isEnabled: true
-      pathname: 'category' # Category main path /category/some-category, you can change this to "group" (/group/some-category)
+      pathname: "category" # Category main path /category/some-category, you can change this to "group" (/group/some-category)
       robots:
         index: true
 
     tag:
       isEnabled: true
-      pathname: 'tag' # Tag main path /tag/some-tag, you can change this to "topics" (/topics/some-category)
+      pathname: "tag" # Tag main path /tag/some-tag, you can change this to "topics" (/topics/some-category)
       robots:
         index: false
 
@@ -260,7 +268,7 @@ analytics:
       id: null # or "G-XXXXXXXXXX"
 
 ui:
-  theme: 'system' # Values: "system" | "light" | "dark" | "light:only" | "dark:only"
+  theme: "system" # Values: "system" | "light" | "dark" | "light:only" | "dark:only"
 ```
 
 <br>
