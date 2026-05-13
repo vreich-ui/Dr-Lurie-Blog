@@ -38,6 +38,56 @@ const metadata = {
       <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden>Sign in with Clerk</button>
     </section>
 
+    <section class="admin-card admin-panel ai-publisher-panel" aria-labelledby="ai-publisher-heading" data-auth-gated hidden>
+      <div class="panel-heading-row">
+        <div>
+          <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">Agent publishing</p>
+          <h2 id="ai-publisher-heading">AI Article Publisher</h2>
+        </div>
+        <span class="endpoint-pill">/.netlify/functions/run-publisher-agent</span>
+      </div>
+      <p class="hint ai-panel-intro">
+        Run the server-side OpenAI publishing agent with already-approved Markdown. No publish secrets are exposed in this browser form.
+      </p>
+
+      <!-- Future ChatKit widget integration should mount alongside this form and write approved article data into these fields. -->
+      <form id="ai-publisher-form" class="admin-form ai-publisher-form">
+        <div class="field">
+          <label for="ai-title">Title</label>
+          <input id="ai-title" name="title" type="text" autocomplete="off" required />
+        </div>
+
+        <div class="field">
+          <label for="ai-slug">Slug <span class="optional-label">optional</span></label>
+          <input id="ai-slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
+          <p class="hint">Leave blank to let the publishing agent derive a slug from the title.</p>
+        </div>
+
+        <div class="field">
+          <label for="ai-markdown">Markdown</label>
+          <textarea
+            id="ai-markdown"
+            name="markdown"
+            class="agent-markdown"
+            placeholder="Paste the complete article Markdown, including Astro frontmatter."
+            required
+          ></textarea>
+        </div>
+
+        <div class="field checkbox-field">
+          <input id="ai-overwrite" name="overwrite" type="checkbox" />
+          <label for="ai-overwrite">Overwrite an existing article with this slug</label>
+        </div>
+
+        <div class="actions">
+          <button id="ai-test-payload" class="btn-secondary" type="button">Test payload</button>
+          <button id="ai-publish" class="btn-primary publish-button" type="submit">Run publishing agent</button>
+        </div>
+      </form>
+
+      <div id="ai-publisher-result" class="agent-result" aria-live="polite" hidden></div>
+    </section>
+
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
       <form id="publish-form" class="admin-form">
         <div class="field">
@@ -287,6 +337,132 @@ const metadata = {
     font-size: clamp(1.35rem, 3vw, 1.7rem);
     font-weight: 700;
     letter-spacing: -0.02em;
+  }
+
+  .panel-heading-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .panel-heading-row h2 {
+    margin-bottom: 0;
+  }
+
+  .endpoint-pill {
+    border: 1px solid rgb(94 140 138 / 30%);
+    border-radius: 999px;
+    padding: 0.45rem 0.7rem;
+    background: rgb(94 140 138 / 10%);
+    color: var(--aw-color-accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+
+  .ai-panel-intro {
+    margin-bottom: 1.2rem;
+  }
+
+  .optional-label {
+    color: var(--aw-color-text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .agent-markdown {
+    min-height: 300px;
+  }
+
+  .agent-result {
+    margin-top: 1.25rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: var(--aw-color-bg-page);
+  }
+
+  .agent-result[data-state='loading'] {
+    border-color: rgb(94 140 138 / 35%);
+  }
+
+  .agent-result[data-state='success'] {
+    border-color: rgb(22 163 74 / 30%);
+    background: rgb(240 253 244 / 75%);
+  }
+
+  .agent-result[data-state='error'] {
+    border-color: rgb(220 38 38 / 25%);
+    background: rgb(254 242 242 / 72%);
+  }
+
+  :global(.dark) .agent-result {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 70%);
+  }
+
+  :global(.dark) .agent-result[data-state='success'] {
+    border-color: rgb(34 197 94 / 28%);
+    background: rgb(20 83 45 / 25%);
+  }
+
+  :global(.dark) .agent-result[data-state='error'] {
+    border-color: rgb(248 113 113 / 28%);
+    background: rgb(127 29 29 / 25%);
+  }
+
+  .agent-result h3 {
+    margin: 0 0 0.75rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  .agent-result dl {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+  }
+
+  .agent-result dt {
+    color: var(--aw-color-text-muted);
+    font-size: 0.84rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .agent-result dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+  }
+
+  .agent-error-hint {
+    margin: 0.75rem 0 0;
+    color: rgb(153 27 27);
+    font-weight: 800;
+  }
+
+  :global(.dark) .agent-error-hint {
+    color: rgb(254 202 202);
+  }
+
+  .agent-json {
+    margin: 0.85rem 0 0;
+    max-height: 320px;
+    overflow: auto;
+    border-radius: 0.75rem;
+    padding: 0.85rem;
+    background: rgb(15 23 42);
+    color: rgb(226 232 240);
+    font-size: 0.82rem;
+    white-space: pre-wrap;
   }
 
   .field {
@@ -547,6 +723,14 @@ const metadata = {
     signIn: document.querySelector('#sign-in'),
     signOut: document.querySelector('#sign-out'),
     publish: document.querySelector('#publish'),
+    aiForm: document.querySelector('#ai-publisher-form'),
+    aiTitle: document.querySelector('#ai-title'),
+    aiSlug: document.querySelector('#ai-slug'),
+    aiMarkdown: document.querySelector('#ai-markdown'),
+    aiOverwrite: document.querySelector('#ai-overwrite'),
+    aiPublish: document.querySelector('#ai-publish'),
+    aiTestPayload: document.querySelector('#ai-test-payload'),
+    aiResult: document.querySelector('#ai-publisher-result'),
     authPanel: document.querySelector('#auth-panel'),
     authHelp: document.querySelector('#auth-help'),
     panelSignIn: document.querySelector('#auth-panel-sign-in'),
@@ -677,6 +861,7 @@ const metadata = {
     fields.panelSignIn.hidden = fields.signIn.hidden;
     fields.signOut.hidden = !isSignedIn;
     fields.publish.disabled = !isSignedIn;
+    fields.aiPublish.disabled = !isSignedIn;
     setGatedContentVisible(isSignedIn);
 
     if (state === 'checking') {
@@ -983,6 +1168,131 @@ const metadata = {
       reader.readAsDataURL(file);
     });
 
+  const publisherAgentEndpoint = '/.netlify/functions/run-publisher-agent';
+
+  const renderAgentJson = (value) => `<pre class="agent-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+
+  const toAgentResultObject = (value, fallbackMessage) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+
+    return {
+      message: typeof value === 'string' && value ? value : fallbackMessage,
+    };
+  };
+
+  const setAgentResult = (state, html) => {
+    fields.aiResult.hidden = false;
+    fields.aiResult.dataset.state = state;
+    fields.aiResult.innerHTML = html;
+  };
+
+  const getAgentPayload = () => ({
+    title: fields.aiTitle.value.trim(),
+    slug: fields.aiSlug.value.trim(),
+    markdown: fields.aiMarkdown.value.trim(),
+    overwrite: fields.aiOverwrite.checked,
+    images: [],
+  });
+
+  const fillAgentTestPayload = () => {
+    fields.aiTitle.value = 'OpenAI Agent Smoke Test';
+    fields.aiSlug.value = 'openai-agent-smoke-test';
+    fields.aiOverwrite.checked = false;
+    fields.aiMarkdown.value = `---
+title: "OpenAI Agent Smoke Test"
+publishDate: ${new Date().toISOString()}
+excerpt: "Smoke-test article published through the OpenAI agent workflow."
+category: "Publishing"
+tags:
+  - "openai agent"
+  - "smoke test"
+author: "Dr. Lurié"
+---
+
+# OpenAI Agent Smoke Test
+
+This is a short smoke-test article for the browser-based AI Article Publisher.
+
+If this article appears on the site, the Clerk-gated admin UI successfully posted to the server-side publishing agent.
+`;
+    setAgentResult('loading', '<h3>Test payload loaded</h3><p class="hint">Review the Markdown, then run the publishing agent.</p>');
+  };
+
+  const isDuplicateError = (status, result) => {
+    const combined = `${result?.error || ''} ${result?.message || ''}`.toLowerCase();
+    return status === 409 || combined.includes('already exists') || combined.includes('duplicate');
+  };
+
+  const renderAgentSuccess = (result) => {
+    const rows = [
+      ['success', String(result.success === true || result.ok === true)],
+      ['articlePath', result.articlePath || result.path || 'Not returned'],
+      ['commit', result.commit || 'Not returned'],
+      ['message', result.message || 'Published successfully.'],
+      ...(result.deployStatus ? [['deployStatus', result.deployStatus]] : []),
+    ];
+
+    setAgentResult(
+      'success',
+      `<h3>Publishing agent succeeded</h3><dl>${rows
+        .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`)
+        .join('')}</dl>${renderAgentJson(result)}`
+    );
+  };
+
+  const renderAgentError = (status, result) => {
+    const duplicateHint = isDuplicateError(status, result)
+      ? '<p class="agent-error-hint">This looks like a duplicate article. Enable overwrite and submit again if you intend to replace it.</p>'
+      : '';
+    const errorBody = Object.keys(result || {}).length ? result : { error: `Publisher agent failed with status ${status}.` };
+
+    setAgentResult(
+      'error',
+      `<h3>Publishing agent failed</h3>${duplicateHint}${renderAgentJson(errorBody)}`
+    );
+  };
+
+  const runPublishingAgent = async (event) => {
+    event.preventDefault();
+
+    const payload = getAgentPayload();
+    if (!payload.title || !payload.markdown) {
+      renderAgentError(400, { error: 'Title and Markdown are required before running the publishing agent.' });
+      return;
+    }
+
+    fields.aiPublish.disabled = true;
+    setAgentResult('loading', '<h3>Running publishing agent…</h3><p class="hint">Checking Clerk session and sending the approved article payload.</p>');
+
+    try {
+      const clerkToken = await getClerkSessionToken();
+      const response = await fetch(publisherAgentEndpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      const parsedResult = await response.json().catch(() => ({}));
+      const result = toAgentResultObject(parsedResult, `Publisher agent returned status ${response.status}.`);
+
+      if (!response.ok || result.success === false || result.ok === false) {
+        renderAgentError(response.status, result);
+        return;
+      }
+
+      renderAgentSuccess({
+        ...result,
+        success: result.success ?? result.ok ?? true,
+      });
+    } catch (error) {
+      renderAgentError(0, { error: error instanceof Error ? error.message : 'Publisher agent could not be reached.' });
+    } finally {
+      fields.aiPublish.disabled = !isSignedIn;
+    }
+  };
+
   const publishArticle = async () => {
     updatePreview();
     updatePublishOutput();
@@ -1109,6 +1419,8 @@ const metadata = {
     }
   });
 
+  fields.aiForm.addEventListener('submit', runPublishingAgent);
+  fields.aiTestPayload.addEventListener('click', fillAgentTestPayload);
   fields.publish.addEventListener('click', publishArticle);
   document.querySelector('#copy-output').addEventListener('click', () => {
     updatePublishOutput();
