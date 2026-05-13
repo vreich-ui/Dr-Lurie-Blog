@@ -1,0 +1,942 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+
+const pageTitle = 'Dr. Lurié AI Agent Admin';
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  <section
+    class="agent-admin-page mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14"
+    data-clerk-publishable-key={clerkPublishableKey}
+  >
+    <header class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+      <div>
+        <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">AI agent workspace</p>
+        <h1 class="mt-2 font-heading text-4xl font-bold tracking-tight text-default sm:text-5xl">{pageTitle}</h1>
+      </div>
+      <div class="admin-auth" aria-live="polite">
+        <span id="auth-status" class="auth-status">Checking sign-in…</span>
+        <button id="sign-in" class="btn-primary btn-sm auth-button" type="button" hidden>Sign in</button>
+        <button id="sign-out" class="btn-secondary btn-sm auth-button" type="button" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <section id="auth-panel" class="admin-card auth-panel" aria-label="Admin authentication" aria-live="polite">
+      <div id="auth-loading" class="auth-loading" role="status">
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <p>Checking sign-in…</p>
+      </div>
+      <p id="auth-help" class="hint">Checking Clerk authentication before showing the AI agent workspace.</p>
+      <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden>Sign in with Clerk</button>
+    </section>
+
+    <div class="agent-layout" data-auth-gated hidden>
+      <section class="admin-card chatkit-card" aria-labelledby="chatkit-heading">
+        <div class="panel-heading-row">
+          <div>
+            <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">ChatKit</p>
+            <h2 id="chatkit-heading">AI Agent Chat</h2>
+          </div>
+          <span class="endpoint-pill">/.netlify/functions/create-chatkit-session</span>
+        </div>
+        <p class="hint panel-intro">
+          Use this ChatKit workspace to run the OpenAI Agent Builder publishing workflow. The browser only receives a short-lived ChatKit client secret from the server.
+        </p>
+
+        <div id="chatkit-status" class="status-box" data-state="loading" aria-live="polite">
+          ChatKit will initialize after Clerk sign-in.
+        </div>
+        <openai-chatkit id="publishing-chatkit" class="chatkit-shell"></openai-chatkit>
+      </section>
+
+      <section class="admin-card" aria-labelledby="direct-publisher-heading">
+        <div class="panel-heading-row">
+          <div>
+            <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">Direct agent runner</p>
+            <h2 id="direct-publisher-heading">AI Article Publisher</h2>
+          </div>
+          <span class="endpoint-pill">/.netlify/functions/run-publisher-agent</span>
+        </div>
+        <p class="hint panel-intro">
+          Use this fallback form to send approved Markdown directly to the existing server-side publishing agent.
+        </p>
+
+        <form id="ai-publisher-form" class="admin-form ai-publisher-form">
+          <div class="field">
+            <label for="ai-title">Title</label>
+            <input id="ai-title" name="title" type="text" autocomplete="off" required />
+          </div>
+
+          <div class="field">
+            <label for="ai-slug">Slug <span class="optional-label">optional</span></label>
+            <input id="ai-slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
+            <p class="hint">Leave blank to let the publishing agent derive a slug from the title.</p>
+          </div>
+
+          <div class="field">
+            <label for="ai-markdown">Markdown</label>
+            <textarea
+              id="ai-markdown"
+              name="markdown"
+              class="agent-markdown"
+              placeholder="Paste the complete article Markdown, including Astro frontmatter."
+              required
+            ></textarea>
+          </div>
+
+          <div class="field checkbox-field">
+            <input id="ai-overwrite" name="overwrite" type="checkbox" />
+            <label for="ai-overwrite">Overwrite an existing article with this slug</label>
+          </div>
+
+          <div class="actions">
+            <button id="ai-test-payload" class="btn-secondary" type="button">Test payload</button>
+            <button id="ai-publish" class="btn-primary publish-button" type="submit">Run publishing agent</button>
+          </div>
+        </form>
+
+        <div id="ai-publisher-result" class="agent-result" aria-live="polite" hidden></div>
+      </section>
+    </div>
+  </section>
+
+  <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
+</Layout>
+
+<style>
+  .agent-admin-page {
+    color: var(--aw-color-text-default);
+  }
+
+  .admin-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.5rem;
+    background: rgb(255 255 255 / 84%);
+    box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 6%);
+    padding: 1.5rem;
+  }
+
+  :global(.dark) .admin-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 72%);
+    box-shadow: none;
+  }
+
+  .agent-layout {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 1024px) {
+    .agent-layout {
+      grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
+      align-items: start;
+    }
+  }
+
+  .auth-panel {
+    margin-bottom: 1.5rem;
+  }
+
+  .auth-loading {
+    display: grid;
+    justify-items: center;
+    gap: 0.85rem;
+    padding: 2.5rem 1rem;
+    color: var(--aw-color-text-muted);
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .auth-loading p {
+    margin: 0;
+  }
+
+  .auth-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgb(209 213 219);
+    border-top-color: var(--aw-color-accent);
+    border-radius: 999px;
+    animation: auth-spin 900ms linear infinite;
+  }
+
+  @keyframes auth-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .auth-panel-button {
+    margin-top: 1rem;
+  }
+
+  .admin-auth {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+
+  .auth-status {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    padding: 0.55rem 0.8rem;
+    background: var(--aw-color-bg-surface);
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .auth-status[data-state='signed-in'] {
+    border-color: rgb(22 163 74 / 30%);
+    color: rgb(22 101 52);
+    background: rgb(220 252 231 / 78%);
+  }
+
+  .auth-status[data-state='signed-out'],
+  .auth-status[data-state='error'] {
+    border-color: rgb(220 38 38 / 25%);
+    color: rgb(153 27 27);
+    background: rgb(254 226 226 / 72%);
+  }
+
+  :global(.dark) .auth-status {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 72%);
+  }
+
+  :global(.dark) .auth-status[data-state='signed-in'] {
+    border-color: rgb(34 197 94 / 28%);
+    color: rgb(187 247 208);
+    background: rgb(20 83 45 / 35%);
+  }
+
+  :global(.dark) .auth-status[data-state='signed-out'],
+  :global(.dark) .auth-status[data-state='error'] {
+    border-color: rgb(248 113 113 / 28%);
+    color: rgb(254 202 202);
+    background: rgb(127 29 29 / 35%);
+  }
+
+  .panel-heading-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  h2 {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.35rem, 3vw, 1.7rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .endpoint-pill {
+    border: 1px solid rgb(94 140 138 / 30%);
+    border-radius: 999px;
+    padding: 0.45rem 0.7rem;
+    background: rgb(94 140 138 / 10%);
+    color: var(--aw-color-accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.78rem;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+
+  .panel-intro {
+    margin-bottom: 1.2rem;
+  }
+
+  .field {
+    margin-bottom: 1.15rem;
+  }
+
+  label,
+  .field-title {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: var(--aw-color-text-heading);
+    font-weight: 700;
+  }
+
+  input,
+  textarea {
+    width: 100%;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.85rem;
+    padding: 0.78rem 0.9rem;
+    color: var(--aw-color-text-default);
+    background: var(--aw-color-bg-page);
+    font: inherit;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
+
+  :global(.dark) input,
+  :global(.dark) textarea {
+    border-color: rgb(51 65 85);
+    background: rgb(2 6 23 / 70%);
+  }
+
+  input:focus,
+  textarea:focus {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 3px rgb(94 140 138 / 18%);
+    outline: none;
+  }
+
+  textarea {
+    min-height: 320px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  .hint {
+    margin: 0.45rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.92rem;
+  }
+
+  .optional-label {
+    color: var(--aw-color-text-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .checkbox-field {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .checkbox-field input {
+    width: auto;
+    margin-top: 0.25rem;
+  }
+
+  .checkbox-field label {
+    margin-bottom: 0;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.4rem;
+  }
+
+  .publish-button {
+    box-shadow: 0 0.9rem 1.8rem rgb(46 111 149 / 20%);
+  }
+
+  .chatkit-card {
+    min-height: 720px;
+  }
+
+  .chatkit-shell {
+    display: block;
+    width: 100%;
+    min-height: 620px;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.dark) .chatkit-shell {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 70%);
+  }
+
+  .status-box,
+  .agent-result {
+    margin: 0 0 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: var(--aw-color-bg-page);
+    color: var(--aw-color-text-muted);
+    font-weight: 700;
+  }
+
+  .agent-result {
+    margin: 1.25rem 0 0;
+  }
+
+  .status-box[data-state='ready'],
+  .agent-result[data-state='success'] {
+    border-color: rgb(22 163 74 / 30%);
+    color: rgb(22 101 52);
+    background: rgb(240 253 244 / 75%);
+  }
+
+  .status-box[data-state='error'],
+  .agent-result[data-state='error'] {
+    border-color: rgb(220 38 38 / 25%);
+    color: rgb(153 27 27);
+    background: rgb(254 242 242 / 72%);
+  }
+
+  :global(.dark) .status-box,
+  :global(.dark) .agent-result {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 70%);
+  }
+
+  :global(.dark) .status-box[data-state='ready'],
+  :global(.dark) .agent-result[data-state='success'] {
+    border-color: rgb(34 197 94 / 28%);
+    color: rgb(187 247 208);
+    background: rgb(20 83 45 / 25%);
+  }
+
+  :global(.dark) .status-box[data-state='error'],
+  :global(.dark) .agent-result[data-state='error'] {
+    border-color: rgb(248 113 113 / 28%);
+    color: rgb(254 202 202);
+    background: rgb(127 29 29 / 25%);
+  }
+
+  .agent-result h3 {
+    margin: 0 0 0.75rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  .agent-result dl {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+  }
+
+  .agent-result dt {
+    color: var(--aw-color-text-muted);
+    font-size: 0.84rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .agent-result dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-weight: 700;
+  }
+
+  .agent-error-hint {
+    margin: 0.75rem 0 0;
+    color: rgb(153 27 27);
+    font-weight: 800;
+  }
+
+  :global(.dark) .agent-error-hint {
+    color: rgb(254 202 202);
+  }
+
+  .agent-json {
+    margin: 0.85rem 0 0;
+    max-height: 320px;
+    overflow: auto;
+    border-radius: 0.75rem;
+    padding: 0.85rem;
+    background: rgb(15 23 42);
+    color: rgb(226 232 240);
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+  }
+
+  @media (max-width: 640px) {
+    .agent-admin-page {
+      padding-top: 1.5rem;
+      padding-bottom: 2.5rem;
+    }
+
+    .admin-card {
+      border-radius: 1.1rem;
+      padding: 1rem;
+    }
+
+    .actions > button,
+    .admin-auth,
+    .auth-button {
+      width: 100%;
+    }
+
+    .admin-auth {
+      align-items: stretch;
+    }
+
+    .auth-status {
+      width: 100%;
+      text-align: center;
+    }
+
+    .chatkit-card {
+      min-height: 620px;
+    }
+
+    .chatkit-shell {
+      min-height: 520px;
+    }
+  }
+</style>
+
+<script is:inline>
+  const fields = {
+    authStatus: document.querySelector('#auth-status'),
+    signIn: document.querySelector('#sign-in'),
+    signOut: document.querySelector('#sign-out'),
+    authPanel: document.querySelector('#auth-panel'),
+    authHelp: document.querySelector('#auth-help'),
+    panelSignIn: document.querySelector('#auth-panel-sign-in'),
+    chatkitStatus: document.querySelector('#chatkit-status'),
+    chatkit: document.querySelector('#publishing-chatkit'),
+    aiForm: document.querySelector('#ai-publisher-form'),
+    aiTitle: document.querySelector('#ai-title'),
+    aiSlug: document.querySelector('#ai-slug'),
+    aiMarkdown: document.querySelector('#ai-markdown'),
+    aiOverwrite: document.querySelector('#ai-overwrite'),
+    aiPublish: document.querySelector('#ai-publish'),
+    aiTestPayload: document.querySelector('#ai-test-payload'),
+    aiResult: document.querySelector('#ai-publisher-result'),
+  };
+
+  let isSignedIn = false;
+  let clerkLoadPromise;
+  let chatkitInitialized = false;
+
+  const adminPage = document.querySelector('.agent-admin-page');
+  const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+  const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+  const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+  const publisherAgentEndpoint = '/.netlify/functions/run-publisher-agent';
+  const chatkitSessionEndpoint = '/.netlify/functions/create-chatkit-session';
+
+  const setGatedContentVisible = (visible) => {
+    gatedContent.forEach((element) => {
+      element.hidden = !visible;
+    });
+  };
+
+  const setAuthLoadingVisible = (visible) => {
+    const loading = document.querySelector('#auth-loading');
+    if (loading) loading.hidden = !visible;
+  };
+
+  const setChatkitStatus = (state, message) => {
+    fields.chatkitStatus.dataset.state = state;
+    fields.chatkitStatus.textContent = message;
+  };
+
+  const loadClerkScript = () =>
+    new Promise((resolve, reject) => {
+      if (window.Clerk) {
+        resolve();
+        return;
+      }
+
+      const resolveWhenClerkExists = () => {
+        if (!window.Clerk) {
+          reject(new Error('Clerk authentication could not be initialized.'));
+          return;
+        }
+
+        resolve();
+      };
+
+      const existingScript = document.querySelector(
+        `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+      );
+      if (existingScript) {
+        existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = clerkJsScriptSrc;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.type = 'text/javascript';
+      script.dataset.drLurieClerkjs = 'true';
+      script.dataset.clerkPublishableKey = clerkPublishableKey;
+      script.addEventListener('load', resolveWhenClerkExists, { once: true });
+      script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+        once: true,
+      });
+      document.head.append(script);
+    });
+
+  const getClerk = async () => {
+    if (!clerkPublishableKey) {
+      throw new Error('Agent authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+    }
+
+    clerkLoadPromise ||= (async () => {
+      await loadClerkScript();
+
+      if (!window.Clerk) {
+        throw new Error('Clerk authentication could not be initialized.');
+      }
+
+      const clerk = window.Clerk;
+      await clerk.load();
+      return clerk;
+    })();
+
+    return clerkLoadPromise;
+  };
+
+  const getSignedInLabel = (clerk) => {
+    const email = clerk.user?.primaryEmailAddress?.emailAddress;
+    const name = clerk.user?.fullName || clerk.user?.firstName;
+    return email || name || 'Clerk user';
+  };
+
+  const showSignedOutPanel = () => {
+    fields.authPanel.hidden = false;
+    fields.authHelp.textContent = 'Sign in with Clerk to access the AI agent workspace.';
+    setAuthLoadingVisible(false);
+  };
+
+  const hideAuthPanel = () => {
+    fields.authPanel.hidden = true;
+    setAuthLoadingVisible(false);
+  };
+
+  const setAuthState = (state, message) => {
+    fields.authStatus.textContent = message;
+    fields.authStatus.dataset.state = state;
+    isSignedIn = state === 'signed-in';
+    fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
+    fields.panelSignIn.hidden = fields.signIn.hidden;
+    fields.signOut.hidden = !isSignedIn;
+    fields.aiPublish.disabled = !isSignedIn;
+    setGatedContentVisible(isSignedIn);
+
+    if (state === 'checking') {
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'Checking Clerk authentication before showing the AI agent workspace.';
+      setAuthLoadingVisible(true);
+    }
+  };
+
+  const renderAuthState = (clerk) => {
+    const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+
+    if (signedIn) {
+      setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
+      hideAuthPanel();
+      initializeChatKit();
+      return;
+    }
+
+    chatkitInitialized = false;
+    setAuthState('signed-out', 'Signed out — sign in to run agents');
+    showSignedOutPanel();
+  };
+
+  const initializeClerkAuth = async () => {
+    setAuthState('checking', 'Checking sign-in…');
+
+    try {
+      const clerk = await getClerk();
+      renderAuthState(clerk);
+
+      if (typeof clerk.addListener === 'function') {
+        clerk.addListener(() => renderAuthState(clerk));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+    }
+  };
+
+  const getClerkSessionToken = async () => {
+    const clerk = await getClerk();
+    renderAuthState(clerk);
+
+    if (!clerk.isSignedIn || !clerk.session) {
+      throw new Error('Sign in with Clerk before running agents.');
+    }
+
+    const token = await clerk.session.getToken();
+
+    if (!token) {
+      throw new Error('Could not retrieve a Clerk session token.');
+    }
+
+    return token;
+  };
+
+  const waitForChatKitElement = async () => {
+    if (window.customElements?.get('openai-chatkit')) return;
+
+    if (window.customElements?.whenDefined) {
+      await Promise.race([
+        window.customElements.whenDefined('openai-chatkit'),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error('ChatKit script did not load.')), 8000)),
+      ]);
+      return;
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 1200));
+  };
+
+  const getChatKitClientSecret = async (currentClientSecret) => {
+    const clerkToken = await getClerkSessionToken();
+    const response = await fetch(chatkitSessionEndpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${clerkToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ currentClientSecret: currentClientSecret || null }),
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || typeof result.client_secret !== 'string') {
+      throw new Error(result.error || 'ChatKit session could not be started.');
+    }
+
+    return result.client_secret;
+  };
+
+  const initializeChatKit = async () => {
+    if (chatkitInitialized) return;
+
+    chatkitInitialized = true;
+    setChatkitStatus('loading', 'Initializing ChatKit…');
+
+    try {
+      await waitForChatKitElement();
+
+      if (!fields.chatkit || typeof fields.chatkit.setOptions !== 'function') {
+        throw new Error('ChatKit web component is unavailable.');
+      }
+
+      fields.chatkit.setOptions({
+        api: {
+          getClientSecret: getChatKitClientSecret,
+        },
+      });
+      setChatkitStatus('ready', 'ChatKit is ready. Use the agent chat below to draft and prepare article payloads.');
+    } catch (error) {
+      chatkitInitialized = false;
+      setChatkitStatus('error', error instanceof Error ? error.message : 'ChatKit could not be initialized.');
+    }
+  };
+
+  const redirectToHostedSignIn = async (clerk) => {
+    if (typeof clerk.redirectToSignIn !== 'function') {
+      throw new Error('Clerk hosted sign-in redirect is unavailable.');
+    }
+
+    await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+  };
+
+  const openSignIn = async () => {
+    setAuthState('checking', 'Opening Clerk sign-in…');
+
+    try {
+      const clerk = await getClerk();
+
+      if (typeof clerk.openSignIn === 'function') {
+        try {
+          await clerk.openSignIn();
+          renderAuthState(clerk);
+          return;
+        } catch (error) {
+          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+        }
+      }
+
+      await redirectToHostedSignIn(clerk);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+    }
+  };
+
+  fields.signIn.addEventListener('click', openSignIn);
+  fields.panelSignIn.addEventListener('click', openSignIn);
+
+  fields.signOut.addEventListener('click', async () => {
+    setAuthState('checking', 'Signing out…');
+
+    try {
+      const clerk = await getClerk();
+      await clerk.signOut();
+      renderAuthState(clerk);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+    }
+  });
+
+  const escapeHtml = (value) =>
+    String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+
+  const renderAgentJson = (value) => `<pre class="agent-json">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+
+  const toAgentResultObject = (value, fallbackMessage) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+
+    return {
+      message: typeof value === 'string' && value ? value : fallbackMessage,
+    };
+  };
+
+  const setAgentResult = (state, html) => {
+    fields.aiResult.hidden = false;
+    fields.aiResult.dataset.state = state;
+    fields.aiResult.innerHTML = html;
+  };
+
+  const getAgentPayload = () => ({
+    title: fields.aiTitle.value.trim(),
+    slug: fields.aiSlug.value.trim(),
+    markdown: fields.aiMarkdown.value.trim(),
+    overwrite: fields.aiOverwrite.checked,
+    images: [],
+  });
+
+  const fillAgentTestPayload = () => {
+    fields.aiTitle.value = 'OpenAI Agent Smoke Test';
+    fields.aiSlug.value = 'openai-agent-smoke-test';
+    fields.aiOverwrite.checked = false;
+    fields.aiMarkdown.value = `---
+title: "OpenAI Agent Smoke Test"
+publishDate: ${new Date().toISOString()}
+excerpt: "Smoke-test article published through the OpenAI agent workflow."
+category: "Publishing"
+tags:
+  - "openai agent"
+  - "smoke test"
+author: "Dr. Lurié"
+---
+
+# OpenAI Agent Smoke Test
+
+This is a short smoke-test article for the browser-based AI Article Publisher.
+
+If this article appears on the site, the Clerk-gated admin UI successfully posted to the server-side publishing agent.
+`;
+    setAgentResult('loading', '<h3>Test payload loaded</h3><p class="hint">Review the Markdown, then run the publishing agent.</p>');
+  };
+
+  const isDuplicateError = (status, result) => {
+    const combined = `${result?.error || ''} ${result?.message || ''}`.toLowerCase();
+    return status === 409 || combined.includes('already exists') || combined.includes('duplicate');
+  };
+
+  const renderAgentSuccess = (result) => {
+    const rows = [
+      ['success', String(result.success === true || result.ok === true)],
+      ['articlePath', result.articlePath || result.path || 'Not returned'],
+      ['commit', result.commit || 'Not returned'],
+      ['message', result.message || 'Published successfully.'],
+      ...(result.deployStatus ? [['deployStatus', result.deployStatus]] : []),
+    ];
+
+    setAgentResult(
+      'success',
+      `<h3>Publishing agent succeeded</h3><dl>${rows
+        .map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`)
+        .join('')}</dl>${renderAgentJson(result)}`
+    );
+  };
+
+  const renderAgentError = (status, result) => {
+    const duplicateHint = isDuplicateError(status, result)
+      ? '<p class="agent-error-hint">This looks like a duplicate article. Enable overwrite and submit again if you intend to replace it.</p>'
+      : '';
+    const errorBody = Object.keys(result || {}).length ? result : { error: `Publisher agent failed with status ${status}.` };
+
+    setAgentResult('error', `<h3>Publishing agent failed</h3>${duplicateHint}${renderAgentJson(errorBody)}`);
+  };
+
+  const runPublishingAgent = async (event) => {
+    event.preventDefault();
+
+    const payload = getAgentPayload();
+    if (!payload.title || !payload.markdown) {
+      renderAgentError(400, { error: 'Title and Markdown are required before running the publishing agent.' });
+      return;
+    }
+
+    fields.aiPublish.disabled = true;
+    setAgentResult(
+      'loading',
+      '<h3>Running publishing agent…</h3><p class="hint">Checking Clerk session and sending the approved article payload.</p>'
+    );
+
+    try {
+      const clerkToken = await getClerkSessionToken();
+      const response = await fetch(publisherAgentEndpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      const parsedResult = await response.json().catch(() => ({}));
+      const result = toAgentResultObject(parsedResult, `Publisher agent returned status ${response.status}.`);
+
+      if (!response.ok || result.success === false || result.ok === false) {
+        renderAgentError(response.status, result);
+        return;
+      }
+
+      renderAgentSuccess({
+        ...result,
+        success: result.success ?? result.ok ?? true,
+      });
+    } catch (error) {
+      renderAgentError(0, { error: error instanceof Error ? error.message : 'Publisher agent could not be reached.' });
+    } finally {
+      fields.aiPublish.disabled = !isSignedIn;
+    }
+  };
+
+  fields.aiForm.addEventListener('submit', runPublishingAgent);
+  fields.aiTestPayload.addEventListener('click', fillAgentTestPayload);
+
+  initializeClerkAuth();
+</script>
