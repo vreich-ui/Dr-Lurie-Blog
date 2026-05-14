@@ -1,0 +1,376 @@
+{
+  "version": "1.0",
+  "name": "AI Publishing Workflow",
+  "template": "{\"type\":\"Card\",\"size\":\"md\",\"padding\":0,\"children\":[{\"type\":\"Col\",\"gap\":0,\"children\":[{\"type\":\"Col\",\"padding\":4,\"gap\":2,\"children\":[{\"type\":\"Row\",\"align\":\"center\",\"children\":[{\"type\":\"Title\",\"value\":\"AI Publishing Workflow\",\"size\":\"md\"},{\"type\":\"Spacer\"},{\"type\":\"Badge\",\"label\":{{ (status) | tojson }},\"variant\":\"soft\",\"color\":\"secondary\"}]},{\"type\":\"Text\",\"value\":\"Generate, review, and publish AI-assisted articles through Netlify.\",\"color\":\"secondary\",\"size\":\"sm\"},{\"type\":\"Row\",\"gap\":1,\"children\":[{\"type\":\"Badge\",\"label\":\"ChatKit\",\"variant\":\"soft\",\"color\":\"secondary\"},{\"type\":\"Badge\",\"label\":\"OpenAI\",\"variant\":\"soft\",\"color\":\"secondary\"},{\"type\":\"Badge\",\"label\":\"Netlify\",\"variant\":\"soft\",\"color\":\"secondary\"},{\"type\":\"Badge\",\"label\":\"Protected\",\"variant\":\"outline\",\"color\":\"secondary\"}]}]},{\"type\":\"Divider\",\"flush\":true},{\"type\":\"Col\",\"padding\":4,\"gap\":3,\"children\":[{\"type\":\"Transition\",\"children\":[{%- set _c -%}{%-if status == \"idle\" -%},{\"type\":\"Col\",\"key\":\"idle\",\"gap\":3,\"children\":[{\"type\":\"Form\",\"onSubmitAction\":{\"type\":\"agent.start_workflow\",\"payload\":{\"endpoint\":{{ (endpoint) | tojson }}}},\"children\":[{\"type\":\"Col\",\"gap\":3,\"children\":[{\"type\":\"Col\",\"gap\":1,\"children\":[{\"type\":\"Label\",\"value\":\"Article idea\",\"fieldName\":\"articleIdea\"},{\"type\":\"Textarea\",\"name\":\"articleIdea\",\"defaultValue\":{{ (articleIdea) | tojson }},\"required\":true,\"rows\":5,\"placeholder\":\"e.g., Why a room can feel clean before it looks clean\"}]},{\"type\":\"Row\",\"gap\":3,\"align\":\"center\",\"children\":[{\"type\":\"Col\",\"flex\":\"auto\",\"gap\":1,\"children\":[{\"type\":\"Label\",\"value\":\"Optional slug\",\"fieldName\":\"slug\"},{\"type\":\"Input\",\"name\":\"slug\",\"defaultValue\":{{ (slug) | tojson }},\"placeholder\":\"e.g., why-clean-has-a-smell\"}]},{\"type\":\"Checkbox\",\"name\":\"overwrite\",\"label\":\"Overwrite existing article\",\"defaultChecked\":{{ (overwrite) | tojson }}}]},{\"type\":\"Row\",\"gap\":2,\"children\":[{\"type\":\"Button\",\"submit\":true,\"style\":\"primary\",\"label\":\"Start AI workflow\",\"iconStart\":\"sparkle\"},{\"type\":\"Button\",\"label\":\"Fill smoke test\",\"variant\":\"outline\",\"iconStart\":\"reload\",\"onClickAction\":{\"type\":\"agent.fill_test_payload\",\"payload\":{\"endpoint\":{{ (endpoint) | tojson }}}}}]}]}]},{\"type\":\"Caption\",\"value\":{{ ((\"Posts to \" ~ endpoint)) | tojson }}},{\"type\":\"Row\",\"gap\":2,\"align\":\"center\",\"children\":[{\"type\":\"Icon\",\"name\":\"info\",\"color\":\"warning\"},{\"type\":\"Text\",\"value\":\"No OpenAI API keys or publish secrets are exposed in the browser.\",\"color\":\"warning\",\"size\":\"sm\"}]}]}{%-else-%}{%-endif-%}{%- endset -%}{{- (_c[1:] if _c and _c[0] == ',' else _c) -}}]}]}]}]}",
+  "jsonSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": [
+          "idle",
+          "researching",
+          "angle_review",
+          "draft_ready",
+          "publishing",
+          "published",
+          "error"
+        ]
+      },
+      "articleIdea": {
+        "type": "string"
+      },
+      "title": {
+        "type": "string"
+      },
+      "slug": {
+        "type": "string"
+      },
+      "markdown": {
+        "type": "string"
+      },
+      "overwrite": {
+        "type": "boolean"
+      },
+      "recommendedAngle": {
+        "type": "string"
+      },
+      "hook": {
+        "type": "string"
+      },
+      "editorialPromise": {
+        "type": "string"
+      },
+      "risks": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "imageBrief": {
+        "type": "string"
+      },
+      "endpoint": {
+        "type": "string"
+      },
+      "result": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "articlePath": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "deployStatus": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "articlePath",
+              "commit",
+              "deployStatus",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "error": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "stack": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "errorJson": {
+        "type": "string"
+      },
+      "states": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "researching",
+                "angle_review",
+                "draft_ready",
+                "publishing",
+                "published",
+                "error"
+              ]
+            },
+            "label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "label"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "status",
+      "articleIdea",
+      "title",
+      "slug",
+      "markdown",
+      "overwrite",
+      "recommendedAngle",
+      "hook",
+      "editorialPromise",
+      "risks",
+      "imageBrief",
+      "endpoint",
+      "result",
+      "error",
+      "states"
+    ],
+    "additionalProperties": false
+  },
+  "outputJsonPreview": {
+    "type": "Card",
+    "size": "md",
+    "padding": 0,
+    "children": [
+      {
+        "type": "Col",
+        "gap": 0,
+        "children": [
+          {
+            "type": "Col",
+            "padding": 4,
+            "gap": 2,
+            "children": [
+              {
+                "type": "Row",
+                "align": "center",
+                "children": [
+                  {
+                    "type": "Title",
+                    "value": "AI Publishing Workflow",
+                    "size": "md"
+                  },
+                  {
+                    "type": "Spacer"
+                  },
+                  {
+                    "type": "Badge",
+                    "label": "idle",
+                    "variant": "soft",
+                    "color": "secondary"
+                  }
+                ]
+              },
+              {
+                "type": "Text",
+                "value": "Generate, review, and publish AI-assisted articles through Netlify.",
+                "color": "secondary",
+                "size": "sm"
+              },
+              {
+                "type": "Row",
+                "gap": 1,
+                "children": [
+                  {
+                    "type": "Badge",
+                    "label": "ChatKit",
+                    "variant": "soft",
+                    "color": "secondary"
+                  },
+                  {
+                    "type": "Badge",
+                    "label": "OpenAI",
+                    "variant": "soft",
+                    "color": "secondary"
+                  },
+                  {
+                    "type": "Badge",
+                    "label": "Netlify",
+                    "variant": "soft",
+                    "color": "secondary"
+                  },
+                  {
+                    "type": "Badge",
+                    "label": "Protected",
+                    "variant": "outline",
+                    "color": "secondary"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "Divider",
+            "flush": true
+          },
+          {
+            "type": "Col",
+            "padding": 4,
+            "gap": 3,
+            "children": [
+              {
+                "type": "Transition",
+                "children": {
+                  "type": "Col",
+                  "key": "idle",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "Form",
+                      "onSubmitAction": {
+                        "type": "agent.start_workflow",
+                        "payload": {
+                          "endpoint": "/.netlify/functions/run-publisher-agent"
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "Col",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "Col",
+                              "gap": 1,
+                              "children": [
+                                {
+                                  "type": "Label",
+                                  "value": "Article idea",
+                                  "fieldName": "articleIdea"
+                                },
+                                {
+                                  "type": "Textarea",
+                                  "name": "articleIdea",
+                                  "defaultValue": "",
+                                  "required": true,
+                                  "rows": 5,
+                                  "placeholder": "e.g., Why a room can feel clean before it looks clean"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "Row",
+                              "gap": 3,
+                              "align": "center",
+                              "children": [
+                                {
+                                  "type": "Col",
+                                  "flex": "auto",
+                                  "gap": 1,
+                                  "children": [
+                                    {
+                                      "type": "Label",
+                                      "value": "Optional slug",
+                                      "fieldName": "slug"
+                                    },
+                                    {
+                                      "type": "Input",
+                                      "name": "slug",
+                                      "defaultValue": "",
+                                      "placeholder": "e.g., why-clean-has-a-smell"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "Checkbox",
+                                  "name": "overwrite",
+                                  "label": "Overwrite existing article",
+                                  "defaultChecked": false
+                                }
+                              ]
+                            },
+                            {
+                              "type": "Row",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "Button",
+                                  "submit": true,
+                                  "style": "primary",
+                                  "label": "Start AI workflow",
+                                  "iconStart": "sparkle"
+                                },
+                                {
+                                  "type": "Button",
+                                  "label": "Fill smoke test",
+                                  "variant": "outline",
+                                  "iconStart": "reload",
+                                  "onClickAction": {
+                                    "type": "agent.fill_test_payload",
+                                    "payload": {
+                                      "endpoint": "/.netlify/functions/run-publisher-agent"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Caption",
+                      "value": "Posts to /.netlify/functions/run-publisher-agent"
+                    },
+                    {
+                      "type": "Row",
+                      "gap": 2,
+                      "align": "center",
+                      "children": [
+                        {
+                          "type": "Icon",
+                          "name": "info",
+                          "color": "warning"
+                        },
+                        {
+                          "type": "Text",
+                          "value": "No OpenAI API keys or publish secrets are exposed in the browser.",
+                          "color": "warning",
+                          "size": "sm"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "encodedWidget": "eyJpZCI6ImViYmE4Y2NiLWY4MzgtNDM2ZC04OTQzLTRkZmQ2YmMzMmRhNCIsIm5hbWUiOiJBSSBQdWJsaXNoaW5nIFdvcmtmbG93IiwidmlldyI6IjxDYXJkIHNpemU9XCJtZFwiIHBhZGRpbmc9ezB9PlxuICA8Q29sIGdhcD17MH0-XG4gICAgPENvbCBwYWRkaW5nPXs0fSBnYXA9ezJ9PlxuICAgICAgPFJvdyBhbGlnbj1cImNlbnRlclwiPlxuICAgICAgICA8VGl0bGUgdmFsdWU9XCJBSSBQdWJsaXNoaW5nIFdvcmtmbG93XCIgc2l6ZT1cIm1kXCIgLz5cbiAgICAgICAgPFNwYWNlciAvPlxuICAgICAgICA8QmFkZ2UgbGFiZWw9e3N0YXR1c30gdmFyaWFudD1cInNvZnRcIiBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICA8L1Jvdz5cblxuICAgICAgPFRleHRcbiAgICAgICAgdmFsdWU9XCJHZW5lcmF0ZSwgcmV2aWV3LCBhbmQgcHVibGlzaCBBSS1hc3Npc3RlZCBhcnRpY2xlcyB0aHJvdWdoIE5ldGxpZnkuXCJcbiAgICAgICAgY29sb3I9XCJzZWNvbmRhcnlcIlxuICAgICAgICBzaXplPVwic21cIlxuICAgICAgLz5cblxuICAgICAgPFJvdyBnYXA9ezF9PlxuICAgICAgICA8QmFkZ2UgbGFiZWw9XCJDaGF0S2l0XCIgdmFyaWFudD1cInNvZnRcIiBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICAgIDxCYWRnZSBsYWJlbD1cIk9wZW5BSVwiIHZhcmlhbnQ9XCJzb2Z0XCIgY29sb3I9XCJzZWNvbmRhcnlcIiAvPlxuICAgICAgICA8QmFkZ2UgbGFiZWw9XCJOZXRsaWZ5XCIgdmFyaWFudD1cInNvZnRcIiBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICAgIDxCYWRnZSBsYWJlbD1cIlByb3RlY3RlZFwiIHZhcmlhbnQ9XCJvdXRsaW5lXCIgY29sb3I9XCJzZWNvbmRhcnlcIiAvPlxuICAgICAgPC9Sb3c-XG4gICAgPC9Db2w-XG5cbiAgICA8RGl2aWRlciBmbHVzaCAvPlxuXG4gICAgPENvbCBwYWRkaW5nPXs0fSBnYXA9ezN9PlxuICAgICAgPFRyYW5zaXRpb24-XG4gICAgICAgIHtzdGF0dXMgPT09IFwiaWRsZVwiID8gKFxuICAgICAgICAgIDxDb2wga2V5PVwiaWRsZVwiIGdhcD17M30-XG4gICAgICAgICAgICA8Rm9ybVxuICAgICAgICAgICAgICBvblN1Ym1pdEFjdGlvbj17e1xuICAgICAgICAgICAgICAgIHR5cGU6IFwiYWdlbnQuc3RhcnRfd29ya2Zsb3dcIixcbiAgICAgICAgICAgICAgICBwYXlsb2FkOiB7IGVuZHBvaW50IH0sXG4gICAgICAgICAgICAgIH19XG4gICAgICAgICAgICA-XG4gICAgICAgICAgICAgIDxDb2wgZ2FwPXszfT5cbiAgICAgICAgICAgICAgICA8Q29sIGdhcD17MX0-XG4gICAgICAgICAgICAgICAgICA8TGFiZWwgdmFsdWU9XCJBcnRpY2xlIGlkZWFcIiBmaWVsZE5hbWU9XCJhcnRpY2xlSWRlYVwiIC8-XG4gICAgICAgICAgICAgICAgICA8VGV4dGFyZWFcbiAgICAgICAgICAgICAgICAgICAgbmFtZT1cImFydGljbGVJZGVhXCJcbiAgICAgICAgICAgICAgICAgICAgZGVmYXVsdFZhbHVlPXthcnRpY2xlSWRlYX1cbiAgICAgICAgICAgICAgICAgICAgcmVxdWlyZWRcbiAgICAgICAgICAgICAgICAgICAgcm93cz17NX1cbiAgICAgICAgICAgICAgICAgICAgcGxhY2Vob2xkZXI9XCJlLmcuLCBXaHkgYSByb29tIGNhbiBmZWVsIGNsZWFuIGJlZm9yZSBpdCBsb29rcyBjbGVhblwiXG4gICAgICAgICAgICAgICAgICAvPlxuICAgICAgICAgICAgICAgIDwvQ29sPlxuXG4gICAgICAgICAgICAgICAgPFJvdyBnYXA9ezN9IGFsaWduPVwiY2VudGVyXCI-XG4gICAgICAgICAgICAgICAgICA8Q29sIGZsZXg9XCJhdXRvXCIgZ2FwPXsxfT5cbiAgICAgICAgICAgICAgICAgICAgPExhYmVsIHZhbHVlPVwiT3B0aW9uYWwgc2x1Z1wiIGZpZWxkTmFtZT1cInNsdWdcIiAvPlxuICAgICAgICAgICAgICAgICAgICA8SW5wdXRcbiAgICAgICAgICAgICAgICAgICAgICBuYW1lPVwic2x1Z1wiXG4gICAgICAgICAgICAgICAgICAgICAgZGVmYXVsdFZhbHVlPXtzbHVnfVxuICAgICAgICAgICAgICAgICAgICAgIHBsYWNlaG9sZGVyPVwiZS5nLiwgd2h5LWNsZWFuLWhhcy1hLXNtZWxsXCJcbiAgICAgICAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgICAgICAgIDwvQ29sPlxuXG4gICAgICAgICAgICAgICAgICA8Q2hlY2tib3hcbiAgICAgICAgICAgICAgICAgICAgbmFtZT1cIm92ZXJ3cml0ZVwiXG4gICAgICAgICAgICAgICAgICAgIGxhYmVsPVwiT3ZlcndyaXRlIGV4aXN0aW5nIGFydGljbGVcIlxuICAgICAgICAgICAgICAgICAgICBkZWZhdWx0Q2hlY2tlZD17b3ZlcndyaXRlfVxuICAgICAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgICAgICA8L1Jvdz5cblxuICAgICAgICAgICAgICAgIDxSb3cgZ2FwPXsyfT5cbiAgICAgICAgICAgICAgICAgIDxCdXR0b25cbiAgICAgICAgICAgICAgICAgICAgc3VibWl0XG4gICAgICAgICAgICAgICAgICAgIHN0eWxlPVwicHJpbWFyeVwiXG4gICAgICAgICAgICAgICAgICAgIGxhYmVsPVwiU3RhcnQgQUkgd29ya2Zsb3dcIlxuICAgICAgICAgICAgICAgICAgICBpY29uU3RhcnQ9XCJzcGFya2xlXCJcbiAgICAgICAgICAgICAgICAgIC8-XG5cbiAgICAgICAgICAgICAgICAgIDxCdXR0b25cbiAgICAgICAgICAgICAgICAgICAgbGFiZWw9XCJGaWxsIHNtb2tlIHRlc3RcIlxuICAgICAgICAgICAgICAgICAgICB2YXJpYW50PVwib3V0bGluZVwiXG4gICAgICAgICAgICAgICAgICAgIGljb25TdGFydD1cInJlbG9hZFwiXG4gICAgICAgICAgICAgICAgICAgIG9uQ2xpY2tBY3Rpb249e3tcbiAgICAgICAgICAgICAgICAgICAgICB0eXBlOiBcImFnZW50LmZpbGxfdGVzdF9wYXlsb2FkXCIsXG4gICAgICAgICAgICAgICAgICAgICAgcGF5bG9hZDogeyBlbmRwb2ludCB9LFxuICAgICAgICAgICAgICAgICAgICB9fVxuICAgICAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgICAgICA8L1Jvdz5cbiAgICAgICAgICAgICAgPC9Db2w-XG4gICAgICAgICAgICA8L0Zvcm0-XG5cbiAgICAgICAgICAgIDxDYXB0aW9uIHZhbHVlPXtgUG9zdHMgdG8gJHtlbmRwb2ludH1gfSAvPlxuXG4gICAgICAgICAgICA8Um93IGdhcD17Mn0gYWxpZ249XCJjZW50ZXJcIj5cbiAgICAgICAgICAgICAgPEljb24gbmFtZT1cImluZm9cIiBjb2xvcj1cIndhcm5pbmdcIiAvPlxuICAgICAgICAgICAgICA8VGV4dFxuICAgICAgICAgICAgICAgIHZhbHVlPVwiTm8gT3BlbkFJIEFQSSBrZXlzIG9yIHB1Ymxpc2ggc2VjcmV0cyBhcmUgZXhwb3NlZCBpbiB0aGUgYnJvd3Nlci5cIlxuICAgICAgICAgICAgICAgIGNvbG9yPVwid2FybmluZ1wiXG4gICAgICAgICAgICAgICAgc2l6ZT1cInNtXCJcbiAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgIDwvUm93PlxuICAgICAgICAgIDwvQ29sPlxuICAgICAgICApIDogc3RhdHVzID09PSBcInJlc2VhcmNoaW5nXCIgPyAoXG4gICAgICAgICAgPENvbCBrZXk9XCJyZXNlYXJjaGluZ1wiIGdhcD17M30gYWxpZ249XCJjZW50ZXJcIj5cbiAgICAgICAgICAgIDxJY29uIG5hbWU9XCJyZWxvYWRcIiBzaXplPVwiMnhsXCIgY29sb3I9XCJzZWNvbmRhcnlcIiAvPlxuICAgICAgICAgICAgPEJhZGdlIGxhYmVsPVwiUmVzZWFyY2hpbmdcIiBjb2xvcj1cImluZm9cIiB2YXJpYW50PVwic29mdFwiIC8-XG4gICAgICAgICAgICA8VGV4dFxuICAgICAgICAgICAgICB2YWx1ZT1cIlRoZSBwdWJsaXNoaW5nIGFnZW50IGlzIHJlc2VhcmNoaW5nIGFuZCBnZW5lcmF0aW5nIGVkaXRvcmlhbCBhbmdsZXMuXCJcbiAgICAgICAgICAgICAgY29sb3I9XCJzZWNvbmRhcnlcIlxuICAgICAgICAgICAgICB0ZXh0QWxpZ249XCJjZW50ZXJcIlxuICAgICAgICAgICAgLz5cbiAgICAgICAgICAgIDxCdXR0b25cbiAgICAgICAgICAgICAgbGFiZWw9XCJDYW5jZWxcIlxuICAgICAgICAgICAgICB2YXJpYW50PVwib3V0bGluZVwiXG4gICAgICAgICAgICAgIG9uQ2xpY2tBY3Rpb249e3tcbiAgICAgICAgICAgICAgICB0eXBlOiBcImFnZW50LmNhbmNlbFwiLFxuICAgICAgICAgICAgICAgIHBheWxvYWQ6IHsgZW5kcG9pbnQgfSxcbiAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgIC8-XG4gICAgICAgICAgPC9Db2w-XG4gICAgICAgICkgOiBzdGF0dXMgPT09IFwiYW5nbGVfcmV2aWV3XCIgPyAoXG4gICAgICAgICAgPENvbCBrZXk9XCJhbmdsZV9yZXZpZXdcIiBnYXA9ezN9PlxuICAgICAgICAgICAgPEJveCBib3JkZXI9ezF9IHJhZGl1cz1cIm1kXCIgcGFkZGluZz17M30gYmFja2dyb3VuZD1cInN1cmZhY2VcIj5cbiAgICAgICAgICAgICAgPENhcHRpb24gdmFsdWU9XCJSZWNvbW1lbmRlZCBhbmdsZVwiIC8-XG4gICAgICAgICAgICAgIDxUZXh0IHZhbHVlPXtyZWNvbW1lbmRlZEFuZ2xlIHx8IFwiTm8gYW5nbGUgcHJvdmlkZWQgeWV0LlwifSAvPlxuICAgICAgICAgICAgPC9Cb3g-XG5cbiAgICAgICAgICAgIDxSb3cgZ2FwPXszfT5cbiAgICAgICAgICAgICAgPEJveCBib3JkZXI9ezF9IHJhZGl1cz1cIm1kXCIgcGFkZGluZz17M30gYmFja2dyb3VuZD1cInN1cmZhY2VcIiBmbGV4PVwiYXV0b1wiPlxuICAgICAgICAgICAgICAgIDxDYXB0aW9uIHZhbHVlPVwiSG9va1wiIC8-XG4gICAgICAgICAgICAgICAgPFRleHQgdmFsdWU9e2hvb2sgfHwgXCJObyBob29rIHByb3ZpZGVkIHlldC5cIn0gLz5cbiAgICAgICAgICAgICAgPC9Cb3g-XG5cbiAgICAgICAgICAgICAgPEJveCBib3JkZXI9ezF9IHJhZGl1cz1cIm1kXCIgcGFkZGluZz17M30gYmFja2dyb3VuZD1cInN1cmZhY2VcIiBmbGV4PVwiYXV0b1wiPlxuICAgICAgICAgICAgICAgIDxDYXB0aW9uIHZhbHVlPVwiRWRpdG9yaWFsIHByb21pc2VcIiAvPlxuICAgICAgICAgICAgICAgIDxUZXh0IHZhbHVlPXtlZGl0b3JpYWxQcm9taXNlIHx8IFwiTm8gZWRpdG9yaWFsIHByb21pc2UgcHJvdmlkZWQgeWV0LlwifSAvPlxuICAgICAgICAgICAgICA8L0JveD5cbiAgICAgICAgICAgIDwvUm93PlxuXG4gICAgICAgICAgICA8Qm94IGJvcmRlcj17MX0gcmFkaXVzPVwibWRcIiBwYWRkaW5nPXszfSBiYWNrZ3JvdW5kPVwic3VyZmFjZVwiPlxuICAgICAgICAgICAgICA8Q2FwdGlvbiB2YWx1ZT1cIlJpc2tzIC8gd2Vha25lc3Nlc1wiIC8-XG4gICAgICAgICAgICAgIHtyaXNrcy5sZW5ndGggPT09IDAgPyAoXG4gICAgICAgICAgICAgICAgPFRleHQgdmFsdWU9XCJOb25lIGxpc3RlZFwiIGNvbG9yPVwic2Vjb25kYXJ5XCIgLz5cbiAgICAgICAgICAgICAgKSA6IChcbiAgICAgICAgICAgICAgICA8Q29sIGdhcD17MX0-XG4gICAgICAgICAgICAgICAgICB7cmlza3MubWFwKChyaXNrLCBpbmRleCkgPT4gKFxuICAgICAgICAgICAgICAgICAgICA8VGV4dCBrZXk9e2ByaXNrLSR7aW5kZXh9YH0gdmFsdWU9e2DigKIgJHtyaXNrfWB9IHNpemU9XCJzbVwiIC8-XG4gICAgICAgICAgICAgICAgICApKX1cbiAgICAgICAgICAgICAgICA8L0NvbD5cbiAgICAgICAgICAgICAgKX1cbiAgICAgICAgICAgIDwvQm94PlxuXG4gICAgICAgICAgICA8Um93IGdhcD17Mn0-XG4gICAgICAgICAgICAgIDxCdXR0b25cbiAgICAgICAgICAgICAgICBsYWJlbD1cIkFwcHJvdmUgYW5nbGVcIlxuICAgICAgICAgICAgICAgIHN0eWxlPVwicHJpbWFyeVwiXG4gICAgICAgICAgICAgICAgb25DbGlja0FjdGlvbj17e1xuICAgICAgICAgICAgICAgICAgdHlwZTogXCJhZ2VudC5hcHByb3ZlX2FuZ2xlXCIsXG4gICAgICAgICAgICAgICAgICBwYXlsb2FkOiB7IGVuZHBvaW50IH0sXG4gICAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgICAgLz5cblxuICAgICAgICAgICAgICA8QnV0dG9uXG4gICAgICAgICAgICAgICAgbGFiZWw9XCJSZWdlbmVyYXRlXCJcbiAgICAgICAgICAgICAgICB2YXJpYW50PVwib3V0bGluZVwiXG4gICAgICAgICAgICAgICAgb25DbGlja0FjdGlvbj17e1xuICAgICAgICAgICAgICAgICAgdHlwZTogXCJhZ2VudC5yZWdlbmVyYXRlX2FuZ2xlXCIsXG4gICAgICAgICAgICAgICAgICBwYXlsb2FkOiB7IGVuZHBvaW50IH0sXG4gICAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgIDwvUm93PlxuICAgICAgICAgIDwvQ29sPlxuICAgICAgICApIDogc3RhdHVzID09PSBcImRyYWZ0X3JlYWR5XCIgPyAoXG4gICAgICAgICAgPENvbCBrZXk9XCJkcmFmdF9yZWFkeVwiIGdhcD17M30-XG4gICAgICAgICAgICA8Um93PlxuICAgICAgICAgICAgICA8Q29sIGZsZXg9XCJhdXRvXCI-XG4gICAgICAgICAgICAgICAgPENhcHRpb24gdmFsdWU9XCJUaXRsZVwiIC8-XG4gICAgICAgICAgICAgICAgPFRleHQgdmFsdWU9e3RpdGxlIHx8IFwiKHVudGl0bGVkKVwifSB3ZWlnaHQ9XCJzZW1pYm9sZFwiIC8-XG4gICAgICAgICAgICAgIDwvQ29sPlxuXG4gICAgICAgICAgICAgIDxDb2w-XG4gICAgICAgICAgICAgICAgPENhcHRpb24gdmFsdWU9XCJTbHVnXCIgLz5cbiAgICAgICAgICAgICAgICA8VGV4dCB2YWx1ZT17c2x1ZyB8fCBcIihhdXRvKVwifSBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICAgICAgICAgIDwvQ29sPlxuICAgICAgICAgICAgPC9Sb3c-XG5cbiAgICAgICAgICAgIDxEaXZpZGVyIC8-XG5cbiAgICAgICAgICAgIDxDYXB0aW9uIHZhbHVlPVwiTWFya2Rvd24gcHJldmlld1wiIC8-XG4gICAgICAgICAgICA8Qm94IGJvcmRlcj17MX0gcmFkaXVzPVwibWRcIiBwYWRkaW5nPXsyfSBiYWNrZ3JvdW5kPVwic3VyZmFjZS1zZWNvbmRhcnlcIj5cbiAgICAgICAgICAgICAgPE1hcmtkb3duIHZhbHVlPXttYXJrZG93biB8fCBcIl9EcmFmdCBpcyBlbXB0eS5fXCJ9IC8-XG4gICAgICAgICAgICA8L0JveD5cblxuICAgICAgICAgICAgPEJveCBib3JkZXI9ezF9IHJhZGl1cz1cIm1kXCIgcGFkZGluZz17M30gYmFja2dyb3VuZD1cInN1cmZhY2VcIj5cbiAgICAgICAgICAgICAgPENhcHRpb24gdmFsdWU9XCJJbWFnZSBicmllZlwiIC8-XG4gICAgICAgICAgICAgIDxUZXh0XG4gICAgICAgICAgICAgICAgdmFsdWU9e2ltYWdlQnJpZWYgfHwgXCJObyBpbWFnZSBicmllZiBwcm92aWRlZC5cIn1cbiAgICAgICAgICAgICAgICBjb2xvcj1cInNlY29uZGFyeVwiXG4gICAgICAgICAgICAgIC8-XG4gICAgICAgICAgICA8L0JveD5cblxuICAgICAgICAgICAgPFJvdyBnYXA9ezJ9PlxuICAgICAgICAgICAgICA8QnV0dG9uXG4gICAgICAgICAgICAgICAgbGFiZWw9XCJBcHByb3ZlIGFuZCBwdWJsaXNoXCJcbiAgICAgICAgICAgICAgICBzdHlsZT1cInByaW1hcnlcIlxuICAgICAgICAgICAgICAgIGljb25TdGFydD1cImNoZWNrLWNpcmNsZS1maWxsZWRcIlxuICAgICAgICAgICAgICAgIG9uQ2xpY2tBY3Rpb249e3tcbiAgICAgICAgICAgICAgICAgIHR5cGU6IFwiYWdlbnQucHVibGlzaF9hcnRpY2xlXCIsXG4gICAgICAgICAgICAgICAgICBwYXlsb2FkOiB7XG4gICAgICAgICAgICAgICAgICAgIGVuZHBvaW50LFxuICAgICAgICAgICAgICAgICAgICB0aXRsZSxcbiAgICAgICAgICAgICAgICAgICAgc2x1ZyxcbiAgICAgICAgICAgICAgICAgICAgbWFya2Rvd24sXG4gICAgICAgICAgICAgICAgICAgIG92ZXJ3cml0ZSxcbiAgICAgICAgICAgICAgICAgICAgaW1hZ2VzOiBbXSxcbiAgICAgICAgICAgICAgICAgIH0sXG4gICAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgICAgLz5cblxuICAgICAgICAgICAgICA8QnV0dG9uXG4gICAgICAgICAgICAgICAgbGFiZWw9XCJSZXZpc2UgZHJhZnRcIlxuICAgICAgICAgICAgICAgIHZhcmlhbnQ9XCJvdXRsaW5lXCJcbiAgICAgICAgICAgICAgICBvbkNsaWNrQWN0aW9uPXt7XG4gICAgICAgICAgICAgICAgICB0eXBlOiBcImFnZW50LnJldmlzZV9kcmFmdFwiLFxuICAgICAgICAgICAgICAgICAgcGF5bG9hZDogeyBlbmRwb2ludCB9LFxuICAgICAgICAgICAgICAgIH19XG4gICAgICAgICAgICAgIC8-XG5cbiAgICAgICAgICAgICAgPEJ1dHRvblxuICAgICAgICAgICAgICAgIGxhYmVsPVwiQmFjayB0byBhbmdsZSByZXZpZXdcIlxuICAgICAgICAgICAgICAgIHZhcmlhbnQ9XCJvdXRsaW5lXCJcbiAgICAgICAgICAgICAgICBvbkNsaWNrQWN0aW9uPXt7XG4gICAgICAgICAgICAgICAgICB0eXBlOiBcImFnZW50LmJhY2tfdG9fYW5nbGVcIixcbiAgICAgICAgICAgICAgICAgIHBheWxvYWQ6IHsgZW5kcG9pbnQgfSxcbiAgICAgICAgICAgICAgICB9fVxuICAgICAgICAgICAgICAvPlxuICAgICAgICAgICAgPC9Sb3c-XG4gICAgICAgICAgPC9Db2w-XG4gICAgICAgICkgOiBzdGF0dXMgPT09IFwicHVibGlzaGluZ1wiID8gKFxuICAgICAgICAgIDxDb2wga2V5PVwicHVibGlzaGluZ1wiIGdhcD17M30gYWxpZ249XCJjZW50ZXJcIj5cbiAgICAgICAgICAgIDxJY29uIG5hbWU9XCJyZWxvYWRcIiBzaXplPVwiMnhsXCIgLz5cbiAgICAgICAgICAgIDxCYWRnZSBsYWJlbD1cIlB1Ymxpc2hpbmdcIiBjb2xvcj1cInN1Y2Nlc3NcIiB2YXJpYW50PVwic29mdFwiIC8-XG4gICAgICAgICAgICA8VGV4dFxuICAgICAgICAgICAgICB2YWx1ZT1cIlB1Ymxpc2hpbmcgYXJ0aWNsZSB0byBOZXRsaWZ5IGFuZCBHaXRIdWLigKZcIlxuICAgICAgICAgICAgICBjb2xvcj1cInNlY29uZGFyeVwiXG4gICAgICAgICAgICAgIHRleHRBbGlnbj1cImNlbnRlclwiXG4gICAgICAgICAgICAvPlxuICAgICAgICAgICAgPEJ1dHRvbiBsYWJlbD1cIlB1Ymxpc2hpbmfigKZcIiBkaXNhYmxlZCB1bmlmb3JtIC8-XG4gICAgICAgICAgPC9Db2w-XG4gICAgICAgICkgOiBzdGF0dXMgPT09IFwicHVibGlzaGVkXCIgJiYgcmVzdWx0ID8gKFxuICAgICAgICAgIDxDb2wga2V5PVwicHVibGlzaGVkXCIgZ2FwPXszfT5cbiAgICAgICAgICAgIDxSb3cgZ2FwPXsyfSBhbGlnbj1cImNlbnRlclwiPlxuICAgICAgICAgICAgICA8QmFkZ2UgbGFiZWw9XCJTdWNjZXNzXCIgY29sb3I9XCJzdWNjZXNzXCIgLz5cbiAgICAgICAgICAgICAgPFRleHQgdmFsdWU9e3Jlc3VsdC5tZXNzYWdlfSBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICAgICAgICA8L1Jvdz5cblxuICAgICAgICAgICAgPEJveCBib3JkZXI9ezF9IHJhZGl1cz1cIm1kXCIgcGFkZGluZz17M30gYmFja2dyb3VuZD1cInN1cmZhY2VcIj5cbiAgICAgICAgICAgICAgPFJvdz5cbiAgICAgICAgICAgICAgICA8VGV4dCB2YWx1ZT1cIkFydGljbGVcIiBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICAgICAgICAgICAgPFNwYWNlciAvPlxuICAgICAgICAgICAgICAgIDxUZXh0IHZhbHVlPXtyZXN1bHQuYXJ0aWNsZVBhdGh9IHdlaWdodD1cInNlbWlib2xkXCIgLz5cbiAgICAgICAgICAgICAgPC9Sb3c-XG5cbiAgICAgICAgICAgICAgPFJvdz5cbiAgICAgICAgICAgICAgICA8VGV4dCB2YWx1ZT1cIkNvbW1pdFwiIGNvbG9yPVwic2Vjb25kYXJ5XCIgLz5cbiAgICAgICAgICAgICAgICA8U3BhY2VyIC8-XG4gICAgICAgICAgICAgICAgPFRleHQgdmFsdWU9e3Jlc3VsdC5jb21taXR9IC8-XG4gICAgICAgICAgICAgIDwvUm93PlxuXG4gICAgICAgICAgICAgIDxSb3c-XG4gICAgICAgICAgICAgICAgPFRleHQgdmFsdWU9XCJEZXBsb3lcIiBjb2xvcj1cInNlY29uZGFyeVwiIC8-XG4gICAgICAgICAgICAgICAgPFNwYWNlciAvPlxuICAgICAgICAgICAgICAgIDxUZXh0IHZhbHVlPXtyZXN1bHQuZGVwbG95U3RhdHVzfSAvPlxuICAgICAgICAgICAgICA8L1Jvdz5cbiAgICAgICAgICAgIDwvQm94PlxuXG4gICAgICAgICAgICA8Um93IGdhcD17Mn0-XG4gICAgICAgICAgICAgIDxCdXR0b25cbiAgICAgICAgICAgICAgICBsYWJlbD1cIlZpZXcgYXJ0aWNsZVwiXG4gICAgICAgICAgICAgICAgaWNvbkVuZD1cImV4dGVybmFsLWxpbmtcIlxuICAgICAgICAgICAgICAgIG9uQ2xpY2tBY3Rpb249e3tcbiAgICAgICAgICAgICAgICAgIHR5cGU6IFwiYWdlbnQudmlld19hcnRpY2xlXCIsXG4gICAgICAgICAgICAgICAgICBwYXlsb2FkOiB7XG4gICAgICAgICAgICAgICAgICAgIGVuZHBvaW50LFxuICAgICAgICAgICAgICAgICAgICBhcnRpY2xlUGF0aDogcmVzdWx0LmFydGljbGVQYXRoLFxuICAgICAgICAgICAgICAgICAgfSxcbiAgICAgICAgICAgICAgICB9fVxuICAgICAgICAgICAgICAvPlxuXG4gICAgICAgICAgICAgIDxCdXR0b25cbiAgICAgICAgICAgICAgICBsYWJlbD1cIk9wZW4gZGVwbG95XCJcbiAgICAgICAgICAgICAgICB2YXJpYW50PVwib3V0bGluZVwiXG4gICAgICAgICAgICAgICAgaWNvbkVuZD1cImV4dGVybmFsLWxpbmtcIlxuICAgICAgICAgICAgICAgIG9uQ2xpY2tBY3Rpb249e3tcbiAgICAgICAgICAgICAgICAgIHR5cGU6IFwiYWdlbnQub3Blbl9kZXBsb3lcIixcbiAgICAgICAgICAgICAgICAgIHBheWxvYWQ6IHtcbiAgICAgICAgICAgICAgICAgICAgZW5kcG9pbnQsXG4gICAgICAgICAgICAgICAgICAgIGNvbW1pdDogcmVzdWx0LmNvbW1pdCxcbiAgICAgICAgICAgICAgICAgIH0sXG4gICAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgICAgLz5cblxuICAgICAgICAgICAgICA8U3BhY2VyIC8-XG5cbiAgICAgICAgICAgICAgPEJ1dHRvblxuICAgICAgICAgICAgICAgIGxhYmVsPVwiU3RhcnQgbmV3IGFydGljbGVcIlxuICAgICAgICAgICAgICAgIGNvbG9yPVwic2Vjb25kYXJ5XCJcbiAgICAgICAgICAgICAgICBvbkNsaWNrQWN0aW9uPXt7XG4gICAgICAgICAgICAgICAgICB0eXBlOiBcImFnZW50LnJlc2V0XCIsXG4gICAgICAgICAgICAgICAgICBwYXlsb2FkOiB7IGVuZHBvaW50IH0sXG4gICAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgIDwvUm93PlxuICAgICAgICAgIDwvQ29sPlxuICAgICAgICApIDogKFxuICAgICAgICAgIDxDb2wga2V5PVwiZXJyb3JcIiBnYXA9ezN9PlxuICAgICAgICAgICAgPFJvdyBnYXA9ezJ9IGFsaWduPVwiY2VudGVyXCI-XG4gICAgICAgICAgICAgIDxCYWRnZSBsYWJlbD1cIkVycm9yXCIgY29sb3I9XCJkYW5nZXJcIiAvPlxuICAgICAgICAgICAgICA8VGV4dFxuICAgICAgICAgICAgICAgIHZhbHVlPVwiU29tZXRoaW5nIHdlbnQgd3Jvbmcgd2hpbGUgcHVibGlzaGluZy5cIlxuICAgICAgICAgICAgICAgIGNvbG9yPVwiZGFuZ2VyXCJcbiAgICAgICAgICAgICAgLz5cbiAgICAgICAgICAgIDwvUm93PlxuXG4gICAgICAgICAgICA8Qm94IGJvcmRlcj17MX0gcmFkaXVzPVwibWRcIiBwYWRkaW5nPXszfSBiYWNrZ3JvdW5kPVwic3VyZmFjZS1zZWNvbmRhcnlcIj5cbiAgICAgICAgICAgICAgPENhcHRpb24gdmFsdWU9XCJEZXRhaWxzXCIgLz5cbiAgICAgICAgICAgICAgPE1hcmtkb3duIHZhbHVlPXtgXFxgXFxgXFxganNvblxcbiR7ZXJyb3JKc29uIHx8IFwiTm8gZXJyb3IgZGV0YWlscyBwcm92aWRlZC5cIn1cXG5cXGBcXGBcXGBgfSAvPlxuICAgICAgICAgICAgPC9Cb3g-XG5cbiAgICAgICAgICAgIDxUZXh0XG4gICAgICAgICAgICAgIHZhbHVlPVwiVHJ5IHJldHJ5aW5nIGZpcnN0LiBJZiBpdCBwZXJzaXN0cywgcmVzZXQgdG8gc3RhcnQgb3ZlciBvciBhZGp1c3QgeW91ciBpbnB1dHMuXCJcbiAgICAgICAgICAgICAgY29sb3I9XCJzZWNvbmRhcnlcIlxuICAgICAgICAgICAgLz5cblxuICAgICAgICAgICAgPFJvdyBnYXA9ezJ9PlxuICAgICAgICAgICAgICA8QnV0dG9uXG4gICAgICAgICAgICAgICAgbGFiZWw9XCJSZXRyeVwiXG4gICAgICAgICAgICAgICAgc3R5bGU9XCJwcmltYXJ5XCJcbiAgICAgICAgICAgICAgICBvbkNsaWNrQWN0aW9uPXt7XG4gICAgICAgICAgICAgICAgICB0eXBlOiBcImFnZW50LnJldHJ5XCIsXG4gICAgICAgICAgICAgICAgICBwYXlsb2FkOiB7IGVuZHBvaW50IH0sXG4gICAgICAgICAgICAgICAgfX1cbiAgICAgICAgICAgICAgLz5cblxuICAgICAgICAgICAgICA8QnV0dG9uXG4gICAgICAgICAgICAgICAgbGFiZWw9XCJSZXNldFwiXG4gICAgICAgICAgICAgICAgdmFyaWFudD1cIm91dGxpbmVcIlxuICAgICAgICAgICAgICAgIG9uQ2xpY2tBY3Rpb249e3tcbiAgICAgICAgICAgICAgICAgIHR5cGU6IFwiYWdlbnQucmVzZXRcIixcbiAgICAgICAgICAgICAgICAgIHBheWxvYWQ6IHsgZW5kcG9pbnQgfSxcbiAgICAgICAgICAgICAgICB9fVxuICAgICAgICAgICAgICAvPlxuICAgICAgICAgICAgPC9Sb3c-XG4gICAgICAgICAgPC9Db2w-XG4gICAgICAgICl9XG4gICAgICA8L1RyYW5zaXRpb24-XG4gICAgPC9Db2w-XG4gIDwvQ29sPlxuPC9DYXJkPlxuIiwiZGVmYXVsdFN0YXRlIjp7InN0YXR1cyI6ImlkbGUiLCJhcnRpY2xlSWRlYSI6IiIsInRpdGxlIjoiIiwic2x1ZyI6IiIsIm1hcmtkb3duIjoiIiwib3ZlcndyaXRlIjpmYWxzZSwicmVjb21tZW5kZWRBbmdsZSI6IiIsImhvb2siOiIiLCJlZGl0b3JpYWxQcm9taXNlIjoiIiwicmlza3MiOltdLCJpbWFnZUJyaWVmIjoiIiwiZW5kcG9pbnQiOiIvLm5ldGxpZnkvZnVuY3Rpb25zL3J1bi1wdWJsaXNoZXItYWdlbnQiLCJyZXN1bHQiOm51bGwsImVycm9yIjpudWxsLCJlcnJvckpzb24iOiIiLCJzdGF0ZXMiOlt7ImlkIjoiaWRsZSIsImxhYmVsIjoiU2V0dXAifSx7ImlkIjoicmVzZWFyY2hpbmciLCJsYWJlbCI6IlJlc2VhcmNoIn0seyJpZCI6ImFuZ2xlX3JldmlldyIsImxhYmVsIjoiQW5nbGUgUmV2aWV3In0seyJpZCI6ImRyYWZ0X3JlYWR5IiwibGFiZWwiOiJEcmFmdCBSZXZpZXcifSx7ImlkIjoicHVibGlzaGluZyIsImxhYmVsIjoiUHVibGlzaCJ9LHsiaWQiOiJwdWJsaXNoZWQiLCJsYWJlbCI6IlN1Y2Nlc3MifSx7ImlkIjoiZXJyb3IiLCJsYWJlbCI6IkVycm9yIn1dfSwic3RhdGVzIjpbXSwic2NoZW1hIjoiaW1wb3J0IHsgeiB9IGZyb20gXCJ6b2RcIlxuXG5jb25zdCBXb3JrZmxvd1N0YXRlID0gei5lbnVtKFtcbiAgXCJpZGxlXCIsXG4gIFwicmVzZWFyY2hpbmdcIixcbiAgXCJhbmdsZV9yZXZpZXdcIixcbiAgXCJkcmFmdF9yZWFkeVwiLFxuICBcInB1Ymxpc2hpbmdcIixcbiAgXCJwdWJsaXNoZWRcIixcbiAgXCJlcnJvclwiLFxuXSlcblxuY29uc3QgU3RlcCA9IHouc3RyaWN0T2JqZWN0KHtcbiAgaWQ6IFdvcmtmbG93U3RhdGUsXG4gIGxhYmVsOiB6LnN0cmluZygpLFxufSlcblxuY29uc3QgUmVzdWx0ID0gei5zdHJpY3RPYmplY3Qoe1xuICBhcnRpY2xlUGF0aDogei5zdHJpbmcoKSxcbiAgY29tbWl0OiB6LnN0cmluZygpLFxuICBkZXBsb3lTdGF0dXM6IHouc3RyaW5nKCksXG4gIG1lc3NhZ2U6IHouc3RyaW5nKCksXG59KVxuXG5jb25zdCBFcnJvck9iamVjdCA9IHouc3RyaWN0T2JqZWN0KHtcbiAgbWVzc2FnZTogei5zdHJpbmcoKSxcbiAgY29kZTogei5zdHJpbmcoKS5vcHRpb25hbCgpLFxuICBzdGFjazogei5zdHJpbmcoKS5vcHRpb25hbCgpLFxufSlcblxuY29uc3QgV2lkZ2V0U3RhdGUgPSB6LnN0cmljdE9iamVjdCh7XG4gIHN0YXR1czogV29ya2Zsb3dTdGF0ZSxcbiAgYXJ0aWNsZUlkZWE6IHouc3RyaW5nKCksXG4gIHRpdGxlOiB6LnN0cmluZygpLFxuICBzbHVnOiB6LnN0cmluZygpLFxuICBtYXJrZG93bjogei5zdHJpbmcoKSxcbiAgb3ZlcndyaXRlOiB6LmJvb2xlYW4oKSxcbiAgcmVjb21tZW5kZWRBbmdsZTogei5zdHJpbmcoKSxcbiAgaG9vazogei5zdHJpbmcoKSxcbiAgZWRpdG9yaWFsUHJvbWlzZTogei5zdHJpbmcoKSxcbiAgcmlza3M6IHouYXJyYXkoei5zdHJpbmcoKSksXG4gIGltYWdlQnJpZWY6IHouc3RyaW5nKCksXG4gIGVuZHBvaW50OiB6LnN0cmluZygpLFxuICByZXN1bHQ6IFJlc3VsdC5udWxsYWJsZSgpLFxuICBlcnJvcjogRXJyb3JPYmplY3QubnVsbGFibGUoKSxcbiAgZXJyb3JKc29uOiB6LnN0cmluZygpLm9wdGlvbmFsKCksXG4gIHN0YXRlczogei5hcnJheShTdGVwKSxcbn0pXG5cbmV4cG9ydCBkZWZhdWx0IFdpZGdldFN0YXRlIiwianNvblNjaGVtYSI6e30sInNjaGVtYU1vZGUiOiJ6b2QiLCJzY2hlbWFWYWxpZGl0eSI6InZhbGlkIiwidmlld1ZhbGlkaXR5IjoidmFsaWQiLCJkZWZhdWx0U3RhdGVWYWxpZGl0eSI6InZhbGlkIn0"
+}
