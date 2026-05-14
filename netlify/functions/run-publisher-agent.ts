@@ -1,3 +1,4 @@
+import { verifyToken } from "@clerk/backend";
 import { Agent, run, tool } from "@openai/agents";
 
 /**
@@ -97,6 +98,50 @@ const getHeader = (headers: LambdaEvent["headers"], name: string) => {
   );
 
   return match?.[1] ?? "";
+};
+
+const getBearerToken = (authorization: string) => {
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || undefined;
+};
+
+const verifyClerkSession = async (event: LambdaEvent) => {
+  const token = getBearerToken(getHeader(event.headers, "authorization"));
+
+  if (!token) {
+    return jsonResponse(401, {
+      success: false,
+      error: "A valid Clerk session token is required to run the publisher agent.",
+    });
+  }
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!secretKey) {
+    return jsonResponse(500, {
+      success: false,
+      error: "Publisher agent authentication is not configured.",
+    });
+  }
+
+  try {
+    const verifiedToken = await verifyToken(token, { secretKey });
+
+    if (!verifiedToken.sub) {
+      return jsonResponse(401, {
+        success: false,
+        error: "Invalid Clerk session token.",
+      });
+    }
+  } catch (error) {
+    console.warn("Rejected publisher agent request with invalid Clerk token.", error);
+    return jsonResponse(401, {
+      success: false,
+      error: "Invalid Clerk session token.",
+    });
+  }
+
+  return undefined;
 };
 
 const toStringValue = (value: unknown) => {
@@ -352,6 +397,12 @@ export const handler = async (event: LambdaEvent) => {
       success: false,
       error: "Method not allowed. Use POST.",
     });
+  }
+
+  const authError = await verifyClerkSession(event);
+
+  if (authError) {
+    return authError;
   }
 
   let input: NormalizedPublisherRequest;

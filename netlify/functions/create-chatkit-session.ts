@@ -1,8 +1,11 @@
+import { verifyToken } from '@clerk/backend';
+
 declare const process: {
   env: Record<string, string | undefined>;
 };
 
 type LambdaEvent = {
+  headers?: Record<string, string | undefined>;
   httpMethod?: string;
 };
 
@@ -10,9 +13,11 @@ type ChatKitSessionResponse = {
   client_secret?: unknown;
 };
 
-const chatKitSessionsUrl = 'https://api.openai.com/v1/chatkit/sessions';
+type VerifiedChatkitUser = {
+  userId: string;
+};
 
-const createAnonymousUserId = () => `anonymous-${globalThis.crypto.randomUUID()}`;
+const chatKitSessionsUrl = 'https://api.openai.com/v1/chatkit/sessions';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -25,9 +30,60 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
+const getHeader = (headers: LambdaEvent['headers'], name: string) => {
+  const normalizedName = name.toLowerCase();
+  const match = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
+
+  return match?.[1] ?? '';
+};
+
+const getBearerToken = (authorization: string) => {
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || undefined;
+};
+
+const verifyClerkSession = async (
+  event: LambdaEvent
+): Promise<VerifiedChatkitUser | ReturnType<typeof jsonResponse>> => {
+  const token = getBearerToken(getHeader(event.headers, 'authorization'));
+
+  if (!token) {
+    return jsonResponse(401, {
+      error: 'A valid Clerk session token is required to create ChatKit sessions.',
+    });
+  }
+
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!secretKey) {
+    return jsonResponse(500, {
+      error: 'ChatKit authentication is not configured.',
+    });
+  }
+
+  try {
+    const verifiedToken = await verifyToken(token, { secretKey });
+
+    if (!verifiedToken.sub) {
+      return jsonResponse(401, { error: 'Invalid Clerk session token.' });
+    }
+
+    return { userId: `clerk-${verifiedToken.sub}` };
+  } catch (error) {
+    console.warn('Rejected ChatKit session request with invalid Clerk token.', error);
+    return jsonResponse(401, { error: 'Invalid Clerk session token.' });
+  }
+};
+
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
+  }
+
+  const verifiedUser = await verifyClerkSession(event);
+
+  if ('statusCode' in verifiedUser) {
+    return verifiedUser;
   }
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -48,7 +104,7 @@ export const handler = async (event: LambdaEvent) => {
         'OpenAI-Beta': 'chatkit_beta=v1',
       },
       body: JSON.stringify({
-        user: createAnonymousUserId(),
+        user: verifiedUser.userId,
         workflow: {
           id: workflowId,
         },

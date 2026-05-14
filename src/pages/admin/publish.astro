@@ -1,7 +1,51 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import publishingWidgetBuilderOutputRaw from '~/chatkit/widgets/AI Publishing Workflow.widget?raw';
 
 const pageTitle = 'Dr. Lurié Science Admin';
+const publishingWidgetBuilderOutput = JSON.parse(publishingWidgetBuilderOutputRaw) as {
+  encodedWidget?: string;
+  jsonSchema?: { properties?: Record<string, unknown> };
+  template?: string;
+};
+const publishingWidgetConfig = JSON.parse(
+  Buffer.from(String(publishingWidgetBuilderOutput.encodedWidget || ''), 'base64').toString('utf8')
+) as {
+  defaultState?: Record<string, unknown>;
+  id?: string;
+  name?: string;
+  view?: string;
+};
+const requiredChatkitActions = [
+  'agent.start_workflow',
+  'agent.publish_article',
+  'agent.fill_test_payload',
+  'agent.reset',
+];
+const requiredPublishingFields = ['articleIdea', 'title', 'slug', 'markdown', 'overwrite'];
+const actionMatches = [
+  ...(publishingWidgetConfig.view?.matchAll(/type:\s*["'](agent\.[^"']+)["']/g) ?? []),
+  ...(publishingWidgetBuilderOutput.template?.matchAll(/\"type\":\"(agent\.[^\"]+)/g) ?? []),
+];
+const configuredWidgetActions = [...new Set(actionMatches.map((match) => match[1]))];
+const configuredWidgetFields = [
+  ...new Set([
+    ...Object.keys(publishingWidgetConfig.defaultState ?? {}),
+    ...Object.keys(publishingWidgetBuilderOutput.jsonSchema?.properties ?? {}),
+  ]),
+];
+const chatkitWidgetBootstrap = {
+  actions: configuredWidgetActions,
+  defaultState: publishingWidgetConfig.defaultState,
+  endpoint: String(publishingWidgetConfig.defaultState?.endpoint || '/.netlify/functions/run-publisher-agent'),
+  fields: configuredWidgetFields,
+  missingActions: requiredChatkitActions.filter((action) => !configuredWidgetActions.includes(action)),
+  missingFields: requiredPublishingFields.filter((field) => !configuredWidgetFields.includes(field)),
+  requiredActions: requiredChatkitActions,
+  requiredFields: requiredPublishingFields,
+  widgetId: publishingWidgetConfig.id,
+  widgetName: publishingWidgetConfig.name || 'AI Publishing Workflow',
+};
 const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
@@ -36,6 +80,42 @@ const metadata = {
       </div>
       <p id="auth-help" class="hint">Checking Clerk authentication before showing the publishing workspace.</p>
       <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden>Sign in with Clerk</button>
+    </section>
+
+    <section class="admin-card admin-panel chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated hidden>
+      <div class="chatkit-panel-header">
+        <div>
+          <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">OpenAI Agent Builder</p>
+          <h2 id="chatkit-heading">AI Publishing Workflow ChatKit</h2>
+          <p class="hint">
+            Uses the Widget Builder output at <code>src/chatkit/widgets/AI Publishing Workflow.widget</code> as the
+            action interface for the OpenAI-hosted workflow.
+          </p>
+        </div>
+        <span id="chatkit-config-status" class="config-status" aria-live="polite">Validating widget config…</span>
+      </div>
+
+      <openai-chatkit id="publishing-chatkit" class="publishing-chatkit"></openai-chatkit>
+
+      <details class="widget-config-details">
+        <summary>Widget/action MVP config</summary>
+        <dl class="widget-config-grid">
+          <div>
+            <dt>Required actions</dt>
+            <dd>{requiredChatkitActions.join(', ')}</dd>
+          </div>
+          <div>
+            <dt>Publishing fields</dt>
+            <dd>{requiredPublishingFields.join(', ')}</dd>
+          </div>
+        </dl>
+      </details>
+
+      <script
+        id="chatkit-widget-bootstrap"
+        type="application/json"
+        set:html={JSON.stringify(chatkitWidgetBootstrap)}
+      ></script>
     </section>
 
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
@@ -192,6 +272,96 @@ const metadata = {
 
   .admin-panel {
     margin-top: 1.5rem;
+  }
+
+  .chatkit-panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .chatkit-panel[hidden] {
+    display: none;
+  }
+
+  .chatkit-panel-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .chatkit-panel h2 {
+    margin: 0.3rem 0 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.6rem, 3vw, 2.15rem);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  .publishing-chatkit {
+    display: block;
+    width: 100%;
+    min-height: 680px;
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.dark) .publishing-chatkit {
+    border-color: rgb(30 41 59);
+  }
+
+  .config-status {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    padding: 0.5rem 0.75rem;
+    background: var(--aw-color-bg-surface);
+    color: var(--aw-color-text-muted);
+    font-size: 0.85rem;
+    font-weight: 800;
+  }
+
+  .config-status[data-state='valid'] {
+    border-color: rgb(22 163 74 / 30%);
+    color: rgb(22 101 52);
+    background: rgb(220 252 231 / 78%);
+  }
+
+  .config-status[data-state='invalid'] {
+    border-color: rgb(220 38 38 / 25%);
+    color: rgb(153 27 27);
+    background: rgb(254 226 226 / 72%);
+  }
+
+  .widget-config-details {
+    color: var(--aw-color-text-muted);
+    font-size: 0.92rem;
+  }
+
+  .widget-config-details summary {
+    cursor: pointer;
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  .widget-config-grid {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.9rem 0 0;
+  }
+
+  .widget-config-grid dt {
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  .widget-config-grid dd {
+    margin: 0.2rem 0 0;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   }
 
   .auth-panel {
@@ -550,6 +720,9 @@ const metadata = {
     authPanel: document.querySelector('#auth-panel'),
     authHelp: document.querySelector('#auth-help'),
     panelSignIn: document.querySelector('#auth-panel-sign-in'),
+    chatkit: document.querySelector('#publishing-chatkit'),
+    chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
+    chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
   };
 
   let imageNames = [];
@@ -561,6 +734,20 @@ const metadata = {
   const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
   const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
   let clerkLoadPromise;
+  let chatkitInitialized = false;
+
+  const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
+
+  const setChatkitConfigStatus = () => {
+    const missingActions = chatkitWidgetConfig.missingActions || [];
+    const missingFields = chatkitWidgetConfig.missingFields || [];
+    const isValid = missingActions.length === 0 && missingFields.length === 0;
+
+    fields.chatkitConfigStatus.dataset.state = isValid ? 'valid' : 'invalid';
+    fields.chatkitConfigStatus.textContent = isValid
+      ? 'MVP widget config confirmed'
+      : `Missing ${[...missingActions, ...missingFields].join(', ')}`;
+  };
 
   const setGatedContentVisible = (visible) => {
     gatedContent.forEach((element) => {
@@ -686,6 +873,153 @@ const metadata = {
     }
   };
 
+  const waitForChatkitElement = async () => {
+    if (customElements.get('openai-chatkit')) return;
+
+    if (typeof customElements.whenDefined === 'function') {
+      await customElements.whenDefined('openai-chatkit');
+    }
+  };
+
+  const sendChatkitStatusMessage = async (message) => {
+    if (typeof fields.chatkit?.sendUserMessage !== 'function') return;
+
+    await fields.chatkit.sendUserMessage({ text: message });
+  };
+
+  const normalizeActionPayload = (payload) => (payload && typeof payload === 'object' ? payload : {});
+
+  const handleChatkitAction = async (action) => {
+    const actionType = action?.type;
+    const payload = normalizeActionPayload(action?.payload);
+
+    if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
+      return;
+    }
+
+    if (actionType === 'agent.fill_test_payload') {
+      await sendChatkitStatusMessage(
+        [
+          'Fill the AI Publishing Workflow widget with a smoke-test article idea, title, slug,',
+          'markdown draft, and overwrite=false.',
+        ].join(' ')
+      );
+      return;
+    }
+
+    if (actionType === 'agent.reset') {
+      await sendChatkitStatusMessage('Reset the AI Publishing Workflow widget to its initial idle state.');
+      return;
+    }
+
+    if (actionType === 'agent.start_workflow') {
+      const articleIdea = String(payload.articleIdea || '').trim();
+      const slug = String(payload.slug || '').trim();
+      const overwrite = Boolean(payload.overwrite);
+
+      if (!articleIdea) {
+        setStatus('Enter an article idea before starting the AI workflow.', false);
+        return;
+      }
+
+      await sendChatkitStatusMessage(
+        [
+          'Start the AI Publishing Workflow using the configured Widget Builder card.',
+          `Article idea: ${articleIdea}`,
+          slug ? `Requested slug: ${slug}` : 'Requested slug: generate from the title',
+          `Overwrite existing article: ${overwrite ? 'yes' : 'no'}`,
+        ].join('\n')
+      );
+      return;
+    }
+
+    if (actionType === 'agent.publish_article') {
+      const title = String(payload.title || '').trim();
+      const slug = String(payload.slug || '').trim();
+      const markdown = String(payload.markdown || '').trim();
+      const endpoint = String(
+        payload.endpoint || chatkitWidgetConfig.endpoint || '/.netlify/functions/run-publisher-agent'
+      );
+      const overwrite = Boolean(payload.overwrite);
+      const missing = [
+        !title ? 'title' : undefined,
+        !slug ? 'slug' : undefined,
+        !markdown ? 'markdown' : undefined,
+      ].filter(Boolean);
+
+      if (missing.length) {
+        setStatus(`ChatKit publish action is missing ${missing.join(', ')}.`, false);
+        return;
+      }
+
+      setStatus('Publishing ChatKit-approved article through the server-side OpenAI agent…', false);
+      const clerkToken = await getClerkSessionToken();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          slug,
+          markdown,
+          overwrite,
+          images: Array.isArray(payload.images) ? payload.images : [],
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result.success === false) {
+        const message = result.error || result.message || `ChatKit publish failed with status ${response.status}.`;
+        setStatus(message, false);
+        await sendChatkitStatusMessage(`Publishing failed: ${message}`);
+        return;
+      }
+
+      const message = result.message || `Published ${result.articlePath || `src/data/post/${slug}.md`}.`;
+      setStatus(message, false);
+      await sendChatkitStatusMessage(`Publishing succeeded: ${message}`);
+    }
+  };
+
+  const initializeChatKit = async () => {
+    if (chatkitInitialized || !fields.chatkit) return;
+
+    setChatkitConfigStatus();
+    await waitForChatkitElement();
+
+    chatkitInitialized = true;
+
+    fields.chatkit.setOptions({
+      api: {
+        async getClientSecret() {
+          const clerkToken = await getClerkSessionToken();
+          const response = await fetch('/.netlify/functions/create-chatkit-session', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${clerkToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          const session = await response.json().catch(() => ({}));
+
+          if (!response.ok || typeof session.client_secret !== 'string') {
+            throw new Error(session.error || 'ChatKit session could not be created.');
+          }
+
+          return session.client_secret;
+        },
+      },
+      composer: {
+        placeholder: 'Ask the OpenAI workflow to draft, revise, or publish an article…',
+      },
+      widgets: {
+        onAction: handleChatkitAction,
+      },
+    });
+  };
+
   const renderAuthState = (clerk) => {
     const signedIn = Boolean(clerk.isSignedIn && clerk.session);
     console.info('Clerk signed-in state', { isSignedIn: signedIn });
@@ -693,6 +1027,10 @@ const metadata = {
     if (signedIn) {
       setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
       hideAuthPanel();
+      initializeChatKit().catch((error) => {
+        console.error('ChatKit initialization failed.', error);
+        setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+      });
       return;
     }
 
@@ -1126,5 +1464,7 @@ const metadata = {
   loadDraft();
   updatePreview();
   updatePublishOutput();
+  setChatkitConfigStatus();
   initializeClerkAuth();
 </script>
+<script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
