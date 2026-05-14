@@ -1,0 +1,765 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+import publishingWidgetBuilderOutputRaw from '~/chatkit/widgets/AI Publishing Workflow.widget?raw';
+
+const pageTitle = 'Dr. Lurié Agent Admin';
+const publishingWidgetBuilderOutput = JSON.parse(publishingWidgetBuilderOutputRaw) as {
+  encodedWidget?: string;
+  jsonSchema?: { properties?: Record<string, unknown> };
+  template?: string;
+};
+const publishingWidgetConfig = JSON.parse(
+  Buffer.from(String(publishingWidgetBuilderOutput.encodedWidget || ''), 'base64').toString('utf8')
+) as {
+  defaultState?: Record<string, unknown>;
+  id?: string;
+  name?: string;
+  view?: string;
+};
+const requiredChatkitActions = [
+  'agent.start_workflow',
+  'agent.publish_article',
+  'agent.fill_test_payload',
+  'agent.reset',
+];
+const requiredPublishingFields = ['articleIdea', 'title', 'slug', 'markdown', 'overwrite'];
+const actionMatches = [
+  ...(publishingWidgetConfig.view?.matchAll(/type:\s*["'](agent\.[^"']+)["']/g) ?? []),
+  ...(publishingWidgetBuilderOutput.template?.matchAll(/\"type\":\"(agent\.[^\"]+)/g) ?? []),
+];
+const configuredWidgetActions = [...new Set(actionMatches.map((match) => match[1]))];
+const configuredWidgetFields = [
+  ...new Set([
+    ...Object.keys(publishingWidgetConfig.defaultState ?? {}),
+    ...Object.keys(publishingWidgetBuilderOutput.jsonSchema?.properties ?? {}),
+  ]),
+];
+const chatkitWidgetBootstrap = {
+  actions: configuredWidgetActions,
+  defaultState: publishingWidgetConfig.defaultState,
+  endpoint: String(publishingWidgetConfig.defaultState?.endpoint || '/.netlify/functions/run-publisher-agent'),
+  fields: configuredWidgetFields,
+  missingActions: requiredChatkitActions.filter((action) => !configuredWidgetActions.includes(action)),
+  missingFields: requiredPublishingFields.filter((field) => !configuredWidgetFields.includes(field)),
+  requiredActions: requiredChatkitActions,
+  requiredFields: requiredPublishingFields,
+  widgetId: publishingWidgetConfig.id,
+  widgetName: publishingWidgetConfig.name || 'AI Publishing Workflow',
+};
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  <section
+    class="agent-admin-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
+    data-clerk-publishable-key={clerkPublishableKey}
+  >
+    <header class="agent-header">
+      <div>
+        <p class="agent-kicker">OpenAI Agent Builder</p>
+        <h1>{pageTitle}</h1>
+        <p class="agent-intro">
+          Use the existing Widget Builder output as the ChatKit interface for the AI publishing workflow.
+        </p>
+      </div>
+      <div class="agent-auth" aria-live="polite">
+        <span id="auth-status" class="pill-status">Checking sign-in…</span>
+        <button id="sign-in" class="btn-primary btn-sm" type="button" hidden>Sign in</button>
+        <button id="sign-out" class="btn-secondary btn-sm" type="button" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <section id="auth-panel" class="agent-card auth-panel" aria-label="Agent admin authentication" aria-live="polite">
+      <div id="auth-loading" class="auth-loading" role="status">
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <p>Checking sign-in…</p>
+      </div>
+      <p id="auth-help" class="hint">Checking Clerk authentication before showing the agent workflow.</p>
+      <button id="auth-panel-sign-in" class="btn-primary" type="button" hidden>Sign in with Clerk</button>
+    </section>
+
+    <section class="agent-card chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated hidden>
+      <div class="chatkit-panel-header">
+        <div>
+          <p class="agent-kicker">Widget Builder output</p>
+          <h2 id="chatkit-heading">AI Publishing Workflow ChatKit</h2>
+          <p class="hint">
+            Loaded from <code>src/chatkit/widgets/AI Publishing Workflow.widget</code>. No OpenAI API keys or publish
+            secrets are exposed in the browser.
+          </p>
+        </div>
+        <span id="chatkit-config-status" class="pill-status" aria-live="polite">Validating widget config…</span>
+      </div>
+
+      <openai-chatkit
+        id="publishing-chatkit"
+        class="publishing-chatkit"
+        data-widget-id={chatkitWidgetBootstrap.widgetId}
+      ></openai-chatkit>
+
+      <details class="widget-config-details">
+        <summary>Widget/action MVP config</summary>
+        <dl class="widget-config-grid">
+          <div>
+            <dt>Required actions</dt>
+            <dd>{requiredChatkitActions.join(', ')}</dd>
+          </div>
+          <div>
+            <dt>Publishing fields</dt>
+            <dd>{requiredPublishingFields.join(', ')}</dd>
+          </div>
+        </dl>
+      </details>
+
+      <p id="agent-status" class="agent-status" aria-live="polite"></p>
+      <script
+        id="chatkit-widget-bootstrap"
+        type="application/json"
+        set:html={JSON.stringify(chatkitWidgetBootstrap)}
+      ></script>
+    </section>
+  </section>
+</Layout>
+
+<style>
+  .agent-admin-page {
+    color: var(--aw-color-text-default);
+  }
+
+  .agent-header {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgb(229 231 235);
+    padding-bottom: 1.5rem;
+  }
+
+  :global(.dark) .agent-header {
+    border-color: rgb(30 41 59);
+  }
+
+  .agent-kicker {
+    margin: 0;
+    color: var(--aw-color-accent);
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  h1,
+  h2 {
+    margin: 0.35rem 0 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-weight: 800;
+    letter-spacing: -0.03em;
+  }
+
+  h1 {
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+  }
+
+  h2 {
+    font-size: clamp(1.6rem, 3vw, 2.15rem);
+  }
+
+  .agent-intro,
+  .hint {
+    margin: 0.55rem 0 0;
+    color: var(--aw-color-text-muted);
+  }
+
+  .agent-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.5rem;
+    background: rgb(255 255 255 / 84%);
+    box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 6%);
+    padding: 1.5rem;
+  }
+
+  :global(.dark) .agent-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 72%);
+    box-shadow: none;
+  }
+
+  .auth-panel {
+    margin-bottom: 1.5rem;
+  }
+
+  .auth-loading {
+    display: grid;
+    justify-items: center;
+    gap: 0.85rem;
+    padding: 2.5rem 1rem;
+    color: var(--aw-color-text-muted);
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .auth-loading p {
+    margin: 0;
+  }
+
+  .auth-spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid rgb(209 213 219);
+    border-top-color: var(--aw-color-accent);
+    border-radius: 999px;
+    animation: auth-spin 900ms linear infinite;
+  }
+
+  @keyframes auth-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .agent-auth,
+  .chatkit-panel-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-auth {
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .chatkit-panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .chatkit-panel[hidden] {
+    display: none;
+  }
+
+  .publishing-chatkit {
+    display: block;
+    width: 100%;
+    min-height: 680px;
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.dark) .publishing-chatkit {
+    border-color: rgb(30 41 59);
+  }
+
+  .pill-status {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    padding: 0.55rem 0.8rem;
+    background: var(--aw-color-bg-surface);
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .pill-status[data-state='valid'],
+  .pill-status[data-state='signed-in'] {
+    border-color: rgb(22 163 74 / 30%);
+    color: rgb(22 101 52);
+    background: rgb(220 252 231 / 78%);
+  }
+
+  .pill-status[data-state='invalid'],
+  .pill-status[data-state='signed-out'],
+  .pill-status[data-state='error'] {
+    border-color: rgb(220 38 38 / 25%);
+    color: rgb(153 27 27);
+    background: rgb(254 226 226 / 72%);
+  }
+
+  .widget-config-details {
+    color: var(--aw-color-text-muted);
+    font-size: 0.92rem;
+  }
+
+  .widget-config-details summary {
+    cursor: pointer;
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  .widget-config-grid {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.9rem 0 0;
+  }
+
+  .widget-config-grid dt {
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  .widget-config-grid dd {
+    margin: 0.2rem 0 0;
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  }
+
+  .agent-status {
+    min-height: 1.3em;
+    margin: 0;
+    color: var(--aw-color-accent);
+    font-weight: 800;
+  }
+
+  @media (min-width: 640px) {
+    .agent-header {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .agent-admin-page {
+      padding-top: 1.5rem;
+      padding-bottom: 2.5rem;
+    }
+
+    .agent-card {
+      border-radius: 1.1rem;
+      padding: 1rem;
+    }
+
+    .agent-auth,
+    .agent-auth button,
+    .pill-status {
+      width: 100%;
+    }
+
+    .pill-status {
+      text-align: center;
+    }
+  }
+</style>
+
+<script is:inline>
+  const fields = {
+    authStatus: document.querySelector('#auth-status'),
+    signIn: document.querySelector('#sign-in'),
+    signOut: document.querySelector('#sign-out'),
+    authPanel: document.querySelector('#auth-panel'),
+    authHelp: document.querySelector('#auth-help'),
+    panelSignIn: document.querySelector('#auth-panel-sign-in'),
+    chatkit: document.querySelector('#publishing-chatkit'),
+    chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
+    chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
+    agentStatus: document.querySelector('#agent-status'),
+  };
+
+  let isSignedIn = false;
+  let clerkLoadPromise;
+  let chatkitInitialized = false;
+
+  const agentPage = document.querySelector('.agent-admin-page');
+  const clerkPublishableKey = agentPage?.dataset.clerkPublishableKey || '';
+  const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+  const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+  const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
+
+  const setStatus = (message, isSuccess = true) => {
+    fields.agentStatus.textContent = message;
+    fields.agentStatus.style.color = isSuccess ? 'var(--aw-color-accent)' : 'rgb(220 38 38)';
+  };
+
+  const setChatkitConfigStatus = () => {
+    const missingActions = chatkitWidgetConfig.missingActions || [];
+    const missingFields = chatkitWidgetConfig.missingFields || [];
+    const isValid = missingActions.length === 0 && missingFields.length === 0;
+
+    fields.chatkitConfigStatus.dataset.state = isValid ? 'valid' : 'invalid';
+    fields.chatkitConfigStatus.textContent = isValid
+      ? 'MVP widget config confirmed'
+      : `Missing ${[...missingActions, ...missingFields].join(', ')}`;
+  };
+
+  const setGatedContentVisible = (visible) => {
+    gatedContent.forEach((element) => {
+      element.hidden = !visible;
+    });
+  };
+
+  const setAuthLoadingVisible = (visible) => {
+    const loading = document.querySelector('#auth-loading');
+    if (loading) loading.hidden = !visible;
+  };
+
+  const loadClerkScript = () =>
+    new Promise((resolve, reject) => {
+      if (window.Clerk) {
+        resolve();
+        return;
+      }
+
+      const resolveWhenClerkExists = () => {
+        if (!window.Clerk) {
+          reject(new Error('Clerk authentication could not be initialized.'));
+          return;
+        }
+
+        resolve();
+      };
+
+      const existingScript = document.querySelector(
+        `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+      );
+      if (existingScript) {
+        existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = clerkJsScriptSrc;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.type = 'text/javascript';
+      script.dataset.drLurieClerkjs = 'true';
+      script.dataset.clerkPublishableKey = clerkPublishableKey;
+      script.addEventListener('load', resolveWhenClerkExists, { once: true });
+      script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+        once: true,
+      });
+      document.head.append(script);
+    });
+
+  const getClerk = async () => {
+    if (!clerkPublishableKey) {
+      throw new Error('Agent admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+    }
+
+    clerkLoadPromise ||= (async () => {
+      await loadClerkScript();
+
+      if (!window.Clerk) {
+        throw new Error('Clerk authentication could not be initialized.');
+      }
+
+      const clerk = window.Clerk;
+      await clerk.load();
+      return clerk;
+    })();
+
+    return clerkLoadPromise;
+  };
+
+  const getSignedInLabel = (clerk) => {
+    const email = clerk.user?.primaryEmailAddress?.emailAddress;
+    const name = clerk.user?.fullName || clerk.user?.firstName;
+    return email || name || 'Clerk user';
+  };
+
+  const showSignedOutPanel = () => {
+    fields.authPanel.hidden = false;
+    fields.authHelp.textContent = 'Sign in with Clerk to access the AI publishing agent.';
+    setAuthLoadingVisible(false);
+  };
+
+  const hideAuthPanel = () => {
+    fields.authPanel.hidden = true;
+    setAuthLoadingVisible(false);
+  };
+
+  const setAuthState = (state, message) => {
+    fields.authStatus.textContent = message;
+    fields.authStatus.dataset.state = state;
+    isSignedIn = state === 'signed-in';
+    fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
+    fields.panelSignIn.hidden = fields.signIn.hidden;
+    fields.signOut.hidden = !isSignedIn;
+    setGatedContentVisible(isSignedIn);
+
+    if (state === 'checking') {
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'Checking Clerk authentication before showing the agent workflow.';
+      setAuthLoadingVisible(true);
+    }
+  };
+
+  const getClerkSessionToken = async () => {
+    const clerk = await getClerk();
+    renderAuthState(clerk);
+
+    if (!clerk.isSignedIn || !clerk.session) {
+      throw new Error('Sign in with Clerk before using the agent workflow.');
+    }
+
+    const token = await clerk.session.getToken();
+
+    if (!token) {
+      throw new Error('Could not retrieve a Clerk session token.');
+    }
+
+    return token;
+  };
+
+  const waitForChatkitElement = async () => {
+    if (customElements.get('openai-chatkit')) return;
+
+    if (typeof customElements.whenDefined === 'function') {
+      await customElements.whenDefined('openai-chatkit');
+    }
+  };
+
+  const sendChatkitStatusMessage = async (message) => {
+    if (typeof fields.chatkit?.sendUserMessage !== 'function') return;
+
+    await fields.chatkit.sendUserMessage({ text: message });
+  };
+
+  const normalizeActionPayload = (payload) => (payload && typeof payload === 'object' ? payload : {});
+
+  const handleChatkitAction = async (action) => {
+    const actionType = action?.type;
+    const payload = normalizeActionPayload(action?.payload);
+
+    if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
+      return;
+    }
+
+    if (actionType === 'agent.fill_test_payload') {
+      await sendChatkitStatusMessage(
+        [
+          'Fill the AI Publishing Workflow widget with a smoke-test article idea, title, slug,',
+          'markdown draft, and overwrite=false.',
+        ].join(' ')
+      );
+      return;
+    }
+
+    if (actionType === 'agent.reset') {
+      await sendChatkitStatusMessage('Reset the AI Publishing Workflow widget to its initial idle state.');
+      setStatus('Agent workflow reset requested.');
+      return;
+    }
+
+    if (actionType === 'agent.start_workflow') {
+      const articleIdea = String(payload.articleIdea || '').trim();
+      const slug = String(payload.slug || '').trim();
+      const overwrite = Boolean(payload.overwrite);
+
+      if (!articleIdea) {
+        setStatus('Enter an article idea before starting the AI workflow.', false);
+        return;
+      }
+
+      await sendChatkitStatusMessage(
+        [
+          'Start the AI Publishing Workflow using the configured Widget Builder card.',
+          `Article idea: ${articleIdea}`,
+          slug ? `Requested slug: ${slug}` : 'Requested slug: generate from the title',
+          `Overwrite existing article: ${overwrite ? 'yes' : 'no'}`,
+        ].join('\n')
+      );
+      setStatus('AI publishing workflow started.');
+      return;
+    }
+
+    if (actionType === 'agent.publish_article') {
+      const title = String(payload.title || '').trim();
+      const slug = String(payload.slug || '').trim();
+      const markdown = String(payload.markdown || '').trim();
+      const endpoint = String(
+        payload.endpoint || chatkitWidgetConfig.endpoint || '/.netlify/functions/run-publisher-agent'
+      );
+      const overwrite = Boolean(payload.overwrite);
+      const missing = [
+        !title ? 'title' : undefined,
+        !slug ? 'slug' : undefined,
+        !markdown ? 'markdown' : undefined,
+      ].filter(Boolean);
+
+      if (missing.length) {
+        setStatus(`ChatKit publish action is missing ${missing.join(', ')}.`, false);
+        return;
+      }
+
+      setStatus('Publishing ChatKit-approved article through the server-side OpenAI agent…');
+      const clerkToken = await getClerkSessionToken();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          slug,
+          markdown,
+          overwrite,
+          images: Array.isArray(payload.images) ? payload.images : [],
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result.success === false) {
+        const message = result.error || result.message || `ChatKit publish failed with status ${response.status}.`;
+        setStatus(message, false);
+        await sendChatkitStatusMessage(`Publishing failed: ${message}`);
+        return;
+      }
+
+      const message = result.message || `Published ${result.articlePath || `src/data/post/${slug}.md`}.`;
+      setStatus(message);
+      await sendChatkitStatusMessage(`Publishing succeeded: ${message}`);
+    }
+  };
+
+  const initializeChatKit = async () => {
+    if (chatkitInitialized || !fields.chatkit) return;
+
+    setChatkitConfigStatus();
+    await waitForChatkitElement();
+
+    chatkitInitialized = true;
+
+    fields.chatkit.setOptions({
+      api: {
+        async getClientSecret() {
+          const clerkToken = await getClerkSessionToken();
+          const response = await fetch('/.netlify/functions/create-chatkit-session', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${clerkToken}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          const session = await response.json().catch(() => ({}));
+
+          if (!response.ok || typeof session.client_secret !== 'string') {
+            throw new Error(session.error || 'ChatKit session could not be created.');
+          }
+
+          return session.client_secret;
+        },
+      },
+      composer: {
+        placeholder: 'Ask the OpenAI workflow to draft, revise, or publish an article…',
+      },
+      widgets: {
+        onAction: handleChatkitAction,
+      },
+    });
+  };
+
+  const renderAuthState = (clerk) => {
+    const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+
+    if (signedIn) {
+      setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
+      hideAuthPanel();
+      initializeChatKit().catch((error) => {
+        console.error('ChatKit initialization failed.', error);
+        setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+      });
+      return;
+    }
+
+    setAuthState('signed-out', 'Signed out — sign in to use agent');
+    showSignedOutPanel();
+  };
+
+  const initializeClerkAuth = async () => {
+    setAuthState('checking', 'Checking sign-in…');
+
+    try {
+      const clerk = await getClerk();
+      renderAuthState(clerk);
+
+      if (typeof clerk.addListener === 'function') {
+        clerk.addListener(() => renderAuthState(clerk));
+      }
+    } catch (error) {
+      console.error('Clerk authentication initialization failed.', error);
+      const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+      setStatus(message, false);
+    }
+  };
+
+  const redirectToHostedSignIn = async (clerk) => {
+    if (typeof clerk.redirectToSignIn !== 'function') {
+      throw new Error('Clerk hosted sign-in redirect is unavailable.');
+    }
+
+    await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+  };
+
+  const openSignIn = async () => {
+    setAuthState('checking', 'Opening Clerk sign-in…');
+
+    try {
+      const clerk = await getClerk();
+
+      if (typeof clerk.openSignIn === 'function') {
+        try {
+          await clerk.openSignIn();
+          renderAuthState(clerk);
+          return;
+        } catch (error) {
+          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+        }
+      }
+
+      await redirectToHostedSignIn(clerk);
+    } catch (error) {
+      console.error('Clerk sign-in failed.', error);
+      const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+      setStatus(message, false);
+    }
+  };
+
+  fields.signIn.addEventListener('click', openSignIn);
+  fields.panelSignIn.addEventListener('click', openSignIn);
+
+  fields.signOut.addEventListener('click', async () => {
+    setAuthState('checking', 'Signing out…');
+
+    try {
+      const clerk = await getClerk();
+      await clerk.signOut();
+      renderAuthState(clerk);
+    } catch (error) {
+      console.error('Clerk sign-out failed.', error);
+      const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+      setStatus(message, false);
+    }
+  });
+
+  setChatkitConfigStatus();
+  initializeClerkAuth();
+</script>
+<script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
