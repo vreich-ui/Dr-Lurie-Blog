@@ -5,8 +5,10 @@ declare const process: {
 };
 
 type LambdaEvent = {
+  body?: string | null;
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
+  isBase64Encoded?: boolean;
 };
 
 type ChatKitSessionResponse = {
@@ -15,6 +17,12 @@ type ChatKitSessionResponse = {
 
 type VerifiedChatkitUser = {
   userId: string;
+};
+
+type ChatkitSessionRequest = {
+  widget?: unknown;
+  widgetId?: unknown;
+  widgetName?: unknown;
 };
 
 const chatKitSessionsUrl = 'https://api.openai.com/v1/chatkit/sessions';
@@ -40,6 +48,33 @@ const getHeader = (headers: LambdaEvent['headers'], name: string) => {
 const getBearerToken = (authorization: string) => {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   return match?.[1]?.trim() || undefined;
+};
+
+const parseJsonBody = (event: LambdaEvent): ChatkitSessionRequest => {
+  if (!event.body) return {};
+
+  const body = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
+
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as ChatkitSessionRequest) : {};
+  } catch (error) {
+    console.warn('Ignoring invalid ChatKit session request JSON.', error);
+    return {};
+  }
+};
+
+const toStateVariable = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
+
+const toWidgetPayload = (value: unknown) => {
+  if (!value || typeof value !== 'object') return undefined;
+
+  try {
+    return JSON.stringify(value);
+  } catch (error) {
+    console.warn('Ignoring ChatKit widget payload that could not be serialized.', error);
+    return undefined;
+  }
 };
 
 const verifyClerkSession = async (
@@ -95,6 +130,11 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
+  const requestBody = parseJsonBody(event);
+  const widgetId = toStateVariable(requestBody.widgetId);
+  const widgetName = toStateVariable(requestBody.widgetName);
+  const widgetPayload = toWidgetPayload(requestBody.widget);
+
   try {
     const response = await fetch(chatKitSessionsUrl, {
       method: 'POST',
@@ -107,6 +147,11 @@ export const handler = async (event: LambdaEvent) => {
         user: verifiedUser.userId,
         workflow: {
           id: workflowId,
+          state_variables: {
+            ...(widgetId ? { chatkit_widget_id: widgetId } : {}),
+            ...(widgetName ? { chatkit_widget_name: widgetName } : {}),
+            ...(widgetPayload ? { chatkit_widget_payload: widgetPayload } : {}),
+          },
         },
       }),
     });

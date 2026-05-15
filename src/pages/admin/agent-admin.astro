@@ -6,6 +6,7 @@ const pageTitle = 'Dr. Lurié Agent Admin';
 const publishingWidgetBuilderOutput = JSON.parse(publishingWidgetBuilderOutputRaw) as {
   encodedWidget?: string;
   jsonSchema?: { properties?: Record<string, unknown> };
+  outputJsonPreview?: Record<string, unknown>;
   template?: string;
 };
 const publishingWidgetConfig = JSON.parse(
@@ -43,6 +44,7 @@ const chatkitWidgetBootstrap = {
   missingFields: requiredPublishingFields.filter((field) => !configuredWidgetFields.includes(field)),
   requiredActions: requiredChatkitActions,
   requiredFields: requiredPublishingFields,
+  widget: publishingWidgetBuilderOutput.outputJsonPreview,
   widgetId: publishingWidgetConfig.id,
   widgetName: publishingWidgetConfig.name || 'AI Publishing Workflow',
 };
@@ -98,11 +100,19 @@ const metadata = {
         <span id="chatkit-config-status" class="pill-status" aria-live="polite">Validating widget config…</span>
       </div>
 
-      <openai-chatkit
-        id="publishing-chatkit"
-        class="publishing-chatkit"
-        data-widget-id={chatkitWidgetBootstrap.widgetId}
-      ></openai-chatkit>
+      <div class="chatkit-conversation-shell" aria-label="ChatKit conversation">
+        <div
+          id="chatkit-widget-seed"
+          class="chatkit-widget-seed"
+          data-widget-id={chatkitWidgetBootstrap.widgetId}
+          aria-label="AI Publishing Workflow widget"
+        ></div>
+        <openai-chatkit
+          id="publishing-chatkit"
+          class="publishing-chatkit"
+          data-widget-id={chatkitWidgetBootstrap.widgetId}
+        ></openai-chatkit>
+      </div>
 
       <details class="widget-config-details">
         <summary>Widget/action MVP config</summary>
@@ -248,18 +258,143 @@ const metadata = {
     display: none;
   }
 
+  .chatkit-conversation-shell {
+    display: grid;
+    gap: 1rem;
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: var(--aw-color-bg-page);
+    padding: 1rem;
+  }
+
+  :global(.dark) .chatkit-conversation-shell {
+    border-color: rgb(30 41 59);
+  }
+
+  .chatkit-widget-seed {
+    max-width: 760px;
+    margin-right: auto;
+  }
+
+  .chatkit-widget-card {
+    overflow: hidden;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    background: rgb(255 255 255);
+    color: rgb(15 23 42);
+    box-shadow: 0 1rem 2.5rem rgb(15 23 42 / 8%);
+  }
+
+  :global(.dark) .chatkit-widget-card {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42);
+    color: rgb(226 232 240);
+  }
+
+  .chatkit-widget-col,
+  .chatkit-widget-form {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chatkit-widget-row {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .chatkit-widget-title {
+    margin: 0;
+    color: inherit;
+    font-size: 1.15rem;
+    font-weight: 850;
+  }
+
+  .chatkit-widget-text,
+  .chatkit-widget-caption {
+    margin: 0;
+    color: rgb(71 85 105);
+  }
+
+  :global(.dark) .chatkit-widget-text,
+  :global(.dark) .chatkit-widget-caption {
+    color: rgb(203 213 225);
+  }
+
+  .chatkit-widget-caption {
+    font-size: 0.8rem;
+  }
+
+  .chatkit-widget-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    border: 1px solid rgb(203 213 225);
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    background: rgb(241 245 249);
+    color: rgb(51 65 85);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .chatkit-widget-divider {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid rgb(226 232 240);
+  }
+
+  :global(.dark) .chatkit-widget-divider {
+    border-top-color: rgb(51 65 85);
+  }
+
+  .chatkit-widget-label,
+  .chatkit-widget-checkbox {
+    color: inherit;
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .chatkit-widget-input,
+  .chatkit-widget-textarea {
+    width: 100%;
+    border: 1px solid rgb(203 213 225);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255);
+    padding: 0.7rem 0.8rem;
+    color: rgb(15 23 42);
+    font: inherit;
+  }
+
+  .chatkit-widget-textarea {
+    min-height: 8rem;
+    resize: vertical;
+  }
+
+  .chatkit-widget-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    border: 1px solid rgb(203 213 225);
+    border-radius: 999px;
+    padding: 0.65rem 0.95rem;
+    background: rgb(255 255 255);
+    color: rgb(15 23 42);
+    font-weight: 850;
+  }
+
+  .chatkit-widget-button[data-style='primary'] {
+    border-color: var(--aw-color-accent);
+    background: var(--aw-color-accent);
+    color: white;
+  }
+
   .publishing-chatkit {
     display: block;
     width: 100%;
     min-height: 680px;
     overflow: hidden;
-    border: 1px solid rgb(229 231 235);
-    border-radius: 1.25rem;
-    background: var(--aw-color-bg-page);
-  }
-
-  :global(.dark) .publishing-chatkit {
-    border-color: rgb(30 41 59);
   }
 
   .pill-status {
@@ -362,6 +497,7 @@ const metadata = {
     authHelp: document.querySelector('#auth-help'),
     panelSignIn: document.querySelector('#auth-panel-sign-in'),
     chatkit: document.querySelector('#publishing-chatkit'),
+    widgetSeed: document.querySelector('#chatkit-widget-seed'),
     chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
     chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
     agentStatus: document.querySelector('#agent-status'),
@@ -380,6 +516,211 @@ const metadata = {
   const setStatus = (message, isSuccess = true) => {
     fields.agentStatus.textContent = message;
     fields.agentStatus.style.color = isSuccess ? 'var(--aw-color-accent)' : 'rgb(220 38 38)';
+  };
+
+  const widgetGap = (value, fallback = 0) => `${Number(value ?? fallback) * 0.25}rem`;
+
+  const applyWidgetBoxStyles = (element, node) => {
+    if (!node || typeof node !== 'object') return;
+
+    if (node.padding !== undefined) {
+      element.style.padding = widgetGap(node.padding);
+    }
+
+    if (node.gap !== undefined) {
+      element.style.gap = widgetGap(node.gap);
+    }
+
+    if (node.align === 'center') {
+      element.style.alignItems = 'center';
+    }
+
+    if (node.flex === 'auto') {
+      element.style.flex = '1 1 16rem';
+    }
+  };
+
+  const getWidgetChildren = (node) => {
+    const children = node?.children ?? [];
+    return Array.isArray(children) ? children : [children];
+  };
+
+  const renderWidgetChildren = (node, parent) => {
+    getWidgetChildren(node).forEach((child) => {
+      const rendered = renderWidgetNode(child);
+      if (rendered) parent.append(rendered);
+    });
+  };
+
+  const collectWidgetFormPayload = (form, action) => {
+    const formData = new FormData(form);
+    const payload = { ...(action?.payload || {}) };
+
+    formData.forEach((value, key) => {
+      payload[key] = value;
+    });
+
+    form.querySelectorAll('input[type="checkbox"][name]').forEach((checkbox) => {
+      payload[checkbox.name] = checkbox.checked;
+    });
+
+    return payload;
+  };
+
+  const dispatchWidgetAction = async (action, form) => {
+    if (!action?.type) return;
+
+    const payload = form ? collectWidgetFormPayload(form, action) : action.payload || {};
+    await handleChatkitAction({ type: action.type, payload });
+  };
+
+  const renderWidgetNode = (node) => {
+    if (!node || typeof node !== 'object') return undefined;
+
+    if (node.type === 'Transition') {
+      return renderWidgetNode(node.children);
+    }
+
+    if (node.type === 'Spacer') {
+      const spacer = document.createElement('span');
+      spacer.style.flex = '1 1 auto';
+      return spacer;
+    }
+
+    if (node.type === 'Divider') {
+      const divider = document.createElement('hr');
+      divider.className = 'chatkit-widget-divider';
+      return divider;
+    }
+
+    if (node.type === 'Card') {
+      const card = document.createElement('article');
+      card.className = 'chatkit-widget-card';
+      applyWidgetBoxStyles(card, node);
+      renderWidgetChildren(node, card);
+      return card;
+    }
+
+    if (node.type === 'Col' || node.type === 'Row') {
+      const element = document.createElement('div');
+      element.className = node.type === 'Col' ? 'chatkit-widget-col' : 'chatkit-widget-row';
+      applyWidgetBoxStyles(element, node);
+      renderWidgetChildren(node, element);
+      return element;
+    }
+
+    if (node.type === 'Form') {
+      const form = document.createElement('form');
+      form.className = 'chatkit-widget-form';
+      applyWidgetBoxStyles(form, node);
+      renderWidgetChildren(node, form);
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        dispatchWidgetAction(node.onSubmitAction, form).catch((error) => {
+          console.error('ChatKit widget action failed.', error);
+          setStatus(error instanceof Error ? error.message : 'ChatKit widget action failed.', false);
+        });
+      });
+      return form;
+    }
+
+    if (node.type === 'Title') {
+      const title = document.createElement('h3');
+      title.className = 'chatkit-widget-title';
+      title.textContent = String(node.value || '');
+      return title;
+    }
+
+    if (node.type === 'Text' || node.type === 'Caption') {
+      const text = document.createElement('p');
+      text.className = node.type === 'Caption' ? 'chatkit-widget-caption' : 'chatkit-widget-text';
+      text.textContent = String(node.value || '');
+      return text;
+    }
+
+    if (node.type === 'Badge') {
+      const badge = document.createElement('span');
+      badge.className = 'chatkit-widget-badge';
+      badge.textContent = String(node.label || '');
+      return badge;
+    }
+
+    if (node.type === 'Label') {
+      const label = document.createElement('label');
+      label.className = 'chatkit-widget-label';
+      label.textContent = String(node.value || '');
+      if (node.fieldName) label.htmlFor = String(node.fieldName);
+      return label;
+    }
+
+    if (node.type === 'Textarea') {
+      const textarea = document.createElement('textarea');
+      textarea.className = 'chatkit-widget-textarea';
+      textarea.name = String(node.name || '');
+      textarea.id = textarea.name;
+      textarea.defaultValue = String(node.defaultValue || '');
+      textarea.placeholder = String(node.placeholder || '');
+      textarea.required = Boolean(node.required);
+      textarea.rows = Number(node.rows || 4);
+      return textarea;
+    }
+
+    if (node.type === 'Input') {
+      const input = document.createElement('input');
+      input.className = 'chatkit-widget-input';
+      input.name = String(node.name || '');
+      input.id = input.name;
+      input.defaultValue = String(node.defaultValue || '');
+      input.placeholder = String(node.placeholder || '');
+      return input;
+    }
+
+    if (node.type === 'Checkbox') {
+      const label = document.createElement('label');
+      label.className = 'chatkit-widget-checkbox';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.name = String(node.name || '');
+      checkbox.defaultChecked = Boolean(node.defaultChecked);
+      label.append(checkbox, ` ${String(node.label || '')}`);
+      return label;
+    }
+
+    if (node.type === 'Button') {
+      const button = document.createElement('button');
+      button.className = 'chatkit-widget-button';
+      button.type = node.submit ? 'submit' : 'button';
+      button.dataset.style = node.style || node.variant || 'secondary';
+      button.textContent = String(node.label || 'Action');
+      if (node.onClickAction) {
+        button.addEventListener('click', () => {
+          dispatchWidgetAction(node.onClickAction, button.form).catch((error) => {
+            console.error('ChatKit widget action failed.', error);
+            setStatus(error instanceof Error ? error.message : 'ChatKit widget action failed.', false);
+          });
+        });
+      }
+      return button;
+    }
+
+    if (node.type === 'Icon') {
+      const icon = document.createElement('span');
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = node.name === 'info' ? 'ⓘ' : '•';
+      return icon;
+    }
+
+    return undefined;
+  };
+
+  const renderChatkitWidgetSeed = () => {
+    if (!fields.widgetSeed || !chatkitWidgetConfig.widget) return;
+
+    fields.widgetSeed.replaceChildren();
+    const widget = renderWidgetNode(chatkitWidgetConfig.widget);
+    if (!widget) return;
+
+    fields.widgetSeed.append(widget);
   };
 
   const setChatkitConfigStatus = () => {
@@ -645,6 +986,11 @@ const metadata = {
               Authorization: `Bearer ${clerkToken}`,
               'Content-Type': 'application/json',
             },
+            body: JSON.stringify({
+              widget: chatkitWidgetConfig.widget,
+              widgetId: chatkitWidgetConfig.widgetId,
+              widgetName: chatkitWidgetConfig.widgetName,
+            }),
           });
           const session = await response.json().catch(() => ({}));
 
@@ -760,6 +1106,7 @@ const metadata = {
   });
 
   setChatkitConfigStatus();
+  renderChatkitWidgetSeed();
   initializeClerkAuth();
 </script>
 <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
