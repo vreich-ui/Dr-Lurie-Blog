@@ -1,0 +1,151 @@
+---
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+---
+
+<button
+  type="button"
+  class="btn-secondary ml-2 py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
+  data-header-auth-button
+  data-clerk-publishable-key={clerkPublishableKey}
+  data-clerk-js-src={clerkJsScriptSrc}
+  aria-live="polite"
+>
+  Sign-In
+</button>
+
+<script is:inline>
+  const buttons = Array.from(document.querySelectorAll('[data-header-auth-button]'));
+
+  if (buttons.length) {
+    let clerkLoadPromise;
+
+    const clerkPublishableKey = buttons[0].dataset.clerkPublishableKey || '';
+    const clerkJsScriptSrc = buttons[0].dataset.clerkJsSrc || '';
+
+    const setButtons = (label, state) => {
+      buttons.forEach((button) => {
+        button.textContent = label;
+        button.dataset.authState = state;
+        button.disabled = state === 'checking';
+      });
+    };
+
+    const loadClerkScript = () =>
+      new Promise((resolve, reject) => {
+        if (window.Clerk) {
+          resolve();
+          return;
+        }
+
+        const existingScript = document.querySelector(
+          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+        );
+
+        if (existingScript) {
+          existingScript.addEventListener('load', () => resolve(), { once: true });
+          existingScript.addEventListener(
+            'error',
+            () => reject(new Error('Clerk authentication could not be loaded.')),
+            {
+              once: true,
+            }
+          );
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = clerkJsScriptSrc;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.dataset.drLurieClerkjs = 'true';
+        script.dataset.clerkPublishableKey = clerkPublishableKey;
+        script.addEventListener('load', () => resolve(), { once: true });
+        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        document.head.append(script);
+      });
+
+    const getClerk = async () => {
+      if (!clerkPublishableKey) {
+        throw new Error('Header authentication is not configured.');
+      }
+
+      clerkLoadPromise ||= (async () => {
+        await loadClerkScript();
+
+        if (!window.Clerk) {
+          throw new Error('Clerk authentication could not be initialized.');
+        }
+
+        await window.Clerk.load();
+        return window.Clerk;
+      })();
+
+      return clerkLoadPromise;
+    };
+
+    const renderAuthState = (clerk) => {
+      setButtons(
+        clerk.isSignedIn && clerk.session ? 'Sign-out' : 'Sign-In',
+        clerk.isSignedIn ? 'signed-in' : 'signed-out'
+      );
+    };
+
+    const initializeAuth = async () => {
+      try {
+        const clerk = await getClerk();
+        renderAuthState(clerk);
+
+        if (typeof clerk.addListener === 'function') {
+          clerk.addListener(() => renderAuthState(clerk));
+        }
+      } catch (error) {
+        console.error('Header authentication initialization failed.', error);
+        setButtons('Sign-In', 'signed-out');
+      }
+    };
+
+    const redirectToHostedSignIn = async (clerk) => {
+      if (typeof clerk.redirectToSignIn !== 'function') {
+        throw new Error('Clerk hosted sign-in redirect is unavailable.');
+      }
+
+      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+    };
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        setButtons('Checking…', 'checking');
+
+        try {
+          const clerk = await getClerk();
+
+          if (clerk.isSignedIn && clerk.session) {
+            await clerk.signOut();
+            renderAuthState(clerk);
+            return;
+          }
+
+          if (typeof clerk.openSignIn === 'function') {
+            try {
+              await clerk.openSignIn();
+              renderAuthState(clerk);
+              return;
+            } catch (error) {
+              console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+            }
+          }
+
+          await redirectToHostedSignIn(clerk);
+        } catch (error) {
+          console.error('Header sign-in/sign-out failed.', error);
+          setButtons('Sign-In', 'signed-out');
+        }
+      });
+    });
+
+    initializeAuth();
+  }
+</script>
