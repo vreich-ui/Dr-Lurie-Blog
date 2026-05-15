@@ -101,8 +101,7 @@ const metadata = {
       <openai-chatkit
         id="publishing-chatkit"
         class="publishing-chatkit"
-        data-widget-id={chatkitWidgetBootstrap.widgetId}
-      ></openai-chatkit>
+        data-widget-id={chatkitWidgetBootstrap.widgetId}></openai-chatkit>
 
       <details class="widget-config-details">
         <summary>Widget/action MVP config</summary>
@@ -119,11 +118,7 @@ const metadata = {
       </details>
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
-      <script
-        id="chatkit-widget-bootstrap"
-        type="application/json"
-        set:html={JSON.stringify(chatkitWidgetBootstrap)}
-      ></script>
+      <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
     </section>
   </section>
 </Layout>

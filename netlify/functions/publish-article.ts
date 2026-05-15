@@ -367,7 +367,7 @@ const getMediaEntries = (input: PublishInput, slug: string): MediaEntry[] => {
       name: toStringValue(file.name),
       type: toStringValue(file.type),
     }))
-    .filter((file): file is { base64: string; name: string; type?: string } =>
+    .filter((file): file is { base64: string; name: string; type: string | undefined } =>
       Boolean(file.base64 && file.name)
     );
 
@@ -391,14 +391,10 @@ const getMediaEntries = (input: PublishInput, slug: string): MediaEntry[] => {
     const repoPath = toStringValue(image.repoPath);
     const filename = toStringValue(image.name);
     const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
-    const path =
-      normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
+    const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
 
     if (!path || !isValidImagePath(path, slug)) {
-      throw new PublishError(
-        403,
-        `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`
-      );
+      throw new PublishError(403, `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`);
     }
 
     const content = toStringValue(image.base64) ?? toStringValue(image.content);
