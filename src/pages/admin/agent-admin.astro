@@ -25,7 +25,7 @@ const requiredChatkitActions = [
 const requiredPublishingFields = ['articleIdea', 'title', 'slug', 'markdown', 'overwrite'];
 const actionMatches = [
   ...(publishingWidgetConfig.view?.matchAll(/type:\s*["'](agent\.[^"']+)["']/g) ?? []),
-  ...(publishingWidgetBuilderOutput.template?.matchAll(/\"type\":\"(agent\.[^\"]+)/g) ?? []),
+  ...(publishingWidgetBuilderOutput.template?.matchAll(/"type":"(agent\.[^"]+)"/g) ?? []),
 ];
 const configuredWidgetActions = [...new Set(actionMatches.map((match) => match[1]))];
 const configuredWidgetFields = [
