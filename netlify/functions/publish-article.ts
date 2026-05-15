@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 
-import { verifyToken } from '@clerk/backend';
+import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -174,47 +174,6 @@ const parseTags = (value: unknown) => {
     : [];
 };
 
-const getHeader = (headers: LambdaEvent['headers'], name: string) => {
-  const normalizedName = name.toLowerCase();
-  const match = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
-
-  return match?.[1] ?? '';
-};
-
-const getBearerToken = (authorization: string) => {
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || undefined;
-};
-
-const verifyClerkSession = async (event: LambdaEvent) => {
-  const token = getBearerToken(getHeader(event.headers, 'authorization'));
-
-  if (!token) {
-    return jsonResponse(401, {
-      error: 'A valid x-publish-key header or Clerk session token is required to publish articles.',
-    });
-  }
-
-  const secretKey = process.env.CLERK_SECRET_KEY;
-
-  if (!secretKey) {
-    return jsonResponse(500, { error: 'Publishing authentication is not configured.' });
-  }
-
-  try {
-    const verifiedToken = await verifyToken(token, { secretKey });
-
-    if (!verifiedToken.sub) {
-      return jsonResponse(401, { error: 'Invalid Clerk session token.' });
-    }
-  } catch (error) {
-    console.warn('Rejected publish request with invalid Clerk session token.', error);
-    return jsonResponse(401, { error: 'Invalid Clerk session token.' });
-  }
-
-  return undefined;
-};
-
 const verifyPublisher = async (event: LambdaEvent) => {
   const publishKey = getHeader(event.headers, 'x-publish-key').trim();
 
@@ -234,7 +193,23 @@ const verifyPublisher = async (event: LambdaEvent) => {
     console.warn('Rejected publish request with invalid x-publish-key. Falling back to Clerk auth.');
   }
 
-  return verifyClerkSession(event);
+  const adminState = await getAdminStateFromEvent(event);
+
+  if (!adminState.authenticated) {
+    const statusCode = adminState.error === 'Clerk authentication is not configured.' ? 500 : 401;
+    const error =
+      adminState.error === 'A valid Clerk session token is required.'
+        ? 'A valid x-publish-key header or Clerk session token is required to publish articles.'
+        : adminState.error || 'A valid x-publish-key header or Clerk session token is required to publish articles.';
+
+    return jsonResponse(statusCode, { error });
+  }
+
+  if (!adminState.isAdmin) {
+    return jsonResponse(403, { error: 'This Clerk user is not authorized to publish articles.' });
+  }
+
+  return undefined;
 };
 
 const parseBody = (event: LambdaEvent): PublishInput | undefined => {
