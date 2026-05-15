@@ -817,7 +817,7 @@ const metadata = {
     try {
       await navigator.clipboard.writeText(text);
       setStatus(successMessage);
-    } catch (error) {
+    } catch {
       fields.outputMarkdown.value = text;
       fields.outputMarkdown.focus();
       fields.outputMarkdown.select();
@@ -948,7 +948,7 @@ const metadata = {
       imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
       renderImages();
       fields.featuredImage.value = draft.featuredImage || '';
-    } catch (error) {
+    } catch {
       localStorage.removeItem(draftKey);
     }
   };
