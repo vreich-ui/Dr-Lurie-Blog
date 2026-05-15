@@ -524,649 +524,652 @@ const metadata = {
 </style>
 
 <script is:inline>
-  const draftKey = 'dr-lurie-admin-draft';
-  const fields = {
-    title: document.querySelector('#title'),
-    slug: document.querySelector('#slug'),
-    excerpt: document.querySelector('#excerpt'),
-    publishDate: document.querySelector('#publish-date'),
-    author: document.querySelector('#author'),
-    category: document.querySelector('#category'),
-    tags: document.querySelector('#tags'),
-    draft: document.querySelector('#draft'),
-    content: document.querySelector('#content'),
-    imageUpload: document.querySelector('#image-upload'),
-    imageList: document.querySelector('#image-list'),
-    featuredImage: document.querySelector('#featured-image'),
-    videoLink: document.querySelector('#video-link'),
-    ctaLink: document.querySelector('#cta-link'),
-    ctaText: document.querySelector('#cta-text'),
-    seoDescription: document.querySelector('#seo-description'),
-    overwrite: document.querySelector('#overwrite-slug'),
-    status: document.querySelector('#status'),
-    previewTitle: document.querySelector('#preview-title'),
-    previewFeaturedImage: document.querySelector('#preview-featured-image'),
-    markdownPreview: document.querySelector('#markdown-preview'),
-    suggestedLocation: document.querySelector('#suggested-location'),
-    outputMarkdown: document.querySelector('#output-markdown'),
-    authStatus: document.querySelector('#auth-status'),
-    signIn: document.querySelector('#sign-in'),
-    signOut: document.querySelector('#sign-out'),
-    publish: document.querySelector('#publish'),
-    authPanel: document.querySelector('#auth-panel'),
-    authHelp: document.querySelector('#auth-help'),
-    panelSignIn: document.querySelector('#auth-panel-sign-in'),
-  };
+  (() => {
+    const draftKey = 'dr-lurie-admin-draft';
+    const fields = {
+      title: document.querySelector('#title'),
+      slug: document.querySelector('#slug'),
+      excerpt: document.querySelector('#excerpt'),
+      publishDate: document.querySelector('#publish-date'),
+      author: document.querySelector('#author'),
+      category: document.querySelector('#category'),
+      tags: document.querySelector('#tags'),
+      draft: document.querySelector('#draft'),
+      content: document.querySelector('#content'),
+      imageUpload: document.querySelector('#image-upload'),
+      imageList: document.querySelector('#image-list'),
+      featuredImage: document.querySelector('#featured-image'),
+      videoLink: document.querySelector('#video-link'),
+      ctaLink: document.querySelector('#cta-link'),
+      ctaText: document.querySelector('#cta-text'),
+      seoDescription: document.querySelector('#seo-description'),
+      overwrite: document.querySelector('#overwrite-slug'),
+      status: document.querySelector('#status'),
+      previewTitle: document.querySelector('#preview-title'),
+      previewFeaturedImage: document.querySelector('#preview-featured-image'),
+      markdownPreview: document.querySelector('#markdown-preview'),
+      suggestedLocation: document.querySelector('#suggested-location'),
+      outputMarkdown: document.querySelector('#output-markdown'),
+      authStatus: document.querySelector('#auth-status'),
+      signIn: document.querySelector('#sign-in'),
+      signOut: document.querySelector('#sign-out'),
+      publish: document.querySelector('#publish'),
+      authPanel: document.querySelector('#auth-panel'),
+      authHelp: document.querySelector('#auth-help'),
+      panelSignIn: document.querySelector('#auth-panel-sign-in'),
+    };
 
-  let imageNames = [];
-  let selectedFiles = [];
-  let isSignedIn = false;
-  let isAdmin = false;
+    let imageNames = [];
+    let selectedFiles = [];
+    let isSignedIn = false;
+    let isAdmin = false;
 
-  const adminPage = document.querySelector('.admin-page');
-  const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
-  const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
-  const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
-  let clerkLoadPromise;
+    const adminPage = document.querySelector('.admin-page');
+    const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+    const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+    const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    let clerkLoadPromise;
 
-  const setGatedContentVisible = (visible) => {
-    gatedContent.forEach((element) => {
-      element.hidden = !visible;
-    });
-  };
+    const setGatedContentVisible = (visible) => {
+      gatedContent.forEach((element) => {
+        element.hidden = !visible;
+      });
+    };
 
-  const setAuthLoadingVisible = (visible) => {
-    const loading = document.querySelector('#auth-loading');
-    if (loading) loading.hidden = !visible;
-  };
+    const setAuthLoadingVisible = (visible) => {
+      const loading = document.querySelector('#auth-loading');
+      if (loading) loading.hidden = !visible;
+    };
 
-  const loadClerkScript = () =>
-    new Promise((resolve, reject) => {
-      if (window.Clerk) {
-        console.info('Clerk script loaded');
-        resolve();
-        return;
-      }
-
-      const resolveWhenClerkExists = () => {
-        if (!window.Clerk) {
-          reject(new Error('Clerk authentication could not be initialized.'));
+    const loadClerkScript = () =>
+      new Promise((resolve, reject) => {
+        if (window.Clerk) {
+          console.info('Clerk script loaded');
+          resolve();
           return;
         }
 
-        console.info('Clerk script loaded');
-        resolve();
-      };
+        const resolveWhenClerkExists = () => {
+          if (!window.Clerk) {
+            reject(new Error('Clerk authentication could not be initialized.'));
+            return;
+          }
 
-      const existingScript = document.querySelector(
-        `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
-      );
-      if (existingScript) {
-        existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
-        existingScript.addEventListener(
+          console.info('Clerk script loaded');
+          resolve();
+        };
+
+        const existingScript = document.querySelector(
+          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+        );
+        if (existingScript) {
+          existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
+          existingScript.addEventListener(
+            'error',
+            (event) => {
+              console.error('ClerkJS script failed to load from existing script tag.', event);
+              reject(new Error('Clerk authentication could not be loaded.'));
+            },
+            { once: true }
+          );
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = clerkJsScriptSrc;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.type = 'text/javascript';
+        script.dataset.drLurieClerkjs = 'true';
+        script.dataset.clerkPublishableKey = clerkPublishableKey;
+        script.addEventListener('load', resolveWhenClerkExists, { once: true });
+        script.addEventListener(
           'error',
           (event) => {
-            console.error('ClerkJS script failed to load from existing script tag.', event);
+            console.error('ClerkJS script failed to load.', event);
             reject(new Error('Clerk authentication could not be loaded.'));
           },
           { once: true }
         );
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = clerkJsScriptSrc;
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.type = 'text/javascript';
-      script.dataset.drLurieClerkjs = 'true';
-      script.dataset.clerkPublishableKey = clerkPublishableKey;
-      script.addEventListener('load', resolveWhenClerkExists, { once: true });
-      script.addEventListener(
-        'error',
-        (event) => {
-          console.error('ClerkJS script failed to load.', event);
-          reject(new Error('Clerk authentication could not be loaded.'));
-        },
-        { once: true }
-      );
-      document.head.append(script);
-    });
-
-  const getClerk = async () => {
-    if (!clerkPublishableKey) {
-      throw new Error('Publishing authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
-    }
-
-    clerkLoadPromise ||= (async () => {
-      await loadClerkScript();
-
-      if (!window.Clerk) {
-        throw new Error('Clerk authentication could not be initialized.');
-      }
-
-      const clerk = window.Clerk;
-      await clerk.load();
-      console.info('Clerk initialized', {
-        status: clerk.status,
-        isSignedIn: Boolean(clerk.isSignedIn),
+        document.head.append(script);
       });
-      return clerk;
-    })();
 
-    return clerkLoadPromise;
-  };
-
-  const getSignedInLabel = (clerk) => {
-    const email = clerk.user?.primaryEmailAddress?.emailAddress;
-    const name = clerk.user?.fullName || clerk.user?.firstName;
-    return email || name || 'Clerk user';
-  };
-
-  const showSignedOutPanel = () => {
-    fields.authPanel.hidden = false;
-    fields.authHelp.textContent = 'Sign in with Clerk to access the publishing workspace.';
-    setAuthLoadingVisible(false);
-  };
-
-  const hideAuthPanel = () => {
-    fields.authPanel.hidden = true;
-    setAuthLoadingVisible(false);
-  };
-
-  const setAuthState = (state, message) => {
-    fields.authStatus.textContent = message;
-    fields.authStatus.dataset.state = state;
-    isSignedIn = state === 'signed-in' || state === 'forbidden';
-    isAdmin = state === 'signed-in';
-    fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
-    fields.panelSignIn.hidden = fields.signIn.hidden;
-    fields.signOut.hidden = !isSignedIn;
-    fields.publish.disabled = !isAdmin;
-    setGatedContentVisible(isAdmin);
-
-    if (state === 'checking') {
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = 'Checking Clerk authentication before showing the publishing workspace.';
-      setAuthLoadingVisible(true);
-    }
-  };
-
-  const getAdminStateForClerk = async (clerk) => {
-    if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-
-    const token = await clerk.session.getToken();
-    if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
-
-    const response = await fetch('/.netlify/functions/admin-auth-state', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    return response
-      .json()
-      .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
-  };
-
-  const renderAuthState = async (clerk) => {
-    const signedIn = Boolean(clerk.isSignedIn && clerk.session);
-    console.info('Clerk signed-in state', { isSignedIn: signedIn });
-
-    if (signedIn) {
-      const adminState = await getAdminStateForClerk(clerk);
-
-      if (adminState.isAdmin) {
-        setAuthState('signed-in', `Signed in as ${adminState.email || getSignedInLabel(clerk)}`);
-        hideAuthPanel();
-        return;
+    const getClerk = async () => {
+      if (!clerkPublishableKey) {
+        throw new Error('Publishing authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
       }
 
-      setAuthState('forbidden', 'Signed in — admin access required');
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = 'This account is signed in, but it is not authorized for the publishing workspace.';
-      setAuthLoadingVisible(false);
-      return;
-    }
+      clerkLoadPromise ||= (async () => {
+        await loadClerkScript();
 
-    setAuthState('signed-out', 'Signed out — sign in to publish');
-    showSignedOutPanel();
-  };
+        if (!window.Clerk) {
+          throw new Error('Clerk authentication could not be initialized.');
+        }
 
-  const initializeClerkAuth = async () => {
-    setAuthState('checking', 'Checking sign-in…');
-
-    try {
-      const clerk = await getClerk();
-      await renderAuthState(clerk);
-
-      if (typeof clerk.addListener === 'function') {
-        clerk.addListener(() => {
-          renderAuthState(clerk).catch((error) => {
-            console.error('Clerk authentication refresh failed.', error);
-          });
+        const clerk = window.Clerk;
+        await clerk.load();
+        console.info('Clerk initialized', {
+          status: clerk.status,
+          isSignedIn: Boolean(clerk.isSignedIn),
         });
-      }
-    } catch (error) {
-      console.error('Clerk authentication initialization failed.', error);
-      const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
-      setAuthState('error', message);
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = message;
-      setAuthLoadingVisible(false);
-      setStatus(message, false);
-    }
-  };
+        return clerk;
+      })();
 
-  const getClerkSessionToken = async () => {
-    const clerk = await getClerk();
-    if (!clerk.isSignedIn || !clerk.session) {
-      throw new Error('Sign in with Clerk before publishing.');
-    }
-
-    if (!isAdmin) {
-      throw new Error('This account is not authorized to publish articles.');
-    }
-
-    const token = await clerk.session.getToken();
-
-    if (!token) {
-      throw new Error('Could not retrieve a Clerk session token.');
-    }
-
-    return token;
-  };
-
-  const escapeHtml = (value) =>
-    String(value)
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-
-  const escapeYaml = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-
-  const formatDateTimeLocal = (date) => {
-    const offset = date.getTimezoneOffset();
-    const localDate = new Date(date.getTime() - offset * 60000);
-    return localDate.toISOString().slice(0, 16);
-  };
-
-  const getPublishDate = () => (fields.publishDate.value ? new Date(fields.publishDate.value) : new Date());
-
-  const parseTags = (value) =>
-    String(value)
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean);
-
-  const slugify = (value) =>
-    String(value)
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-  const sanitizeFilename = (value) =>
-    String(value)
-      .split(/[\\/]/)
-      .pop()
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'upload';
-
-  const getCurrentSlug = () =>
-    slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
-
-  const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
-
-  const getFeaturedImagePath = () => (fields.featuredImage.value ? getUploadPath(fields.featuredImage.value) : '');
-
-  const getDraft = () => ({
-    title: fields.title.value,
-    slug: fields.slug.value,
-    excerpt: fields.excerpt.value,
-    publishDate: fields.publishDate.value,
-    author: fields.author.value,
-    category: fields.category.value,
-    tags: fields.tags.value,
-    draft: fields.draft.checked,
-    content: fields.content.value,
-    imageNames,
-    featuredImage: fields.featuredImage.value,
-    videoLink: fields.videoLink.value,
-    ctaLink: fields.ctaLink.value,
-    ctaText: fields.ctaText.value,
-    seoDescription: fields.seoDescription.value,
-    overwrite: fields.overwrite.checked,
-  });
-
-  const setStatus = (message, autoClear = true) => {
-    fields.status.textContent = message;
-    if (message && autoClear) {
-      window.setTimeout(() => {
-        if (fields.status.textContent === message) fields.status.textContent = '';
-      }, 2500);
-    }
-  };
-
-  const copyText = async (text, successMessage) => {
-    if (!text) return;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus(successMessage);
-    } catch {
-      fields.outputMarkdown.value = text;
-      fields.outputMarkdown.focus();
-      fields.outputMarkdown.select();
-      setStatus('Clipboard unavailable. Text selected for manual copy.');
-    }
-  };
-
-  const renderImages = () => {
-    fields.imageList.innerHTML = '';
-    fields.featuredImage.innerHTML = '<option value="">Select an uploaded image</option>';
-
-    imageNames.forEach((name) => {
-      const option = document.createElement('option');
-      option.value = name;
-      option.textContent = name;
-      fields.featuredImage.append(option);
-
-      const item = document.createElement('li');
-      const filename = document.createElement('span');
-      const copyButton = document.createElement('button');
-
-      filename.className = 'filename';
-      filename.textContent = name;
-      copyButton.className = 'btn-secondary btn-sm copy-button';
-      copyButton.type = 'button';
-      copyButton.textContent = 'Copy Markdown';
-      copyButton.addEventListener('click', () => {
-        copyText(`![Alt text](${getUploadPath(name)})`, `Copied Markdown for ${name}.`);
-      });
-
-      item.append(filename, copyButton);
-      fields.imageList.append(item);
-    });
-  };
-
-  const renderMarkdownPreview = (markdown) => {
-    if (!markdown.trim()) return 'Preview will appear here.';
-
-    return markdown
-      .split(/\n{2,}/)
-      .map((block) => {
-        const text = block.trim();
-        if (!text) return '';
-        if (text.startsWith('### ')) return `<h3>${escapeHtml(text.slice(4))}</h3>`;
-        if (text.startsWith('## ')) return `<h2>${escapeHtml(text.slice(3))}</h2>`;
-        if (text.startsWith('# ')) return `<h1>${escapeHtml(text.slice(2))}</h1>`;
-        if (text.startsWith('![')) return `<p><code>${escapeHtml(text)}</code></p>`;
-
-        const inline = escapeHtml(text)
-          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.*?)\*/g, '<em>$1</em>')
-          .replace(/`([^`]+)`/g, '<code>$1</code>')
-          .replace(/\n/g, '<br />');
-        return `<p>${inline}</p>`;
-      })
-      .join('');
-  };
-
-  const updatePreview = () => {
-    const featuredPath = getFeaturedImagePath();
-    fields.previewTitle.textContent = fields.title.value || 'Untitled article';
-    fields.previewFeaturedImage.textContent = featuredPath || 'None selected';
-    fields.markdownPreview.innerHTML = renderMarkdownPreview(fields.content.value);
-  };
-
-  const buildMarkdown = () => {
-    const slug = getCurrentSlug();
-    const featuredPath = getFeaturedImagePath();
-    const tags = parseTags(fields.tags.value);
-    const publishDate = getPublishDate().toISOString();
-    const frontmatter = [
-      '---',
-      `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
-      `publishDate: ${publishDate}`,
-      ...(fields.draft.checked ? ['draft: true'] : []),
-      ...(fields.excerpt.value ? [`excerpt: "${escapeYaml(fields.excerpt.value)}"`] : []),
-      ...(featuredPath ? [`image: "${escapeYaml(featuredPath)}"`] : []),
-      ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
-      ...(fields.ctaLink.value ? [`ctaLink: "${escapeYaml(fields.ctaLink.value)}"`] : []),
-      ...(fields.ctaText.value ? [`ctaText: "${escapeYaml(fields.ctaText.value)}"`] : []),
-      ...(fields.category.value ? [`category: "${escapeYaml(fields.category.value)}"`] : []),
-      ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
-      ...(fields.author.value ? [`author: "${escapeYaml(fields.author.value)}"`] : []),
-      ...(fields.seoDescription.value
-        ? ['metadata:', `  description: "${escapeYaml(fields.seoDescription.value)}"`]
-        : []),
-      '---',
-      '',
-    ];
-
-    return {
-      slug,
-      markdown: `${frontmatter.join('\n')}${fields.content.value.trim()}\n`,
+      return clerkLoadPromise;
     };
-  };
 
-  const updatePublishOutput = () => {
-    const { slug, markdown } = buildMarkdown();
-    fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
-    fields.outputMarkdown.value = markdown;
-  };
+    const getSignedInLabel = (clerk) => {
+      const email = clerk.user?.primaryEmailAddress?.emailAddress;
+      const name = clerk.user?.fullName || clerk.user?.firstName;
+      return email || name || 'Clerk user';
+    };
 
-  const saveDraft = () => {
-    localStorage.setItem(draftKey, JSON.stringify(getDraft()));
-    setStatus('Draft saved.');
-  };
+    const showSignedOutPanel = () => {
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'Sign in with Clerk to access the publishing workspace.';
+      setAuthLoadingVisible(false);
+    };
 
-  const loadDraft = () => {
-    const saved = localStorage.getItem(draftKey);
-    if (!saved) return;
+    const hideAuthPanel = () => {
+      fields.authPanel.hidden = true;
+      setAuthLoadingVisible(false);
+    };
 
-    try {
-      const draft = JSON.parse(saved);
-      fields.title.value = draft.title || '';
-      fields.slug.value = draft.slug || '';
-      fields.excerpt.value = draft.excerpt || '';
-      fields.publishDate.value = draft.publishDate || formatDateTimeLocal(new Date());
-      fields.author.value = draft.author || '';
-      fields.category.value = draft.category || '';
-      fields.tags.value = draft.tags || '';
-      fields.draft.checked = Boolean(draft.draft);
-      fields.content.value = draft.content || '';
-      fields.videoLink.value = draft.videoLink || '';
-      fields.ctaLink.value = draft.ctaLink || '';
-      fields.ctaText.value = draft.ctaText || '';
-      fields.seoDescription.value = draft.seoDescription || '';
-      fields.overwrite.checked = Boolean(draft.overwrite);
-      imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
-      renderImages();
-      fields.featuredImage.value = draft.featuredImage || '';
-    } catch {
-      localStorage.removeItem(draftKey);
-    }
-  };
+    const setAuthState = (state, message) => {
+      fields.authStatus.textContent = message;
+      fields.authStatus.dataset.state = state;
+      isSignedIn = state === 'signed-in' || state === 'forbidden';
+      isAdmin = state === 'signed-in';
+      fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
+      fields.panelSignIn.hidden = fields.signIn.hidden;
+      fields.signOut.hidden = !isSignedIn;
+      fields.publish.disabled = !isAdmin;
+      setGatedContentVisible(isAdmin);
 
-  fields.title.addEventListener('input', () => {
-    if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
-  });
+      if (state === 'checking') {
+        fields.authPanel.hidden = false;
+        fields.authHelp.textContent = 'Checking Clerk authentication before showing the publishing workspace.';
+        setAuthLoadingVisible(true);
+      }
+    };
 
-  fields.imageUpload.addEventListener('change', () => {
-    selectedFiles = Array.from(fields.imageUpload.files || []);
-    imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
-    const previousFeaturedImage = fields.featuredImage.value;
-    renderImages();
-    if (imageNames.includes(previousFeaturedImage)) fields.featuredImage.value = previousFeaturedImage;
-    updatePreview();
-    updatePublishOutput();
-  });
+    const getAdminStateForClerk = async (clerk) => {
+      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
 
-  document.querySelector('#save-draft').addEventListener('click', saveDraft);
-  document.querySelector('#preview').addEventListener('click', () => {
-    updatePreview();
-    setStatus('Preview updated.');
-  });
-  const fileToBase64 = (file) =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.addEventListener('load', () => {
-        const result = String(reader.result || '');
-        resolve(result.includes(',') ? result.split(',').pop() : result);
-      });
-      reader.addEventListener('error', () => reject(reader.error));
-      reader.readAsDataURL(file);
-    });
+      const token = await clerk.session.getToken();
+      if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
 
-  const publishArticle = async () => {
-    updatePreview();
-    updatePublishOutput();
-
-    const { slug } = buildMarkdown();
-    if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
-      setStatus('Title, slug, and Markdown content are required before publishing.', false);
-      return;
-    }
-
-    const publishButton = document.querySelector('#publish');
-    publishButton.disabled = true;
-    setStatus('Checking Clerk session…', false);
-
-    try {
-      const clerkToken = await getClerkSessionToken();
-      setStatus('Publishing article to GitHub…', false);
-
-      const files = await Promise.all(
-        selectedFiles.map(async (file) => ({
-          base64: await fileToBase64(file),
-          name: sanitizeFilename(file.name),
-          type: file.type,
-        }))
-      );
-      const response = await fetch('/.netlify/functions/publish-article', {
-        method: 'POST',
+      const response = await fetch('/.netlify/functions/admin-auth-state', {
+        method: 'GET',
         headers: {
-          Authorization: `Bearer ${clerkToken}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title: fields.title.value,
-          slug,
-          excerpt: fields.excerpt.value,
-          publishDate: getPublishDate().toISOString(),
-          author: fields.author.value,
-          category: fields.category.value,
-          tags: parseTags(fields.tags.value),
-          draft: fields.draft.checked,
-          content: fields.content.value,
-          featuredImage: fields.featuredImage.value,
-          seoDescription: fields.seoDescription.value,
-          videoLink: fields.videoLink.value,
-          ctaLink: fields.ctaLink.value,
-          ctaText: fields.ctaText.value,
-          overwrite: fields.overwrite.checked,
-          files,
-        }),
       });
-      const result = await response.json().catch(() => ({}));
 
-      if (!response.ok) {
-        const message = result.error || `Publish failed with status ${response.status}.`;
-        setStatus(response.status === 409 ? `${message} Check overwrite to replace it.` : message, false);
+      return response
+        .json()
+        .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+    };
+
+    const renderAuthState = async (clerk) => {
+      const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+      console.info('Clerk signed-in state', { isSignedIn: signedIn });
+
+      if (signedIn) {
+        const adminState = await getAdminStateForClerk(clerk);
+
+        if (adminState.isAdmin) {
+          setAuthState('signed-in', `Signed in as ${adminState.email || getSignedInLabel(clerk)}`);
+          hideAuthPanel();
+          return;
+        }
+
+        setAuthState('forbidden', 'Signed in — admin access required');
+        fields.authPanel.hidden = false;
+        fields.authHelp.textContent =
+          'This account is signed in, but it is not authorized for the publishing workspace.';
+        setAuthLoadingVisible(false);
         return;
       }
 
-      setStatus(
-        `Published ${result.articlePath || result.path || `src/data/post/${slug}.md`} in commit ${String(result.commit || '').slice(0, 7)}.`,
-        false
-      );
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
-    } finally {
-      publishButton.disabled = !isSignedIn;
-    }
-  };
+      setAuthState('signed-out', 'Signed out — sign in to publish');
+      showSignedOutPanel();
+    };
 
-  const redirectToHostedSignIn = async (clerk) => {
-    if (typeof clerk.redirectToSignIn !== 'function') {
-      throw new Error('Clerk hosted sign-in redirect is unavailable.');
-    }
+    const initializeClerkAuth = async () => {
+      setAuthState('checking', 'Checking sign-in…');
 
-    await clerk.redirectToSignIn({ redirectUrl: window.location.href });
-  };
+      try {
+        const clerk = await getClerk();
+        await renderAuthState(clerk);
 
-  const openSignIn = async () => {
-    setAuthState('checking', 'Opening Clerk sign-in…');
-
-    try {
-      const clerk = await getClerk();
-
-      if (typeof clerk.openSignIn === 'function') {
-        try {
-          await clerk.openSignIn();
-          await renderAuthState(clerk);
-          return;
-        } catch (error) {
-          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+        if (typeof clerk.addListener === 'function') {
+          clerk.addListener(() => {
+            renderAuthState(clerk).catch((error) => {
+              console.error('Clerk authentication refresh failed.', error);
+            });
+          });
         }
+      } catch (error) {
+        console.error('Clerk authentication initialization failed.', error);
+        const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
+        setAuthState('error', message);
+        fields.authPanel.hidden = false;
+        fields.authHelp.textContent = message;
+        setAuthLoadingVisible(false);
+        setStatus(message, false);
+      }
+    };
+
+    const getClerkSessionToken = async () => {
+      const clerk = await getClerk();
+      if (!clerk.isSignedIn || !clerk.session) {
+        throw new Error('Sign in with Clerk before publishing.');
       }
 
-      await redirectToHostedSignIn(clerk);
-    } catch (error) {
-      console.error('Clerk sign-in failed.', error);
-      const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
-      setAuthState('error', message);
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = message;
-      setAuthLoadingVisible(false);
-      setStatus(message, false);
-    }
-  };
+      if (!isAdmin) {
+        throw new Error('This account is not authorized to publish articles.');
+      }
 
-  fields.signIn.addEventListener('click', openSignIn);
-  fields.panelSignIn.addEventListener('click', openSignIn);
+      const token = await clerk.session.getToken();
 
-  fields.signOut.addEventListener('click', async () => {
-    setAuthState('checking', 'Signing out…');
+      if (!token) {
+        throw new Error('Could not retrieve a Clerk session token.');
+      }
 
-    try {
-      const clerk = await getClerk();
-      await clerk.signOut();
-      await renderAuthState(clerk);
-    } catch (error) {
-      console.error('Clerk sign-out failed.', error);
-      const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
-      setAuthState('error', message);
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = message;
-      setAuthLoadingVisible(false);
-      setStatus(message, false);
-    }
-  });
+      return token;
+    };
 
-  fields.publish.addEventListener('click', publishArticle);
-  document.querySelector('#copy-output').addEventListener('click', () => {
-    updatePublishOutput();
-    copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
-  });
+    const escapeHtml = (value) =>
+      String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
 
-  ['input', 'change'].forEach((eventName) => {
-    document.querySelector('#publish-form').addEventListener(eventName, () => {
+    const escapeYaml = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+
+    const formatDateTimeLocal = (date) => {
+      const offset = date.getTimezoneOffset();
+      const localDate = new Date(date.getTime() - offset * 60000);
+      return localDate.toISOString().slice(0, 16);
+    };
+
+    const getPublishDate = () => (fields.publishDate.value ? new Date(fields.publishDate.value) : new Date());
+
+    const parseTags = (value) =>
+      String(value)
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+
+    const slugify = (value) =>
+      String(value)
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    const sanitizeFilename = (value) =>
+      String(value)
+        .split(/[\\/]/)
+        .pop()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'upload';
+
+    const getCurrentSlug = () =>
+      slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+
+    const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
+
+    const getFeaturedImagePath = () => (fields.featuredImage.value ? getUploadPath(fields.featuredImage.value) : '');
+
+    const getDraft = () => ({
+      title: fields.title.value,
+      slug: fields.slug.value,
+      excerpt: fields.excerpt.value,
+      publishDate: fields.publishDate.value,
+      author: fields.author.value,
+      category: fields.category.value,
+      tags: fields.tags.value,
+      draft: fields.draft.checked,
+      content: fields.content.value,
+      imageNames,
+      featuredImage: fields.featuredImage.value,
+      videoLink: fields.videoLink.value,
+      ctaLink: fields.ctaLink.value,
+      ctaText: fields.ctaText.value,
+      seoDescription: fields.seoDescription.value,
+      overwrite: fields.overwrite.checked,
+    });
+
+    const setStatus = (message, autoClear = true) => {
+      fields.status.textContent = message;
+      if (message && autoClear) {
+        window.setTimeout(() => {
+          if (fields.status.textContent === message) fields.status.textContent = '';
+        }, 2500);
+      }
+    };
+
+    const copyText = async (text, successMessage) => {
+      if (!text) return;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus(successMessage);
+      } catch {
+        fields.outputMarkdown.value = text;
+        fields.outputMarkdown.focus();
+        fields.outputMarkdown.select();
+        setStatus('Clipboard unavailable. Text selected for manual copy.');
+      }
+    };
+
+    const renderImages = () => {
+      fields.imageList.innerHTML = '';
+      fields.featuredImage.innerHTML = '<option value="">Select an uploaded image</option>';
+
+      imageNames.forEach((name) => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        fields.featuredImage.append(option);
+
+        const item = document.createElement('li');
+        const filename = document.createElement('span');
+        const copyButton = document.createElement('button');
+
+        filename.className = 'filename';
+        filename.textContent = name;
+        copyButton.className = 'btn-secondary btn-sm copy-button';
+        copyButton.type = 'button';
+        copyButton.textContent = 'Copy Markdown';
+        copyButton.addEventListener('click', () => {
+          copyText(`![Alt text](${getUploadPath(name)})`, `Copied Markdown for ${name}.`);
+        });
+
+        item.append(filename, copyButton);
+        fields.imageList.append(item);
+      });
+    };
+
+    const renderMarkdownPreview = (markdown) => {
+      if (!markdown.trim()) return 'Preview will appear here.';
+
+      return markdown
+        .split(/\n{2,}/)
+        .map((block) => {
+          const text = block.trim();
+          if (!text) return '';
+          if (text.startsWith('### ')) return `<h3>${escapeHtml(text.slice(4))}</h3>`;
+          if (text.startsWith('## ')) return `<h2>${escapeHtml(text.slice(3))}</h2>`;
+          if (text.startsWith('# ')) return `<h1>${escapeHtml(text.slice(2))}</h1>`;
+          if (text.startsWith('![')) return `<p><code>${escapeHtml(text)}</code></p>`;
+
+          const inline = escapeHtml(text)
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\n/g, '<br />');
+          return `<p>${inline}</p>`;
+        })
+        .join('');
+    };
+
+    const updatePreview = () => {
+      const featuredPath = getFeaturedImagePath();
+      fields.previewTitle.textContent = fields.title.value || 'Untitled article';
+      fields.previewFeaturedImage.textContent = featuredPath || 'None selected';
+      fields.markdownPreview.innerHTML = renderMarkdownPreview(fields.content.value);
+    };
+
+    const buildMarkdown = () => {
+      const slug = getCurrentSlug();
+      const featuredPath = getFeaturedImagePath();
+      const tags = parseTags(fields.tags.value);
+      const publishDate = getPublishDate().toISOString();
+      const frontmatter = [
+        '---',
+        `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
+        `publishDate: ${publishDate}`,
+        ...(fields.draft.checked ? ['draft: true'] : []),
+        ...(fields.excerpt.value ? [`excerpt: "${escapeYaml(fields.excerpt.value)}"`] : []),
+        ...(featuredPath ? [`image: "${escapeYaml(featuredPath)}"`] : []),
+        ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
+        ...(fields.ctaLink.value ? [`ctaLink: "${escapeYaml(fields.ctaLink.value)}"`] : []),
+        ...(fields.ctaText.value ? [`ctaText: "${escapeYaml(fields.ctaText.value)}"`] : []),
+        ...(fields.category.value ? [`category: "${escapeYaml(fields.category.value)}"`] : []),
+        ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
+        ...(fields.author.value ? [`author: "${escapeYaml(fields.author.value)}"`] : []),
+        ...(fields.seoDescription.value
+          ? ['metadata:', `  description: "${escapeYaml(fields.seoDescription.value)}"`]
+          : []),
+        '---',
+        '',
+      ];
+
+      return {
+        slug,
+        markdown: `${frontmatter.join('\n')}${fields.content.value.trim()}\n`,
+      };
+    };
+
+    const updatePublishOutput = () => {
+      const { slug, markdown } = buildMarkdown();
+      fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
+      fields.outputMarkdown.value = markdown;
+    };
+
+    const saveDraft = () => {
+      localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+      setStatus('Draft saved.');
+    };
+
+    const loadDraft = () => {
+      const saved = localStorage.getItem(draftKey);
+      if (!saved) return;
+
+      try {
+        const draft = JSON.parse(saved);
+        fields.title.value = draft.title || '';
+        fields.slug.value = draft.slug || '';
+        fields.excerpt.value = draft.excerpt || '';
+        fields.publishDate.value = draft.publishDate || formatDateTimeLocal(new Date());
+        fields.author.value = draft.author || '';
+        fields.category.value = draft.category || '';
+        fields.tags.value = draft.tags || '';
+        fields.draft.checked = Boolean(draft.draft);
+        fields.content.value = draft.content || '';
+        fields.videoLink.value = draft.videoLink || '';
+        fields.ctaLink.value = draft.ctaLink || '';
+        fields.ctaText.value = draft.ctaText || '';
+        fields.seoDescription.value = draft.seoDescription || '';
+        fields.overwrite.checked = Boolean(draft.overwrite);
+        imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
+        renderImages();
+        fields.featuredImage.value = draft.featuredImage || '';
+      } catch {
+        localStorage.removeItem(draftKey);
+      }
+    };
+
+    fields.title.addEventListener('input', () => {
+      if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
+    });
+
+    fields.imageUpload.addEventListener('change', () => {
+      selectedFiles = Array.from(fields.imageUpload.files || []);
+      imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
+      const previousFeaturedImage = fields.featuredImage.value;
+      renderImages();
+      if (imageNames.includes(previousFeaturedImage)) fields.featuredImage.value = previousFeaturedImage;
       updatePreview();
       updatePublishOutput();
     });
-  });
 
-  if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
-  loadDraft();
-  updatePreview();
-  updatePublishOutput();
-  initializeClerkAuth();
+    document.querySelector('#save-draft').addEventListener('click', saveDraft);
+    document.querySelector('#preview').addEventListener('click', () => {
+      updatePreview();
+      setStatus('Preview updated.');
+    });
+    const fileToBase64 = (file) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+          const result = String(reader.result || '');
+          resolve(result.includes(',') ? result.split(',').pop() : result);
+        });
+        reader.addEventListener('error', () => reject(reader.error));
+        reader.readAsDataURL(file);
+      });
+
+    const publishArticle = async () => {
+      updatePreview();
+      updatePublishOutput();
+
+      const { slug } = buildMarkdown();
+      if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
+        setStatus('Title, slug, and Markdown content are required before publishing.', false);
+        return;
+      }
+
+      const publishButton = document.querySelector('#publish');
+      publishButton.disabled = true;
+      setStatus('Checking Clerk session…', false);
+
+      try {
+        const clerkToken = await getClerkSessionToken();
+        setStatus('Publishing article to GitHub…', false);
+
+        const files = await Promise.all(
+          selectedFiles.map(async (file) => ({
+            base64: await fileToBase64(file),
+            name: sanitizeFilename(file.name),
+            type: file.type,
+          }))
+        );
+        const response = await fetch('/.netlify/functions/publish-article', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: fields.title.value,
+            slug,
+            excerpt: fields.excerpt.value,
+            publishDate: getPublishDate().toISOString(),
+            author: fields.author.value,
+            category: fields.category.value,
+            tags: parseTags(fields.tags.value),
+            draft: fields.draft.checked,
+            content: fields.content.value,
+            featuredImage: fields.featuredImage.value,
+            seoDescription: fields.seoDescription.value,
+            videoLink: fields.videoLink.value,
+            ctaLink: fields.ctaLink.value,
+            ctaText: fields.ctaText.value,
+            overwrite: fields.overwrite.checked,
+            files,
+          }),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const message = result.error || `Publish failed with status ${response.status}.`;
+          setStatus(response.status === 409 ? `${message} Check overwrite to replace it.` : message, false);
+          return;
+        }
+
+        setStatus(
+          `Published ${result.articlePath || result.path || `src/data/post/${slug}.md`} in commit ${String(result.commit || '').slice(0, 7)}.`,
+          false
+        );
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
+      } finally {
+        publishButton.disabled = !isSignedIn;
+      }
+    };
+
+    const redirectToHostedSignIn = async (clerk) => {
+      if (typeof clerk.redirectToSignIn !== 'function') {
+        throw new Error('Clerk hosted sign-in redirect is unavailable.');
+      }
+
+      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+    };
+
+    const openSignIn = async () => {
+      setAuthState('checking', 'Opening Clerk sign-in…');
+
+      try {
+        const clerk = await getClerk();
+
+        if (typeof clerk.openSignIn === 'function') {
+          try {
+            await clerk.openSignIn();
+            await renderAuthState(clerk);
+            return;
+          } catch (error) {
+            console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+          }
+        }
+
+        await redirectToHostedSignIn(clerk);
+      } catch (error) {
+        console.error('Clerk sign-in failed.', error);
+        const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
+        setAuthState('error', message);
+        fields.authPanel.hidden = false;
+        fields.authHelp.textContent = message;
+        setAuthLoadingVisible(false);
+        setStatus(message, false);
+      }
+    };
+
+    fields.signIn.addEventListener('click', openSignIn);
+    fields.panelSignIn.addEventListener('click', openSignIn);
+
+    fields.signOut.addEventListener('click', async () => {
+      setAuthState('checking', 'Signing out…');
+
+      try {
+        const clerk = await getClerk();
+        await clerk.signOut();
+        await renderAuthState(clerk);
+      } catch (error) {
+        console.error('Clerk sign-out failed.', error);
+        const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
+        setAuthState('error', message);
+        fields.authPanel.hidden = false;
+        fields.authHelp.textContent = message;
+        setAuthLoadingVisible(false);
+        setStatus(message, false);
+      }
+    });
+
+    fields.publish.addEventListener('click', publishArticle);
+    document.querySelector('#copy-output').addEventListener('click', () => {
+      updatePublishOutput();
+      copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
+    });
+
+    ['input', 'change'].forEach((eventName) => {
+      document.querySelector('#publish-form').addEventListener(eventName, () => {
+        updatePreview();
+        updatePublishOutput();
+      });
+    });
+
+    if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
+    loadDraft();
+    updatePreview();
+    updatePublishOutput();
+    initializeClerkAuth();
+  })();
 </script>
