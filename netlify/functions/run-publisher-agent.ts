@@ -1,4 +1,4 @@
-import { verifyToken } from '@clerk/backend';
+import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import { Agent, run, tool } from '@openai/agents';
 
 /**
@@ -91,51 +91,26 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const getHeader = (headers: LambdaEvent['headers'], name: string) => {
-  const normalizedName = name.toLowerCase();
-  const match = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
+const verifyClerkAdminSession = async (event: LambdaEvent) => {
+  const adminState = await getAdminStateFromEvent(event);
 
-  return match?.[1] ?? '';
-};
+  if (!adminState.authenticated) {
+    const statusCode = adminState.error === 'Clerk authentication is not configured.' ? 500 : 401;
+    const error =
+      adminState.error === 'A valid Clerk session token is required.'
+        ? 'A valid Clerk session token is required to run the publisher agent.'
+        : adminState.error || 'A valid Clerk session token is required to run the publisher agent.';
 
-const getBearerToken = (authorization: string) => {
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || undefined;
-};
-
-const verifyClerkSession = async (event: LambdaEvent) => {
-  const token = getBearerToken(getHeader(event.headers, 'authorization'));
-
-  if (!token) {
-    return jsonResponse(401, {
+    return jsonResponse(statusCode, {
       success: false,
-      error: 'A valid Clerk session token is required to run the publisher agent.',
+      error,
     });
   }
 
-  const secretKey = process.env.CLERK_SECRET_KEY;
-
-  if (!secretKey) {
-    return jsonResponse(500, {
+  if (!adminState.isAdmin) {
+    return jsonResponse(403, {
       success: false,
-      error: 'Publisher agent authentication is not configured.',
-    });
-  }
-
-  try {
-    const verifiedToken = await verifyToken(token, { secretKey });
-
-    if (!verifiedToken.sub) {
-      return jsonResponse(401, {
-        success: false,
-        error: 'Invalid Clerk session token.',
-      });
-    }
-  } catch (error) {
-    console.warn('Rejected publisher agent request with invalid Clerk token.', error);
-    return jsonResponse(401, {
-      success: false,
-      error: 'Invalid Clerk session token.',
+      error: 'This Clerk user is not authorized to run the publisher agent.',
     });
   }
 
@@ -368,7 +343,7 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const authError = await verifyClerkSession(event);
+  const authError = await verifyClerkAdminSession(event);
 
   if (authError) {
     return authError;
