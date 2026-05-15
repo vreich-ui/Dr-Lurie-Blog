@@ -1,0 +1,473 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+
+const pageTitle = 'Admin Dashboard';
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  <section
+    class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
+    data-clerk-publishable-key={clerkPublishableKey}
+  >
+    <header class="dashboard-header">
+      <div>
+        <p class="dashboard-kicker">Admin workspace</p>
+        <h1>{pageTitle}</h1>
+        <p class="dashboard-intro">A private command center for Dr. Lurié publishing and workflow tools.</p>
+      </div>
+      <div class="dashboard-auth" aria-live="polite">
+        <span id="auth-status" class="pill-status">Checking sign-in…</span>
+        <button id="sign-in" class="btn-primary btn-sm" type="button" hidden>Sign in</button>
+        <button id="sign-out" class="btn-secondary btn-sm" type="button" hidden>Sign out</button>
+      </div>
+    </header>
+
+    <section
+      id="auth-panel"
+      class="dashboard-card auth-panel"
+      aria-label="Admin dashboard authentication"
+      aria-live="polite"
+    >
+      <div id="auth-loading" class="auth-loading" role="status">
+        <span class="auth-spinner" aria-hidden="true"></span>
+        <p>Checking admin access…</p>
+      </div>
+      <p id="auth-help" class="hint">Checking Clerk authentication before showing admin resources.</p>
+      <button id="auth-panel-sign-in" class="btn-primary" type="button" hidden>Sign in with Clerk</button>
+    </section>
+
+    <section class="dashboard-grid" data-auth-gated hidden>
+      <article class="dashboard-card">
+        <p class="dashboard-kicker">Publishing</p>
+        <h2>Publish Article</h2>
+        <p>Create or update Markdown articles, upload imagery, and queue the GitHub-backed publish flow.</p>
+        <a class="btn-primary" href="/admin/publish">Open publisher</a>
+      </article>
+
+      <article class="dashboard-card">
+        <p class="dashboard-kicker">AI workflow</p>
+        <h2>AI Publisher</h2>
+        <p>
+          Use the ChatKit-powered assistant to prepare approved article payloads and run the server publisher agent.
+        </p>
+        <a class="btn-secondary" href="/admin/agent-admin">Open AI publisher</a>
+      </article>
+
+      <article class="dashboard-card dashboard-card-wide">
+        <p class="dashboard-kicker">Coming soon</p>
+        <h2>Dashboard roadmap</h2>
+        <ul>
+          <li>Review recent publishing activity and deploy status.</li>
+          <li>Manage draft queues and research note handoffs.</li>
+          <li>Monitor admin-only workflow health checks.</li>
+        </ul>
+      </article>
+    </section>
+  </section>
+</Layout>
+
+<style>
+  .admin-dashboard {
+    color: var(--aw-color-text-default);
+  }
+
+  .dashboard-header {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgb(229 231 235);
+  }
+
+  :global(.dark) .dashboard-header {
+    border-color: rgb(30 41 59);
+  }
+
+  .dashboard-kicker {
+    margin: 0 0 0.5rem;
+    color: var(--aw-color-accent);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-header h1,
+  .dashboard-card h2 {
+    margin: 0;
+    font-family: var(--aw-font-heading, inherit);
+    font-weight: 800;
+    line-height: 1.05;
+  }
+
+  .dashboard-header h1 {
+    font-size: clamp(2.35rem, 7vw, 4rem);
+  }
+
+  .dashboard-intro,
+  .dashboard-card p,
+  .dashboard-card li,
+  .hint {
+    color: var(--aw-color-text-muted);
+  }
+
+  .dashboard-intro {
+    max-width: 42rem;
+    margin: 1rem 0 0;
+    font-size: 1.1rem;
+  }
+
+  .dashboard-auth {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .pill-status {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 999px;
+    padding: 0.45rem 0.75rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  :global(.dark) .pill-status {
+    border-color: rgb(51 65 85);
+  }
+
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .dashboard-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.5rem;
+    background: rgb(255 255 255 / 0.86);
+    padding: 1.5rem;
+    box-shadow: 0 18px 45px rgb(15 23 42 / 0.07);
+  }
+
+  :global(.dark) .dashboard-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.76);
+  }
+
+  .dashboard-card p {
+    margin: 0.85rem 0 1.15rem;
+  }
+
+  .dashboard-card ul {
+    margin: 1rem 0 0;
+    padding-left: 1.25rem;
+  }
+
+  .dashboard-card-wide {
+    grid-column: 1 / -1;
+  }
+
+  .auth-panel {
+    margin-bottom: 1rem;
+  }
+
+  .auth-loading {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    font-weight: 700;
+  }
+
+  .auth-loading[hidden] {
+    display: none;
+  }
+
+  .auth-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgb(203 213 225);
+    border-top-color: var(--aw-color-accent);
+    border-radius: 999px;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .auth-panel button {
+    margin-top: 0.75rem;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 767px) {
+    .admin-dashboard {
+      padding-top: 1.5rem;
+    }
+
+    .dashboard-header {
+      flex-direction: column;
+    }
+
+    .dashboard-auth,
+    .dashboard-auth button,
+    .pill-status {
+      width: 100%;
+    }
+
+    .pill-status {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<script is:inline>
+  const fields = {
+    authStatus: document.querySelector('#auth-status'),
+    signIn: document.querySelector('#sign-in'),
+    signOut: document.querySelector('#sign-out'),
+    authPanel: document.querySelector('#auth-panel'),
+    authHelp: document.querySelector('#auth-help'),
+    panelSignIn: document.querySelector('#auth-panel-sign-in'),
+  };
+
+  const adminPage = document.querySelector('.admin-dashboard');
+  const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+  const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+  const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+  let clerkLoadPromise;
+
+  const setGatedContentVisible = (visible) => {
+    gatedContent.forEach((element) => {
+      element.hidden = !visible;
+    });
+  };
+
+  const setAuthLoadingVisible = (visible) => {
+    const loading = document.querySelector('#auth-loading');
+    if (loading) loading.hidden = !visible;
+  };
+
+  const loadClerkScript = () =>
+    new Promise((resolve, reject) => {
+      if (window.Clerk) {
+        resolve();
+        return;
+      }
+
+      const existingScript = document.querySelector(
+        `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+      );
+      if (existingScript) {
+        existingScript.addEventListener('load', () => resolve(), { once: true });
+        existingScript.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = clerkJsScriptSrc;
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.type = 'text/javascript';
+      script.dataset.drLurieClerkjs = 'true';
+      script.dataset.clerkPublishableKey = clerkPublishableKey;
+      script.addEventListener('load', () => resolve(), { once: true });
+      script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+        once: true,
+      });
+      document.head.append(script);
+    });
+
+  const getClerk = async () => {
+    if (!clerkPublishableKey) {
+      throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+    }
+
+    clerkLoadPromise ||= (async () => {
+      await loadClerkScript();
+
+      if (!window.Clerk) {
+        throw new Error('Clerk authentication could not be initialized.');
+      }
+
+      const clerk = window.Clerk;
+      await clerk.load();
+      return clerk;
+    })();
+
+    return clerkLoadPromise;
+  };
+
+  const getSignedInLabel = (clerk, adminState) => {
+    const email = adminState?.email || clerk.user?.primaryEmailAddress?.emailAddress;
+    const name = clerk.user?.fullName || clerk.user?.firstName;
+    return email || name || 'Clerk user';
+  };
+
+  const setAuthState = (state, message) => {
+    fields.authStatus.textContent = message;
+    fields.authStatus.dataset.state = state;
+    const signedIn = state === 'signed-in' || state === 'forbidden';
+    const isAdmin = state === 'signed-in';
+    fields.signIn.hidden = signedIn || state === 'checking' || state === 'error';
+    fields.panelSignIn.hidden = fields.signIn.hidden;
+    fields.signOut.hidden = !signedIn;
+    setGatedContentVisible(isAdmin);
+
+    if (state === 'checking') {
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'Checking Clerk authentication before showing admin resources.';
+      setAuthLoadingVisible(true);
+    }
+  };
+
+  const getAdminStateForClerk = async (clerk) => {
+    if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+    const token = await clerk.session.getToken();
+    if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+
+    const response = await fetch('/.netlify/functions/admin-auth-state', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return response
+      .json()
+      .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+  };
+
+  const renderAuthState = async (clerk) => {
+    const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+
+    if (signedIn) {
+      const adminState = await getAdminStateForClerk(clerk);
+
+      if (adminState.isAdmin) {
+        setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk, adminState)}`);
+        fields.authPanel.hidden = true;
+        setAuthLoadingVisible(false);
+        return;
+      }
+
+      setAuthState('forbidden', 'Signed in — admin access required');
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'This account is signed in, but it is not authorized for admin resources.';
+      setAuthLoadingVisible(false);
+      return;
+    }
+
+    setAuthState('signed-out', 'Signed out — sign in for admin access');
+    fields.authPanel.hidden = false;
+    fields.authHelp.textContent = 'Sign in with an authorized admin account to access this dashboard.';
+    setAuthLoadingVisible(false);
+  };
+
+  const initializeClerkAuth = async () => {
+    setAuthState('checking', 'Checking sign-in…');
+
+    try {
+      const clerk = await getClerk();
+      await renderAuthState(clerk);
+
+      if (typeof clerk.addListener === 'function') {
+        clerk.addListener(() => {
+          renderAuthState(clerk).catch((error) => {
+            console.error('Clerk authentication refresh failed.', error);
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Clerk authentication initialization failed.', error);
+      const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+    }
+  };
+
+  const redirectToHostedSignIn = async (clerk) => {
+    if (typeof clerk.redirectToSignIn !== 'function') {
+      throw new Error('Clerk hosted sign-in redirect is unavailable.');
+    }
+
+    await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+  };
+
+  const openSignIn = async () => {
+    setAuthState('checking', 'Opening Clerk sign-in…');
+
+    try {
+      const clerk = await getClerk();
+
+      if (typeof clerk.openSignIn === 'function') {
+        try {
+          await clerk.openSignIn();
+          await renderAuthState(clerk);
+          return;
+        } catch (error) {
+          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+        }
+      }
+
+      await redirectToHostedSignIn(clerk);
+    } catch (error) {
+      console.error('Clerk sign-in failed.', error);
+      const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+    }
+  };
+
+  fields.signIn.addEventListener('click', openSignIn);
+  fields.panelSignIn.addEventListener('click', openSignIn);
+
+  fields.signOut.addEventListener('click', async () => {
+    setAuthState('checking', 'Signing out…');
+
+    try {
+      const clerk = await getClerk();
+      await clerk.signOut();
+      await renderAuthState(clerk);
+    } catch (error) {
+      console.error('Clerk sign-out failed.', error);
+      const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
+      setAuthState('error', message);
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = message;
+      setAuthLoadingVisible(false);
+    }
+  });
+
+  initializeClerkAuth();
+</script>

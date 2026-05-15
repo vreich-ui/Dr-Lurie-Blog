@@ -363,6 +363,7 @@ const metadata = {
   };
 
   let isSignedIn = false;
+  let isAdmin = false;
   let clerkLoadPromise;
   let chatkitInitialized = false;
 
@@ -480,11 +481,12 @@ const metadata = {
   const setAuthState = (state, message) => {
     fields.authStatus.textContent = message;
     fields.authStatus.dataset.state = state;
-    isSignedIn = state === 'signed-in';
+    isSignedIn = state === 'signed-in' || state === 'forbidden';
+    isAdmin = state === 'signed-in';
     fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
     fields.panelSignIn.hidden = fields.signIn.hidden;
     fields.signOut.hidden = !isSignedIn;
-    setGatedContentVisible(isSignedIn);
+    setGatedContentVisible(isAdmin);
 
     if (state === 'checking') {
       fields.authPanel.hidden = false;
@@ -495,10 +497,12 @@ const metadata = {
 
   const getClerkSessionToken = async () => {
     const clerk = await getClerk();
-    renderAuthState(clerk);
-
     if (!clerk.isSignedIn || !clerk.session) {
       throw new Error('Sign in with Clerk before using the agent workflow.');
+    }
+
+    if (!isAdmin) {
+      throw new Error('This account is not authorized to use the agent workflow.');
     }
 
     const token = await clerk.session.getToken();
@@ -659,16 +663,46 @@ const metadata = {
     });
   };
 
-  const renderAuthState = (clerk) => {
+  const getAdminStateForClerk = async (clerk) => {
+    if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+    const token = await clerk.session.getToken();
+    if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+
+    const response = await fetch('/.netlify/functions/admin-auth-state', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return response
+      .json()
+      .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+  };
+
+  const renderAuthState = async (clerk) => {
     const signedIn = Boolean(clerk.isSignedIn && clerk.session);
 
     if (signedIn) {
-      setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
-      hideAuthPanel();
-      initializeChatKit().catch((error) => {
-        console.error('ChatKit initialization failed.', error);
-        setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
-      });
+      const adminState = await getAdminStateForClerk(clerk);
+
+      if (adminState.isAdmin) {
+        setAuthState('signed-in', `Signed in as ${adminState.email || getSignedInLabel(clerk)}`);
+        hideAuthPanel();
+        initializeChatKit().catch((error) => {
+          console.error('ChatKit initialization failed.', error);
+          setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+        });
+        return;
+      }
+
+      setAuthState('forbidden', 'Signed in — admin access required');
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent =
+        'This account is signed in, but it is not authorized for the AI publishing workflow.';
+      setAuthLoadingVisible(false);
       return;
     }
 
@@ -681,10 +715,14 @@ const metadata = {
 
     try {
       const clerk = await getClerk();
-      renderAuthState(clerk);
+      await renderAuthState(clerk);
 
       if (typeof clerk.addListener === 'function') {
-        clerk.addListener(() => renderAuthState(clerk));
+        clerk.addListener(() => {
+          renderAuthState(clerk).catch((error) => {
+            console.error('Clerk authentication refresh failed.', error);
+          });
+        });
       }
     } catch (error) {
       console.error('Clerk authentication initialization failed.', error);
@@ -714,7 +752,7 @@ const metadata = {
       if (typeof clerk.openSignIn === 'function') {
         try {
           await clerk.openSignIn();
-          renderAuthState(clerk);
+          await renderAuthState(clerk);
           return;
         } catch (error) {
           console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
@@ -742,7 +780,7 @@ const metadata = {
     try {
       const clerk = await getClerk();
       await clerk.signOut();
-      renderAuthState(clerk);
+      await renderAuthState(clerk);
     } catch (error) {
       console.error('Clerk sign-out failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';

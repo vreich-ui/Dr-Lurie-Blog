@@ -17,7 +17,9 @@ const metadata = {
     class="admin-page mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14"
     data-clerk-publishable-key={clerkPublishableKey}
   >
-    <header class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+    <header
+      class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
+    >
       <div>
         <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">Publishing workspace</p>
         <h1 class="mt-2 font-heading text-4xl font-bold tracking-tight text-default sm:text-5xl">{pageTitle}</h1>
@@ -35,7 +37,9 @@ const metadata = {
         <p>Checking sign-in…</p>
       </div>
       <p id="auth-help" class="hint">Checking Clerk authentication before showing the publishing workspace.</p>
-      <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden>Sign in with Clerk</button>
+      <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden
+        >Sign in with Clerk</button
+      >
     </section>
 
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
@@ -57,8 +61,7 @@ const metadata = {
             name="excerpt"
             rows="3"
             maxlength="300"
-            placeholder="Short list-card and topic summary copy."
-          ></textarea>
+            placeholder="Short list-card and topic summary copy."></textarea>
         </div>
 
         <div class="field-grid">
@@ -92,7 +95,8 @@ const metadata = {
 
         <div class="field">
           <label for="content">Markdown content</label>
-          <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."></textarea>
+          <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
+          ></textarea>
         </div>
 
         <div class="field">
@@ -166,7 +170,9 @@ const metadata = {
       </p>
       <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button>
       <textarea id="output-markdown" class="output-markdown" readonly></textarea>
-      <p class="publish-message">Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.</p>
+      <p class="publish-message">
+        Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.
+      </p>
     </section>
   </section>
 </Layout>
@@ -555,6 +561,7 @@ const metadata = {
   let imageNames = [];
   let selectedFiles = [];
   let isSignedIn = false;
+  let isAdmin = false;
 
   const adminPage = document.querySelector('.admin-page');
   const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
@@ -628,9 +635,7 @@ const metadata = {
 
   const getClerk = async () => {
     if (!clerkPublishableKey) {
-      throw new Error(
-        'Publishing authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.'
-      );
+      throw new Error('Publishing authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
     }
 
     clerkLoadPromise ||= (async () => {
@@ -672,12 +677,13 @@ const metadata = {
   const setAuthState = (state, message) => {
     fields.authStatus.textContent = message;
     fields.authStatus.dataset.state = state;
-    isSignedIn = state === 'signed-in';
+    isSignedIn = state === 'signed-in' || state === 'forbidden';
+    isAdmin = state === 'signed-in';
     fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
     fields.panelSignIn.hidden = fields.signIn.hidden;
     fields.signOut.hidden = !isSignedIn;
-    fields.publish.disabled = !isSignedIn;
-    setGatedContentVisible(isSignedIn);
+    fields.publish.disabled = !isAdmin;
+    setGatedContentVisible(isAdmin);
 
     if (state === 'checking') {
       fields.authPanel.hidden = false;
@@ -686,13 +692,42 @@ const metadata = {
     }
   };
 
-  const renderAuthState = (clerk) => {
+  const getAdminStateForClerk = async (clerk) => {
+    if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+    const token = await clerk.session.getToken();
+    if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+
+    const response = await fetch('/.netlify/functions/admin-auth-state', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    return response
+      .json()
+      .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+  };
+
+  const renderAuthState = async (clerk) => {
     const signedIn = Boolean(clerk.isSignedIn && clerk.session);
     console.info('Clerk signed-in state', { isSignedIn: signedIn });
 
     if (signedIn) {
-      setAuthState('signed-in', `Signed in as ${getSignedInLabel(clerk)}`);
-      hideAuthPanel();
+      const adminState = await getAdminStateForClerk(clerk);
+
+      if (adminState.isAdmin) {
+        setAuthState('signed-in', `Signed in as ${adminState.email || getSignedInLabel(clerk)}`);
+        hideAuthPanel();
+        return;
+      }
+
+      setAuthState('forbidden', 'Signed in — admin access required');
+      fields.authPanel.hidden = false;
+      fields.authHelp.textContent = 'This account is signed in, but it is not authorized for the publishing workspace.';
+      setAuthLoadingVisible(false);
       return;
     }
 
@@ -705,10 +740,14 @@ const metadata = {
 
     try {
       const clerk = await getClerk();
-      renderAuthState(clerk);
+      await renderAuthState(clerk);
 
       if (typeof clerk.addListener === 'function') {
-        clerk.addListener(() => renderAuthState(clerk));
+        clerk.addListener(() => {
+          renderAuthState(clerk).catch((error) => {
+            console.error('Clerk authentication refresh failed.', error);
+          });
+        });
       }
     } catch (error) {
       console.error('Clerk authentication initialization failed.', error);
@@ -723,10 +762,12 @@ const metadata = {
 
   const getClerkSessionToken = async () => {
     const clerk = await getClerk();
-    renderAuthState(clerk);
-
     if (!clerk.isSignedIn || !clerk.session) {
       throw new Error('Sign in with Clerk before publishing.');
+    }
+
+    if (!isAdmin) {
+      throw new Error('This account is not authorized to publish articles.');
     }
 
     const token = await clerk.session.getToken();
@@ -777,7 +818,8 @@ const metadata = {
       .replace(/[^a-z0-9._-]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'upload';
 
-  const getCurrentSlug = () => slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+  const getCurrentSlug = () =>
+    slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
 
   const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
 
@@ -1069,7 +1111,7 @@ const metadata = {
       if (typeof clerk.openSignIn === 'function') {
         try {
           await clerk.openSignIn();
-          renderAuthState(clerk);
+          await renderAuthState(clerk);
           return;
         } catch (error) {
           console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
@@ -1097,7 +1139,7 @@ const metadata = {
     try {
       const clerk = await getClerk();
       await clerk.signOut();
-      renderAuthState(clerk);
+      await renderAuthState(clerk);
     } catch (error) {
       console.error('Clerk sign-out failed.', error);
       const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';

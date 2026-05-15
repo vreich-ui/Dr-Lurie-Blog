@@ -1,4 +1,4 @@
-import { verifyToken } from '@clerk/backend';
+import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 
 declare const process: {
   env: Record<string, string | undefined>;
@@ -30,49 +30,30 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const getHeader = (headers: LambdaEvent['headers'], name: string) => {
-  const normalizedName = name.toLowerCase();
-  const match = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
-
-  return match?.[1] ?? '';
-};
-
-const getBearerToken = (authorization: string) => {
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || undefined;
-};
-
-const verifyClerkSession = async (
+const verifyClerkAdminSession = async (
   event: LambdaEvent
 ): Promise<VerifiedChatkitUser | ReturnType<typeof jsonResponse>> => {
-  const token = getBearerToken(getHeader(event.headers, 'authorization'));
+  const adminState = await getAdminStateFromEvent(event);
 
-  if (!token) {
-    return jsonResponse(401, {
-      error: 'A valid Clerk session token is required to create ChatKit sessions.',
-    });
+  if (!adminState.authenticated) {
+    const statusCode = adminState.error === 'Clerk authentication is not configured.' ? 500 : 401;
+    const error =
+      adminState.error === 'A valid Clerk session token is required.'
+        ? 'A valid Clerk session token is required to create ChatKit sessions.'
+        : adminState.error || 'A valid Clerk session token is required to create ChatKit sessions.';
+
+    return jsonResponse(statusCode, { error });
   }
 
-  const secretKey = process.env.CLERK_SECRET_KEY;
-
-  if (!secretKey) {
-    return jsonResponse(500, {
-      error: 'ChatKit authentication is not configured.',
-    });
+  if (!adminState.isAdmin) {
+    return jsonResponse(403, { error: 'This Clerk user is not authorized to create ChatKit sessions.' });
   }
 
-  try {
-    const verifiedToken = await verifyToken(token, { secretKey });
-
-    if (!verifiedToken.sub) {
-      return jsonResponse(401, { error: 'Invalid Clerk session token.' });
-    }
-
-    return { userId: `clerk-${verifiedToken.sub}` };
-  } catch (error) {
-    console.warn('Rejected ChatKit session request with invalid Clerk token.', error);
+  if (!adminState.userId) {
     return jsonResponse(401, { error: 'Invalid Clerk session token.' });
   }
+
+  return { userId: `clerk-${adminState.userId}` };
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -80,7 +61,7 @@ export const handler = async (event: LambdaEvent) => {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const verifiedUser = await verifyClerkSession(event);
+  const verifiedUser = await verifyClerkAdminSession(event);
 
   if ('statusCode' in verifiedUser) {
     return verifiedUser;
