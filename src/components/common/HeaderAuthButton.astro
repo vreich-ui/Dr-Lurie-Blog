@@ -221,28 +221,15 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       });
     };
 
-    const redirectToHostedSignIn = async (clerk) => {
-      if (typeof clerk.redirectToSignIn !== 'function') {
-        throw new Error('Clerk hosted sign-in redirect is unavailable.');
-      }
-
-      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
-    };
-
     const openSignIn = async () => {
       const clerk = await getClerk();
 
-      if (typeof clerk.openSignIn === 'function') {
-        try {
-          await clerk.openSignIn();
-          await renderAuthState(clerk);
-          return;
-        } catch (error) {
-          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
-        }
+      if (typeof clerk.openSignIn !== 'function') {
+        throw new Error('Clerk modal sign-in is unavailable.');
       }
 
-      await redirectToHostedSignIn(clerk);
+      await clerk.openSignIn();
+      await renderAuthState(clerk);
     };
 
     const openUserProfile = async () => {
