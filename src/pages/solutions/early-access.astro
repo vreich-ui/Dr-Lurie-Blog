@@ -1,0 +1,26 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+import { getPermalink } from '~/utils/permalinks';
+
+const metadata = {
+  title: 'Early Access',
+  description: 'Join Dr. Lurié early access for product previews, research notes, and launch updates.',
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-20">
+    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Early access</p>
+    <h1 class="mt-3 text-4xl font-bold tracking-tight text-heading sm:text-5xl">
+      Follow the product work before launch.
+    </h1>
+    <p class="mt-5 text-lg leading-8 text-muted">
+      Early access is the place for launch timing, product previews, and research-led updates as Dr. Lurié solutions are
+      prepared.
+    </p>
+    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+      <a class="btn-primary" href={getPermalink('/newsletter')}>Join newsletter</a>
+      <a class="btn-secondary" href={getPermalink('/solutions/shop-preview')}>View shop preview</a>
+    </div>
+  </section>
+</Layout>

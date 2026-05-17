@@ -16,6 +16,7 @@ interface Link {
   ariaLabel?: string;
   icon?: string;
   description?: string;
+  authAction?: string;
 }
 
 interface MenuLink extends Link {
@@ -103,22 +104,39 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                   </button>
                   <div class="dropdown-menu mega-menu md:backdrop-blur-xl dark:md:bg-dark rounded-2xl md:absolute md:left-1/2 md:-translate-x-1/2 pl-4 md:pl-0 md:hidden font-medium md:bg-white/95 md:min-w-[520px] md:max-w-[min(680px,calc(100vw-2rem))] md:p-3 md:ring-1 md:ring-gray-200/80 dark:md:ring-slate-700/80 drop-shadow-xl">
                     <ul class="grid gap-1 md:grid-cols-2">
-                      {links.map(({ text: text2, href: href2, description }) => (
+                      {links.map(({ text: text2, href: href2, description, authAction }) => (
                         <li>
-                          <a
-                            class:list={[
-                              'group rounded-xl py-3 px-4 block whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90',
-                              { 'aw-link-active': href2 === currentPath },
-                            ]}
-                            href={href2}
-                          >
-                            <span class="block font-semibold">{text2}</span>
-                            {description && (
-                              <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
-                                {description}
-                              </span>
-                            )}
-                          </a>
+                          {authAction ? (
+                            <button
+                              type="button"
+                              class="group w-full rounded-xl py-3 px-4 block text-left whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90"
+                              {...(authAction === 'profile'
+                                ? { 'data-auth-profile': true }
+                                : { 'data-auth-sign-out': true })}
+                            >
+                              <span class="block font-semibold">{text2}</span>
+                              {description && (
+                                <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                  {description}
+                                </span>
+                              )}
+                            </button>
+                          ) : (
+                            <a
+                              class:list={[
+                                'group rounded-xl py-3 px-4 block whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90',
+                                { 'aw-link-active': href2 === currentPath },
+                              ]}
+                              href={href2}
+                            >
+                              <span class="block font-semibold">{text2}</span>
+                              {description && (
+                                <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                  {description}
+                                </span>
+                              )}
+                            </a>
+                          )}
                         </li>
                       ))}
                     </ul>

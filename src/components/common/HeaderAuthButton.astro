@@ -1,4 +1,6 @@
 ---
+import { getPermalink } from '~/utils/permalinks';
+
 const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 ---
@@ -37,7 +39,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       </button>
       <a
         class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
-        href="/#early-access"
+        href={getPermalink('/solutions/early-access')}
         role="menuitem"
       >
         Join Early Access
@@ -55,7 +57,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       </button>
       <a
         class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
-        href="/#early-access"
+        href={getPermalink('/member-updates')}
         role="menuitem"
       >
         Member updates
@@ -302,7 +304,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           return;
         }
 
-        if (signInButton && root) {
+        if (signInButton) {
           event.preventDefault();
           event.stopPropagation();
           openSignIn().catch((error) => {
@@ -311,7 +313,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           return;
         }
 
-        if (profileButton && root) {
+        if (profileButton) {
           event.preventDefault();
           event.stopPropagation();
           openUserProfile().catch((error) => {
@@ -320,7 +322,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           return;
         }
 
-        if (signOutButton && root) {
+        if (signOutButton) {
           event.preventDefault();
           event.stopPropagation();
           signOut().catch((error) => {

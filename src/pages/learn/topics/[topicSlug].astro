@@ -12,14 +12,14 @@ export const getStaticPaths = (async () => {
   const topics = new Map<string, { title: string; slug: string }>();
 
   posts.forEach((post) => {
-    post.tags?.forEach((tag) => topics.set(tag.slug, tag));
+    if (post.category) topics.set(post.category.slug, post.category);
   });
 
   return Array.from(topics.values()).map((topic) => ({
-    params: { topic: topic.slug },
+    params: { topicSlug: topic.slug },
     props: {
       topic,
-      posts: posts.filter((post) => post.tags?.some((tag) => tag.slug === topic.slug)),
+      posts: posts.filter((post) => post.category?.slug === topic.slug),
     },
   }));
 }) satisfies GetStaticPaths;
@@ -35,13 +35,14 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section class="dl-section">
-    <a class="text-sm font-semibold text-primary hover:text-secondary" href={getPermalink('/topics')}>← All topics</a>
+    <a class="text-sm font-semibold text-primary hover:text-secondary" href={getPermalink('/learn/topics')}>
+      ← All topics
+    </a>
     <div class="mt-4 rounded-3xl bg-gradient-to-br from-sky-50 via-amber-50 to-transparent p-6 sm:p-10">
       <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Topic</p>
       <h1 class="mt-3 text-4xl font-bold capitalize sm:text-5xl">{topic.title}</h1>
       <p class="mt-5 max-w-2xl text-lg text-muted">
-        A focused collection of Dr. Lurié education for understanding this part of age-aware skin biology and product
-        decision-making.
+        A focused collection of Dr. Lurié education assigned to this category in article frontmatter.
       </p>
     </div>
 

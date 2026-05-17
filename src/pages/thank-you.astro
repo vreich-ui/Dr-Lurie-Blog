@@ -1,5 +1,6 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import { getPermalink } from '~/utils/permalinks';
 
 const metadata = {
   title: 'Thank You',
@@ -46,8 +47,8 @@ const thankYouMessages = {
     </noscript>
 
     <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-      <a class="btn-primary" href="/">Return Home</a>
-      <a class="btn-secondary" href="/topics">Explore Skin Science</a>
+      <a class="btn-primary" href={getPermalink('/')}>Return Home</a>
+      <a class="btn-secondary" href={getPermalink('/learn/topics')}>Explore Skin Science</a>
     </div>
   </section>
 </Layout>

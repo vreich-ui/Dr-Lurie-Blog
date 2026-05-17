@@ -10,17 +10,17 @@ const homeFooterData = {
     {
       title: 'Start learning',
       links: [
-        { text: 'Start Here', href: getPermalink('/#start-here') },
-        { text: 'Beginner Guides', href: getBlogPermalink() },
-        { text: 'Healthy Aging', href: getPermalink('/topics') },
-        { text: 'Skin Barrier Health', href: getPermalink('/topics') },
+        { text: 'Start Here', href: getPermalink('/start-here') },
+        { text: 'Library', href: getBlogPermalink() },
+        { text: 'Topics', href: getPermalink('/learn/topics') },
+        { text: 'Free Guide', href: getPermalink('/guides/free-guide') },
       ],
     },
     {
       title: 'Connect',
       links: [
         { text: 'About', href: getPermalink('/about') },
-        { text: 'Newsletter', href: getPermalink('/#newsletter') },
+        { text: 'Newsletter', href: getPermalink('/newsletter') },
       ],
     },
   ],
@@ -87,9 +87,7 @@ const trustNotes = [
 
 <Layout metadata={metadata}>
   <section class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-20">
-    <p class="mb-4 text-sm font-medium uppercase tracking-[0.16em] text-accent">
-      Physician-led skin health education
-    </p>
+    <p class="mb-4 text-sm font-medium uppercase tracking-[0.16em] text-accent">Physician-led skin health education</p>
     <h1 class="max-w-3xl text-4xl font-bold tracking-tight text-heading sm:text-5xl">
       Healthy Skin for Skincare Newcomers
     </h1>
@@ -102,8 +100,8 @@ const trustNotes = [
       confidence through physician-led education.
     </p>
     <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-      <a class="btn-primary" href="#start-here">Start Here</a>
-      <a class="btn-secondary" href="#newsletter">Join Newsletter</a>
+      <a class="btn-primary" href={getPermalink('/start-here')}>Start Here</a>
+      <a class="btn-secondary" href={getPermalink('/newsletter')}>Join Newsletter</a>
     </div>
   </section>
 
@@ -128,12 +126,8 @@ const trustNotes = [
   <section id="start-here" class="mx-auto max-w-5xl border-t border-gray-200 px-4 py-14 sm:px-6 dark:border-gray-800">
     <div class="max-w-2xl">
       <p class="text-sm font-medium uppercase tracking-[0.16em] text-accent">Start here</p>
-      <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">
-        Five simple places to begin.
-      </h2>
-      <p class="mt-4 text-muted">
-        Read these in order or choose the question that feels most useful today.
-      </p>
+      <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">Five simple places to begin.</h2>
+      <p class="mt-4 text-muted">Read these in order or choose the question that feels most useful today.</p>
     </div>
     <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
       {
