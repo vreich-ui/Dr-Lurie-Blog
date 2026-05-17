@@ -1,4 +1,6 @@
 ---
+import { getPermalink } from '~/utils/permalinks';
+
 const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 ---
@@ -13,10 +15,10 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     type="button"
     class="btn-secondary py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
     data-auth-trigger
-    aria-haspopup="menu"
+    aria-haspopup="dialog"
     aria-expanded="false"
   >
-    Account
+    Sign In / Join
   </button>
   <div
     class="absolute right-0 z-50 mt-3 w-60 rounded-2xl border border-gray-200 bg-white p-2 text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
@@ -25,24 +27,6 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     hidden
   >
     <div class="px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted" data-auth-label>Account</div>
-
-    <div data-auth-signed-out hidden>
-      <button
-        type="button"
-        class="w-full rounded-xl px-3 py-2 text-left font-semibold hover:bg-gray-100 dark:hover:bg-slate-800"
-        data-auth-sign-in
-        role="menuitem"
-      >
-        Sign In
-      </button>
-      <a
-        class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
-        href="/#early-access"
-        role="menuitem"
-      >
-        Join Early Access
-      </a>
-    </div>
 
     <div data-auth-signed-in hidden>
       <button
@@ -55,13 +39,12 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       </button>
       <a
         class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
-        href="/#early-access"
+        href={getPermalink('/member-updates')}
         role="menuitem"
       >
         Member updates
       </a>
       <div data-auth-admin-links hidden></div>
-      <div class="my-2 border-t border-gray-200 dark:border-slate-700"></div>
       <button
         type="button"
         class="w-full rounded-xl px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-800"
@@ -155,12 +138,18 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       headerAuthState.clerkLoadPromise ||= (async () => {
         await loadClerkScript();
 
-        if (!window.Clerk) {
+        let clerk = window.Clerk;
+        if (typeof clerk === 'function') {
+          clerk = new clerk(clerkPublishableKey);
+          window.Clerk = clerk;
+        }
+
+        if (!clerk || typeof clerk.load !== 'function') {
           throw new Error('Clerk authentication could not be initialized.');
         }
 
-        await window.Clerk.load();
-        return window.Clerk;
+        await clerk.load();
+        return clerk;
       })();
 
       return headerAuthState.clerkLoadPromise;
@@ -223,13 +212,16 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       getAuthRoots().forEach((root) => {
         const trigger = root.querySelector('[data-auth-trigger]');
         const label = root.querySelector('[data-auth-label]');
-        const signedOutPanel = root.querySelector('[data-auth-signed-out]');
         const signedInPanel = root.querySelector('[data-auth-signed-in]');
         const adminLinks = root.querySelector('[data-auth-admin-links]');
 
-        if (trigger) trigger.textContent = signedIn ? 'Account' : 'Sign In';
+        root.dataset.authSignedIn = String(signedIn);
+        if (trigger) {
+          trigger.textContent = signedIn ? 'Account' : 'Sign In / Join';
+          trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
+        }
+        if (!signedIn) setMenuOpen(root, false);
         if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
-        if (signedOutPanel) signedOutPanel.hidden = signedIn;
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
       });
@@ -252,8 +244,10 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           await renderAuthState(clerk);
           return;
         } catch (error) {
-          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
+          console.error('Clerk modal sign-in failed. Falling back to hosted sign-in redirect.', error);
         }
+      } else {
+        console.error('Clerk modal sign-in is unavailable. Falling back to hosted sign-in redirect.');
       }
 
       await redirectToHostedSignIn(clerk);
@@ -288,6 +282,13 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           event.preventDefault();
           event.stopPropagation();
 
+          if (root.dataset.authSignedIn !== 'true') {
+            openSignIn().catch((error) => {
+              console.error('Header sign-in failed.', error);
+            });
+            return;
+          }
+
           const menu = root.querySelector('[data-auth-menu]');
           const isOpen = Boolean(menu && !menu.hidden);
           closeAllMenus();
@@ -302,7 +303,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           return;
         }
 
-        if (signInButton && root) {
+        if (signInButton) {
           event.preventDefault();
           event.stopPropagation();
           openSignIn().catch((error) => {
@@ -311,7 +312,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           return;
         }
 
-        if (profileButton && root) {
+        if (profileButton) {
           event.preventDefault();
           event.stopPropagation();
           openUserProfile().catch((error) => {
@@ -320,7 +321,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
           return;
         }
 
-        if (signOutButton && root) {
+        if (signOutButton) {
           event.preventDefault();
           event.stopPropagation();
           signOut().catch((error) => {

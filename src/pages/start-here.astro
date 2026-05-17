@@ -1,0 +1,24 @@
+---
+import Layout from '~/layouts/PageLayout.astro';
+import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
+
+const metadata = {
+  title: 'Start Here',
+  description: 'A simple path into Dr. Lurié skin health education for skincare newcomers.',
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-20">
+    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Start here</p>
+    <h1 class="mt-3 text-4xl font-bold tracking-tight text-heading sm:text-5xl">Begin with the basics.</h1>
+    <p class="mt-5 text-lg leading-8 text-muted">
+      Use this hub as a calm first step: learn what healthy skin means, browse the library, then decide whether early
+      access updates are useful for you.
+    </p>
+    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+      <a class="btn-primary" href={getBlogPermalink()}>Browse the library</a>
+      <a class="btn-secondary" href={getPermalink('/learn/topics')}>Explore topics</a>
+    </div>
+  </section>
+</Layout>

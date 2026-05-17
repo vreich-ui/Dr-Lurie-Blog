@@ -17,11 +17,16 @@ export const headerData = {
           href: getPermalink('/about'),
           description: 'Meet the biophysicist behind the age-aware approach.',
         },
+        {
+          text: 'Start Here guide',
+          href: getPermalink('/start-here'),
+          description: 'Begin with the simplest path through Dr. Lurié skin health education.',
+        },
       ],
     },
     {
       text: 'Learn',
-      href: getBlogPermalink(),
+      href: getPermalink('/learn/library'),
       links: [
         {
           text: 'Education Library',
@@ -30,35 +35,44 @@ export const headerData = {
         },
         {
           text: 'Topics',
-          href: getPermalink('/topics'),
-          description: 'Explore articles grouped by age-related skin and scent themes.',
+          href: getPermalink('/learn/topics'),
+          description: 'Explore articles grouped by their category frontmatter topics.',
         },
         {
           text: 'Free Guide',
-          href: getPermalink('/#guide'),
+          href: getPermalink('/guides/free-guide'),
           description: 'Get the structured guide to aging skin and body odor changes.',
         },
       ],
     },
     {
       text: 'Solutions',
-      href: getPermalink('/shop'),
+      href: getPermalink('/solutions/shop-preview'),
       links: [
         {
           text: 'Shop Preview',
-          href: getPermalink('/shop'),
+          href: getPermalink('/solutions/shop-preview'),
           description: 'See the upcoming age-aware skincare product direction.',
         },
         {
           text: 'Early Access',
-          href: getPermalink('/#early-access'),
+          href: getPermalink('/solutions/early-access'),
           description: 'Join updates as research-led solutions become available.',
+        },
+        {
+          text: 'Join Early Access',
+          href: getPermalink('/solutions/early-access'),
+          description: 'Request launch notes, previews, and member-only product updates.',
         },
       ],
     },
   ],
   actions: [
-    { text: 'Join Early Access', href: getPermalink('/#early-access'), variant: 'primary' } satisfies CallToAction,
+    {
+      text: 'Join Early Access',
+      href: getPermalink('/solutions/early-access'),
+      variant: 'primary',
+    } satisfies CallToAction,
   ],
 };
 
@@ -70,15 +84,15 @@ export const footerData = {
         { text: 'Home', href: getPermalink('/') },
         { text: 'About', href: getPermalink('/about') },
         { text: 'Education', href: getBlogPermalink() },
-        { text: 'Topics', href: getPermalink('/topics') },
+        { text: 'Topics', href: getPermalink('/learn/topics') },
       ],
     },
     {
       title: 'Next steps',
       links: [
-        { text: 'Free Guide', href: getPermalink('/#guide') },
-        { text: 'Shop Preview', href: getPermalink('/shop') },
-        { text: 'Early Access', href: getPermalink('/#early-access') },
+        { text: 'Free Guide', href: getPermalink('/guides/free-guide') },
+        { text: 'Shop Preview', href: getPermalink('/solutions/shop-preview') },
+        { text: 'Early Access', href: getPermalink('/solutions/early-access') },
         { text: 'Contact', href: getPermalink('/contact') },
       ],
     },

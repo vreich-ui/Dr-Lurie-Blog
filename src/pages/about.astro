@@ -1,5 +1,6 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
 
 const metadata = {
   title: 'About Dr. Leonid Lurie',
@@ -148,8 +149,8 @@ const metadata = {
       possible.
     </p>
     <div class="mt-8 flex flex-col sm:flex-row gap-3">
-      <a class="btn-primary w-full sm:w-auto" href="/blog">Read the Insights</a>
-      <a class="btn-secondary w-full sm:w-auto" href="/#guide">Get the Free Guide</a>
+      <a class="btn-primary w-full sm:w-auto" href={getBlogPermalink()}>Read the Insights</a>
+      <a class="btn-secondary w-full sm:w-auto" href={getPermalink('/guides/free-guide')}>Get the Free Guide</a>
     </div>
   </section>
 </Layout>

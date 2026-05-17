@@ -7,19 +7,25 @@ const posts = await fetchPosts();
 const topicMap = new Map<string, { title: string; slug: string; count: number; excerpts: Array<string> }>();
 
 posts.forEach((post) => {
-  post.tags?.forEach((tag) => {
-    const current = topicMap.get(tag.slug) ?? { title: tag.title, slug: tag.slug, count: 0, excerpts: [] };
-    current.count += 1;
-    if (post.excerpt && current.excerpts.length < 2) current.excerpts.push(post.excerpt);
-    topicMap.set(tag.slug, current);
-  });
+  if (!post.category) return;
+
+  const current = topicMap.get(post.category.slug) ?? {
+    title: post.category.title,
+    slug: post.category.slug,
+    count: 0,
+    excerpts: [],
+  };
+
+  current.count += 1;
+  if (post.excerpt && current.excerpts.length < 2) current.excerpts.push(post.excerpt);
+  topicMap.set(post.category.slug, current);
 });
 
 const topics = Array.from(topicMap.values()).sort((a, b) => a.title.localeCompare(b.title));
 
 const metadata = {
   title: 'Topics',
-  description: 'Browse Dr. Lurié articles by aging skin, body odor, barrier function, and skincare education topics.',
+  description: 'Browse Dr. Lurié articles by the category frontmatter topic assigned to each article.',
   openGraph: {
     images: [
       {
@@ -38,8 +44,8 @@ const metadata = {
     <div class="mt-3 max-w-3xl">
       <h1 class="text-4xl font-bold sm:text-5xl">Topics</h1>
       <p class="mt-5 text-lg text-muted">
-        Follow the themes that matter most as skin biology changes with age — from barrier function and lipids to
-        age-related scent compounds and practical skincare decisions.
+        Topics are generated from article category frontmatter, so this hub always mirrors the science themes used in
+        the library.
       </p>
     </div>
 
@@ -54,7 +60,7 @@ const metadata = {
             <p class="mt-4 flex-1 text-muted">
               {topic.excerpts[0] ?? 'Explore practical, science-led education from Dr. Lurié on this topic.'}
             </p>
-            <a class="btn-secondary btn-sm mt-6 self-start" href={getPermalink(`/topics/${topic.slug}`)}>
+            <a class="btn-secondary btn-sm mt-6 self-start" href={getPermalink(`/learn/topics/${topic.slug}`)}>
               View topic
             </a>
           </article>

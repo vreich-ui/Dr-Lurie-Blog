@@ -14,3 +14,28 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/blog"
+  to = "/learn/library"
+  status = 301
+
+[[redirects]]
+  from = "/topics"
+  to = "/learn/topics"
+  status = 301
+
+[[redirects]]
+  from = "/topics/*"
+  to = "/learn/topics/:splat"
+  status = 301
+
+[[redirects]]
+  from = "/shop"
+  to = "/solutions/shop-preview"
+  status = 301
+
+[[redirects]]
+  from = "/early-access"
+  to = "/solutions/early-access"
+  status = 301
