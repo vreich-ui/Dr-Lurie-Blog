@@ -102,21 +102,21 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                     {text}{' '}
                     <Icon name="tabler:chevron-down" class="w-3.5 h-3.5 ml-0.5 rtl:ml-0 rtl:mr-0.5 hidden md:inline" />
                   </button>
-                  <div class="dropdown-menu mega-menu md:backdrop-blur-xl dark:md:bg-dark rounded-2xl md:absolute md:left-1/2 md:-translate-x-1/2 pl-4 md:pl-0 md:hidden font-medium md:bg-white/95 md:min-w-[520px] md:max-w-[min(680px,calc(100vw-2rem))] md:p-3 md:ring-1 md:ring-gray-200/80 dark:md:ring-slate-700/80 drop-shadow-xl">
-                    <ul class="grid gap-1 md:grid-cols-2">
+                  <div class="dropdown-menu mega-menu rounded-2xl pl-4 font-medium md:absolute md:left-1/2 md:top-full md:mt-3 md:hidden md:min-w-[520px] md:max-w-[min(680px,calc(100vw-2rem))] md:rounded-3xl md:border md:border-gray-200/75 md:bg-white/95 md:p-4 md:shadow-2xl md:shadow-slate-900/10 md:ring-1 md:ring-slate-900/5 md:backdrop-blur-xl dark:md:border-slate-700/70 dark:md:bg-slate-950/95 dark:md:shadow-black/30 dark:md:ring-white/10">
+                    <ul class="grid gap-2 md:grid-cols-2">
                       {links.map(({ text: text2, href: href2, description, authAction }) => (
                         <li>
                           {authAction ? (
                             <button
                               type="button"
-                              class="group w-full rounded-xl py-3 px-4 block text-left whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90"
+                              class="group block w-full rounded-2xl border border-transparent bg-white/70 px-4 py-3 text-left whitespace-normal transition-colors hover:border-gray-200 hover:bg-gray-50 hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-800/90 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
                               {...(authAction === 'profile'
                                 ? { 'data-auth-profile': true }
                                 : { 'data-auth-sign-out': true })}
                             >
                               <span class="block font-semibold">{text2}</span>
                               {description && (
-                                <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                <span class="mt-1 block text-sm font-normal leading-5 text-slate-600 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-slate-200">
                                   {description}
                                 </span>
                               )}
@@ -124,14 +124,14 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                           ) : (
                             <a
                               class:list={[
-                                'group rounded-xl py-3 px-4 block whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90',
+                                'group block rounded-2xl border border-transparent bg-white/70 px-4 py-3 whitespace-normal transition-colors hover:border-gray-200 hover:bg-gray-50 hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-800/90 dark:hover:text-white dark:focus-visible:ring-offset-slate-950',
                                 { 'aw-link-active': href2 === currentPath },
                               ]}
                               href={href2}
                             >
                               <span class="block font-semibold">{text2}</span>
                               {description && (
-                                <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                <span class="mt-1 block text-sm font-normal leading-5 text-slate-600 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-slate-200">
                                   {description}
                                 </span>
                               )}
@@ -166,7 +166,6 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     >
       <div class="flex w-full flex-nowrap items-center justify-end gap-2 md:w-auto">
         <div class="flex shrink-0 flex-nowrap items-center">
-          {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
           {
             showRssFeed && (
               <a
@@ -178,6 +177,7 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
               </a>
             )
           }
+          {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
         </div>
         <span class="flex shrink-0 flex-nowrap items-center whitespace-nowrap">
           <HeaderAuthButton />
