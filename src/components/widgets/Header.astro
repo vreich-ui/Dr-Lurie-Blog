@@ -161,11 +161,11 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     <div
       class:list={[
         { 'ml-auto rtl:ml-0 rtl:mr-auto': position === 'left' },
-        'hidden md:self-center md:flex items-center md:mb-0 fixed w-full md:w-auto md:static justify-end left-0 rtl:left-auto rtl:right-0 bottom-0 p-3 md:p-0 md:justify-self-end',
+        'hidden md:self-center md:flex md:items-center md:mb-0 fixed w-full md:w-auto md:static md:justify-end left-0 rtl:left-auto rtl:right-0 bottom-0 p-3 md:p-0 md:justify-self-end md:flex-nowrap',
       ]}
     >
-      <div class="items-center flex justify-between w-full md:w-auto">
-        <div class="flex">
+      <div class="flex w-full flex-nowrap items-center justify-end gap-2 md:w-auto">
+        <div class="flex shrink-0 flex-nowrap items-center">
           {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
           {
             showRssFeed && (
@@ -179,14 +179,14 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
             )
           }
         </div>
-        <span class="ml-4 flex flex-nowrap items-center whitespace-nowrap rtl:ml-0 rtl:mr-4">
+        <span class="flex shrink-0 flex-nowrap items-center whitespace-nowrap">
           <HeaderAuthButton />
           {
             actions?.length
               ? actions.map((btnProps) => (
                   <Button
                     {...btnProps}
-                    class="ml-2 inline-flex w-auto shrink-0 py-2.5 px-5.5 text-sm font-semibold shadow-none md:px-6"
+                    class="ml-2 inline-flex w-auto shrink-0 whitespace-nowrap py-2.5 px-5.5 text-sm font-semibold shadow-none md:px-6"
                   />
                 ))
               : ''

@@ -69,13 +69,8 @@ export const headerData = {
   ],
   actions: [
     {
-      text: 'Start Here',
-      href: getPermalink('/start-here'),
-      variant: 'secondary',
-    } satisfies CallToAction,
-    {
-      text: 'Join Newsletter',
-      href: getPermalink('/newsletter'),
+      text: 'Join Early Access',
+      href: getPermalink('/solutions/early-access'),
       variant: 'primary',
     } satisfies CallToAction,
   ],
