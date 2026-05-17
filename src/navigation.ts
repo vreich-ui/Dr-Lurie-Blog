@@ -66,10 +66,6 @@ export const headerData = {
         },
       ],
     },
-    {
-      text: 'RSS Feed',
-      href: getAsset('/rss.xml'),
-    },
   ],
   actions: [
     {
