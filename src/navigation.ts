@@ -29,7 +29,7 @@ export const headerData = {
       href: getPermalink('/learn/library'),
       links: [
         {
-          text: 'Library',
+          text: 'Education Library',
           href: getBlogPermalink(),
           description: 'Browse all skin science articles and practical explainers.',
         },
@@ -70,44 +70,6 @@ export const headerData = {
       text: 'RSS Feed',
       href: getAsset('/rss.xml'),
     },
-    {
-      text: 'Account',
-      href: getPermalink('/member-updates'),
-      links: [
-        {
-          text: 'Account settings',
-          href: '#account-settings',
-          authAction: 'profile',
-          description: 'Open the default Clerk account settings panel.',
-        },
-        {
-          text: 'Member updates',
-          href: getPermalink('/member-updates'),
-          description: 'Read member notes and early access updates.',
-        },
-        {
-          text: 'Admin',
-          href: getPermalink('/admin'),
-          description: 'Open the admin dashboard.',
-        },
-        {
-          text: 'Publish',
-          href: getPermalink('/admin/publish'),
-          description: 'Publish or stage a new article.',
-        },
-        {
-          text: 'Agent Admin',
-          href: getPermalink('/admin/agent-admin'),
-          description: 'Manage the AI publishing workflow.',
-        },
-        {
-          text: 'Sign out',
-          href: '#sign-out',
-          authAction: 'signOut',
-          description: 'Sign out with Clerk.',
-        },
-      ],
-    },
   ],
   actions: [
     {
@@ -118,11 +80,6 @@ export const headerData = {
     {
       text: 'Join Newsletter',
       href: getPermalink('/newsletter'),
-      variant: 'primary',
-    } satisfies CallToAction,
-    {
-      text: 'Join Early Access',
-      href: getPermalink('/solutions/early-access'),
       variant: 'primary',
     } satisfies CallToAction,
   ],
