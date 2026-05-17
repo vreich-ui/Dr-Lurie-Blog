@@ -15,10 +15,10 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     type="button"
     class="btn-secondary py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
     data-auth-trigger
-    aria-haspopup="menu"
+    aria-haspopup="dialog"
     aria-expanded="false"
   >
-    Account
+    Sign In / Join
   </button>
   <div
     class="absolute right-0 z-50 mt-3 w-60 rounded-2xl border border-gray-200 bg-white p-2 text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
@@ -27,24 +27,6 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     hidden
   >
     <div class="px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted" data-auth-label>Account</div>
-
-    <div data-auth-signed-out hidden>
-      <button
-        type="button"
-        class="w-full rounded-xl px-3 py-2 text-left font-semibold hover:bg-gray-100 dark:hover:bg-slate-800"
-        data-auth-sign-in
-        role="menuitem"
-      >
-        Sign In
-      </button>
-      <a
-        class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
-        href={getPermalink('/solutions/early-access')}
-        role="menuitem"
-      >
-        Join Early Access
-      </a>
-    </div>
 
     <div data-auth-signed-in hidden>
       <button
@@ -224,13 +206,16 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       getAuthRoots().forEach((root) => {
         const trigger = root.querySelector('[data-auth-trigger]');
         const label = root.querySelector('[data-auth-label]');
-        const signedOutPanel = root.querySelector('[data-auth-signed-out]');
         const signedInPanel = root.querySelector('[data-auth-signed-in]');
         const adminLinks = root.querySelector('[data-auth-admin-links]');
 
-        if (trigger) trigger.textContent = signedIn ? 'Account' : 'Sign In';
+        root.dataset.authSignedIn = String(signedIn);
+        if (trigger) {
+          trigger.textContent = signedIn ? 'Account' : 'Sign In / Join';
+          trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
+        }
+        if (!signedIn) setMenuOpen(root, false);
         if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
-        if (signedOutPanel) signedOutPanel.hidden = signedIn;
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
       });
@@ -288,6 +273,13 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         if (trigger && root) {
           event.preventDefault();
           event.stopPropagation();
+
+          if (root.dataset.authSignedIn !== 'true') {
+            openSignIn().catch((error) => {
+              console.error('Header sign-in failed.', error);
+            });
+            return;
+          }
 
           const menu = root.querySelector('[data-auth-menu]');
           const isOpen = Boolean(menu && !menu.hidden);
