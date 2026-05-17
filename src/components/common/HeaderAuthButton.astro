@@ -138,12 +138,18 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       headerAuthState.clerkLoadPromise ||= (async () => {
         await loadClerkScript();
 
-        if (!window.Clerk) {
+        let clerk = window.Clerk;
+        if (typeof clerk === 'function') {
+          clerk = new clerk(clerkPublishableKey);
+          window.Clerk = clerk;
+        }
+
+        if (!clerk || typeof clerk.load !== 'function') {
           throw new Error('Clerk authentication could not be initialized.');
         }
 
-        await window.Clerk.load();
-        return window.Clerk;
+        await clerk.load();
+        return clerk;
       })();
 
       return headerAuthState.clerkLoadPromise;
