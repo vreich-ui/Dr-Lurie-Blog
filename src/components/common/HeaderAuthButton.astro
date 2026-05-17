@@ -3,36 +3,114 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 ---
 
-<button
-  type="button"
-  class="btn-secondary ml-2 py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
-  data-header-auth-button
+<div
+  class="header-auth relative ml-2"
+  data-header-auth
   data-clerk-publishable-key={clerkPublishableKey}
   data-clerk-js-src={clerkJsScriptSrc}
-  aria-live="polite"
 >
-  Sign-In
-</button>
+  <button
+    type="button"
+    class="btn-secondary py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
+    data-auth-trigger
+    aria-haspopup="menu"
+    aria-expanded="false"
+  >
+    Account
+  </button>
+  <div
+    class="absolute right-0 z-50 mt-3 w-60 rounded-2xl border border-gray-200 bg-white p-2 text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
+    data-auth-menu
+    role="menu"
+    hidden
+  >
+    <div class="px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted" data-auth-label>Account</div>
+
+    <div data-auth-signed-out hidden>
+      <button
+        type="button"
+        class="w-full rounded-xl px-3 py-2 text-left font-semibold hover:bg-gray-100 dark:hover:bg-slate-800"
+        data-auth-sign-in
+        role="menuitem"
+      >
+        Sign In
+      </button>
+      <a
+        class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
+        href="/#early-access"
+        role="menuitem"
+      >
+        Join Early Access
+      </a>
+    </div>
+
+    <div data-auth-signed-in hidden>
+      <button
+        type="button"
+        class="w-full rounded-xl px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-800"
+        data-auth-profile
+        role="menuitem"
+      >
+        Account settings
+      </button>
+      <a
+        class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
+        href="/#early-access"
+        role="menuitem"
+      >
+        Member updates
+      </a>
+      <div data-auth-admin-links hidden></div>
+      <div class="my-2 border-t border-gray-200 dark:border-slate-700"></div>
+      <button
+        type="button"
+        class="w-full rounded-xl px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-800"
+        data-auth-sign-out
+        role="menuitem"
+      >
+        Sign out
+      </button>
+    </div>
+  </div>
+</div>
 
 <script is:inline>
-  const buttons = Array.from(document.querySelectorAll('[data-header-auth-button]'));
+  (() => {
+    if (!window.__drLurieHeaderAuth) {
+      window.__drLurieHeaderAuth = {
+        clerkLoadPromise: undefined,
+        initialized: false,
+      };
+    }
 
-  if (buttons.length) {
-    let clerkLoadPromise;
+    const headerAuthState = window.__drLurieHeaderAuth;
+    const getAuthRoots = () => Array.from(document.querySelectorAll('[data-header-auth]'));
 
-    const clerkPublishableKey = buttons[0].dataset.clerkPublishableKey || '';
-    const clerkJsScriptSrc = buttons[0].dataset.clerkJsSrc || '';
+    const getHeaderAuthConfig = () => {
+      const firstRoot = getAuthRoots()[0];
+      return {
+        clerkPublishableKey: firstRoot?.dataset.clerkPublishableKey || '',
+        clerkJsScriptSrc: firstRoot?.dataset.clerkJsSrc || '',
+      };
+    };
 
-    const setButtons = (label, state) => {
-      buttons.forEach((button) => {
-        button.textContent = label;
-        button.dataset.authState = state;
-        button.disabled = state === 'checking';
-      });
+    const setMenuOpen = (root, open) => {
+      const trigger = root.querySelector('[data-auth-trigger]');
+      const menu = root.querySelector('[data-auth-menu]');
+      if (!trigger || !menu) return;
+
+      menu.hidden = !open;
+      trigger.setAttribute('aria-expanded', String(open));
+    };
+
+    const closeAllMenus = () => {
+      getAuthRoots().forEach((root) => setMenuOpen(root, false));
     };
 
     const loadClerkScript = () =>
       new Promise((resolve, reject) => {
+        const { clerkPublishableKey, clerkJsScriptSrc } = getHeaderAuthConfig();
+
         if (window.Clerk) {
           resolve();
           return;
@@ -68,11 +146,13 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       });
 
     const getClerk = async () => {
+      const { clerkPublishableKey } = getHeaderAuthConfig();
+
       if (!clerkPublishableKey) {
         throw new Error('Header authentication is not configured.');
       }
 
-      clerkLoadPromise ||= (async () => {
+      headerAuthState.clerkLoadPromise ||= (async () => {
         await loadClerkScript();
 
         if (!window.Clerk) {
@@ -83,28 +163,76 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         return window.Clerk;
       })();
 
-      return clerkLoadPromise;
+      return headerAuthState.clerkLoadPromise;
     };
 
-    const renderAuthState = (clerk) => {
-      setButtons(
-        clerk.isSignedIn && clerk.session ? 'Sign-out' : 'Sign-In',
-        clerk.isSignedIn ? 'signed-in' : 'signed-out'
-      );
+    const getAdminState = async (clerk) => {
+      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+      const token = await clerk.session.getToken();
+      if (!token) return { authenticated: true, isAdmin: false };
+
+      const response = await fetch('/.netlify/functions/admin-auth-state', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.json().catch(() => ({ authenticated: true, isAdmin: false }));
     };
 
-    const initializeAuth = async () => {
-      try {
-        const clerk = await getClerk();
-        renderAuthState(clerk);
+    const adminMenuItems = [
+      { href: '/admin', text: 'Admin Dashboard' },
+      { href: '/admin/publish', text: 'Publish Article' },
+      { href: '/admin/agent-admin', text: 'AI Publisher' },
+    ];
 
-        if (typeof clerk.addListener === 'function') {
-          clerk.addListener(() => renderAuthState(clerk));
-        }
-      } catch (error) {
-        console.error('Header authentication initialization failed.', error);
-        setButtons('Sign-In', 'signed-out');
-      }
+    const getSignedInLabel = (clerk, adminState) => {
+      const email = adminState?.email || clerk.user?.primaryEmailAddress?.emailAddress;
+      const name = clerk.user?.fullName || clerk.user?.firstName;
+      return email || name || 'Account';
+    };
+
+    const renderAdminLinks = (container, isAdmin) => {
+      container.hidden = !isAdmin;
+      container.replaceChildren();
+
+      if (!isAdmin) return;
+
+      const divider = document.createElement('div');
+      divider.className = 'my-2 border-t border-gray-200 dark:border-slate-700';
+      container.append(divider);
+
+      adminMenuItems.forEach((item) => {
+        const link = document.createElement('a');
+        link.className = 'block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800';
+        link.href = item.href;
+        link.role = 'menuitem';
+        link.textContent = item.text;
+        container.append(link);
+      });
+    };
+
+    const renderAuthState = async (clerk = undefined) => {
+      const activeClerk = clerk ?? (await getClerk());
+      const signedIn = Boolean(activeClerk.isSignedIn && activeClerk.session);
+      const adminState = signedIn ? await getAdminState(activeClerk) : { authenticated: false, isAdmin: false };
+
+      getAuthRoots().forEach((root) => {
+        const trigger = root.querySelector('[data-auth-trigger]');
+        const label = root.querySelector('[data-auth-label]');
+        const signedOutPanel = root.querySelector('[data-auth-signed-out]');
+        const signedInPanel = root.querySelector('[data-auth-signed-in]');
+        const adminLinks = root.querySelector('[data-auth-admin-links]');
+
+        if (trigger) trigger.textContent = signedIn ? 'Account' : 'Sign In';
+        if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
+        if (signedOutPanel) signedOutPanel.hidden = signedIn;
+        if (signedInPanel) signedInPanel.hidden = !signedIn;
+        if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
+      });
     };
 
     const redirectToHostedSignIn = async (clerk) => {
@@ -115,37 +243,120 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       await clerk.redirectToSignIn({ redirectUrl: window.location.href });
     };
 
-    buttons.forEach((button) => {
-      button.addEventListener('click', async () => {
-        setButtons('Checking…', 'checking');
+    const openSignIn = async () => {
+      const clerk = await getClerk();
 
+      if (typeof clerk.openSignIn === 'function') {
         try {
-          const clerk = await getClerk();
-
-          if (clerk.isSignedIn && clerk.session) {
-            await clerk.signOut();
-            renderAuthState(clerk);
-            return;
-          }
-
-          if (typeof clerk.openSignIn === 'function') {
-            try {
-              await clerk.openSignIn();
-              renderAuthState(clerk);
-              return;
-            } catch (error) {
-              console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
-            }
-          }
-
-          await redirectToHostedSignIn(clerk);
+          await clerk.openSignIn();
+          await renderAuthState(clerk);
+          return;
         } catch (error) {
-          console.error('Header sign-in/sign-out failed.', error);
-          setButtons('Sign-In', 'signed-out');
+          console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
         }
-      });
-    });
+      }
 
-    initializeAuth();
-  }
+      await redirectToHostedSignIn(clerk);
+    };
+
+    const openUserProfile = async () => {
+      const clerk = await getClerk();
+      if (typeof clerk.openUserProfile === 'function') {
+        await clerk.openUserProfile();
+      }
+    };
+
+    const signOut = async () => {
+      const clerk = await getClerk();
+      await clerk.signOut();
+      await renderAuthState(clerk);
+      closeAllMenus();
+    };
+
+    if (!headerAuthState.initialized) {
+      headerAuthState.initialized = true;
+
+      document.addEventListener('click', (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const trigger = target?.closest('[data-auth-trigger]');
+        const signInButton = target?.closest('[data-auth-sign-in]');
+        const profileButton = target?.closest('[data-auth-profile]');
+        const signOutButton = target?.closest('[data-auth-sign-out]');
+
+        if (trigger && root) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          const menu = root.querySelector('[data-auth-menu]');
+          const isOpen = Boolean(menu && !menu.hidden);
+          closeAllMenus();
+          setMenuOpen(root, !isOpen);
+
+          if (!isOpen) {
+            renderAuthState().catch((error) => {
+              console.error('Header authentication refresh failed.', error);
+            });
+          }
+
+          return;
+        }
+
+        if (signInButton && root) {
+          event.preventDefault();
+          event.stopPropagation();
+          openSignIn().catch((error) => {
+            console.error('Header sign-in failed.', error);
+          });
+          return;
+        }
+
+        if (profileButton && root) {
+          event.preventDefault();
+          event.stopPropagation();
+          openUserProfile().catch((error) => {
+            console.error('Clerk account settings failed.', error);
+          });
+          return;
+        }
+
+        if (signOutButton && root) {
+          event.preventDefault();
+          event.stopPropagation();
+          signOut().catch((error) => {
+            console.error('Header sign-out failed.', error);
+          });
+          return;
+        }
+
+        if (!root) closeAllMenus();
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeAllMenus();
+      });
+
+      document.addEventListener('astro:page-load', () => {
+        renderAuthState().catch((error) => {
+          console.error('Header authentication refresh failed.', error);
+        });
+      });
+    }
+
+    getClerk()
+      .then(async (clerk) => {
+        await renderAuthState(clerk);
+        if (typeof clerk.addListener === 'function' && !headerAuthState.clerkListenerAttached) {
+          headerAuthState.clerkListenerAttached = true;
+          clerk.addListener(() => {
+            renderAuthState(clerk).catch((error) => {
+              console.error('Header authentication refresh failed.', error);
+            });
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('Header authentication initialization failed.', error);
+      });
+  })();
 </script>
