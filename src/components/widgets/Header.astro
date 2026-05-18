@@ -4,8 +4,6 @@ import Logo from '~/components/Logo.astro';
 import ToggleTheme from '~/components/common/ToggleTheme.astro';
 import ToggleMenu from '~/components/common/ToggleMenu.astro';
 import HeaderAuthButton from '~/components/common/HeaderAuthButton.astro';
-import Button from '~/components/ui/Button.astro';
-
 import { getHomePermalink } from '~/utils/permalinks';
 import { trimSlash, getAsset } from '~/utils/permalinks';
 import type { CallToAction } from '~/types';
@@ -39,7 +37,6 @@ export interface Props {
 const {
   id = 'header',
   links = [],
-  actions = [],
   isSticky = false,
   isDark = false,
   isFullWidth = false,
@@ -102,21 +99,21 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                     {text}{' '}
                     <Icon name="tabler:chevron-down" class="w-3.5 h-3.5 ml-0.5 rtl:ml-0 rtl:mr-0.5 hidden md:inline" />
                   </button>
-                  <div class="dropdown-menu mega-menu md:backdrop-blur-xl dark:md:bg-dark rounded-2xl md:absolute md:left-1/2 md:-translate-x-1/2 pl-4 md:pl-0 md:hidden font-medium md:bg-white/95 md:min-w-[520px] md:max-w-[min(680px,calc(100vw-2rem))] md:p-3 md:ring-1 md:ring-gray-200/80 dark:md:ring-slate-700/80 drop-shadow-xl">
-                    <ul class="grid gap-1 md:grid-cols-2">
+                  <div class="dropdown-menu mega-menu rounded-2xl pl-4 font-medium md:absolute md:left-1/2 md:top-full md:mt-3 md:min-w-[520px] md:max-w-[min(680px,calc(100vw-2rem))] md:rounded-3xl md:border md:border-gray-200/75 md:bg-white/95 md:p-4 md:shadow-2xl md:shadow-slate-900/10 md:ring-1 md:ring-slate-900/5 md:backdrop-blur-xl dark:md:border-slate-700/70 dark:md:bg-slate-950/95 dark:md:shadow-black/30 dark:md:ring-white/10">
+                    <ul class="grid gap-2 md:grid-cols-2">
                       {links.map(({ text: text2, href: href2, description, authAction }) => (
                         <li>
                           {authAction ? (
                             <button
                               type="button"
-                              class="group w-full rounded-xl py-3 px-4 block text-left whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90"
+                              class="group block w-full rounded-2xl border border-transparent bg-white/70 px-4 py-3 text-left whitespace-normal transition-colors hover:border-gray-200 hover:bg-gray-50 hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-800/90 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
                               {...(authAction === 'profile'
                                 ? { 'data-auth-profile': true }
                                 : { 'data-auth-sign-out': true })}
                             >
                               <span class="block font-semibold">{text2}</span>
                               {description && (
-                                <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                <span class="mt-1 block text-sm font-normal leading-5 text-slate-600 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-slate-200">
                                   {description}
                                 </span>
                               )}
@@ -124,14 +121,14 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
                           ) : (
                             <a
                               class:list={[
-                                'group rounded-xl py-3 px-4 block whitespace-normal hover:bg-gray-100 hover:text-link dark:hover:text-white dark:hover:bg-slate-800/90',
+                                'group block rounded-2xl border border-transparent bg-white/70 px-4 py-3 whitespace-normal transition-colors hover:border-gray-200 hover:bg-gray-50 hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:bg-slate-900/60 dark:hover:border-slate-700 dark:hover:bg-slate-800/90 dark:hover:text-white dark:focus-visible:ring-offset-slate-950',
                                 { 'aw-link-active': href2 === currentPath },
                               ]}
                               href={href2}
                             >
                               <span class="block font-semibold">{text2}</span>
                               {description && (
-                                <span class="mt-1 block text-sm font-normal leading-5 text-muted group-hover:text-default dark:group-hover:text-slate-300">
+                                <span class="mt-1 block text-sm font-normal leading-5 text-slate-600 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-slate-200">
                                   {description}
                                 </span>
                               )}
@@ -166,7 +163,17 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     >
       <div class="flex w-full flex-nowrap items-center justify-end gap-2 md:w-auto">
         <div class="flex shrink-0 flex-nowrap items-center">
-          {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
+          <button
+            type="button"
+            class="inline-flex items-center rounded-lg p-2.5 text-sm text-muted transition-colors hover:bg-gray-100 hover:text-link focus:outline-none focus:ring-4 focus:ring-gray-200 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white dark:focus:ring-gray-700"
+            aria-label="Open search"
+            aria-haspopup="dialog"
+            aria-expanded="false"
+            aria-controls="header-search-overlay"
+            data-header-search-trigger
+          >
+            <Icon name="tabler:search" class="h-5 w-5" />
+          </button>
           {
             showRssFeed && (
               <a
@@ -178,21 +185,217 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
               </a>
             )
           }
+          {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
         </div>
         <span class="flex shrink-0 flex-nowrap items-center whitespace-nowrap">
           <HeaderAuthButton />
-          {
-            actions?.length
-              ? actions.map((btnProps) => (
-                  <Button
-                    {...btnProps}
-                    class="ml-2 inline-flex w-auto shrink-0 whitespace-nowrap py-2.5 px-5.5 text-sm font-semibold shadow-none md:px-6"
-                  />
-                ))
-              : ''
-          }
         </span>
       </div>
     </div>
   </div>
 </header>
+
+<div
+  id="header-search-overlay"
+  class="fixed inset-0 z-50 hidden bg-slate-950/35 px-4 py-6 backdrop-blur-sm sm:px-6"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="header-search-title"
+  data-header-search-overlay
+>
+  <div
+    class="mx-auto mt-16 max-w-2xl rounded-3xl border border-gray-200/80 bg-white p-4 shadow-2xl shadow-slate-900/20 dark:border-slate-700/80 dark:bg-slate-950 dark:shadow-black/40 sm:p-5"
+  >
+    <div class="mb-4 flex items-center justify-between gap-4">
+      <div>
+        <h2 id="header-search-title" class="text-lg font-semibold text-default">Search Dr. Lurié</h2>
+        <p class="mt-1 text-sm text-muted">Search support is being prepared.</p>
+      </div>
+      <button
+        type="button"
+        class="inline-flex rounded-full p-2 text-muted transition-colors hover:bg-gray-100 hover:text-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
+        aria-label="Close search"
+        data-header-search-close
+      >
+        <Icon name="tabler:x" class="h-5 w-5" />
+      </button>
+    </div>
+    <form data-header-search-form>
+      <label class="sr-only" for="header-search-input">Search query</label>
+      <div
+        class="flex items-center gap-3 rounded-2xl border border-gray-200 bg-surface px-4 py-3 dark:border-slate-700 dark:bg-slate-900"
+      >
+        <Icon name="tabler:search" class="h-5 w-5 shrink-0 text-muted" />
+        <input
+          id="header-search-input"
+          class="w-full border-0 bg-transparent p-0 text-base text-default placeholder:text-muted focus-visible:ring-0 focus-visible:ring-offset-0"
+          type="search"
+          placeholder="Search articles, topics, and solutions"
+          autocomplete="off"
+          data-header-search-input
+        />
+      </div>
+      <p class="mt-3 text-sm text-muted" aria-live="polite" data-header-search-status>Search coming soon…</p>
+    </form>
+  </div>
+</div>
+
+<script>
+  const headerDropdownCloseDelay = 180;
+  const headerDropdownDesktopQuery = window.matchMedia('(min-width: 768px)');
+
+  function initHeaderDropdownHoverIntent() {
+    const header = document.getElementById('header') as
+      | (HTMLElement & { awDropdownHoverIntentController?: AbortController })
+      | null;
+
+    if (!header) return;
+
+    header.awDropdownHoverIntentController?.abort();
+
+    const controller = new AbortController();
+    header.awDropdownHoverIntentController = controller;
+
+    const dropdowns = Array.from(header.querySelectorAll<HTMLElement>('.dropdown'));
+    const closeTimers = new WeakMap<HTMLElement, number>();
+
+    const clearPendingClose = (dropdown: HTMLElement) => {
+      const timer = closeTimers.get(dropdown);
+
+      if (timer) {
+        window.clearTimeout(timer);
+        closeTimers.delete(dropdown);
+      }
+    };
+
+    const closeDropdown = (dropdown: HTMLElement) => {
+      clearPendingClose(dropdown);
+      dropdown.classList.remove('dropdown-open');
+    };
+
+    const openDropdown = (dropdown: HTMLElement) => {
+      if (!headerDropdownDesktopQuery.matches) return;
+
+      dropdowns.forEach((item) => {
+        if (item !== dropdown) closeDropdown(item);
+      });
+      clearPendingClose(dropdown);
+      dropdown.classList.add('dropdown-open');
+    };
+
+    const scheduleClose = (dropdown: HTMLElement) => {
+      clearPendingClose(dropdown);
+
+      const timer = window.setTimeout(() => {
+        closeDropdown(dropdown);
+      }, headerDropdownCloseDelay);
+
+      closeTimers.set(dropdown, timer);
+    };
+
+    dropdowns.forEach((dropdown) => {
+      const menu = dropdown.querySelector<HTMLElement>('.dropdown-menu');
+
+      dropdown.addEventListener('mouseenter', () => openDropdown(dropdown), { signal: controller.signal });
+      dropdown.addEventListener('mouseleave', () => scheduleClose(dropdown), { signal: controller.signal });
+      dropdown.addEventListener('focusin', () => openDropdown(dropdown), { signal: controller.signal });
+      dropdown.addEventListener(
+        'focusout',
+        (event) => {
+          const nextFocusedElement = event.relatedTarget;
+
+          if (nextFocusedElement instanceof Node && dropdown.contains(nextFocusedElement)) return;
+
+          scheduleClose(dropdown);
+        },
+        { signal: controller.signal }
+      );
+
+      menu?.addEventListener('mouseenter', () => openDropdown(dropdown), { signal: controller.signal });
+      menu?.addEventListener('mouseleave', () => scheduleClose(dropdown), { signal: controller.signal });
+    });
+
+    headerDropdownDesktopQuery.addEventListener(
+      'change',
+      (event) => {
+        if (event.matches) return;
+
+        dropdowns.forEach(closeDropdown);
+      },
+      { signal: controller.signal }
+    );
+  }
+
+  function initHeaderSearchOverlay() {
+    const searchWindow = window as Window & { awHeaderSearchController?: AbortController };
+    searchWindow.awHeaderSearchController?.abort();
+
+    const overlay = document.querySelector<HTMLElement>('[data-header-search-overlay]');
+    const input = document.querySelector<HTMLInputElement>('[data-header-search-input]');
+    const status = document.querySelector<HTMLElement>('[data-header-search-status]');
+    const form = document.querySelector<HTMLFormElement>('[data-header-search-form]');
+    const triggers = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-header-search-trigger]'));
+    const closeButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-header-search-close]'));
+    let previousFocus: Element | null = null;
+
+    if (!overlay || !input) return;
+
+    const controller = new AbortController();
+    searchWindow.awHeaderSearchController = controller;
+
+    const setSearchStatus = () => {
+      if (!status) return;
+
+      const query = input.value.trim();
+      status.textContent = query ? `Search coming soon for “${query}”.` : 'Search coming soon…';
+    };
+
+    const closeSearch = () => {
+      overlay.classList.add('hidden');
+      triggers.forEach((trigger) => trigger.setAttribute('aria-expanded', 'false'));
+
+      if (previousFocus instanceof HTMLElement) previousFocus.focus();
+    };
+
+    const openSearch = () => {
+      previousFocus = document.activeElement;
+      overlay.classList.remove('hidden');
+      triggers.forEach((trigger) => trigger.setAttribute('aria-expanded', 'true'));
+      window.requestAnimationFrame(() => input.focus());
+      setSearchStatus();
+    };
+
+    triggers.forEach((trigger) => trigger.addEventListener('click', openSearch, { signal: controller.signal }));
+    closeButtons.forEach((button) => button.addEventListener('click', closeSearch, { signal: controller.signal }));
+    input.addEventListener('input', setSearchStatus, { signal: controller.signal });
+    form?.addEventListener(
+      'submit',
+      (event) => {
+        event.preventDefault();
+        setSearchStatus();
+      },
+      { signal: controller.signal }
+    );
+    overlay.addEventListener(
+      'click',
+      (event) => {
+        if (event.target === overlay) closeSearch();
+      },
+      { signal: controller.signal }
+    );
+    document.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key === 'Escape' && !overlay.classList.contains('hidden')) closeSearch();
+      },
+      { signal: controller.signal }
+    );
+  }
+
+  initHeaderDropdownHoverIntent();
+  initHeaderSearchOverlay();
+  document.addEventListener('astro:after-swap', () => {
+    initHeaderDropdownHoverIntent();
+    initHeaderSearchOverlay();
+  });
+</script>
