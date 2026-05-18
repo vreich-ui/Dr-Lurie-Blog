@@ -301,6 +301,10 @@
   .editorial-prose :where(h1, h2, h3, h4) {
     font-family: var(--aw-font-serif, Georgia, serif);
   }
+  .editorial-prose > *:last-child,
+  .dl-reading > *:last-child {
+    margin-bottom: 72px;
+  }
   .dl-reading {
     @apply max-w-[720px];
     font-family: var(--aw-font-serif, Georgia, serif);
