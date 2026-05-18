@@ -18,7 +18,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     aria-haspopup="dialog"
     aria-expanded="false"
   >
-    <span data-auth-trigger-label>Login</span>
+    <span data-auth-trigger-label>Account</span>
     <svg
       class="ml-0.5 hidden h-3.5 w-3.5 transition-transform rtl:ml-0 rtl:mr-0.5"
       data-auth-trigger-chevron
@@ -34,7 +34,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     </svg>
   </button>
   <div
-    class="absolute right-0 z-50 mt-2 w-[min(21.5rem,calc(100vw-1rem))] origin-top-right rounded-2xl border border-gray-200/80 bg-white p-3 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
+    class="absolute left-2 z-50 mt-2 w-[min(18rem,calc(100vw-1rem))] origin-top-left rounded-2xl border border-gray-200/80 bg-white p-3 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
     data-auth-menu
     role="menu"
     hidden
@@ -309,6 +309,26 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       closeAllMenus();
     };
 
+    const initializeHeaderAuthState = () => {
+      getClerk()
+        .then(async (clerk) => {
+          await renderAuthState(clerk);
+          if (typeof clerk.addListener === 'function' && !headerAuthState.clerkListenerAttached) {
+            headerAuthState.clerkListenerAttached = true;
+            clerk.addListener(() => {
+              renderAuthState(clerk).catch((error) => {
+                console.error('Header authentication refresh failed.', error);
+              });
+            });
+          }
+        })
+        .catch((error) => {
+          console.error('Header authentication initialization failed.', error);
+        });
+    };
+
+    initializeHeaderAuthState();
+
     if (!headerAuthState.initialized) {
       headerAuthState.initialized = true;
 
@@ -397,27 +417,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         if (event.key === 'Escape') closeAllMenus();
       });
 
-      document.addEventListener('astro:page-load', () => {
-        renderAuthState().catch((error) => {
-          console.error('Header authentication refresh failed.', error);
-        });
-      });
+      document.addEventListener('astro:page-load', initializeHeaderAuthState);
     }
-
-    getClerk()
-      .then(async (clerk) => {
-        await renderAuthState(clerk);
-        if (typeof clerk.addListener === 'function' && !headerAuthState.clerkListenerAttached) {
-          headerAuthState.clerkListenerAttached = true;
-          clerk.addListener(() => {
-            renderAuthState(clerk).catch((error) => {
-              console.error('Header authentication refresh failed.', error);
-            });
-          });
-        }
-      })
-      .catch((error) => {
-        console.error('Header authentication initialization failed.', error);
-      });
   })();
 </script>
