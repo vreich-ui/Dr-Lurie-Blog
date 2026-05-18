@@ -1,46 +1,45 @@
 ---
-publishDate: 2026-05-11T12:23:00.000Z
+publishDate: 2026-05-18T14:47:00.000Z
 title: "Why Some People Smell Stronger Than Others"
-excerpt: "What we call body odor is not simply something the body gives off. It takes shape on the skin — through moisture, heat, secretions, and the bacteria already waiting there."
-image: "~/assets/images/uploads/why-some-people-smell-stronger-than-others/dr-lurie-education-biology.jpg"
-video: "https://www.youtube.com"
-ctaLink: "https://www.youtube.com"
-ctaText: "Watch this video"
-category: "Smell and Body Odor"
+excerpt: "In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age. Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself."
+image: "~/assets/images/uploads/why-some-people-smell-stronger-than-others/1a0f41b7-98a8-44ff-9586-8ddd73e723af.png"
+ctaText: "Get your confidence back"
 tags:
   - "Body Odor"
   - "Smell"
   - "Health"
-author: "Zeev Reich"
-metadata:
-  description: "Body odor is made on the skin, not just released. Learn the scientific reason why some people smell stronger—it's about changing skin chemistry and the unique way bacteria produce"
+author: "Roger Ebert-Smith"
 ---
-You know this before you know how to say it. Some people seem to leave more of themselves in a room. A scarf smells like one person and not another. Two people can be equally clean, equally freshly showered, and by late afternoon one feels almost scentless while the other has gathered a noticeable edge — warmer, sharper, heavier, somehow more present in the air.
+There is a moment, usually sometime after forty, when people begin to notice that certain older relatives have a distinct scent. Not necessarily unpleasant. Just different. A little dry, faintly sweet, slightly musty in a way that seems to belong more to old books or stored fabric than to sweat itself.
 
-Most of us are taught to read that difference morally. Cleaner. Less clean. Better habits. Worse habits. But body odor is less simple than that. It is not just a question of what leaves the body. It is also a question of what happens after it leaves.
+Most people assume this is simply what aging smells like. Or worse, that it reflects neglect. But the reality is stranger, and much more specific.
 
-That is the hidden part: odor is produced, not just released.
-The body supplies the material, and the skin microbiome finishes the sentence.
-Sweat itself is usually not the smell people think they are noticing. What matters is what skin bacteria do with the sweat, oils, and other compounds the body brings to the surface. Skin is not blank. It is warm, uneven, alive, full of tiny conditions that differ from person to person. In one body, bacteria meet one mix of moisture and secretions. In another, they meet something slightly different. The smell that rises from that exchange can be faint, sour, musky, sweet, dry, metallic, or sharp. That is why body odor feels so individual.
+In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age.  Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself.
 
-That is also why one person can smell stronger without necessarily sweating much more.
+As the body ages, its antioxidant defenses gradually weaken. The oils naturally present on the skin become more vulnerable to oxidation from sunlight, air, and ordinary environmental stress. One result of this breakdown is 2-Nonenal, an unsaturated aldehyde with an odor often described as grassy, waxy, or slightly oily. 
 
-A stronger smell is not always a matter of volume. Often it is a matter of chemistry.
+What makes it distinctive is not intensity, but persistence.
 
-A body that produces more of the compounds bacteria like to break down can create a stronger odor even when the amount of sweat looks ordinary. A person may seem to “turn” faster not because they are dirtier, but because their skin gives bacteria more to work with — or gives them the kind of material that becomes more pungent once it is transformed. What reaches the air is the finished version.
+The compound clings to fabric unusually well. It settles into collars, bedding, upholstered furniture. Even after bathing, traces can remain in textiles and slowly reappear in the surrounding air. That lingering quality is part of why people experience it less like ordinary body odor and more like an atmosphere attached to age itself.
 
-This is why the difference between people can feel larger than expected. One body does not simply emit more. It creates a more odor-active meeting between skin and microbes. The smell is being made on contact.
+There is also an odd social distortion around it.
 
-Cleanliness still matters, but it does not settle the question. Clean skin is still active skin. It still sweats. It still warms. It still hosts bacteria. Washing resets the surface for a while, but it does not erase the deeper conditions that shape what happens next.
+One study found that older people’s body odor was actually rated by participants as less intense and less unpleasant than the odor of younger groups.  Yet culturally, “old person smell” carries disproportionate embarrassment. Researchers noted that reactions became more negative once people were told the scent came from an older individual.
 
-And those conditions are not fixed.
+In other words, some of what people think they are smelling may partly be expectation.
 
-Part of what makes someone smell stronger — or simply different — is that the body’s raw material can shift. Hormones can change it. Food can change it. Age can change it. Not always dramatically, and not always in ways a person can predict, but enough to alter the mix that reaches the skin. That is why a person can feel newly unfamiliar to themselves even when nothing obvious in the routine has changed. The soap is the same. The deodorant is the same. Yet the scent is not.
+Still, recognition of the phenomenon has created a small but growing category of products designed specifically to target 2-Nonenal rather than ordinary sweat. Conventional soaps are not especially effective because they are designed mainly to remove surface oil or suppress odor-causing bacteria. 2-Nonenal behaves differently at a chemical level. 
 
-We tend to imagine smell as a trait, something a person simply has. In reality it is closer to a live reaction. The body is constantly being translated into air. Skin secretions become food for bacteria. Bacteria turn them into volatile compounds. Those compounds rise and spread and attach themselves to fabric, collars, sheets, the inside of a car. What others smell is not just you. It is you after transformation.
+The ingredient that appears most often in targeted formulations is Japanese persimmon extract.
 
-That helps explain something else people notice but rarely phrase directly: some people do not merely smell stronger. They smell more distinct. Their scent seems to have a signature, a shape, a persistence. It does not read as generic body odor. It reads as specifically theirs. The body gives off a particular mix of materials, the skin hosts a particular microbial community, and together they make something more individual than most people realize.
+Persimmon contains a dense concentration of polyphenols that appear to work in two directions at once: helping reduce oxidative activity on the skin while also neutralizing existing odor compounds. In small clinical studies, soaps containing persimmon extract significantly reduced measurable 2-Nonenal after several weeks of use. 
 
-So the puzzle is not why some people smell stronger, as though they were somehow failing at cleanliness. It is why some bodies create more scent from the same ordinary day.
+What is interesting is how this shifts the entire framing of the issue.
 
-Some people do not simply carry a stronger smell. Their skin turns the day into more of one. And if smell is being made on the skin, not merely released by the body, the next question is hard to avoid: what can actually change the process?
+Age-related scent is not really a hygiene failure. It is closer to a visible gray hair or a change in skin texture — a subtle biochemical marker of the body moving through time. The skin’s chemistry changes. The air around it changes too.
+
+That distinction matters because shame tends to make people approach the subject harshly, either toward themselves or toward aging relatives. But the phenomenon itself is remarkably ordinary. Nearly everyone who lives long enough experiences some version of it.
+
+And once you know the mechanism, the scent becomes easier to place. You start noticing its texture differently: less like dirt, more like oxidation. Less like sweat, more like paper aging slowly in sunlight.
+
+Which may explain why the smell feels strangely familiar even before we understand where we learned it from.
