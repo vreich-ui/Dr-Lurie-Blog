@@ -69,21 +69,7 @@ const metadata = {
           Use the existing Widget Builder output as the ChatKit interface for the AI publishing workflow.
         </p>
       </div>
-      <div class="agent-auth" aria-live="polite">
-        <span id="auth-status" class="pill-status">Checking sign-in…</span>
-        <button id="sign-in" class="btn-primary btn-sm" type="button" hidden>Sign in</button>
-        <button id="sign-out" class="btn-secondary btn-sm" type="button" hidden>Sign out</button>
-      </div>
     </header>
-
-    <section id="auth-panel" class="agent-card auth-panel" aria-label="Agent admin authentication" aria-live="polite">
-      <div id="auth-loading" class="auth-loading" role="status">
-        <span class="auth-spinner" aria-hidden="true"></span>
-        <p>Checking sign-in…</p>
-      </div>
-      <p id="auth-help" class="hint">Checking Clerk authentication before showing the agent workflow.</p>
-      <button id="auth-panel-sign-in" class="btn-primary" type="button" hidden>Sign in with Clerk</button>
-    </section>
 
     <section class="agent-card chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated hidden>
       <div class="chatkit-panel-header">
@@ -187,51 +173,12 @@ const metadata = {
     box-shadow: none;
   }
 
-  .auth-panel {
-    margin-bottom: 1.5rem;
-  }
-
-  .auth-loading {
-    display: grid;
-    justify-items: center;
-    gap: 0.85rem;
-    padding: 2.5rem 1rem;
-    color: var(--aw-color-text-muted);
-    text-align: center;
-    font-weight: 700;
-  }
-
-  .auth-loading p {
-    margin: 0;
-  }
-
-  .auth-spinner {
-    width: 2rem;
-    height: 2rem;
-    border: 3px solid rgb(209 213 219);
-    border-top-color: var(--aw-color-accent);
-    border-radius: 999px;
-    animation: auth-spin 900ms linear infinite;
-  }
-
-  @keyframes auth-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .agent-auth,
   .chatkit-panel-header {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
-  }
-
-  .agent-auth {
-    align-items: center;
-    justify-content: flex-start;
   }
 
   .chatkit-panel {
@@ -267,16 +214,13 @@ const metadata = {
     font-weight: 800;
   }
 
-  .pill-status[data-state='valid'],
-  .pill-status[data-state='signed-in'] {
+  .pill-status[data-state='valid'] {
     border-color: rgb(22 163 74 / 30%);
     color: rgb(22 101 52);
     background: rgb(220 252 231 / 78%);
   }
 
-  .pill-status[data-state='invalid'],
-  .pill-status[data-state='signed-out'],
-  .pill-status[data-state='error'] {
+  .pill-status[data-state='invalid'] {
     border-color: rgb(220 38 38 / 25%);
     color: rgb(153 27 27);
     background: rgb(254 226 226 / 72%);
@@ -336,8 +280,6 @@ const metadata = {
       padding: 1rem;
     }
 
-    .agent-auth,
-    .agent-auth button,
     .pill-status {
       width: 100%;
     }
@@ -351,19 +293,12 @@ const metadata = {
 <script is:inline>
   (() => {
     const fields = {
-      authStatus: document.querySelector('#auth-status'),
-      signIn: document.querySelector('#sign-in'),
-      signOut: document.querySelector('#sign-out'),
-      authPanel: document.querySelector('#auth-panel'),
-      authHelp: document.querySelector('#auth-help'),
-      panelSignIn: document.querySelector('#auth-panel-sign-in'),
       chatkit: document.querySelector('#publishing-chatkit'),
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
     };
 
-    let isSignedIn = false;
     let isAdmin = false;
     let clerkLoadPromise;
     let chatkitInitialized = false;
@@ -394,11 +329,6 @@ const metadata = {
       gatedContent.forEach((element) => {
         element.hidden = !visible;
       });
-    };
-
-    const setAuthLoadingVisible = (visible) => {
-      const loading = document.querySelector('#auth-loading');
-      if (loading) loading.hidden = !visible;
     };
 
     const loadClerkScript = () =>
@@ -466,44 +396,15 @@ const metadata = {
       return clerkLoadPromise;
     };
 
-    const getSignedInLabel = (clerk) => {
-      const email = clerk.user?.primaryEmailAddress?.emailAddress;
-      const name = clerk.user?.fullName || clerk.user?.firstName;
-      return email || name || 'Clerk user';
-    };
-
-    const showSignedOutPanel = () => {
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = 'Sign in with Clerk to access the AI publishing agent.';
-      setAuthLoadingVisible(false);
-    };
-
-    const hideAuthPanel = () => {
-      fields.authPanel.hidden = true;
-      setAuthLoadingVisible(false);
-    };
-
-    const setAuthState = (state, message) => {
-      fields.authStatus.textContent = message;
-      fields.authStatus.dataset.state = state;
-      isSignedIn = state === 'signed-in' || state === 'forbidden';
+    const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
-      fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
-      fields.panelSignIn.hidden = fields.signIn.hidden;
-      fields.signOut.hidden = !isSignedIn;
       setGatedContentVisible(isAdmin);
-
-      if (state === 'checking') {
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = 'Checking Clerk authentication before showing the agent workflow.';
-        setAuthLoadingVisible(true);
-      }
     };
 
     const getClerkSessionToken = async () => {
       const clerk = await getClerk();
       if (!clerk.isSignedIn || !clerk.session) {
-        throw new Error('Sign in with Clerk before using the agent workflow.');
+        throw new Error('Authenticate with Clerk before using the agent workflow.');
       }
 
       if (!isAdmin) {
@@ -694,8 +595,7 @@ const metadata = {
         const adminState = await getAdminStateForClerk(clerk);
 
         if (adminState.isAdmin) {
-          setAuthState('signed-in', `Signed in as ${adminState.email || getSignedInLabel(clerk)}`);
-          hideAuthPanel();
+          setAuthState('signed-in');
           initializeChatKit().catch((error) => {
             console.error('ChatKit initialization failed.', error);
             setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
@@ -703,20 +603,15 @@ const metadata = {
           return;
         }
 
-        setAuthState('forbidden', 'Signed in — admin access required');
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent =
-          'This account is signed in, but it is not authorized for the AI publishing workflow.';
-        setAuthLoadingVisible(false);
+        setAuthState('forbidden');
         return;
       }
 
-      setAuthState('signed-out', 'Signed out — sign in to use agent');
-      showSignedOutPanel();
+      setAuthState('signed-out');
     };
 
     const initializeClerkAuth = async () => {
-      setAuthState('checking', 'Checking sign-in…');
+      setAuthState('checking');
 
       try {
         const clerk = await getClerk();
@@ -732,70 +627,10 @@ const metadata = {
       } catch (error) {
         console.error('Clerk authentication initialization failed.', error);
         const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
-        setAuthState('error', message);
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = message;
-        setAuthLoadingVisible(false);
+        setAuthState('error');
         setStatus(message, false);
       }
     };
-
-    const redirectToHostedSignIn = async (clerk) => {
-      if (typeof clerk.redirectToSignIn !== 'function') {
-        throw new Error('Clerk hosted sign-in redirect is unavailable.');
-      }
-
-      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
-    };
-
-    const openSignIn = async () => {
-      setAuthState('checking', 'Opening Clerk sign-in…');
-
-      try {
-        const clerk = await getClerk();
-
-        if (typeof clerk.openSignIn === 'function') {
-          try {
-            await clerk.openSignIn();
-            await renderAuthState(clerk);
-            return;
-          } catch (error) {
-            console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
-          }
-        }
-
-        await redirectToHostedSignIn(clerk);
-      } catch (error) {
-        console.error('Clerk sign-in failed.', error);
-        const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
-        setAuthState('error', message);
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = message;
-        setAuthLoadingVisible(false);
-        setStatus(message, false);
-      }
-    };
-
-    fields.signIn.addEventListener('click', openSignIn);
-    fields.panelSignIn.addEventListener('click', openSignIn);
-
-    fields.signOut.addEventListener('click', async () => {
-      setAuthState('checking', 'Signing out…');
-
-      try {
-        const clerk = await getClerk();
-        await clerk.signOut();
-        await renderAuthState(clerk);
-      } catch (error) {
-        console.error('Clerk sign-out failed.', error);
-        const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
-        setAuthState('error', message);
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = message;
-        setAuthLoadingVisible(false);
-        setStatus(message, false);
-      }
-    });
 
     setChatkitConfigStatus();
     initializeClerkAuth();

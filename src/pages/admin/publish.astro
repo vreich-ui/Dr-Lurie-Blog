@@ -24,23 +24,7 @@ const metadata = {
         <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">Publishing workspace</p>
         <h1 class="mt-2 font-heading text-4xl font-bold tracking-tight text-default sm:text-5xl">{pageTitle}</h1>
       </div>
-      <div class="admin-auth" aria-live="polite">
-        <span id="auth-status" class="auth-status">Checking sign-in…</span>
-        <button id="sign-in" class="btn-primary btn-sm auth-button" type="button" hidden>Sign in</button>
-        <button id="sign-out" class="btn-secondary btn-sm auth-button" type="button" hidden>Sign out</button>
-      </div>
     </header>
-
-    <section id="auth-panel" class="admin-card auth-panel" aria-label="Admin authentication" aria-live="polite">
-      <div id="auth-loading" class="auth-loading" role="status">
-        <span class="auth-spinner" aria-hidden="true"></span>
-        <p>Checking sign-in…</p>
-      </div>
-      <p id="auth-help" class="hint">Checking Clerk authentication before showing the publishing workspace.</p>
-      <button id="auth-panel-sign-in" class="btn-primary auth-panel-button" type="button" hidden
-        >Sign in with Clerk</button
-      >
-    </section>
 
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
       <form id="publish-form" class="admin-form">
@@ -198,92 +182,6 @@ const metadata = {
 
   .admin-panel {
     margin-top: 1.5rem;
-  }
-
-  .auth-panel {
-    margin-bottom: 1.5rem;
-  }
-
-  .auth-loading {
-    display: grid;
-    justify-items: center;
-    gap: 0.85rem;
-    padding: 2.5rem 1rem;
-    color: var(--aw-color-text-muted);
-    text-align: center;
-    font-weight: 700;
-  }
-
-  .auth-loading p {
-    margin: 0;
-  }
-
-  .auth-spinner {
-    width: 2rem;
-    height: 2rem;
-    border: 3px solid rgb(209 213 219);
-    border-top-color: var(--aw-color-accent);
-    border-radius: 999px;
-    animation: auth-spin 900ms linear infinite;
-  }
-
-  @keyframes auth-spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  .auth-panel-button {
-    margin-top: 1rem;
-  }
-
-  .admin-auth {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 0.75rem;
-  }
-
-  .auth-status {
-    border: 1px solid rgb(229 231 235);
-    border-radius: 999px;
-    padding: 0.55rem 0.8rem;
-    background: var(--aw-color-bg-surface);
-    color: var(--aw-color-text-muted);
-    font-size: 0.9rem;
-    font-weight: 700;
-  }
-
-  .auth-status[data-state='signed-in'] {
-    border-color: rgb(22 163 74 / 30%);
-    color: rgb(22 101 52);
-    background: rgb(220 252 231 / 78%);
-  }
-
-  .auth-status[data-state='signed-out'],
-  .auth-status[data-state='error'] {
-    border-color: rgb(220 38 38 / 25%);
-    color: rgb(153 27 27);
-    background: rgb(254 226 226 / 72%);
-  }
-
-  :global(.dark) .auth-status {
-    border-color: rgb(30 41 59);
-    background: rgb(15 23 42 / 72%);
-  }
-
-  :global(.dark) .auth-status[data-state='signed-in'] {
-    border-color: rgb(34 197 94 / 28%);
-    color: rgb(187 247 208);
-    background: rgb(20 83 45 / 35%);
-  }
-
-  :global(.dark) .auth-status[data-state='signed-out'],
-  :global(.dark) .auth-status[data-state='error'] {
-    border-color: rgb(248 113 113 / 28%);
-    color: rgb(254 202 202);
-    background: rgb(127 29 29 / 35%);
   }
 
   .admin-panel h2 {
@@ -506,19 +404,8 @@ const metadata = {
       flex-direction: column;
     }
 
-    .actions > button,
-    .admin-auth,
-    .auth-button {
+    .actions > button {
       width: 100%;
-    }
-
-    .admin-auth {
-      align-items: stretch;
-    }
-
-    .auth-status {
-      width: 100%;
-      text-align: center;
     }
   }
 </style>
@@ -550,18 +437,11 @@ const metadata = {
       markdownPreview: document.querySelector('#markdown-preview'),
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
-      authStatus: document.querySelector('#auth-status'),
-      signIn: document.querySelector('#sign-in'),
-      signOut: document.querySelector('#sign-out'),
       publish: document.querySelector('#publish'),
-      authPanel: document.querySelector('#auth-panel'),
-      authHelp: document.querySelector('#auth-help'),
-      panelSignIn: document.querySelector('#auth-panel-sign-in'),
     };
 
     let imageNames = [];
     let selectedFiles = [];
-    let isSignedIn = false;
     let isAdmin = false;
 
     const adminPage = document.querySelector('.admin-page');
@@ -574,11 +454,6 @@ const metadata = {
       gatedContent.forEach((element) => {
         element.hidden = !visible;
       });
-    };
-
-    const setAuthLoadingVisible = (visible) => {
-      const loading = document.querySelector('#auth-loading');
-      if (loading) loading.hidden = !visible;
     };
 
     const loadClerkScript = () =>
@@ -658,39 +533,10 @@ const metadata = {
       return clerkLoadPromise;
     };
 
-    const getSignedInLabel = (clerk) => {
-      const email = clerk.user?.primaryEmailAddress?.emailAddress;
-      const name = clerk.user?.fullName || clerk.user?.firstName;
-      return email || name || 'Clerk user';
-    };
-
-    const showSignedOutPanel = () => {
-      fields.authPanel.hidden = false;
-      fields.authHelp.textContent = 'Sign in with Clerk to access the publishing workspace.';
-      setAuthLoadingVisible(false);
-    };
-
-    const hideAuthPanel = () => {
-      fields.authPanel.hidden = true;
-      setAuthLoadingVisible(false);
-    };
-
-    const setAuthState = (state, message) => {
-      fields.authStatus.textContent = message;
-      fields.authStatus.dataset.state = state;
-      isSignedIn = state === 'signed-in' || state === 'forbidden';
+    const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
-      fields.signIn.hidden = isSignedIn || state === 'checking' || state === 'error';
-      fields.panelSignIn.hidden = fields.signIn.hidden;
-      fields.signOut.hidden = !isSignedIn;
       fields.publish.disabled = !isAdmin;
       setGatedContentVisible(isAdmin);
-
-      if (state === 'checking') {
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = 'Checking Clerk authentication before showing the publishing workspace.';
-        setAuthLoadingVisible(true);
-      }
     };
 
     const getAdminStateForClerk = async (clerk) => {
@@ -720,25 +566,19 @@ const metadata = {
         const adminState = await getAdminStateForClerk(clerk);
 
         if (adminState.isAdmin) {
-          setAuthState('signed-in', `Signed in as ${adminState.email || getSignedInLabel(clerk)}`);
-          hideAuthPanel();
+          setAuthState('signed-in');
           return;
         }
 
-        setAuthState('forbidden', 'Signed in — admin access required');
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent =
-          'This account is signed in, but it is not authorized for the publishing workspace.';
-        setAuthLoadingVisible(false);
+        setAuthState('forbidden');
         return;
       }
 
-      setAuthState('signed-out', 'Signed out — sign in to publish');
-      showSignedOutPanel();
+      setAuthState('signed-out');
     };
 
     const initializeClerkAuth = async () => {
-      setAuthState('checking', 'Checking sign-in…');
+      setAuthState('checking');
 
       try {
         const clerk = await getClerk();
@@ -754,10 +594,7 @@ const metadata = {
       } catch (error) {
         console.error('Clerk authentication initialization failed.', error);
         const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
-        setAuthState('error', message);
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = message;
-        setAuthLoadingVisible(false);
+        setAuthState('error');
         setStatus(message, false);
       }
     };
@@ -765,7 +602,7 @@ const metadata = {
     const getClerkSessionToken = async () => {
       const clerk = await getClerk();
       if (!clerk.isSignedIn || !clerk.session) {
-        throw new Error('Sign in with Clerk before publishing.');
+        throw new Error('Authenticate with Clerk before publishing.');
       }
 
       if (!isAdmin) {
@@ -1092,66 +929,9 @@ const metadata = {
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
-        publishButton.disabled = !isSignedIn;
+        publishButton.disabled = !isAdmin;
       }
     };
-
-    const redirectToHostedSignIn = async (clerk) => {
-      if (typeof clerk.redirectToSignIn !== 'function') {
-        throw new Error('Clerk hosted sign-in redirect is unavailable.');
-      }
-
-      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
-    };
-
-    const openSignIn = async () => {
-      setAuthState('checking', 'Opening Clerk sign-in…');
-
-      try {
-        const clerk = await getClerk();
-
-        if (typeof clerk.openSignIn === 'function') {
-          try {
-            await clerk.openSignIn();
-            await renderAuthState(clerk);
-            return;
-          } catch (error) {
-            console.error('Clerk openSignIn failed. Redirecting to Clerk-hosted sign-in.', error);
-          }
-        }
-
-        await redirectToHostedSignIn(clerk);
-      } catch (error) {
-        console.error('Clerk sign-in failed.', error);
-        const message = error instanceof Error ? error.message : 'Clerk sign-in could not be opened.';
-        setAuthState('error', message);
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = message;
-        setAuthLoadingVisible(false);
-        setStatus(message, false);
-      }
-    };
-
-    fields.signIn.addEventListener('click', openSignIn);
-    fields.panelSignIn.addEventListener('click', openSignIn);
-
-    fields.signOut.addEventListener('click', async () => {
-      setAuthState('checking', 'Signing out…');
-
-      try {
-        const clerk = await getClerk();
-        await clerk.signOut();
-        await renderAuthState(clerk);
-      } catch (error) {
-        console.error('Clerk sign-out failed.', error);
-        const message = error instanceof Error ? error.message : 'Clerk sign-out failed.';
-        setAuthState('error', message);
-        fields.authPanel.hidden = false;
-        fields.authHelp.textContent = message;
-        setAuthLoadingVisible(false);
-        setStatus(message, false);
-      }
-    });
 
     fields.publish.addEventListener('click', publishArticle);
     document.querySelector('#copy-output').addEventListener('click', () => {
