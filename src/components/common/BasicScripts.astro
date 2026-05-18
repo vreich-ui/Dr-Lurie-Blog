@@ -135,7 +135,10 @@ import { UI } from 'astrowind:config';
         return;
       }
 
-      if (target?.closest('[data-mobile-menu-utilities]')) return;
+      if (target?.closest('[data-mobile-menu-utilities]')) {
+        if (target.closest('a[href]')) closeMobileMenu();
+        return;
+      }
 
       closeMobileMenu();
     });
@@ -217,8 +220,8 @@ import { UI } from 'astrowind:config';
 
   document.addEventListener('astro:after-swap', () => {
     initTheme();
-    onLoad();
     onPageShow();
+    onLoad();
   });
 </script>
 
