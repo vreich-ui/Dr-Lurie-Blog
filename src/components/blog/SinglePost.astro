@@ -1,7 +1,5 @@
 ---
 import Image from '~/components/common/Image.astro';
-import PostTags from '~/components/blog/Tags.astro';
-import SocialShare from '~/components/common/SocialShare.astro';
 
 import { getFormattedMonthYear } from '~/utils/utils';
 
@@ -93,12 +91,57 @@ const heroImageAspect = (() => {
         )
       }
     </header>
-    <div class="editorial-prose px-6 sm:px-6 dl-mt-s dl-gap-m prose-headings:scroll-mt-[80px]">
+    <div class="editorial-prose px-6 sm:px-6 dl-mt-s dl-gap-m">
       <slot />
     </div>
-    <div class="mx-auto px-6 sm:px-6 max-w-[720px] dl-mt-m flex justify-between flex-col sm:flex-row">
-      <PostTags tags={post.tags} class="mr-5 rtl:mr-0 rtl:ml-5" />
-      <SocialShare url={url} text={post.title} class="dl-mt-s sm:mt-1 align-middle text-gray-500 dark:text-slate-600" />
+    <div class="mx-auto max-w-[720px] px-6 sm:px-6 dl-mt-m">
+      <button
+        type="button"
+        data-immersive-share
+        data-share-url={String(url)}
+        data-share-title={post.title}
+        class="text-sm text-muted underline decoration-gray-300 underline-offset-4 transition hover:text-default dark:text-slate-500 dark:hover:text-slate-300"
+      >
+        Share
+      </button>
     </div>
   </article>
 </section>
+
+<script is:inline>
+  const registerShareHandler = () => {
+    const shareButton = document.querySelector('[data-immersive-share]');
+    if (!(shareButton instanceof HTMLButtonElement)) return;
+
+    shareButton.addEventListener('click', async () => {
+      const shareUrl = shareButton.dataset.shareUrl || window.location.href;
+      const shareTitle = shareButton.dataset.shareTitle || document.title;
+
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: shareTitle, url: shareUrl });
+          return;
+        } catch {
+          // Fall through to clipboard on dismiss/error.
+        }
+      }
+
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        const originalText = shareButton.textContent;
+        shareButton.textContent = 'Link copied';
+        window.setTimeout(() => {
+          shareButton.textContent = originalText;
+        }, 1400);
+      } catch {
+        window.prompt('Copy this link:', shareUrl);
+      }
+    });
+  };
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(registerShareHandler);
+  } else {
+    window.setTimeout(registerShareHandler, 1);
+  }
+</script>
