@@ -2,7 +2,7 @@
 publishDate: 2026-05-18T14:47:00.000Z
 title: "Why Some People Smell Stronger Than Others"
 excerpt: "In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age. Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself."
-image: "~/assets/images/uploads/why-some-people-smell-stronger-than-others/1a0f41b7-98a8-44ff-9586-8ddd73e723af.png"
+image: "~/assets/images/uploads/why-some-people-smell-stronger-than-others/People-Breathing.png"
 ctaText: "Get your confidence back"
 tags:
   - "Body Odor"
