@@ -3,6 +3,37 @@
 @tailwind utilities;
 
 @layer utilities {
+  /* Deliberate editorial spacing tiers */
+  .dl-mt-xs { margin-top: 8px; }
+  .dl-mb-xs { margin-bottom: 8px; }
+  .dl-pt-xs { padding-top: 8px; }
+  .dl-pb-xs { padding-bottom: 8px; }
+  .dl-gap-xs > * + * { margin-top: 8px; }
+
+  .dl-mt-s { margin-top: 16px; }
+  .dl-mb-s { margin-bottom: 16px; }
+  .dl-pt-s { padding-top: 16px; }
+  .dl-pb-s { padding-bottom: 16px; }
+  .dl-gap-s > * + * { margin-top: 16px; }
+
+  .dl-mt-m { margin-top: 28px; }
+  .dl-mb-m { margin-bottom: 28px; }
+  .dl-pt-m { padding-top: 28px; }
+  .dl-pb-m { padding-bottom: 28px; }
+  .dl-gap-m > * + * { margin-top: 28px; }
+
+  .dl-mt-l { margin-top: 48px; }
+  .dl-mb-l { margin-bottom: 48px; }
+  .dl-pt-l { padding-top: 48px; }
+  .dl-pb-l { padding-bottom: 48px; }
+  .dl-gap-l > * + * { margin-top: 48px; }
+
+  .dl-mt-xl { margin-top: 72px; }
+  .dl-mb-xl { margin-bottom: 72px; }
+  .dl-pt-xl { padding-top: 72px; }
+  .dl-pb-xl { padding-bottom: 72px; }
+  .dl-gap-xl > * + * { margin-top: 72px; }
+
   .bg-page {
     background-color: var(--aw-color-bg-page);
   }
@@ -250,11 +281,29 @@
     line-height: 1.82;
   }
   .editorial-prose :where(p, ul, ol, blockquote) {
-    margin-top: 1.05em;
-    margin-bottom: 1.05em;
+    margin-top: 28px;
+    margin-bottom: 28px;
+  }
+  .editorial-prose :where(h1, h2, h3, h4, h5, h6, figure, img, pre, table) {
+    margin-top: 48px;
+    margin-bottom: 28px;
+  }
+  .editorial-prose :where(ul, ol) {
+    padding-left: 1.4em;
+  }
+  .editorial-prose :where(hr) {
+    /* To insert a reflection gap in a content page, add a Markdown horizontal rule (`---`). */
+    margin-top: 48px;
+    margin-bottom: 48px;
+    border: 0;
+    border-top: 1px solid rgb(148 163 184 / 0.28);
   }
   .editorial-prose :where(h1, h2, h3, h4) {
     font-family: var(--aw-font-serif, Georgia, serif);
+  }
+  .editorial-prose > *:last-child,
+  .dl-reading > *:last-child {
+    margin-bottom: 72px;
   }
   .dl-reading {
     @apply max-w-[720px];
