@@ -21,6 +21,12 @@
   .text-muted {
     color: var(--aw-color-text-muted);
   }
+  .line-clamp-2 {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
 }
 
 @layer components {

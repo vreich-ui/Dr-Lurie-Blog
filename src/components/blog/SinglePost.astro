@@ -18,32 +18,46 @@ export interface Props {
 const { post, url } = Astro.props;
 ---
 
-<section class="py-8 sm:py-16 lg:py-20 mx-auto">
+<section class="py-5 sm:py-8 lg:py-10 mx-auto">
   <article>
     <header
       class={post.image
         ? 'intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade'
         : 'intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade'}
     >
-      <div class="flex justify-between flex-col sm:flex-row max-w-3xl mx-auto mt-0 mb-2 px-4 sm:px-6 sm:items-center">
-        <p>
-          <Icon name="tabler:clock" class="w-4 h-4 inline-block -mt-0.5 dark:text-gray-400" />
-          <time datetime={String(post.publishDate)} class="inline-block">{getFormattedDate(post.publishDate)}</time>
+      <h1
+        class="px-4 sm:px-6 max-w-3xl mx-auto text-4xl md:text-5xl font-bold leading-tighter tracking-tighter font-heading"
+      >
+        {post.title}
+      </h1>
+      <p
+        class="line-clamp-2 max-w-3xl mx-auto mt-3 mb-3 px-4 sm:px-6 text-lg md:text-xl leading-snug text-muted dark:text-slate-400"
+      >
+        {post.excerpt}
+      </p>
+
+      <div class="max-w-3xl mx-auto mt-0 mb-4 px-4 sm:px-6 text-xs sm:text-sm text-muted dark:text-slate-400">
+        <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span class="inline-flex items-center gap-1">
+            <Icon name="tabler:clock" class="w-4 h-4 dark:text-gray-400" />
+            <time datetime={String(post.publishDate)}>{getFormattedDate(post.publishDate)}</time>
+          </span>
           {
             post.author && (
               <>
-                {' '}
-                · <Icon name="tabler:user" class="w-4 h-4 inline-block -mt-0.5 dark:text-gray-400" />
-                <span class="inline-block">{post.author}</span>
+                <span aria-hidden="true">·</span>
+                <span class="inline-flex items-center gap-1">
+                  <Icon name="tabler:user" class="w-4 h-4 dark:text-gray-400" />
+                  <span>{post.author}</span>
+                </span>
               </>
             )
           }
           {
             post.category && (
               <>
-                {' '}
-                ·{' '}
-                <a class="hover:underline inline-block" href={getPermalink(post.category.slug, 'category')}>
+                <span aria-hidden="true">·</span>
+                <a class="hover:underline" href={getPermalink(post.category.slug, 'category')}>
                   {post.category.title}
                 </a>
               </>
@@ -52,34 +66,24 @@ const { post, url } = Astro.props;
           {
             post.readingTime && (
               <>
-                &nbsp;· <span>{post.readingTime}</span> min read
+                <span aria-hidden="true">·</span>
+                <span>{post.readingTime} min read</span>
               </>
             )
           }
         </p>
       </div>
 
-      <h1
-        class="px-4 sm:px-6 max-w-3xl mx-auto text-4xl md:text-5xl font-bold leading-tighter tracking-tighter font-heading"
-      >
-        {post.title}
-      </h1>
-      <p
-        class="max-w-3xl mx-auto mt-4 mb-8 px-4 sm:px-6 text-xl md:text-2xl text-muted dark:text-slate-400 text-justify"
-      >
-        {post.excerpt}
-      </p>
-
       {
         post.image ? (
           <Image
             src={post.image}
-            class="max-w-full lg:max-w-[900px] mx-auto mb-6 sm:rounded-md bg-gray-400 dark:bg-slate-700"
-            widths={[400, 900]}
-            sizes="(max-width: 900px) 400px, 900px"
+            class="w-full max-w-3xl max-h-[260px] sm:max-h-[340px] lg:max-h-[380px] object-cover mx-auto mb-4 sm:rounded-md bg-gray-400 dark:bg-slate-700"
+            widths={[400, 768]}
+            sizes="(max-width: 768px) 100vw, 768px"
             alt={post?.excerpt || ''}
-            width={900}
-            height={506}
+            width={768}
+            height={432}
             loading="eager"
             decoding="async"
           />
@@ -89,30 +93,34 @@ const { post, url } = Astro.props;
           </div>
         )
       }
-      {post.video && (
-        <div class="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
-          <div class="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <iframe
-              class="aspect-video w-full"
-              src={post.video}
-              title={`${post.title} video`}
-              loading="lazy"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowfullscreen
-            />
+      {
+        post.video && (
+          <div class="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <iframe
+                class="aspect-video w-full"
+                src={post.video}
+                title={`${post.title} video`}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+              />
+            </div>
           </div>
-        </div>
-      )}
-      {post.ctaLink && (
-        <div class="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
-          <a class="btn-primary" href={post.ctaLink}>
-            {post.ctaText || 'Learn more'}
-          </a>
-        </div>
-      )}
+        )
+      }
+      {
+        post.ctaLink && (
+          <div class="mx-auto mt-6 max-w-3xl px-4 sm:px-6">
+            <a class="btn-primary" href={post.ctaLink}>
+              {post.ctaText || 'Learn more'}
+            </a>
+          </div>
+        )
+      }
     </header>
     <div
-      class="mx-auto px-6 sm:px-6 max-w-3xl prose prose-md lg:prose-xl dark:prose-invert dark:prose-headings:text-slate-300 prose-headings:font-heading prose-headings:leading-tighter prose-headings:tracking-tighter prose-headings:font-bold prose-a:text-primary dark:prose-a:text-blue-400 prose-img:rounded-md prose-img:shadow-lg mt-8 prose-headings:scroll-mt-[80px] prose-li:my-0"
+      class="mx-auto px-6 sm:px-6 max-w-3xl prose prose-md lg:prose-xl dark:prose-invert dark:prose-headings:text-slate-300 prose-headings:font-heading prose-headings:leading-tighter prose-headings:tracking-tighter prose-headings:font-bold prose-a:text-primary dark:prose-a:text-blue-400 prose-img:rounded-md prose-img:shadow-lg mt-5 prose-headings:scroll-mt-[80px] prose-li:my-0"
     >
       <slot />
     </div>
