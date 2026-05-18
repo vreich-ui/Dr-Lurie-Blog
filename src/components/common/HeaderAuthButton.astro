@@ -34,39 +34,39 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     </svg>
   </button>
   <div
-    class="absolute left-2 z-50 mt-2 w-[min(18rem,calc(100vw-1rem))] origin-top-left rounded-2xl border border-gray-200/80 bg-white p-3 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
+    class="absolute right-0 z-50 mt-2 w-[min(14.5rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] origin-top-right rounded-2xl border border-gray-200/80 bg-white p-2.5 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
     data-auth-menu
     role="menu"
     hidden
   >
     <div
-      class="mb-2 truncate border-b border-gray-200/80 px-2 pb-2 text-[0.6875rem] font-medium uppercase leading-4 tracking-[0.1em] text-muted dark:border-slate-700/80"
+      class="mb-1.5 truncate border-b border-gray-200/70 px-2 pb-1.5 text-xs font-medium leading-4 text-muted dark:border-slate-700/70"
       data-auth-label
     >
       Account
     </div>
 
-    <div class="space-y-1" data-auth-signed-in hidden>
+    <div class="space-y-0.5" data-auth-signed-in hidden>
       <button
         type="button"
-        class="w-full rounded-xl px-3 py-2 text-left font-semibold leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
+        class="w-full rounded-lg px-2.5 py-1.5 text-left font-medium leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
         data-auth-profile
         role="menuitem"
       >
         Account settings
       </button>
       <a
-        class="block rounded-xl px-3 py-2 font-semibold leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
+        class="block rounded-lg px-2.5 py-1.5 font-medium leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
         href={getPermalink('/member-updates')}
         role="menuitem"
       >
         Member updates
       </a>
       <div data-auth-admin-links hidden></div>
-      <div class="my-1.5 border-t border-gray-200/80 dark:border-slate-700/80"></div>
+      <div class="my-1 border-t border-gray-200/70 dark:border-slate-700/70"></div>
       <button
         type="button"
-        class="w-full rounded-xl px-3 py-2 text-left font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900"
+        class="w-full rounded-lg px-2.5 py-1.5 text-left font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900"
         data-auth-sign-out
         role="menuitem"
       >
@@ -216,7 +216,10 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     const getSignedInLabel = (clerk, adminState) => {
       const email = adminState?.email || clerk.user?.primaryEmailAddress?.emailAddress;
       const name = clerk.user?.fullName || clerk.user?.firstName;
-      return email || name || 'Account';
+
+      if (email) return email.split('@')[0] || email;
+
+      return name || 'Account';
     };
 
     const renderAdminLinks = (container, isAdmin) => {
@@ -226,13 +229,13 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       if (!isAdmin) return;
 
       const divider = document.createElement('div');
-      divider.className = 'my-1.5 border-t border-gray-200/80 dark:border-slate-700/80';
+      divider.className = 'my-1 border-t border-gray-200/70 dark:border-slate-700/70';
       container.append(divider);
 
       adminMenuItems.forEach((item) => {
         const link = document.createElement('a');
         link.className =
-          'block rounded-xl px-3 py-2 font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900';
+          'block rounded-lg px-2.5 py-1.5 font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900';
         link.href = item.href;
         link.role = 'menuitem';
         link.textContent = item.text;
@@ -254,6 +257,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         const adminLinks = root.querySelector('[data-auth-admin-links]');
 
         root.dataset.authSignedIn = String(signedIn);
+        root.dataset.authAdmin = String(Boolean(adminState.isAdmin));
         if (trigger) {
           trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
         }
@@ -266,6 +270,8 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
+        const menu = root.querySelector('[data-auth-menu]');
+        if (menu) menu.style.width = adminState.isAdmin ? 'min(15.5rem, calc(100vw - 2rem))' : '';
       });
     };
 
