@@ -196,3 +196,93 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     </div>
   </div>
 </header>
+
+<script>
+  const headerDropdownCloseDelay = 180;
+  const headerDropdownDesktopQuery = window.matchMedia('(min-width: 768px)');
+
+  function initHeaderDropdownHoverIntent() {
+    const header = document.getElementById('header') as
+      | (HTMLElement & { awDropdownHoverIntentController?: AbortController })
+      | null;
+
+    if (!header) return;
+
+    header.awDropdownHoverIntentController?.abort();
+
+    const controller = new AbortController();
+    header.awDropdownHoverIntentController = controller;
+
+    const dropdowns = Array.from(header.querySelectorAll<HTMLElement>('.dropdown'));
+    const closeTimers = new WeakMap<HTMLElement, number>();
+
+    const clearPendingClose = (dropdown: HTMLElement) => {
+      const timer = closeTimers.get(dropdown);
+
+      if (timer) {
+        window.clearTimeout(timer);
+        closeTimers.delete(dropdown);
+      }
+    };
+
+    const closeDropdown = (dropdown: HTMLElement) => {
+      clearPendingClose(dropdown);
+      dropdown.classList.remove('dropdown-open');
+    };
+
+    const openDropdown = (dropdown: HTMLElement) => {
+      if (!headerDropdownDesktopQuery.matches) return;
+
+      dropdowns.forEach((item) => {
+        if (item !== dropdown) closeDropdown(item);
+      });
+      clearPendingClose(dropdown);
+      dropdown.classList.add('dropdown-open');
+    };
+
+    const scheduleClose = (dropdown: HTMLElement) => {
+      clearPendingClose(dropdown);
+
+      const timer = window.setTimeout(() => {
+        closeDropdown(dropdown);
+      }, headerDropdownCloseDelay);
+
+      closeTimers.set(dropdown, timer);
+    };
+
+    dropdowns.forEach((dropdown) => {
+      const menu = dropdown.querySelector<HTMLElement>('.dropdown-menu');
+
+      dropdown.addEventListener('mouseenter', () => openDropdown(dropdown), { signal: controller.signal });
+      dropdown.addEventListener('mouseleave', () => scheduleClose(dropdown), { signal: controller.signal });
+      dropdown.addEventListener('focusin', () => openDropdown(dropdown), { signal: controller.signal });
+      dropdown.addEventListener(
+        'focusout',
+        (event) => {
+          const nextFocusedElement = event.relatedTarget;
+
+          if (nextFocusedElement instanceof Node && dropdown.contains(nextFocusedElement)) return;
+
+          scheduleClose(dropdown);
+        },
+        { signal: controller.signal }
+      );
+
+      menu?.addEventListener('mouseenter', () => openDropdown(dropdown), { signal: controller.signal });
+      menu?.addEventListener('mouseleave', () => scheduleClose(dropdown), { signal: controller.signal });
+    });
+
+    headerDropdownDesktopQuery.addEventListener(
+      'change',
+      (event) => {
+        if (event.matches) return;
+
+        dropdowns.forEach(closeDropdown);
+      },
+      { signal: controller.signal }
+    );
+  }
+
+  initHeaderDropdownHoverIntent();
+  document.addEventListener('astro:after-swap', initHeaderDropdownHoverIntent);
+</script>

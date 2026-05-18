@@ -95,8 +95,10 @@
     bottom: 100%;
     left: 0;
     height: 0.875rem;
+    pointer-events: none;
   }
 
+  .dropdown.dropdown-open .dropdown-menu,
   .dropdown:focus .dropdown-menu,
   .dropdown:focus-within .dropdown-menu,
   .dropdown:hover .dropdown-menu {
@@ -104,6 +106,13 @@
     opacity: 1;
     pointer-events: auto;
     transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  .dropdown.dropdown-open .dropdown-menu::before,
+  .dropdown:focus .dropdown-menu::before,
+  .dropdown:focus-within .dropdown-menu::before,
+  .dropdown:hover .dropdown-menu::before {
+    pointer-events: auto;
   }
 }
 
