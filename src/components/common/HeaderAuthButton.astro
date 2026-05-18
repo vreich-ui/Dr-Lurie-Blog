@@ -6,19 +6,32 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 ---
 
 <div
-  class="header-auth relative ml-2"
+  class="header-auth relative ml-1"
   data-header-auth
   data-clerk-publishable-key={clerkPublishableKey}
   data-clerk-js-src={clerkJsScriptSrc}
 >
   <button
     type="button"
-    class="inline-flex w-auto items-center justify-center rounded-full border border-gray-300/90 bg-transparent px-4 py-2 text-xs font-semibold uppercase leading-none tracking-[0.16em] text-default shadow-none transition-colors duration-200 hover:border-primary hover:bg-gray-100 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-950 md:px-4.5"
+    class="flex items-center whitespace-nowrap px-2 py-3 text-base font-medium tracking-[0.01rem] text-default transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:text-white dark:focus-visible:ring-offset-slate-950 md:text-[0.9375rem]"
     data-auth-trigger
     aria-haspopup="dialog"
     aria-expanded="false"
   >
-    LOGIN
+    <span data-auth-trigger-label>Login</span>
+    <svg
+      class="ml-0.5 hidden h-3.5 w-3.5 transition-transform rtl:ml-0 rtl:mr-0.5"
+      data-auth-trigger-chevron
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+    >
+      <path d="m6 9 6 6 6-6"></path>
+    </svg>
   </button>
   <div
     class="absolute right-0 z-50 mt-2 w-[min(21.5rem,calc(100vw-1rem))] origin-top-right rounded-2xl border border-gray-200/80 bg-white p-3 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
@@ -90,10 +103,26 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 
       menu.hidden = !open;
       trigger.setAttribute('aria-expanded', String(open));
+      root.querySelector('[data-auth-trigger-chevron]')?.classList.toggle('rotate-180', open);
+    };
+
+    let authMenuCloseTimer;
+
+    const clearAuthMenuCloseTimer = () => {
+      if (!authMenuCloseTimer) return;
+
+      window.clearTimeout(authMenuCloseTimer);
+      authMenuCloseTimer = undefined;
     };
 
     const closeAllMenus = () => {
+      clearAuthMenuCloseTimer();
       getAuthRoots().forEach((root) => setMenuOpen(root, false));
+    };
+
+    const scheduleAuthMenuClose = (root) => {
+      clearAuthMenuCloseTimer();
+      authMenuCloseTimer = window.setTimeout(() => setMenuOpen(root, false), 180);
     };
 
     const loadClerkScript = () =>
@@ -218,14 +247,20 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 
       getAuthRoots().forEach((root) => {
         const trigger = root.querySelector('[data-auth-trigger]');
+        const triggerLabel = root.querySelector('[data-auth-trigger-label]');
+        const triggerChevron = root.querySelector('[data-auth-trigger-chevron]');
         const label = root.querySelector('[data-auth-label]');
         const signedInPanel = root.querySelector('[data-auth-signed-in]');
         const adminLinks = root.querySelector('[data-auth-admin-links]');
 
         root.dataset.authSignedIn = String(signedIn);
         if (trigger) {
-          trigger.textContent = signedIn ? 'ACCOUNT' : 'LOGIN';
           trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
+        }
+        if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Login';
+        if (triggerChevron) {
+          triggerChevron.classList.toggle('hidden', !signedIn);
+          triggerChevron.classList.toggle('rotate-180', signedIn && trigger?.getAttribute('aria-expanded') === 'true');
         }
         if (!signedIn) setMenuOpen(root, false);
         if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
@@ -296,16 +331,11 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
             return;
           }
 
-          const menu = root.querySelector('[data-auth-menu]');
-          const isOpen = Boolean(menu && !menu.hidden);
           closeAllMenus();
-          setMenuOpen(root, !isOpen);
-
-          if (!isOpen) {
-            renderAuthState().catch((error) => {
-              console.error('Header authentication refresh failed.', error);
-            });
-          }
+          setMenuOpen(root, true);
+          renderAuthState().catch((error) => {
+            console.error('Header authentication refresh failed.', error);
+          });
 
           return;
         }
@@ -338,6 +368,29 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         }
 
         if (!root) closeAllMenus();
+      });
+
+      document.addEventListener('mouseover', (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const trigger = target?.closest('[data-auth-trigger]');
+        const menu = target?.closest('[data-auth-menu]');
+
+        if (!root || root.dataset.authSignedIn !== 'true' || (!trigger && !menu)) return;
+
+        clearAuthMenuCloseTimer();
+        setMenuOpen(root, true);
+      });
+
+      document.addEventListener('mouseout', (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const nextTarget = event.relatedTarget;
+
+        if (!root || root.dataset.authSignedIn !== 'true') return;
+        if (nextTarget instanceof Node && root.contains(nextTarget)) return;
+
+        scheduleAuthMenuClose(root);
       });
 
       document.addEventListener('keydown', (event) => {
