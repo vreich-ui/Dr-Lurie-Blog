@@ -97,18 +97,6 @@
     @apply mx-auto max-w-md gap-0 px-4 pt-8;
   }
 
-  [data-mobile-menu-utilities] .header-auth {
-    @apply ml-0 w-full;
-  }
-
-  [data-mobile-menu-utilities] [data-auth-trigger] {
-    @apply w-full justify-center rounded-2xl border border-gray-200 bg-white px-4 py-3 text-base font-semibold shadow-sm hover:border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600;
-  }
-
-  [data-mobile-menu-utilities] [data-auth-menu] {
-    @apply static mt-2 w-full max-w-none rounded-2xl text-left;
-  }
-
   .dropdown .dropdown-menu {
     display: none;
   }

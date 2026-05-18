@@ -89,11 +89,21 @@ import { UI } from 'astrowind:config';
     window.addEventListener('scroll', requestHeaderScrollUpdate, { passive: true, signal: controller.signal });
   };
 
+  function resetMobileDropdown(dropdown) {
+    dropdown.classList.remove('mobile-open');
+    dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
+
+    const authTrigger = dropdown.querySelector('[data-auth-trigger]');
+    const authMenu = dropdown.querySelector('[data-auth-menu]');
+
+    authTrigger?.setAttribute('aria-expanded', 'false');
+    if (authMenu) authMenu.hidden = true;
+    dropdown.querySelector('[data-auth-mobile-icon-closed]')?.classList.remove('hidden');
+    dropdown.querySelector('[data-auth-mobile-icon-open]')?.classList.add('hidden');
+  }
+
   function resetMobileAccordions() {
-    document.querySelectorAll('#header .dropdown.mobile-open').forEach((dropdown) => {
-      dropdown.classList.remove('mobile-open');
-      dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
-    });
+    document.querySelectorAll('#header .dropdown.mobile-open').forEach(resetMobileDropdown);
   }
 
   function closeMobileMenu() {
@@ -115,8 +125,7 @@ import { UI } from 'astrowind:config';
     document.querySelectorAll('#header .dropdown.mobile-open').forEach((item) => {
       if (item === dropdown) return;
 
-      item.classList.remove('mobile-open');
-      item.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
+      resetMobileDropdown(item);
     });
 
     dropdown.classList.toggle('mobile-open', willOpen);
@@ -135,7 +144,7 @@ import { UI } from 'astrowind:config';
         return;
       }
 
-      if (target?.closest('[data-mobile-menu-utilities]')) {
+      if (target?.closest('[data-mobile-menu-utilities], [data-mobile-auth-menu]')) {
         if (target.closest('a[href]')) closeMobileMenu();
         return;
       }
