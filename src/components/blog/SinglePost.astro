@@ -13,6 +13,15 @@ export interface Props {
 }
 
 const { post, url } = Astro.props;
+const heroImageAspect = (() => {
+  if (post.image && typeof post.image === 'object' && 'width' in post.image && 'height' in post.image) {
+    const ratio = post.image.width / post.image.height;
+
+    return Math.abs(ratio - 3 / 2) < Math.abs(ratio - 16 / 9) ? 'aspect-[3/2]' : 'aspect-[16/9]';
+  }
+
+  return 'aspect-[16/9]';
+})();
 ---
 
 <section class="py-5 sm:py-8 lg:py-10 mx-auto">
@@ -45,7 +54,7 @@ const { post, url } = Astro.props;
         post.image ? (
           <Image
             src={post.image}
-            class="w-full max-w-3xl max-h-[260px] sm:max-h-[340px] lg:max-h-[380px] object-cover mx-auto mb-4 sm:rounded-md bg-gray-400 dark:bg-slate-700"
+            class={`w-full max-w-3xl ${heroImageAspect} object-cover mx-auto mb-4 sm:rounded-md bg-gray-400 dark:bg-slate-700`}
             widths={[400, 768]}
             sizes="(max-width: 768px) 100vw, 768px"
             alt={post?.excerpt || ''}
