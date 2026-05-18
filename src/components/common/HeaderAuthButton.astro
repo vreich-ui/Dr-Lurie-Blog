@@ -6,48 +6,67 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 ---
 
 <div
-  class="header-auth relative ml-2"
+  class="header-auth relative ml-1"
   data-header-auth
   data-clerk-publishable-key={clerkPublishableKey}
   data-clerk-js-src={clerkJsScriptSrc}
 >
   <button
     type="button"
-    class="btn-secondary py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
+    class="flex items-center whitespace-nowrap px-2 py-3 text-base font-medium tracking-[0.01rem] text-default transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:text-white dark:focus-visible:ring-offset-slate-950 md:text-[0.9375rem]"
     data-auth-trigger
     aria-haspopup="dialog"
     aria-expanded="false"
   >
-    Sign In / Join
+    <span data-auth-trigger-label>Account</span>
+    <svg
+      class="ml-0.5 hidden h-3.5 w-3.5 transition-transform rtl:ml-0 rtl:mr-0.5"
+      data-auth-trigger-chevron
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+    >
+      <path d="m6 9 6 6 6-6"></path>
+    </svg>
   </button>
   <div
-    class="absolute right-0 z-50 mt-3 w-60 rounded-2xl border border-gray-200 bg-white p-2 text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
+    class="absolute right-0 z-50 mt-2 w-[min(14.5rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] origin-top-right rounded-2xl border border-gray-200/80 bg-white p-2.5 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
     data-auth-menu
     role="menu"
     hidden
   >
-    <div class="px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted" data-auth-label>Account</div>
+    <div
+      class="mb-1.5 truncate border-b border-gray-200/70 px-2 pb-1.5 text-xs font-medium leading-4 text-muted dark:border-slate-700/70"
+      data-auth-label
+    >
+      Account
+    </div>
 
-    <div data-auth-signed-in hidden>
+    <div class="space-y-0.5" data-auth-signed-in hidden>
       <button
         type="button"
-        class="w-full rounded-xl px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-800"
+        class="w-full rounded-lg px-2.5 py-1.5 text-left font-medium leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
         data-auth-profile
         role="menuitem"
       >
         Account settings
       </button>
       <a
-        class="block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800"
+        class="block rounded-lg px-2.5 py-1.5 font-medium leading-5 text-slate-800 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-100 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
         href={getPermalink('/member-updates')}
         role="menuitem"
       >
         Member updates
       </a>
       <div data-auth-admin-links hidden></div>
+      <div class="my-1 border-t border-gray-200/70 dark:border-slate-700/70"></div>
       <button
         type="button"
-        class="w-full rounded-xl px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-slate-800"
+        class="w-full rounded-lg px-2.5 py-1.5 text-left font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900"
         data-auth-sign-out
         role="menuitem"
       >
@@ -84,10 +103,26 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 
       menu.hidden = !open;
       trigger.setAttribute('aria-expanded', String(open));
+      root.querySelector('[data-auth-trigger-chevron]')?.classList.toggle('rotate-180', open);
+    };
+
+    let authMenuCloseTimer;
+
+    const clearAuthMenuCloseTimer = () => {
+      if (!authMenuCloseTimer) return;
+
+      window.clearTimeout(authMenuCloseTimer);
+      authMenuCloseTimer = undefined;
     };
 
     const closeAllMenus = () => {
+      clearAuthMenuCloseTimer();
       getAuthRoots().forEach((root) => setMenuOpen(root, false));
+    };
+
+    const scheduleAuthMenuClose = (root) => {
+      clearAuthMenuCloseTimer();
+      authMenuCloseTimer = window.setTimeout(() => setMenuOpen(root, false), 180);
     };
 
     const loadClerkScript = () =>
@@ -181,7 +216,10 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
     const getSignedInLabel = (clerk, adminState) => {
       const email = adminState?.email || clerk.user?.primaryEmailAddress?.emailAddress;
       const name = clerk.user?.fullName || clerk.user?.firstName;
-      return email || name || 'Account';
+
+      if (email) return email.split('@')[0] || email;
+
+      return name || 'Account';
     };
 
     const renderAdminLinks = (container, isAdmin) => {
@@ -191,12 +229,13 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       if (!isAdmin) return;
 
       const divider = document.createElement('div');
-      divider.className = 'my-2 border-t border-gray-200 dark:border-slate-700';
+      divider.className = 'my-1 border-t border-gray-200/70 dark:border-slate-700/70';
       container.append(divider);
 
       adminMenuItems.forEach((item) => {
         const link = document.createElement('a');
-        link.className = 'block rounded-xl px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-800';
+        link.className =
+          'block rounded-lg px-2.5 py-1.5 font-medium leading-5 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-900';
         link.href = item.href;
         link.role = 'menuitem';
         link.textContent = item.text;
@@ -211,19 +250,28 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 
       getAuthRoots().forEach((root) => {
         const trigger = root.querySelector('[data-auth-trigger]');
+        const triggerLabel = root.querySelector('[data-auth-trigger-label]');
+        const triggerChevron = root.querySelector('[data-auth-trigger-chevron]');
         const label = root.querySelector('[data-auth-label]');
         const signedInPanel = root.querySelector('[data-auth-signed-in]');
         const adminLinks = root.querySelector('[data-auth-admin-links]');
 
         root.dataset.authSignedIn = String(signedIn);
+        root.dataset.authAdmin = String(Boolean(adminState.isAdmin));
         if (trigger) {
-          trigger.textContent = signedIn ? 'Account' : 'Sign In / Join';
           trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
+        }
+        if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Login';
+        if (triggerChevron) {
+          triggerChevron.classList.toggle('hidden', !signedIn);
+          triggerChevron.classList.toggle('rotate-180', signedIn && trigger?.getAttribute('aria-expanded') === 'true');
         }
         if (!signedIn) setMenuOpen(root, false);
         if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
+        const menu = root.querySelector('[data-auth-menu]');
+        if (menu) menu.style.width = adminState.isAdmin ? 'min(15.5rem, calc(100vw - 2rem))' : '';
       });
     };
 
@@ -267,6 +315,26 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
       closeAllMenus();
     };
 
+    const initializeHeaderAuthState = () => {
+      getClerk()
+        .then(async (clerk) => {
+          await renderAuthState(clerk);
+          if (typeof clerk.addListener === 'function' && !headerAuthState.clerkListenerAttached) {
+            headerAuthState.clerkListenerAttached = true;
+            clerk.addListener(() => {
+              renderAuthState(clerk).catch((error) => {
+                console.error('Header authentication refresh failed.', error);
+              });
+            });
+          }
+        })
+        .catch((error) => {
+          console.error('Header authentication initialization failed.', error);
+        });
+    };
+
+    initializeHeaderAuthState();
+
     if (!headerAuthState.initialized) {
       headerAuthState.initialized = true;
 
@@ -289,16 +357,11 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
             return;
           }
 
-          const menu = root.querySelector('[data-auth-menu]');
-          const isOpen = Boolean(menu && !menu.hidden);
           closeAllMenus();
-          setMenuOpen(root, !isOpen);
-
-          if (!isOpen) {
-            renderAuthState().catch((error) => {
-              console.error('Header authentication refresh failed.', error);
-            });
-          }
+          setMenuOpen(root, true);
+          renderAuthState().catch((error) => {
+            console.error('Header authentication refresh failed.', error);
+          });
 
           return;
         }
@@ -333,31 +396,34 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         if (!root) closeAllMenus();
       });
 
+      document.addEventListener('mouseover', (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const trigger = target?.closest('[data-auth-trigger]');
+        const menu = target?.closest('[data-auth-menu]');
+
+        if (!root || root.dataset.authSignedIn !== 'true' || (!trigger && !menu)) return;
+
+        clearAuthMenuCloseTimer();
+        setMenuOpen(root, true);
+      });
+
+      document.addEventListener('mouseout', (event) => {
+        const target = event.target instanceof Element ? event.target : undefined;
+        const root = target?.closest('[data-header-auth]');
+        const nextTarget = event.relatedTarget;
+
+        if (!root || root.dataset.authSignedIn !== 'true') return;
+        if (nextTarget instanceof Node && root.contains(nextTarget)) return;
+
+        scheduleAuthMenuClose(root);
+      });
+
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeAllMenus();
       });
 
-      document.addEventListener('astro:page-load', () => {
-        renderAuthState().catch((error) => {
-          console.error('Header authentication refresh failed.', error);
-        });
-      });
+      document.addEventListener('astro:page-load', initializeHeaderAuthState);
     }
-
-    getClerk()
-      .then(async (clerk) => {
-        await renderAuthState(clerk);
-        if (typeof clerk.addListener === 'function' && !headerAuthState.clerkListenerAttached) {
-          headerAuthState.clerkListenerAttached = true;
-          clerk.addListener(() => {
-            renderAuthState(clerk).catch((error) => {
-              console.error('Header authentication refresh failed.', error);
-            });
-          });
-        }
-      })
-      .catch((error) => {
-        console.error('Header authentication initialization failed.', error);
-      });
   })();
 </script>

@@ -40,19 +40,103 @@ import { UI } from 'astrowind:config';
     }
   }
 
-  const onLoad = function () {
-    let lastKnownScrollPosition = window.scrollY;
-    let previousScrollPosition = window.scrollY;
-    let ticking = true;
+  const initHeaderScrollBehavior = function () {
+    window.__drLurieHeaderScrollController?.abort();
 
-    attachEvent('#header nav', 'click', function () {
-      document.querySelector('[data-aw-toggle-menu]')?.classList.remove('expanded');
-      document.body.classList.remove('overflow-hidden');
-      document.getElementById('header')?.classList.remove('h-screen');
-      document.getElementById('header')?.classList.remove('expanded');
-      document.getElementById('header')?.classList.remove('bg-page');
-      document.querySelector('#header nav')?.classList.add('hidden');
-      document.querySelector('#header > div > div:last-child')?.classList.add('hidden');
+    const header = document.querySelector('#header[data-aw-sticky-header]');
+    if (!header) return;
+
+    const controller = new AbortController();
+    window.__drLurieHeaderScrollController = controller;
+
+    const minScrollDelta = 6;
+    const hideAfterScrollY = 96;
+    const showAtTopScrollY = 20;
+    let previousScrollPosition = Math.max(window.scrollY, 0);
+    let ticking = false;
+
+    const applyHeaderStylesOnScroll = function () {
+      const currentScrollPosition = Math.max(window.scrollY, 0);
+      const scrollDelta = currentScrollPosition - previousScrollPosition;
+      const menuIsExpanded = header.classList.contains('expanded');
+
+      header.classList.toggle('scroll', currentScrollPosition > 60);
+
+      if (menuIsExpanded || currentScrollPosition <= showAtTopScrollY) {
+        header.classList.remove('aw-hidden');
+        previousScrollPosition = currentScrollPosition;
+      } else if (Math.abs(scrollDelta) >= minScrollDelta) {
+        if (scrollDelta > 0 && currentScrollPosition > hideAfterScrollY) {
+          header.classList.add('aw-hidden');
+        } else if (scrollDelta < 0) {
+          header.classList.remove('aw-hidden');
+        }
+
+        previousScrollPosition = currentScrollPosition;
+      }
+
+      ticking = false;
+    };
+
+    const requestHeaderScrollUpdate = function () {
+      if (ticking) return;
+
+      window.requestAnimationFrame(applyHeaderStylesOnScroll);
+      ticking = true;
+    };
+
+    applyHeaderStylesOnScroll();
+    window.addEventListener('scroll', requestHeaderScrollUpdate, { passive: true, signal: controller.signal });
+  };
+
+  function resetMobileAccordions() {
+    document.querySelectorAll('#header .dropdown.mobile-open').forEach((dropdown) => {
+      dropdown.classList.remove('mobile-open');
+      dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  function closeMobileMenu() {
+    document.querySelector('[data-aw-toggle-menu]')?.classList.remove('expanded');
+    document.body.classList.remove('overflow-hidden');
+    document.getElementById('header')?.classList.remove('h-screen');
+    document.getElementById('header')?.classList.remove('expanded');
+    document.getElementById('header')?.classList.remove('bg-page');
+    document.querySelector('#header nav')?.classList.add('hidden');
+    document.querySelector('#header > div > div:last-child')?.classList.add('hidden');
+    resetMobileAccordions();
+  }
+
+  function toggleMobileAccordion(trigger) {
+    const dropdown = trigger.closest('.dropdown');
+    if (!dropdown) return;
+
+    const willOpen = !dropdown.classList.contains('mobile-open');
+
+    document.querySelectorAll('#header .dropdown.mobile-open').forEach((item) => {
+      if (item === dropdown) return;
+
+      item.classList.remove('mobile-open');
+      item.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
+    });
+
+    dropdown.classList.toggle('mobile-open', willOpen);
+    trigger.setAttribute('aria-expanded', String(willOpen));
+  }
+
+  const onLoad = function () {
+    attachEvent('#header nav', 'click', function (event) {
+      const target = event.target instanceof Element ? event.target : undefined;
+      const accordionTrigger = target?.closest('[data-mobile-accordion-trigger]');
+
+      if (accordionTrigger && window.matchMedia('(max-width: 767px)').matches) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleMobileAccordion(accordionTrigger);
+        return;
+      }
+
+      closeMobileMenu();
     });
 
     attachEvent('[data-aw-toggle-menu]', 'click', function (_, elem) {
@@ -63,6 +147,8 @@ import { UI } from 'astrowind:config';
       document.getElementById('header')?.classList.toggle('bg-page');
       document.querySelector('#header nav')?.classList.toggle('hidden');
       document.querySelector('#header > div > div:last-child')?.classList.toggle('hidden');
+
+      if (!elem.classList.contains('expanded')) resetMobileAccordions();
     });
 
     attachEvent('[data-aw-toggle-color-scheme]', 'click', function () {
@@ -110,60 +196,20 @@ import { UI } from 'astrowind:config';
     });
 
     const screenSize = window.matchMedia('(max-width: 767px)');
-    screenSize.addEventListener('change', function () {
-      document.querySelector('[data-aw-toggle-menu]')?.classList.remove('expanded');
-      document.body.classList.remove('overflow-hidden');
-      document.getElementById('header')?.classList.remove('h-screen');
-      document.getElementById('header')?.classList.remove('expanded');
-      document.getElementById('header')?.classList.remove('bg-page');
-      document.querySelector('#header nav')?.classList.add('hidden');
-      document.querySelector('#header > div > div:last-child')?.classList.add('hidden');
-    });
+    screenSize.addEventListener('change', closeMobileMenu);
 
-    function applyHeaderStylesOnScroll() {
-      const header = document.querySelector('#header[data-aw-sticky-header]');
-      if (!header) return;
-
-      const menuIsExpanded = header.classList.contains('expanded');
-      if (lastKnownScrollPosition > 60 && !header.classList.contains('scroll')) {
-        header.classList.add('scroll');
-      } else if (lastKnownScrollPosition <= 60 && header.classList.contains('scroll')) {
-        header.classList.remove('scroll');
-      }
-
-      if (!menuIsExpanded && lastKnownScrollPosition > 120 && lastKnownScrollPosition > previousScrollPosition) {
-        header.classList.add('aw-hidden');
-      } else {
-        header.classList.remove('aw-hidden');
-      }
-
-      previousScrollPosition = Math.max(lastKnownScrollPosition, 0);
-      ticking = false;
-    }
-    applyHeaderStylesOnScroll();
-
-    attachEvent([document], 'scroll', function () {
-      lastKnownScrollPosition = window.scrollY;
-
-      if (!ticking) {
-        window.requestAnimationFrame(() => {
-          applyHeaderStylesOnScroll();
-        });
-        ticking = true;
+    attachEvent([document], 'keydown', function (event) {
+      if (event.key === 'Escape' && document.getElementById('header')?.classList.contains('expanded')) {
+        closeMobileMenu();
       }
     });
+
+    initHeaderScrollBehavior();
   };
   const onPageShow = function () {
     document.documentElement.classList.add('motion-safe:scroll-smooth');
-    const elem = document.querySelector('[data-aw-toggle-menu]');
-    if (elem) {
-      elem.classList.remove('expanded');
-    }
-    document.body.classList.remove('overflow-hidden');
-    document.getElementById('header')?.classList.remove('h-screen');
-    document.getElementById('header')?.classList.remove('expanded');
+    closeMobileMenu();
     document.getElementById('header')?.classList.remove('aw-hidden');
-    document.querySelector('#header nav')?.classList.add('hidden');
   };
 
   window.onload = onLoad;
