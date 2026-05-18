@@ -13,12 +13,12 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 >
   <button
     type="button"
-    class="btn-secondary py-2.5 px-5.5 font-semibold shadow-none text-sm w-auto md:px-6"
+    class="inline-flex w-auto items-center justify-center rounded-full border border-gray-300/90 bg-transparent px-4 py-2 text-xs font-semibold uppercase leading-none tracking-[0.16em] text-default shadow-none transition-colors duration-200 hover:border-primary hover:bg-gray-100 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-400 dark:hover:bg-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-950 md:px-4.5"
     data-auth-trigger
     aria-haspopup="dialog"
     aria-expanded="false"
   >
-    Sign In / Join
+    LOGIN
   </button>
   <div
     class="absolute right-0 z-50 mt-2 w-[min(21.5rem,calc(100vw-1rem))] origin-top-right rounded-2xl border border-gray-200/80 bg-white p-3 text-sm shadow-xl shadow-slate-900/10 transition duration-200 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30"
@@ -224,7 +224,7 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
 
         root.dataset.authSignedIn = String(signedIn);
         if (trigger) {
-          trigger.textContent = signedIn ? 'Account' : 'Sign In / Join';
+          trigger.textContent = signedIn ? 'ACCOUNT' : 'LOGIN';
           trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
         }
         if (!signedIn) setMenuOpen(root, false);
