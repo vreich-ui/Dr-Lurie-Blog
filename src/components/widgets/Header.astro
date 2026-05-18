@@ -76,14 +76,7 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
       <a class="flex items-center" href={getHomePermalink()}>
         <Logo text={logoText} />
       </a>
-      <div class="flex items-center gap-2 md:hidden">
-        <a
-          class="rounded-full bg-primary px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950"
-          href={getPermalink('/solutions/early-access')}
-          data-mobile-header-cta
-        >
-          Join Early Access
-        </a>
+      <div class="flex items-center md:hidden">
         <ToggleMenu />
       </div>
     </div>
@@ -221,8 +214,15 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
           }
           {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
         </div>
-        <span class="flex shrink-0 flex-nowrap items-center whitespace-nowrap">
+        <span class="flex shrink-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap">
           <HeaderAuthButton />
+          <a
+            class="inline-flex w-full justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950 md:hidden"
+            href={getPermalink('/newsletter')}
+            data-mobile-newsletter-cta
+          >
+            Join Newsletter
+          </a>
         </span>
       </div>
     </div>

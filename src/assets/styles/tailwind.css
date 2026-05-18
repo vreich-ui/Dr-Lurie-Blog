@@ -85,10 +85,6 @@
 }
 
 @media (max-width: 767px) {
-  #header.expanded [data-mobile-header-cta] {
-    display: none;
-  }
-
   #header.expanded > div:first-child {
     @apply bg-page;
   }

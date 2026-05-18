@@ -270,6 +270,9 @@ const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/cl
         if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
+        document.querySelectorAll('[data-mobile-newsletter-cta]').forEach((cta) => {
+          cta.hidden = signedIn;
+        });
         const menu = root.querySelector('[data-auth-menu]');
         if (menu) menu.style.width = adminState.isAdmin ? 'min(15.5rem, calc(100vw - 2rem))' : '';
       });
