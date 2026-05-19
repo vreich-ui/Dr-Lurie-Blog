@@ -3,7 +3,7 @@ import Layout from '~/layouts/PageLayout.astro';
 // Do not regenerate this widget; it is imported from the existing .widget file.
 import publishingWidgetBuilderOutputRaw from '~/chatkit/widgets/AI Publishing Workflow.widget?raw';
 
-const pageTitle = 'Dr. Lurié AI Agent Content Generation';
+const pageTitle = 'Dr. Lurié AI Publishing 2.0';
 const publishingWidgetBuilderOutput = JSON.parse(publishingWidgetBuilderOutputRaw) as {
   encodedWidget?: string;
   jsonSchema?: { properties?: Record<string, unknown> };
@@ -67,7 +67,7 @@ const metadata = {
         <p class="agent-kicker">OpenAI Agent Builder</p>
         <h1>{pageTitle}</h1>
         <p class="agent-intro">
-          Use the existing Widget Builder output as the ChatKit interface for the AI publishing workflow.
+          Use the existing Widget Builder output as the ChatKit interface for AI Publishing 2.0.
         </p>
       </div>
     </header>
