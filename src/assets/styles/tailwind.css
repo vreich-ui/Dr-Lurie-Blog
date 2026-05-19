@@ -280,6 +280,18 @@
   .editorial-prose :where(p, li, blockquote) {
     line-height: 1.82;
   }
+  .editorial-prose :where(p),
+  .dl-reading :where(p) {
+    margin-bottom: 1.4em;
+  }
+  .editorial-prose :where(img),
+  .dl-reading :where(img) {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: min(70vh, 560px);
+    object-fit: contain;
+  }
   .editorial-prose :where(p, ul, ol, blockquote) {
     margin-top: 28px;
     margin-bottom: 28px;
@@ -322,6 +334,13 @@
   }
   .dl-card {
     @apply rounded-2xl border border-gray-200 bg-surface p-6 shadow-sm shadow-slate-900/5 dark:border-slate-800 dark:bg-slate-900;
+  }
+}
+
+@media (min-width: 768px) {
+  .editorial-prose :where(p),
+  .dl-reading :where(p) {
+    margin-bottom: 28px;
   }
 }
 
