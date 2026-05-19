@@ -68,7 +68,8 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
-  const workflowId = process.env.OPENAI_CHATKIT_WORKFLOW_ID;
+  const workflowId =
+    process.env.OPENAI_CHATKIT_WORKFLOW_ID ?? 'wf_6a0c52dddb648190a34af0443d65daa20e7d2d451980ffbf';
 
   if (!openaiApiKey || !workflowId) {
     return jsonResponse(500, {
