@@ -544,21 +544,30 @@ const metadata = {
       fields.chatkit.setOptions({
         api: {
           async getClientSecret() {
-            const clerkToken = await getClerkSessionToken();
-            const response = await fetch('/.netlify/functions/create-chatkit-session', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${clerkToken}`,
-                'Content-Type': 'application/json',
-              },
-            });
-            const session = await response.json().catch(() => ({}));
+            const fetchClientSecret = async () => {
+              const clerkToken = await getClerkSessionToken();
+              const response = await fetch('/.netlify/functions/create-chatkit-session', {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${clerkToken}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              const session = await response.json().catch(() => ({}));
 
-            if (!response.ok || typeof session.client_secret !== 'string') {
-              throw new Error(session.error || 'ChatKit session could not be created.');
+              if (!response.ok || typeof session.client_secret !== 'string') {
+                throw new Error(session.error || 'ChatKit session could not be created.');
+              }
+
+              return session.client_secret;
+            };
+
+            try {
+              return await fetchClientSecret();
+            } catch (error) {
+              console.warn('Retrying ChatKit session creation after initial failure.', error);
+              return fetchClientSecret();
             }
-
-            return session.client_secret;
           },
         },
         composer: {
@@ -584,9 +593,19 @@ const metadata = {
         },
       });
 
-      return response
+      const body = await response
         .json()
         .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+
+      if (!response.ok) {
+        return {
+          ...body,
+          isTransientError: response.status >= 500 || response.status === 429,
+          statusCode: response.status,
+        };
+      }
+
+      return body;
     };
 
     const renderAuthState = async (clerk) => {
@@ -601,6 +620,11 @@ const metadata = {
             console.error('ChatKit initialization failed.', error);
             setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
           });
+          return;
+        }
+
+        if (isAdmin && (adminState.isTransientError || adminState.statusCode === 0)) {
+          setStatus('Session check temporarily unavailable. Keeping AI Publishing 2.0 active.', false);
           return;
         }
 
