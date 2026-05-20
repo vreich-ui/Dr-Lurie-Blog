@@ -29,6 +29,8 @@ type PublishImageInput = {
 };
 
 type PublisherRequest = {
+  action?: unknown;
+  articleIdea?: unknown;
   images?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
@@ -137,6 +139,7 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
         : adminState.error || 'A valid Clerk session token is required to run the publisher agent.';
 
     return jsonResponse(statusCode, {
+      status: 'error',
       success: false,
       error,
     });
@@ -144,6 +147,7 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
 
   if (!adminState.isAdmin) {
     return jsonResponse(403, {
+      status: 'error',
       success: false,
       error: 'This Clerk user is not authorized to run the publisher agent.',
     });
@@ -250,6 +254,8 @@ const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest =
     title: title ?? '',
   };
 };
+
+const getActionName = (input: PublisherRequest) => toStringValue(input.action) ?? 'agent.publish_article';
 
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
@@ -380,6 +386,7 @@ const getAgentMetadata = (agentResult: unknown) => {
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, {
+      status: 'error',
       success: false,
       error: 'Method not allowed. Use POST.',
     });
@@ -399,8 +406,28 @@ export const handler = async (event: LambdaEvent) => {
 
     if (!body) {
       return jsonResponse(400, {
+        status: 'error',
         success: false,
         error: 'Missing request body.',
+      });
+    }
+
+    const action = getActionName(body);
+    if (action === 'agent.fill_test_payload') {
+      return jsonResponse(200, {
+        status: 'ok',
+        success: true,
+        action,
+        message: 'Test payload action acknowledged.',
+      });
+    }
+    if (action === 'agent.start_workflow') {
+      return jsonResponse(200, {
+        status: 'ok',
+        success: true,
+        action,
+        articleIdea: toStringValue(body.articleIdea) ?? '',
+        message: 'Workflow start action acknowledged.',
       });
     }
 
@@ -409,6 +436,7 @@ export const handler = async (event: LambdaEvent) => {
   } catch (error) {
     const statusCode = error instanceof RunnerError ? error.statusCode : 400;
     return jsonResponse(statusCode, {
+      status: 'error',
       success: false,
       error: error instanceof Error ? error.message : 'Invalid publisher agent request.',
     });
@@ -449,6 +477,7 @@ export const handler = async (event: LambdaEvent) => {
     const statusCode = success ? 200 : Number(publishResult.statusCode) || 502;
 
     return jsonResponse(statusCode, {
+      status: success ? 'ok' : 'error',
       success,
       articlePath: toStringValue(publishResult.articlePath) ?? articlePath,
       imagePaths,
@@ -474,6 +503,7 @@ export const handler = async (event: LambdaEvent) => {
     const statusCode = error instanceof RunnerError ? error.statusCode : 500;
 
     return jsonResponse(statusCode, {
+      status: 'error',
       success: false,
       articlePath,
       imagePaths: [],
