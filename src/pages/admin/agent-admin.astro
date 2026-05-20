@@ -461,7 +461,19 @@ const metadata = {
       await fields.chatkit.sendUserMessage({ text: message });
     };
 
-    const normalizeActionPayload = (payload) => (payload && typeof payload === 'object' ? payload : {});
+    const normalizeActionPayload = (payload) => {
+      if (payload && typeof payload === 'object') return payload;
+      if (typeof payload === 'string') {
+        try {
+          const parsed = JSON.parse(payload);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+          return {};
+        }
+      }
+
+      return {};
+    };
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
     const toText = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -578,6 +590,16 @@ const metadata = {
           ...(images.length ? { images } : {}),
         };
 
+        const requestBody = {
+          slug,
+          title: title || undefined,
+          markdown,
+          articlePath: `src/data/post/${slug}.md`,
+          overwrite,
+          ...(commitMessage ? { commitMessage } : {}),
+          ...(images.length ? { images } : {}),
+        };
+
         setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
         isPublishInFlight = true;
         const clerkToken = await getClerkSessionToken();
@@ -585,9 +607,9 @@ const metadata = {
           const response = await fetch('/.netlify/functions/publish-article', {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${clerkToken}`,
               'Content-Type': 'application/json',
             },
+            credentials: 'same-origin',
             body: JSON.stringify(requestBody),
           });
           debugState.lastWidgetActionStatus = String(response.status);
