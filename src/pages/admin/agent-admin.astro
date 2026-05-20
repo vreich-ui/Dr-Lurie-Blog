@@ -590,8 +590,19 @@ const metadata = {
           ...(images.length ? { images } : {}),
         };
 
+        const requestBody = {
+          slug,
+          title: title || undefined,
+          markdown,
+          articlePath: `src/data/post/${slug}.md`,
+          overwrite,
+          ...(commitMessage ? { commitMessage } : {}),
+          ...(images.length ? { images } : {}),
+        };
+
         setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
         isPublishInFlight = true;
+        const clerkToken = await getClerkSessionToken();
         try {
           const response = await fetch('/.netlify/functions/publish-article', {
             method: 'POST',
