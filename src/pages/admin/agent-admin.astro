@@ -317,6 +317,7 @@ const metadata = {
     };
 
     let isAdmin = false;
+    let isPublishInFlight = false;
     let clerkLoadPromise;
     let chatkitInitialized = false;
 
@@ -460,7 +461,46 @@ const metadata = {
       await fields.chatkit.sendUserMessage({ text: message });
     };
 
-    const normalizeActionPayload = (payload) => (payload && typeof payload === 'object' ? payload : {});
+    const normalizeActionPayload = (payload) => {
+      if (payload && typeof payload === 'object') return payload;
+      if (typeof payload === 'string') {
+        try {
+          const parsed = JSON.parse(payload);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+          return {};
+        }
+      }
+
+      return {};
+    };
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
+    const toText = (value) => (typeof value === 'string' ? value.trim() : '');
+    const isValidImagePath = (value) =>
+      typeof value === 'string' && /^(src\/assets\/images\/|public\/|images\/|https?:\/\/)/.test(value.trim());
+    const normalizePublishImages = (images) => {
+      if (!Array.isArray(images)) return [];
+
+      return images
+        .map((image) => {
+          if (!image || typeof image !== 'object') return null;
+          const base64 = toText(image.base64 || image.content);
+          const name = toText(image.name || image.fileName);
+          const repoPath = toText(image.repoPath);
+          const compactBase64 = base64.replace(/\s/g, '');
+          if (!compactBase64 || compactBase64.length < 16 || !base64Pattern.test(compactBase64)) return null;
+          if (!name) return null;
+          if (repoPath && !isValidImagePath(repoPath)) return null;
+
+          return {
+            content: compactBase64,
+            name,
+            ...(repoPath ? { repoPath } : {}),
+          };
+        })
+        .filter(Boolean);
+    };
 
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
@@ -513,55 +553,95 @@ const metadata = {
       }
 
       if (actionType === 'agent.publish_article') {
-        const title = String(payload.title || '').trim();
-        const slug = String(payload.slug || '').trim();
-        const markdown = String(payload.markdown || '').trim();
-        const endpoint = String(
-          payload.endpoint || chatkitWidgetConfig.endpoint || '/.netlify/functions/run-publisher-agent'
-        );
+        if (isPublishInFlight) {
+          setStatus('Publish already in progress. Please wait for completion.');
+          return;
+        }
+
+        const title = toText(payload.title);
+        const slug = toText(payload.slug);
+        const markdown = toText(payload.markdown || payload.content);
         const overwrite = Boolean(payload.overwrite);
-        const missing = [
-          !title ? 'title' : undefined,
-          !slug ? 'slug' : undefined,
-          !markdown ? 'markdown' : undefined,
-        ].filter(Boolean);
+        const commitMessage = toText(payload.commitMessage);
+        const images = normalizePublishImages(payload.images);
+        const rawImages = Array.isArray(payload.images) ? payload.images : [];
+        const invalidImageCount = rawImages.length - images.length;
 
-        if (missing.length) {
-          setStatus(`ChatKit publish action is missing ${missing.join(', ')}.`, false);
+        if (!slug || !slugPattern.test(slug)) {
+          setStatus('Publish blocked: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
+          return;
+        }
+        if (!markdown) {
+          setStatus('Publish blocked: markdown content is required.', false);
+          return;
+        }
+        if (invalidImageCount > 0) {
+          setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
           return;
         }
 
-        setStatus('Publishing ChatKit-approved article through the server-side OpenAI agent…');
-        const clerkToken = await getClerkSessionToken();
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${clerkToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'agent.publish_article',
-            title,
-            slug,
-            markdown,
-            overwrite,
-            images: Array.isArray(payload.images) ? payload.images : [],
-          }),
-        });
-        debugState.lastWidgetActionStatus = String(response.status);
-        setDebugLine();
-        const result = await response.json().catch(() => ({}));
+        const requestBody = {
+          slug,
+          title: title || undefined,
+          markdown,
+          articlePath: `src/data/post/${slug}.md`,
+          overwrite,
+          ...(commitMessage ? { commitMessage } : {}),
+          ...(images.length ? { images } : {}),
+        };
 
-        if (!response.ok || result.success === false) {
-          const message = result.error || result.message || `ChatKit publish failed with status ${response.status}.`;
-          setStatus(message, false);
-          await sendChatkitStatusMessage(`Publishing failed: ${message}`);
-          return;
+        setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
+        isPublishInFlight = true;
+        try {
+          const response = await fetch('/.netlify/functions/publish-article', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(requestBody),
+          });
+          debugState.lastWidgetActionStatus = String(response.status);
+          setDebugLine();
+          const result = await response.json().catch(() => ({}));
+
+          if (response.status === 409) {
+            const message =
+              result.error ||
+              result.message ||
+              'Article already exists. Retry with overwrite=true to replace the existing file.';
+            setStatus(message, false);
+            await sendChatkitStatusMessage(`${message} You can retry now with overwrite=true.`);
+            return;
+          }
+
+          if (!response.ok || result.success === false) {
+            const message = result.error || result.message || `Publish failed with status ${response.status}.`;
+            setStatus(message, false);
+            await sendChatkitStatusMessage(`Publishing failed: ${message}`);
+            return;
+          }
+
+          const articlePath = toText(result.articlePath) || `src/data/post/${slug}.md`;
+          const commit = toText(result.commit);
+          const deployStatus = toText(result.deployStatus) || 'unknown';
+          const imagePaths = Array.isArray(result.imagePaths) ? result.imagePaths.filter((path) => typeof path === 'string') : [];
+          const verifyLink = `/blog/${slug}`;
+          const summary = `Published ${articlePath}. Deploy: ${deployStatus}.`;
+          setStatus(summary);
+          await sendChatkitStatusMessage(
+            [
+              `Publishing succeeded.`,
+              `articlePath: ${articlePath}`,
+              `commit: ${commit || 'n/a'}`,
+              `deployStatus: ${deployStatus}`,
+              `imagePaths: ${imagePaths.length ? imagePaths.join(', ') : 'none'}`,
+              `Verify: ${verifyLink}`,
+            ].join('\n')
+          );
+        } finally {
+          isPublishInFlight = false;
         }
-
-        const message = result.message || `Published ${result.articlePath || `src/data/post/${slug}.md`}.`;
-        setStatus(message);
-        await sendChatkitStatusMessage(`Publishing succeeded: ${message}`);
       }
     };
 
