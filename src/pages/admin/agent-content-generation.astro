@@ -105,6 +105,7 @@ const metadata = {
       </details>
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
+      <pre id="agent-error-panel" class="agent-error-panel" hidden></pre>
       <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
     </section>
   </section>
@@ -262,6 +263,18 @@ const metadata = {
     font-weight: 800;
   }
 
+  .agent-error-panel {
+    margin: 0;
+    border: 1px solid rgb(220 38 38 / 25%);
+    border-radius: 0.75rem;
+    background: rgb(254 242 242 / 80%);
+    color: rgb(127 29 29);
+    padding: 0.8rem;
+    font-size: 0.82rem;
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+
   @media (min-width: 640px) {
     .agent-header {
       flex-direction: row;
@@ -298,6 +311,7 @@ const metadata = {
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
+      errorPanel: document.querySelector('#agent-error-panel'),
     };
 
     let isAdmin = false;
@@ -313,7 +327,23 @@ const metadata = {
     const setStatus = (message, isSuccess = true) => {
       fields.agentStatus.textContent = message;
       fields.agentStatus.style.color = isSuccess ? 'var(--aw-color-accent)' : 'rgb(220 38 38)';
+      if (isSuccess) clearErrorPanel();
     };
+    const logPrefix = '[AI Publishing 2.0]';
+
+    const showErrorPanel = (label, payload) => {
+      if (!fields.errorPanel) return;
+      const detail = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+      fields.errorPanel.hidden = false;
+      fields.errorPanel.textContent = `${label}\n${detail}`;
+    };
+
+    const clearErrorPanel = () => {
+      if (!fields.errorPanel) return;
+      fields.errorPanel.hidden = true;
+      fields.errorPanel.textContent = '';
+    };
+
 
     const setChatkitConfigStatus = () => {
       const missingActions = chatkitWidgetConfig.missingActions || [];
@@ -335,6 +365,7 @@ const metadata = {
     const loadClerkScript = () =>
       new Promise((resolve, reject) => {
         if (window.Clerk) {
+          console.info(logPrefix, 'Clerk already present on window.');
           resolve();
           return;
         }
@@ -390,7 +421,9 @@ const metadata = {
         }
 
         const clerk = window.Clerk;
+        console.info(logPrefix, 'Loading Clerk client…');
         await clerk.load();
+        console.info(logPrefix, 'Clerk loaded.', { signedIn: Boolean(clerk.isSignedIn) });
         return clerk;
       })();
 
@@ -413,6 +446,7 @@ const metadata = {
       }
 
       const token = await clerk.session.getToken();
+      console.info(logPrefix, 'Retrieved Clerk session token.', { hasToken: Boolean(token) });
 
       if (!token) {
         throw new Error('Could not retrieve a Clerk session token.');
@@ -439,6 +473,7 @@ const metadata = {
 
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
+      console.info(logPrefix, 'Widget action received.', { actionType, action });
       const payload = normalizeActionPayload(action?.payload);
 
       if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
@@ -504,6 +539,7 @@ const metadata = {
 
         setStatus('Publishing ChatKit-approved article through the server-side OpenAI agent…');
         const clerkToken = await getClerkSessionToken();
+        console.info(logPrefix, 'Posting widget publish action.', { endpoint, title, slug, overwrite });
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -519,6 +555,7 @@ const metadata = {
           }),
         });
         const result = await response.json().catch(() => ({}));
+        console.info(logPrefix, 'Widget publish response received.', { status: response.status, ok: response.ok, result });
 
         if (!response.ok || result.success === false) {
           const message = result.error || result.message || `ChatKit publish failed with status ${response.status}.`;
@@ -546,6 +583,7 @@ const metadata = {
           async getClientSecret() {
             const fetchClientSecret = async () => {
               const clerkToken = await getClerkSessionToken();
+              console.info(logPrefix, 'Requesting ChatKit session/client secret…');
               const response = await fetch('/.netlify/functions/create-chatkit-session', {
                 method: 'POST',
                 headers: {
@@ -554,8 +592,10 @@ const metadata = {
                 },
               });
               const session = await response.json().catch(() => ({}));
+              console.info(logPrefix, 'ChatKit session response received.', { status: response.status, ok: response.ok, session });
 
               if (!response.ok || typeof session.client_secret !== 'string') {
+                showErrorPanel('ChatKit session request failed', { status: response.status, body: session });
                 throw new Error(session.error || 'ChatKit session could not be created.');
               }
 
@@ -585,6 +625,7 @@ const metadata = {
       const token = await clerk.session.getToken();
       if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
 
+      console.info(logPrefix, 'Checking Clerk admin state…');
       const response = await fetch('/.netlify/functions/admin-auth-state', {
         method: 'GET',
         headers: {
@@ -596,6 +637,8 @@ const metadata = {
       const body = await response
         .json()
         .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+
+      console.info(logPrefix, 'Admin auth response received.', { status: response.status, ok: response.ok, body });
 
       if (!response.ok) {
         return {
