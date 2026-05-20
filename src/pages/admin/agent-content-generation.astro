@@ -105,6 +105,7 @@ const metadata = {
       </details>
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
+      <p id="agent-runtime-line" class="agent-runtime-line" aria-live="polite"></p>
       <pre id="agent-error-panel" class="agent-error-panel" hidden></pre>
       <pre id="agent-debug-panel" class="agent-debug-panel"></pre>
       <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
@@ -304,6 +305,13 @@ const metadata = {
       text-align: center;
     }
   }
+
+  .agent-runtime-line {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.82rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  }
 </style>
 
 <script is:inline>
@@ -313,6 +321,7 @@ const metadata = {
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
+      runtimeLine: document.querySelector('#agent-runtime-line'),
       errorPanel: document.querySelector('#agent-error-panel'),
       debugPanel: document.querySelector('#agent-debug-panel'),
     };
@@ -324,6 +333,15 @@ const metadata = {
     let chatkitMountLocked = false;
 
     const runtimeState = (window.__drLurieChatkitState ||= { initialized: false, initCount: 0 });
+    const actionEndpoint = '/.netlify/functions/run-publisher-agent';
+    const runtimeFlags = {
+      sessionEndpointCalled: false,
+      sessionSuccess: false,
+      widgetLoaded: false,
+      actionEndpointRegistered: false,
+      lastActionClicked: '',
+      lastActionResponseStatus: '',
+    };
 
     const agentPage = document.querySelector('.agent-admin-page');
     const clerkPublishableKey = agentPage?.dataset.clerkPublishableKey || '';
@@ -364,6 +382,18 @@ const metadata = {
       };
 
       fields.debugPanel.textContent = JSON.stringify(panelPayload, null, 2);
+    };
+
+    const renderRuntimeLine = () => {
+      if (!fields.runtimeLine) return;
+      fields.runtimeLine.textContent = [
+        `session endpoint called: ${runtimeFlags.sessionEndpointCalled ? 'yes' : 'no'}`,
+        `session success: ${runtimeFlags.sessionSuccess ? 'yes' : 'no'}`,
+        `widget loaded: ${runtimeFlags.widgetLoaded ? 'yes' : 'no'}`,
+        `action endpoint registered: ${runtimeFlags.actionEndpointRegistered ? 'yes' : 'no'}`,
+        `last action clicked: ${runtimeFlags.lastActionClicked || 'none'}`,
+        `last action response status: ${runtimeFlags.lastActionResponseStatus || 'none'}`,
+      ].join(' | ');
     };
 
     const inspectChatkitSurface = (tag = 'inspect') => {
@@ -530,6 +560,8 @@ const metadata = {
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
       console.info(logPrefix, 'Widget action received.', { actionType, action });
+      runtimeFlags.lastActionClicked = String(actionType || '');
+      renderRuntimeLine();
       const payload = normalizeActionPayload(action?.payload);
 
       if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
@@ -537,6 +569,19 @@ const metadata = {
       }
 
       if (actionType === 'agent.fill_test_payload') {
+        const clerkToken = await getClerkSessionToken();
+        const response = await fetch(actionEndpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: actionType, type: actionType, title: 'Smoke Test Payload', slug: 'smoke-test-payload' }),
+        });
+        const result = await response.json().catch(() => ({}));
+        runtimeFlags.lastActionResponseStatus = String(response.status);
+        renderRuntimeLine();
+        console.info(logPrefix, 'Widget fill_test_payload action response.', { status: response.status, result });
         await sendChatkitStatusMessage(
           [
             'Fill the AI Publishing Workflow widget with a smoke-test article idea, title, slug,',
@@ -561,6 +606,19 @@ const metadata = {
           setStatus('Enter an article idea before starting the AI workflow.', false);
           return;
         }
+        const clerkToken = await getClerkSessionToken();
+        const response = await fetch(actionEndpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: actionType, type: actionType, articleIdea, slug: slug || 'article-idea', overwrite }),
+        });
+        const result = await response.json().catch(() => ({}));
+        runtimeFlags.lastActionResponseStatus = String(response.status);
+        renderRuntimeLine();
+        console.info(logPrefix, 'Widget start_workflow action response.', { status: response.status, result });
 
         await sendChatkitStatusMessage(
           [
@@ -578,9 +636,7 @@ const metadata = {
         const title = String(payload.title || '').trim();
         const slug = String(payload.slug || '').trim();
         const markdown = String(payload.markdown || '').trim();
-        const endpoint = String(
-          payload.endpoint || chatkitWidgetConfig.endpoint || '/.netlify/functions/run-publisher-agent'
-        );
+        const endpoint = actionEndpoint;
         const overwrite = Boolean(payload.overwrite);
         const missing = [
           !title ? 'title' : undefined,
@@ -611,6 +667,8 @@ const metadata = {
           }),
         });
         const result = await response.json().catch(() => ({}));
+        runtimeFlags.lastActionResponseStatus = String(response.status);
+        renderRuntimeLine();
         console.info(logPrefix, 'Widget publish response received.', { status: response.status, ok: response.ok, result });
 
         if (!response.ok || result.success === false) {
@@ -639,6 +697,9 @@ const metadata = {
       runtimeState.initialized = true;
       runtimeState.initCount += 1;
       chatkitMountLocked = true;
+      runtimeFlags.widgetLoaded = true;
+      runtimeFlags.actionEndpointRegistered = String(chatkitWidgetConfig.endpoint || actionEndpoint) === actionEndpoint;
+      renderRuntimeLine();
       setDebugPanel('chatkit-init-start', { initCount: runtimeState.initCount });
       inspectChatkitSurface('chatkit-init-surface');
       setGatedContentVisible(true);
@@ -654,6 +715,8 @@ const metadata = {
             const fetchClientSecret = async () => {
               const clerkToken = await getClerkSessionToken();
               console.info(logPrefix, 'Requesting ChatKit session/client secret…');
+              runtimeFlags.sessionEndpointCalled = true;
+              renderRuntimeLine();
               const response = await fetch('/.netlify/functions/create-chatkit-session', {
                 method: 'POST',
                 headers: {
@@ -666,10 +729,14 @@ const metadata = {
 
               if (!response.ok || typeof session.client_secret !== 'string') {
                 showErrorPanel('ChatKit session request failed', { status: response.status, body: session });
+                runtimeFlags.sessionSuccess = false;
+                renderRuntimeLine();
                 throw new Error(session.error || 'ChatKit session could not be created.');
               }
 
               chatkitSessionSecret = session.client_secret;
+              runtimeFlags.sessionSuccess = true;
+              renderRuntimeLine();
               return chatkitSessionSecret;
             };
 
