@@ -196,7 +196,7 @@ const metadata = {
     display: block;
     width: 100%;
     min-height: 680px;
-    overflow: hidden;
+    overflow: visible;
     border: 1px solid rgb(229 231 235);
     border-radius: 1.25rem;
     background: var(--aw-color-bg-page);
@@ -317,6 +317,8 @@ const metadata = {
     let isAdmin = false;
     let clerkLoadPromise;
     let chatkitInitialized = false;
+    let chatkitSessionSecret;
+    let chatkitMountLocked = false;
 
     const agentPage = document.querySelector('.agent-admin-page');
     const clerkPublishableKey = agentPage?.dataset.clerkPublishableKey || '';
@@ -430,8 +432,12 @@ const metadata = {
       return clerkLoadPromise;
     };
 
-    const setAuthState = (state) => {
+    const setAuthState = (state, options = {}) => {
       isAdmin = state === 'signed-in';
+      const preserveMountedChatkit = options.preserveMountedChatkit === true;
+
+      if (preserveMountedChatkit && chatkitMountLocked) return;
+
       setGatedContentVisible(isAdmin);
     };
 
@@ -577,10 +583,17 @@ const metadata = {
       await waitForChatkitElement();
 
       chatkitInitialized = true;
+      chatkitMountLocked = true;
+      setGatedContentVisible(true);
 
       fields.chatkit.setOptions({
         api: {
           async getClientSecret() {
+            if (chatkitSessionSecret) {
+              console.info(logPrefix, 'Using cached ChatKit client secret.');
+              return chatkitSessionSecret;
+            }
+
             const fetchClientSecret = async () => {
               const clerkToken = await getClerkSessionToken();
               console.info(logPrefix, 'Requesting ChatKit session/client secret…');
@@ -599,7 +612,8 @@ const metadata = {
                 throw new Error(session.error || 'ChatKit session could not be created.');
               }
 
-              return session.client_secret;
+              chatkitSessionSecret = session.client_secret;
+              return chatkitSessionSecret;
             };
 
             try {
@@ -668,6 +682,14 @@ const metadata = {
 
         if (isAdmin && (adminState.isTransientError || adminState.statusCode === 0)) {
           setStatus('Session check temporarily unavailable. Keeping AI Publishing 2.0 active.', false);
+          setAuthState('signed-in', { preserveMountedChatkit: true });
+          return;
+        }
+
+        if (chatkitMountLocked) {
+          console.warn(logPrefix, 'Admin refresh returned non-admin after mount; preserving active ChatKit instance.', adminState);
+          setStatus('Admin session refresh changed unexpectedly; keeping current ChatKit session active.', false);
+          setAuthState('signed-in', { preserveMountedChatkit: true });
           return;
         }
 
