@@ -42,15 +42,15 @@ const verifyClerkAdminSession = async (
         ? 'A valid Clerk session token is required to create ChatKit sessions.'
         : adminState.error || 'A valid Clerk session token is required to create ChatKit sessions.';
 
-    return jsonResponse(statusCode, { error });
+    return jsonResponse(statusCode, { status: 'error', error });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to create ChatKit sessions.' });
+    return jsonResponse(403, { status: 'error', error: 'This Clerk user is not authorized to create ChatKit sessions.' });
   }
 
   if (!adminState.userId) {
-    return jsonResponse(401, { error: 'Invalid Clerk session token.' });
+    return jsonResponse(401, { status: 'error', error: 'Invalid Clerk session token.' });
   }
 
   return { userId: `clerk-${adminState.userId}` };
@@ -58,7 +58,7 @@ const verifyClerkAdminSession = async (
 
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') {
-    return jsonResponse(405, { error: 'Method not allowed' });
+    return jsonResponse(405, { status: 'error', error: 'Method not allowed' });
   }
 
   const verifiedUser = await verifyClerkAdminSession(event);
@@ -72,6 +72,7 @@ export const handler = async (event: LambdaEvent) => {
 
   if (!openaiApiKey || !workflowId) {
     return jsonResponse(500, {
+      status: 'error',
       error: 'Chat session creation is not configured.',
     });
   }
@@ -100,19 +101,19 @@ export const handler = async (event: LambdaEvent) => {
         statusText: response.statusText,
       });
 
-      return jsonResponse(502, { error: 'Chat session could not be created.' });
+      return jsonResponse(502, { status: 'error', error: 'Chat session could not be created.' });
     }
 
     if (typeof session.client_secret !== 'string' || !session.client_secret) {
       console.error('OpenAI ChatKit session response did not include a client_secret.');
 
-      return jsonResponse(502, { error: 'Chat session could not be created.' });
+      return jsonResponse(502, { status: 'error', error: 'Chat session could not be created.' });
     }
 
     return jsonResponse(200, { client_secret: session.client_secret });
   } catch (error) {
     console.error('OpenAI ChatKit session creation failed.', error);
 
-    return jsonResponse(502, { error: 'Chat session could not be created.' });
+    return jsonResponse(502, { status: 'error', error: 'Chat session could not be created.' });
   }
 };

@@ -104,6 +104,7 @@ const metadata = {
       </details>
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
+      <p id="agent-debug" class="agent-debug" aria-live="polite"></p>
       <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
     </section>
   </section>
@@ -261,6 +262,14 @@ const metadata = {
     font-weight: 800;
   }
 
+  .agent-debug {
+    margin-top: 0.5rem;
+    color: rgb(71 85 105);
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-line;
+  }
+
   @media (min-width: 640px) {
     .agent-header {
       flex-direction: row;
@@ -297,6 +306,13 @@ const metadata = {
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
+      agentDebug: document.querySelector('#agent-debug'),
+    };
+    const debugState = {
+      sessionRequestStatus: 'not-started',
+      sessionHasClientSecret: false,
+      lastWidgetActionSent: 'none',
+      lastWidgetActionStatus: 'n/a',
     };
 
     let isAdmin = false;
@@ -312,6 +328,14 @@ const metadata = {
     const setStatus = (message, isSuccess = true) => {
       fields.agentStatus.textContent = message;
       fields.agentStatus.style.color = isSuccess ? 'var(--aw-color-accent)' : 'rgb(220 38 38)';
+    };
+    const setDebugLine = () => {
+      if (!fields.agentDebug) return;
+      fields.agentDebug.textContent =
+        `session request: ${debugState.sessionRequestStatus}\n` +
+        `session response has client_secret: ${String(debugState.sessionHasClientSecret)}\n` +
+        `last widget action sent: ${debugState.lastWidgetActionSent}\n` +
+        `last widget action status: ${debugState.lastWidgetActionStatus}`;
     };
 
     const setChatkitConfigStatus = () => {
@@ -439,6 +463,8 @@ const metadata = {
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
       const payload = normalizeActionPayload(action?.payload);
+      debugState.lastWidgetActionSent = String(actionType || 'unknown');
+      setDebugLine();
 
       if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
         return;
@@ -479,6 +505,8 @@ const metadata = {
           ].join('\n')
         );
         setStatus('AI publishing workflow started.');
+        debugState.lastWidgetActionStatus = 'local-only';
+        setDebugLine();
         return;
       }
 
@@ -510,6 +538,7 @@ const metadata = {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            action: 'agent.publish_article',
             title,
             slug,
             markdown,
@@ -517,6 +546,8 @@ const metadata = {
             images: Array.isArray(payload.images) ? payload.images : [],
           }),
         });
+        debugState.lastWidgetActionStatus = String(response.status);
+        setDebugLine();
         const result = await response.json().catch(() => ({}));
 
         if (!response.ok || result.success === false) {
@@ -551,13 +582,16 @@ const metadata = {
                 'Content-Type': 'application/json',
               },
             });
-            const session = await response.json().catch(() => ({}));
+            debugState.sessionRequestStatus = String(response.status);
+            const body = await response.json().catch(() => ({}));
+            debugState.sessionHasClientSecret = typeof body.client_secret === 'string';
+            setDebugLine();
 
-            if (!response.ok || typeof session.client_secret !== 'string') {
-              throw new Error(session.error || 'ChatKit session could not be created.');
+            if (!response.ok || typeof body.client_secret !== 'string') {
+              throw new Error(body.error || 'ChatKit session could not be created.');
             }
 
-            return session.client_secret;
+            return body.client_secret;
           },
         },
         composer: {

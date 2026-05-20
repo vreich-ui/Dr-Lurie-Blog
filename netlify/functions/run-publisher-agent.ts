@@ -1,5 +1,6 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import { Agent, run, tool } from '@openai/agents';
+import { z } from 'zod';
 
 /**
  * Netlify environment required by this server-side Agent SDK runner:
@@ -28,9 +29,12 @@ type PublishImageInput = {
 };
 
 type PublisherRequest = {
+  action?: unknown;
+  articleIdea?: unknown;
   images?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
+  publishSecret?: unknown;
   slug?: unknown;
   title?: unknown;
 };
@@ -68,6 +72,40 @@ type PublishToolResult = PublishEndpointResult & {
   };
 };
 
+const publishImageSchema = z
+  .object({
+    name: z.string().trim().min(1).optional(),
+    repoPath: z.string().trim().min(1).optional(),
+    type: z.string().trim().min(1).optional(),
+    encoding: z.string().trim().min(1).optional(),
+    base64: z.string().trim().min(1).optional(),
+    content: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+const publishToolInputSchema = z
+  .object({
+    slug: z.string().trim().min(1),
+    title: z.string().trim().min(1),
+    markdown: z.string().trim().min(1).optional(),
+    content: z.string().trim().min(1).optional(),
+    description: z.string().trim().min(1).optional(),
+    publishDate: z.string().trim().min(1).optional(),
+    author: z.string().trim().min(1).optional(),
+    tags: z.array(z.string().trim().min(1)).optional(),
+    images: z.array(publishImageSchema).optional(),
+    overwrite: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.markdown && !value.content) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Either markdown or content is required.',
+        path: ['markdown'],
+      });
+    }
+  });
+
 const jsonHeaders = {
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -102,6 +140,7 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
         : adminState.error || 'A valid Clerk session token is required to run the publisher agent.';
 
     return jsonResponse(statusCode, {
+      status: 'error',
       success: false,
       error,
     });
@@ -109,12 +148,35 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
 
   if (!adminState.isAdmin) {
     return jsonResponse(403, {
+      status: 'error',
       success: false,
       error: 'This Clerk user is not authorized to run the publisher agent.',
     });
   }
 
   return undefined;
+};
+
+const verifyRequestAuthorization = async (event: LambdaEvent, input?: PublisherRequest) => {
+  const publishKey = getHeader(event.headers, 'x-publish-key').trim();
+  const publishSecretFromBody = toStringValue(input?.publishSecret) ?? '';
+  const providedSecret = publishKey || publishSecretFromBody;
+
+  if (providedSecret) {
+    const publishSecret = process.env.PUBLISH_SECRET;
+
+    if (publishSecret && providedSecret === publishSecret) {
+      return undefined;
+    }
+
+    return jsonResponse(403, {
+      status: 'error',
+      success: false,
+      error: 'Invalid publish key.',
+    });
+  }
+
+  return verifyClerkAdminSession(event);
 };
 
 const toStringValue = (value: unknown) => {
@@ -216,46 +278,54 @@ const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest =
   };
 };
 
+const getActionName = (input: PublisherRequest) => toStringValue(input.action) ?? 'agent.publish_article';
+
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 
 const createPublishTool = ({
   endpoint,
-  input,
+  defaultInput,
   publishSecret,
   onPublishResult,
 }: {
   endpoint: string;
-  input: NormalizedPublisherRequest;
+  defaultInput: NormalizedPublisherRequest;
   publishSecret: string;
   onPublishResult?: (result: PublishToolResult) => void;
 }) =>
   tool({
     name: 'publish_approved_article',
     description: 'Publishes the already-approved article payload through the existing secure Netlify publish endpoint.',
-    parameters: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
+    parameters: publishToolInputSchema,
     strict: true,
-    async execute(): Promise<PublishToolResult> {
-      const articlePath = `${repoContentRoot}/${input.slug}.md`;
+    async execute(rawInput): Promise<PublishToolResult> {
+      const parsed = publishToolInputSchema.parse(rawInput);
+      const slug = slugify(parsed.slug);
+      const markdown = toStringValue(parsed.markdown) ?? defaultInput.markdown;
+      const title = toStringValue(parsed.title) ?? defaultInput.title;
+      const articlePath = `${repoContentRoot}/${slug}.md`;
+      const normalizedImages = normalizeImages(parsed.images ?? defaultInput.images);
       const payload = {
-        slug: input.slug,
+        slug,
         articlePath,
-        markdown: input.markdown,
-        images: input.images.length ? input.images : [],
-        commitMessage: `Publish article: ${input.title}`,
-        overwrite: input.overwrite,
+        markdown,
+        content: parsed.content,
+        description: parsed.description,
+        publishDate: parsed.publishDate,
+        author: parsed.author,
+        tags: parsed.tags,
+        title,
+        images: normalizedImages.length ? normalizedImages : [],
+        commitMessage: `Publish article: ${title}`,
+        overwrite: parsed.overwrite ?? defaultInput.overwrite,
       };
 
       console.info('Publisher agent posting approved article.', {
         articlePath,
         imageCount: payload.images.length,
-        overwrite: input.overwrite,
-        slug: input.slug,
+        overwrite: payload.overwrite,
+        slug,
       });
 
       const response = await fetch(endpoint, {
@@ -284,8 +354,8 @@ const createPublishTool = ({
           articlePath,
           commitMessage: payload.commitMessage,
           imageCount: payload.images.length,
-          overwrite: input.overwrite,
-          slug: input.slug,
+          overwrite: payload.overwrite,
+          slug,
         },
       };
 
@@ -297,12 +367,12 @@ const createPublishTool = ({
 
 export const createPublisherAgent = ({
   endpoint,
-  input,
+  defaultInput,
   publishSecret,
   onPublishResult,
 }: {
   endpoint: string;
-  input: NormalizedPublisherRequest;
+  defaultInput: NormalizedPublisherRequest;
   publishSecret: string;
   onPublishResult?: (result: PublishToolResult) => void;
 }) =>
@@ -310,10 +380,11 @@ export const createPublisherAgent = ({
     name: 'Dr. Lurie Server-Side Publisher',
     instructions: [
       'You run server-side publishing for already-approved Dr. Lurié article data.',
-      'Do not rewrite, summarize, or otherwise alter the approved article.',
+      'Do not rewrite, summarize, or otherwise alter the approved article content.',
+      'Call publish_approved_article once with the approved fields exactly as provided.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
     ].join('\n'),
-    tools: [createPublishTool({ endpoint, input, publishSecret, onPublishResult })],
+    tools: [createPublishTool({ endpoint, defaultInput, publishSecret, onPublishResult })],
   });
 
 const getAgentMetadata = (agentResult: unknown) => {
@@ -338,27 +409,49 @@ const getAgentMetadata = (agentResult: unknown) => {
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, {
+      status: 'error',
       success: false,
       error: 'Method not allowed. Use POST.',
     });
   }
 
-  const authError = await verifyClerkAdminSession(event);
-
-  if (authError) {
-    return authError;
-  }
-
   let input: NormalizedPublisherRequest;
   let env: { endpoint: string; publishSecret: string };
+  let body: PublisherRequest | undefined;
 
   try {
-    const body = parseBody(event);
+    body = parseBody(event);
 
     if (!body) {
       return jsonResponse(400, {
+        status: 'error',
         success: false,
         error: 'Missing request body.',
+      });
+    }
+
+    const authError = await verifyRequestAuthorization(event, body);
+
+    if (authError) {
+      return authError;
+    }
+
+    const action = getActionName(body);
+    if (action === 'agent.fill_test_payload') {
+      return jsonResponse(200, {
+        status: 'ok',
+        success: true,
+        action,
+        message: 'Test payload action acknowledged.',
+      });
+    }
+    if (action === 'agent.start_workflow') {
+      return jsonResponse(200, {
+        status: 'ok',
+        success: true,
+        action,
+        articleIdea: toStringValue(body.articleIdea) ?? '',
+        message: 'Workflow start action acknowledged.',
       });
     }
 
@@ -367,6 +460,7 @@ export const handler = async (event: LambdaEvent) => {
   } catch (error) {
     const statusCode = error instanceof RunnerError ? error.statusCode : 400;
     return jsonResponse(statusCode, {
+      status: 'error',
       success: false,
       error: error instanceof Error ? error.message : 'Invalid publisher agent request.',
     });
@@ -385,13 +479,17 @@ export const handler = async (event: LambdaEvent) => {
 
     const agent = createPublisherAgent({
       endpoint: env.endpoint,
-      input,
+      defaultInput: input,
       publishSecret: env.publishSecret,
       onPublishResult: (result) => {
         publishResult = result;
       },
     });
-    const agentResult = await run(agent, `Publish the approved article at ${articlePath}.`, { maxTurns: 3 });
+    const agentResult = await run(
+      agent,
+      `Publish the approved article using this payload JSON exactly:\n${JSON.stringify(input)}\nArticle path: ${articlePath}.`,
+      { maxTurns: 3 }
+    );
     const metadata = getAgentMetadata(agentResult);
 
     if (!publishResult) {
@@ -403,6 +501,7 @@ export const handler = async (event: LambdaEvent) => {
     const statusCode = success ? 200 : Number(publishResult.statusCode) || 502;
 
     return jsonResponse(statusCode, {
+      status: success ? 'ok' : 'error',
       success,
       articlePath: toStringValue(publishResult.articlePath) ?? articlePath,
       imagePaths,
@@ -428,6 +527,7 @@ export const handler = async (event: LambdaEvent) => {
     const statusCode = error instanceof RunnerError ? error.statusCode : 500;
 
     return jsonResponse(statusCode, {
+      status: 'error',
       success: false,
       articlePath,
       imagePaths: [],
