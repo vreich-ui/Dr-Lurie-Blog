@@ -13,6 +13,8 @@ type ChatKitSessionResponse = {
   client_secret?: unknown;
 };
 
+const WORKFLOW_ID_PATTERN = /^wf_[a-zA-Z0-9]+$/;
+
 type VerifiedChatkitUser = {
   userId: string;
 };
@@ -68,12 +70,19 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const openaiApiKey = process.env.OPENAI_API_KEY;
-  const workflowId = process.env.OPENAI_CHATKIT_WORKFLOW_ID;
+  const workflowId = process.env.OPENAI_CHATKIT_WORKFLOW_ID?.trim();
 
   if (!openaiApiKey || !workflowId) {
     return jsonResponse(500, {
       status: 'error',
       error: 'Chat session creation is not configured.',
+    });
+  }
+
+  if (!WORKFLOW_ID_PATTERN.test(workflowId)) {
+    return jsonResponse(500, {
+      status: 'error',
+      error: 'Chat session workflow configuration is invalid.',
     });
   }
 
@@ -110,7 +119,10 @@ export const handler = async (event: LambdaEvent) => {
       return jsonResponse(502, { status: 'error', error: 'Chat session could not be created.' });
     }
 
-    return jsonResponse(200, { client_secret: session.client_secret });
+    return jsonResponse(200, {
+      client_secret: session.client_secret,
+      workflow_id: workflowId,
+    });
   } catch (error) {
     console.error('OpenAI ChatKit session creation failed.', error);
 

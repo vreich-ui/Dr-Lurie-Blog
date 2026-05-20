@@ -311,6 +311,7 @@ const metadata = {
     const debugState = {
       sessionRequestStatus: 'not-started',
       sessionHasClientSecret: false,
+      sessionWorkflowId: 'unknown',
       lastWidgetActionSent: 'none',
       lastWidgetActionStatus: 'n/a',
     };
@@ -334,6 +335,7 @@ const metadata = {
       fields.agentDebug.textContent =
         `session request: ${debugState.sessionRequestStatus}\n` +
         `session response has client_secret: ${String(debugState.sessionHasClientSecret)}\n` +
+        `session workflow id: ${debugState.sessionWorkflowId}\n` +
         `last widget action sent: ${debugState.lastWidgetActionSent}\n` +
         `last widget action status: ${debugState.lastWidgetActionStatus}`;
     };
@@ -585,6 +587,7 @@ const metadata = {
             debugState.sessionRequestStatus = String(response.status);
             const body = await response.json().catch(() => ({}));
             debugState.sessionHasClientSecret = typeof body.client_secret === 'string';
+            debugState.sessionWorkflowId = typeof body.workflow_id === 'string' ? body.workflow_id : 'missing';
             setDebugLine();
 
             if (!response.ok || typeof body.client_secret !== 'string') {
