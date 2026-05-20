@@ -164,7 +164,7 @@ Required Netlify environment variables for the existing publish endpoint are:
 - `CLERK_SECRET_KEY`
 - `PUBLIC_CLERK_PUBLISHABLE_KEY`
 
-The server-side OpenAI Agents SDK runner lives at `netlify/functions/run-publisher-agent.ts`. It accepts approved article JSON (`title`, `slug`, `markdown`, `images`, and optional `overwrite`), normalizes the slug to kebab-case, runs the publisher agent, and calls the existing publish endpoint through a code-defined tool. Configure these additional Netlify environment variables for the runner:
+The server-side OpenAI Agents SDK runner lives at `netlify/functions/run-publisher-agent.ts`. It accepts approved article JSON, runs an OpenAI Agent tool, and reuses the existing `publish-article` Netlify Function so GitHub commit/deploy behavior stays in one place. Configure these additional Netlify environment variables for the runner:
 
 - `OPENAI_API_KEY`
 - `NETLIFY_PUBLISH_ENDPOINT` (for example, `https://<site-domain>/.netlify/functions/publish-article`)
@@ -172,7 +172,26 @@ The server-side OpenAI Agents SDK runner lives at `netlify/functions/run-publish
 
 `NETLIFY_PUBLISH_SECRET` and `PUBLISH_SECRET` should contain the same secret value in Netlify, but the code intentionally keeps the names separate so the existing publish endpoint secret behavior remains intact. Do not expose either variable to browser code.
 
-Agent Builder JSON must use the exact top-level shape `slug`, `articlePath`, `markdown`, `images`, and `commitMessage`. The Agent SDK deploy tool should POST that JSON to `https://<site-domain>/.netlify/functions/publish-article` with `Content-Type: application/json` and `x-publish-key: <PUBLISH_SECRET>`. The `markdown` value must already be fully rendered Markdown with frontmatter before sending. Article paths must resolve to `src/data/post/{slug}.md`, and image `repoPath` values must resolve to `src/assets/images/uploads/{slug}/{filename}`; Markdown frontmatter image paths should use `~/assets/images/uploads/{slug}/{filename}`.
+#### OpenAI Agent Builder / Agents SDK publish handoff
+
+`/.netlify/functions/run-publisher-agent` expects JSON with these top-level fields: `slug`, `title`, one of `markdown` or `content`, and optional `description`, `publishDate`, `author`, `tags`, `images`, `overwrite`.
+
+Inside the runner, the Agent SDK tool `publish_approved_article` validates the same fields with Zod, then POSTs this normalized body to `NETLIFY_PUBLISH_ENDPOINT`:
+
+- `slug`
+- `articlePath` (`src/data/post/{slug}.md`)
+- `markdown` (preferred for agent payloads)
+- optional passthrough fields: `content`, `description`, `publishDate`, `author`, `tags`, `title`
+- `images`
+- `commitMessage` (`Publish article: {title}`)
+- `overwrite`
+
+The tool sends:
+
+- `Content-Type: application/json`
+- `x-publish-key: ${NETLIFY_PUBLISH_SECRET}`
+
+`publish-article` then performs the existing GitHub commit/update workflow and returns commit/deploy metadata.
 
 Use `npm run agent:publish:dry-run` to print a local verification payload without network access. Use `AGENT_PUBLISH_BASE_URL=https://<site-domain> PUBLISH_SECRET=... npm run agent:publish` to send the same payload shape to the Netlify Function.
 

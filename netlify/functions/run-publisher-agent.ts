@@ -1,5 +1,6 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import { Agent, run, tool } from '@openai/agents';
+import { z } from 'zod';
 
 /**
  * Netlify environment required by this server-side Agent SDK runner:
@@ -67,6 +68,40 @@ type PublishToolResult = PublishEndpointResult & {
     slug: string;
   };
 };
+
+const publishImageSchema = z
+  .object({
+    name: z.string().trim().min(1).optional(),
+    repoPath: z.string().trim().min(1).optional(),
+    type: z.string().trim().min(1).optional(),
+    encoding: z.string().trim().min(1).optional(),
+    base64: z.string().trim().min(1).optional(),
+    content: z.string().trim().min(1).optional(),
+  })
+  .strict();
+
+const publishToolInputSchema = z
+  .object({
+    slug: z.string().trim().min(1),
+    title: z.string().trim().min(1),
+    markdown: z.string().trim().min(1).optional(),
+    content: z.string().trim().min(1).optional(),
+    description: z.string().trim().min(1).optional(),
+    publishDate: z.string().trim().min(1).optional(),
+    author: z.string().trim().min(1).optional(),
+    tags: z.array(z.string().trim().min(1)).optional(),
+    images: z.array(publishImageSchema).optional(),
+    overwrite: z.boolean().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.markdown && !value.content) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Either markdown or content is required.',
+        path: ['markdown'],
+      });
+    }
+  });
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -221,41 +256,47 @@ const toStringArray = (value: unknown) =>
 
 const createPublishTool = ({
   endpoint,
-  input,
+  defaultInput,
   publishSecret,
   onPublishResult,
 }: {
   endpoint: string;
-  input: NormalizedPublisherRequest;
+  defaultInput: NormalizedPublisherRequest;
   publishSecret: string;
   onPublishResult?: (result: PublishToolResult) => void;
 }) =>
   tool({
     name: 'publish_approved_article',
     description: 'Publishes the already-approved article payload through the existing secure Netlify publish endpoint.',
-    parameters: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
+    parameters: publishToolInputSchema,
     strict: true,
-    async execute(): Promise<PublishToolResult> {
-      const articlePath = `${repoContentRoot}/${input.slug}.md`;
+    async execute(rawInput): Promise<PublishToolResult> {
+      const parsed = publishToolInputSchema.parse(rawInput);
+      const slug = slugify(parsed.slug);
+      const markdown = toStringValue(parsed.markdown) ?? defaultInput.markdown;
+      const title = toStringValue(parsed.title) ?? defaultInput.title;
+      const articlePath = `${repoContentRoot}/${slug}.md`;
+      const normalizedImages = normalizeImages(parsed.images ?? defaultInput.images);
       const payload = {
-        slug: input.slug,
+        slug,
         articlePath,
-        markdown: input.markdown,
-        images: input.images.length ? input.images : [],
-        commitMessage: `Publish article: ${input.title}`,
-        overwrite: input.overwrite,
+        markdown,
+        content: parsed.content,
+        description: parsed.description,
+        publishDate: parsed.publishDate,
+        author: parsed.author,
+        tags: parsed.tags,
+        title,
+        images: normalizedImages.length ? normalizedImages : [],
+        commitMessage: `Publish article: ${title}`,
+        overwrite: parsed.overwrite ?? defaultInput.overwrite,
       };
 
       console.info('Publisher agent posting approved article.', {
         articlePath,
         imageCount: payload.images.length,
-        overwrite: input.overwrite,
-        slug: input.slug,
+        overwrite: payload.overwrite,
+        slug,
       });
 
       const response = await fetch(endpoint, {
@@ -284,8 +325,8 @@ const createPublishTool = ({
           articlePath,
           commitMessage: payload.commitMessage,
           imageCount: payload.images.length,
-          overwrite: input.overwrite,
-          slug: input.slug,
+          overwrite: payload.overwrite,
+          slug,
         },
       };
 
@@ -297,12 +338,12 @@ const createPublishTool = ({
 
 export const createPublisherAgent = ({
   endpoint,
-  input,
+  defaultInput,
   publishSecret,
   onPublishResult,
 }: {
   endpoint: string;
-  input: NormalizedPublisherRequest;
+  defaultInput: NormalizedPublisherRequest;
   publishSecret: string;
   onPublishResult?: (result: PublishToolResult) => void;
 }) =>
@@ -310,10 +351,11 @@ export const createPublisherAgent = ({
     name: 'Dr. Lurie Server-Side Publisher',
     instructions: [
       'You run server-side publishing for already-approved Dr. Lurié article data.',
-      'Do not rewrite, summarize, or otherwise alter the approved article.',
+      'Do not rewrite, summarize, or otherwise alter the approved article content.',
+      'Call publish_approved_article once with the approved fields exactly as provided.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
     ].join('\n'),
-    tools: [createPublishTool({ endpoint, input, publishSecret, onPublishResult })],
+    tools: [createPublishTool({ endpoint, defaultInput, publishSecret, onPublishResult })],
   });
 
 const getAgentMetadata = (agentResult: unknown) => {
@@ -385,13 +427,17 @@ export const handler = async (event: LambdaEvent) => {
 
     const agent = createPublisherAgent({
       endpoint: env.endpoint,
-      input,
+      defaultInput: input,
       publishSecret: env.publishSecret,
       onPublishResult: (result) => {
         publishResult = result;
       },
     });
-    const agentResult = await run(agent, `Publish the approved article at ${articlePath}.`, { maxTurns: 3 });
+    const agentResult = await run(
+      agent,
+      `Publish the approved article using this payload JSON exactly:\n${JSON.stringify(input)}\nArticle path: ${articlePath}.`,
+      { maxTurns: 3 }
+    );
     const metadata = getAgentMetadata(agentResult);
 
     if (!publishResult) {
