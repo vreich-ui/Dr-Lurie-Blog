@@ -34,6 +34,7 @@ type PublisherRequest = {
   images?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
+  publishSecret?: unknown;
   slug?: unknown;
   title?: unknown;
 };
@@ -156,13 +157,15 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
   return undefined;
 };
 
-const verifyRequestAuthorization = async (event: LambdaEvent) => {
+const verifyRequestAuthorization = async (event: LambdaEvent, input?: PublisherRequest) => {
   const publishKey = getHeader(event.headers, 'x-publish-key').trim();
+  const publishSecretFromBody = toStringValue(input?.publishSecret) ?? '';
+  const providedSecret = publishKey || publishSecretFromBody;
 
-  if (publishKey) {
+  if (providedSecret) {
     const publishSecret = process.env.PUBLISH_SECRET;
 
-    if (publishSecret && publishKey === publishSecret) {
+    if (publishSecret && providedSecret === publishSecret) {
       return undefined;
     }
 
@@ -412,17 +415,12 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const authError = await verifyRequestAuthorization(event);
-
-  if (authError) {
-    return authError;
-  }
-
   let input: NormalizedPublisherRequest;
   let env: { endpoint: string; publishSecret: string };
+  let body: PublisherRequest | undefined;
 
   try {
-    const body = parseBody(event);
+    body = parseBody(event);
 
     if (!body) {
       return jsonResponse(400, {
@@ -430,6 +428,12 @@ export const handler = async (event: LambdaEvent) => {
         success: false,
         error: 'Missing request body.',
       });
+    }
+
+    const authError = await verifyRequestAuthorization(event, body);
+
+    if (authError) {
+      return authError;
     }
 
     const action = getActionName(body);
