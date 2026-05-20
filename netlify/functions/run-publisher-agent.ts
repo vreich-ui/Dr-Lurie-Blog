@@ -28,11 +28,14 @@ type PublishImageInput = {
 };
 
 type PublisherRequest = {
+  action?: unknown;
+  articleIdea?: unknown;
   images?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
   slug?: unknown;
   title?: unknown;
+  type?: unknown;
 };
 
 type NormalizedPublisherRequest = {
@@ -103,6 +106,7 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
 
     return jsonResponse(statusCode, {
       success: false,
+      status: 'error',
       error,
     });
   }
@@ -110,6 +114,7 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
   if (!adminState.isAdmin) {
     return jsonResponse(403, {
       success: false,
+      status: 'error',
       error: 'This Clerk user is not authorized to run the publisher agent.',
     });
   }
@@ -194,14 +199,21 @@ const normalizeImages = (images: unknown) => {
   });
 };
 
+const getActionType = (input: PublisherRequest) =>
+  toStringValue(input.action) ?? toStringValue(input.type);
+
 const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest => {
   const title = toStringValue(input.title);
   const rawSlug = toStringValue(input.slug) ?? title;
   const slug = rawSlug ? slugify(rawSlug) : undefined;
   const markdown = toStringValue(input.markdown);
-  const missing = [!title ? 'title' : undefined, !slug ? 'slug' : undefined, !markdown ? 'markdown' : undefined].filter(
-    Boolean
-  );
+  const actionType = getActionType(input);
+  const requiresPublishFields = actionType !== 'agent.start_workflow' && actionType !== 'agent.fill_test_payload';
+  const missing = [
+    !title ? 'title' : undefined,
+    !slug ? 'slug' : undefined,
+    !requiresPublishFields && !markdown ? undefined : !markdown ? 'markdown' : undefined,
+  ].filter(Boolean);
 
   if (missing.length) {
     throw new RunnerError(400, `Missing required field${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}.`);
@@ -209,7 +221,7 @@ const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest =
 
   return {
     images: normalizeImages(input.images),
-    markdown: markdown ?? '',
+    markdown: markdown ?? toStringValue(input.articleIdea) ?? '(workflow requested without markdown)',
     overwrite: toBooleanValue(input.overwrite),
     slug: slug ?? '',
     title: title ?? '',
@@ -339,6 +351,7 @@ export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, {
       success: false,
+      status: 'error',
       error: 'Method not allowed. Use POST.',
     });
   }
@@ -358,6 +371,7 @@ export const handler = async (event: LambdaEvent) => {
     if (!body) {
       return jsonResponse(400, {
         success: false,
+        status: 'error',
         error: 'Missing request body.',
       });
     }
@@ -368,6 +382,7 @@ export const handler = async (event: LambdaEvent) => {
     const statusCode = error instanceof RunnerError ? error.statusCode : 400;
     return jsonResponse(statusCode, {
       success: false,
+      status: 'error',
       error: error instanceof Error ? error.message : 'Invalid publisher agent request.',
     });
   }
@@ -404,6 +419,7 @@ export const handler = async (event: LambdaEvent) => {
 
     return jsonResponse(statusCode, {
       success,
+      status: success ? 'success' : 'error',
       articlePath: toStringValue(publishResult.articlePath) ?? articlePath,
       imagePaths,
       deployStatus: toStringValue(publishResult.deployStatus) ?? 'unknown',
@@ -429,6 +445,7 @@ export const handler = async (event: LambdaEvent) => {
 
     return jsonResponse(statusCode, {
       success: false,
+      status: 'error',
       articlePath,
       imagePaths: [],
       deployStatus: 'failed',
