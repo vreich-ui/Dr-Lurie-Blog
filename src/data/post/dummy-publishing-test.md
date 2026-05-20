@@ -1,3 +1,14 @@
+---
+title: "Dummy Publishing Test"
+publishDate: 2026-05-20
+excerpt: "This is a temporary test publish from the Netlify publisher endpoint."
+description: "Testing Netlify publisher endpoint with dummy article content."
+tags:
+  - test
+  - dummy
+  - publisher
+---
+
 # Dummy Publishing Test
 
 This is a test article body.
