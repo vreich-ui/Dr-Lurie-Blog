@@ -156,6 +156,26 @@ const verifyClerkAdminSession = async (event: LambdaEvent) => {
   return undefined;
 };
 
+const verifyRequestAuthorization = async (event: LambdaEvent) => {
+  const publishKey = getHeader(event.headers, 'x-publish-key').trim();
+
+  if (publishKey) {
+    const publishSecret = process.env.PUBLISH_SECRET;
+
+    if (publishSecret && publishKey === publishSecret) {
+      return undefined;
+    }
+
+    return jsonResponse(403, {
+      status: 'error',
+      success: false,
+      error: 'Invalid publish key.',
+    });
+  }
+
+  return verifyClerkAdminSession(event);
+};
+
 const toStringValue = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
 
@@ -392,7 +412,7 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const authError = await verifyClerkAdminSession(event);
+  const authError = await verifyRequestAuthorization(event);
 
   if (authError) {
     return authError;
