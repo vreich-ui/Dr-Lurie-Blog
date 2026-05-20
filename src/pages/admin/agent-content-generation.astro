@@ -106,6 +106,7 @@ const metadata = {
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
       <pre id="agent-error-panel" class="agent-error-panel" hidden></pre>
+      <pre id="agent-debug-panel" class="agent-debug-panel"></pre>
       <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
     </section>
   </section>
@@ -263,7 +264,8 @@ const metadata = {
     font-weight: 800;
   }
 
-  .agent-error-panel {
+  .agent-error-panel,
+  .agent-debug-panel {
     margin: 0;
     border: 1px solid rgb(220 38 38 / 25%);
     border-radius: 0.75rem;
@@ -312,6 +314,7 @@ const metadata = {
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
       errorPanel: document.querySelector('#agent-error-panel'),
+      debugPanel: document.querySelector('#agent-debug-panel'),
     };
 
     let isAdmin = false;
@@ -319,6 +322,8 @@ const metadata = {
     let chatkitInitialized = false;
     let chatkitSessionSecret;
     let chatkitMountLocked = false;
+
+    const runtimeState = (window.__drLurieChatkitState ||= { initialized: false, initCount: 0 });
 
     const agentPage = document.querySelector('.agent-admin-page');
     const clerkPublishableKey = agentPage?.dataset.clerkPublishableKey || '';
@@ -344,6 +349,51 @@ const metadata = {
       if (!fields.errorPanel) return;
       fields.errorPanel.hidden = true;
       fields.errorPanel.textContent = '';
+    };
+
+
+    const setDebugPanel = (label, data = {}) => {
+      if (!fields.debugPanel) return;
+
+      const panelPayload = {
+        label,
+        timestamp: new Date().toISOString(),
+        initialized: runtimeState.initialized,
+        initCount: runtimeState.initCount,
+        data,
+      };
+
+      fields.debugPanel.textContent = JSON.stringify(panelPayload, null, 2);
+    };
+
+    const inspectChatkitSurface = (tag = 'inspect') => {
+      const chatkitEl = fields.chatkit;
+      if (!chatkitEl) return;
+
+      const parent = chatkitEl.parentElement;
+      const chatkitStyle = window.getComputedStyle(chatkitEl);
+      const parentStyle = parent ? window.getComputedStyle(parent) : undefined;
+      const netlifyDrawer = document.querySelector('iframe[data-netlify-drawer], iframe#netlify-drawer');
+
+      setDebugPanel(tag, {
+        chatkit: {
+          opacity: chatkitStyle.opacity,
+          pointerEvents: chatkitStyle.pointerEvents,
+          inert: chatkitEl.inert === true,
+          disabled: chatkitEl.disabled === true,
+          rect: chatkitEl.getBoundingClientRect(),
+        },
+        parent: parent
+          ? {
+              opacity: parentStyle?.opacity,
+              pointerEvents: parentStyle?.pointerEvents,
+              overflow: parentStyle?.overflow,
+              zIndex: parentStyle?.zIndex,
+              inert: parent.inert === true,
+            }
+          : null,
+        netlifyDrawer: Boolean(netlifyDrawer),
+      });
     };
 
 
@@ -577,13 +627,20 @@ const metadata = {
     };
 
     const initializeChatKit = async () => {
-      if (chatkitInitialized || !fields.chatkit) return;
+      if (chatkitInitialized || runtimeState.initialized || !fields.chatkit) {
+        setDebugPanel('chatkit-init-skip', { chatkitInitialized, runtimeInitialized: runtimeState.initialized });
+        return;
+      }
 
       setChatkitConfigStatus();
       await waitForChatkitElement();
 
       chatkitInitialized = true;
+      runtimeState.initialized = true;
+      runtimeState.initCount += 1;
       chatkitMountLocked = true;
+      setDebugPanel('chatkit-init-start', { initCount: runtimeState.initCount });
+      inspectChatkitSurface('chatkit-init-surface');
       setGatedContentVisible(true);
 
       fields.chatkit.setOptions({
@@ -677,6 +734,7 @@ const metadata = {
             console.error('ChatKit initialization failed.', error);
             setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
           });
+          inspectChatkitSurface('auth-signed-in');
           return;
         }
 
@@ -722,7 +780,20 @@ const metadata = {
       }
     };
 
+    window.addEventListener('error', (event) => {
+      console.error(logPrefix, 'window.error', event.error || event.message);
+      showErrorPanel('Runtime error', { message: String(event.message || 'unknown error') });
+      inspectChatkitSurface('window-error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error(logPrefix, 'window.unhandledrejection', event.reason);
+      showErrorPanel('Unhandled rejection', { reason: String(event.reason || 'unknown rejection') });
+      inspectChatkitSurface('window-unhandledrejection');
+    });
+
     setChatkitConfigStatus();
+    inspectChatkitSurface('pre-auth');
     initializeClerkAuth();
   })();
 </script>
