@@ -10,7 +10,11 @@ type LambdaEvent = {
 };
 
 type ChatKitSessionResponse = {
+  id?: unknown;
   client_secret?: unknown;
+  expires_at?: unknown;
+  config?: unknown;
+  max_requests?: unknown;
 };
 
 const WORKFLOW_ID_PATTERN = /^wf_[a-zA-Z0-9]+$/;
@@ -121,7 +125,11 @@ export const handler = async (event: LambdaEvent) => {
 
     return jsonResponse(200, {
       client_secret: session.client_secret,
+      session_id: typeof session.id === 'string' ? session.id : undefined,
       workflow_id: workflowId,
+      expires_at: typeof session.expires_at === 'number' ? session.expires_at : undefined,
+      config: session.config && typeof session.config === 'object' ? session.config : undefined,
+      max_requests: typeof session.max_requests === 'number' ? session.max_requests : undefined,
     });
   } catch (error) {
     console.error('OpenAI ChatKit session creation failed.', error);
