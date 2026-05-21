@@ -46,7 +46,6 @@ const chatkitWidgetBootstrap = {
   widgetId: publishingWidgetConfig.id,
   widgetName: publishingWidgetConfig.name || 'AI Publishing Workflow',
 };
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
   robots: {
@@ -59,7 +58,6 @@ const metadata = {
 <Layout metadata={metadata}>
   <section
     class="agent-admin-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
-    data-clerk-publishable-key={clerkPublishableKey}
   >
     <header class="agent-header">
       <div>
@@ -71,7 +69,7 @@ const metadata = {
       </div>
     </header>
 
-    <section class="agent-card chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated hidden>
+    <section class="agent-card chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated>
       <div class="chatkit-panel-header">
         <div>
           <p class="agent-kicker">Widget Builder output</p>
@@ -105,7 +103,10 @@ const metadata = {
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
       <p id="agent-debug" class="agent-debug" aria-live="polite"></p>
-      <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
+      <script
+        id="chatkit-widget-bootstrap"
+        type="application/json"
+        set:html={JSON.stringify(chatkitWidgetBootstrap)}></script>
     </section>
   </section>
 </Layout>
@@ -316,13 +317,10 @@ const metadata = {
       lastWidgetActionStatus: 'n/a',
     };
 
-    let isAdmin = false;
-    let clerkLoadPromise;
+    let isAdmin = true;
+    let isPublishInFlight = false;
     let chatkitInitialized = false;
 
-    const agentPage = document.querySelector('.agent-admin-page');
-    const clerkPublishableKey = agentPage?.dataset.clerkPublishableKey || '';
-    const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
 
@@ -357,94 +355,7 @@ const metadata = {
       });
     };
 
-    const loadClerkScript = () =>
-      new Promise((resolve, reject) => {
-        if (window.Clerk) {
-          resolve();
-          return;
-        }
-
-        const resolveWhenClerkExists = () => {
-          if (!window.Clerk) {
-            reject(new Error('Clerk authentication could not be initialized.'));
-            return;
-          }
-
-          resolve();
-        };
-
-        const existingScript = document.querySelector(
-          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
-        );
-        if (existingScript) {
-          existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
-          existingScript.addEventListener(
-            'error',
-            () => reject(new Error('Clerk authentication could not be loaded.')),
-            {
-              once: true,
-            }
-          );
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = clerkJsScriptSrc;
-        script.async = true;
-        script.crossOrigin = 'anonymous';
-        script.type = 'text/javascript';
-        script.dataset.drLurieClerkjs = 'true';
-        script.dataset.clerkPublishableKey = clerkPublishableKey;
-        script.addEventListener('load', resolveWhenClerkExists, { once: true });
-        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
-          once: true,
-        });
-        document.head.append(script);
-      });
-
-    const getClerk = async () => {
-      if (!clerkPublishableKey) {
-        throw new Error('Agent admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
-      }
-
-      clerkLoadPromise ||= (async () => {
-        await loadClerkScript();
-
-        if (!window.Clerk) {
-          throw new Error('Clerk authentication could not be initialized.');
-        }
-
-        const clerk = window.Clerk;
-        await clerk.load();
-        return clerk;
-      })();
-
-      return clerkLoadPromise;
-    };
-
-    const setAuthState = (state) => {
-      isAdmin = state === 'signed-in';
-      setGatedContentVisible(isAdmin);
-    };
-
-    const getClerkSessionToken = async () => {
-      const clerk = await getClerk();
-      if (!clerk.isSignedIn || !clerk.session) {
-        throw new Error('Authenticate with Clerk before using the agent workflow.');
-      }
-
-      if (!isAdmin) {
-        throw new Error('This account is not authorized to use the agent workflow.');
-      }
-
-      const token = await clerk.session.getToken();
-
-      if (!token) {
-        throw new Error('Could not retrieve a Clerk session token.');
-      }
-
-      return token;
-    };
+    setGatedContentVisible(isAdmin);
 
     const waitForChatkitElement = async () => {
       if (customElements.get('openai-chatkit')) return;
@@ -460,7 +371,46 @@ const metadata = {
       await fields.chatkit.sendUserMessage({ text: message });
     };
 
-    const normalizeActionPayload = (payload) => (payload && typeof payload === 'object' ? payload : {});
+    const normalizeActionPayload = (payload) => {
+      if (payload && typeof payload === 'object') return payload;
+      if (typeof payload === 'string') {
+        try {
+          const parsed = JSON.parse(payload);
+          return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+          return {};
+        }
+      }
+
+      return {};
+    };
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
+    const toText = (value) => (typeof value === 'string' ? value.trim() : '');
+    const isValidImagePath = (value) =>
+      typeof value === 'string' && /^(src\/assets\/images\/|public\/|images\/|https?:\/\/)/.test(value.trim());
+    const normalizePublishImages = (images) => {
+      if (!Array.isArray(images)) return [];
+
+      return images
+        .map((image) => {
+          if (!image || typeof image !== 'object') return null;
+          const base64 = toText(image.base64 || image.content);
+          const name = toText(image.name || image.fileName);
+          const repoPath = toText(image.repoPath);
+          const compactBase64 = base64.replace(/\s/g, '');
+          if (!compactBase64 || compactBase64.length < 16 || !base64Pattern.test(compactBase64)) return null;
+          if (!name) return null;
+          if (repoPath && !isValidImagePath(repoPath)) return null;
+
+          return {
+            content: compactBase64,
+            name,
+            ...(repoPath ? { repoPath } : {}),
+          };
+        })
+        .filter(Boolean);
+    };
 
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
@@ -513,55 +463,95 @@ const metadata = {
       }
 
       if (actionType === 'agent.publish_article') {
-        const title = String(payload.title || '').trim();
-        const slug = String(payload.slug || '').trim();
-        const markdown = String(payload.markdown || '').trim();
-        const endpoint = String(
-          payload.endpoint || chatkitWidgetConfig.endpoint || '/.netlify/functions/run-publisher-agent'
-        );
+        if (isPublishInFlight) {
+          setStatus('Publish already in progress. Please wait for completion.');
+          return;
+        }
+
+        const title = toText(payload.title);
+        const slug = toText(payload.slug);
+        const markdown = toText(payload.markdown || payload.content);
         const overwrite = Boolean(payload.overwrite);
-        const missing = [
-          !title ? 'title' : undefined,
-          !slug ? 'slug' : undefined,
-          !markdown ? 'markdown' : undefined,
-        ].filter(Boolean);
+        const commitMessage = toText(payload.commitMessage);
+        const images = normalizePublishImages(payload.images);
+        const rawImages = Array.isArray(payload.images) ? payload.images : [];
+        const invalidImageCount = rawImages.length - images.length;
 
-        if (missing.length) {
-          setStatus(`ChatKit publish action is missing ${missing.join(', ')}.`, false);
+        if (!slug || !slugPattern.test(slug)) {
+          setStatus('Publish blocked: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
+          return;
+        }
+        if (!markdown) {
+          setStatus('Publish blocked: markdown content is required.', false);
+          return;
+        }
+        if (invalidImageCount > 0) {
+          setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
           return;
         }
 
-        setStatus('Publishing ChatKit-approved article through the server-side OpenAI agent…');
-        const clerkToken = await getClerkSessionToken();
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${clerkToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'agent.publish_article',
-            title,
-            slug,
-            markdown,
-            overwrite,
-            images: Array.isArray(payload.images) ? payload.images : [],
-          }),
-        });
-        debugState.lastWidgetActionStatus = String(response.status);
-        setDebugLine();
-        const result = await response.json().catch(() => ({}));
+        const requestBody = {
+          slug,
+          title: title || undefined,
+          markdown,
+          articlePath: `src/data/post/${slug}.md`,
+          overwrite,
+          ...(commitMessage ? { commitMessage } : {}),
+          ...(images.length ? { images } : {}),
+        };
 
-        if (!response.ok || result.success === false) {
-          const message = result.error || result.message || `ChatKit publish failed with status ${response.status}.`;
-          setStatus(message, false);
-          await sendChatkitStatusMessage(`Publishing failed: ${message}`);
-          return;
+        setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
+        isPublishInFlight = true;
+        try {
+          const response = await fetch('/.netlify/functions/publish-article', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify(requestBody),
+          });
+          debugState.lastWidgetActionStatus = String(response.status);
+          setDebugLine();
+          const result = await response.json().catch(() => ({}));
+
+          if (response.status === 409) {
+            const message =
+              result.error ||
+              result.message ||
+              'Article already exists. Retry with overwrite=true to replace the existing file.';
+            setStatus(message, false);
+            await sendChatkitStatusMessage(`${message} You can retry now with overwrite=true.`);
+            return;
+          }
+
+          if (!response.ok || result.success === false) {
+            const message = result.error || result.message || `Publish failed with status ${response.status}.`;
+            setStatus(message, false);
+            await sendChatkitStatusMessage(`Publishing failed: ${message}`);
+            return;
+          }
+
+          const articlePath = toText(result.articlePath) || `src/data/post/${slug}.md`;
+          const commit = toText(result.commit);
+          const deployStatus = toText(result.deployStatus) || 'unknown';
+          const imagePaths = Array.isArray(result.imagePaths) ? result.imagePaths.filter((path) => typeof path === 'string') : [];
+          const verifyLink = `/blog/${slug}`;
+          const summary = `Published ${articlePath}. Deploy: ${deployStatus}.`;
+          setStatus(summary);
+          await sendChatkitStatusMessage(
+            [
+              `Publishing succeeded.`,
+              `articlePath: ${articlePath}`,
+              `commit: ${commit || 'n/a'}`,
+              `deployStatus: ${deployStatus}`,
+              `imagePaths: ${imagePaths.length ? imagePaths.join(', ') : 'none'}`,
+              `Verify: ${verifyLink}`,
+            ].join('\n')
+          );
+        } finally {
+          isPublishInFlight = false;
         }
-
-        const message = result.message || `Published ${result.articlePath || `src/data/post/${slug}.md`}.`;
-        setStatus(message);
-        await sendChatkitStatusMessage(`Publishing succeeded: ${message}`);
       }
     };
 
@@ -576,13 +566,12 @@ const metadata = {
       fields.chatkit.setOptions({
         api: {
           async getClientSecret() {
-            const clerkToken = await getClerkSessionToken();
             const response = await fetch('/.netlify/functions/create-chatkit-session', {
               method: 'POST',
               headers: {
-                Authorization: `Bearer ${clerkToken}`,
                 'Content-Type': 'application/json',
               },
+              credentials: 'same-origin',
             });
             debugState.sessionRequestStatus = String(response.status);
             const body = await response.json().catch(() => ({}));
@@ -606,71 +595,11 @@ const metadata = {
       });
     };
 
-    const getAdminStateForClerk = async (clerk) => {
-      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-
-      const token = await clerk.session.getToken();
-      if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
-
-      const response = await fetch('/.netlify/functions/admin-auth-state', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      return response
-        .json()
-        .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
-    };
-
-    const renderAuthState = async (clerk) => {
-      const signedIn = Boolean(clerk.isSignedIn && clerk.session);
-
-      if (signedIn) {
-        const adminState = await getAdminStateForClerk(clerk);
-
-        if (adminState.isAdmin) {
-          setAuthState('signed-in');
-          initializeChatKit().catch((error) => {
-            console.error('ChatKit initialization failed.', error);
-            setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
-          });
-          return;
-        }
-
-        setAuthState('forbidden');
-        return;
-      }
-
-      setAuthState('signed-out');
-    };
-
-    const initializeClerkAuth = async () => {
-      setAuthState('checking');
-
-      try {
-        const clerk = await getClerk();
-        await renderAuthState(clerk);
-
-        if (typeof clerk.addListener === 'function') {
-          clerk.addListener(() => {
-            renderAuthState(clerk).catch((error) => {
-              console.error('Clerk authentication refresh failed.', error);
-            });
-          });
-        }
-      } catch (error) {
-        console.error('Clerk authentication initialization failed.', error);
-        const message = error instanceof Error ? error.message : 'Clerk authentication could not be initialized.';
-        setAuthState('error');
-        setStatus(message, false);
-      }
-    };
-
     setChatkitConfigStatus();
-    initializeClerkAuth();
+    initializeChatKit().catch((error) => {
+      console.error('ChatKit initialization failed.', error);
+      setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+    });
   })();
 </script>
 <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
