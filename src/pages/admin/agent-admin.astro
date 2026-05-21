@@ -58,6 +58,7 @@ const metadata = {
 <Layout metadata={metadata}>
   <section
     class="agent-admin-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
+    data-clerk-publishable-key={import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? ''}
   >
     <header class="agent-header">
       <div>
@@ -320,6 +321,9 @@ const metadata = {
     let isAdmin = true;
     let isPublishInFlight = false;
     let chatkitInitialized = false;
+    let clerkLoadPromise;
+    const clerkPublishableKey = document.querySelector('.agent-admin-page')?.dataset.clerkPublishableKey || '';
+    const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
@@ -356,6 +360,60 @@ const metadata = {
     };
 
     setGatedContentVisible(isAdmin);
+
+    const loadClerkScript = () =>
+      new Promise((resolve, reject) => {
+        if (window.Clerk) {
+          resolve();
+          return;
+        }
+
+        const existingScript = document.querySelector(
+          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+        );
+        if (existingScript) {
+          existingScript.addEventListener('load', () => resolve(), { once: true });
+          existingScript.addEventListener(
+            'error',
+            () => reject(new Error('Clerk authentication could not be loaded.')),
+            { once: true }
+          );
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = clerkJsScriptSrc;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.type = 'text/javascript';
+        script.dataset.drLurieClerkjs = 'true';
+        script.dataset.clerkPublishableKey = clerkPublishableKey;
+        script.addEventListener('load', () => resolve(), { once: true });
+        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        document.head.append(script);
+      });
+
+    const getClerk = async () => {
+      if (!clerkPublishableKey) {
+        throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+      }
+
+      clerkLoadPromise ||= (async () => {
+        await loadClerkScript();
+
+        if (!window.Clerk) {
+          throw new Error('Clerk authentication could not be initialized.');
+        }
+
+        const clerk = window.Clerk;
+        await clerk.load();
+        return clerk;
+      })();
+
+      return clerkLoadPromise;
+    };
 
     const waitForChatkitElement = async () => {
       if (customElements.get('openai-chatkit')) return;
@@ -558,6 +616,14 @@ const metadata = {
     const initializeChatKit = async () => {
       if (chatkitInitialized || !fields.chatkit) return;
 
+      const clerk = await getClerk();
+      if (!clerk.isSignedIn || !clerk.session) {
+        isAdmin = false;
+        setGatedContentVisible(false);
+        setStatus('Sign in with an active admin session to use the AI publishing workflow.', false);
+        return;
+      }
+
       setChatkitConfigStatus();
       await waitForChatkitElement();
 
@@ -566,9 +632,20 @@ const metadata = {
       fields.chatkit.setOptions({
         api: {
           async getClientSecret() {
+            const token = await clerk.session?.getToken();
+            if (!token) {
+              debugState.sessionRequestStatus = 'missing-token';
+              debugState.sessionHasClientSecret = false;
+              debugState.sessionWorkflowId = 'missing';
+              setDebugLine();
+              setStatus('Sign-in required: your admin session token is missing. Please sign in again.', false);
+              throw new Error('Admin session token is required before creating a ChatKit session.');
+            }
+
             const response = await fetch('/.netlify/functions/create-chatkit-session', {
               method: 'POST',
               headers: {
+                Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
               credentials: 'same-origin',
