@@ -442,6 +442,67 @@ const metadata = {
 
       return {};
     };
+    const isPublisherDeployPayload = (value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
+      const candidate = value;
+      const hasRequiredFields =
+        'slug' in candidate &&
+        'title' in candidate &&
+        'markdown' in candidate &&
+        'publishDate' in candidate &&
+        'overwrite' in candidate;
+
+      return hasRequiredFields && Array.isArray(candidate.tags) && Array.isArray(candidate.images);
+    };
+    const normalizeWorkflowOutput = (raw) => {
+      const seen = new Set();
+
+      const walk = (value) => {
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (!trimmed) return null;
+          try {
+            return walk(JSON.parse(trimmed));
+          } catch {
+            return null;
+          }
+        }
+
+        if (!value || typeof value !== 'object') return null;
+        if (seen.has(value)) return null;
+        seen.add(value);
+
+        if (isPublisherDeployPayload(value)) {
+          return value;
+        }
+
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            const result = walk(item);
+            if (result) return result;
+          }
+          return null;
+        }
+
+        const nestedKeys = ['output', 'finalOutput', 'content', 'text'];
+        for (const key of nestedKeys) {
+          if (key in value) {
+            const result = walk(value[key]);
+            if (result) return result;
+          }
+        }
+
+        for (const nestedValue of Object.values(value)) {
+          const result = walk(nestedValue);
+          if (result) return result;
+        }
+
+        return null;
+      };
+
+      return walk(raw);
+    };
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
     const toText = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -612,6 +673,20 @@ const metadata = {
         }
       }
     };
+    const inspectAndHandleWorkflowOutput = async (rawOutput) => {
+      console.debug('Raw ChatKit output:', rawOutput);
+      const publishPayload = normalizeWorkflowOutput(rawOutput);
+      console.debug('Normalized publish payload:', publishPayload);
+
+      if (!publishPayload) return false;
+
+      console.debug('Detected publisher payload:', publishPayload);
+      await handleChatkitAction({
+        type: 'agent.publish_article',
+        payload: publishPayload,
+      });
+      return true;
+    };
 
     const initializeChatKit = async () => {
       if (chatkitInitialized || !fields.chatkit) return;
@@ -670,6 +745,29 @@ const metadata = {
           onAction: handleChatkitAction,
         },
       });
+
+      const processChatkitEvent = async (event) => {
+        const rawOutput = event?.detail?.data ?? event?.detail ?? event;
+        await inspectAndHandleWorkflowOutput(rawOutput);
+      };
+      const logChatkitEvent = (eventName) => (event) => {
+        console.debug(`[ChatKit event] ${eventName}`, event?.detail);
+      };
+
+      const chatkitEventsToLog = [
+        'chatkit.error',
+        'chatkit.response.start',
+        'chatkit.response.end',
+        'chatkit.thread.change',
+        'chatkit.log',
+      ];
+
+      chatkitEventsToLog.forEach((eventName) => {
+        fields.chatkit.addEventListener(eventName, logChatkitEvent(eventName));
+      });
+
+      fields.chatkit.addEventListener('chatkit.response.end', processChatkitEvent);
+      fields.chatkit.addEventListener('chatkit.log', processChatkitEvent);
     };
 
     setChatkitConfigStatus();
