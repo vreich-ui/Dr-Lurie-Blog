@@ -486,6 +486,30 @@ const metadata = {
           setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
           return;
         }
+        if (invalidImageCount > 0) {
+          setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
+          return;
+        }
+
+        const requestBody = {
+          slug,
+          title: title || undefined,
+          markdown,
+          articlePath: `src/data/post/${slug}.md`,
+          overwrite,
+          ...(commitMessage ? { commitMessage } : {}),
+          ...(images.length ? { images } : {}),
+        };
+
+        const requestBody = {
+          slug,
+          title: title || undefined,
+          markdown,
+          articlePath: `src/data/post/${slug}.md`,
+          overwrite,
+          ...(commitMessage ? { commitMessage } : {}),
+          ...(images.length ? { images } : {}),
+        };
 
         const requestBody = {
           slug,
