@@ -367,6 +367,10 @@ const metadata = {
       sessionWorkflowId: 'unknown',
       lastWidgetActionSent: 'none',
       lastWidgetActionStatus: 'n/a',
+      chatkitHasDataLoaded: false,
+      chatkitIframePresent: false,
+      chatkitIframeSrcOrigin: 'none',
+      getClientSecretCallCount: 0,
     };
 
     let isAdmin = true;
@@ -439,6 +443,50 @@ const metadata = {
       if (preErrorDomSnapshots.length > 10) preErrorDomSnapshots.shift();
       console.debug('ChatKit DOM snapshot', snapshot);
     };
+    const captureChatkitLoadState = (reason = 'load-state') => {
+      if (!shouldCaptureChatkitDom || !fields.chatkit) return;
+      const host = fields.chatkit;
+      const hostAttributes = Object.fromEntries(Array.from(host.attributes).map((attr) => [attr.name, attr.value]));
+      const hasDataLoaded = host.getAttribute('data-loaded') === 'true';
+      let iframePresent = false;
+      let iframeSrcOrigin = 'none';
+      let iframeSrcPath = null;
+      let iframe = null;
+      try {
+        iframe = host.shadowRoot?.querySelector?.('iframe') || null;
+        iframePresent = Boolean(iframe);
+        if (iframe?.src) {
+          const iframeUrl = new URL(iframe.src, window.location.href);
+          iframeSrcOrigin = iframeUrl.origin;
+          iframeSrcPath = iframeUrl.pathname;
+        }
+      } catch {
+        iframeSrcOrigin = 'inaccessible';
+      }
+
+      debugState.chatkitHasDataLoaded = hasDataLoaded;
+      debugState.chatkitIframePresent = iframePresent;
+      debugState.chatkitIframeSrcOrigin = iframeSrcOrigin;
+      setDebugLine();
+
+      const snapshot = {
+        timestamp: new Date().toISOString(),
+        reason,
+        host_attributes: hostAttributes,
+        has_data_loaded: hasDataLoaded,
+        iframe_present: iframePresent,
+        iframe_src_origin: iframeSrcOrigin,
+        iframe_src_path: iframeSrcPath,
+      };
+      appendDebugJson('ChatKit iframe/load state', snapshot);
+      console.debug('ChatKit iframe/load state', snapshot);
+
+      if (iframe && !iframe.dataset.drLurieDebugListenersAttached) {
+        iframe.dataset.drLurieDebugListenersAttached = 'true';
+        iframe.addEventListener('load', () => captureChatkitLoadState('iframe-load'));
+        iframe.addEventListener('error', () => captureChatkitLoadState('iframe-error'));
+      }
+    };
 
     const setStatus = (message, isSuccess = true) => {
       fields.agentStatus.textContent = message;
@@ -451,7 +499,11 @@ const metadata = {
         `session response has client_secret: ${String(debugState.sessionHasClientSecret)}\n` +
         `session workflow id: ${debugState.sessionWorkflowId}\n` +
         `last widget action sent: ${debugState.lastWidgetActionSent}\n` +
-        `last widget action status: ${debugState.lastWidgetActionStatus}`;
+        `last widget action status: ${debugState.lastWidgetActionStatus}\n` +
+        `chatkit_has_data_loaded: ${String(debugState.chatkitHasDataLoaded)}\n` +
+        `chatkit_iframe_present: ${String(debugState.chatkitIframePresent)}\n` +
+        `chatkit_iframe_src_origin: ${debugState.chatkitIframeSrcOrigin}\n` +
+        `get_client_secret_call_count: ${String(debugState.getClientSecretCallCount)}`;
     };
     const appendDebugJson = (label, payload) => {
       if (!fields.agentDebug) return;
@@ -845,6 +897,8 @@ const metadata = {
       const chatkitOptions = {
         api: {
           async getClientSecret() {
+            debugState.getClientSecretCallCount += 1;
+            setDebugLine();
             const token = await clerk.session?.getToken();
             if (!token) {
               debugState.sessionRequestStatus = 'missing-token';
@@ -901,6 +955,8 @@ const metadata = {
               chatkit_required_actions: Array.isArray(chatkitWidgetConfig.requiredActions)
                 ? chatkitWidgetConfig.requiredActions
                 : [],
+              get_client_secret_call_count: debugState.getClientSecretCallCount,
+              client_secret_length: typeof body.client_secret === 'string' ? body.client_secret.length : 0,
             });
 
             if (!response.ok || typeof body.client_secret !== 'string') {
@@ -936,7 +992,13 @@ const metadata = {
             }),
       };
       fields.chatkit.setOptions(chatkitOptions);
+      if (shouldCaptureChatkitDom) {
+        captureChatkitLoadState('before-setOptions');
+      }
       setChatkitErrorOverlay('');
+      if (shouldCaptureChatkitDom) {
+        captureChatkitLoadState('after-setOptions');
+      }
       if (chatkitMinimalMode) {
         setStatus('ChatKit minimal diagnostic mode enabled (?chatkit_minimal=1).');
       }
@@ -947,6 +1009,7 @@ const metadata = {
         observerTargets.forEach((target) => {
           const observer = new MutationObserver(() => {
             captureChatkitDomSnapshot('mutation');
+            captureChatkitLoadState('mutation');
           });
           observer.observe(target, {
             childList: true,
@@ -991,6 +1054,7 @@ const metadata = {
         setChatkitErrorOverlay(`${errorMessage} Widget remains mounted for diagnostics.`);
         if (shouldCaptureChatkitDom) {
           captureChatkitDomSnapshot('chatkit.error');
+          captureChatkitLoadState('chatkit.error');
           appendDebugJson('Pre-error ChatKit DOM snapshots', preErrorDomSnapshots);
         }
         appendDebugJson('chatkit.error detail', event?.detail ?? null);
