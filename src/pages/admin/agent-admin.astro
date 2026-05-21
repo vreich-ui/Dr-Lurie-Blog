@@ -514,7 +514,7 @@ const metadata = {
           ...(images.length ? { images } : {}),
         };
 
-        const requestBody = {
+        const publishPayload = {
           slug,
           title: title || undefined,
           markdown,
@@ -533,7 +533,7 @@ const metadata = {
               'Content-Type': 'application/json',
             },
             credentials: 'same-origin',
-            body: JSON.stringify(requestBody),
+            body: JSON.stringify(publishPayload),
           });
           debugState.lastWidgetActionStatus = String(response.status);
           setDebugLine();
