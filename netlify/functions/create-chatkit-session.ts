@@ -36,6 +36,12 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
+const isDebugSessionMetadataEnabled = () => {
+  if (process.env.CHATKIT_DEBUG === 'true') return true;
+  const netlifyContext = process.env.CONTEXT?.toLowerCase();
+  return netlifyContext === 'deploy-preview';
+};
+
 const verifyClerkAdminSession = async (
   event: LambdaEvent
 ): Promise<VerifiedChatkitUser | ReturnType<typeof jsonResponse>> => {
@@ -123,13 +129,20 @@ export const handler = async (event: LambdaEvent) => {
       return jsonResponse(502, { status: 'error', error: 'Chat session could not be created.' });
     }
 
+    const debugMetadata = isDebugSessionMetadataEnabled()
+      ? {
+          session_id: typeof session.id === 'string' ? session.id : undefined,
+          expires_at: typeof session.expires_at === 'number' ? session.expires_at : undefined,
+          max_requests: typeof session.max_requests === 'number' ? session.max_requests : undefined,
+          config_keys: session.config && typeof session.config === 'object' ? Object.keys(session.config as object) : [],
+          has_client_secret: true,
+        }
+      : {};
+
     return jsonResponse(200, {
       client_secret: session.client_secret,
-      session_id: typeof session.id === 'string' ? session.id : undefined,
       workflow_id: workflowId,
-      expires_at: typeof session.expires_at === 'number' ? session.expires_at : undefined,
-      config: session.config && typeof session.config === 'object' ? session.config : undefined,
-      max_requests: typeof session.max_requests === 'number' ? session.max_requests : undefined,
+      ...debugMetadata,
     });
   } catch (error) {
     console.error('OpenAI ChatKit session creation failed.', error);

@@ -756,7 +756,11 @@ const metadata = {
               has_client_secret: typeof body.client_secret === 'string' && body.client_secret.length > 0,
               expires_at: typeof body.expires_at === 'number' ? body.expires_at : null,
               max_requests: typeof body.max_requests === 'number' ? body.max_requests : null,
-              config_keys: body.config && typeof body.config === 'object' ? Object.keys(body.config) : [],
+              config_keys: Array.isArray(body.config_keys)
+                ? body.config_keys.filter((key) => typeof key === 'string')
+                : body.config && typeof body.config === 'object'
+                  ? Object.keys(body.config)
+                  : [],
               chatkit_widget_id: chatkitWidgetConfig.widgetId || null,
               chatkit_required_actions: Array.isArray(chatkitWidgetConfig.requiredActions)
                 ? chatkitWidgetConfig.requiredActions
