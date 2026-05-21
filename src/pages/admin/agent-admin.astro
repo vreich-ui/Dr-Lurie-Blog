@@ -79,14 +79,20 @@ const metadata = {
             Loaded from <code>src/chatkit/widgets/AI Publishing Workflow.widget</code>. No OpenAI API keys or publish
             secrets are exposed in the browser.
           </p>
+          <p id="chatkit-mode-banner" class="chatkit-mode-banner" hidden></p>
         </div>
         <span id="chatkit-config-status" class="pill-status" aria-live="polite">Validating widget config…</span>
       </div>
 
-      <openai-chatkit
-        id="publishing-chatkit"
-        class="publishing-chatkit"
-        data-widget-id={chatkitWidgetBootstrap.widgetId}></openai-chatkit>
+      <div id="chatkit-shell" class="chatkit-shell">
+        <openai-chatkit
+          id="publishing-chatkit"
+          class="publishing-chatkit"
+          data-widget-id={chatkitWidgetBootstrap.widgetId}></openai-chatkit>
+        <div id="chatkit-error-overlay" class="chatkit-error-overlay" hidden>
+          <p id="chatkit-error-overlay-text">ChatKit encountered a runtime error.</p>
+        </div>
+      </div>
 
       <details class="widget-config-details">
         <summary>Widget/action MVP config</summary>
@@ -206,6 +212,48 @@ const metadata = {
   :global(.dark) .publishing-chatkit {
     border-color: rgb(30 41 59);
   }
+  .chatkit-shell {
+    position: relative;
+    min-height: 520px;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: var(--aw-color-bg-page);
+    overflow: hidden;
+  }
+
+  :global(.dark) .chatkit-shell {
+    border-color: rgb(30 41 59);
+  }
+
+  .chatkit-error-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    background: rgb(255 255 255 / 88%);
+    color: rgb(127 29 29);
+    font-weight: 800;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  :global(.dark) .chatkit-error-overlay {
+    background: rgb(15 23 42 / 88%);
+    color: rgb(254 202 202);
+  }
+
+  .chatkit-mode-banner {
+    margin: 0.65rem 0 0;
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    background: rgb(254 249 195);
+    color: rgb(113 63 18);
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
 
   .pill-status {
     border: 1px solid rgb(229 231 235);
@@ -305,6 +353,9 @@ const metadata = {
   (() => {
     const fields = {
       chatkit: document.querySelector('#publishing-chatkit'),
+      chatkitModeBanner: document.querySelector('#chatkit-mode-banner'),
+      chatkitErrorOverlay: document.querySelector('#chatkit-error-overlay'),
+      chatkitErrorOverlayText: document.querySelector('#chatkit-error-overlay-text'),
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
@@ -330,6 +381,22 @@ const metadata = {
     const pageQuery = new URLSearchParams(window.location.search);
     const chatkitMinimalMode = pageQuery.get('chatkit_minimal') === '1';
     const chatkitDebugMode = pageQuery.get('chatkit_debug') === '1';
+    const setChatkitModeBanner = () => {
+      if (!fields.chatkitModeBanner) return;
+      const modes = [chatkitMinimalMode ? 'chatkit_minimal=1' : '', chatkitDebugMode ? 'chatkit_debug=1' : ''].filter(Boolean);
+      if (!modes.length) {
+        fields.chatkitModeBanner.hidden = true;
+        return;
+      }
+      fields.chatkitModeBanner.hidden = false;
+      fields.chatkitModeBanner.textContent = `Diagnostic mode active: ${modes.join(' + ')}`;
+    };
+    const setChatkitErrorOverlay = (message) => {
+      if (!fields.chatkitErrorOverlay) return;
+      const hasError = Boolean(message);
+      fields.chatkitErrorOverlay.hidden = !hasError;
+      if (hasError && fields.chatkitErrorOverlayText) fields.chatkitErrorOverlayText.textContent = message;
+    };
 
     const setStatus = (message, isSuccess = true) => {
       fields.agentStatus.textContent = message;
@@ -374,6 +441,7 @@ const metadata = {
     };
 
     setGatedContentVisible(isAdmin);
+    setChatkitModeBanner();
 
     const loadClerkScript = () =>
       new Promise((resolve, reject) => {
@@ -820,6 +888,7 @@ const metadata = {
             }),
       };
       fields.chatkit.setOptions(chatkitOptions);
+      setChatkitErrorOverlay('');
       if (chatkitMinimalMode) {
         setStatus('ChatKit minimal diagnostic mode enabled (?chatkit_minimal=1).');
       }
@@ -853,7 +922,9 @@ const metadata = {
           event?.detail?.error?.name || event?.detail?.error?._name || event?.detail?.name || 'ChatKitError';
         debugState.lastWidgetActionStatus = 'error';
         setDebugLine();
-        setStatus(`ChatKit runtime/widget error (${eventName}). See debug details below for full event payload.`, false);
+        const errorMessage = `ChatKit runtime/widget error (${eventName}).`;
+        setStatus(`${errorMessage} See debug details below for full event payload.`, false);
+        setChatkitErrorOverlay(`${errorMessage} Widget remains mounted for diagnostics.`);
         appendDebugJson('chatkit.error detail', event?.detail ?? null);
       });
     };
