@@ -13,8 +13,10 @@ type ChatKitSessionResponse = {
   id?: unknown;
   client_secret?: unknown;
   expires_at?: unknown;
-  config?: unknown;
-  max_requests?: unknown;
+  chatkit_configuration?: unknown;
+  max_requests_per_1_minute?: unknown;
+  rate_limits?: unknown;
+  workflow?: unknown;
 };
 
 const WORKFLOW_ID_PATTERN = /^wf_[a-zA-Z0-9]+$/;
@@ -133,8 +135,20 @@ export const handler = async (event: LambdaEvent) => {
       ? {
           session_id: typeof session.id === 'string' ? session.id : undefined,
           expires_at: typeof session.expires_at === 'number' ? session.expires_at : undefined,
-          max_requests: typeof session.max_requests === 'number' ? session.max_requests : undefined,
-          config_keys: session.config && typeof session.config === 'object' ? Object.keys(session.config as object) : [],
+          max_requests_per_1_minute:
+            typeof session.max_requests_per_1_minute === 'number' ? session.max_requests_per_1_minute : undefined,
+          config_keys:
+            session.chatkit_configuration && typeof session.chatkit_configuration === 'object'
+              ? Object.keys(session.chatkit_configuration as object)
+              : undefined,
+          rate_limits:
+            session.rate_limits && typeof session.rate_limits === 'object'
+              ? session.rate_limits
+              : undefined,
+          workflow:
+            session.workflow && typeof session.workflow === 'object'
+              ? session.workflow
+              : undefined,
           has_client_secret: true,
         }
       : {};

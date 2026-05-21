@@ -327,6 +327,7 @@ const metadata = {
 
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
+    const chatkitMinimalMode = new URLSearchParams(window.location.search).get('chatkit_minimal') === '1';
 
     const setStatus = (message, isSuccess = true) => {
       fields.agentStatus.textContent = message;
@@ -723,7 +724,7 @@ const metadata = {
 
       chatkitInitialized = true;
 
-      fields.chatkit.setOptions({
+      const chatkitOptions = {
         api: {
           async getClientSecret() {
             const token = await clerk.session?.getToken();
@@ -755,12 +756,15 @@ const metadata = {
               workflow_id: typeof body.workflow_id === 'string' ? body.workflow_id : null,
               has_client_secret: typeof body.client_secret === 'string' && body.client_secret.length > 0,
               expires_at: typeof body.expires_at === 'number' ? body.expires_at : null,
-              max_requests: typeof body.max_requests === 'number' ? body.max_requests : null,
+              max_requests_per_1_minute:
+                typeof body.max_requests_per_1_minute === 'number' ? body.max_requests_per_1_minute : null,
               config_keys: Array.isArray(body.config_keys)
                 ? body.config_keys.filter((key) => typeof key === 'string')
                 : body.config && typeof body.config === 'object'
                   ? Object.keys(body.config)
                   : [],
+              rate_limits: body.rate_limits && typeof body.rate_limits === 'object' ? body.rate_limits : null,
+              workflow: body.workflow && typeof body.workflow === 'object' ? body.workflow : null,
               chatkit_widget_id: chatkitWidgetConfig.widgetId || null,
               chatkit_required_actions: Array.isArray(chatkitWidgetConfig.requiredActions)
                 ? chatkitWidgetConfig.requiredActions
@@ -788,13 +792,21 @@ const metadata = {
             return body.client_secret;
           },
         },
-        composer: {
-          placeholder: 'Ask the OpenAI workflow to draft, revise, or publish an article…',
-        },
-        widgets: {
-          onAction: handleChatkitAction,
-        },
-      });
+        ...(chatkitMinimalMode
+          ? {}
+          : {
+              composer: {
+                placeholder: 'Ask the OpenAI workflow to draft, revise, or publish an article…',
+              },
+              widgets: {
+                onAction: handleChatkitAction,
+              },
+            }),
+      };
+      fields.chatkit.setOptions(chatkitOptions);
+      if (chatkitMinimalMode) {
+        setStatus('ChatKit minimal diagnostic mode enabled (?chatkit_minimal=1).');
+      }
 
       const processChatkitEvent = async (event) => {
         const rawOutput = event?.detail?.data ?? event?.detail ?? event;
@@ -816,8 +828,10 @@ const metadata = {
         fields.chatkit.addEventListener(eventName, logChatkitEvent(eventName));
       });
 
-      fields.chatkit.addEventListener('chatkit.response.end', processChatkitEvent);
-      fields.chatkit.addEventListener('chatkit.log', processChatkitEvent);
+      if (!chatkitMinimalMode) {
+        fields.chatkit.addEventListener('chatkit.response.end', processChatkitEvent);
+        fields.chatkit.addEventListener('chatkit.log', processChatkitEvent);
+      }
       fields.chatkit.addEventListener('chatkit.error', (event) => {
         const eventName =
           event?.detail?.error?.name || event?.detail?.error?._name || event?.detail?.name || 'ChatKitError';
