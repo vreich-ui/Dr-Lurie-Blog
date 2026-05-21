@@ -388,6 +388,7 @@ const metadata = {
     const chatkitCaptureMode = pageQuery.get('chatkit_capture') === '1';
     const shouldCaptureChatkitDom = chatkitDebugMode || chatkitCaptureMode;
     const preErrorDomSnapshots = [];
+    const isOpenAiOrigin = (origin) => /(^https:\/\/cdn\.platform\.openai\.com$)|(^https:\/\/.*openai\.com$)/.test(origin || '');
     const setChatkitModeBanner = () => {
       if (!fields.chatkitModeBanner) return;
       const modes = [chatkitMinimalMode ? 'chatkit_minimal=1' : '', chatkitDebugMode ? 'chatkit_debug=1' : ''].filter(Boolean);
@@ -540,6 +541,47 @@ const metadata = {
       appendDebugJson('ChatKit DOM capture enabled', {
         chatkit_debug: chatkitDebugMode,
         chatkit_capture: chatkitCaptureMode,
+      });
+    }
+    if (chatkitDebugMode) {
+      window.addEventListener('message', (event) => {
+        if (!isOpenAiOrigin(event.origin)) return;
+        const data = event.data;
+        const safeSummary =
+          data && typeof data === 'object'
+            ? {
+                origin: event.origin,
+                keys: Object.keys(data).slice(0, 20),
+                value_types: Object.fromEntries(
+                  Object.entries(data)
+                    .slice(0, 20)
+                    .map(([key, value]) => [key, Array.isArray(value) ? 'array' : typeof value])
+                ),
+              }
+            : {
+                origin: event.origin,
+                data_type: typeof data,
+              };
+        console.debug('ChatKit postMessage (safe)', safeSummary);
+        appendDebugJson('ChatKit postMessage (safe)', safeSummary);
+      });
+      window.addEventListener('error', (event) => {
+        const payload = {
+          message: event?.message || 'Unknown window error',
+          name: event?.error?.name || 'Error',
+          stack_first_line: typeof event?.error?.stack === 'string' ? event.error.stack.split('\n')[0] : null,
+        };
+        console.debug('Window error (debug)', payload);
+        appendDebugJson('Window error (debug)', payload);
+      });
+      window.addEventListener('unhandledrejection', (event) => {
+        const reason = event?.reason;
+        const payload = {
+          reason_name: reason?.name || typeof reason,
+          reason_message: reason?.message || String(reason),
+        };
+        console.debug('Unhandled rejection (debug)', payload);
+        appendDebugJson('Unhandled rejection (debug)', payload);
       });
     }
 
@@ -1052,6 +1094,11 @@ const metadata = {
         const errorMessage = `ChatKit runtime/widget error (${eventName}).`;
         setStatus(`${errorMessage} See debug details below for full event payload.`, false);
         setChatkitErrorOverlay(`${errorMessage} Widget remains mounted for diagnostics.`);
+        if (debugState.chatkitHasDataLoaded && debugState.chatkitIframePresent) {
+          appendDebugJson('ChatKit conclusion', {
+            summary: 'Iframe loaded; IntegrationError occurred during ChatKit/session/workflow validation.',
+          });
+        }
         if (shouldCaptureChatkitDom) {
           captureChatkitDomSnapshot('chatkit.error');
           captureChatkitLoadState('chatkit.error');

@@ -127,6 +127,19 @@ export const handler = async (event: LambdaEvent) => {
     });
 
     const session = (await response.json()) as ChatKitSessionResponse;
+    const safeSessionMeta = {
+      status: response.status,
+      request_workflow_id: workflowId,
+      has_session_id: typeof session.id === 'string' && session.id.length > 0,
+      has_workflow: Boolean(session.workflow && typeof session.workflow === 'object'),
+      chatkit_configuration_keys:
+        session.chatkit_configuration && typeof session.chatkit_configuration === 'object'
+          ? Object.keys(session.chatkit_configuration as object)
+          : [],
+      rate_limit_keys:
+        session.rate_limits && typeof session.rate_limits === 'object' ? Object.keys(session.rate_limits as object) : [],
+    };
+    console.info('ChatKit session safe metadata', safeSessionMeta);
 
     if (!response.ok) {
       console.error('OpenAI ChatKit session creation failed.', {
