@@ -5,6 +5,7 @@ declare const process: {
 };
 
 type LambdaEvent = {
+  rawUrl?: string;
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
 };
@@ -38,7 +39,18 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const isDebugSessionMetadataEnabled = () => {
+const isDebugSessionMetadataEnabled = (event: LambdaEvent) => {
+  const requestUrl = event.rawUrl || '';
+  const hasDebugQuery = (() => {
+    if (!requestUrl) return false;
+    try {
+      const parsed = new URL(requestUrl);
+      return parsed.searchParams.get('chatkit_debug') === '1';
+    } catch {
+      return requestUrl.includes('chatkit_debug=1');
+    }
+  })();
+  if (hasDebugQuery) return true;
   if (process.env.CHATKIT_DEBUG === 'true') return true;
   const netlifyContext = process.env.CONTEXT?.toLowerCase();
   return netlifyContext === 'deploy-preview';
@@ -131,7 +143,7 @@ export const handler = async (event: LambdaEvent) => {
       return jsonResponse(502, { status: 'error', error: 'Chat session could not be created.' });
     }
 
-    const debugMetadata = isDebugSessionMetadataEnabled()
+    const debugMetadata = isDebugSessionMetadataEnabled(event)
       ? {
           session_id: typeof session.id === 'string' ? session.id : undefined,
           expires_at: typeof session.expires_at === 'number' ? session.expires_at : undefined,
