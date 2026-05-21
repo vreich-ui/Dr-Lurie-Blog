@@ -341,6 +341,17 @@ const metadata = {
         `last widget action sent: ${debugState.lastWidgetActionSent}\n` +
         `last widget action status: ${debugState.lastWidgetActionStatus}`;
     };
+    const appendDebugJson = (label, payload) => {
+      if (!fields.agentDebug) return;
+      const serialized = (() => {
+        try {
+          return JSON.stringify(payload, null, 2);
+        } catch {
+          return String(payload);
+        }
+      })();
+      fields.agentDebug.textContent = `${fields.agentDebug.textContent || ''}\n${label}\n${serialized}`;
+    };
 
     const setChatkitConfigStatus = () => {
       const missingActions = chatkitWidgetConfig.missingActions || [];
@@ -692,10 +703,18 @@ const metadata = {
       if (chatkitInitialized || !fields.chatkit) return;
 
       const clerk = await getClerk();
+      if (!clerk) {
+        setStatus('Clerk failed to load. Admin authentication is unavailable in this environment.', false);
+        debugState.lastWidgetActionStatus = 'clerk-not-loaded';
+        setDebugLine();
+        return;
+      }
       if (!clerk.isSignedIn || !clerk.session) {
         isAdmin = false;
         setGatedContentVisible(false);
         setStatus('Sign in with an active admin session to use the AI publishing workflow.', false);
+        debugState.lastWidgetActionStatus = 'not-signed-in';
+        setDebugLine();
         return;
       }
 
@@ -712,6 +731,7 @@ const metadata = {
               debugState.sessionRequestStatus = 'missing-token';
               debugState.sessionHasClientSecret = false;
               debugState.sessionWorkflowId = 'missing';
+              debugState.lastWidgetActionStatus = 'missing-clerk-token';
               setDebugLine();
               setStatus('Sign-in required: your admin session token is missing. Please sign in again.', false);
               throw new Error('Admin session token is required before creating a ChatKit session.');
@@ -732,6 +752,20 @@ const metadata = {
             setDebugLine();
 
             if (!response.ok || typeof body.client_secret !== 'string') {
+              if (response.status === 401) {
+                debugState.lastWidgetActionStatus = 'session-401';
+                setStatus('ChatKit session failed (401 Unauthorized). Your admin session may be expired; sign in again.', false);
+              } else if (response.status === 403) {
+                debugState.lastWidgetActionStatus = 'session-403';
+                setStatus('ChatKit session failed (403 Forbidden). Your account is not allowed to use this admin workflow.', false);
+              } else if (response.status >= 500) {
+                debugState.lastWidgetActionStatus = 'session-500';
+                setStatus('ChatKit session failed (server error). Deploy preview backend could not create a session.', false);
+              } else {
+                debugState.lastWidgetActionStatus = `session-${String(response.status || 'error')}`;
+              }
+              appendDebugJson('Session endpoint response', body);
+              setDebugLine();
               throw new Error(body.error || 'ChatKit session could not be created.');
             }
 
@@ -768,12 +802,29 @@ const metadata = {
 
       fields.chatkit.addEventListener('chatkit.response.end', processChatkitEvent);
       fields.chatkit.addEventListener('chatkit.log', processChatkitEvent);
+      fields.chatkit.addEventListener('chatkit.error', (event) => {
+        debugState.lastWidgetActionStatus = 'error';
+        setDebugLine();
+        setStatus('ChatKit runtime/widget error. See debug details below for full event payload.', false);
+        appendDebugJson('chatkit.error detail', event?.detail ?? null);
+      });
     };
 
     setChatkitConfigStatus();
     initializeChatKit().catch((error) => {
       console.error('ChatKit initialization failed.', error);
-      setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+      if (String(error?.message || '').toLowerCase().includes('clerk')) {
+        debugState.lastWidgetActionStatus = 'clerk-not-loaded';
+        setStatus('Clerk not loaded. Authentication script failed to initialize in this deploy preview.', false);
+      } else {
+        debugState.lastWidgetActionStatus = 'chatkit-runtime-error';
+        setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+      }
+      setDebugLine();
+      appendDebugJson('ChatKit initialization error', {
+        message: error?.message || String(error),
+        name: error?.name || 'Error',
+      });
     });
   })();
 </script>
