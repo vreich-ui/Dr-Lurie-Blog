@@ -381,6 +381,9 @@ const metadata = {
     const pageQuery = new URLSearchParams(window.location.search);
     const chatkitMinimalMode = pageQuery.get('chatkit_minimal') === '1';
     const chatkitDebugMode = pageQuery.get('chatkit_debug') === '1';
+    const chatkitCaptureMode = pageQuery.get('chatkit_capture') === '1';
+    const shouldCaptureChatkitDom = chatkitDebugMode || chatkitCaptureMode;
+    const preErrorDomSnapshots = [];
     const setChatkitModeBanner = () => {
       if (!fields.chatkitModeBanner) return;
       const modes = [chatkitMinimalMode ? 'chatkit_minimal=1' : '', chatkitDebugMode ? 'chatkit_debug=1' : ''].filter(Boolean);
@@ -396,6 +399,45 @@ const metadata = {
       const hasError = Boolean(message);
       fields.chatkitErrorOverlay.hidden = !hasError;
       if (hasError && fields.chatkitErrorOverlayText) fields.chatkitErrorOverlayText.textContent = message;
+    };
+    const captureChatkitDomSnapshot = (reason = 'observer') => {
+      if (!shouldCaptureChatkitDom || !fields.chatkit) return;
+      const wrapper = document.querySelector('#chatkit-shell');
+      const chatkitElement = fields.chatkit;
+      const wrapperRect = wrapper?.getBoundingClientRect?.() || null;
+      const chatkitRect = chatkitElement.getBoundingClientRect?.() || null;
+      const wrapperText = (wrapper?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+      const childTags = Array.from(chatkitElement.children || [])
+        .map((node) => node?.tagName?.toLowerCase?.())
+        .filter(Boolean);
+      let shadowSummary = null;
+      try {
+        if (chatkitElement.shadowRoot) {
+          const shadowText = (chatkitElement.shadowRoot.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+          shadowSummary = {
+            inner_html_length: chatkitElement.shadowRoot.innerHTML?.length || 0,
+            text_preview: shadowText,
+          };
+        }
+      } catch {
+        shadowSummary = { inaccessible: true };
+      }
+
+      const snapshot = {
+        timestamp: new Date().toISOString(),
+        reason,
+        wrapper_inner_html_length: wrapper?.innerHTML?.length || 0,
+        chatkit_outer_html_length: chatkitElement.outerHTML?.length || 0,
+        visible_text_preview: wrapperText,
+        wrapper_size: wrapperRect ? { width: Math.round(wrapperRect.width), height: Math.round(wrapperRect.height) } : null,
+        chatkit_size: chatkitRect ? { width: Math.round(chatkitRect.width), height: Math.round(chatkitRect.height) } : null,
+        child_tags: childTags,
+        shadow_root: shadowSummary,
+      };
+
+      preErrorDomSnapshots.push(snapshot);
+      if (preErrorDomSnapshots.length > 10) preErrorDomSnapshots.shift();
+      console.debug('ChatKit DOM snapshot', snapshot);
     };
 
     const setStatus = (message, isSuccess = true) => {
@@ -442,6 +484,12 @@ const metadata = {
 
     setGatedContentVisible(isAdmin);
     setChatkitModeBanner();
+    if (shouldCaptureChatkitDom) {
+      appendDebugJson('ChatKit DOM capture enabled', {
+        chatkit_debug: chatkitDebugMode,
+        chatkit_capture: chatkitCaptureMode,
+      });
+    }
 
     const loadClerkScript = () =>
       new Promise((resolve, reject) => {
@@ -892,6 +940,22 @@ const metadata = {
       if (chatkitMinimalMode) {
         setStatus('ChatKit minimal diagnostic mode enabled (?chatkit_minimal=1).');
       }
+      if (shouldCaptureChatkitDom) {
+        captureChatkitDomSnapshot('after-setOptions');
+        const wrapper = document.querySelector('#chatkit-shell');
+        const observerTargets = [wrapper, fields.chatkit].filter(Boolean);
+        observerTargets.forEach((target) => {
+          const observer = new MutationObserver(() => {
+            captureChatkitDomSnapshot('mutation');
+          });
+          observer.observe(target, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+          });
+        });
+      }
 
       const processChatkitEvent = async (event) => {
         const rawOutput = event?.detail?.data ?? event?.detail ?? event;
@@ -925,6 +989,10 @@ const metadata = {
         const errorMessage = `ChatKit runtime/widget error (${eventName}).`;
         setStatus(`${errorMessage} See debug details below for full event payload.`, false);
         setChatkitErrorOverlay(`${errorMessage} Widget remains mounted for diagnostics.`);
+        if (shouldCaptureChatkitDom) {
+          captureChatkitDomSnapshot('chatkit.error');
+          appendDebugJson('Pre-error ChatKit DOM snapshots', preErrorDomSnapshots);
+        }
         appendDebugJson('chatkit.error detail', event?.detail ?? null);
       });
     };
