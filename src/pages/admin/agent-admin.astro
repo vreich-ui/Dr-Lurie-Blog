@@ -371,6 +371,9 @@ const metadata = {
       chatkitIframePresent: false,
       chatkitIframeSrcOrigin: 'none',
       getClientSecretCallCount: 0,
+      hasChatkitPostMessage: false,
+      lastChatkitPostMessageType: 'unknown',
+      lastChatkitPostMessageEvent: 'unknown',
     };
 
     let isAdmin = true;
@@ -504,7 +507,10 @@ const metadata = {
         `chatkit_has_data_loaded: ${String(debugState.chatkitHasDataLoaded)}\n` +
         `chatkit_iframe_present: ${String(debugState.chatkitIframePresent)}\n` +
         `chatkit_iframe_src_origin: ${debugState.chatkitIframeSrcOrigin}\n` +
-        `get_client_secret_call_count: ${String(debugState.getClientSecretCallCount)}`;
+        `get_client_secret_call_count: ${String(debugState.getClientSecretCallCount)}\n` +
+        `chatkit_postmessage_seen: ${String(debugState.hasChatkitPostMessage)}\n` +
+        `chatkit_last_postmessage_type: ${debugState.lastChatkitPostMessageType}\n` +
+        `chatkit_last_postmessage_event: ${debugState.lastChatkitPostMessageEvent}`;
     };
     const appendDebugJson = (label, payload) => {
       if (!fields.agentDebug) return;
@@ -547,21 +553,21 @@ const metadata = {
       window.addEventListener('message', (event) => {
         if (!isOpenAiOrigin(event.origin)) return;
         const data = event.data;
-        const safeSummary =
-          data && typeof data === 'object'
-            ? {
-                origin: event.origin,
-                keys: Object.keys(data).slice(0, 20),
-                value_types: Object.fromEntries(
-                  Object.entries(data)
-                    .slice(0, 20)
-                    .map(([key, value]) => [key, Array.isArray(value) ? 'array' : typeof value])
-                ),
-              }
-            : {
-                origin: event.origin,
-                data_type: typeof data,
-              };
+        const dataType = Array.isArray(data) ? 'array' : typeof data;
+        const postMessageType = data && typeof data === 'object' && typeof data.type === 'string' ? data.type : 'unknown';
+        const postMessageEvent = data && typeof data === 'object' && typeof data.event === 'string' ? data.event : 'unknown';
+        debugState.hasChatkitPostMessage = true;
+        debugState.lastChatkitPostMessageType = postMessageType;
+        debugState.lastChatkitPostMessageEvent = postMessageEvent;
+        setDebugLine();
+        const safeSummary = {
+          timestamp: new Date().toISOString(),
+          origin: event.origin,
+          type: postMessageType,
+          event: postMessageEvent,
+          data_type: dataType,
+          data_keys: data && typeof data === 'object' ? Object.keys(data).slice(0, 20) : [],
+        };
         console.debug('ChatKit postMessage (safe)', safeSummary);
         appendDebugJson('ChatKit postMessage (safe)', safeSummary);
       });
@@ -1096,7 +1102,11 @@ const metadata = {
         setChatkitErrorOverlay(`${errorMessage} Widget remains mounted for diagnostics.`);
         if (debugState.chatkitHasDataLoaded && debugState.chatkitIframePresent) {
           appendDebugJson('ChatKit conclusion', {
-            summary: 'Iframe loaded; IntegrationError occurred during ChatKit/session/workflow validation.',
+            iframe_loaded: true,
+            chatkit_sent_postmessage: debugState.hasChatkitPostMessage,
+            last_chatkit_postmessage_type: debugState.lastChatkitPostMessageType,
+            last_chatkit_postmessage_event: debugState.lastChatkitPostMessageEvent,
+            summary: 'IntegrationError happened after iframe postMessage during ChatKit/session/workflow validation.',
           });
         }
         if (shouldCaptureChatkitDom) {
