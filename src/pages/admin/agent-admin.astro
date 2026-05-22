@@ -87,6 +87,7 @@ const metadata = {
         id="publishing-chatkit"
         class="publishing-chatkit"
         data-widget-id={chatkitWidgetBootstrap.widgetId}></openai-chatkit>
+      <button id="publish-latest-json" class="publish-latest-json-btn" type="button">Publish latest agent JSON</button>
 
       <details class="widget-config-details">
         <summary>Widget/action MVP config</summary>
@@ -228,6 +229,15 @@ const metadata = {
     color: rgb(153 27 27);
     background: rgb(254 226 226 / 72%);
   }
+  .publish-latest-json-btn {
+    justify-self: start;
+    border: 1px solid rgb(148 163 184);
+    border-radius: 0.65rem;
+    padding: 0.6rem 0.9rem;
+    background: var(--aw-color-bg-surface);
+    color: var(--aw-color-text-heading);
+    font-weight: 700;
+  }
 
   .widget-config-details {
     color: var(--aw-color-text-muted);
@@ -305,6 +315,7 @@ const metadata = {
   (() => {
     const fields = {
       chatkit: document.querySelector('#publishing-chatkit'),
+      publishLatestJsonButton: document.querySelector('#publish-latest-json'),
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
@@ -568,32 +579,22 @@ const metadata = {
       await handleChatkitAction({ type: 'agent.publish_article', payload });
       return true;
     };
-    const processChatkitEvent = async (event) => {
-      try {
-        const rawOutput =
-          event?.detail?.data ?? event?.detail?.response ?? event?.detail?.message ?? event?.detail ?? event;
-        const scheduleInspection = () => {
-          const inspectTask = () =>
-            inspectAndHandleWorkflowOutput(rawOutput)
-              .then((handled) => {
-                console.debug('ChatKit workflow output inspected.', { handled, eventType: event?.type });
-              })
-              .catch((error) => {
-                console.warn('Could not inspect ChatKit workflow output.', error);
-              });
+    const processChatkitEvent = async (rawOutput) =>
+      new Promise((resolve) => {
+        const inspectTask = () =>
+          inspectAndHandleWorkflowOutput(rawOutput)
+            .then((handled) => resolve(Boolean(handled)))
+            .catch((error) => {
+              console.warn('Could not inspect ChatKit workflow output.', error);
+              resolve(false);
+            });
 
-          if (typeof queueMicrotask === 'function') {
-            queueMicrotask(inspectTask);
-            return;
-          }
-          setTimeout(inspectTask, 0);
-        };
-
-        scheduleInspection();
-      } catch (error) {
-        console.warn('Could not inspect ChatKit workflow output.', error);
-      }
-    };
+        if (typeof queueMicrotask === 'function') {
+          queueMicrotask(inspectTask);
+          return;
+        }
+        setTimeout(inspectTask, 0);
+      });
 
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
@@ -770,11 +771,13 @@ const metadata = {
       await waitForChatkitElement();
 
       chatkitInitialized = true;
-      const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response'];
-      CHATKIT_OUTPUT_EVENTS.forEach((eventName) => {
-        fields.chatkit.addEventListener(eventName, processChatkitEvent);
+      fields.publishLatestJsonButton?.addEventListener('click', async () => {
+        const transcriptText = `${fields.chatkit?.innerText || ''}\n${fields.chatkit?.textContent || ''}`.trim();
+        const handled = await processChatkitEvent(transcriptText);
+        if (!handled) {
+          setStatus('No publisher JSON found in the latest ChatKit output.', false);
+        }
       });
-      console.debug('ChatKit JSON publish listeners attached:', CHATKIT_OUTPUT_EVENTS);
 
       fields.chatkit.setOptions({
         api: {
