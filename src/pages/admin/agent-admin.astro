@@ -321,6 +321,7 @@ const metadata = {
     let isAdmin = true;
     let isPublishInFlight = false;
     let chatkitInitialized = false;
+    const processedPublisherPayloads = new Set();
     let clerkLoadPromise;
     const clerkPublishableKey = document.querySelector('.agent-admin-page')?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
@@ -468,6 +469,103 @@ const metadata = {
           };
         })
         .filter(Boolean);
+    };
+    const normalizeFencedJson = (text) => {
+      if (typeof text !== 'string') return '';
+      const trimmed = text.trim();
+      const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+      return fencedMatch ? fencedMatch[1].trim() : trimmed;
+    };
+    const safeJsonParse = (text) => {
+      if (typeof text !== 'string') return null;
+
+      const normalized = normalizeFencedJson(text);
+      const parseCandidate = (candidate) => {
+        try {
+          return JSON.parse(candidate);
+        } catch {
+          return null;
+        }
+      };
+
+      const directParsed = parseCandidate(normalized);
+      if (directParsed !== null) return directParsed;
+
+      const stack = [];
+      let bestBlock = '';
+      for (let index = 0; index < normalized.length; index += 1) {
+        const char = normalized[index];
+        if (char === '{') {
+          stack.push(index);
+        } else if (char === '}' && stack.length > 0) {
+          const start = stack.pop();
+          const candidate = normalized.slice(start, index + 1);
+          if (candidate.length > bestBlock.length) bestBlock = candidate;
+        }
+      }
+      if (!bestBlock) return null;
+      return parseCandidate(bestBlock);
+    };
+    const isPublisherPayload = (value) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+      const slug = toText(value.slug);
+      const markdown = toText(value.markdown);
+      const content = toText(value.content);
+      const hasValidOverwrite = value.overwrite === undefined || typeof value.overwrite === 'boolean';
+      return Boolean(slug && (markdown || content) && hasValidOverwrite);
+    };
+    const findPublisherPayload = (input, seen = new WeakSet()) => {
+      if (!input) return null;
+
+      if (isPublisherPayload(input)) return input;
+
+      if (typeof input === 'string') {
+        const parsed = safeJsonParse(input);
+        return parsed ? findPublisherPayload(parsed, seen) : null;
+      }
+
+      if (typeof input !== 'object') return null;
+      if (seen.has(input)) return null;
+      seen.add(input);
+
+      if (Array.isArray(input)) {
+        for (const item of input) {
+          const found = findPublisherPayload(item, seen);
+          if (found) return found;
+        }
+        return null;
+      }
+
+      for (const value of Object.values(input)) {
+        const found = findPublisherPayload(value, seen);
+        if (found) return found;
+      }
+      return null;
+    };
+    const inspectAndHandleWorkflowOutput = async (rawOutput) => {
+      const payload = findPublisherPayload(rawOutput);
+      if (!payload) return false;
+
+      const dedupeKey = JSON.stringify({
+        slug: toText(payload.slug),
+        overwrite: Boolean(payload.overwrite),
+        markdown: toText(payload.markdown || payload.content),
+      });
+      if (processedPublisherPayloads.has(dedupeKey)) return false;
+      processedPublisherPayloads.add(dedupeKey);
+
+      await handleChatkitAction({ type: 'agent.publish_article', payload });
+      return true;
+    };
+    const processChatkitEvent = async (event) => {
+      try {
+        const rawOutput =
+          event?.detail?.data ?? event?.detail?.response ?? event?.detail?.message ?? event?.detail ?? event;
+        const handled = await inspectAndHandleWorkflowOutput(rawOutput);
+        console.debug('ChatKit workflow output inspected.', { handled, eventType: event?.type });
+      } catch (error) {
+        console.warn('Could not inspect ChatKit workflow output.', error);
+      }
     };
 
     const handleChatkitAction = async (action) => {
@@ -628,6 +726,10 @@ const metadata = {
       await waitForChatkitElement();
 
       chatkitInitialized = true;
+      const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response', 'chatkit.log'];
+      CHATKIT_OUTPUT_EVENTS.forEach((eventName) => {
+        fields.chatkit.addEventListener(eventName, processChatkitEvent);
+      });
 
       fields.chatkit.setOptions({
         api: {
