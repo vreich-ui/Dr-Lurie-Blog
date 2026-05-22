@@ -770,10 +770,11 @@ const metadata = {
       await waitForChatkitElement();
 
       chatkitInitialized = true;
-      const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response', 'chatkit.log'];
+      const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response'];
       CHATKIT_OUTPUT_EVENTS.forEach((eventName) => {
         fields.chatkit.addEventListener(eventName, processChatkitEvent);
       });
+      console.debug('ChatKit JSON publish listeners attached:', CHATKIT_OUTPUT_EVENTS);
 
       fields.chatkit.setOptions({
         api: {
