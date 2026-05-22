@@ -517,7 +517,10 @@ const metadata = {
     const findPublisherPayload = (input, seen = new WeakSet()) => {
       if (!input) return null;
 
-      if (isPublisherPayload(input)) return input;
+      if (isPublisherPayload(input)) {
+        console.debug('findPublisherPayload: detected payload', input);
+        return input;
+      }
 
       if (typeof input === 'string') {
         const parsed = safeJsonParse(input);
@@ -543,15 +546,23 @@ const metadata = {
       return null;
     };
     const inspectAndHandleWorkflowOutput = async (rawOutput) => {
+      console.debug('inspectAndHandleWorkflowOutput: received output', rawOutput);
       const payload = findPublisherPayload(rawOutput);
-      if (!payload) return false;
+      if (!payload) {
+        console.debug('inspectAndHandleWorkflowOutput: publish skipped (no payload found)');
+        return false;
+      }
+      console.debug('inspectAndHandleWorkflowOutput: detected payload', payload);
 
       const dedupeKey = JSON.stringify({
         slug: toText(payload.slug),
         overwrite: Boolean(payload.overwrite),
         markdown: toText(payload.markdown || payload.content),
       });
-      if (processedPublisherPayloads.has(dedupeKey)) return false;
+      if (processedPublisherPayloads.has(dedupeKey)) {
+        console.debug('inspectAndHandleWorkflowOutput: dedupe hit, publish skipped', { dedupeKey });
+        return false;
+      }
       processedPublisherPayloads.add(dedupeKey);
 
       await handleChatkitAction({ type: 'agent.publish_article', payload });
@@ -571,10 +582,20 @@ const metadata = {
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
       const payload = normalizeActionPayload(action?.payload);
+      console.debug('handleChatkitAction: action received', { actionType, payload });
       debugState.lastWidgetActionSent = String(actionType || 'unknown');
       setDebugLine();
 
-      if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
+      console.debug(
+        'requiredActions check',
+        actionType,
+        chatkitWidgetConfig.requiredActions,
+        chatkitWidgetConfig.requiredActions?.includes(actionType)
+      );
+
+      const isSyntheticPublish = actionType === 'agent.publish_article';
+      if (!isSyntheticPublish && !chatkitWidgetConfig.requiredActions?.includes(actionType)) {
+        console.debug('handleChatkitAction: publish skipped by requiredActions filter', { actionType });
         return;
       }
 
@@ -620,6 +641,7 @@ const metadata = {
 
       if (actionType === 'agent.publish_article') {
         if (isPublishInFlight) {
+          console.debug('handleChatkitAction: publish skipped, publish already in flight');
           setStatus('Publish already in progress. Please wait for completion.');
           return;
         }
@@ -634,6 +656,7 @@ const metadata = {
         const invalidImageCount = rawImages.length - images.length;
 
         if (!slug || !slugPattern.test(slug)) {
+          console.debug('handleChatkitAction: slug validation failed', { slug });
           setStatus('Publish blocked: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
           return;
         }
@@ -726,6 +749,38 @@ const metadata = {
       await waitForChatkitElement();
 
       chatkitInitialized = true;
+      if (!fields.chatkit.__eventDebugPatched) {
+        fields.chatkit.__eventDebugPatched = true;
+
+        const originalDispatchEvent = fields.chatkit.dispatchEvent.bind(fields.chatkit);
+
+        fields.chatkit.dispatchEvent = (event) => {
+          try {
+            console.groupCollapsed(`[ChatKit dispatch] ${event?.type || 'unknown'}`);
+
+            console.debug('event:', event);
+            console.debug('detail:', event?.detail);
+
+            const extracted =
+              event?.detail?.data ??
+              event?.detail?.response ??
+              event?.detail?.message ??
+              event?.detail?.item ??
+              event?.detail ??
+              event;
+
+            console.debug('extracted output:', extracted);
+
+            inspectAndHandleWorkflowOutput(extracted);
+          } catch (error) {
+            console.warn('ChatKit dispatch inspection failed', error);
+          } finally {
+            console.groupEnd();
+          }
+
+          return originalDispatchEvent(event);
+        };
+      }
       const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response', 'chatkit.log'];
       CHATKIT_OUTPUT_EVENTS.forEach((eventName) => {
         fields.chatkit.addEventListener(eventName, processChatkitEvent);
