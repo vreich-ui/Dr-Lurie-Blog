@@ -87,7 +87,15 @@ const metadata = {
         id="publishing-chatkit"
         class="publishing-chatkit"
         data-widget-id={chatkitWidgetBootstrap.widgetId}></openai-chatkit>
-      <button id="publish-latest-json" class="publish-latest-json-btn" type="button">Publish latest agent JSON</button>
+      <button id="publish-latest-json" class="publish-latest-json-btn" type="button">
+        Try publish from visible ChatKit text
+      </button>
+      <label class="publish-json-label" for="pasted-agent-json">Paste agent JSON output</label>
+      <textarea
+        id="pasted-agent-json"
+        class="publish-json-textarea"
+        placeholder="Paste the final publisher JSON from the agent here..."></textarea>
+      <button id="publish-pasted-json" class="publish-latest-json-btn" type="button">Publish pasted JSON</button>
 
       <details class="widget-config-details">
         <summary>Widget/action MVP config</summary>
@@ -238,6 +246,22 @@ const metadata = {
     color: var(--aw-color-text-heading);
     font-weight: 700;
   }
+  .publish-json-label {
+    color: var(--aw-color-text-heading);
+    font-weight: 700;
+  }
+  .publish-json-textarea {
+    width: 100%;
+    min-height: 160px;
+    border: 1px solid rgb(148 163 184);
+    border-radius: 0.65rem;
+    padding: 0.75rem;
+    background: var(--aw-color-bg-page);
+    color: var(--aw-color-text-default);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
 
   .widget-config-details {
     color: var(--aw-color-text-muted);
@@ -316,6 +340,8 @@ const metadata = {
     const fields = {
       chatkit: document.querySelector('#publishing-chatkit'),
       publishLatestJsonButton: document.querySelector('#publish-latest-json'),
+      publishPastedJsonButton: document.querySelector('#publish-pasted-json'),
+      pastedAgentJson: document.querySelector('#pasted-agent-json'),
       chatkitConfig: document.querySelector('#chatkit-widget-bootstrap'),
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
@@ -776,6 +802,13 @@ const metadata = {
         const handled = await processChatkitEvent(transcriptText);
         if (!handled) {
           setStatus('No publisher JSON found in the latest ChatKit output.', false);
+        }
+      });
+      fields.publishPastedJsonButton?.addEventListener('click', async () => {
+        const pastedText = toText(fields.pastedAgentJson?.value);
+        const handled = await inspectAndHandleWorkflowOutput(pastedText);
+        if (!handled) {
+          setStatus('No valid publisher JSON found in pasted content.', false);
         }
       });
 
