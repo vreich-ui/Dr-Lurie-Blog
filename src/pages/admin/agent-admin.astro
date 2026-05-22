@@ -572,8 +572,24 @@ const metadata = {
       try {
         const rawOutput =
           event?.detail?.data ?? event?.detail?.response ?? event?.detail?.message ?? event?.detail ?? event;
-        const handled = await inspectAndHandleWorkflowOutput(rawOutput);
-        console.debug('ChatKit workflow output inspected.', { handled, eventType: event?.type });
+        const scheduleInspection = () => {
+          const inspectTask = () =>
+            inspectAndHandleWorkflowOutput(rawOutput)
+              .then((handled) => {
+                console.debug('ChatKit workflow output inspected.', { handled, eventType: event?.type });
+              })
+              .catch((error) => {
+                console.warn('Could not inspect ChatKit workflow output.', error);
+              });
+
+          if (typeof queueMicrotask === 'function') {
+            queueMicrotask(inspectTask);
+            return;
+          }
+          setTimeout(inspectTask, 0);
+        };
+
+        scheduleInspection();
       } catch (error) {
         console.warn('Could not inspect ChatKit workflow output.', error);
       }
@@ -680,6 +696,7 @@ const metadata = {
         };
 
         setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
+        console.debug('Calling publish-article function with payload:', publishPayload);
         isPublishInFlight = true;
         try {
           const response = await fetch('/.netlify/functions/publish-article', {
@@ -755,30 +772,40 @@ const metadata = {
         const originalDispatchEvent = fields.chatkit.dispatchEvent.bind(fields.chatkit);
 
         fields.chatkit.dispatchEvent = (event) => {
+          const result = originalDispatchEvent(event);
           try {
-            console.groupCollapsed(`[ChatKit dispatch] ${event?.type || 'unknown'}`);
+            const eventType = event?.type || 'unknown';
+            const detail = event?.detail;
+            console.groupCollapsed(`[ChatKit dispatch] ${eventType}`);
 
             console.debug('event:', event);
-            console.debug('detail:', event?.detail);
-
+            console.debug('detail:', detail);
             const extracted =
-              event?.detail?.data ??
-              event?.detail?.response ??
-              event?.detail?.message ??
-              event?.detail?.item ??
-              event?.detail ??
+              detail?.data ??
+              detail?.response ??
+              detail?.message ??
+              detail?.item ??
+              detail ??
               event;
 
             console.debug('extracted output:', extracted);
-
-            inspectAndHandleWorkflowOutput(extracted);
-          } catch (error) {
-            console.warn('ChatKit dispatch inspection failed', error);
-          } finally {
             console.groupEnd();
+
+            const inspectTask = () => {
+              inspectAndHandleWorkflowOutput(extracted).catch((error) => {
+                console.warn('ChatKit deferred output inspection failed', error);
+              });
+            };
+            if (typeof queueMicrotask === 'function') {
+              queueMicrotask(inspectTask);
+            } else {
+              setTimeout(inspectTask, 0);
+            }
+          } catch (error) {
+            console.warn('ChatKit dispatch logging failed', error);
           }
 
-          return originalDispatchEvent(event);
+          return result;
         };
       }
       const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response', 'chatkit.log'];
