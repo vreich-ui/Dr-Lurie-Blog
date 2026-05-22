@@ -696,17 +696,21 @@ const metadata = {
         };
 
         setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
-        console.debug('Calling publish-article function with payload:', publishPayload);
+        const clerk = await getClerk().catch(() => null);
+        const token = await clerk?.session?.getToken?.();
+        console.debug('Calling publish-article function with auth token:', Boolean(token));
         isPublishInFlight = true;
         try {
           const response = await fetch('/.netlify/functions/publish-article', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             credentials: 'same-origin',
             body: JSON.stringify(publishPayload),
           });
+          console.debug('publish-article response status:', response.status);
           debugState.lastWidgetActionStatus = String(response.status);
           setDebugLine();
           const result = await response.json().catch(() => ({}));
@@ -766,48 +770,6 @@ const metadata = {
       await waitForChatkitElement();
 
       chatkitInitialized = true;
-      if (!fields.chatkit.__eventDebugPatched) {
-        fields.chatkit.__eventDebugPatched = true;
-
-        const originalDispatchEvent = fields.chatkit.dispatchEvent.bind(fields.chatkit);
-
-        fields.chatkit.dispatchEvent = (event) => {
-          const result = originalDispatchEvent(event);
-          try {
-            const eventType = event?.type || 'unknown';
-            const detail = event?.detail;
-            console.groupCollapsed(`[ChatKit dispatch] ${eventType}`);
-
-            console.debug('event:', event);
-            console.debug('detail:', detail);
-            const extracted =
-              detail?.data ??
-              detail?.response ??
-              detail?.message ??
-              detail?.item ??
-              detail ??
-              event;
-
-            console.debug('extracted output:', extracted);
-            console.groupEnd();
-
-            const inspectTask = () => {
-              inspectAndHandleWorkflowOutput(extracted).catch((error) => {
-                console.warn('ChatKit deferred output inspection failed', error);
-              });
-            };
-            if (typeof queueMicrotask === 'function') {
-              queueMicrotask(inspectTask);
-            } else {
-              setTimeout(inspectTask, 0);
-            }
-          } catch (error) {
-            console.warn('ChatKit dispatch logging failed', error);
-          }
-
-          return result;
-        };
-      }
       const CHATKIT_OUTPUT_EVENTS = ['chatkit.response.end', 'chatkit.response', 'chatkit.log'];
       CHATKIT_OUTPUT_EVENTS.forEach((eventName) => {
         fields.chatkit.addEventListener(eventName, processChatkitEvent);
