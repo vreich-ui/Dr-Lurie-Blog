@@ -160,6 +160,9 @@ const isValidImagePath = (path: string, slug: string) => {
   return path.startsWith(prefix) && path.length > prefix.length && !path.endsWith('/');
 };
 
+
+const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
+
 const parseTags = (value: unknown) => {
   if (Array.isArray(value)) {
     return value.map((tag) => toStringValue(tag)).filter((tag): tag is string => Boolean(tag));
@@ -424,7 +427,7 @@ export const handler = async (event: LambdaEvent) => {
   const missing = [
     !slug ? 'slug' : undefined,
     !markdownInput && !content ? (isAgentPayload ? 'markdown' : 'content') : undefined,
-    !isAgentPayload && !title ? 'title' : undefined,
+    !markdownInput && !isAgentPayload && !title ? 'title' : undefined,
     !isAgentPayload && !publishDate ? 'publishDate' : undefined,
   ].filter(Boolean);
 
@@ -479,23 +482,39 @@ export const handler = async (event: LambdaEvent) => {
     const imagePath = selectedFeatured
       ? mediaEntries.find((entry) => entry.path.endsWith(`/${selectedFeatured}`))?.displayPath
       : undefined;
-    const markdown =
-      markdownInput ??
-      buildFrontmatter({
-        author: toStringValue(input.author),
-        category: toStringValue(input.category),
-        content: content ?? '',
-        ctaLink: toStringValue(input.ctaLink),
-        ctaText: toStringValue(input.ctaText),
-        draft: toBooleanValue(input.draft),
-        excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
-        imagePath,
-        publishDate,
-        seoDescription: toStringValue(input.seoDescription),
-        tags: parseTags(input.tags),
-        title: title ?? slug,
-        videoLink: toStringValue(input.videoLink),
-      });
+    const markdown = markdownInput
+      ? hasFrontmatter(markdownInput)
+        ? markdownInput
+        : buildFrontmatter({
+            author: toStringValue(input.author),
+            category: toStringValue(input.category),
+            content: markdownInput,
+            ctaLink: toStringValue(input.ctaLink),
+            ctaText: toStringValue(input.ctaText),
+            draft: toBooleanValue(input.draft),
+            excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
+            imagePath,
+            publishDate,
+            seoDescription: toStringValue(input.seoDescription),
+            tags: parseTags(input.tags),
+            title: title ?? slug,
+            videoLink: toStringValue(input.videoLink),
+          })
+      : buildFrontmatter({
+          author: toStringValue(input.author),
+          category: toStringValue(input.category),
+          content: content ?? '',
+          ctaLink: toStringValue(input.ctaLink),
+          ctaText: toStringValue(input.ctaText),
+          draft: toBooleanValue(input.draft),
+          excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
+          imagePath,
+          publishDate,
+          seoDescription: toStringValue(input.seoDescription),
+          tags: parseTags(input.tags),
+          title: title ?? slug,
+          videoLink: toStringValue(input.videoLink),
+        });
 
     const ref = await githubRequest<GitHubRef>(`/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
     const commit = await githubRequest<GitHubCommit>(`/repos/${repo}/git/commits/${ref.object.sha}`, token);
