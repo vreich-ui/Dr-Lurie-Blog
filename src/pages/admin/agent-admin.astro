@@ -576,6 +576,12 @@ const metadata = {
         return null;
       }
 
+      const outputParsedPayload = findPublisherPayload(input.output_parsed, seen);
+      if (outputParsedPayload) return outputParsedPayload;
+
+      const directPayload = findPublisherPayload(input.payload, seen);
+      if (directPayload) return directPayload;
+
       for (const value of Object.values(input)) {
         const found = findPublisherPayload(value, seen);
         if (found) return found;
