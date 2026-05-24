@@ -34,9 +34,13 @@ const normalizeTags = (tags: PublishArticlePayload['tags']) => {
   return [];
 };
 
-const buildMarkdownFromPayload = (payload: PublishArticlePayload, publishDate: string) => {
-  const title = toText(payload.title) || 'Untitled article';
-  const content = toText(payload.content);
+const buildMarkdownFromPayload = (
+  payload: PublishArticlePayload,
+  publishDate: string,
+  bodyContent: string = toText(payload.content)
+) => {
+  const title = toText(payload.title) || toText(payload.slug);
+  const content = bodyContent;
   const tags = normalizeTags(payload.tags);
   const frontmatter = [
     '---',
@@ -61,6 +65,8 @@ const buildMarkdownFromPayload = (payload: PublishArticlePayload, publishDate: s
   return `${frontmatter.join('\n')}${content}\n`;
 };
 
+const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
+
 const getClerkSessionToken = async () => {
   const clerk = (window as any).Clerk;
   const token = await clerk?.session?.getToken?.();
@@ -74,7 +80,12 @@ export const publishArticleFromPayload = async (payload: PublishArticlePayload):
   }
 
   const publishDate = toText(payload.publishDate) || new Date().toISOString();
-  const markdown = toText(payload.markdown) || buildMarkdownFromPayload(payload, publishDate);
+  const markdownInput = toText(payload.markdown);
+  const markdown = markdownInput
+    ? hasFrontmatter(markdownInput)
+      ? markdownInput
+      : buildMarkdownFromPayload(payload, publishDate, markdownInput)
+    : buildMarkdownFromPayload(payload, publishDate);
 
   const requestBody = {
     ...payload,
