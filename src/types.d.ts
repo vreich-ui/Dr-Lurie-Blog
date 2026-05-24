@@ -291,3 +291,11 @@ export interface Content extends Omit<Headline, 'classes'>, Widget {
 }
 
 export interface Contact extends Omit<Headline, 'classes'>, Form, Widget {}
+
+export {};
+
+declare global {
+  interface Window {
+    publishArticleFromPayload?: (payload: import("./lib/publishArticleFromPayload").PublishArticlePayload) => Promise<import("./lib/publishArticleFromPayload").PublishArticleResult>;
+  }
+}

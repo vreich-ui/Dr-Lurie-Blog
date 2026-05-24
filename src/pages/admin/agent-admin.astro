@@ -301,6 +301,12 @@ const metadata = {
   }
 </style>
 
+<script>
+  import { publishArticleFromPayload } from "../../lib/publishArticleFromPayload";
+
+  window.publishArticleFromPayload = publishArticleFromPayload;
+</script>
+
 <script is:inline>
   (() => {
     const fields = {
@@ -526,11 +532,9 @@ const metadata = {
           return;
         }
 
-        const title = toText(payload.title);
         const slug = toText(payload.slug);
-        const markdown = toText(payload.markdown || payload.content);
-        const overwrite = Boolean(payload.overwrite);
-        const commitMessage = toText(payload.commitMessage);
+        const markdown = toText(payload.markdown);
+        const content = toText(payload.content);
         const images = normalizePublishImages(payload.images);
         const rawImages = Array.isArray(payload.images) ? payload.images : [];
         const invalidImageCount = rawImages.length - images.length;
@@ -539,8 +543,8 @@ const metadata = {
           setStatus('Publish blocked: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
           return;
         }
-        if (!markdown) {
-          setStatus('Publish blocked: markdown content is required.', false);
+        if (!markdown && !content) {
+          setStatus('Publish blocked: markdown or content is required.', false);
           return;
         }
         if (invalidImageCount > 0) {
@@ -550,30 +554,38 @@ const metadata = {
 
         const publishPayload = {
           slug,
-          title: title || undefined,
-          markdown,
-          articlePath: `src/data/post/${slug}.md`,
-          overwrite,
-          ...(commitMessage ? { commitMessage } : {}),
-          ...(images.length ? { images } : {}),
+          title: toText(payload.title) || undefined,
+          markdown: markdown || undefined,
+          content: content || undefined,
+          publishDate: toText(payload.publishDate) || undefined,
+          draft: typeof payload.draft === 'boolean' ? payload.draft : undefined,
+          author: toText(payload.author) || undefined,
+          category: toText(payload.category) || undefined,
+          tags: Array.isArray(payload.tags)
+            ? payload.tags.map((tag) => toText(tag)).filter(Boolean)
+            : toText(payload.tags) || undefined,
+          excerpt: toText(payload.excerpt) || undefined,
+          overwrite: Boolean(payload.overwrite),
+          images,
+          featuredImage: toText(payload.featuredImage) || undefined,
+          videoLink: toText(payload.videoLink) || undefined,
+          ctaLink: toText(payload.ctaLink) || undefined,
+          ctaText: toText(payload.ctaText) || undefined,
+          seoDescription: toText(payload.seoDescription) || undefined,
+          commitMessage: toText(payload.commitMessage) || undefined,
         };
 
         setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
         isPublishInFlight = true;
         try {
-          const response = await fetch('/.netlify/functions/publish-article', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(publishPayload),
-          });
-          debugState.lastWidgetActionStatus = String(response.status);
+          const publishResult = await (window.publishArticleFromPayload
+            ? window.publishArticleFromPayload(publishPayload)
+            : Promise.resolve({ ok: false, status: 500, body: { error: 'Publisher module is unavailable.' } }));
+          debugState.lastWidgetActionStatus = String(publishResult.status);
           setDebugLine();
-          const result = await response.json().catch(() => ({}));
+          const result = publishResult.body || {};
 
-          if (response.status === 409) {
+          if (publishResult.status === 409) {
             const message =
               result.error ||
               result.message ||
@@ -583,8 +595,8 @@ const metadata = {
             return;
           }
 
-          if (!response.ok || result.success === false) {
-            const message = result.error || result.message || `Publish failed with status ${response.status}.`;
+          if (!publishResult.ok || result.success === false) {
+            const message = result.error || result.message || `Publish failed with status ${publishResult.status}.`;
             setStatus(message, false);
             await sendChatkitStatusMessage(`Publishing failed: ${message}`);
             return;
