@@ -16,6 +16,7 @@ export type PublishArticlePayload = {
   ctaLink?: string;
   ctaText?: string;
   seoDescription?: string;
+  commitMessage?: string;
 };
 
 export type PublishArticleResult = {
