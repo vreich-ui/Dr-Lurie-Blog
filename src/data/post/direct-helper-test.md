@@ -1,7 +1,7 @@
 ---
 title: "Direct Helper Test"
 publishDate: 2026-05-25T12:00:00Z
-draft: true
+draft: false
 tags:
   - "Testing"
 author: "Dr. Lurie"
