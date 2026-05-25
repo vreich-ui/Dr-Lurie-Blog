@@ -545,7 +545,7 @@ const metadata = {
         try {
           const parsed = JSON.parse(value);
           return parsed && typeof parsed === 'object' ? parsed : null;
-        } catch (error) {
+        } catch {
           throw new Error('End node parsed_output is a string, but JSON.parse failed.');
         }
       }
@@ -708,7 +708,7 @@ const metadata = {
             await runPublishFromPayload(parsed, `${sourceLabel} (auto)`);
           }
         }
-      } catch (error) {
+      } catch {
         debugState.publishPayloadDetected = 'false';
         capturedParsedPayload = null;
         updatePublishPreview(null, error instanceof Error ? error.message : 'Failed to parse workflow output.');
@@ -735,6 +735,49 @@ const metadata = {
               : 'Manual console/test payload';
         await capturePayloadCandidate(rawData, sourceLabel);
       }
+    };
+
+
+    const callAuthorizedEndpoint = async (url, payload = {}) => {
+      const clerk = await getClerk();
+      const token = await clerk.session?.getToken();
+      if (!token) {
+        throw new Error('Admin session token is required before calling ChatKit methods.');
+      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        console.error(`ChatKit method request failed: ${url}`, { status: response.status, body });
+      }
+      return { ok: response.ok, status: response.status, body };
+    };
+
+    window.ChatKitMethod = async (method, payload = {}) => {
+      if (method === 'create-chatkit-session') {
+        const result = await callAuthorizedEndpoint('/.netlify/functions/create-chatkit-session');
+        if (!result.ok || typeof result.body?.client_secret !== 'string') {
+          console.error('ChatKit session response failed validation.', result.body);
+        }
+        return result.body;
+      }
+
+      if (method === 'run-publisher-agent') {
+        const result = await callAuthorizedEndpoint('/.netlify/functions/run-publisher-agent', payload);
+        if (!result.ok) {
+          console.error('ChatKit action response failed.', result.body);
+        }
+        return result.body;
+      }
+
+      return null;
     };
 
     const handleChatkitAction = async (action) => {
@@ -831,7 +874,7 @@ const metadata = {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
               },
-              credentials: 'same-origin',
+              credentials: 'include',
             });
             debugState.sessionRequestStatus = String(response.status);
             const body = await response.json().catch(() => ({}));
@@ -840,6 +883,7 @@ const metadata = {
             setDebugLine();
 
             if (!response.ok || typeof body.client_secret !== 'string') {
+              console.error('ChatKit session request failed.', { status: response.status, body });
               throw new Error(body.error || 'ChatKit session could not be created.');
             }
 
