@@ -632,7 +632,7 @@ const metadata = {
         markdown: markdown || undefined,
         content: content || undefined,
         publishDate: toText(payload.publishDate) || undefined,
-        draft: typeof payload.draft === 'boolean' ? payload.draft : undefined,
+        draft: payload.draft === true,
         author: toText(payload.author) || undefined,
         category: toText(payload.category) || undefined,
         tags: Array.isArray(payload.tags) ? payload.tags.map((tag) => toText(tag)).filter(Boolean) : toText(payload.tags) || undefined,
@@ -699,7 +699,7 @@ const metadata = {
           return;
         }
         const payloadKey = getPayloadFingerprint(parsed);
-        updatePublishPreview(parsed, `Payload captured from ${sourceLabel}. Key=${payloadKey}. Ready to publish.`);
+        updatePublishPreview(parsed, `Captured from ${sourceLabel}. Key=${payloadKey}. Ready to publish.`);
         setDebugLine();
         if (autoPublishOnOutput) {
           if (autoPublishedPayloadKeys.has(payloadKey)) {
@@ -727,7 +727,13 @@ const metadata = {
       if (debugState.eventLog.length > 20) debugState.eventLog.shift();
       setDebugLine();
       if (payloadLike) {
-        await capturePayloadCandidate(rawData, eventName);
+        const sourceLabel =
+          eventName.startsWith('widget.onAction:agent.publish_article')
+            ? 'widget action'
+            : eventName.startsWith('element:') || eventName.startsWith('window:')
+              ? 'End output'
+              : 'Manual console/test payload';
+        await capturePayloadCandidate(rawData, sourceLabel);
       }
     };
 
@@ -741,6 +747,9 @@ const metadata = {
         // no-op; still allow parsed output capture below.
       }
       await trackEvent(`widget.onAction:${String(actionType || 'unknown')}`, payload);
+      if (actionType === 'agent.publish_article') {
+        await capturePayloadCandidate(payload, 'widget action');
+      }
 
       if (actionType === 'agent.fill_test_payload') {
         await sendChatkitStatusMessage(
@@ -783,7 +792,7 @@ const metadata = {
       }
 
       if (actionType === 'agent.publish_article') {
-        await runPublishFromPayload(capturedParsedPayload || payload, 'agent.publish_article');
+        await runPublishFromPayload(capturedParsedPayload || payload, 'Captured from widget action');
       }
     };
 
@@ -884,7 +893,7 @@ const metadata = {
         setStatus('Publish blocked: no parsed End node payload captured yet.', false);
         return;
       }
-      runPublishFromPayload(capturedParsedPayload, 'explicit button click');
+      runPublishFromPayload(capturedParsedPayload, 'Manual console/test payload');
     });
     initializeChatKit().catch((error) => {
       console.error('ChatKit initialization failed.', error);
