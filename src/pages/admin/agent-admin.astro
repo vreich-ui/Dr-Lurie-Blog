@@ -722,11 +722,18 @@ const metadata = {
         rawData && typeof rawData === 'object' ? Object.keys(rawData).slice(0, 12).join(', ') || '(no-keys)' : '(non-object)';
       debugState.lastEventType = eventName;
       debugState.lastEventDetailKeys = detailKeys;
-      const payloadLike = rawData && typeof rawData === 'object' && (rawData.slug || rawData.parsed_output || rawData.parsedOutput || rawData.output || rawData.final_output || rawData.finalOutput || rawData.payload);
+      const payloadCandidateKey =
+        rawData && typeof rawData === 'object'
+          ? ['slug', 'parsed_output', 'parsedOutput', 'output', 'final_output', 'finalOutput', 'payload', 'data', 'result', 'detail'].find(
+              (key) => typeof rawData[key] !== 'undefined'
+            ) || ''
+          : '';
+      const payloadLike = Boolean(payloadCandidateKey);
       debugState.eventLog.push(`${new Date().toISOString()} | ${eventName} | keys: ${detailKeys} | payload: ${payloadLike ? 'yes' : 'no'}`);
       if (debugState.eventLog.length > 20) debugState.eventLog.shift();
       setDebugLine();
       if (payloadLike) {
+        console.debug('[agent-admin] payload capture gate passed', { eventName, matchedKey: payloadCandidateKey });
         const sourceLabel =
           eventName.startsWith('widget.onAction:agent.publish_article')
             ? 'widget action'
