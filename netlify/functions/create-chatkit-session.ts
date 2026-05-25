@@ -120,6 +120,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     return jsonResponse(200, {
+      ...(session && typeof session === 'object' ? session : {}),
       client_secret: session.client_secret,
       workflow_id: workflowId,
     });

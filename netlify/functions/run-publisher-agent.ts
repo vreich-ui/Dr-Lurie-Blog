@@ -113,6 +113,77 @@ const jsonHeaders = {
 
 const repoContentRoot = 'src/data/post';
 
+type WorkflowStatus = 'idle' | 'researching' | 'angle_review' | 'draft_ready' | 'publishing' | 'published' | 'error';
+
+type WorkflowOutput = {
+  status: WorkflowStatus;
+  articleIdea: string;
+  title: string;
+  slug: string;
+  markdown: string;
+  overwrite: boolean;
+  recommendedAngle: string;
+  hook: string;
+  editorialPromise: string;
+  risks: string[];
+  imageBrief: string;
+  endpoint: string;
+  result: { articlePath: string; commit: string; deployStatus: string; message: string } | null;
+  error: { message: string; code?: string; stack?: string } | null;
+  errorJson?: string;
+  states: Array<{ id: WorkflowStatus; label: string }>;
+  tags: string[];
+};
+
+type AgentWorkflowEvent = {
+  type: 'agent_workflow_event';
+  action: 'agent.start_workflow' | 'agent.publish_article' | 'agent.fill_test_payload' | 'agent.reset' | 'end';
+  output?: WorkflowOutput;
+  payload?: Record<string, unknown>;
+};
+
+const workflowStates: Array<{ id: WorkflowStatus; label: string }> = [
+  { id: 'idle', label: 'Idle' },
+  { id: 'researching', label: 'Researching' },
+  { id: 'angle_review', label: 'Angle review' },
+  { id: 'draft_ready', label: 'Draft ready' },
+  { id: 'publishing', label: 'Publishing' },
+  { id: 'published', label: 'Published' },
+  { id: 'error', label: 'Error' },
+];
+
+const buildOutput = ({ action, endpoint, body, normalized, result, error }: { action: string; endpoint: string; body?: PublisherRequest; normalized?: NormalizedPublisherRequest; result?: PublishToolResult; error?: Error | RunnerError; }): WorkflowOutput => ({
+  status:
+    action === 'agent.reset' ? 'idle' :
+    action === 'agent.fill_test_payload' ? 'draft_ready' :
+    action === 'agent.start_workflow' ? 'researching' :
+    result && (result.success === true || result.ok === true) ? 'published' :
+    error ? 'error' : 'publishing',
+  articleIdea: toStringValue(body?.articleIdea) ?? '',
+  title: normalized?.title ?? toStringValue(body?.title) ?? '',
+  slug: normalized?.slug ?? toStringValue(body?.slug) ?? '',
+  markdown: normalized?.markdown ?? toStringValue(body?.markdown) ?? '',
+  overwrite: normalized?.overwrite ?? toBooleanValue(body?.overwrite),
+  recommendedAngle: '',
+  hook: '',
+  editorialPromise: '',
+  risks: [],
+  imageBrief: '',
+  endpoint,
+  result: result
+    ? {
+        articlePath: toStringValue(result.articlePath) ?? `${repoContentRoot}/${normalized?.slug ?? ''}.md`,
+        commit: toStringValue(result.commit) ?? '',
+        deployStatus: toStringValue(result.deployStatus) ?? 'unknown',
+        message: toStringValue(result.message) ?? '',
+      }
+    : null,
+  error: error ? { message: error.message, code: String((error as RunnerError).statusCode ?? 'error') } : null,
+  states: workflowStates,
+  tags: [],
+});
+
+
 class RunnerError extends Error {
   statusCode: number;
 
@@ -128,6 +199,12 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   headers: jsonHeaders,
   body: JSON.stringify(body),
 });
+
+const workflowResponse = (statusCode: number, events: AgentWorkflowEvent[]) =>
+  jsonResponse(statusCode, {
+    type: 'chatkit.session',
+    events,
+  });
 
 const verifyClerkAdminSession = async (event: LambdaEvent) => {
   const adminState = await getAdminStateFromEvent(event);
@@ -437,22 +514,12 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const action = getActionName(body);
-    if (action === 'agent.fill_test_payload') {
-      return jsonResponse(200, {
-        status: 'ok',
-        success: true,
-        action,
-        message: 'Test payload action acknowledged.',
-      });
-    }
-    if (action === 'agent.start_workflow') {
-      return jsonResponse(200, {
-        status: 'ok',
-        success: true,
-        action,
-        articleIdea: toStringValue(body.articleIdea) ?? '',
-        message: 'Workflow start action acknowledged.',
-      });
+    if (action === 'agent.fill_test_payload' || action === 'agent.start_workflow' || action === 'agent.reset') {
+      const output = buildOutput({ action, endpoint: process.env.NETLIFY_PUBLISH_ENDPOINT ?? '', body });
+      return workflowResponse(200, [
+        { type: 'agent_workflow_event', action: action as AgentWorkflowEvent['action'], payload: { acknowledged: true } },
+        { type: 'agent_workflow_event', action: 'end', output },
+      ]);
     }
 
     input = normalizeRequest(body);
@@ -500,23 +567,14 @@ export const handler = async (event: LambdaEvent) => {
     const success = publishResult.success === true || publishResult.ok === true;
     const statusCode = success ? 200 : Number(publishResult.statusCode) || 502;
 
-    return jsonResponse(statusCode, {
-      status: success ? 'ok' : 'error',
-      success,
-      articlePath: toStringValue(publishResult.articlePath) ?? articlePath,
-      imagePaths,
-      deployStatus: toStringValue(publishResult.deployStatus) ?? 'unknown',
-      message:
-        toStringValue(publishResult.error) ??
-        toStringValue(publishResult.message) ??
-        (success ? `Article publish queued for ${articlePath}.` : 'Publish endpoint failed.'),
-      commit: toStringValue(publishResult.commit),
-      agent: {
-        ...metadata,
-        normalizedSlug: input.slug,
-        publishPayload: publishResult.payload,
-      },
-    });
+    const message =
+      toStringValue(publishResult.error) ??
+      toStringValue(publishResult.message) ??
+      (success ? `Article publish queued for ${articlePath}.` : 'Publish endpoint failed.');
+    return workflowResponse(statusCode, [
+      { type: 'agent_workflow_event', action: 'agent.publish_article', payload: { imagePaths, success, agent: { ...metadata, normalizedSlug: input.slug, publishPayload: publishResult.payload } } },
+      { type: 'agent_workflow_event', action: 'end', output: buildOutput({ action: 'agent.publish_article', endpoint: env.endpoint, normalized: input, result: { ...publishResult, message } }) },
+    ]);
   } catch (error) {
     console.error('Publisher agent failed.', {
       articlePath,
@@ -526,14 +584,10 @@ export const handler = async (event: LambdaEvent) => {
 
     const statusCode = error instanceof RunnerError ? error.statusCode : 500;
 
-    return jsonResponse(statusCode, {
-      status: 'error',
-      success: false,
-      articlePath,
-      imagePaths: [],
-      deployStatus: 'failed',
-      message: error instanceof Error ? error.message : 'Publisher agent failed.',
-      commit: undefined,
-    });
+    const message = error instanceof Error ? error.message : 'Publisher agent failed.';
+    return workflowResponse(statusCode, [
+      { type: 'agent_workflow_event', action: 'agent.publish_article', payload: { success: false } },
+      { type: 'agent_workflow_event', action: 'end', output: buildOutput({ action: 'agent.publish_article', endpoint: env.endpoint, normalized: input, error: error instanceof Error ? error : new Error(message), result: { payload: { articlePath, commitMessage: '', imageCount: 0, overwrite: input.overwrite, slug: input.slug }, articlePath, deployStatus: 'failed', message, ok: false } as PublishToolResult }) },
+    ]);
   }
 };
