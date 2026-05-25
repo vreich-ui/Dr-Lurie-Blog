@@ -392,6 +392,10 @@ const metadata = {
       sessionWorkflowId: 'unknown',
       lastWidgetActionSent: 'none',
       lastWidgetActionStatus: 'n/a',
+      lastEventType: 'none',
+      lastEventDetailKeys: 'n/a',
+      publishPayloadDetected: 'false',
+      eventLog: [],
     };
 
     let isAdmin = true;
@@ -413,12 +417,17 @@ const metadata = {
     };
     const setDebugLine = () => {
       if (!fields.agentDebug) return;
+      const recentEvents = debugState.eventLog.slice(-6).join('\n');
       fields.agentDebug.textContent =
         `session request: ${debugState.sessionRequestStatus}\n` +
         `session response has client_secret: ${String(debugState.sessionHasClientSecret)}\n` +
         `session workflow id: ${debugState.sessionWorkflowId}\n` +
+        `last chatkit event: ${debugState.lastEventType}\n` +
+        `last event detail keys: ${debugState.lastEventDetailKeys}\n` +
+        `publish-looking payload detected: ${debugState.publishPayloadDetected}\n` +
         `last widget action sent: ${debugState.lastWidgetActionSent}\n` +
-        `last widget action status: ${debugState.lastWidgetActionStatus}`;
+        `last widget action status: ${debugState.lastWidgetActionStatus}\n` +
+        `recent chatkit events:\n${recentEvents || 'none'}`;
     };
 
     const setChatkitConfigStatus = () => {
@@ -542,6 +551,19 @@ const metadata = {
       }
       return null;
     };
+    const extractPossibleOutput = (payload) => {
+      if (!payload || typeof payload !== 'object') return undefined;
+      return (
+        payload.parsed_output ??
+        payload.parsedOutput ??
+        payload.output ??
+        payload.final_output ??
+        payload.finalOutput ??
+        payload.payload ??
+        payload.data ??
+        payload.result
+      );
+    };
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
     const toText = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -656,6 +678,59 @@ const metadata = {
       }
     };
 
+    const capturePayloadCandidate = async (candidate, sourceLabel) => {
+      const normalized = normalizeActionPayload(candidate);
+      const possibleOutput = extractPossibleOutput(normalized);
+      const rawCandidate = typeof possibleOutput !== 'undefined' ? possibleOutput : normalized;
+      try {
+        const parsed = parseOutputObject(rawCandidate);
+        capturedParsedPayload = parsed;
+        const publishLooking = Boolean(parsed && toText(parsed.slug) && (toText(parsed.markdown) || toText(parsed.content)));
+        debugState.publishPayloadDetected = String(publishLooking);
+        if (!parsed) {
+          updatePublishPreview(null, `Event ${sourceLabel} captured but payload is not an object.`);
+          setDebugLine();
+          return;
+        }
+        if (!publishLooking) {
+          updatePublishPreview(parsed, `Event ${sourceLabel} captured output, but required fields are missing.`);
+          setStatus('missing required field: output must include slug and either markdown or content.', false);
+          setDebugLine();
+          return;
+        }
+        const payloadKey = getPayloadFingerprint(parsed);
+        updatePublishPreview(parsed, `Payload captured from ${sourceLabel}. Key=${payloadKey}. Ready to publish.`);
+        setDebugLine();
+        if (autoPublishOnOutput) {
+          if (autoPublishedPayloadKeys.has(payloadKey)) {
+            setStatus('Auto-publish skipped: this payload was already published. Use Publish payload to retry manually.');
+          } else {
+            await runPublishFromPayload(parsed, `${sourceLabel} (auto)`);
+          }
+        }
+      } catch (error) {
+        debugState.publishPayloadDetected = 'false';
+        capturedParsedPayload = null;
+        updatePublishPreview(null, error instanceof Error ? error.message : 'Failed to parse workflow output.');
+        setStatus(error instanceof Error ? error.message : 'Failed to parse workflow output.', false);
+        setDebugLine();
+      }
+    };
+
+    const trackEvent = async (eventName, rawData) => {
+      const detailKeys =
+        rawData && typeof rawData === 'object' ? Object.keys(rawData).slice(0, 12).join(', ') || '(no-keys)' : '(non-object)';
+      debugState.lastEventType = eventName;
+      debugState.lastEventDetailKeys = detailKeys;
+      const payloadLike = rawData && typeof rawData === 'object' && (rawData.slug || rawData.parsed_output || rawData.parsedOutput || rawData.output || rawData.final_output || rawData.finalOutput || rawData.payload);
+      debugState.eventLog.push(`${new Date().toISOString()} | ${eventName} | keys: ${detailKeys} | payload: ${payloadLike ? 'yes' : 'no'}`);
+      if (debugState.eventLog.length > 20) debugState.eventLog.shift();
+      setDebugLine();
+      if (payloadLike) {
+        await capturePayloadCandidate(rawData, eventName);
+      }
+    };
+
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
       const payload = normalizeActionPayload(action?.payload);
@@ -665,33 +740,7 @@ const metadata = {
       if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
         // no-op; still allow parsed output capture below.
       }
-      const possibleOutput = payload.parsed_output ?? payload.parsedOutput ?? payload.output ?? payload.final_output;
-      if (typeof possibleOutput !== 'undefined') {
-        try {
-          const parsed = parseOutputObject(possibleOutput);
-          capturedParsedPayload = parsed;
-          if (!parsed) {
-            updatePublishPreview(null, 'Workflow output captured but it is not an object.');
-          } else if (!toText(parsed.slug) || (!toText(parsed.markdown) && !toText(parsed.content))) {
-            updatePublishPreview(parsed, 'Output captured, but missing required field(s): slug and markdown/content.');
-            setStatus('missing required field: output must include slug and either markdown or content.', false);
-          } else {
-            const payloadKey = getPayloadFingerprint(parsed);
-            updatePublishPreview(parsed, `Parsed output captured and validated. Key=${payloadKey}. Ready to publish.`);
-            if (autoPublishOnOutput) {
-              if (autoPublishedPayloadKeys.has(payloadKey)) {
-                setStatus('Auto-publish skipped: this payload was already published. Use Publish payload to retry manually.');
-              } else {
-                await runPublishFromPayload(parsed, 'End node parsed_output (auto)');
-              }
-            }
-          }
-        } catch (error) {
-          capturedParsedPayload = null;
-          updatePublishPreview(null, error instanceof Error ? error.message : 'Failed to parse workflow output.');
-          setStatus(error instanceof Error ? error.message : 'Failed to parse workflow output.', false);
-        }
-      }
+      await trackEvent(`widget.onAction:${String(actionType || 'unknown')}`, payload);
 
       if (actionType === 'agent.fill_test_payload') {
         await sendChatkitStatusMessage(
@@ -794,6 +843,29 @@ const metadata = {
         widgets: {
           onAction: handleChatkitAction,
         },
+      });
+
+      const eventNames = ['message', 'chatkit:message', 'chatkit:event', 'chatkit:action', 'action', 'workflow:output', 'output'];
+      eventNames.forEach((eventName) => {
+        fields.chatkit?.addEventListener(eventName, async (event) => {
+          await trackEvent(`element:${eventName}`, event?.detail ?? event);
+        });
+      });
+
+      window.addEventListener('message', async (event) => {
+        const data = event?.data;
+        const looksChatkit =
+          data &&
+          typeof data === 'object' &&
+          (String(data.type || '').toLowerCase().includes('chatkit') ||
+            String(data.event || '').toLowerCase().includes('chatkit') ||
+            data.parsed_output ||
+            data.parsedOutput ||
+            data.final_output ||
+            data.finalOutput);
+        if (looksChatkit) {
+          await trackEvent('window:message', data);
+        }
       });
     };
 
