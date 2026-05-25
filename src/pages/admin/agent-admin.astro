@@ -104,6 +104,18 @@ const metadata = {
 
       <p id="agent-status" class="agent-status" aria-live="polite"></p>
       <p id="agent-debug" class="agent-debug" aria-live="polite"></p>
+      <section class="publish-output-panel" aria-labelledby="publish-output-heading">
+        <div class="publish-output-header">
+          <h3 id="publish-output-heading">End node payload</h3>
+          <button id="publish-explicit-button" class="publish-button" type="button" disabled>Publish payload</button>
+        </div>
+        <label class="auto-publish-toggle" for="auto-publish-toggle">
+          <input id="auto-publish-toggle" type="checkbox" checked />
+          <span>Auto-publish when valid payload is captured</span>
+        </label>
+        <p id="publish-output-meta" class="publish-output-meta">Waiting for workflow output…</p>
+        <pre id="publish-output-preview" class="publish-output-preview">No parsed output captured yet.</pre>
+      </section>
       <script
         id="chatkit-widget-bootstrap"
         type="application/json"
@@ -271,6 +283,60 @@ const metadata = {
     line-height: 1.4;
     white-space: pre-line;
   }
+  .publish-output-panel {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: var(--aw-color-bg-surface);
+  }
+  .publish-output-header {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .publish-output-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--aw-color-text-heading);
+  }
+  .publish-button {
+    border: 1px solid rgb(22 163 74 / 40%);
+    background: rgb(22 163 74 / 12%);
+    color: rgb(22 101 52);
+    padding: 0.45rem 0.75rem;
+    border-radius: 0.65rem;
+    font-weight: 700;
+  }
+  .publish-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .publish-output-meta {
+    margin: 0.75rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.88rem;
+  }
+  .auto-publish-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.88rem;
+    color: var(--aw-color-text-muted);
+  }
+  .auto-publish-toggle input {
+    margin: 0;
+  }
+  .publish-output-preview {
+    margin: 0.75rem 0 0;
+    max-height: 280px;
+    overflow: auto;
+    border-radius: 0.75rem;
+    padding: 0.8rem;
+    background: rgb(15 23 42 / 4%);
+    font-size: 0.82rem;
+  }
 
   @media (min-width: 640px) {
     .agent-header {
@@ -315,6 +381,10 @@ const metadata = {
       chatkitConfigStatus: document.querySelector('#chatkit-config-status'),
       agentStatus: document.querySelector('#agent-status'),
       agentDebug: document.querySelector('#agent-debug'),
+      publishButton: document.querySelector('#publish-explicit-button'),
+      autoPublishToggle: document.querySelector('#auto-publish-toggle'),
+      publishOutputMeta: document.querySelector('#publish-output-meta'),
+      publishOutputPreview: document.querySelector('#publish-output-preview'),
     };
     const debugState = {
       sessionRequestStatus: 'not-started',
@@ -327,6 +397,9 @@ const metadata = {
     let isAdmin = true;
     let isPublishInFlight = false;
     let chatkitInitialized = false;
+    let capturedParsedPayload = null;
+    let autoPublishOnOutput = fields.autoPublishToggle?.checked ?? true;
+    const autoPublishedPayloadKeys = new Set();
     let clerkLoadPromise;
     const clerkPublishableKey = document.querySelector('.agent-admin-page')?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
@@ -448,9 +521,38 @@ const metadata = {
 
       return {};
     };
+    const updatePublishPreview = (payload, message) => {
+      if (fields.publishOutputMeta) fields.publishOutputMeta.textContent = message;
+      if (fields.publishOutputPreview) {
+        fields.publishOutputPreview.textContent = payload
+          ? JSON.stringify(payload, null, 2)
+          : 'No parsed output captured yet.';
+      }
+      if (fields.publishButton) fields.publishButton.disabled = !payload || isPublishInFlight;
+    };
+    const parseOutputObject = (value) => {
+      if (value && typeof value === 'object') return value;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (error) {
+          throw new Error('End node parsed_output is a string, but JSON.parse failed.');
+        }
+      }
+      return null;
+    };
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
     const toText = (value) => (typeof value === 'string' ? value.trim() : '');
+    const getPayloadFingerprint = (payload) => {
+      const slug = toText(payload?.slug);
+      const commitMessage = toText(payload?.commitMessage);
+      const markdown = toText(payload?.markdown);
+      const content = toText(payload?.content);
+      const bodySignature = markdown ? `md:${markdown.length}` : `ct:${content.length}`;
+      return `${slug}|${commitMessage || 'none'}|${bodySignature}`;
+    };
     const isValidImagePath = (value) =>
       typeof value === 'string' && /^(src\/assets\/images\/|public\/|images\/|https?:\/\/)/.test(value.trim());
     const normalizePublishImages = (images) => {
@@ -476,6 +578,84 @@ const metadata = {
         .filter(Boolean);
     };
 
+    const runPublishFromPayload = async (sourcePayload, origin = 'widget action') => {
+      if (isPublishInFlight) {
+        setStatus('Publish already in progress. Please wait for completion.');
+        return;
+      }
+      const payload = normalizeActionPayload(sourcePayload);
+      const slug = toText(payload.slug);
+      const markdown = toText(payload.markdown);
+      const content = toText(payload.content);
+      const images = normalizePublishImages(payload.images);
+      const rawImages = Array.isArray(payload.images) ? payload.images : [];
+      const invalidImageCount = rawImages.length - images.length;
+
+      if (!slug || !slugPattern.test(slug)) {
+        setStatus('missing required field: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
+        return;
+      }
+      if (!markdown && !content) {
+        setStatus('missing required field: markdown or content is required.', false);
+        return;
+      }
+      if (invalidImageCount > 0) {
+        setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
+        return;
+      }
+
+      const publishPayload = {
+        slug,
+        title: toText(payload.title) || undefined,
+        markdown: markdown || undefined,
+        content: content || undefined,
+        publishDate: toText(payload.publishDate) || undefined,
+        draft: typeof payload.draft === 'boolean' ? payload.draft : undefined,
+        author: toText(payload.author) || undefined,
+        category: toText(payload.category) || undefined,
+        tags: Array.isArray(payload.tags) ? payload.tags.map((tag) => toText(tag)).filter(Boolean) : toText(payload.tags) || undefined,
+        excerpt: toText(payload.excerpt) || undefined,
+        overwrite: Boolean(payload.overwrite),
+        images,
+        featuredImage: toText(payload.featuredImage) || undefined,
+        videoLink: toText(payload.videoLink) || undefined,
+        ctaLink: toText(payload.ctaLink) || undefined,
+        ctaText: toText(payload.ctaText) || undefined,
+        seoDescription: toText(payload.seoDescription) || undefined,
+        commitMessage: toText(payload.commitMessage) || undefined,
+      };
+      const payloadKey = getPayloadFingerprint(payload);
+      updatePublishPreview(payload, `Payload ready from ${origin}. key=${payloadKey}`);
+      setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
+      isPublishInFlight = true;
+      if (fields.publishButton) fields.publishButton.disabled = true;
+      try {
+        const publishResult = await window.publishArticleFromPayload(publishPayload);
+        debugState.lastWidgetActionStatus = String(publishResult.status);
+        setDebugLine();
+        const result = publishResult.body || {};
+        if (publishResult.status === 409) {
+          const message = result.error || result.message || 'Article already exists. Retry with overwrite=true to replace the existing file.';
+          setStatus(message, false);
+          return;
+        }
+        if (!publishResult.ok || result.success === false) {
+          const message = result.error || result.message || `Publish failed with status ${publishResult.status}.`;
+          setStatus(message, false);
+          return;
+        }
+        const articlePath = toText(result.articlePath) || `src/data/post/${slug}.md`;
+        const commit = toText(result.commit);
+        const deployStatus = toText(result.deployStatus) || 'unknown';
+        const message = toText(result.message) || 'Publish request completed.';
+        autoPublishedPayloadKeys.add(payloadKey);
+        setStatus(`Published ${articlePath}. commit=${commit || 'n/a'} deploy=${deployStatus}. ${message}`);
+      } finally {
+        isPublishInFlight = false;
+        if (fields.publishButton) fields.publishButton.disabled = !capturedParsedPayload;
+      }
+    };
+
     const handleChatkitAction = async (action) => {
       const actionType = action?.type;
       const payload = normalizeActionPayload(action?.payload);
@@ -483,7 +663,34 @@ const metadata = {
       setDebugLine();
 
       if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
-        return;
+        // no-op; still allow parsed output capture below.
+      }
+      const possibleOutput = payload.parsed_output ?? payload.parsedOutput ?? payload.output ?? payload.final_output;
+      if (typeof possibleOutput !== 'undefined') {
+        try {
+          const parsed = parseOutputObject(possibleOutput);
+          capturedParsedPayload = parsed;
+          if (!parsed) {
+            updatePublishPreview(null, 'Workflow output captured but it is not an object.');
+          } else if (!toText(parsed.slug) || (!toText(parsed.markdown) && !toText(parsed.content))) {
+            updatePublishPreview(parsed, 'Output captured, but missing required field(s): slug and markdown/content.');
+            setStatus('missing required field: output must include slug and either markdown or content.', false);
+          } else {
+            const payloadKey = getPayloadFingerprint(parsed);
+            updatePublishPreview(parsed, `Parsed output captured and validated. Key=${payloadKey}. Ready to publish.`);
+            if (autoPublishOnOutput) {
+              if (autoPublishedPayloadKeys.has(payloadKey)) {
+                setStatus('Auto-publish skipped: this payload was already published. Use Publish payload to retry manually.');
+              } else {
+                await runPublishFromPayload(parsed, 'End node parsed_output (auto)');
+              }
+            }
+          }
+        } catch (error) {
+          capturedParsedPayload = null;
+          updatePublishPreview(null, error instanceof Error ? error.message : 'Failed to parse workflow output.');
+          setStatus(error instanceof Error ? error.message : 'Failed to parse workflow output.', false);
+        }
       }
 
       if (actionType === 'agent.fill_test_payload') {
@@ -527,101 +734,7 @@ const metadata = {
       }
 
       if (actionType === 'agent.publish_article') {
-        if (isPublishInFlight) {
-          setStatus('Publish already in progress. Please wait for completion.');
-          return;
-        }
-
-        const slug = toText(payload.slug);
-        const markdown = toText(payload.markdown);
-        const content = toText(payload.content);
-        const images = normalizePublishImages(payload.images);
-        const rawImages = Array.isArray(payload.images) ? payload.images : [];
-        const invalidImageCount = rawImages.length - images.length;
-
-        if (!slug || !slugPattern.test(slug)) {
-          setStatus('Publish blocked: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
-          return;
-        }
-        if (!markdown && !content) {
-          setStatus('Publish blocked: markdown or content is required.', false);
-          return;
-        }
-        if (invalidImageCount > 0) {
-          setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
-          return;
-        }
-
-        const publishPayload = {
-          slug,
-          title: toText(payload.title) || undefined,
-          markdown: markdown || undefined,
-          content: content || undefined,
-          publishDate: toText(payload.publishDate) || undefined,
-          draft: typeof payload.draft === 'boolean' ? payload.draft : undefined,
-          author: toText(payload.author) || undefined,
-          category: toText(payload.category) || undefined,
-          tags: Array.isArray(payload.tags)
-            ? payload.tags.map((tag) => toText(tag)).filter(Boolean)
-            : toText(payload.tags) || undefined,
-          excerpt: toText(payload.excerpt) || undefined,
-          overwrite: Boolean(payload.overwrite),
-          images,
-          featuredImage: toText(payload.featuredImage) || undefined,
-          videoLink: toText(payload.videoLink) || undefined,
-          ctaLink: toText(payload.ctaLink) || undefined,
-          ctaText: toText(payload.ctaText) || undefined,
-          seoDescription: toText(payload.seoDescription) || undefined,
-          commitMessage: toText(payload.commitMessage) || undefined,
-        };
-
-        setStatus('Workflow complete. Publishing article via /.netlify/functions/publish-article…');
-        isPublishInFlight = true;
-        try {
-          const publishResult = await (window.publishArticleFromPayload
-            ? window.publishArticleFromPayload(publishPayload)
-            : Promise.resolve({ ok: false, status: 500, body: { error: 'Publisher module is unavailable.' } }));
-          debugState.lastWidgetActionStatus = String(publishResult.status);
-          setDebugLine();
-          const result = publishResult.body || {};
-
-          if (publishResult.status === 409) {
-            const message =
-              result.error ||
-              result.message ||
-              'Article already exists. Retry with overwrite=true to replace the existing file.';
-            setStatus(message, false);
-            await sendChatkitStatusMessage(`${message} You can retry now with overwrite=true.`);
-            return;
-          }
-
-          if (!publishResult.ok || result.success === false) {
-            const message = result.error || result.message || `Publish failed with status ${publishResult.status}.`;
-            setStatus(message, false);
-            await sendChatkitStatusMessage(`Publishing failed: ${message}`);
-            return;
-          }
-
-          const articlePath = toText(result.articlePath) || `src/data/post/${slug}.md`;
-          const commit = toText(result.commit);
-          const deployStatus = toText(result.deployStatus) || 'unknown';
-          const imagePaths = Array.isArray(result.imagePaths) ? result.imagePaths.filter((path) => typeof path === 'string') : [];
-          const verifyLink = `/blog/${slug}`;
-          const summary = `Published ${articlePath}. Deploy: ${deployStatus}.`;
-          setStatus(summary);
-          await sendChatkitStatusMessage(
-            [
-              `Publishing succeeded.`,
-              `articlePath: ${articlePath}`,
-              `commit: ${commit || 'n/a'}`,
-              `deployStatus: ${deployStatus}`,
-              `imagePaths: ${imagePaths.length ? imagePaths.join(', ') : 'none'}`,
-              `Verify: ${verifyLink}`,
-            ].join('\n')
-          );
-        } finally {
-          isPublishInFlight = false;
-        }
+        await runPublishFromPayload(capturedParsedPayload || payload, 'agent.publish_article');
       }
     };
 
@@ -685,6 +798,22 @@ const metadata = {
     };
 
     setChatkitConfigStatus();
+    fields.autoPublishToggle?.addEventListener('change', (event) => {
+      autoPublishOnOutput = Boolean(event?.target?.checked);
+      if (capturedParsedPayload) {
+        updatePublishPreview(
+          capturedParsedPayload,
+          autoPublishOnOutput ? 'Auto-publish enabled for next valid captured payload.' : 'Auto-publish disabled. Manual publish only.'
+        );
+      }
+    });
+    fields.publishButton?.addEventListener('click', () => {
+      if (!capturedParsedPayload) {
+        setStatus('Publish blocked: no parsed End node payload captured yet.', false);
+        return;
+      }
+      runPublishFromPayload(capturedParsedPayload, 'explicit button click');
+    });
     initializeChatKit().catch((error) => {
       console.error('ChatKit initialization failed.', error);
       setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
