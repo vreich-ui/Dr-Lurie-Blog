@@ -718,63 +718,80 @@ const metadata = {
     };
 
     const trackEvent = async (eventName, rawData) => {
-      const detailKeys =
-        rawData && typeof rawData === 'object' ? Object.keys(rawData).slice(0, 12).join(', ') || '(no-keys)' : '(non-object)';
-      debugState.lastEventType = eventName;
-      debugState.lastEventDetailKeys = detailKeys;
-      const payloadCandidateKey =
-        rawData && typeof rawData === 'object'
-          ? ['slug', 'parsed_output', 'parsedOutput', 'output', 'final_output', 'finalOutput', 'payload', 'data', 'result', 'detail'].find(
-              (key) => typeof rawData[key] !== 'undefined'
-            ) || ''
-          : '';
-      const payloadLike = Boolean(payloadCandidateKey);
-      debugState.eventLog.push(`${new Date().toISOString()} | ${eventName} | keys: ${detailKeys} | payload: ${payloadLike ? 'yes' : 'no'}`);
-      if (debugState.eventLog.length > 20) debugState.eventLog.shift();
-      setDebugLine();
-      if (payloadLike) {
-        console.debug('[agent-admin] payload capture gate passed', { eventName, matchedKey: payloadCandidateKey });
-        const sourceLabel =
-          eventName.startsWith('widget.onAction:agent.publish_article')
-            ? 'widget action'
-            : eventName.startsWith('element:') || eventName.startsWith('window:')
-              ? 'End output'
-              : 'Manual console/test payload';
-        await capturePayloadCandidate(rawData, sourceLabel);
+      try {
+        const detailKeysArray = rawData && typeof rawData === 'object' ? Object.keys(rawData).slice(0, 12) : [];
+        const detailKeys = detailKeysArray.join(', ') || '(no-keys)';
+        debugState.lastEventType = eventName;
+        debugState.lastEventDetailKeys = rawData && typeof rawData === 'object' ? detailKeys : '(non-object)';
+        const payloadKeyCandidates = ['data', 'detail', 'result', 'parsed_output', 'parsedOutput', 'output', 'final_output', 'finalOutput', 'payload'];
+        const directMatchKey =
+          rawData && typeof rawData === 'object' ? payloadKeyCandidates.find((key) => typeof rawData[key] !== 'undefined') || '' : '';
+        const nestedPayloadMatchKey =
+          rawData && typeof rawData === 'object' && rawData.payload && typeof rawData.payload === 'object'
+            ? payloadKeyCandidates.find((key) => typeof rawData.payload[key] !== 'undefined') || ''
+            : '';
+        const slugMatchKey = rawData && typeof rawData === 'object' && typeof rawData.slug !== 'undefined' ? 'slug' : '';
+        const payloadCandidateKey = directMatchKey || (nestedPayloadMatchKey ? `payload.${nestedPayloadMatchKey}` : '') || slugMatchKey;
+        const payloadLike = Boolean(payloadCandidateKey);
+        debugState.eventLog.push(
+          `${new Date().toISOString()} | ${eventName} | keys: ${rawData && typeof rawData === 'object' ? detailKeys : '(non-object)'} | payload: ${payloadLike ? 'yes' : 'no'}`
+        );
+        if (debugState.eventLog.length > 20) debugState.eventLog.shift();
+        setDebugLine();
+        if (payloadLike) {
+          console.debug('[agent-admin] payload capture gate passed', {
+            eventName,
+            matchedKey: payloadCandidateKey,
+            topLevelKeys: detailKeysArray,
+          });
+          const sourceLabel =
+            eventName.startsWith('widget.onAction:agent.publish_article')
+              ? 'widget action'
+              : eventName.startsWith('element:') || eventName.startsWith('window:')
+                ? 'End output'
+                : 'Manual console/test payload';
+          await capturePayloadCandidate(rawData, sourceLabel);
+        }
+      } catch (error) {
+        console.error('[agent-admin] trackEvent failed', {
+          eventName,
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     };
 
     const handleChatkitAction = async (action) => {
-      const actionType = action?.type;
-      const payload = normalizeActionPayload(action?.payload);
-      debugState.lastWidgetActionSent = String(actionType || 'unknown');
-      setDebugLine();
+      try {
+        const actionType = action?.type;
+        const payload = normalizeActionPayload(action?.payload);
+        debugState.lastWidgetActionSent = String(actionType || 'unknown');
+        setDebugLine();
 
-      if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
-        // no-op; still allow parsed output capture below.
-      }
-      await trackEvent(`widget.onAction:${String(actionType || 'unknown')}`, payload);
-      if (actionType === 'agent.publish_article') {
-        await capturePayloadCandidate(payload, 'widget action');
-      }
+        if (!chatkitWidgetConfig.requiredActions?.includes(actionType)) {
+          // no-op; still allow parsed output capture below.
+        }
+        await trackEvent(`widget.onAction:${String(actionType || 'unknown')}`, payload);
+        if (actionType === 'agent.publish_article') {
+          await capturePayloadCandidate(payload, 'widget action');
+        }
 
-      if (actionType === 'agent.fill_test_payload') {
-        await sendChatkitStatusMessage(
-          [
-            'Fill the AI Publishing Workflow widget with a smoke-test article idea, title, slug,',
-            'markdown draft, and overwrite=false.',
-          ].join(' ')
-        );
-        return;
-      }
+        if (actionType === 'agent.fill_test_payload') {
+          await sendChatkitStatusMessage(
+            [
+              'Fill the AI Publishing Workflow widget with a smoke-test article idea, title, slug,',
+              'markdown draft, and overwrite=false.',
+            ].join(' ')
+          );
+          return;
+        }
 
-      if (actionType === 'agent.reset') {
-        await sendChatkitStatusMessage('Reset the AI Publishing Workflow widget to its initial idle state.');
-        setStatus('Agent workflow reset requested.');
-        return;
-      }
+        if (actionType === 'agent.reset') {
+          await sendChatkitStatusMessage('Reset the AI Publishing Workflow widget to its initial idle state.');
+          setStatus('Agent workflow reset requested.');
+          return;
+        }
 
-      if (actionType === 'agent.start_workflow') {
+        if (actionType === 'agent.start_workflow') {
         const articleIdea = String(payload.articleIdea || '').trim();
         const slug = String(payload.slug || '').trim();
         const overwrite = Boolean(payload.overwrite);
@@ -800,6 +817,11 @@ const metadata = {
 
       if (actionType === 'agent.publish_article') {
         await runPublishFromPayload(capturedParsedPayload || payload, 'Captured from widget action');
+        }
+      } catch (error) {
+        console.error('[agent-admin] handleChatkitAction failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     };
 
