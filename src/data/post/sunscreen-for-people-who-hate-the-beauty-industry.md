@@ -1,17 +1,21 @@
 ---
+publishDate: 2026-05-27T00:00:00.000Z
 title: "Sunscreen for People Who Hate the Beauty Industry"
-publishDate: "2026-05-27"
 excerpt: "A plain-language guide to treating sunscreen as skin maintenance after 40: why photoaging shows up later, what broad-spectrum really means, and how to make sun protection tolerable if you hate the feel or the marketing."
-description: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
+category: "Health"
 tags:
-  - sunscreen
-  - photoaging
-  - sun protection
-  - aging skin
-  - dark spots
-  - skin health
+  - "sunscreen"
+  - "photoaging"
+  - "sun protection"
+  - "aging skin"
+  - "dark spots"
+  - "skin health"
+author: "Dr. Lurie"
+metadata:
+  description: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
 ---
-
+---
+title: "Sunscreen for People Who Hate the Beauty Industry"
 # Sunscreen for People Who Hate the Beauty Industry
 
 If you are not interested in beauty routines, sunscreen can sound like one more thing you were supposed to care about years ago.
