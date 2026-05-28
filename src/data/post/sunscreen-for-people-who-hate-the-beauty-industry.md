@@ -3,6 +3,7 @@ publishDate: 2026-05-27T00:00:00.000Z
 title: "Sunscreen for People Who Hate the Beauty Industry"
 excerpt: "A plain-language guide to treating sunscreen as skin maintenance after 40: why photoaging shows up later, what broad-spectrum really means, and how to make sun protection tolerable if you hate the feel or the marketing."
 category: "Health"
+image: "~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.png"
 tags:
   - "sunscreen"
   - "photoaging"
