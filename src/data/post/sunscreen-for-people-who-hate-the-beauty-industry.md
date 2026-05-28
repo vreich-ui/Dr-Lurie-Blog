@@ -11,7 +11,6 @@ tags:
   - "dark spots"
   - "skin health"
 author: "Rebbeca Stevenson"
-metadata: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
 description: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
 ---
 
