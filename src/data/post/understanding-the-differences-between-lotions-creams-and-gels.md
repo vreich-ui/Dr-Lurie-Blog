@@ -1,10 +1,14 @@
 ---
-publishDate: 2026-05-22T10:19:00.000Z
+publishDate: 2026-05-22
 title: "Understanding the Differences Between Lotions, Creams, and Gels"
 excerpt: "When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best."
 image: "~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.png"
-tags: "Lotions", "Creams", "Gels"
+tags:
+- "Lotions"
+- "Creams"
+- "Gels"
 ---
+
 When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best.
 
 **Lotions** are typically lighter in texture, containing more water relative to oils. This makes them feel thin and spreadable, often quickly absorbing without leaving a heavy residue. Because of their water-rich yet emollient-containing formula, lotions tend to suit normal to slightly oily or sensitive skin types that need hydration without weight.
