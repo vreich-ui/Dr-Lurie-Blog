@@ -4,7 +4,7 @@ import { Icon } from 'astro-icon/components';
 
 <button
   type="button"
-  class="back-to-top fixed bottom-5 right-5 z-50 inline-flex h-12 w-12 translate-y-4 items-center justify-center rounded-full border border-gray-200/80 bg-white/95 text-primary opacity-0 shadow-xl shadow-slate-900/15 ring-1 ring-slate-900/5 backdrop-blur transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-primary hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:border-slate-700/80 dark:bg-slate-900/95 dark:text-slate-100 dark:ring-white/10 dark:hover:bg-primary md:bottom-6 md:right-6"
+  class="back-to-top fixed bottom-5 z-50 inline-flex h-12 w-12 translate-y-4 items-center justify-center rounded-full border border-gray-200/80 bg-white/95 text-primary opacity-0 shadow-xl shadow-slate-900/15 ring-1 ring-slate-900/5 backdrop-blur transition duration-200 ease-out hover:-translate-y-0.5 hover:bg-primary hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:border-slate-700/80 dark:bg-slate-900/95 dark:text-slate-100 dark:ring-white/10 dark:hover:bg-primary md:bottom-8"
   data-back-to-top
   aria-label="Back to top"
   aria-hidden="true"
@@ -15,6 +15,9 @@ import { Icon } from 'astro-icon/components';
 </button>
 
 <style is:global>
+  .back-to-top {
+    right: max(1rem, calc((100vw - 720px) / 2 - 4.5rem));
+  }
   .back-to-top.is-visible {
     opacity: 1;
     pointer-events: auto;
