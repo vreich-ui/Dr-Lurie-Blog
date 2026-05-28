@@ -3,6 +3,7 @@ publishDate: 2026-05-28
 title: "Your Products May Not Have Stopped Working"
 excerpt: "Midlife skin changes can feel sudden. Learn how perimenopause and menopause may affect dryness, sensitivity, breakouts, facial hair, and scalp hair without routine panic."
 category: "Skincare"
+image: "~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.png"
 tags:
   - "perimenopause"
   - "menopause"
