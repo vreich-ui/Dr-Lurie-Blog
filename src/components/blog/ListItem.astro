@@ -108,7 +108,9 @@ const link = APP_BLOG?.post?.isEnabled ? getPermalink(post.permalink, 'post') : 
 
     {
       post.excerpt && (
-        <p class="line-clamp-3 flex-grow text-base leading-normal text-muted dark:text-slate-400">{post.excerpt}</p>
+        <p class="line-clamp-4 flex-grow text-[0.7875rem] leading-normal italic text-muted dark:text-slate-400">
+          {post.excerpt}
+        </p>
       )
     }
     {
