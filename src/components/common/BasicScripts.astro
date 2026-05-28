@@ -89,6 +89,77 @@ import { UI } from 'astrowind:config';
     window.addEventListener('scroll', requestHeaderScrollUpdate, { passive: true, signal: controller.signal });
   };
 
+  const initBackToTopButton = function () {
+    window.__drLurieBackToTopController?.abort();
+
+    const backToTopButton = document.querySelector('[data-back-to-top]');
+    if (!(backToTopButton instanceof HTMLButtonElement)) return;
+
+    const controller = new AbortController();
+    window.__drLurieBackToTopController = controller;
+
+    const showAfterScrollY = 360;
+    const minScrollDelta = 8;
+    let previousScrollPosition = Math.max(window.scrollY, 0);
+    let ticking = false;
+    let isReturningToTop = false;
+
+    const setButtonVisibility = function (isVisible) {
+      backToTopButton.classList.toggle('is-visible', isVisible);
+      backToTopButton.setAttribute('aria-hidden', String(!isVisible));
+      backToTopButton.tabIndex = isVisible ? 0 : -1;
+    };
+
+    const updateBackToTopVisibility = function () {
+      const currentScrollPosition = Math.max(window.scrollY, 0);
+      const scrollDelta = currentScrollPosition - previousScrollPosition;
+      const hasScrolledUp = scrollDelta < -minScrollDelta;
+      const hasScrolledDown = scrollDelta > minScrollDelta;
+
+      if (isReturningToTop) {
+        setButtonVisibility(false);
+        if (currentScrollPosition <= showAfterScrollY) isReturningToTop = false;
+        previousScrollPosition = currentScrollPosition;
+        ticking = false;
+        return;
+      }
+
+      if (currentScrollPosition <= showAfterScrollY) {
+        setButtonVisibility(false);
+      } else if (hasScrolledUp) {
+        setButtonVisibility(true);
+      } else if (hasScrolledDown) {
+        setButtonVisibility(false);
+      }
+
+      if (Math.abs(scrollDelta) >= minScrollDelta || currentScrollPosition <= showAfterScrollY) {
+        previousScrollPosition = currentScrollPosition;
+      }
+
+      ticking = false;
+    };
+
+    const requestBackToTopUpdate = function () {
+      if (ticking) return;
+
+      window.requestAnimationFrame(updateBackToTopVisibility);
+      ticking = true;
+    };
+
+    backToTopButton.addEventListener(
+      'click',
+      () => {
+        isReturningToTop = true;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setButtonVisibility(false);
+      },
+      { signal: controller.signal }
+    );
+
+    setButtonVisibility(false);
+    window.addEventListener('scroll', requestBackToTopUpdate, { passive: true, signal: controller.signal });
+  };
+
   function resetMobileDropdown(dropdown) {
     dropdown.classList.remove('mobile-open');
     dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
@@ -217,6 +288,7 @@ import { UI } from 'astrowind:config';
     });
 
     initHeaderScrollBehavior();
+    initBackToTopButton();
   };
   const onPageShow = function () {
     document.documentElement.classList.add('motion-safe:scroll-smooth');
