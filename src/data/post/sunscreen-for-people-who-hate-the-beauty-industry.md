@@ -8,16 +8,11 @@ tags:
   - "sunscreen"
   - "photoaging"
   - "sun protection"
-  - "aging skin"
   - "dark spots"
   - "skin health"
-author: "Dr. Lurie"
-metadata:
-  description: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
----
----
-title: "Sunscreen for People Who Hate the Beauty Industry"
-# Sunscreen for People Who Hate the Beauty Industry
+author: "Rebbeca Stevenson"
+metadata: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
+description: "A practical, non-vanity guide for adults over 40 on photoaging, cumulative UV exposure, broad-spectrum sunscreen, reapplication, hats, shade, darker skin, indoor exposure, and when spots or moles need medical attention."
 
 If you are not interested in beauty routines, sunscreen can sound like one more thing you were supposed to care about years ago.
 
