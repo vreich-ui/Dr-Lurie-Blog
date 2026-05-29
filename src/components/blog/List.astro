@@ -7,9 +7,21 @@ export interface Props {
 }
 
 const { posts } = Astro.props;
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 ---
 
-<ul>
+<div
+  class="mb-8 flex flex-wrap items-center justify-end gap-3"
+  data-admin-library-mode-controls
+  data-clerk-publishable-key={clerkPublishableKey}
+  hidden
+>
+  <a class="btn-secondary text-sm" href="?unpublished=1" data-admin-drafts-link>View unpublished drafts</a>
+  <a class="btn-secondary text-sm" href="." data-admin-published-link hidden>Back to published Library</a>
+  <p class="w-full text-right text-xs text-muted dark:text-slate-400" data-admin-unpublished-status></p>
+</div>
+
+<ul data-blog-list>
   {
     posts.map((post) => (
       <li class="mb-12 md:mb-20">
@@ -21,24 +33,119 @@ const { posts } = Astro.props;
 
 <script is:inline>
   const registerBlogPreviewAdminControls = () => {
-    const previews = Array.from(document.querySelectorAll('[data-post-preview]'));
-    const adminEditControls = Array.from(document.querySelectorAll('[data-post-preview] [data-admin-edit]'));
-    const adminPublishControls = Array.from(
-      document.querySelectorAll('[data-post-preview] [data-admin-publish-toggle]')
-    );
-    const adminControls = [...adminEditControls, ...adminPublishControls];
-    const clerkPublishableKey = previews.find((preview) => preview.dataset.clerkPublishableKey)?.dataset
-      .clerkPublishableKey;
+    const list = document.querySelector('[data-blog-list]');
+    const modeControls = document.querySelector('[data-admin-library-mode-controls]');
+    const draftsLink = document.querySelector('[data-admin-drafts-link]');
+    const publishedLink = document.querySelector('[data-admin-published-link]');
+    const modeStatus = document.querySelector('[data-admin-unpublished-status]');
+    const firstPreview = document.querySelector('[data-post-preview]');
+    const clerkPublishableKey =
+      modeControls?.dataset.clerkPublishableKey || firstPreview?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+    const isUnpublishedMode = new URLSearchParams(window.location.search).get('unpublished') === '1';
 
-    if (!adminControls.length || !clerkPublishableKey) return;
+    if (!list || !clerkPublishableKey) return;
 
     let clerkLoadPromise;
+    let activeClerk;
+
+    const setModeStatus = (message) => {
+      if (modeStatus) modeStatus.textContent = message || '';
+    };
+
+    const getAdminControls = () => [
+      ...Array.from(document.querySelectorAll('[data-post-preview] [data-admin-edit]')),
+      ...Array.from(document.querySelectorAll('[data-post-preview] [data-admin-publish-toggle]')),
+    ];
+
+    const getAdminPublishControls = () =>
+      Array.from(document.querySelectorAll('[data-post-preview] [data-admin-publish-toggle]'));
 
     const setAdminControlsVisible = (visible) => {
-      adminControls.forEach((control) => {
+      getAdminControls().forEach((control) => {
         control.hidden = !visible;
       });
+      if (modeControls) modeControls.hidden = !visible;
+    };
+
+    const configureModeLinks = () => {
+      const draftUrl = new URL(window.location.href);
+      draftUrl.searchParams.set('unpublished', '1');
+
+      const publishedUrl = new URL(window.location.href);
+      publishedUrl.searchParams.delete('unpublished');
+
+      if (draftsLink) draftsLink.href = `${draftUrl.pathname}${draftUrl.search}${draftUrl.hash}`;
+      if (publishedLink) publishedLink.href = `${publishedUrl.pathname}${publishedUrl.search}${publishedUrl.hash}`;
+      if (draftsLink) draftsLink.hidden = isUnpublishedMode;
+      if (publishedLink) publishedLink.hidden = !isUnpublishedMode;
+    };
+
+    const escapeHtml = (value) =>
+      String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const formatDate = (value) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.valueOf())) return '';
+      return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+    };
+
+    const renderDraftPreview = (post) => {
+      const title = escapeHtml(post.title || post.slug || 'Untitled draft');
+      const slug = escapeHtml(post.slug || '');
+      const author = post.author ? ` · ${escapeHtml(String(post.author).replaceAll('-', ' '))}` : '';
+      const category = post.category ? ` · ${escapeHtml(post.category)}` : '';
+      const publishDate = escapeHtml(formatDate(post.publishDate));
+      const excerpt = post.excerpt
+        ? `<p class="line-clamp-4 flex-grow text-[0.7875rem] leading-normal italic text-muted dark:text-slate-400">${escapeHtml(post.excerpt)}</p>`
+        : '';
+      const tags = Array.isArray(post.tags)
+        ? post.tags
+            .map((tag) => `<span class="text-xs text-muted dark:text-slate-400">#${escapeHtml(tag)}</span>`)
+            .join(' ')
+        : '';
+
+      return `
+        <li class="mb-12 md:mb-20">
+          <article class="max-w-md mx-auto md:max-w-none grid gap-6 md:gap-8" data-post-preview data-post-unpublished="true">
+            <div class="mt-2 md:col-span-2">
+              <header>
+                <div class="mb-1 flex items-start gap-3">
+                  <span class="text-sm text-muted dark:text-slate-400">
+                    <time>${publishDate}</time>${author}${category}
+                  </span>
+                  <div class="ml-auto inline-flex shrink-0 items-center gap-1" data-admin-preview-actions>
+                    <span class="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[0.6875rem] font-semibold leading-none text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200" data-admin-publish-badge>Draft</span>
+                    <button type="button" class="inline-flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-semibold text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300" data-admin-publish-toggle data-post-slug="${slug}" data-post-draft="true" aria-pressed="false" aria-label="Publish article" title="Publish article">
+                      <span data-admin-publish-status>Publish</span>
+                    </button>
+                    <a class="inline-flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-semibold text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300" href="/admin/publish?edit=${encodeURIComponent(post.slug || '')}" data-admin-edit aria-label="Edit article">
+                      Edit
+                    </a>
+                  </div>
+                </div>
+                <h2 class="text-xl sm:text-2xl font-bold leading-tight mb-2 font-heading dark:text-slate-300">${title}</h2>
+              </header>
+              ${excerpt}
+              ${tags ? `<footer class="mt-5 flex flex-wrap gap-2">${tags}</footer>` : ''}
+            </div>
+          </article>
+        </li>`;
+    };
+
+    const renderDrafts = (drafts) => {
+      if (!Array.isArray(drafts) || !drafts.length) {
+        list.innerHTML =
+          '<li class="rounded-2xl border border-dashed border-gray-300 p-6 text-sm text-muted dark:border-slate-700 dark:text-slate-400">No unpublished drafts found.</li>';
+        return;
+      }
+
+      list.innerHTML = drafts.map((post) => renderDraftPreview(post)).join('');
     };
 
     const loadClerkScript = () =>
@@ -96,6 +203,7 @@ const { posts } = Astro.props;
 
         const clerk = window.Clerk;
         await clerk.load();
+        activeClerk = clerk;
         return clerk;
       })();
 
@@ -170,7 +278,7 @@ const { posts } = Astro.props;
       setPublishControlState(control, !willDraft, willDraft ? 'Unpublishing article…' : 'Publishing article…');
 
       try {
-        const clerk = await getClerk();
+        const clerk = activeClerk || (await getClerk());
         const token = await getClerkSessionToken(clerk);
 
         if (!token) throw new Error('A valid Clerk session token is required.');
@@ -208,19 +316,67 @@ const { posts } = Astro.props;
       }
     };
 
-    adminPublishControls.forEach((control) => {
-      setPublishControlState(control, control.dataset.postDraft === 'true');
-      if (control.dataset.adminPublishBound === 'true') return;
+    const bindPreviewToggleControls = () => {
+      getAdminPublishControls().forEach((control) => {
+        setPublishControlState(control, control.dataset.postDraft === 'true');
+        if (control.dataset.adminPublishBound === 'true') return;
 
-      control.dataset.adminPublishBound = 'true';
-      control.addEventListener('click', () => {
-        togglePublishState(control);
+        control.dataset.adminPublishBound = 'true';
+        control.addEventListener('click', () => {
+          togglePublishState(control);
+        });
       });
-    });
+    };
+
+    const loadUnpublishedDrafts = async (clerk) => {
+      if (!isUnpublishedMode) return;
+
+      const token = await getClerkSessionToken(clerk);
+      if (!token) {
+        setModeStatus('Sign in as an admin to view unpublished drafts.');
+        return;
+      }
+
+      setModeStatus('Loading unpublished drafts…');
+
+      try {
+        const response = await fetch('/.netlify/functions/list-draft-articles', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Draft articles could not be loaded with status ${response.status}.`);
+        }
+
+        renderDrafts(result.posts || []);
+        bindPreviewToggleControls();
+        setAdminControlsVisible(true);
+        setModeStatus(
+          `${(result.posts || []).length} unpublished draft${(result.posts || []).length === 1 ? '' : 's'} loaded.`
+        );
+      } catch (error) {
+        setModeStatus(error instanceof Error ? error.message : 'Unpublished drafts could not be loaded.');
+      }
+    };
+
+    bindPreviewToggleControls();
+    configureModeLinks();
 
     const renderAdminEditState = async (clerk) => {
       const adminState = await getAdminStateForClerk(clerk);
-      setAdminControlsVisible(Boolean(adminState.isAdmin));
+      const isAdmin = Boolean(adminState.isAdmin);
+      setAdminControlsVisible(isAdmin);
+
+      if (isAdmin) {
+        await loadUnpublishedDrafts(clerk);
+      } else if (isUnpublishedMode) {
+        setModeStatus('Sign in as an admin to view unpublished drafts.');
+      }
     };
 
     getClerk()
