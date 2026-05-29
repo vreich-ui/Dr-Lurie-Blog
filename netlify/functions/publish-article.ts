@@ -160,7 +160,6 @@ const isValidImagePath = (path: string, slug: string) => {
   return path.startsWith(prefix) && path.length > prefix.length && !path.endsWith('/');
 };
 
-
 const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
 
 const parseTags = (value: unknown) => {
@@ -478,10 +477,12 @@ export const handler = async (event: LambdaEvent) => {
     const mediaEntries = getMediaEntries(input, slug);
     publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
+    const existingFeaturedImage = featuredImage?.startsWith('~/assets/images/uploads/') ? featuredImage : undefined;
     const selectedFeatured = featuredImage ? sanitizeFilename(featuredImage) : undefined;
-    const imagePath = selectedFeatured
+    const uploadedImagePath = selectedFeatured
       ? mediaEntries.find((entry) => entry.path.endsWith(`/${selectedFeatured}`))?.displayPath
       : undefined;
+    const imagePath = uploadedImagePath ?? existingFeaturedImage;
     const markdown = markdownInput
       ? hasFrontmatter(markdownInput)
         ? markdownInput
