@@ -1251,29 +1251,39 @@ const metadata = {
       if (invalidTextField) throw new Error(`JSON field "${invalidTextField}" must be a string.`);
 
       ['tags', 'sources'].forEach((fieldName) => {
-        if (data[fieldName] != null && !Array.isArray(data[fieldName])) {
-          throw new Error(`JSON field "${fieldName}" must be an array.`);
-        }
+        [fieldName, `${fieldName}[]`].forEach((fieldKey) => {
+          if (data[fieldKey] == null) return;
 
-        if (Array.isArray(data[fieldName]) && data[fieldName].some((item) => typeof item !== 'string')) {
-          throw new Error(`JSON field "${fieldName}" must contain only strings.`);
-        }
+          if (!Array.isArray(data[fieldKey])) {
+            throw new Error(`JSON field "${fieldKey}" must be an array.`);
+          }
+
+          if (data[fieldKey].some((item) => typeof item !== 'string')) {
+            throw new Error(`JSON field "${fieldKey}" must contain only strings.`);
+          }
+        });
       });
     };
 
+    const getImportArrayValue = (data, fieldName) =>
+      data[fieldName] != null ? data[fieldName] : data[`${fieldName}[]`];
+
     const populateFromJsonImport = (data) => {
+      const importedTags = getImportArrayValue(data, 'tags');
+      const importedSources = getImportArrayValue(data, 'sources');
+
       fields.title.value = data.title || '';
       fields.excerpt.value = data.deck || '';
       fields.seoDescription.value = data.description || '';
       fields.slug.value = data.slug || '';
-      fields.tags.value = Array.isArray(data.tags)
-        ? data.tags
+      fields.tags.value = Array.isArray(importedTags)
+        ? importedTags
             .map((tag) => tag.trim())
             .filter(Boolean)
             .join(', ')
         : '';
       fields.content.value = data.content || '';
-      fields.sources.value = Array.isArray(data.sources) ? formatImportedList(data.sources) : '';
+      fields.sources.value = Array.isArray(importedSources) ? formatImportedList(importedSources) : '';
       updatePreview();
       updatePublishOutput();
     };
