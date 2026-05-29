@@ -27,7 +27,11 @@ const heroImageAspect = (() => {
 ---
 
 <section class="dl-pt-s dl-pb-l sm:py-8 lg:py-10 mx-auto">
-  <article data-print-article data-clerk-publishable-key={clerkPublishableKey}>
+  <article
+    data-print-article
+    data-clerk-publishable-key={clerkPublishableKey}
+    data-post-unpublished={String(Boolean(post.draft))}
+  >
     <header
       class={post.image
         ? 'intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade'
@@ -50,16 +54,51 @@ const heroImageAspect = (() => {
           {post.readingTime && <span aria-hidden="true">·</span>}
           <time datetime={String(post.publishDate)}>{getFormattedMonthYear(post.publishDate)}</time>
         </p>
-        <a
-          class="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-          href={adminEditHref}
-          data-admin-edit
-          hidden
-          aria-label="Edit article"
-        >
-          <Icon name="tabler:pencil" class="h-5 w-5" aria-hidden="true" />
-          <span class="sr-only">Edit article</span>
-        </a>
+        <div class="ml-auto inline-flex shrink-0 items-center gap-2">
+          <span
+            class="hidden rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
+            data-admin-publish-badge
+          >
+            Unpublished / Draft
+          </span>
+          <button
+            type="button"
+            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            data-admin-publish-toggle
+            data-post-slug={post.slug}
+            data-post-draft={String(Boolean(post.draft))}
+            hidden
+            aria-pressed={!post.draft}
+            aria-label={post.draft ? 'Publish article' : 'Unpublish article'}
+            title={post.draft ? 'Publish article' : 'Unpublish article'}
+          >
+            <Icon
+              name="tabler:cloud-upload"
+              class={`h-5 w-5 ${post.draft ? '' : 'hidden'}`}
+              data-admin-publish-icon="publish"
+              aria-hidden="true"
+            />
+            <Icon
+              name="tabler:cloud-off"
+              class={`h-5 w-5 ${post.draft ? 'hidden' : ''}`}
+              data-admin-publish-icon="unpublish"
+              aria-hidden="true"
+            />
+            <span class="sr-only" data-admin-publish-status>
+              {post.draft ? 'Publish article' : 'Unpublish article'}
+            </span>
+          </button>
+          <a
+            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            href={adminEditHref}
+            data-admin-edit
+            hidden
+            aria-label="Edit article"
+          >
+            <Icon name="tabler:pencil" class="h-5 w-5" aria-hidden="true" />
+            <span class="sr-only">Edit article</span>
+          </a>
+        </div>
       </div>
 
       {
@@ -143,11 +182,47 @@ const heroImageAspect = (() => {
       </a>
     </div>
   </article>
+  <dialog
+    class="w-[min(92vw,32rem)] rounded-2xl border border-gray-200 bg-white p-0 text-default shadow-2xl backdrop:bg-slate-950/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+    data-admin-publish-confirm
+    aria-labelledby="admin-publish-confirm-title"
+  >
+    <form method="dialog" class="p-6">
+      <div class="flex items-start gap-3">
+        <div
+          class="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+        >
+          <Icon name="tabler:alert-triangle" class="h-5 w-5" aria-hidden="true" />
+        </div>
+        <div>
+          <h2 id="admin-publish-confirm-title" class="font-heading text-xl font-bold">Confirm article status change</h2>
+          <p class="mt-2 text-sm leading-6 text-muted dark:text-slate-300" data-admin-publish-confirm-message>
+            Unpublishing saves this article as a draft and removes it from public library pages after the site
+            refreshes.
+          </p>
+        </div>
+      </div>
+      <div class="mt-6 flex flex-wrap justify-end gap-3">
+        <button class="btn-secondary" type="submit" value="cancel">Cancel</button>
+        <button class="btn-primary" type="submit" value="confirm">Confirm</button>
+      </div>
+    </form>
+  </dialog>
 </section>
 
 <style>
-  [data-admin-edit][hidden] {
+  [data-admin-edit][hidden],
+  [data-admin-publish-toggle][hidden] {
     display: none !important;
+  }
+
+  [data-print-article][data-post-unpublished='true'] {
+    opacity: 0.72;
+    filter: grayscale(0.35);
+  }
+
+  [data-print-article][data-post-unpublished='true'] [data-admin-publish-badge] {
+    display: inline-flex;
   }
 
   @media print {
@@ -175,7 +250,9 @@ const heroImageAspect = (() => {
     }
 
     .post-actions,
-    [data-admin-edit] {
+    [data-admin-edit],
+    [data-admin-publish-toggle],
+    [data-admin-publish-badge] {
       display: none !important;
     }
   }
@@ -185,15 +262,17 @@ const heroImageAspect = (() => {
   const registerAdminEditControls = () => {
     const article = document.querySelector('[data-print-article]');
     const adminEditControls = Array.from(document.querySelectorAll('[data-admin-edit]'));
+    const adminPublishControls = Array.from(document.querySelectorAll('[data-admin-publish-toggle]'));
+    const adminControls = [...adminEditControls, ...adminPublishControls];
     const clerkPublishableKey = article?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 
-    if (!adminEditControls.length || !clerkPublishableKey) return;
+    if (!adminControls.length || !clerkPublishableKey) return;
 
     let clerkLoadPromise;
 
-    const setAdminEditControlsVisible = (visible) => {
-      adminEditControls.forEach((control) => {
+    const setAdminControlsVisible = (visible) => {
+      adminControls.forEach((control) => {
         control.hidden = !visible;
       });
     };
@@ -259,10 +338,16 @@ const heroImageAspect = (() => {
       return clerkLoadPromise;
     };
 
-    const getAdminStateForClerk = async (clerk) => {
-      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+    const getClerkSessionToken = async (clerk) => {
+      if (!clerk.isSignedIn || !clerk.session) return '';
 
       const token = await clerk.session.getToken();
+      return typeof token === 'string' ? token : '';
+    };
+
+    const getAdminStateForClerk = async (clerk) => {
+      const token = await getClerkSessionToken(clerk);
+      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
       if (!token) return { authenticated: true, isAdmin: false };
 
       const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -276,9 +361,114 @@ const heroImageAspect = (() => {
       return response.json().catch(() => ({ authenticated: true, isAdmin: false }));
     };
 
+    const setPublishControlState = (control, draft, statusText) => {
+      control.dataset.postDraft = String(Boolean(draft));
+      control.setAttribute('aria-pressed', String(!draft));
+      control.setAttribute('aria-label', draft ? 'Publish article' : 'Unpublish article');
+      control.setAttribute('title', draft ? 'Publish article' : 'Unpublish article');
+
+      const publishIcon = control.querySelector('[data-admin-publish-icon="publish"]');
+      const unpublishIcon = control.querySelector('[data-admin-publish-icon="unpublish"]');
+      if (publishIcon) publishIcon.classList.toggle('hidden', !draft);
+      if (unpublishIcon) unpublishIcon.classList.toggle('hidden', draft);
+      [publishIcon, unpublishIcon].forEach((icon) => {
+        if (!icon) return;
+        icon.classList.toggle('text-amber-600', draft);
+        icon.classList.toggle('dark:text-amber-300', draft);
+      });
+
+      const status = control.querySelector('[data-admin-publish-status]');
+      if (status) status.textContent = statusText || (draft ? 'Article is unpublished draft' : 'Article is published');
+    };
+
+    const applyArticleDraftState = (draft) => {
+      if (article) article.dataset.postUnpublished = String(Boolean(draft));
+      adminPublishControls.forEach((control) => setPublishControlState(control, draft));
+    };
+
+    const confirmPublishChange = async (willDraft) => {
+      const dialog = document.querySelector('[data-admin-publish-confirm]');
+      const message = dialog?.querySelector('[data-admin-publish-confirm-message]');
+      const warning = willDraft
+        ? 'Unpublishing saves this article as a draft and removes it from public library pages after the site refreshes.'
+        : 'Publishing makes this article visible on public article and library pages after the site refreshes.';
+
+      if (message) message.textContent = warning;
+
+      if (!(dialog instanceof HTMLDialogElement) || typeof dialog.showModal !== 'function') {
+        return window.confirm(warning);
+      }
+
+      return new Promise((resolve) => {
+        const handleClose = () => {
+          dialog.removeEventListener('close', handleClose);
+          resolve(dialog.returnValue === 'confirm');
+        };
+
+        dialog.addEventListener('close', handleClose);
+        dialog.showModal();
+      });
+    };
+
+    const togglePublishState = async (control) => {
+      const slug = control.dataset.postSlug || '';
+      const willDraft = control.dataset.postDraft !== 'true';
+      const confirmed = await confirmPublishChange(willDraft);
+
+      if (!confirmed) return;
+
+      control.disabled = true;
+      setPublishControlState(control, !willDraft, willDraft ? 'Unpublishing article…' : 'Publishing article…');
+
+      try {
+        const clerk = await getClerk();
+        const token = await getClerkSessionToken(clerk);
+
+        if (!token) throw new Error('A valid Clerk session token is required.');
+
+        const response = await fetch('/.netlify/functions/toggle-article-publish', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ slug, draft: willDraft }),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Publish status update failed with status ${response.status}.`);
+        }
+
+        applyArticleDraftState(Boolean(result.draft));
+        setPublishControlState(
+          control,
+          Boolean(result.draft),
+          result.draft ? 'Article unpublished and saved as draft' : 'Article published'
+        );
+      } catch (error) {
+        const isDraft = control.dataset.postDraft === 'true';
+        setPublishControlState(
+          control,
+          isDraft,
+          error instanceof Error ? error.message : 'Article publish status could not be updated'
+        );
+        window.alert(error instanceof Error ? error.message : 'Article publish status could not be updated.');
+      } finally {
+        control.disabled = false;
+      }
+    };
+
+    adminPublishControls.forEach((control) => {
+      setPublishControlState(control, control.dataset.postDraft === 'true');
+      control.addEventListener('click', () => {
+        togglePublishState(control);
+      });
+    });
+
     const renderAdminEditState = async (clerk) => {
       const adminState = await getAdminStateForClerk(clerk);
-      setAdminEditControlsVisible(Boolean(adminState.isAdmin));
+      setAdminControlsVisible(Boolean(adminState.isAdmin));
     };
 
     getClerk()
@@ -287,11 +477,11 @@ const heroImageAspect = (() => {
 
         if (typeof clerk.addListener === 'function') {
           clerk.addListener(() => {
-            renderAdminEditState(clerk).catch(() => setAdminEditControlsVisible(false));
+            renderAdminEditState(clerk).catch(() => setAdminControlsVisible(false));
           });
         }
       })
-      .catch(() => setAdminEditControlsVisible(false));
+      .catch(() => setAdminControlsVisible(false));
   };
 
   const registerArticleActions = () => {
