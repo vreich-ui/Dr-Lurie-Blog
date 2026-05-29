@@ -1,4 +1,5 @@
 ---
+import { Icon } from 'astro-icon/components';
 import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Dr. Lurié Science Admin';
@@ -30,6 +31,34 @@ const metadata = {
 
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
       <form id="publish-form" class="admin-form">
+        <div class="json-import-card" aria-labelledby="json-import-heading">
+          <div class="json-import-header">
+            <div>
+              <h2 id="json-import-heading">Import JSON</h2>
+              <p class="hint">Paste article JSON or upload a single <code>.json</code> file to populate this form.</p>
+            </div>
+            <label class="json-upload-button" for="json-upload">
+              <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
+              <span>Upload JSON</span>
+            </label>
+            <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
+          </div>
+          <textarea
+            id="json-import"
+            class="json-import-input"
+            rows="6"
+            placeholder='{
+  "title": "Article title",
+  "deck": "Short excerpt",
+  "sources": ["Source citation"]
+}'
+          ></textarea>
+          <div class="json-import-actions">
+            <button id="load-json" class="btn-secondary btn-sm" type="button">Load JSON</button>
+            <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
+          </div>
+        </div>
+
         <div class="field">
           <label for="title">Title</label>
           <input id="title" name="title" type="text" autocomplete="off" />
@@ -84,6 +113,17 @@ const metadata = {
           <label for="content">Markdown content</label>
           <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
           ></textarea>
+        </div>
+
+        <div class="field">
+          <label for="sources">Sources</label>
+          <textarea
+            id="sources"
+            name="sources"
+            class="sources-input"
+            rows="4"
+            placeholder="One source per line, or comma-separated citations."></textarea>
+          <p class="hint">Imported <code>sources[]</code> are stored as one citation per line.</p>
         </div>
 
         <div class="field">
@@ -184,6 +224,105 @@ const metadata = {
     box-shadow: none;
   }
 
+  .json-import-card {
+    margin-bottom: 1.3rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.1rem;
+    padding: 1rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  :global(.dark) .json-import-card {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 42%);
+  }
+
+  .json-import-header,
+  .json-import-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+  }
+
+  .json-import-header {
+    margin-bottom: 0.85rem;
+  }
+
+  .json-import-card h2 {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  .json-import-input {
+    min-height: 9rem;
+    max-height: 13rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.92rem;
+  }
+
+  .sources-input {
+    min-height: 7.5rem;
+  }
+
+  .json-upload-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    width: auto;
+    margin: 0;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 999px;
+    padding: 0.62rem 0.9rem;
+    color: var(--aw-color-text-heading);
+    background: var(--aw-color-bg-page);
+    cursor: pointer;
+    font-size: 0.92rem;
+    white-space: nowrap;
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      color 180ms ease;
+  }
+
+  .json-upload-button:hover,
+  .json-upload-button:focus-within {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 3px rgb(94 140 138 / 14%);
+    color: var(--aw-color-accent);
+  }
+
+  .json-upload-icon {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+
+  .json-import-actions {
+    margin-top: 0.7rem;
+  }
+
+  .json-upload-name {
+    color: var(--aw-color-text-muted);
+    font-size: 0.88rem;
+    overflow-wrap: anywhere;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+    padding: 0;
+  }
+
   .admin-panel {
     margin-top: 1.5rem;
   }
@@ -255,6 +394,12 @@ const metadata = {
     min-height: 420px;
     resize: vertical;
     line-height: 1.6;
+  }
+
+  .json-import-input,
+  .sources-input,
+  #excerpt {
+    min-height: auto;
   }
 
   .hint {
@@ -408,6 +553,17 @@ const metadata = {
       flex-direction: column;
     }
 
+    .json-import-header,
+    .json-import-actions {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .json-upload-button,
+    .json-import-actions > button {
+      width: 100%;
+    }
+
     .actions > button {
       width: 100%;
     }
@@ -426,6 +582,10 @@ const metadata = {
       author: document.querySelector('#author'),
       category: document.querySelector('#category'),
       tags: document.querySelector('#tags'),
+      sources: document.querySelector('#sources'),
+      jsonImport: document.querySelector('#json-import'),
+      jsonUpload: document.querySelector('#json-upload'),
+      jsonUploadName: document.querySelector('#json-upload-name'),
       draft: document.querySelector('#draft'),
       content: document.querySelector('#content'),
       imageUpload: document.querySelector('#image-upload'),
@@ -668,6 +828,18 @@ const metadata = {
         .map((tag) => tag.trim())
         .filter(Boolean);
 
+    const parseSources = (value) =>
+      String(value)
+        .split(/\n|,/)
+        .map((source) => source.trim())
+        .filter(Boolean);
+
+    const formatImportedList = (value) =>
+      value
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .join('\n');
+
     const slugify = (value) =>
       String(value)
         .toLowerCase()
@@ -707,6 +879,7 @@ const metadata = {
       tags: fields.tags.value,
       draft: fields.draft.checked,
       content: fields.content.value,
+      sources: fields.sources.value,
       imageNames,
       featuredImage: fields.featuredImage.value,
       existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
@@ -802,6 +975,7 @@ const metadata = {
       const slug = getCurrentSlug();
       const featuredPath = getFeaturedImagePath();
       const tags = parseTags(fields.tags.value);
+      const sources = parseSources(fields.sources.value);
       const publishDate = getPublishDate().toISOString();
       const frontmatter = [
         '---',
@@ -816,6 +990,7 @@ const metadata = {
         ...(fields.category.value ? [`category: "${escapeYaml(fields.category.value)}"`] : []),
         ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
         ...(fields.author.value ? [`author: "${escapeYaml(fields.author.value)}"`] : []),
+        ...(sources.length ? ['sources:', ...sources.map((source) => `  - "${escapeYaml(source)}"`)] : []),
         ...(fields.seoDescription.value
           ? ['metadata:', `  description: "${escapeYaml(fields.seoDescription.value)}"`]
           : []),
@@ -855,6 +1030,7 @@ const metadata = {
         fields.tags.value = draft.tags || '';
         fields.draft.checked = Boolean(draft.draft);
         fields.content.value = draft.content || '';
+        fields.sources.value = draft.sources || '';
         fields.videoLink.value = draft.videoLink || '';
         fields.ctaLink.value = draft.ctaLink || '';
         fields.ctaText.value = draft.ctaText || '';
@@ -896,6 +1072,7 @@ const metadata = {
       fields.tags.value = Array.isArray(article.tags) ? article.tags.join(', ') : article.tags || '';
       fields.draft.checked = Boolean(article.draft);
       fields.content.value = article.content || '';
+      fields.sources.value = Array.isArray(article.sources) ? article.sources.join('\n') : article.sources || '';
       fields.videoLink.value = article.videoLink || article.video || '';
       fields.ctaLink.value = article.ctaLink || '';
       fields.ctaText.value = article.ctaText || '';
@@ -949,9 +1126,191 @@ const metadata = {
       }
     };
 
+    const getDuplicateTopLevelKeys = (text) => {
+      const duplicates = [];
+      const seen = new Set();
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let keyStart = -1;
+      let expectingKey = false;
+      let possibleKey = false;
+      let afterKey = false;
+      let currentKey = '';
+
+      for (let index = 0; index < text.length; index += 1) {
+        const char = text[index];
+
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+          } else if (char === '\\') {
+            escaped = true;
+          } else if (char === '"') {
+            inString = false;
+            if (depth === 1 && possibleKey) {
+              currentKey = text.slice(keyStart, index);
+              possibleKey = false;
+              afterKey = true;
+            }
+          }
+          continue;
+        }
+
+        if (char === '"') {
+          inString = true;
+          keyStart = index + 1;
+          possibleKey = depth === 1 && expectingKey;
+          continue;
+        }
+
+        if (/\s/.test(char)) continue;
+
+        if (char === '{') {
+          depth += 1;
+          expectingKey = depth === 1;
+          afterKey = false;
+          continue;
+        }
+
+        if (char === '}') {
+          depth -= 1;
+          expectingKey = false;
+          afterKey = false;
+          continue;
+        }
+
+        if (char === '[') {
+          depth += 1;
+          expectingKey = false;
+          afterKey = false;
+          continue;
+        }
+
+        if (char === ']') {
+          depth -= 1;
+          expectingKey = false;
+          afterKey = false;
+          continue;
+        }
+
+        if (depth === 1 && afterKey && char === ':') {
+          if (seen.has(currentKey) && !duplicates.includes(currentKey)) duplicates.push(currentKey);
+          seen.add(currentKey);
+          expectingKey = false;
+          afterKey = false;
+          continue;
+        }
+
+        if (depth === 1 && char === ',') {
+          expectingKey = true;
+          afterKey = false;
+        }
+      }
+
+      return duplicates;
+    };
+
+    const validateImportShape = (data) => {
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error(
+          'JSON import must be a single top-level object. Arrays or multiple article objects are not supported.'
+        );
+      }
+
+      const textFields = ['title', 'deck', 'description', 'slug', 'content'];
+      const invalidTextField = textFields.find(
+        (fieldName) => data[fieldName] != null && typeof data[fieldName] !== 'string'
+      );
+      if (invalidTextField) throw new Error(`JSON field "${invalidTextField}" must be a string.`);
+
+      ['tags', 'sources'].forEach((fieldName) => {
+        if (data[fieldName] != null && !Array.isArray(data[fieldName])) {
+          throw new Error(`JSON field "${fieldName}" must be an array.`);
+        }
+
+        if (Array.isArray(data[fieldName]) && data[fieldName].some((item) => typeof item !== 'string')) {
+          throw new Error(`JSON field "${fieldName}" must contain only strings.`);
+        }
+      });
+    };
+
+    const populateFromJsonImport = (data) => {
+      fields.title.value = data.title || '';
+      fields.excerpt.value = data.deck || '';
+      fields.seoDescription.value = data.description || '';
+      fields.slug.value = data.slug || '';
+      fields.tags.value = Array.isArray(data.tags)
+        ? data.tags
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+            .join(', ')
+        : '';
+      fields.content.value = data.content || '';
+      fields.sources.value = Array.isArray(data.sources) ? formatImportedList(data.sources) : '';
+      updatePreview();
+      updatePublishOutput();
+    };
+
+    const loadJsonImport = (rawValue = fields.jsonImport.value) => {
+      const rawJson = rawValue.trim();
+      if (!rawJson) {
+        setStatus('Paste JSON or choose a .json file before loading.', false);
+        return;
+      }
+
+      try {
+        const duplicates = getDuplicateTopLevelKeys(rawJson);
+        if (duplicates.length) {
+          throw new Error(
+            `JSON import has duplicate top-level field${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}.`
+          );
+        }
+
+        const data = JSON.parse(rawJson);
+        validateImportShape(data);
+        populateFromJsonImport(data);
+        setStatus('JSON loaded into the publishing form.');
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
+        const isSyntaxError = error instanceof SyntaxError;
+        setStatus(isSyntaxError ? `Invalid JSON. ${message}` : message, false);
+      }
+    };
+
+    const readJsonFile = (file) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => resolve(String(reader.result || '')));
+        reader.addEventListener('error', () => reject(reader.error || new Error('JSON file could not be read.')));
+        reader.readAsText(file);
+      });
+
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
     });
+
+    fields.jsonUpload.addEventListener('change', async () => {
+      const [file] = Array.from(fields.jsonUpload.files || []);
+      if (!file) return;
+
+      fields.jsonUploadName.textContent = file.name;
+      if (!file.name.toLowerCase().endsWith('.json')) {
+        setStatus('Choose a .json file for import.', false);
+        fields.jsonUpload.value = '';
+        return;
+      }
+
+      try {
+        const rawJson = await readJsonFile(file);
+        fields.jsonImport.value = rawJson;
+        loadJsonImport(rawJson);
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'JSON file could not be read.', false);
+      }
+    });
+
+    document.querySelector('#load-json').addEventListener('click', () => loadJsonImport());
 
     fields.imageUpload.addEventListener('change', () => {
       selectedFiles = Array.from(fields.imageUpload.files || []);
@@ -1022,6 +1381,8 @@ const metadata = {
             tags: parseTags(fields.tags.value),
             draft: fields.draft.checked,
             content: fields.content.value,
+            markdown: fields.outputMarkdown.value,
+            sources: parseSources(fields.sources.value),
             featuredImage: fields.featuredImage.value,
             existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
             seoDescription: fields.seoDescription.value,
