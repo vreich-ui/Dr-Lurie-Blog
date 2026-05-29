@@ -1,4 +1,6 @@
 ---
+import { Icon } from 'astro-icon/components';
+
 import Image from '~/components/common/Image.astro';
 
 import { getFormattedMonthYear } from '~/utils/utils';
@@ -23,7 +25,7 @@ const heroImageAspect = (() => {
 ---
 
 <section class="dl-pt-s dl-pb-l sm:py-8 lg:py-10 mx-auto">
-  <article>
+  <article data-print-article>
     <header
       class={post.image
         ? 'intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade'
@@ -96,23 +98,73 @@ const heroImageAspect = (() => {
     <div class="editorial-prose px-6 sm:px-6 dl-mt-s dl-gap-m">
       <slot />
     </div>
-    <div class="mx-auto max-w-[720px] px-6 sm:px-6 dl-mt-m">
+    <div class="post-actions mx-auto flex max-w-[720px] items-center gap-3 px-6 sm:px-6 dl-mt-m">
       <button
         type="button"
         data-immersive-share
         data-share-url={String(url)}
         data-share-title={post.title}
-        class="text-sm text-muted underline decoration-gray-300 underline-offset-4 transition hover:text-default dark:text-slate-500 dark:hover:text-slate-300"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        aria-label="Share article"
       >
-        Share
+        <Icon name="tabler:share" class="h-5 w-5" aria-hidden="true" />
+        <span class="sr-only" data-share-status>Share article</span>
+      </button>
+      <button
+        type="button"
+        data-immersive-print
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        aria-label="Print article"
+      >
+        <Icon name="tabler:printer" class="h-5 w-5" aria-hidden="true" />
+        <span class="sr-only">Print article</span>
       </button>
     </div>
   </article>
 </section>
 
+<style>
+  @media print {
+    body > * {
+      display: none !important;
+    }
+
+    body > *:has([data-print-article]) {
+      display: block !important;
+      visibility: visible !important;
+    }
+
+    [data-print-article],
+    [data-print-article] * {
+      visibility: visible !important;
+    }
+
+    [data-print-article] {
+      position: static !important;
+      display: block !important;
+      width: auto !important;
+      max-width: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .post-actions {
+      display: none !important;
+    }
+  }
+</style>
+
 <script is:inline>
-  const registerShareHandler = () => {
+  const registerArticleActions = () => {
     const shareButton = document.querySelector('[data-immersive-share]');
+    const printButton = document.querySelector('[data-immersive-print]');
+
+    if (printButton instanceof HTMLButtonElement) {
+      printButton.addEventListener('click', () => {
+        window.print();
+      });
+    }
+
     if (!(shareButton instanceof HTMLButtonElement)) return;
 
     shareButton.addEventListener('click', async () => {
@@ -130,10 +182,13 @@ const heroImageAspect = (() => {
 
       try {
         await navigator.clipboard.writeText(shareUrl);
-        const originalText = shareButton.textContent;
-        shareButton.textContent = 'Link copied';
+        const shareStatus = shareButton.querySelector('[data-share-status]');
+        const originalText = shareStatus?.textContent || 'Share article';
+        if (shareStatus) shareStatus.textContent = 'Link copied';
+        shareButton.setAttribute('aria-label', 'Link copied');
         window.setTimeout(() => {
-          shareButton.textContent = originalText;
+          if (shareStatus) shareStatus.textContent = originalText;
+          shareButton.setAttribute('aria-label', originalText);
         }, 1400);
       } catch {
         window.prompt('Copy this link:', shareUrl);
@@ -142,8 +197,8 @@ const heroImageAspect = (() => {
   };
 
   if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(registerShareHandler);
+    window.requestIdleCallback(registerArticleActions);
   } else {
-    window.setTimeout(registerShareHandler, 1);
+    window.setTimeout(registerArticleActions, 1);
   }
 </script>
