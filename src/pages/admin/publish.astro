@@ -852,11 +852,28 @@ const metadata = {
         .map((source) => source.trim())
         .filter(Boolean);
 
-    const formatImportedList = (value) =>
-      value
-        .map((item) => String(item).trim())
+    const isSimpleImportObject = (value) =>
+      Boolean(
+        value &&
+          typeof value === 'object' &&
+          !Array.isArray(value) &&
+          Object.values(value).every((item) => item == null || ['string', 'number', 'boolean'].includes(typeof item))
+      );
+
+    const formatImportedSource = (source) => {
+      if (typeof source === 'string') return source.trim();
+      if (!isSimpleImportObject(source)) return '';
+
+      return Object.entries(source)
+        .map(([key, value]) => {
+          if (value == null || String(value).trim() === '') return '';
+          return `${key}: ${String(value).trim()}`;
+        })
         .filter(Boolean)
-        .join('\n');
+        .join('; ');
+    };
+
+    const formatImportedList = (value) => value.map(formatImportedSource).filter(Boolean).join('\n');
 
     const slugify = (value) =>
       String(value)
@@ -1252,8 +1269,16 @@ const metadata = {
           throw new Error(`JSON field "${fieldKey}" must be an array.`);
         }
 
-        if (data[fieldKey].some((item) => typeof item !== 'string')) {
-          throw new Error(`JSON field "${fieldKey}" must contain only strings.`);
+        const hasInvalidItem = data[fieldKey].some((item) =>
+          fieldName === 'sources' ? typeof item !== 'string' && !isSimpleImportObject(item) : typeof item !== 'string'
+        );
+
+        if (hasInvalidItem) {
+          throw new Error(
+            fieldName === 'sources'
+              ? `JSON field "${fieldKey}" must contain only strings or simple objects.`
+              : `JSON field "${fieldKey}" must contain only strings.`
+          );
         }
       });
     };
