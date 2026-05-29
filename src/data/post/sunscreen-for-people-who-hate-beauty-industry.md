@@ -1,7 +1,7 @@
 ---
 publishDate: 2026-05-29T11:18:00.000Z
 title: "Sunscreen for People Who Don’t Want a Beauty Routine"
-image: "~/assets/images/uploads/sunscreen-for-people-who-hate-beauty-industry/sunscreen-hat-glasses-carkeys.png"
+image: "~/assets/images/uploads/sunscreen-for-people-who-hate-beauty-industry/serene-skincare-display-in-soft-light.png"
 tags:
   - "sunscreen"
   - "photoaging"
