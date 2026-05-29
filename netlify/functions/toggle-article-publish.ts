@@ -61,8 +61,6 @@ const toStringValue = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const toBooleanValue = (value: unknown) => value === true || value === 'true' || value === 'on';
-
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -110,7 +108,7 @@ const updateDraftFrontmatter = (markdown: string, draft: boolean) => {
   const lines = block.split(/\r?\n/);
   let sawDraft = false;
   const nextLines = lines.reduce<string[]>((accumulator, line) => {
-    if (/^draft:\s*(true|false)\s*$/i.test(line.trim())) {
+    if (/^draft\s*:/i.test(line.trim())) {
       sawDraft = true;
       if (draft) accumulator.push('draft: true');
       return accumulator;
@@ -121,10 +119,8 @@ const updateDraftFrontmatter = (markdown: string, draft: boolean) => {
   }, []);
 
   if (draft && !sawDraft) {
-    const insertIndex = Math.min(
-      nextLines.findIndex((line) => /^title:\s*/i.test(line.trim())) + 1 || nextLines.length,
-      nextLines.length
-    );
+    const titleIndex = nextLines.findIndex((line) => /^title\s*:/i.test(line.trim()));
+    const insertIndex = titleIndex >= 0 ? titleIndex + 1 : nextLines.length;
     nextLines.splice(insertIndex, 0, 'draft: true');
   }
 
@@ -188,7 +184,7 @@ export const handler = async (event: LambdaEvent) => {
   const rawSlug = toStringValue(input?.slug);
   const slug = rawSlug ? slugify(rawSlug) : undefined;
 
-  if (!slug || typeof input?.draft === 'undefined') {
+  if (!slug || typeof input?.draft !== 'boolean') {
     return jsonResponse(400, { error: 'A valid slug and draft boolean are required.' });
   }
 
@@ -202,7 +198,7 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const draft = toBooleanValue(input.draft);
+  const draft = input.draft;
   const articlePath = normalizeRepoPath(`${repoContentRoot}/${slug}.md`);
 
   if (!articlePath || !isExpectedArticlePath(articlePath, slug)) {
@@ -233,12 +229,10 @@ export const handler = async (event: LambdaEvent) => {
     if (nextMarkdown === markdown) {
       return jsonResponse(200, {
         ok: true,
-        success: true,
-        articlePath,
-        draft,
-        message: draft ? 'Article is already unpublished.' : 'Article is already published.',
-        path: articlePath,
         slug,
+        draft,
+        articlePath,
+        commit: null,
       });
     }
 
@@ -247,20 +241,17 @@ export const handler = async (event: LambdaEvent) => {
       body: JSON.stringify({
         branch,
         content: Buffer.from(nextMarkdown, 'utf8').toString('base64'),
-        message: `${draft ? 'Unpublish' : 'Publish'} article: ${slug}`,
+        message: `Update publish state: ${slug}`,
         sha: file.sha,
       }),
     });
 
     return jsonResponse(200, {
       ok: true,
-      success: true,
-      articlePath,
-      commit: result.commit?.sha,
-      draft,
-      message: draft ? 'Article unpublished and saved as draft.' : 'Article published.',
-      path: result.content?.path ?? articlePath,
       slug,
+      draft,
+      articlePath,
+      commit: result.commit?.sha ?? null,
     });
   } catch (error) {
     console.error('Failed to update article publish status.', { articlePath, slug, error });
