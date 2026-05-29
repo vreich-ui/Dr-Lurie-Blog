@@ -38,6 +38,7 @@ const metadata = {
         <div class="field">
           <label for="slug">Slug</label>
           <input id="slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
+          <p id="slug-edit-hint" class="hint" hidden></p>
         </div>
 
         <div class="field">
@@ -419,6 +420,7 @@ const metadata = {
     const fields = {
       title: document.querySelector('#title'),
       slug: document.querySelector('#slug'),
+      slugHint: document.querySelector('#slug-edit-hint'),
       excerpt: document.querySelector('#excerpt'),
       publishDate: document.querySelector('#publish-date'),
       author: document.querySelector('#author'),
@@ -462,9 +464,15 @@ const metadata = {
 
     const setEditorModeCopy = (mode) => {
       const editing = mode === 'edit';
+      const editSlug = getEditSlug();
       fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
       fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
       fields.overwrite.checked = editing || fields.overwrite.checked;
+      fields.slug.disabled = editing;
+      fields.slugHint.hidden = !editing;
+      fields.slugHint.textContent = editing
+        ? `Slug is locked in edit mode. Updates overwrite src/data/post/${editSlug}.md in place.`
+        : '';
     };
 
     const setGatedContentVisible = (visible) => {
@@ -676,7 +684,9 @@ const metadata = {
         .replace(/^-+|-+$/g, '') || 'upload';
 
     const getCurrentSlug = () =>
-      slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+      isEditMode()
+        ? getEditSlug()
+        : slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
 
     const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
 
@@ -878,7 +888,7 @@ const metadata = {
 
     const populateArticleForEdit = (article) => {
       fields.title.value = article.title || '';
-      fields.slug.value = article.slug || getEditSlug();
+      fields.slug.value = getEditSlug() || article.slug || '';
       fields.excerpt.value = article.excerpt || '';
       fields.publishDate.value = formatEditPublishDate(article.publishDate);
       fields.author.value = article.author || '';
@@ -929,7 +939,10 @@ const metadata = {
         }
 
         populateArticleForEdit(result.article || result);
-        setStatus(`Editing ${editSlug}. Publishing will update the existing article.`, false);
+        setStatus(
+          `Editing ${editSlug}. Slug is locked; publishing will update src/data/post/${editSlug}.md in place.`,
+          false
+        );
       } catch (error) {
         editArticleLoaded = false;
         setStatus(error instanceof Error ? error.message : 'Article could not be loaded for editing.', false);
@@ -1027,8 +1040,11 @@ const metadata = {
           return;
         }
 
+        const publishedPath = result.articlePath || result.path || `src/data/post/${slug}.md`;
+        const shortCommit = String(result.commit || '').slice(0, 7);
+        const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
         setStatus(
-          `Published ${result.articlePath || result.path || `src/data/post/${slug}.md`} in commit ${String(result.commit || '').slice(0, 7)}.`,
+          isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`,
           false
         );
       } catch (error) {
