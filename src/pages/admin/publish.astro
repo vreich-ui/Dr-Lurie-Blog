@@ -57,6 +57,7 @@ const metadata = {
             <button id="load-json" class="btn-secondary btn-sm" type="button">Load JSON</button>
             <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
           </div>
+          <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
         </div>
 
         <div class="field">
@@ -309,6 +310,22 @@ const metadata = {
     color: var(--aw-color-text-muted);
     font-size: 0.88rem;
     overflow-wrap: anywhere;
+  }
+
+  .json-import-status {
+    min-height: 1.3em;
+    margin: 0.65rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.92rem;
+    font-weight: 700;
+  }
+
+  .json-import-status.is-error {
+    color: var(--aw-color-accent);
+  }
+
+  .json-import-status.is-success {
+    color: var(--aw-color-secondary);
   }
 
   .visually-hidden {
@@ -586,6 +603,7 @@ const metadata = {
       jsonImport: document.querySelector('#json-import'),
       jsonUpload: document.querySelector('#json-upload'),
       jsonUploadName: document.querySelector('#json-upload-name'),
+      jsonImportStatus: document.querySelector('#json-import-status'),
       draft: document.querySelector('#draft'),
       content: document.querySelector('#content'),
       imageUpload: document.querySelector('#image-upload'),
@@ -897,6 +915,14 @@ const metadata = {
           if (fields.status.textContent === message) fields.status.textContent = '';
         }, 2500);
       }
+    };
+
+    const setJsonImportStatus = (message, isError = false, mirrorGlobal = true) => {
+      fields.jsonImportStatus.textContent = message;
+      fields.jsonImportStatus.classList.toggle('is-error', Boolean(message && isError));
+      fields.jsonImportStatus.classList.toggle('is-success', Boolean(message && !isError));
+
+      if (mirrorGlobal) setStatus(message, !isError);
     };
 
     const copyText = async (text, successMessage) => {
@@ -1316,7 +1342,7 @@ const metadata = {
     const loadJsonImport = (rawValue = fields.jsonImport.value) => {
       const rawJson = rawValue.trim();
       if (!rawJson) {
-        setStatus('Paste JSON or choose a .json file before loading.', false);
+        setJsonImportStatus('Paste JSON or choose a .json file before loading.', true);
         return;
       }
 
@@ -1332,11 +1358,11 @@ const metadata = {
         const data = JSON.parse(objectJson);
         validateImportShape(data);
         populateFromJsonImport(data);
-        setStatus('JSON loaded into the publishing form.');
+        setJsonImportStatus('JSON loaded into the publishing form.');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
         const isSyntaxError = error instanceof SyntaxError;
-        setStatus(isSyntaxError ? `Invalid JSON. ${message}` : message, false);
+        setJsonImportStatus(isSyntaxError ? `Invalid JSON. ${message}` : message, true);
       }
     };
 
@@ -1358,7 +1384,7 @@ const metadata = {
 
       fields.jsonUploadName.textContent = file.name;
       if (!file.name.toLowerCase().endsWith('.json')) {
-        setStatus('Choose a .json file for import.', false);
+        setJsonImportStatus('Choose a .json file for import.', true);
         fields.jsonUpload.value = '';
         return;
       }
@@ -1368,7 +1394,7 @@ const metadata = {
         fields.jsonImport.value = rawJson;
         loadJsonImport(rawJson);
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'JSON file could not be read.', false);
+        setJsonImportStatus(error instanceof Error ? error.message : 'JSON file could not be read.', true);
       }
     });
 
