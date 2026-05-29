@@ -2,7 +2,6 @@
 import { Icon } from 'astro-icon/components';
 
 import Image from '~/components/common/Image.astro';
-import Button from '~/components/ui/Button.astro';
 
 import { getFormattedMonthYear } from '~/utils/utils';
 
@@ -51,10 +50,16 @@ const heroImageAspect = (() => {
           {post.readingTime && <span aria-hidden="true">·</span>}
           <time datetime={String(post.publishDate)}>{getFormattedMonthYear(post.publishDate)}</time>
         </p>
-        <Button variant="secondary" class="btn-sm ml-auto shrink-0 gap-1.5" href={adminEditHref} data-admin-edit hidden>
-          <Icon name="tabler:pencil" class="h-4 w-4" aria-hidden="true" />
-          Edit
-        </Button>
+        <a
+          class="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          href={adminEditHref}
+          data-admin-edit
+          hidden
+          aria-label="Edit article"
+        >
+          <Icon name="tabler:pencil" class="h-5 w-5" aria-hidden="true" />
+          <span class="sr-only">Edit article</span>
+        </a>
       </div>
 
       {
@@ -126,10 +131,16 @@ const heroImageAspect = (() => {
         <Icon name="tabler:printer" class="h-5 w-5" aria-hidden="true" />
         <span class="sr-only">Print article</span>
       </button>
-      <Button variant="secondary" class="btn-sm ml-auto shrink-0 gap-1.5" href={adminEditHref} data-admin-edit hidden>
-        <Icon name="tabler:pencil" class="h-4 w-4" aria-hidden="true" />
-        Edit
-      </Button>
+      <a
+        class="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        href={adminEditHref}
+        data-admin-edit
+        hidden
+        aria-label="Edit article"
+      >
+        <Icon name="tabler:pencil" class="h-5 w-5" aria-hidden="true" />
+        <span class="sr-only">Edit article</span>
+      </a>
     </div>
   </article>
 </section>
