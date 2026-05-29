@@ -1252,6 +1252,67 @@ const metadata = {
       updatePublishOutput();
     };
 
+    const getImportJsonObjectText = (text) => {
+      const trimmed = text.trim();
+      const fencedJson = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+      const candidate = fencedJson ? fencedJson[1].trim() : trimmed;
+      const objectStart = candidate.indexOf('{');
+
+      if (objectStart === -1) {
+        throw new Error('JSON import must include one top-level object.');
+      }
+
+      if (candidate.slice(0, objectStart).trim()) {
+        throw new Error('Remove any text before the JSON object and try again.');
+      }
+
+      let depth = 0;
+      let inString = false;
+      let escaped = false;
+      let objectEnd = -1;
+
+      for (let index = objectStart; index < candidate.length; index += 1) {
+        const char = candidate[index];
+
+        if (inString) {
+          if (escaped) {
+            escaped = false;
+          } else if (char === '\\') {
+            escaped = true;
+          } else if (char === '"') {
+            inString = false;
+          }
+          continue;
+        }
+
+        if (char === '"') {
+          inString = true;
+          continue;
+        }
+
+        if (char === '{' || char === '[') depth += 1;
+        if (char === '}' || char === ']') depth -= 1;
+
+        if (depth === 0) {
+          objectEnd = index;
+          break;
+        }
+      }
+
+      if (objectEnd === -1) {
+        throw new Error('JSON import has an incomplete top-level object.');
+      }
+
+      const trailingText = candidate.slice(objectEnd + 1).trim();
+      if (trailingText) {
+        throw new Error(
+          'JSON import must contain only one top-level object. Remove duplicate objects or trailing text.'
+        );
+      }
+
+      return candidate.slice(objectStart, objectEnd + 1);
+    };
+
     const loadJsonImport = (rawValue = fields.jsonImport.value) => {
       const rawJson = rawValue.trim();
       if (!rawJson) {
@@ -1260,14 +1321,15 @@ const metadata = {
       }
 
       try {
-        const duplicates = getDuplicateTopLevelKeys(rawJson);
+        const objectJson = getImportJsonObjectText(rawJson);
+        const duplicates = getDuplicateTopLevelKeys(objectJson);
         if (duplicates.length) {
           throw new Error(
             `JSON import has duplicate top-level field${duplicates.length === 1 ? '' : 's'}: ${duplicates.join(', ')}.`
           );
         }
 
-        const data = JSON.parse(rawJson);
+        const data = JSON.parse(objectJson);
         validateImportShape(data);
         populateFromJsonImport(data);
         setStatus('JSON loaded into the publishing form.');
