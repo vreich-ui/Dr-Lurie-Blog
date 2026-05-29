@@ -18,3 +18,227 @@ const { posts } = Astro.props;
     ))
   }
 </ul>
+
+<script is:inline>
+  const registerBlogPreviewAdminControls = () => {
+    const previews = Array.from(document.querySelectorAll('[data-post-preview]'));
+    const adminEditControls = Array.from(document.querySelectorAll('[data-post-preview] [data-admin-edit]'));
+    const adminPublishControls = Array.from(
+      document.querySelectorAll('[data-post-preview] [data-admin-publish-toggle]')
+    );
+    const adminControls = [...adminEditControls, ...adminPublishControls];
+    const clerkPublishableKey = previews.find((preview) => preview.dataset.clerkPublishableKey)?.dataset
+      .clerkPublishableKey;
+    const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+
+    if (!adminControls.length || !clerkPublishableKey) return;
+
+    let clerkLoadPromise;
+
+    const setAdminControlsVisible = (visible) => {
+      adminControls.forEach((control) => {
+        control.hidden = !visible;
+      });
+    };
+
+    const loadClerkScript = () =>
+      new Promise((resolve, reject) => {
+        if (window.Clerk) {
+          resolve();
+          return;
+        }
+
+        const resolveWhenClerkExists = () => {
+          if (!window.Clerk) {
+            reject(new Error('Clerk authentication could not be initialized.'));
+            return;
+          }
+
+          resolve();
+        };
+
+        const existingScript = document.querySelector(
+          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+        );
+        if (existingScript) {
+          existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
+          existingScript.addEventListener(
+            'error',
+            () => reject(new Error('Clerk authentication could not be loaded.')),
+            {
+              once: true,
+            }
+          );
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = clerkJsScriptSrc;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.type = 'text/javascript';
+        script.dataset.drLurieClerkjs = 'true';
+        script.dataset.clerkPublishableKey = clerkPublishableKey;
+        script.addEventListener('load', resolveWhenClerkExists, { once: true });
+        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        document.head.append(script);
+      });
+
+    const getClerk = async () => {
+      clerkLoadPromise ||= (async () => {
+        await loadClerkScript();
+
+        if (!window.Clerk) {
+          throw new Error('Clerk authentication could not be initialized.');
+        }
+
+        const clerk = window.Clerk;
+        await clerk.load();
+        return clerk;
+      })();
+
+      return clerkLoadPromise;
+    };
+
+    const getClerkSessionToken = async (clerk) => {
+      if (!clerk.isSignedIn || !clerk.session) return '';
+
+      const token = await clerk.session.getToken();
+      return typeof token === 'string' ? token : '';
+    };
+
+    const getAdminStateForClerk = async (clerk) => {
+      const token = await getClerkSessionToken(clerk);
+      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+      if (!token) return { authenticated: true, isAdmin: false };
+
+      const response = await fetch('/.netlify/functions/admin-auth-state', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.json().catch(() => ({ authenticated: true, isAdmin: false }));
+    };
+
+    const setPublishControlState = (control, draft, statusText) => {
+      control.dataset.postDraft = String(Boolean(draft));
+      control.setAttribute('aria-pressed', String(!draft));
+      control.setAttribute('aria-label', draft ? 'Publish article' : 'Unpublish article');
+      control.setAttribute('title', draft ? 'Publish article' : 'Unpublish article');
+
+      const publishIcon = control.querySelector('[data-admin-publish-icon="publish"]');
+      const unpublishIcon = control.querySelector('[data-admin-publish-icon="unpublish"]');
+      if (publishIcon) publishIcon.classList.toggle('hidden', !draft);
+      if (unpublishIcon) unpublishIcon.classList.toggle('hidden', draft);
+      [publishIcon, unpublishIcon].forEach((icon) => {
+        if (!icon) return;
+        icon.classList.toggle('text-amber-600', draft);
+        icon.classList.toggle('dark:text-amber-300', draft);
+      });
+
+      const status = control.querySelector('[data-admin-publish-status]');
+      if (status) status.textContent = statusText || (draft ? 'Article is unpublished draft' : 'Article is published');
+    };
+
+    const applyPreviewDraftState = (control, draft) => {
+      const preview = control.closest('[data-post-preview]');
+      if (preview) preview.dataset.postUnpublished = String(Boolean(draft));
+      setPublishControlState(control, draft);
+    };
+
+    const confirmPublishChange = (willDraft) => {
+      const warning = willDraft
+        ? 'Unpublishing saves this article as a draft and removes it from public library pages after the site refreshes.'
+        : 'Publishing makes this article visible on public article and library pages after the site refreshes.';
+
+      return window.confirm(warning);
+    };
+
+    const togglePublishState = async (control) => {
+      const slug = control.dataset.postSlug || '';
+      const willDraft = control.dataset.postDraft !== 'true';
+      const confirmed = confirmPublishChange(willDraft);
+
+      if (!confirmed) return;
+
+      control.disabled = true;
+      setPublishControlState(control, !willDraft, willDraft ? 'Unpublishing article…' : 'Publishing article…');
+
+      try {
+        const clerk = await getClerk();
+        const token = await getClerkSessionToken(clerk);
+
+        if (!token) throw new Error('A valid Clerk session token is required.');
+
+        const response = await fetch('/.netlify/functions/toggle-article-publish', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ slug, draft: willDraft }),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Publish status update failed with status ${response.status}.`);
+        }
+
+        applyPreviewDraftState(control, Boolean(result.draft));
+        setPublishControlState(
+          control,
+          Boolean(result.draft),
+          result.draft ? 'Article unpublished and saved as draft' : 'Article published'
+        );
+      } catch (error) {
+        const isDraft = control.dataset.postDraft === 'true';
+        setPublishControlState(
+          control,
+          isDraft,
+          error instanceof Error ? error.message : 'Article publish status could not be updated'
+        );
+        window.alert(error instanceof Error ? error.message : 'Article publish status could not be updated.');
+      } finally {
+        control.disabled = false;
+      }
+    };
+
+    adminPublishControls.forEach((control) => {
+      setPublishControlState(control, control.dataset.postDraft === 'true');
+      if (control.dataset.adminPublishBound === 'true') return;
+
+      control.dataset.adminPublishBound = 'true';
+      control.addEventListener('click', () => {
+        togglePublishState(control);
+      });
+    });
+
+    const renderAdminEditState = async (clerk) => {
+      const adminState = await getAdminStateForClerk(clerk);
+      setAdminControlsVisible(Boolean(adminState.isAdmin));
+    };
+
+    getClerk()
+      .then(async (clerk) => {
+        await renderAdminEditState(clerk);
+
+        if (typeof clerk.addListener === 'function') {
+          clerk.addListener(() => {
+            renderAdminEditState(clerk).catch(() => setAdminControlsVisible(false));
+          });
+        }
+      })
+      .catch(() => setAdminControlsVisible(false));
+  };
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(registerBlogPreviewAdminControls);
+  } else {
+    window.setTimeout(registerBlogPreviewAdminControls, 1);
+  }
+</script>
