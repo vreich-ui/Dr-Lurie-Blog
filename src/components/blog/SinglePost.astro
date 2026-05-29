@@ -2,6 +2,7 @@
 import { Icon } from 'astro-icon/components';
 
 import Image from '~/components/common/Image.astro';
+import Button from '~/components/ui/Button.astro';
 
 import { getFormattedMonthYear } from '~/utils/utils';
 
@@ -50,7 +51,10 @@ const heroImageAspect = (() => {
           {post.readingTime && <span aria-hidden="true">·</span>}
           <time datetime={String(post.publishDate)}>{getFormattedMonthYear(post.publishDate)}</time>
         </p>
-        <a class="btn-secondary ml-auto" href={adminEditHref} data-admin-edit hidden>Edit</a>
+        <Button variant="secondary" class="btn-sm ml-auto shrink-0 gap-1.5" href={adminEditHref} data-admin-edit hidden>
+          <Icon name="tabler:pencil" class="h-4 w-4" aria-hidden="true" />
+          Edit
+        </Button>
       </div>
 
       {
@@ -122,7 +126,10 @@ const heroImageAspect = (() => {
         <Icon name="tabler:printer" class="h-5 w-5" aria-hidden="true" />
         <span class="sr-only">Print article</span>
       </button>
-      <a class="btn-secondary ml-auto" href={adminEditHref} data-admin-edit hidden>Edit</a>
+      <Button variant="secondary" class="btn-sm ml-auto shrink-0 gap-1.5" href={adminEditHref} data-admin-edit hidden>
+        <Icon name="tabler:pencil" class="h-4 w-4" aria-hidden="true" />
+        Edit
+      </Button>
     </div>
   </article>
 </section>
