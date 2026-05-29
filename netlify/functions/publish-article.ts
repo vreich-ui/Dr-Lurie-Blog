@@ -60,6 +60,7 @@ type PublishInput = {
   excerpt?: unknown;
   files?: unknown;
   featuredImage?: unknown;
+  existingFeaturedImagePath?: unknown;
   images?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
@@ -155,9 +156,35 @@ const normalizeRepoPath = (value: string) => {
 
 const isExpectedArticlePath = (path: string, slug: string) => path === `${repoContentRoot}/${slug}.md`;
 
+const isValidUploadedImagePath = (path: string) => {
+  const prefix = `${uploadRoot}/`;
+  return path.startsWith(prefix) && path.length > prefix.length && !path.endsWith('/');
+};
+
 const isValidImagePath = (path: string, slug: string) => {
   const prefix = `${uploadRoot}/${slug}/`;
-  return path.startsWith(prefix) && path.length > prefix.length && !path.endsWith('/');
+  return isValidUploadedImagePath(path) && path.startsWith(prefix) && path.length > prefix.length;
+};
+
+const normalizeExistingFeaturedImagePath = (value: unknown) => {
+  const rawPath = toStringValue(value);
+  if (!rawPath) return undefined;
+
+  const repoPath = rawPath.startsWith('~/assets/images/uploads/')
+    ? rawPath.replace('~/assets/images/uploads/', `${uploadRoot}/`)
+    : rawPath.startsWith('/src/assets/images/uploads/')
+      ? rawPath.slice(1)
+      : rawPath.startsWith(`${uploadRoot}/`)
+        ? rawPath
+        : undefined;
+
+  const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
+
+  if (!normalizedPath || !isValidUploadedImagePath(normalizedPath)) {
+    throw new PublishError(403, `existingFeaturedImagePath must be under ${uploadRoot}/ and include a filename.`);
+  }
+
+  return normalizedPath.replace(`${uploadRoot}/`, '~/assets/images/uploads/');
 };
 
 const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
@@ -477,11 +504,13 @@ export const handler = async (event: LambdaEvent) => {
     const mediaEntries = getMediaEntries(input, slug);
     publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
-    const existingFeaturedImage = featuredImage?.startsWith('~/assets/images/uploads/') ? featuredImage : undefined;
     const selectedFeatured = featuredImage ? sanitizeFilename(featuredImage) : undefined;
     const uploadedImagePath = selectedFeatured
       ? mediaEntries.find((entry) => entry.path.endsWith(`/${selectedFeatured}`))?.displayPath
       : undefined;
+    const existingFeaturedImage = uploadedImagePath
+      ? undefined
+      : normalizeExistingFeaturedImagePath(toStringValue(input.existingFeaturedImagePath) ?? featuredImage);
     const imagePath = uploadedImagePath ?? existingFeaturedImage;
     const markdown = markdownInput
       ? hasFrontmatter(markdownInput)
