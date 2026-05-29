@@ -14,6 +14,11 @@ type GitHubContentFile = {
   path?: string;
 };
 
+type ParsedFrontmatter = {
+  content: string;
+  data: Record<string, unknown>;
+};
+
 const jsonHeaders = {
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
@@ -55,12 +60,17 @@ const slugify = (value: string) =>
 const parseScalar = (value: string) => {
   const trimmed = value.trim();
   const quoted = trimmed.match(/^['"](.*)['"]$/s);
-  return quoted ? quoted[1].replace(/\\([\\"])/g, '$1') : trimmed;
+  if (quoted) return quoted[1].replace(/\\([\\"])/g, '$1');
+  if (trimmed === 'true') return true;
+  if (trimmed === 'false') return false;
+  if (trimmed === '[]') return [];
+
+  return trimmed;
 };
 
-const parseFrontmatter = (markdown: string) => {
-  const match = markdown.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
-  if (!match) return { data: {} as Record<string, unknown>, content: markdown };
+const parseFrontmatter = (markdown: string): ParsedFrontmatter => {
+  const match = markdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/);
+  if (!match) return { data: {}, content: markdown };
 
   const data: Record<string, unknown> = {};
   const lines = match[1].split('\n');
@@ -73,8 +83,8 @@ const parseFrontmatter = (markdown: string) => {
     const [, key, rawValue] = pair;
 
     if (rawValue === '') {
-      const nested: Record<string, string> = {};
-      const list: string[] = [];
+      const nested: Record<string, unknown> = {};
+      const list: unknown[] = [];
 
       while (
         index + 1 < lines.length &&
@@ -93,8 +103,6 @@ const parseFrontmatter = (markdown: string) => {
       }
 
       data[key] = list.length ? list : nested;
-    } else if (rawValue === 'true' || rawValue === 'false') {
-      data[key] = rawValue === 'true';
     } else {
       data[key] = parseScalar(rawValue);
     }
@@ -104,6 +112,39 @@ const parseFrontmatter = (markdown: string) => {
     data,
     content: markdown.slice(match[0].length),
   };
+};
+
+const normalizeRepoPath = (value: string) => {
+  if (value.startsWith('/') || value.includes('\\')) return undefined;
+
+  const normalized = value.split('/').reduce<string[]>((parts, part) => {
+    if (!part || part === '.') return parts;
+    if (part === '..') {
+      parts.pop();
+      return parts;
+    }
+    parts.push(part);
+    return parts;
+  }, []);
+
+  const path = normalized.join('/');
+  return path === value && !path.startsWith('../') ? path : undefined;
+};
+
+const isExpectedArticlePath = (path: string | undefined, slug: string) => path === `${repoContentRoot}/${slug}.md`;
+
+const parseTags = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.map((tag) => toStringValue(tag)).filter((tag): tag is string => Boolean(tag));
+  }
+
+  const tags = toStringValue(value);
+  return tags
+    ? tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    : [];
 };
 
 const githubRequest = async <T>(path: string, token: string) => {
@@ -165,13 +206,24 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const articlePath = `${repoContentRoot}/${slug}.md`;
+  const articlePath = normalizeRepoPath(`${repoContentRoot}/${slug}.md`);
+
+  if (!articlePath || !isExpectedArticlePath(articlePath, slug)) {
+    return jsonResponse(403, { error: `slug must resolve to ${repoContentRoot}/{slug}.md.` });
+  }
 
   try {
     const file = await githubRequest<GitHubContentFile>(
       `/repos/${repo}/contents/${encodeURIComponent(articlePath).replaceAll('%2F', '/')}?ref=${encodeURIComponent(branch)}`,
       token
     );
+
+    if (!isExpectedArticlePath(file.path, slug)) {
+      return jsonResponse(403, {
+        error: `GitHub returned an unexpected path. Expected ${repoContentRoot}/${slug}.md.`,
+        path: file.path,
+      });
+    }
 
     if (file.encoding !== 'base64' || !file.content) {
       return jsonResponse(500, { error: 'Article content could not be decoded.' });
@@ -182,22 +234,31 @@ export const handler = async (event: LambdaEvent) => {
     const metadata =
       data.metadata && typeof data.metadata === 'object' ? (data.metadata as Record<string, unknown>) : {};
 
+    const image = toStringValue(data.image) ?? '';
+    const video = toStringValue(data.video) ?? '';
+    const description = toStringValue(metadata.description) ?? '';
+
     return jsonResponse(200, {
       article: {
         slug,
         title: toStringValue(data.title) ?? '',
-        excerpt: toStringValue(data.excerpt) ?? '',
         publishDate: toStringValue(data.publishDate) ?? '',
-        author: toStringValue(data.author) ?? '',
-        category: toStringValue(data.category) ?? '',
-        tags: Array.isArray(data.tags) ? data.tags.filter((tag): tag is string => typeof tag === 'string') : [],
-        draft: data.draft === true,
-        content,
-        featuredImage: toStringValue(data.image) ?? '',
-        videoLink: toStringValue(data.video) ?? '',
+        excerpt: toStringValue(data.excerpt) ?? '',
+        image,
+        video,
         ctaLink: toStringValue(data.ctaLink) ?? '',
         ctaText: toStringValue(data.ctaText) ?? '',
-        seoDescription: toStringValue(metadata.description) ?? '',
+        category: toStringValue(data.category) ?? '',
+        tags: parseTags(data.tags),
+        author: toStringValue(data.author) ?? '',
+        draft: data.draft === true,
+        metadata: {
+          description,
+        },
+        content,
+        featuredImage: image,
+        videoLink: video,
+        seoDescription: description,
         markdown,
         articlePath,
       },
