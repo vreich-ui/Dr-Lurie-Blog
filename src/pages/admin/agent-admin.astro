@@ -116,10 +116,7 @@ const metadata = {
         <p id="publish-output-meta" class="publish-output-meta">Waiting for workflow output…</p>
         <pre id="publish-output-preview" class="publish-output-preview">No parsed output captured yet.</pre>
       </section>
-      <script
-        id="chatkit-widget-bootstrap"
-        type="application/json"
-        set:html={JSON.stringify(chatkitWidgetBootstrap)}></script>
+      <script id="chatkit-widget-bootstrap" type="application/json" set:html={JSON.stringify(chatkitWidgetBootstrap)} />
     </section>
   </section>
 </Layout>
@@ -368,7 +365,7 @@ const metadata = {
 </style>
 
 <script>
-  import { publishArticleFromPayload } from "../../lib/publishArticleFromPayload";
+  import { publishArticleFromPayload } from '../../lib/publishArticleFromPayload';
 
   window.publishArticleFromPayload = publishArticleFromPayload;
 </script>
@@ -545,7 +542,7 @@ const metadata = {
         try {
           const parsed = JSON.parse(value);
           return parsed && typeof parsed === 'object' ? parsed : null;
-        } catch (error) {
+        } catch {
           throw new Error('End node parsed_output is a string, but JSON.parse failed.');
         }
       }
@@ -614,7 +611,10 @@ const metadata = {
       const invalidImageCount = rawImages.length - images.length;
 
       if (!slug || !slugPattern.test(slug)) {
-        setStatus('missing required field: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).', false);
+        setStatus(
+          'missing required field: slug must be non-empty and slug-like (lowercase letters, numbers, hyphens).',
+          false
+        );
         return;
       }
       if (!markdown && !content) {
@@ -622,7 +622,10 @@ const metadata = {
         return;
       }
       if (invalidImageCount > 0) {
-        setStatus('Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.', false);
+        setStatus(
+          'Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.',
+          false
+        );
         return;
       }
 
@@ -635,7 +638,9 @@ const metadata = {
         draft: payload.draft === true,
         author: toText(payload.author) || undefined,
         category: toText(payload.category) || undefined,
-        tags: Array.isArray(payload.tags) ? payload.tags.map((tag) => toText(tag)).filter(Boolean) : toText(payload.tags) || undefined,
+        tags: Array.isArray(payload.tags)
+          ? payload.tags.map((tag) => toText(tag)).filter(Boolean)
+          : toText(payload.tags) || undefined,
         excerpt: toText(payload.excerpt) || undefined,
         overwrite: Boolean(payload.overwrite),
         images,
@@ -657,7 +662,10 @@ const metadata = {
         setDebugLine();
         const result = publishResult.body || {};
         if (publishResult.status === 409) {
-          const message = result.error || result.message || 'Article already exists. Retry with overwrite=true to replace the existing file.';
+          const message =
+            result.error ||
+            result.message ||
+            'Article already exists. Retry with overwrite=true to replace the existing file.';
           setStatus(message, false);
           return;
         }
@@ -685,7 +693,9 @@ const metadata = {
       try {
         const parsed = parseOutputObject(rawCandidate);
         capturedParsedPayload = parsed;
-        const publishLooking = Boolean(parsed && toText(parsed.slug) && (toText(parsed.markdown) || toText(parsed.content)));
+        const publishLooking = Boolean(
+          parsed && toText(parsed.slug) && (toText(parsed.markdown) || toText(parsed.content))
+        );
         debugState.publishPayloadDetected = String(publishLooking);
         if (!parsed) {
           updatePublishPreview(null, `Event ${sourceLabel} captured but payload is not an object.`);
@@ -703,7 +713,9 @@ const metadata = {
         setDebugLine();
         if (autoPublishOnOutput) {
           if (autoPublishedPayloadKeys.has(payloadKey)) {
-            setStatus('Auto-publish skipped: this payload was already published. Use Publish payload to retry manually.');
+            setStatus(
+              'Auto-publish skipped: this payload was already published. Use Publish payload to retry manually.'
+            );
           } else {
             await runPublishFromPayload(parsed, `${sourceLabel} (auto)`);
           }
@@ -719,20 +731,32 @@ const metadata = {
 
     const trackEvent = async (eventName, rawData) => {
       const detailKeys =
-        rawData && typeof rawData === 'object' ? Object.keys(rawData).slice(0, 12).join(', ') || '(no-keys)' : '(non-object)';
+        rawData && typeof rawData === 'object'
+          ? Object.keys(rawData).slice(0, 12).join(', ') || '(no-keys)'
+          : '(non-object)';
       debugState.lastEventType = eventName;
       debugState.lastEventDetailKeys = detailKeys;
-      const payloadLike = rawData && typeof rawData === 'object' && (rawData.slug || rawData.parsed_output || rawData.parsedOutput || rawData.output || rawData.final_output || rawData.finalOutput || rawData.payload);
-      debugState.eventLog.push(`${new Date().toISOString()} | ${eventName} | keys: ${detailKeys} | payload: ${payloadLike ? 'yes' : 'no'}`);
+      const payloadLike =
+        rawData &&
+        typeof rawData === 'object' &&
+        (rawData.slug ||
+          rawData.parsed_output ||
+          rawData.parsedOutput ||
+          rawData.output ||
+          rawData.final_output ||
+          rawData.finalOutput ||
+          rawData.payload);
+      debugState.eventLog.push(
+        `${new Date().toISOString()} | ${eventName} | keys: ${detailKeys} | payload: ${payloadLike ? 'yes' : 'no'}`
+      );
       if (debugState.eventLog.length > 20) debugState.eventLog.shift();
       setDebugLine();
       if (payloadLike) {
-        const sourceLabel =
-          eventName.startsWith('widget.onAction:agent.publish_article')
-            ? 'widget action'
-            : eventName.startsWith('element:') || eventName.startsWith('window:')
-              ? 'End output'
-              : 'Manual console/test payload';
+        const sourceLabel = eventName.startsWith('widget.onAction:agent.publish_article')
+          ? 'widget action'
+          : eventName.startsWith('element:') || eventName.startsWith('window:')
+            ? 'End output'
+            : 'Manual console/test payload';
         await capturePayloadCandidate(rawData, sourceLabel);
       }
     };
@@ -854,7 +878,15 @@ const metadata = {
         },
       });
 
-      const eventNames = ['message', 'chatkit:message', 'chatkit:event', 'chatkit:action', 'action', 'workflow:output', 'output'];
+      const eventNames = [
+        'message',
+        'chatkit:message',
+        'chatkit:event',
+        'chatkit:action',
+        'action',
+        'workflow:output',
+        'output',
+      ];
       eventNames.forEach((eventName) => {
         fields.chatkit?.addEventListener(eventName, async (event) => {
           await trackEvent(`element:${eventName}`, event?.detail ?? event);
@@ -866,8 +898,12 @@ const metadata = {
         const looksChatkit =
           data &&
           typeof data === 'object' &&
-          (String(data.type || '').toLowerCase().includes('chatkit') ||
-            String(data.event || '').toLowerCase().includes('chatkit') ||
+          (String(data.type || '')
+            .toLowerCase()
+            .includes('chatkit') ||
+            String(data.event || '')
+              .toLowerCase()
+              .includes('chatkit') ||
             data.parsed_output ||
             data.parsedOutput ||
             data.final_output ||
@@ -884,7 +920,9 @@ const metadata = {
       if (capturedParsedPayload) {
         updatePublishPreview(
           capturedParsedPayload,
-          autoPublishOnOutput ? 'Auto-publish enabled for next valid captured payload.' : 'Auto-publish disabled. Manual publish only.'
+          autoPublishOnOutput
+            ? 'Auto-publish enabled for next valid captured payload.'
+            : 'Auto-publish disabled. Manual publish only.'
         );
       }
     });

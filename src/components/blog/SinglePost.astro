@@ -13,6 +13,8 @@ export interface Props {
 }
 
 const { post, url } = Astro.props;
+const adminEditHref = `/admin/publish?edit=${encodeURIComponent(post.slug)}`;
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const heroImageAspect = (() => {
   if (post.image && typeof post.image === 'object' && 'width' in post.image && 'height' in post.image) {
     const ratio = post.image.width / post.image.height;
@@ -25,7 +27,7 @@ const heroImageAspect = (() => {
 ---
 
 <section class="dl-pt-s dl-pb-l sm:py-8 lg:py-10 mx-auto">
-  <article data-print-article>
+  <article data-print-article data-clerk-publishable-key={clerkPublishableKey}>
     <header
       class={post.image
         ? 'intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade'
@@ -42,12 +44,22 @@ const heroImageAspect = (() => {
         {post.excerpt}
       </p>
 
-      <div class="max-w-[720px] mx-auto dl-mb-s px-4 sm:px-6">
+      <div class="max-w-[720px] mx-auto dl-mb-s flex items-center gap-3 px-4 sm:px-6">
         <p class="inline-flex flex-wrap items-center gap-2 text-xs text-muted dark:text-slate-400">
           {post.readingTime && <span>{post.readingTime} min read</span>}
           {post.readingTime && <span aria-hidden="true">·</span>}
           <time datetime={String(post.publishDate)}>{getFormattedMonthYear(post.publishDate)}</time>
         </p>
+        <a
+          class="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+          href={adminEditHref}
+          data-admin-edit
+          hidden
+          aria-label="Edit article"
+        >
+          <Icon name="tabler:pencil" class="h-5 w-5" aria-hidden="true" />
+          <span class="sr-only">Edit article</span>
+        </a>
       </div>
 
       {
@@ -119,11 +131,25 @@ const heroImageAspect = (() => {
         <Icon name="tabler:printer" class="h-5 w-5" aria-hidden="true" />
         <span class="sr-only">Print article</span>
       </button>
+      <a
+        class="ml-auto inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+        href={adminEditHref}
+        data-admin-edit
+        hidden
+        aria-label="Edit article"
+      >
+        <Icon name="tabler:pencil" class="h-5 w-5" aria-hidden="true" />
+        <span class="sr-only">Edit article</span>
+      </a>
     </div>
   </article>
 </section>
 
 <style>
+  [data-admin-edit][hidden] {
+    display: none !important;
+  }
+
   @media print {
     body > * {
       display: none !important;
@@ -148,13 +174,126 @@ const heroImageAspect = (() => {
       padding: 0 !important;
     }
 
-    .post-actions {
+    .post-actions,
+    [data-admin-edit] {
       display: none !important;
     }
   }
 </style>
 
 <script is:inline>
+  const registerAdminEditControls = () => {
+    const article = document.querySelector('[data-print-article]');
+    const adminEditControls = Array.from(document.querySelectorAll('[data-admin-edit]'));
+    const clerkPublishableKey = article?.dataset.clerkPublishableKey || '';
+    const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+
+    if (!adminEditControls.length || !clerkPublishableKey) return;
+
+    let clerkLoadPromise;
+
+    const setAdminEditControlsVisible = (visible) => {
+      adminEditControls.forEach((control) => {
+        control.hidden = !visible;
+      });
+    };
+
+    const loadClerkScript = () =>
+      new Promise((resolve, reject) => {
+        if (window.Clerk) {
+          resolve();
+          return;
+        }
+
+        const resolveWhenClerkExists = () => {
+          if (!window.Clerk) {
+            reject(new Error('Clerk authentication could not be initialized.'));
+            return;
+          }
+
+          resolve();
+        };
+
+        const existingScript = document.querySelector(
+          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
+        );
+        if (existingScript) {
+          existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
+          existingScript.addEventListener(
+            'error',
+            () => reject(new Error('Clerk authentication could not be loaded.')),
+            {
+              once: true,
+            }
+          );
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.src = clerkJsScriptSrc;
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.type = 'text/javascript';
+        script.dataset.drLurieClerkjs = 'true';
+        script.dataset.clerkPublishableKey = clerkPublishableKey;
+        script.addEventListener('load', resolveWhenClerkExists, { once: true });
+        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
+          once: true,
+        });
+        document.head.append(script);
+      });
+
+    const getClerk = async () => {
+      clerkLoadPromise ||= (async () => {
+        await loadClerkScript();
+
+        if (!window.Clerk) {
+          throw new Error('Clerk authentication could not be initialized.');
+        }
+
+        const clerk = window.Clerk;
+        await clerk.load();
+        return clerk;
+      })();
+
+      return clerkLoadPromise;
+    };
+
+    const getAdminStateForClerk = async (clerk) => {
+      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+      const token = await clerk.session.getToken();
+      if (!token) return { authenticated: true, isAdmin: false };
+
+      const response = await fetch('/.netlify/functions/admin-auth-state', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.json().catch(() => ({ authenticated: true, isAdmin: false }));
+    };
+
+    const renderAdminEditState = async (clerk) => {
+      const adminState = await getAdminStateForClerk(clerk);
+      setAdminEditControlsVisible(Boolean(adminState.isAdmin));
+    };
+
+    getClerk()
+      .then(async (clerk) => {
+        await renderAdminEditState(clerk);
+
+        if (typeof clerk.addListener === 'function') {
+          clerk.addListener(() => {
+            renderAdminEditState(clerk).catch(() => setAdminEditControlsVisible(false));
+          });
+        }
+      })
+      .catch(() => setAdminEditControlsVisible(false));
+  };
+
   const registerArticleActions = () => {
     const shareButton = document.querySelector('[data-immersive-share]');
     const printButton = document.querySelector('[data-immersive-print]');
@@ -196,9 +335,14 @@ const heroImageAspect = (() => {
     });
   };
 
+  const registerPostEnhancements = () => {
+    registerAdminEditControls();
+    registerArticleActions();
+  };
+
   if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(registerArticleActions);
+    window.requestIdleCallback(registerPostEnhancements);
   } else {
-    window.setTimeout(registerArticleActions, 1);
+    window.setTimeout(registerPostEnhancements, 1);
   }
 </script>
