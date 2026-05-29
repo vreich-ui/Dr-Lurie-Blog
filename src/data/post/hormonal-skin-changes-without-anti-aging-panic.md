@@ -1,8 +1,8 @@
 ---
-title: "Your Products May Not Have Stopped Working"
 publishDate: 2026-05-29T15:56:00.000Z
+title: "Your Products May Not Have Stopped Working"
 excerpt: "Perimenopause and menopause can change skin comfort, tolerance, oil balance, and hair patterns. That does not make every change an anti-aging emergency."
-image: "~/assets/images/uploads/hormonal-skin-changes-without-anti-aging-panic/serene-skincare-display-in-soft-light.png"
+image: "~/assets/images/uploads/hormonal-skin-changes-without-anti-aging-panic/serene-skincare-display-in-soft-light-small-.png"
 tags:
   - "perimenopause"
   - "menopause"
@@ -12,11 +12,6 @@ tags:
   - "adult acne"
   - "midlife skincare"
   - "hair changes"
-sources:
-  - "name: American Academy of Dermatology — Caring for your skin in menopause; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/skin-care-during-menopause"
-  - "name: ACOG — The Menopause Years; url: https://www.acog.org/womens-health/faqs/the-menopause-years"
-  - "name: DermNet — Menopause and the skin; url: https://dermnetnz.org/topics/menopause-and-the-skin"
-  - "name: American Academy of Dermatology — Adult acne; url: https://www.aad.org/public/diseases/acne/really-acne/adult-acne"
 metadata:
   description: "Midlife skin changes can feel sudden. Learn how perimenopause and menopause may affect dryness, sensitivity, breakouts, facial hair, and scalp hair without routine panic."
 ---
