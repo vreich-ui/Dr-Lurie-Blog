@@ -1237,6 +1237,27 @@ const metadata = {
       return duplicates;
     };
 
+    const getImportArrayKeys = (fieldName) => [fieldName, `${fieldName}[]`];
+
+    const getImportArrayValue = (data, fieldName) => {
+      const [plainKey, bracketedKey] = getImportArrayKeys(fieldName);
+      return data[plainKey] != null ? data[plainKey] : data[bracketedKey];
+    };
+
+    const validateImportArrayField = (data, fieldName) => {
+      getImportArrayKeys(fieldName).forEach((fieldKey) => {
+        if (data[fieldKey] == null) return;
+
+        if (!Array.isArray(data[fieldKey])) {
+          throw new Error(`JSON field "${fieldKey}" must be an array.`);
+        }
+
+        if (data[fieldKey].some((item) => typeof item !== 'string')) {
+          throw new Error(`JSON field "${fieldKey}" must contain only strings.`);
+        }
+      });
+    };
+
     const validateImportShape = (data) => {
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
         throw new Error(
@@ -1250,23 +1271,8 @@ const metadata = {
       );
       if (invalidTextField) throw new Error(`JSON field "${invalidTextField}" must be a string.`);
 
-      ['tags', 'sources'].forEach((fieldName) => {
-        [fieldName, `${fieldName}[]`].forEach((fieldKey) => {
-          if (data[fieldKey] == null) return;
-
-          if (!Array.isArray(data[fieldKey])) {
-            throw new Error(`JSON field "${fieldKey}" must be an array.`);
-          }
-
-          if (data[fieldKey].some((item) => typeof item !== 'string')) {
-            throw new Error(`JSON field "${fieldKey}" must contain only strings.`);
-          }
-        });
-      });
+      ['tags', 'sources'].forEach((fieldName) => validateImportArrayField(data, fieldName));
     };
-
-    const getImportArrayValue = (data, fieldName) =>
-      data[fieldName] != null ? data[fieldName] : data[`${fieldName}[]`];
 
     const populateFromJsonImport = (data) => {
       const importedTags = getImportArrayValue(data, 'tags');
