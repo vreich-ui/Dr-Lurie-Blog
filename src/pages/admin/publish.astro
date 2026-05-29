@@ -21,7 +21,9 @@ const metadata = {
       class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
     >
       <div>
-        <p class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">Publishing workspace</p>
+        <p id="publish-mode" class="admin-kicker text-sm font-semibold uppercase tracking-[0.18em] text-accent">
+          Publishing workspace
+        </p>
         <h1 class="mt-2 font-heading text-4xl font-bold tracking-tight text-default sm:text-5xl">{pageTitle}</h1>
       </div>
     </header>
@@ -129,7 +131,7 @@ const metadata = {
         <div class="actions">
           <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
           <button id="preview" class="btn-secondary" type="button">Preview</button>
-          <button id="publish" class="btn-primary publish-button" type="button">Publish</button>
+          <button id="publish" class="btn-primary publish-button" type="button">Publish Article</button>
         </div>
         <p id="status" class="status" aria-live="polite"></p>
       </form>
@@ -438,17 +440,30 @@ const metadata = {
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
       publish: document.querySelector('#publish'),
+      publishMode: document.querySelector('#publish-mode'),
     };
 
     let imageNames = [];
     let selectedFiles = [];
     let isAdmin = false;
+    let editArticleLoaded = false;
 
     const adminPage = document.querySelector('.admin-page');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     let clerkLoadPromise;
+
+    const getEditSlug = () => slugify(new URLSearchParams(window.location.search).get('edit') || '');
+
+    const isEditMode = () => Boolean(getEditSlug());
+
+    const setEditorModeCopy = (mode) => {
+      const editing = mode === 'edit';
+      fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
+      fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
+      fields.overwrite.checked = editing || fields.overwrite.checked;
+    };
 
     const setGatedContentVisible = (visible) => {
       gatedContent.forEach((element) => {
@@ -567,6 +582,7 @@ const metadata = {
 
         if (adminState.isAdmin) {
           setAuthState('signed-in');
+          await initializeEditMode(clerk);
           return;
         }
 
@@ -662,7 +678,12 @@ const metadata = {
 
     const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
 
-    const getFeaturedImagePath = () => (fields.featuredImage.value ? getUploadPath(fields.featuredImage.value) : '');
+    const getFeaturedImagePath = () => {
+      const value = fields.featuredImage.value.trim();
+      if (!value) return '';
+      if (value.startsWith('~/assets/images/uploads/') || value.startsWith('https://')) return value;
+      return getUploadPath(value);
+    };
 
     const getDraft = () => ({
       title: fields.title.value,
@@ -834,6 +855,81 @@ const metadata = {
       }
     };
 
+    const ensureFeaturedImageOption = (value) => {
+      if (!value || Array.from(fields.featuredImage.options).some((option) => option.value === value)) return;
+
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      fields.featuredImage.append(option);
+    };
+
+    const formatEditPublishDate = (value) => {
+      if (!value) return formatDateTimeLocal(new Date());
+
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? formatDateTimeLocal(new Date()) : formatDateTimeLocal(date);
+    };
+
+    const populateArticleForEdit = (article) => {
+      fields.title.value = article.title || '';
+      fields.slug.value = article.slug || getEditSlug();
+      fields.excerpt.value = article.excerpt || '';
+      fields.publishDate.value = formatEditPublishDate(article.publishDate);
+      fields.author.value = article.author || '';
+      fields.category.value = article.category || '';
+      fields.tags.value = Array.isArray(article.tags) ? article.tags.join(', ') : article.tags || '';
+      fields.draft.checked = Boolean(article.draft);
+      fields.content.value = article.content || '';
+      fields.videoLink.value = article.videoLink || article.video || '';
+      fields.ctaLink.value = article.ctaLink || '';
+      fields.ctaText.value = article.ctaText || '';
+      fields.seoDescription.value = article.seoDescription || '';
+      fields.overwrite.checked = true;
+      selectedFiles = [];
+      imageNames = [];
+      renderImages();
+      if (article.featuredImage) {
+        ensureFeaturedImageOption(article.featuredImage);
+        fields.featuredImage.value = article.featuredImage;
+      }
+      updatePreview();
+      updatePublishOutput();
+    };
+
+    const initializeEditMode = async (clerk) => {
+      const editSlug = getEditSlug();
+      if (!editSlug || editArticleLoaded) return;
+
+      editArticleLoaded = true;
+      setEditorModeCopy('edit');
+      setStatus(`Loading ${editSlug} for editing…`, false);
+
+      try {
+        const token = await clerk.session.getToken();
+        if (!token) throw new Error('Could not retrieve a Clerk session token.');
+
+        const response = await fetch(`/.netlify/functions/get-article-for-edit?slug=${encodeURIComponent(editSlug)}`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Could not load article for editing (${response.status}).`);
+        }
+
+        populateArticleForEdit(result.article || result);
+        setStatus(`Editing ${editSlug}. Publishing will update the existing article.`, false);
+      } catch (error) {
+        editArticleLoaded = false;
+        setStatus(error instanceof Error ? error.message : 'Article could not be loaded for editing.', false);
+      }
+    };
+
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
     });
@@ -947,7 +1043,8 @@ const metadata = {
     });
 
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
-    loadDraft();
+    setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
+    if (!isEditMode()) loadDraft();
     updatePreview();
     updatePublishOutput();
     initializeClerkAuth();

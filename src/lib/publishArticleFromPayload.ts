@@ -22,7 +22,7 @@ export type PublishArticlePayload = {
 export type PublishArticleResult = {
   ok: boolean;
   status: number;
-  body: any;
+  body: unknown;
 };
 
 const escapeYaml = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -30,7 +30,11 @@ const toText = (value: unknown) => (typeof value === 'string' ? value.trim() : '
 
 const normalizeTags = (tags: PublishArticlePayload['tags']) => {
   if (Array.isArray(tags)) return tags.map((tag) => toText(tag)).filter(Boolean);
-  if (typeof tags === 'string') return tags.split(',').map((tag) => tag.trim()).filter(Boolean);
+  if (typeof tags === 'string')
+    return tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
   return [];
 };
 
@@ -67,8 +71,16 @@ const buildMarkdownFromPayload = (
 
 const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
 
+type ClerkWindow = Window & {
+  Clerk?: {
+    session?: {
+      getToken?: () => Promise<unknown>;
+    };
+  };
+};
+
 const getClerkSessionToken = async () => {
-  const clerk = (window as any).Clerk;
+  const clerk = (window as ClerkWindow).Clerk;
   const token = await clerk?.session?.getToken?.();
   return typeof token === 'string' ? token : '';
 };
