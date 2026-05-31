@@ -1,0 +1,22 @@
+{
+  "name": "save-json-blob-mcp",
+  "version": "0.1.0",
+  "description": "Minimal MCP server for the save-json-blob Netlify workflow function.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "save-json-blob-mcp": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/server.js && node --check test/integration.test.js",
+    "test": "node --test test/integration.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
