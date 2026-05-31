@@ -13,7 +13,7 @@ This package is intended for Agent Builder / local MCP usage. It exposes one too
 Both variables are required at runtime:
 
 - `NETLIFY_PUBLISH_SECRET` - required. Sent only as the `x-publish-key` request header to the Netlify function.
-- `SAVE_JSON_BLOB_BASE_URL` - required. Site/function origin, for example `https://example.netlify.app`.
+- `SAVE_JSON_BLOB_BASE_URL` - required. Site root origin without a path or trailing slash, for example `https://example.netlify.app`.
 
 Secret handling rules:
 
@@ -24,15 +24,11 @@ Secret handling rules:
 
 ## Install and run
 
+This package is private and intended to run from this repository, not from the public npm registry. Install dependencies in this folder and start the stdio server locally:
+
 ```sh
 npm install
 npm start
-```
-
-Or run directly after install:
-
-```sh
-npx save-json-blob-mcp
 ```
 
 ## Supported agent/stage names
@@ -215,6 +211,12 @@ Complete reader insight and route to research using the latest record snapshot v
 }
 ```
 
+## Deployment notes
+
+- Configure `SAVE_JSON_BLOB_BASE_URL` as the production site root, without a path or trailing slash. Example: `https://example.netlify.app`, not `https://example.netlify.app/` or `https://example.netlify.app/.netlify/functions/save-json-blob`.
+- The server currently normalizes a trailing slash defensively before appending `/.netlify/functions/save-json-blob`, but deployment configuration should still use the root URL without the trailing slash for clarity.
+- Keep `NETLIFY_PUBLISH_SECRET` in the MCP runtime environment only; do not place it in Agent Builder tool schemas, prompts, sample calls, or checked-in configuration.
+
 ## Testing
 
 ```sh
@@ -232,3 +234,5 @@ The server maps backend non-2xx responses to tool errors without exposing respon
 - HTTP 404 -> `not found`
 - HTTP 409 -> `conflict`
 - Other non-2xx responses -> `HTTP <status>: <raw response text>`
+
+For unmapped statuses, the raw backend response text is intentionally surfaced for debugging. Avoid returning secrets or sensitive details from the backend response body because the MCP tool error will show that text to the agent client.
