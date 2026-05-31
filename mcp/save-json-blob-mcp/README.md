@@ -26,13 +26,41 @@ Or run directly after install:
 npx save-json-blob-mcp
 ```
 
-## Tools
+## Core tools
 
 - `save_json_blob.create_request(input: any, request_id?: string)` calls `create_request` and returns `record`.
 - `save_json_blob.get_request(request_id: string)` calls `get_request` and returns `record`.
 - `save_json_blob.list_pending_requests(stage?: string, status?: string)` calls `list_pending_requests` and returns `records`.
 - `save_json_blob.patch_agent_output(request_id: string, agent_name: string, expected_agent_version: number, output: any)` calls `patch_agent_output` and returns `record`.
 - `save_json_blob.mark_agent_complete(request_id: string, agent_name: string, expected_record_version: number, current_stage?: string | null, next_agent?: string | null, workflow_status?: string, needs_review?: boolean, last_error?: string | null)` calls `mark_agent_complete` and returns `record`.
+
+Agent names in the core tools are normalized to the backend allow-list:
+
+```text
+reader_insight|research|angle|draft|final_article
+```
+
+For example, `reader insight`, `reader-insight`, and `Reader_Insight` normalize to `reader_insight`.
+
+## Stage helper tools
+
+The server also registers two helper tools for every allowed stage (`reader_insight`, `research`, `angle`, `draft`, and `final_article`):
+
+- `<stage>.update_output(request_id: string, output: any, expected_agent_version?: number)` calls `patch_agent_output` with the stage hardcoded as `agent_name`. If `expected_agent_version` is omitted, it defaults to `0` for the first write.
+- `<stage>.mark_complete(request_id: string, expected_record_version: number, next_agent?: string | null)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `next_agent` is optional and normalized to the backend allow-list when provided.
+
+Registered helper tool names:
+
+- `reader_insight.update_output`
+- `reader_insight.mark_complete`
+- `research.update_output`
+- `research.mark_complete`
+- `angle.update_output`
+- `angle.mark_complete`
+- `draft.update_output`
+- `draft.mark_complete`
+- `final_article.update_output`
+- `final_article.mark_complete`
 
 ## Error mapping
 

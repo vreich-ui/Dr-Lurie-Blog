@@ -7,6 +7,40 @@ import { z } from 'zod';
 
 const FUNCTION_PATH = '/.netlify/functions/save-json-blob';
 
+const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
+const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
+
+const agentList = () => ALLOWED_AGENTS.join('|');
+
+const normalizeAgentName = (value, fieldName) => {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    throw new Error(`${fieldName} must be one of ${agentList()}.`);
+  }
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (!ALLOWED_AGENT_SET.has(normalized)) {
+    throw new Error(`${fieldName} must be one of ${agentList()}.`);
+  }
+
+  return normalized;
+};
+
+const normalizeOptionalAgentName = (value, fieldName) => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  return normalizeAgentName(value, fieldName);
+};
+
 const createRequestId = () => `req_${randomUUID()}`;
 
 const requiredEnv = (name) => {
@@ -93,6 +127,14 @@ const callAction = async (payload, resultKey) => {
   }
 };
 
+const callNormalizedAction = async (createPayload, resultKey) => {
+  try {
+    return await callAction(createPayload(), resultKey);
+  } catch (error) {
+    return toolError(error instanceof Error ? error.message : String(error));
+  }
+};
+
 const createServer = () => {
   const server = new McpServer({
     name: 'save-json-blob-mcp',
@@ -132,7 +174,11 @@ const createServer = () => {
         status: z.string().min(1).optional(),
       },
     },
-    async ({ stage, status }) => callAction({ action: 'list_pending_requests', stage, status }, 'records')
+    async ({ stage, status }) =>
+      callNormalizedAction(
+        () => ({ action: 'list_pending_requests', stage: normalizeOptionalAgentName(stage, 'stage'), status }),
+        'records'
+      )
   );
 
   server.registerTool(
@@ -147,14 +193,14 @@ const createServer = () => {
       },
     },
     async ({ request_id, agent_name, expected_agent_version, output }) =>
-      callAction(
-        {
+      callNormalizedAction(
+        () => ({
           action: 'patch_agent_output',
           request_id,
-          agent_name,
+          agent_name: normalizeAgentName(agent_name, 'agent_name'),
           expected_agent_version,
           output,
-        },
+        }),
         'record'
       )
   );
@@ -174,8 +220,66 @@ const createServer = () => {
         last_error: z.string().nullable().optional(),
       },
     },
-    async (input) => callAction({ action: 'mark_agent_complete', ...input }, 'record')
+    async (input) =>
+      callNormalizedAction(
+        () => ({
+          action: 'mark_agent_complete',
+          ...input,
+          agent_name: normalizeAgentName(input.agent_name, 'agent_name'),
+          current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
+          next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
+        }),
+        'record'
+      )
   );
+
+  for (const agentName of ALLOWED_AGENTS) {
+    server.registerTool(
+      `${agentName}.update_output`,
+      {
+        description: `Patch ${agentName} output and default expected_agent_version to 0 for the first write.`,
+        inputSchema: {
+          request_id: z.string().min(1),
+          output: z.any(),
+          expected_agent_version: z.number().int().nonnegative().optional(),
+        },
+      },
+      async ({ request_id, output, expected_agent_version }) =>
+        callAction(
+          {
+            action: 'patch_agent_output',
+            request_id,
+            agent_name: agentName,
+            expected_agent_version: expected_agent_version ?? 0,
+            output,
+          },
+          'record'
+        )
+    );
+
+    server.registerTool(
+      `${agentName}.mark_complete`,
+      {
+        description: `Mark ${agentName} complete with the agent name hardcoded and optional next_agent normalized.`,
+        inputSchema: {
+          request_id: z.string().min(1),
+          expected_record_version: z.number().int().nonnegative(),
+          next_agent: z.string().min(1).nullable().optional(),
+        },
+      },
+      async ({ request_id, expected_record_version, next_agent }) =>
+        callNormalizedAction(
+          () => ({
+            action: 'mark_agent_complete',
+            request_id,
+            agent_name: agentName,
+            expected_record_version,
+            next_agent: normalizeOptionalAgentName(next_agent, 'next_agent'),
+          }),
+          'record'
+        )
+    );
+  }
 
   return server;
 };
