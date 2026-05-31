@@ -31,6 +31,14 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   }
 </ul>
 
+<style>
+  [data-admin-library-mode-controls][hidden],
+  [data-admin-drafts-link][hidden],
+  [data-admin-published-link][hidden] {
+    display: none !important;
+  }
+</style>
+
 <script is:inline>
   const registerBlogPreviewAdminControls = () => {
     const list = document.querySelector('[data-blog-list]');
@@ -61,11 +69,17 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
     const getAdminPublishControls = () =>
       Array.from(document.querySelectorAll('[data-post-preview] [data-admin-publish-toggle]'));
 
+    const setElementHidden = (element, hidden) => {
+      if (!element) return;
+      element.hidden = hidden;
+      element.classList.toggle('hidden', hidden);
+    };
+
     const setAdminControlsVisible = (visible) => {
       getAdminControls().forEach((control) => {
-        control.hidden = !visible;
+        setElementHidden(control, !visible);
       });
-      if (modeControls) modeControls.hidden = !visible;
+      setElementHidden(modeControls, !visible);
     };
 
     const configureModeLinks = () => {
@@ -77,8 +91,8 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 
       if (draftsLink) draftsLink.href = `${draftUrl.pathname}${draftUrl.search}${draftUrl.hash}`;
       if (publishedLink) publishedLink.href = `${publishedUrl.pathname}${publishedUrl.search}${publishedUrl.hash}`;
-      if (draftsLink) draftsLink.hidden = isUnpublishedMode;
-      if (publishedLink) publishedLink.hidden = !isUnpublishedMode;
+      setElementHidden(draftsLink, isUnpublishedMode);
+      setElementHidden(publishedLink, !isUnpublishedMode);
     };
 
     const escapeHtml = (value) =>
