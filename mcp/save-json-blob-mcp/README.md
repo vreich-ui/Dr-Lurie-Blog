@@ -62,6 +62,14 @@ Registered helper tool names:
 - `final_article.update_output`
 - `final_article.mark_complete`
 
+## Testing
+
+```sh
+npm test
+```
+
+The integration test requires `NETLIFY_PUBLISH_SECRET` and `SAVE_JSON_BLOB_BASE_URL`. When either variable is missing, Node's test runner reports the integration case as skipped.
+
 ## Error mapping
 
 The server maps backend non-2xx responses to tool errors without exposing response headers:
