@@ -29,6 +29,20 @@ const loadNetlifyBlobs = async () => {
   );
 };
 
+export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> => {
+  const netlifyBlobs = await loadNetlifyBlobs();
+
+  if (netlifyBlobs) {
+    netlifyBlobs.connectLambda(event);
+
+    return netlifyBlobs.getStore('workflows');
+  }
+
+  console.warn('Using local file-backed workflow blob store because @netlify/blobs is unavailable.');
+
+  return createLocalBlobStore('workflows');
+};
+
 export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
   const netlifyBlobs = await loadNetlifyBlobs();
 
