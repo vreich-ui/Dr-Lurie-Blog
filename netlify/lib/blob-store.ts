@@ -38,7 +38,7 @@ export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> =
     return netlifyBlobs.getStore('workflows');
   }
 
-  console.warn('Using local file-backed workflow blob store because @netlify/blobs is unavailable.');
+  console.log('Using local file-backed workflow blob store because @netlify/blobs is unavailable.');
 
   return createLocalBlobStore('workflows');
 };
