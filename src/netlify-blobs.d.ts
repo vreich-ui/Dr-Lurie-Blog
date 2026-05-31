@@ -6,6 +6,10 @@ declare module '@netlify/blobs' {
     get: (key: string) => Promise<string | null>;
     del: (key: string) => Promise<void>;
     setJSON: (key: string, value: unknown, options?: { metadata?: BlobMetadata }) => Promise<void>;
+    list: (options?: {
+      prefix?: string;
+      directories?: boolean;
+    }) => Promise<{ blobs: Array<{ key: string; etag: string }>; directories: string[] }>;
   };
 
   export const connectLambda: (event: unknown) => void;
