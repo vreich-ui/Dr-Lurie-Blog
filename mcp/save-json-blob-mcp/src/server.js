@@ -171,11 +171,12 @@ export const createServer = () => {
       inputSchema: {
         stage: z.string().min(1).optional(),
         status: z.string().min(1).optional(),
+        limit: z.number().int().positive().max(1000).optional(),
       },
     },
-    async ({ stage, status }) =>
+    async ({ stage, status, limit }) =>
       callNormalizedAction(
-        () => ({ action: 'list_pending_requests', stage: normalizeOptionalAgentName(stage, 'stage'), status }),
+        () => ({ action: 'list_pending_requests', stage: normalizeOptionalAgentName(stage, 'stage'), status, limit }),
         'records'
       )
   );
@@ -282,4 +283,3 @@ export const createServer = () => {
 
   return server;
 };
-

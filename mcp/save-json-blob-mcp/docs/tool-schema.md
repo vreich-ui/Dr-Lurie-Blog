@@ -64,12 +64,13 @@ Sample backend request body:
 
 ### `save_json_blob_list_pending_requests`
 
-Calls backend action `list_pending_requests` and returns `records`.
+Calls backend action `list_pending_requests` and returns `records` sorted by `updated_at` descending (newest first).
 
 Optional fields:
 
 - `stage: string` - normalized to the supported agent-name allow-list when provided.
 - `status: string` - backend workflow status filter. The backend defaults to `pending` when omitted.
+- `limit: number` - positive integer result limit. Defaults to `50` when omitted.
 
 Sample backend request body:
 
@@ -77,7 +78,8 @@ Sample backend request body:
 {
   "action": "list_pending_requests",
   "stage": "research",
-  "status": "pending"
+  "status": "pending",
+  "limit": 50
 }
 ```
 
