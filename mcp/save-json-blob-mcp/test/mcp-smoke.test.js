@@ -11,6 +11,7 @@ const EXPECTED_TOOL_NAMES = [
   'save_json_blob_list_pending_requests',
   'save_json_blob_patch_agent_output',
   'save_json_blob_mark_agent_complete',
+  'ping',
   'reader_insight_update_output',
   'reader_insight_mark_complete',
   'research_update_output',
@@ -47,6 +48,9 @@ test('MCP stdio server lists underscore-only Agent Builder tool names', async ()
       tools.map((tool) => tool.name),
       EXPECTED_TOOL_NAMES
     );
+
+    const pingResult = await client.callTool({ name: 'ping', arguments: {} });
+    assert.deepEqual(pingResult.structuredContent, { ok: true, server: 'Dr_Lurie_Science_MCP' });
   } finally {
     await client.close();
   }

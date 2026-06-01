@@ -2,9 +2,12 @@
 import { randomUUID } from 'node:crypto';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 
 const FUNCTION_PATH = '/.netlify/functions/save-json-blob';
+const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
+const REQUIRED_ENV = ['NETLIFY_PUBLISH_SECRET', 'SAVE_JSON_BLOB_BASE_URL'];
 
 const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
 const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
@@ -41,6 +44,55 @@ const normalizeOptionalAgentName = (value, fieldName) => {
 };
 
 const createRequestId = () => `req_${randomUUID()}`;
+
+const logStartup = (message, metadata = {}) => {
+  const suffix = Object.keys(metadata).length ? ` ${JSON.stringify(metadata)}` : '';
+  console.error(`[${SERVER_DIAGNOSTIC_NAME}] ${message}${suffix}`);
+};
+
+const validateEnvironmentForStartup = () => {
+  const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
+
+  logStartup('Environment validation complete.', {
+    required: REQUIRED_ENV,
+    missing,
+    ok: missing.length === 0,
+  });
+};
+
+const installRequestLogging = (server, getRegisteredToolNames) => {
+  const originalSetRequestHandler = server.server.setRequestHandler.bind(server.server);
+
+  server.server.setRequestHandler = (requestSchema, handler) => {
+    if (requestSchema === ListToolsRequestSchema) {
+      return originalSetRequestHandler(requestSchema, async (request, extra) => {
+        const result = await handler(request, extra);
+        const toolNames = result.tools.map((tool) => tool.name);
+
+        logStartup('ListTools request.', {
+          registeredToolCount: toolNames.length,
+          registeredToolNames: toolNames,
+        });
+
+        return result;
+      });
+    }
+
+    if (requestSchema === CallToolRequestSchema) {
+      return originalSetRequestHandler(requestSchema, async (request, extra) => {
+        logStartup('CallTool request.', {
+          toolName: request.params.name,
+          registeredToolCount: getRegisteredToolNames().length,
+          registeredToolNames: getRegisteredToolNames(),
+        });
+
+        return handler(request, extra);
+      });
+    }
+
+    return originalSetRequestHandler(requestSchema, handler);
+  };
+};
 
 const requiredEnv = (name) => {
   const value = process.env[name];
@@ -135,10 +187,29 @@ const callNormalizedAction = async (createPayload, resultKey) => {
 };
 
 export const createServer = () => {
+  logStartup('Server startup.');
+  validateEnvironmentForStartup();
+
+  const registeredToolNames = [];
   const server = new McpServer({
     name: 'save-json-blob-mcp',
     version: '0.1.0',
   });
+
+  installRequestLogging(server, () => [...registeredToolNames]);
+
+  const originalRegisterTool = server.registerTool.bind(server);
+  server.registerTool = (name, config, callback) => {
+    const registeredTool = originalRegisterTool(name, config, callback);
+    registeredToolNames.push(name);
+    logStartup('Tool registered.', {
+      toolName: name,
+      registeredToolCount: registeredToolNames.length,
+      registeredToolNames: [...registeredToolNames],
+    });
+
+    return registeredTool;
+  };
 
   server.registerTool(
     'save_json_blob_create_request',
@@ -233,6 +304,15 @@ export const createServer = () => {
       )
   );
 
+  server.registerTool(
+    'ping',
+    {
+      description: 'Diagnostic tool that confirms the MCP server is reachable.',
+      inputSchema: {},
+    },
+    async () => toolJson({ ok: true, server: SERVER_DIAGNOSTIC_NAME })
+  );
+
   for (const agentName of ALLOWED_AGENTS) {
     server.registerTool(
       `${agentName}_update_output`,
@@ -280,6 +360,15 @@ export const createServer = () => {
         )
     );
   }
+
+  if (registeredToolNames.length === 0) {
+    throw new Error('Fatal startup error: no MCP tools were registered.');
+  }
+
+  logStartup('Tool registration complete.', {
+    registeredToolCount: registeredToolNames.length,
+    registeredToolNames,
+  });
 
   return server;
 };
