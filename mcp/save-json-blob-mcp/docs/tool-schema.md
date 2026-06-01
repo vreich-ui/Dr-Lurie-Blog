@@ -2,6 +2,24 @@
 
 Agent Builder requires underscore-only tool names. The MCP server registers the core workflow tools and helper tools below, and any legacy dotted examples such as `save_json_blob.create_request` must be ignored.
 
+## Agent context / production endpoint
+
+Use this file as the compact context document for agents that need to understand the Dr. Lurie MCP server tools.
+
+Production ChatGPT/Atlas connector details:
+
+- Public MCP endpoint: `https://drluriescience.netlify.app/mcp`
+- Expected connector/server name: `Dr_Lurie_MCP_Server`
+- Production Netlify entry point: `netlify/functions/mcp.ts`, reached through the root `netlify.toml` `/mcp` rewrite.
+- Local/standalone package implementation: `mcp/save-json-blob-mcp/src/server.js` with stdio and standalone HTTP helpers.
+
+Security/context rules for agents:
+
+- Do not ask users for `NETLIFY_PUBLISH_SECRET`, `PUBLISH_SECRET`, or `SAVE_JSON_BLOB_BASE_URL`.
+- Do not include secrets in tool arguments, prompts, schemas, checked-in config, or browser/client code.
+- Tool calls should use the public MCP endpoint only; backend publish credentials remain server-side.
+- Use underscore-only tool names from this document. Ignore legacy dotted examples such as `save_json_blob.create_request`.
+
 ## Supported agent/stage names
 
 The backend allow-list is:
@@ -22,6 +40,15 @@ Core tool fields that accept an agent/stage name are normalized before the backe
 - If `expected_record_version` is stale and the completion is not already reflected in the record, the backend returns HTTP `409` and the MCP tool returns `conflict`.
 
 ## Core tools
+
+Registered core tool names:
+
+- `save_json_blob_create_request`
+- `save_json_blob_get_request`
+- `save_json_blob_list_pending_requests`
+- `save_json_blob_patch_agent_output`
+- `save_json_blob_mark_agent_complete`
+- `ping`
 
 ### `save_json_blob_create_request`
 
@@ -134,6 +161,21 @@ Sample backend request body:
   "expected_record_version": 2,
   "next_agent": "angle",
   "workflow_status": "in_progress"
+}
+```
+
+### `ping`
+
+Diagnostic tool that confirms the MCP server is reachable.
+
+Required fields: none.
+
+Sample tool result:
+
+```json
+{
+  "ok": true,
+  "server": "Dr_Lurie_Science_MCP"
 }
 ```
 
