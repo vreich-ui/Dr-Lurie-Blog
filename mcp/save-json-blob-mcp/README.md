@@ -1,12 +1,12 @@
 # save-json-blob MCP server
 
-Minimal stdio MCP server that wraps the Netlify workflow function at:
+Minimal MCP server that wraps the Netlify workflow function at:
 
 ```text
 ${SAVE_JSON_BLOB_BASE_URL}/.netlify/functions/save-json-blob
 ```
 
-This package is intended for Agent Builder / local MCP usage. It exposes one tool per backend workflow action, plus stage-specific helper tools that reduce versioning mistakes.
+This package is intended for Agent Builder / local MCP usage. It exposes one tool per backend workflow action, plus stage-specific helper tools that reduce versioning mistakes. The existing stdio entrypoint remains available for local tests, and `src/http.js` exposes the same `createServer()` over MCP Streamable HTTP for remote Agent Builder connections.
 
 ## Agent Builder tool-name decision
 
@@ -45,11 +45,35 @@ npm install
 npm start
 ```
 
+Start the remote MCP Streamable HTTP server with:
+
+```sh
+npm run start:http
+```
+
+By default, the HTTP server listens on `PORT` or `MCP_HTTP_PORT` (falling back to `3000`) and binds to `HOST` or `MCP_HTTP_HOST` (falling back to `0.0.0.0`).
+
+Remote endpoints:
+
+- MCP endpoint for Agent Builder: `https://<your-public-host>/mcp`
+- Health endpoint: `https://<your-public-host>/health`
+
+If you set `MCP_HTTP_PATH`, connect Agent Builder to `https://<your-public-host><MCP_HTTP_PATH>` instead of `/mcp`. If you set `MCP_HTTP_HEALTH_PATH`, use that path instead of `/health` for health checks.
+
+The HTTP transport is stateless Streamable HTTP. Each MCP POST request receives a fresh `createServer()` instance with the same 15 registered tool names used by the stdio server.
+
+Optional remote access token:
+
+- Set `MCP_HTTP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on the MCP endpoint.
+- Do not use `NETLIFY_PUBLISH_SECRET` as this token. `NETLIFY_PUBLISH_SECRET` must remain only in the server runtime environment and is used solely when the MCP tool calls the Netlify function.
+
+
 ## Deployment notes
 
 - Configure `SAVE_JSON_BLOB_BASE_URL` as the production site root, without a path or trailing slash. Example: `https://example.netlify.app`, not `https://example.netlify.app/` or `https://example.netlify.app/.netlify/functions/save-json-blob`.
 - The server currently normalizes a trailing slash defensively before appending `/.netlify/functions/save-json-blob`, but deployment configuration should still use the root URL without the trailing slash for clarity.
-- Keep `NETLIFY_PUBLISH_SECRET` in the MCP runtime environment only; do not place it in Agent Builder tool schemas, prompts, sample calls, or checked-in configuration.
+- Keep `NETLIFY_PUBLISH_SECRET` in the MCP runtime environment only; do not place it in Agent Builder tool schemas, prompts, sample calls, HTTP client configuration, or checked-in configuration.
+- Keep `SAVE_JSON_BLOB_BASE_URL` in the MCP runtime environment; MCP clients only need the public MCP endpoint path such as `/mcp`, not the backend Netlify function URL.
 
 ## Testing
 
