@@ -16,6 +16,12 @@
   node_bundler = "esbuild"
 
 [[redirects]]
+  from = "/mcp"
+  to = "/.netlify/functions/mcp"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/blog"
   to = "/learn/library"
   status = 301
