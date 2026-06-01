@@ -19,6 +19,7 @@ Core registered tool names:
 - `save_json_blob_list_pending_requests`
 - `save_json_blob_patch_agent_output`
 - `save_json_blob_mark_agent_complete`
+- `ping`
 
 For full tool schemas, versioning rules, helper tool names, and sample calls, see [`docs/tool-schema.md`](docs/tool-schema.md).
 
@@ -60,13 +61,39 @@ Remote endpoints:
 
 If you set `MCP_HTTP_PATH`, connect Agent Builder to `https://<your-public-host><MCP_HTTP_PATH>` instead of `/mcp`. If you set `MCP_HTTP_HEALTH_PATH`, use that path instead of `/health` for health checks.
 
-The HTTP transport is stateless Streamable HTTP. Each MCP POST request receives a fresh `createServer()` instance with the same 15 registered tool names used by the stdio server.
+The HTTP transport is stateless Streamable HTTP. Each MCP POST request receives a fresh `createServer()` instance with the same 16 registered tool names used by the stdio server.
 
 Optional remote access token:
 
 - Set `MCP_HTTP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on the MCP endpoint.
 - Do not use `NETLIFY_PUBLISH_SECRET` as this token. `NETLIFY_PUBLISH_SECRET` must remain only in the server runtime environment and is used solely when the MCP tool calls the Netlify function.
 
+## Verify tool registration with MCP Inspector
+
+Use the official MCP Inspector to confirm that the server starts, registers tools, and exposes the diagnostic `ping` tool. The startup logs are written to stderr and include the registered tool count and registered tool names without printing environment variable values or secrets.
+
+From this package directory, run:
+
+```sh
+NETLIFY_PUBLISH_SECRET='replace-with-local-secret' \
+SAVE_JSON_BLOB_BASE_URL='https://example.netlify.app' \
+npx @modelcontextprotocol/inspector node src/index.js
+```
+
+In Inspector:
+
+1. Open the **Tools** section.
+2. Click **List Tools** and verify that `ping` plus the save-json-blob tools appear.
+3. Run `ping` and confirm it returns:
+
+```json
+{
+  "ok": true,
+  "server": "Dr_Lurie_Science_MCP"
+}
+```
+
+If zero tools are registered, the MCP server throws a fatal startup error instead of continuing.
 
 ## Deployment notes
 
