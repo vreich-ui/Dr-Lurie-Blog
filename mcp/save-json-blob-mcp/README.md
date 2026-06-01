@@ -97,6 +97,10 @@ If zero tools are registered, the MCP server throws a fatal startup error instea
 
 ## Deployment notes
 
+Production ChatGPT/Atlas uses the site-level Netlify Function at `netlify/functions/mcp.ts`, reached through the `/mcp` rewrite in the root `netlify.toml`. Keep that route as the production MCP entry point for `https://drluriescience.netlify.app/mcp` and connector name `Dr_Lurie_MCP_Server`.
+
+This package remains the local/standalone MCP implementation for stdio and HTTP smoke tests. Do not assume `npm run start:http` in this package is automatically deployed by Netlify; Netlify serves functions from the root `netlify/functions` directory.
+
 - Configure `SAVE_JSON_BLOB_BASE_URL` as the production site root, without a path or trailing slash. Example: `https://example.netlify.app`, not `https://example.netlify.app/` or `https://example.netlify.app/.netlify/functions/save-json-blob`.
 - The server currently normalizes a trailing slash defensively before appending `/.netlify/functions/save-json-blob`, but deployment configuration should still use the root URL without the trailing slash for clarity.
 - Keep `NETLIFY_PUBLISH_SECRET` in the MCP runtime environment only; do not place it in Agent Builder tool schemas, prompts, sample calls, HTTP client configuration, or checked-in configuration.
