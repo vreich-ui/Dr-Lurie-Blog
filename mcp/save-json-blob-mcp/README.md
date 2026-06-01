@@ -45,14 +45,27 @@ Core tool fields that accept an agent/stage name are normalized before the backe
 
 - `patch_agent_output` uses per-agent output versions. If an agent has not written output yet, the backend treats the existing output version as `0` before incrementing it.
 - Therefore, the first `expected_agent_version` for an agent output write must be `0`.
-- Stage helper tools (`<stage>.update_output`) default omitted `expected_agent_version` to `0` to make first writes safer.
+- Stage helper tools (`<stage>_update_output`) default omitted `expected_agent_version` to `0` to make first writes safer.
 - Replaying the exact same `patch_agent_output` payload can be idempotent and return the existing record with `idempotent: true`, depending on backend state.
 - `mark_agent_complete` always requires `expected_record_version`. Use the `version` from the latest record snapshot returned by `create_request`, `get_request`, `patch_agent_output`, or a previous completion call.
 - If `expected_record_version` is stale and the completion is not already reflected in the record, the backend returns HTTP `409` and the MCP tool returns `conflict`.
 
+
+## Agent Builder tool-name decision
+
+Agent Builder expects underscore-only tool names. Use the registered underscore-only names in this README and in `docs/tool-schema.md`; ignore any legacy prompt examples or older notes that use dotted names such as `save_json_blob.create_request`.
+
+Core registered tool names:
+
+- `save_json_blob_create_request`
+- `save_json_blob_get_request`
+- `save_json_blob_list_pending_requests`
+- `save_json_blob_patch_agent_output`
+- `save_json_blob_mark_agent_complete`
+
 ## Core tool schema
 
-### `save_json_blob.create_request`
+### `save_json_blob_create_request`
 
 Calls backend action `create_request` and returns `record`.
 
@@ -74,7 +87,7 @@ Sample backend request body:
 }
 ```
 
-### `save_json_blob.get_request`
+### `save_json_blob_get_request`
 
 Calls backend action `get_request` and returns `record`.
 
@@ -91,7 +104,7 @@ Sample backend request body:
 }
 ```
 
-### `save_json_blob.list_pending_requests`
+### `save_json_blob_list_pending_requests`
 
 Calls backend action `list_pending_requests` and returns `records`.
 
@@ -110,7 +123,7 @@ Sample backend request body:
 }
 ```
 
-### `save_json_blob.patch_agent_output`
+### `save_json_blob_patch_agent_output`
 
 Calls backend action `patch_agent_output` and returns `record`.
 
@@ -133,7 +146,7 @@ Sample backend request body:
 }
 ```
 
-### `save_json_blob.mark_agent_complete`
+### `save_json_blob_mark_agent_complete`
 
 Calls backend action `mark_agent_complete` and returns `record`.
 
@@ -168,21 +181,21 @@ Sample backend request body:
 
 The server also registers two helper tools for every allowed stage (`reader_insight`, `research`, `angle`, `draft`, and `final_article`):
 
-- `<stage>.update_output(request_id: string, output: any, expected_agent_version?: number)` calls `patch_agent_output` with the stage hardcoded as `agent_name`. If `expected_agent_version` is omitted, it defaults to `0` for the first write.
-- `<stage>.mark_complete(request_id: string, expected_record_version: number, next_agent?: string | null)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `next_agent` is optional and normalized to the backend allow-list when provided.
+- `<stage>_update_output(request_id: string, output: any, expected_agent_version?: number)` calls `patch_agent_output` with the stage hardcoded as `agent_name`. If `expected_agent_version` is omitted, it defaults to `0` for the first write.
+- `<stage>_mark_complete(request_id: string, expected_record_version: number, next_agent?: string | null)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `next_agent` is optional and normalized to the backend allow-list when provided.
 
 Registered helper tool names:
 
-- `reader_insight.update_output`
-- `reader_insight.mark_complete`
-- `research.update_output`
-- `research.mark_complete`
-- `angle.update_output`
-- `angle.mark_complete`
-- `draft.update_output`
-- `draft.mark_complete`
-- `final_article.update_output`
-- `final_article.mark_complete`
+- `reader_insight_update_output`
+- `reader_insight_mark_complete`
+- `research_update_output`
+- `research_mark_complete`
+- `angle_update_output`
+- `angle_mark_complete`
+- `draft_update_output`
+- `draft_mark_complete`
+- `final_article_update_output`
+- `final_article_mark_complete`
 
 ### Stage helper sample tool calls
 
@@ -190,7 +203,7 @@ First write for reader insight output using the helper default version of `0`:
 
 ```json
 {
-  "tool": "reader_insight.update_output",
+  "tool": "reader_insight_update_output",
   "arguments": {
     "request_id": "req_123",
     "output": { "reader_need": "Clear explanation for sensitive aging skin." }
@@ -202,7 +215,7 @@ Complete reader insight and route to research using the latest record snapshot v
 
 ```json
 {
-  "tool": "reader_insight.mark_complete",
+  "tool": "reader_insight_mark_complete",
   "arguments": {
     "request_id": "req_123",
     "expected_record_version": 2,
