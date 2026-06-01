@@ -42,6 +42,33 @@ const assertWorkflowOk = ({ body, response, responseText }, action) => {
   return body;
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitForPendingRequest = async ({ requestId, stage, timeoutMs = 5000 }) => {
+  const startedAt = Date.now();
+  let lastBody;
+
+  while (Date.now() - startedAt <= timeoutMs) {
+    const listBody = assertWorkflowOk(
+      await postWorkflowAction({ action: 'list_pending_requests', stage, limit: 50 }),
+      'list_pending_requests'
+    );
+
+    if (listBody.records.some((record) => record.request_id === requestId)) {
+      return listBody;
+    }
+
+    lastBody = listBody;
+    await sleep(250);
+  }
+
+  assert.fail(
+    `Expected ${requestId} in ${stage} pending list within ${timeoutMs}ms. Last records: ${JSON.stringify(
+      lastBody?.records ?? []
+    )}`
+  );
+};
+
 test(
   'save-json-blob workflow idempotency and conflict integration',
   { skip: missingEnv.length ? `requires ${missingEnv.join(', ')}` : false },
@@ -60,14 +87,7 @@ test(
     assert.equal(createBody.record.version, 1);
     assert.equal(createBody.record.next_agent, 'reader_insight');
 
-    const listBody = assertWorkflowOk(
-      await postWorkflowAction({ action: 'list_pending_requests', stage: 'reader_insight' }),
-      'list_pending_requests'
-    );
-    assert.ok(
-      listBody.records.some((record) => record.request_id === requestId),
-      `Expected ${requestId} in reader_insight pending list`
-    );
+    await waitForPendingRequest({ requestId, stage: 'reader_insight' });
 
     const patchPayload = {
       action: 'patch_agent_output',

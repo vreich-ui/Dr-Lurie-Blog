@@ -8,7 +8,7 @@
  * Supported actions and example payloads:
  * - create_request: { "action": "create_request", "request_id": "req_123", "input": { "topic": "Skin barrier" } }
  * - get_request: { "action": "get_request", "request_id": "req_123" }
- * - list_pending_requests: { "action": "list_pending_requests", "stage": "research", "status": "pending" }
+ * - list_pending_requests: { "action": "list_pending_requests", "stage": "research", "status": "pending", "limit": 50 }
  * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "output": { "notes": [] } }
  * - mark_agent_complete: { "action": "mark_agent_complete", "request_id": "req_123", "agent_name": "research", "expected_record_version": 2, "next_agent": "angle", "workflow_status": "in_progress" }
  */
@@ -79,6 +79,7 @@ type LambdaEvent = {
 
 type BlobListResult = {
   blobs: Array<{ key: string }>;
+  directories?: string[];
 };
 
 type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {
@@ -86,6 +87,7 @@ type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {
   list?: (options?: {
     prefix?: string;
     directories?: boolean;
+    paginate?: boolean;
   }) => Promise<BlobListResult> | AsyncIterable<BlobListResult>;
 };
 
@@ -112,6 +114,7 @@ const requestSchema = z
     workflow_status: z.string().min(1).optional(),
     last_error: z.string().nullable().optional(),
     needs_review: z.boolean().optional(),
+    limit: z.number().int().positive().max(1000).optional(),
   })
   .strict();
 
@@ -163,6 +166,7 @@ const verifyPublishKey = (event: LambdaEvent, action?: WorkflowAction) => {
 const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index/by-stage/${nextAgent}/${requestId}`;
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
+const DEFAULT_LIST_LIMIT = 50;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
@@ -266,7 +270,7 @@ const listIndexRequestIds = async (store: WorkflowBlobStore, prefix: string) => 
     throw new Error('Workflow blob store does not support listing index keys.');
   }
 
-  const result = await store.list({ prefix, directories: false });
+  const result = await store.list({ prefix, directories: false, paginate: true });
   const blobs: Array<{ key: string }> = [];
 
   if (Symbol.asyncIterator in Object(result)) {
@@ -368,6 +372,7 @@ const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowReque
   const stage = stageValue === undefined ? undefined : parseRequiredAgentName(stageValue);
   if (stageValue !== undefined && !stage) return jsonResponse(400, { action: body.action, error: 'Invalid stage.' });
 
+  const limit = body.limit ?? DEFAULT_LIST_LIMIT;
   const statusIds = await listIndexRequestIds(store, `workflows/index/by-status/${status}/`);
   const stageIds = stage ? await listIndexRequestIds(store, `workflows/index/by-stage/${stage}/`) : undefined;
   const requestIds = [...statusIds].filter((requestId) => !stageIds || stageIds.has(requestId));
@@ -383,8 +388,9 @@ const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowReque
     }))
     .sort(
       (left, right) =>
-        left.updated_at.localeCompare(right.updated_at) || left.request_id.localeCompare(right.request_id)
-    );
+        right.updated_at.localeCompare(left.updated_at) || right.request_id.localeCompare(left.request_id)
+    )
+    .slice(0, limit);
 
   return jsonResponse(200, { action: body.action, records: summaries });
 };
