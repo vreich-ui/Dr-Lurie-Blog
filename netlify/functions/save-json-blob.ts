@@ -11,6 +11,11 @@
  * - list_pending_requests: { "action": "list_pending_requests", "stage": "research", "status": "pending", "limit": 50 }
  * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "output": { "notes": [] } }
  * - mark_agent_complete: { "action": "mark_agent_complete", "request_id": "req_123", "agent_name": "research", "expected_record_version": 2, "next_agent": "angle", "workflow_status": "in_progress" }
+ * - checkout_request: { "action": "checkout_request", "request_id": "req_123", "owner_id": "agent_1", "owner_label": "Draft agent", "lease_seconds": 900 }
+ * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
+ * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
+ * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
+ * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123" }
  */
 import { timingSafeEqual } from 'node:crypto';
 
@@ -51,6 +56,7 @@ export type WorkflowRecord = {
   needs_review: boolean;
   input: unknown;
   agent_outputs: Partial<Record<AllowedAgentName, AgentOutputRecord>>;
+  lock?: WorkflowLockRecord;
   history: WorkflowHistoryEntry[];
   version: number;
 };
@@ -60,6 +66,14 @@ type AgentOutputRecord = {
   updated_at: string;
   output: unknown;
   expected_agent_version: number;
+};
+
+type WorkflowLockRecord = {
+  token: string;
+  owner_id: string;
+  owner_label: string;
+  acquired_at: string;
+  expires_at: string;
 };
 
 type WorkflowHistoryEntry = {
@@ -99,6 +113,11 @@ const requestSchema = z
       'list_pending_requests',
       'patch_agent_output',
       'mark_agent_complete',
+      'checkout_request',
+      'refresh_lock',
+      'checkin_request',
+      'force_unlock',
+      'mark_published',
     ]),
     request_id: z.string().min(1).optional(),
     input: z.unknown().optional(),
@@ -115,6 +134,10 @@ const requestSchema = z
     last_error: z.string().nullable().optional(),
     needs_review: z.boolean().optional(),
     limit: z.number().int().positive().max(1000).optional(),
+    lock_token: z.string().min(1).optional(),
+    owner_id: z.string().min(1).optional(),
+    owner_label: z.string().min(1).optional(),
+    lease_seconds: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -538,6 +561,12 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
       return patchAgentOutput(store, body);
     case 'mark_agent_complete':
       return markAgentComplete(store, body);
+    case 'checkout_request':
+    case 'refresh_lock':
+    case 'checkin_request':
+    case 'force_unlock':
+    case 'mark_published':
+      return jsonResponse(501, { action: body.action, error: 'Action is not implemented yet.' });
   }
 };
 
