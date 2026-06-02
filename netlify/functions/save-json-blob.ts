@@ -9,10 +9,15 @@
  * - create_request: { "action": "create_request", "request_id": "req_123", "input": { "topic": "Skin barrier" } }
  * - get_request: { "action": "get_request", "request_id": "req_123" }
  * - list_pending_requests: { "action": "list_pending_requests", "stage": "research", "status": "pending", "limit": 50 }
- * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "output": { "notes": [] } }
- * - mark_agent_complete: { "action": "mark_agent_complete", "request_id": "req_123", "agent_name": "research", "expected_record_version": 2, "next_agent": "angle", "workflow_status": "in_progress" }
+ * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "lock_token": "lock_123", "output": { "notes": [] } }
+ * - mark_agent_complete: { "action": "mark_agent_complete", "request_id": "req_123", "agent_name": "research", "expected_record_version": 2, "lock_token": "lock_123", "next_agent": "angle", "workflow_status": "in_progress" }
+ * - checkout_request: { "action": "checkout_request", "request_id": "req_123", "owner_id": "agent_1", "owner_label": "Draft agent", "lease_seconds": 900 }
+ * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
+ * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
+ * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
+ * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
  */
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { z } from 'zod';
 
@@ -34,9 +39,9 @@ export const allowedAgents = new Set<AllowedAgentName>([
   'final_article',
 ]);
 
-export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'published';
 
-const allowedStatuses = new Set<WorkflowStatus>(['pending', 'in_progress', 'completed', 'failed']);
+const allowedStatuses = new Set<WorkflowStatus>(['pending', 'in_progress', 'completed', 'failed', 'published']);
 
 export type WorkflowRecord = {
   request_id: string;
@@ -51,6 +56,7 @@ export type WorkflowRecord = {
   needs_review: boolean;
   input: unknown;
   agent_outputs: Partial<Record<AllowedAgentName, AgentOutputRecord>>;
+  lock?: WorkflowLockRecord;
   history: WorkflowHistoryEntry[];
   version: number;
 };
@@ -60,6 +66,14 @@ type AgentOutputRecord = {
   updated_at: string;
   output: unknown;
   expected_agent_version: number;
+};
+
+type WorkflowLockRecord = {
+  token: string;
+  owner_id: string;
+  owner_label: string;
+  acquired_at: string;
+  expires_at: string;
 };
 
 type WorkflowHistoryEntry = {
@@ -99,6 +113,11 @@ const requestSchema = z
       'list_pending_requests',
       'patch_agent_output',
       'mark_agent_complete',
+      'checkout_request',
+      'refresh_lock',
+      'checkin_request',
+      'force_unlock',
+      'mark_published',
     ]),
     request_id: z.string().min(1).optional(),
     input: z.unknown().optional(),
@@ -115,6 +134,19 @@ const requestSchema = z
     last_error: z.string().nullable().optional(),
     needs_review: z.boolean().optional(),
     limit: z.number().int().positive().max(1000).optional(),
+    lock_token: z.string().min(1).optional(),
+    owner_id: z.string().min(1).optional(),
+    owner_label: z.string().min(1).optional(),
+    lease_seconds: z.number().int().positive().optional(),
+    commit_metadata: z.record(z.string(), z.unknown()).optional(),
+    commit: z.string().min(1).optional(),
+    commit_sha: z.string().min(1).optional(),
+    commit_url: z.string().min(1).optional(),
+    article_path: z.string().min(1).optional(),
+    articlePath: z.string().min(1).optional(),
+    deploy_status: z.string().min(1).optional(),
+    deployStatus: z.string().min(1).optional(),
+    message: z.string().min(1).optional(),
   })
   .strict();
 
@@ -167,6 +199,7 @@ const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index/by-stage/${nextAgent}/${requestId}`;
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
 const DEFAULT_LIST_LIMIT = 50;
+const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
@@ -222,6 +255,58 @@ const parseOptionalWorkflowStatus = (value: unknown) => {
   if (!status) return { ok: false as const, error: 'Invalid workflow_status.' };
 
   return { ok: true as const, value: status };
+};
+
+const requireStringField = (body: WorkflowRequest, fieldName: 'lock_token' | 'owner_id' | 'owner_label') => {
+  const value = body[fieldName];
+  if (!value) return jsonResponse(400, { action: body.action, error: `${fieldName} is required.` });
+
+  return undefined;
+};
+
+const getLeaseSeconds = (body: WorkflowRequest) => body.lease_seconds ?? DEFAULT_LOCK_LEASE_SECONDS;
+
+const addSecondsIso = (fromMs: number, seconds: number) => new Date(fromMs + seconds * 1000).toISOString();
+
+const getLockExpirationMs = (lock: WorkflowLockRecord) => {
+  const expiresAtMs = Date.parse(lock.expires_at);
+
+  return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
+};
+
+const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
+  Boolean(lock && getLockExpirationMs(lock) > nowMs);
+
+const lockExpiredResponse = (body: WorkflowRequest) =>
+  jsonResponse(423, { action: body.action, error: 'lock_expired', lock_expired: true });
+
+const validateMutationLock = (record: WorkflowRecord, body: WorkflowRequest) => {
+  if (!body.lock_token || !record.lock) return lockExpiredResponse(body);
+  if (record.lock.token !== body.lock_token) return lockExpiredResponse(body);
+  if (!isLockActive(record.lock, Date.now())) return lockExpiredResponse(body);
+
+  return undefined;
+};
+
+const commitMetadataFields = [
+  'commit',
+  'commit_sha',
+  'commit_url',
+  'article_path',
+  'articlePath',
+  'deploy_status',
+  'deployStatus',
+  'message',
+] as const;
+
+const getCommitMetadata = (body: WorkflowRequest) => {
+  const metadata: Record<string, unknown> = { ...(body.commit_metadata ?? {}) };
+
+  for (const field of commitMetadataFields) {
+    if (body[field] !== undefined) metadata[field] = body[field];
+  }
+
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
 };
 
 const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
@@ -408,6 +493,9 @@ const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowRequest)
   const previousRecord = await loadRecord(store, body.request_id as string);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
   const existingOutput = previousRecord.agent_outputs[agentName];
   const existingVersion = existingOutput?.version ?? 0;
 
@@ -493,6 +581,9 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   const previousRecord = await loadRecord(store, body.request_id as string);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
   if (previousRecord.version !== body.expected_record_version) {
     if (completionAlreadyReflected(previousRecord, agentName, body)) {
       return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
@@ -526,6 +617,227 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
+const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const missingOwnerId = requireStringField(body, 'owner_id');
+  if (missingOwnerId) return missingOwnerId;
+
+  const missingOwnerLabel = requireStringField(body, 'owner_label');
+  if (missingOwnerLabel) return missingOwnerLabel;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  const timestampMs = Date.now();
+  const timestamp = new Date(timestampMs).toISOString();
+  if (isLockActive(previousRecord.lock, timestampMs)) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  }
+
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: {
+      token: randomUUID(),
+      owner_id: body.owner_id as string,
+      owner_label: body.owner_label as string,
+      acquired_at: timestamp,
+      expires_at: addSecondsIso(timestampMs, getLeaseSeconds(body)),
+    },
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: body.owner_id,
+          owner_label: body.owner_label,
+          lease_seconds: getLeaseSeconds(body),
+          replaced_expired_lock: Boolean(previousRecord.lock),
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const missingLockToken = requireStringField(body, 'lock_token');
+  if (missingLockToken) return missingLockToken;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  if (!previousRecord.lock) return jsonResponse(409, { action: body.action, error: 'No lock is currently held.' });
+  if (previousRecord.lock.token !== body.lock_token) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  }
+
+  const timestampMs = Date.now();
+  const timestamp = new Date(timestampMs).toISOString();
+  if (!isLockActive(previousRecord.lock, timestampMs)) {
+    return jsonResponse(409, { action: body.action, error: 'Lock has expired.', lock: previousRecord.lock });
+  }
+
+  const leaseSeconds = getLeaseSeconds(body);
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: {
+      ...previousRecord.lock,
+      expires_at: addSecondsIso(getLockExpirationMs(previousRecord.lock), leaseSeconds),
+    },
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock.owner_id,
+          owner_label: previousRecord.lock.owner_label,
+          lease_seconds: leaseSeconds,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const missingLockToken = requireStringField(body, 'lock_token');
+  if (missingLockToken) return missingLockToken;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  if (!previousRecord.lock) return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+
+  if (previousRecord.lock.token !== body.lock_token) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  }
+
+  const timestamp = nowIso();
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: undefined,
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock.owner_id,
+          owner_label: previousRecord.lock.owner_label,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  if (!previousRecord.lock) return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+
+  const timestamp = nowIso();
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: undefined,
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock.owner_id,
+          owner_label: previousRecord.lock.owner_label,
+          forced: true,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
+  if (previousRecord.workflow_status === 'published') {
+    return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+  }
+
+  const timestamp = nowIso();
+  const commitMetadata = getCommitMetadata(body);
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    workflow_status: 'published',
+    current_stage: null,
+    next_agent: null,
+    last_error: null,
+    needs_review: false,
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock?.owner_id,
+          owner_label: previousRecord.lock?.owner_label,
+          ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
 const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   switch (body.action) {
     case 'create_request':
@@ -538,6 +850,16 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
       return patchAgentOutput(store, body);
     case 'mark_agent_complete':
       return markAgentComplete(store, body);
+    case 'checkout_request':
+      return checkoutRequest(store, body);
+    case 'refresh_lock':
+      return refreshLock(store, body);
+    case 'checkin_request':
+      return checkinRequest(store, body);
+    case 'force_unlock':
+      return forceUnlock(store, body);
+    case 'mark_published':
+      return markPublished(store, body);
   }
 };
 
