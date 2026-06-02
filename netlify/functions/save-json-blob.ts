@@ -9,8 +9,8 @@
  * - create_request: { "action": "create_request", "request_id": "req_123", "input": { "topic": "Skin barrier" } }
  * - get_request: { "action": "get_request", "request_id": "req_123" }
  * - list_pending_requests: { "action": "list_pending_requests", "stage": "research", "status": "pending", "limit": 50 }
- * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "output": { "notes": [] } }
- * - mark_agent_complete: { "action": "mark_agent_complete", "request_id": "req_123", "agent_name": "research", "expected_record_version": 2, "next_agent": "angle", "workflow_status": "in_progress" }
+ * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "lock_token": "lock_123", "output": { "notes": [] } }
+ * - mark_agent_complete: { "action": "mark_agent_complete", "request_id": "req_123", "agent_name": "research", "expected_record_version": 2, "lock_token": "lock_123", "next_agent": "angle", "workflow_status": "in_progress" }
  * - checkout_request: { "action": "checkout_request", "request_id": "req_123", "owner_id": "agent_1", "owner_label": "Draft agent", "lease_seconds": 900 }
  * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
  * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
@@ -248,6 +248,37 @@ const parseOptionalWorkflowStatus = (value: unknown) => {
   return { ok: true as const, value: status };
 };
 
+const requireStringField = (body: WorkflowRequest, fieldName: 'lock_token' | 'owner_id' | 'owner_label') => {
+  const value = body[fieldName];
+  if (!value) return jsonResponse(400, { action: body.action, error: `${fieldName} is required.` });
+
+  return undefined;
+};
+
+const getLeaseSeconds = (body: WorkflowRequest) => body.lease_seconds ?? DEFAULT_LOCK_LEASE_SECONDS;
+
+const addSecondsIso = (fromMs: number, seconds: number) => new Date(fromMs + seconds * 1000).toISOString();
+
+const getLockExpirationMs = (lock: WorkflowLockRecord) => {
+  const expiresAtMs = Date.parse(lock.expires_at);
+
+  return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
+};
+
+const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
+  Boolean(lock && getLockExpirationMs(lock) > nowMs);
+
+const lockExpiredResponse = (body: WorkflowRequest) =>
+  jsonResponse(423, { action: body.action, error: 'lock_expired', lock_expired: true });
+
+const validateMutationLock = (record: WorkflowRecord, body: WorkflowRequest) => {
+  if (!body.lock_token || !record.lock) return lockExpiredResponse(body);
+  if (record.lock.token !== body.lock_token) return lockExpiredResponse(body);
+  if (!isLockActive(record.lock, Date.now())) return lockExpiredResponse(body);
+
+  return undefined;
+};
+
 const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
   const value = await store.get(recordKey(requestId));
 
@@ -432,6 +463,9 @@ const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowRequest)
   const previousRecord = await loadRecord(store, body.request_id as string);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
   const existingOutput = previousRecord.agent_outputs[agentName];
   const existingVersion = existingOutput?.version ?? 0;
 
@@ -517,6 +551,9 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   const previousRecord = await loadRecord(store, body.request_id as string);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
   if (previousRecord.version !== body.expected_record_version) {
     if (completionAlreadyReflected(previousRecord, agentName, body)) {
       return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
@@ -549,26 +586,6 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
 
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
-
-const requireStringField = (body: WorkflowRequest, fieldName: 'lock_token' | 'owner_id' | 'owner_label') => {
-  const value = body[fieldName];
-  if (!value) return jsonResponse(400, { action: body.action, error: `${fieldName} is required.` });
-
-  return undefined;
-};
-
-const getLeaseSeconds = (body: WorkflowRequest) => body.lease_seconds ?? DEFAULT_LOCK_LEASE_SECONDS;
-
-const addSecondsIso = (fromMs: number, seconds: number) => new Date(fromMs + seconds * 1000).toISOString();
-
-const getLockExpirationMs = (lock: WorkflowLockRecord) => {
-  const expiresAtMs = Date.parse(lock.expires_at);
-
-  return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
-};
-
-const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
-  Boolean(lock && getLockExpirationMs(lock) > nowMs);
 
 const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
@@ -746,6 +763,49 @@ const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
+const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
+  if (previousRecord.workflow_status === 'published') {
+    return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+  }
+
+  const timestamp = nowIso();
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    workflow_status: 'published',
+    current_stage: null,
+    next_agent: null,
+    last_error: null,
+    needs_review: false,
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock?.owner_id,
+          owner_label: previousRecord.lock?.owner_label,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
 const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   switch (body.action) {
     case 'create_request':
@@ -767,7 +827,7 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
     case 'force_unlock':
       return forceUnlock(store, body);
     case 'mark_published':
-      return jsonResponse(501, { action: body.action, error: 'Action is not implemented yet.' });
+      return markPublished(store, body);
   }
 };
 
