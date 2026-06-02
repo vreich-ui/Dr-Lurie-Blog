@@ -15,7 +15,7 @@
  * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
  * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
  * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
- * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123" }
+ * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -138,6 +138,15 @@ const requestSchema = z
     owner_id: z.string().min(1).optional(),
     owner_label: z.string().min(1).optional(),
     lease_seconds: z.number().int().positive().optional(),
+    commit_metadata: z.record(z.string(), z.unknown()).optional(),
+    commit: z.string().min(1).optional(),
+    commit_sha: z.string().min(1).optional(),
+    commit_url: z.string().min(1).optional(),
+    article_path: z.string().min(1).optional(),
+    articlePath: z.string().min(1).optional(),
+    deploy_status: z.string().min(1).optional(),
+    deployStatus: z.string().min(1).optional(),
+    message: z.string().min(1).optional(),
   })
   .strict();
 
@@ -277,6 +286,27 @@ const validateMutationLock = (record: WorkflowRecord, body: WorkflowRequest) => 
   if (!isLockActive(record.lock, Date.now())) return lockExpiredResponse(body);
 
   return undefined;
+};
+
+const commitMetadataFields = [
+  'commit',
+  'commit_sha',
+  'commit_url',
+  'article_path',
+  'articlePath',
+  'deploy_status',
+  'deployStatus',
+  'message',
+] as const;
+
+const getCommitMetadata = (body: WorkflowRequest) => {
+  const metadata: Record<string, unknown> = { ...(body.commit_metadata ?? {}) };
+
+  for (const field of commitMetadataFields) {
+    if (body[field] !== undefined) metadata[field] = body[field];
+  }
+
+  return Object.keys(metadata).length > 0 ? metadata : undefined;
 };
 
 const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
@@ -778,6 +808,7 @@ const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) =>
   }
 
   const timestamp = nowIso();
+  const commitMetadata = getCommitMetadata(body);
   const nextRecord: WorkflowRecord = {
     ...previousRecord,
     updated_at: timestamp,
@@ -794,6 +825,7 @@ const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) =>
         details: {
           owner_id: previousRecord.lock?.owner_id,
           owner_label: previousRecord.lock?.owner_label,
+          ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
         },
       },
     ],
