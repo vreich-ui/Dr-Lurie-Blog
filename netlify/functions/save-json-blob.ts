@@ -34,9 +34,9 @@ export const allowedAgents = new Set<AllowedAgentName>([
   'final_article',
 ]);
 
-export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'published';
 
-const allowedStatuses = new Set<WorkflowStatus>(['pending', 'in_progress', 'completed', 'failed']);
+const allowedStatuses = new Set<WorkflowStatus>(['pending', 'in_progress', 'completed', 'failed', 'published']);
 
 export type WorkflowRecord = {
   request_id: string;
