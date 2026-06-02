@@ -17,7 +17,7 @@
  * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
  * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123" }
  */
-import { timingSafeEqual } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { z } from 'zod';
 
@@ -190,6 +190,7 @@ const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index/by-stage/${nextAgent}/${requestId}`;
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
 const DEFAULT_LIST_LIMIT = 50;
+const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
@@ -549,6 +550,202 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
+const requireStringField = (body: WorkflowRequest, fieldName: 'lock_token' | 'owner_id' | 'owner_label') => {
+  const value = body[fieldName];
+  if (!value) return jsonResponse(400, { action: body.action, error: `${fieldName} is required.` });
+
+  return undefined;
+};
+
+const getLeaseSeconds = (body: WorkflowRequest) => body.lease_seconds ?? DEFAULT_LOCK_LEASE_SECONDS;
+
+const addSecondsIso = (fromMs: number, seconds: number) => new Date(fromMs + seconds * 1000).toISOString();
+
+const getLockExpirationMs = (lock: WorkflowLockRecord) => {
+  const expiresAtMs = Date.parse(lock.expires_at);
+
+  return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
+};
+
+const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
+  Boolean(lock && getLockExpirationMs(lock) > nowMs);
+
+const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const missingOwnerId = requireStringField(body, 'owner_id');
+  if (missingOwnerId) return missingOwnerId;
+
+  const missingOwnerLabel = requireStringField(body, 'owner_label');
+  if (missingOwnerLabel) return missingOwnerLabel;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  const timestampMs = Date.now();
+  const timestamp = new Date(timestampMs).toISOString();
+  if (isLockActive(previousRecord.lock, timestampMs)) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  }
+
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: {
+      token: randomUUID(),
+      owner_id: body.owner_id as string,
+      owner_label: body.owner_label as string,
+      acquired_at: timestamp,
+      expires_at: addSecondsIso(timestampMs, getLeaseSeconds(body)),
+    },
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: body.owner_id,
+          owner_label: body.owner_label,
+          lease_seconds: getLeaseSeconds(body),
+          replaced_expired_lock: Boolean(previousRecord.lock),
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const missingLockToken = requireStringField(body, 'lock_token');
+  if (missingLockToken) return missingLockToken;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  if (!previousRecord.lock) return jsonResponse(409, { action: body.action, error: 'No lock is currently held.' });
+  if (previousRecord.lock.token !== body.lock_token) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  }
+
+  const timestampMs = Date.now();
+  const timestamp = new Date(timestampMs).toISOString();
+  if (!isLockActive(previousRecord.lock, timestampMs)) {
+    return jsonResponse(409, { action: body.action, error: 'Lock has expired.', lock: previousRecord.lock });
+  }
+
+  const leaseSeconds = getLeaseSeconds(body);
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: {
+      ...previousRecord.lock,
+      expires_at: addSecondsIso(getLockExpirationMs(previousRecord.lock), leaseSeconds),
+    },
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock.owner_id,
+          owner_label: previousRecord.lock.owner_label,
+          lease_seconds: leaseSeconds,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const missingLockToken = requireStringField(body, 'lock_token');
+  if (missingLockToken) return missingLockToken;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  if (!previousRecord.lock) return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+
+  if (previousRecord.lock.token !== body.lock_token) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  }
+
+  const timestamp = nowIso();
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: undefined,
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock.owner_id,
+          owner_label: previousRecord.lock.owner_label,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
+const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const previousRecord = await loadRecord(store, body.request_id as string);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  if (!previousRecord.lock) return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+
+  const timestamp = nowIso();
+  const nextRecord: WorkflowRecord = {
+    ...previousRecord,
+    updated_at: timestamp,
+    lock: undefined,
+    history: [
+      ...previousRecord.history,
+      {
+        at: timestamp,
+        action: body.action,
+        details: {
+          owner_id: previousRecord.lock.owner_id,
+          owner_label: previousRecord.lock.owner_label,
+          forced: true,
+        },
+      },
+    ],
+    version: previousRecord.version + 1,
+  };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: nextRecord });
+};
+
 const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   switch (body.action) {
     case 'create_request':
@@ -562,9 +759,13 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
     case 'mark_agent_complete':
       return markAgentComplete(store, body);
     case 'checkout_request':
+      return checkoutRequest(store, body);
     case 'refresh_lock':
+      return refreshLock(store, body);
     case 'checkin_request':
+      return checkinRequest(store, body);
     case 'force_unlock':
+      return forceUnlock(store, body);
     case 'mark_published':
       return jsonResponse(501, { action: body.action, error: 'Action is not implemented yet.' });
   }
