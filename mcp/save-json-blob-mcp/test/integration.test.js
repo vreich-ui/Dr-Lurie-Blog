@@ -75,8 +75,20 @@ test(
   async () => {
     const requestId = `wf-test-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const input = {
-      source: 'save-json-blob-mcp integration test',
-      created_at: new Date().toISOString(),
+      record_type: 'content_source',
+      schema_version: 'content_source.v1',
+      content: {
+        schema_version: 'content_blocks.v1',
+        title: 'save-json-blob-mcp integration test',
+      },
+      workflow: {
+        schema_version: 'content_workflow.v1',
+        workflow_id: requestId,
+      },
+      versioning: {
+        schema_version: 'versioning.v1',
+        record_version: 1,
+      },
     };
 
     const createBody = assertWorkflowOk(
@@ -89,11 +101,26 @@ test(
 
     await waitForPendingRequest({ requestId, stage: 'reader_insight' });
 
+    const checkoutBody = assertWorkflowOk(
+      await postWorkflowAction({
+        action: 'checkout_request',
+        request_id: requestId,
+        owner_id: 'integration-test-agent',
+        owner_label: 'Integration test agent',
+        lease_seconds: 900,
+      }),
+      'checkout_request'
+    );
+    assert.equal(checkoutBody.record.request_id, requestId);
+    assert.ok(checkoutBody.record.lock.token);
+    const lockToken = checkoutBody.record.lock.token;
+
     const patchPayload = {
       action: 'patch_agent_output',
       request_id: requestId,
       agent_name: 'reader_insight',
       expected_agent_version: 0,
+      lock_token: lockToken,
       output: {
         summary: 'Reader insight complete.',
         audiences: ['integration-test'],
@@ -102,7 +129,7 @@ test(
     const patchBody = assertWorkflowOk(await postWorkflowAction(patchPayload), 'patch_agent_output');
     assert.equal(patchBody.record.request_id, requestId);
     assert.equal(patchBody.record.agent_outputs.reader_insight.version, 1);
-    assert.equal(patchBody.record.version, 2);
+    assert.equal(patchBody.record.version, checkoutBody.record.version + 1);
 
     const idempotentPatchBody = assertWorkflowOk(await postWorkflowAction(patchPayload), 'patch_agent_output');
     assert.equal(idempotentPatchBody.idempotent, true);
@@ -114,6 +141,7 @@ test(
         request_id: requestId,
         agent_name: 'reader_insight',
         expected_record_version: patchBody.record.version,
+        lock_token: lockToken,
         next_agent: 'research',
         workflow_status: 'in_progress',
       }),
@@ -129,11 +157,19 @@ test(
       request_id: requestId,
       agent_name: 'reader_insight',
       expected_record_version: patchBody.record.version,
+      lock_token: lockToken,
       next_agent: 'angle',
       workflow_status: 'in_progress',
     });
     assert.equal(conflictResult.response.status, 409);
     assert.equal(conflictResult.body.ok, false);
     assert.equal(conflictResult.body.conflict, true);
+
+    const checkinBody = assertWorkflowOk(
+      await postWorkflowAction({ action: 'checkin_request', request_id: requestId, lock_token: lockToken }),
+      'checkin_request'
+    );
+    assert.equal(checkinBody.record.request_id, requestId);
+    assert.equal(checkinBody.record.lock, undefined);
   }
 );

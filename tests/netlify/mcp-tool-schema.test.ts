@@ -85,3 +85,64 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   assert.equal(media.additionalProperties, false);
   assert.equal(property(media, 'image_prompt_register').additionalProperties, true);
 });
+
+test('workflow mutation tools expose lock_token schemas and lock-aware descriptions', async () => {
+  const body = await listTools();
+  const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
+
+  for (const name of [
+    'save_json_blob_checkout_request',
+    'save_json_blob_refresh_lock',
+    'save_json_blob_checkin_request',
+  ]) {
+    assert.ok(tools.has(name), `Expected ${name} to be registered.`);
+  }
+
+  for (const name of [
+    'save_json_blob_patch_agent_output',
+    'save_json_blob_mark_agent_complete',
+    'reader_insight_update_output',
+    'reader_insight_mark_complete',
+  ]) {
+    const tool = tools.get(name);
+    assert.ok(tool, `Expected ${name} to be registered.`);
+    assert.ok(property(tool.inputSchema, 'lock_token'), `Expected ${name} to accept lock_token.`);
+    assert.match(String((tool as { description?: string }).description), /checkout first/i);
+    assert.match(String((tool as { description?: string }).description), /check in/i);
+  }
+});
+
+test('stage mark-complete helpers expose transition fields and document common routing', async () => {
+  const body = await listTools();
+  const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
+  const expectedTransitions: Array<[string, string]> = [
+    ['reader_insight_mark_complete', 'reader_insight → research'],
+    ['research_mark_complete', 'research → angle'],
+    ['angle_mark_complete', 'angle → draft'],
+    ['draft_mark_complete', 'draft → final_article'],
+    ['final_article_mark_complete', 'final_article → null'],
+  ];
+
+  for (const [name, transitionText] of expectedTransitions) {
+    const tool = tools.get(name);
+    assert.ok(tool, `Expected ${name} to be registered.`);
+
+    for (const field of [
+      'current_stage',
+      'next_agent',
+      'workflow_status',
+      'needs_review',
+      'last_error',
+      'lock_token',
+    ]) {
+      assert.ok(property(tool.inputSchema, field), `Expected ${name} to accept ${field}.`);
+    }
+
+    assert.deepEqual(tool.inputSchema.required, ['request_id', 'expected_record_version']);
+    assert.match(String((tool as { description?: string }).description), new RegExp(transitionText));
+  }
+
+  const finalTool = tools.get('final_article_mark_complete');
+  assert.ok(finalTool);
+  assert.match(String((finalTool as { description?: string }).description), /workflow_status: "completed"/);
+});

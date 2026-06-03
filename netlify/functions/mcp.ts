@@ -35,6 +35,7 @@ const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
 const PROTOCOL_VERSION = '2025-06-18';
 const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'] as const;
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
+const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 
 const jsonHeaders = {
   'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id',
@@ -58,6 +59,28 @@ const toolError = (message: string) => ({
 });
 
 const agentList = () => ALLOWED_AGENTS.join('|');
+
+const workflowLockInstruction =
+  'Agents must call checkout first to acquire a lock_token, then patch output with that lock_token, then mark complete with that lock_token, then check in when done or refresh the lock before it expires as needed.';
+
+const STAGE_TRANSITIONS: Record<
+  (typeof ALLOWED_AGENTS)[number],
+  { nextAgent: string | null; workflowStatus?: string }
+> = {
+  reader_insight: { nextAgent: 'research' },
+  research: { nextAgent: 'angle' },
+  angle: { nextAgent: 'draft' },
+  draft: { nextAgent: 'final_article' },
+  final_article: { nextAgent: null, workflowStatus: 'completed' },
+};
+
+const stageTransitionDescription = (agentName: (typeof ALLOWED_AGENTS)[number]) => {
+  const transition = STAGE_TRANSITIONS[agentName];
+  const nextAgent = transition.nextAgent === null ? 'null' : transition.nextAgent;
+  const workflowStatus = transition.workflowStatus ? ` with workflow_status: "${transition.workflowStatus}"` : '';
+
+  return `Common transition: ${agentName} → ${nextAgent}${workflowStatus}.`;
+};
 
 const normalizeAgentName = (value: unknown, fieldName: string) => {
   if (value === null || value === undefined) return value;
@@ -101,6 +124,19 @@ const constStringSchema = (value: string, description?: string) => ({
   const: value,
   ...(description ? { description } : {}),
 });
+
+const lockTokenSchema = stringSchema(
+  'Lock token returned by checkout_request; required for mutating workflow records.'
+);
+const ownerIdSchema = stringSchema('Stable owner id for the agent or process acquiring the workflow lock.');
+const ownerLabelSchema = stringSchema(
+  'Human-readable owner label for the agent or process acquiring the workflow lock.'
+);
+const leaseSecondsSchema = {
+  type: 'integer',
+  minimum: 1,
+  description: 'Optional lock lease duration in seconds; backend default applies when omitted.',
+};
 
 const objectSchema = (
   properties: Record<string, unknown>,
@@ -321,34 +357,75 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_json_blob_patch_agent_output',
-    description: 'Patch one agent output for a save-json-blob workflow request and return its record.',
+    description: `Patch one agent output for a save-json-blob workflow request and return its record. ${workflowLockInstruction}`,
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
         agent_name: stringSchema(),
         expected_agent_version: intSchema(),
+        lock_token: lockTokenSchema,
         output: { description: 'Agent output payload.' },
       },
-      ['request_id', 'agent_name', 'expected_agent_version', 'output']
+      ['request_id', 'agent_name', 'expected_agent_version', 'lock_token', 'output']
     ),
   },
   {
     name: 'save_json_blob_mark_agent_complete',
-    description: 'Mark one agent complete for a save-json-blob workflow request and return its record.',
+    description: `Mark one agent complete for a save-json-blob workflow request and return its record. ${workflowLockInstruction}`,
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
         agent_name: stringSchema(),
         expected_record_version: intSchema(),
+        lock_token: lockTokenSchema,
         current_stage: nullableStringSchema(),
         next_agent: nullableStringSchema(),
         workflow_status: stringSchema(),
         needs_review: { type: 'boolean' },
         last_error: nullableStringSchema(),
       },
-      ['request_id', 'agent_name', 'expected_record_version']
+      ['request_id', 'agent_name', 'expected_record_version', 'lock_token']
     ),
   },
+  {
+    name: 'save_json_blob_checkout_request',
+    description: `Checkout a save-json-blob workflow request and acquire a lock_token before patching output. ${workflowLockInstruction}`,
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema(),
+        owner_id: ownerIdSchema,
+        owner_label: ownerLabelSchema,
+        lease_seconds: leaseSecondsSchema,
+      },
+      ['request_id', 'owner_id', 'owner_label']
+    ),
+  },
+  {
+    name: 'save_json_blob_refresh_lock',
+    description: `Refresh an active workflow lock before it expires when more time is needed. ${workflowLockInstruction}`,
+    inputSchema: objectSchema(
+      { request_id: stringSchema(), lock_token: lockTokenSchema, lease_seconds: leaseSecondsSchema },
+      ['request_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'save_json_blob_checkin_request',
+    description: `Check in a workflow request to release the lock after patching output and marking complete. ${workflowLockInstruction}`,
+    inputSchema: objectSchema({ request_id: stringSchema(), lock_token: lockTokenSchema }, [
+      'request_id',
+      'lock_token',
+    ]),
+  },
+  ...(ADMIN_TOOLS_ENABLED
+    ? [
+        {
+          name: 'save_json_blob_force_unlock',
+          description:
+            'Admin-only emergency tool that forcefully releases a workflow lock. Prefer checkin_request with the valid lock_token whenever possible.',
+          inputSchema: objectSchema({ request_id: stringSchema() }, ['request_id']),
+        },
+      ]
+    : []),
   {
     name: 'ping',
     description: 'Diagnostic tool that confirms the MCP server is reachable.',
@@ -357,24 +434,30 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   ...ALLOWED_AGENTS.flatMap<ToolDefinition>((agentName) => [
     {
       name: `${agentName}_update_output`,
-      description: `Patch ${agentName} output and default expected_agent_version to 0 for the first write.`,
+      description: `Patch ${agentName} output with a lock_token and default expected_agent_version to 0 for the first write. ${workflowLockInstruction}`,
       inputSchema: objectSchema(
         {
           request_id: stringSchema(),
           output: { description: 'Agent output payload.' },
           expected_agent_version: intSchema(),
+          lock_token: lockTokenSchema,
         },
-        ['request_id', 'output']
+        ['request_id', 'output', 'lock_token']
       ),
     },
     {
       name: `${agentName}_mark_complete`,
-      description: `Mark ${agentName} complete with the agent name hardcoded and optional next_agent normalized.`,
+      description: `Mark ${agentName} complete with the agent name hardcoded and optional current_stage, next_agent, workflow_status, needs_review, last_error, and lock_token forwarded to the backend. ${stageTransitionDescription(agentName)} ${workflowLockInstruction}`,
       inputSchema: objectSchema(
         {
           request_id: stringSchema(),
           expected_record_version: intSchema(),
+          lock_token: lockTokenSchema,
+          current_stage: nullableStringSchema(),
           next_agent: nullableStringSchema(),
+          workflow_status: stringSchema(),
+          needs_review: { type: 'boolean' },
+          last_error: nullableStringSchema(),
         },
         ['request_id', 'expected_record_version']
       ),
@@ -502,6 +585,38 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         }),
         'records'
       );
+    case 'save_json_blob_checkout_request':
+      return callAction(
+        event,
+        {
+          action: 'checkout_request',
+          request_id: input.request_id,
+          owner_id: input.owner_id,
+          owner_label: input.owner_label,
+          lease_seconds: input.lease_seconds,
+        },
+        'record'
+      );
+    case 'save_json_blob_refresh_lock':
+      return callAction(
+        event,
+        {
+          action: 'refresh_lock',
+          request_id: input.request_id,
+          lock_token: input.lock_token,
+          lease_seconds: input.lease_seconds,
+        },
+        'record'
+      );
+    case 'save_json_blob_checkin_request':
+      return callAction(
+        event,
+        { action: 'checkin_request', request_id: input.request_id, lock_token: input.lock_token },
+        'record'
+      );
+    case 'save_json_blob_force_unlock':
+      if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
+      return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
     case 'save_json_blob_patch_agent_output':
       return callNormalizedAction(
         event,
@@ -510,6 +625,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           request_id: input.request_id,
           agent_name: normalizeAgentName(input.agent_name, 'agent_name'),
           expected_agent_version: input.expected_agent_version,
+          lock_token: input.lock_token,
           output: input.output,
         }),
         'record'
@@ -540,6 +656,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           request_id: input.request_id,
           agent_name: updateAgent,
           expected_agent_version: input.expected_agent_version ?? 0,
+          lock_token: input.lock_token,
           output: input.output,
         },
         'record'
@@ -555,7 +672,12 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           request_id: input.request_id,
           agent_name: completeAgent,
           expected_record_version: input.expected_record_version,
+          lock_token: input.lock_token,
+          current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
           next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
+          workflow_status: input.workflow_status,
+          needs_review: input.needs_review,
+          last_error: input.last_error,
         }),
         'record'
       );
