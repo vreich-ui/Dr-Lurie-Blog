@@ -21,3 +21,120 @@ This separation keeps publication credentials in server-only runtimes, avoids ad
 - `commit_metadata`: publication result details such as commit SHA, commit URL, article path, deploy status, and a human-readable message.
 
 The mark-published step records publication state only. It must not accept, request, display, or return server publish credentials.
+
+## Agent output envelope examples
+
+Each agent should patch its stage output with `save_json_blob_patch_agent_output` (or the stage-specific `*_update_output` helper). Store one schema-versioned envelope in `record.agent_outputs.{agent_name}.output`; put stage-specific fields under `data`, routing notes under `handoff`, and non-contract extension fields under `metadata`.
+
+### `reader_insight`
+
+```json
+{
+  "schema_version": "agent_output.v1",
+  "agent_name": "reader_insight",
+  "summary": "Reader need, concern, and desired takeaway.",
+  "data": {
+    "audience_questions": ["What should I do first?"],
+    "reader_risks": ["May confuse normal aging changes with disease."],
+    "recommended_angle_inputs": ["Emphasize calm, non-alarmist guidance."]
+  },
+  "handoff": {
+    "next_agent": "research",
+    "notes": "Prioritize claims that need sources."
+  },
+  "metadata": {}
+}
+```
+
+### `research`
+
+```json
+{
+  "schema_version": "agent_output.v1",
+  "agent_name": "research",
+  "summary": "Evidence map and source-backed claim list.",
+  "data": {
+    "sources": [{ "source_id": "src_1", "name": "Source name", "url": "https://example.com" }],
+    "claims": [{ "claim_id": "claim_1", "claim_text": "A verifiable claim.", "source_ids": ["src_1"] }],
+    "open_questions": ["Needs a stronger source for ingredient comparison."]
+  },
+  "handoff": {
+    "next_agent": "angle",
+    "notes": "Use claim_1 only with the linked source."
+  },
+  "metadata": {}
+}
+```
+
+### `angle`
+
+```json
+{
+  "schema_version": "agent_output.v1",
+  "agent_name": "angle",
+  "summary": "Approved editorial angle and structure.",
+  "data": {
+    "thesis": "The article should explain the issue without anti-aging panic.",
+    "outline": [{ "section_id": "intro", "heading": "Why this changes" }],
+    "compliance_requirements": [
+      { "requirement_id": "req_1", "category": "medical_claim", "description": "Avoid diagnosis language." }
+    ]
+  },
+  "handoff": {
+    "next_agent": "draft",
+    "notes": "Draft to the outline and preserve compliance requirements."
+  },
+  "metadata": {}
+}
+```
+
+### `draft`
+
+```json
+{
+  "schema_version": "agent_output.v1",
+  "agent_name": "draft",
+  "summary": "Draft article body ready for final editing.",
+  "data": {
+    "draft_markdown": "## Draft section\n\nDraft body...",
+    "content_blocks": [{ "block_id": "intro", "block_type": "markdown", "payload": "Intro copy" }],
+    "revision_requests": [{ "request_id": "rev_1", "instruction": "Tighten the intro." }]
+  },
+  "handoff": {
+    "next_agent": "final_article",
+    "notes": "Resolve rev_1 before publishing."
+  },
+  "metadata": {}
+}
+```
+
+### `final_article`
+
+```json
+{
+  "schema_version": "agent_output.v1",
+  "agent_name": "final_article",
+  "summary": "Final article and publish payload are ready.",
+  "data": {
+    "final_markdown": "---\ntitle: Example\n---\n\nFinal body...",
+    "publication": {
+      "publish_payload": {
+        "slug": "example-article",
+        "title": "Example Article",
+        "markdown": "---\ntitle: Example\n---\n\nFinal body...",
+        "tags": ["skin-health"]
+      }
+    },
+    "validation": {
+      "has_slug": true,
+      "has_title": true,
+      "has_article_body": true
+    }
+  },
+  "handoff": {
+    "next_agent": null,
+    "notes": "Publish or hand off to the server-side publisher, then mark published."
+  },
+  "metadata": {}
+}
+```

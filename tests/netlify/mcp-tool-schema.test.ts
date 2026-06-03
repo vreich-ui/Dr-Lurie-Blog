@@ -73,6 +73,10 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   const workflow = property(inputSchema, 'workflow');
   const versioning = property(inputSchema, 'versioning');
   const media = property(inputSchema, 'media');
+  const claims = property(inputSchema, 'claims');
+  const compliance = property(inputSchema, 'compliance');
+  const commercial = property(inputSchema, 'commercial');
+  const revisionControl = property(inputSchema, 'revision_control');
 
   assert.match(String(property(content, 'title').description), /title/i);
   assert.match(String(property(editorial, 'draft_markdown').description), /Markdown draft body/i);
@@ -80,10 +84,58 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   assert.match(String(property(workflow, 'workflow_id').description), /preserve across handoffs/i);
   assert.match(String(property(versioning, 'record_version').description), /revision tracking/i);
 
+  assert.ok(property(workflow, 'current_agent'));
+  assert.ok(property(workflow, 'metadata'));
+  assert.ok(property(claims, 'claim_list'));
+  assert.ok(property(compliance, 'requirements'));
+  assert.ok(property(commercial, 'offers'));
+  assert.ok(property(media, 'image_asset_register'));
+  assert.ok(property(revisionControl, 'revision_requests'));
+
   assert.equal(content.additionalProperties, false);
   assert.equal(publication.additionalProperties, false);
   assert.equal(media.additionalProperties, false);
-  assert.equal(property(media, 'image_prompt_register').additionalProperties, true);
+  assert.notEqual(property(media, 'image_prompt_register').additionalProperties, true);
+  assert.equal(property(workflow, 'metadata').additionalProperties, true);
+});
+
+test('content_source.v1 MCP schema uses concrete workflow and agent-priority section items', async () => {
+  const body = await listTools();
+  const createTool = body.result.tools.find((tool) => tool.name === 'save_json_blob_create_request');
+
+  assert.ok(createTool);
+
+  const inputSchema = property(createTool.inputSchema, 'input');
+  const workflow = property(inputSchema, 'workflow');
+  const claims = property(inputSchema, 'claims');
+  const compliance = property(inputSchema, 'compliance');
+  const commercial = property(inputSchema, 'commercial');
+  const media = property(inputSchema, 'media');
+  const revisionControl = property(inputSchema, 'revision_control');
+
+  const claimItems = property(claims, 'claim_list').items as Record<string, unknown>;
+  const requirementItems = property(compliance, 'requirements').items as Record<string, unknown>;
+  const offerItems = property(commercial, 'offers').items as Record<string, unknown>;
+  const assetItems = property(media, 'image_asset_register').items as Record<string, unknown>;
+  const revisionItems = property(revisionControl, 'revision_requests').items as Record<string, unknown>;
+
+  assert.deepEqual((property(workflow, 'current_agent') as { enum: string[] }).enum, [
+    'reader_insight',
+    'research',
+    'angle',
+    'draft',
+    'final_article',
+  ]);
+  assert.ok(property(claimItems, 'claim_text'));
+  assert.ok(property(requirementItems, 'description'));
+  assert.ok(property(offerItems, 'name'));
+  assert.ok(property(assetItems, 'asset_id'));
+  assert.ok(property(revisionItems, 'instruction'));
+  assert.equal(claimItems.additionalProperties, false);
+  assert.equal(requirementItems.additionalProperties, false);
+  assert.equal(offerItems.additionalProperties, false);
+  assert.equal(assetItems.additionalProperties, false);
+  assert.equal(revisionItems.additionalProperties, false);
 });
 
 test('workflow mutation tools expose lock_token schemas and lock-aware descriptions', async () => {
