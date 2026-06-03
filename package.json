@@ -20,7 +20,7 @@
     "fix": "npm run fix:eslint && npm run fix:prettier",
     "fix:eslint": "eslint --fix .",
     "fix:prettier": "prettier -w .",
-    "test:opt-in": "rm -rf .tmp/save-opt-in-test; tsc -p tests/netlify/tsconfig.json && node --test .tmp/save-opt-in-test/tests/netlify/save-opt-in.test.js; status=$?; rm -rf .tmp/save-opt-in-test; exit $status",
+    "test:opt-in": "rm -rf .tmp/save-opt-in-test; tsc -p tests/netlify/tsconfig.json && node --test .tmp/save-opt-in-test/tests/netlify/*.test.js; status=$?; rm -rf .tmp/save-opt-in-test; exit $status",
     "agent:publish:dry-run": "node scripts/agent-builder-publish-dry-run.mjs --dry-run",
     "agent:publish": "node scripts/agent-builder-publish-dry-run.mjs --send"
   },
