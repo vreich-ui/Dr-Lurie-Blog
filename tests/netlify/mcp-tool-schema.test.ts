@@ -94,6 +94,7 @@ test('workflow mutation tools expose lock_token schemas and lock-aware descripti
     'save_json_blob_checkout_request',
     'save_json_blob_refresh_lock',
     'save_json_blob_checkin_request',
+    'save_json_blob_mark_published',
   ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
   }
@@ -145,4 +146,23 @@ test('stage mark-complete helpers expose transition fields and document common r
   const finalTool = tools.get('final_article_mark_complete');
   assert.ok(finalTool);
   assert.match(String((finalTool as { description?: string }).description), /workflow_status: "completed"/);
+});
+
+test('save_json_blob_mark_published exposes only workflow-state inputs', async () => {
+  const body = await listTools();
+  const tool = body.result.tools.find((item) => item.name === 'save_json_blob_mark_published');
+
+  assert.ok(tool, 'Expected save_json_blob_mark_published to be registered.');
+  assert.deepEqual(tool.inputSchema.required, ['request_id', 'lock_token', 'commit_metadata']);
+  assert.ok(property(tool.inputSchema, 'request_id'));
+  assert.ok(property(tool.inputSchema, 'lock_token'));
+  assert.ok(property(tool.inputSchema, 'commit_metadata'));
+  assert.match(
+    String((tool as { description?: string }).description),
+    /does not invoke the article publishing endpoint/i
+  );
+
+  const serializedSchema = JSON.stringify(tool);
+  assert.equal(serializedSchema.includes('NETLIFY_PUBLISH_SECRET'), false);
+  assert.equal(serializedSchema.includes('PUBLISH_SECRET'), false);
 });

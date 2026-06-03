@@ -416,6 +416,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       'lock_token',
     ]),
   },
+
+  {
+    name: 'save_json_blob_mark_published',
+    description:
+      'Mark a completed workflow record as published after the final article has been validated and publishing has succeeded or been handed off. This tool only updates workflow state; it does not invoke the article publishing endpoint. Server-only publish credentials are never accepted as inputs or returned.',
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema(),
+        lock_token: lockTokenSchema,
+        commit_metadata: {
+          type: 'object',
+          description:
+            'Optional publication result metadata such as commit SHA, commit URL, article path, deploy status, and a human-readable message.',
+          additionalProperties: true,
+        },
+      },
+      ['request_id', 'lock_token', 'commit_metadata']
+    ),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -510,7 +529,7 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
   const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
 
   if (!publishSecret) {
-    return toolError('NETLIFY_PUBLISH_SECRET is required.');
+    return toolError('Server-side workflow storage credentials are not configured.');
   }
 
   const saveResponse = await saveJsonBlobHandler({
@@ -612,6 +631,17 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callAction(
         event,
         { action: 'checkin_request', request_id: input.request_id, lock_token: input.lock_token },
+        'record'
+      );
+    case 'save_json_blob_mark_published':
+      return callAction(
+        event,
+        {
+          action: 'mark_published',
+          request_id: input.request_id,
+          lock_token: input.lock_token,
+          commit_metadata: input.commit_metadata,
+        },
         'record'
       );
     case 'save_json_blob_force_unlock':
