@@ -157,10 +157,20 @@ const arraySchema = (items: Record<string, unknown>, description?: string) => ({
 });
 
 const stringArraySchema = (description?: string) => arraySchema({ type: 'string' }, description);
-const extensionRegisterSchema = (description: string) => ({
+const metadataBagSchema = (description: string) => ({
   type: 'object',
   description,
+  properties: {},
   additionalProperties: true,
+});
+const agentNameJsonSchema = (description?: string) => ({
+  type: 'string',
+  enum: ALLOWED_AGENTS,
+  ...(description ? { description } : {}),
+});
+const nullableAgentNameJsonSchema = (description?: string) => ({
+  anyOf: [{ type: 'string', enum: ALLOWED_AGENTS }, { type: 'null' }],
+  ...(description ? { description } : {}),
 });
 
 const publishPayloadJsonSchema = objectSchema(
@@ -175,6 +185,18 @@ const publishPayloadJsonSchema = objectSchema(
     tags: stringArraySchema('Article tags.'),
     images: arraySchema({}, 'Image metadata or asset references.'),
     overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
+    draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
+    articlePath: stringSchema('Optional normalized repository path, usually src/data/post/{slug}.md.'),
+    category: stringSchema('Article category.'),
+    excerpt: stringSchema('Article excerpt.'),
+    seoDescription: stringSchema('SEO description.'),
+    featuredImage: stringSchema('Featured image filename or path.'),
+    existingFeaturedImagePath: stringSchema('Existing repository image path for the featured image.'),
+    videoLink: stringSchema('Optional video link.'),
+    ctaLink: stringSchema('Optional CTA link.'),
+    ctaText: stringSchema('Optional CTA text.'),
+    commitMessage: stringSchema('Optional publish commit message.'),
+    metadata: metadataBagSchema('Optional publish-payload extension data.'),
   },
   ['slug', 'title'],
   'Publication payload used by the publishing step; include slug, title, and article body fields when ready to publish.'
@@ -184,10 +206,88 @@ const contentBlockJsonSchema = objectSchema(
   {
     block_id: stringSchema('Stable block identifier.'),
     block_type: stringSchema('Block kind such as markdown, image, cta, or quiz.'),
-    payload: { description: 'Block payload. Intentionally open for agent-generated block data.' },
+    payload: { description: 'Block payload for the declared block_type; use metadata bags for non-contract fields.' },
     section_id: stringSchema('Optional section id this block belongs to.'),
   },
   ['block_id', 'block_type']
+);
+
+const claimJsonSchema = objectSchema(
+  {
+    claim_id: stringSchema('Stable claim identifier.'),
+    claim_text: stringSchema('Verifiable claim text to fact-check or preserve.'),
+    claim_type: stringSchema('Claim category such as factual, medical, product, or comparative.'),
+    source_ids: stringArraySchema('Source ids that support or contextualize the claim.'),
+    confidence: { type: 'number', minimum: 0, maximum: 1, description: 'Agent confidence from 0 to 1.' },
+    status: stringSchema('Review status such as proposed, verified, needs_source, or rejected.'),
+    metadata: metadataBagSchema('Optional claim-specific extension data.'),
+  },
+  ['claim_text']
+);
+
+const complianceRequirementJsonSchema = objectSchema(
+  {
+    requirement_id: stringSchema('Stable compliance requirement identifier.'),
+    category: stringSchema('Requirement category such as medical_claim, disclosure, source_quality, or privacy.'),
+    description: stringSchema('Plain-language compliance requirement.'),
+    status: stringSchema('Compliance status such as pending, satisfied, needs_review, or blocked.'),
+    related_claim_ids: stringArraySchema('Claim ids this requirement applies to.'),
+    notes: stringSchema('Reviewer or agent notes.'),
+    metadata: metadataBagSchema('Optional compliance-specific extension data.'),
+  },
+  ['category', 'description']
+);
+
+const commercialOfferJsonSchema = objectSchema(
+  {
+    offer_id: stringSchema('Stable offer identifier.'),
+    name: stringSchema('Offer or product name.'),
+    url: stringSchema('Destination URL for the offer.'),
+    cta_text: stringSchema('CTA text associated with the offer.'),
+    disclosure: stringSchema('Commercial disclosure text.'),
+    placement: stringSchema('Suggested article placement or section id.'),
+    metadata: metadataBagSchema('Optional offer-specific extension data.'),
+  },
+  ['name']
+);
+
+const imagePromptJsonSchema = objectSchema(
+  {
+    prompt_id: stringSchema('Stable image prompt identifier.'),
+    prompt: stringSchema('Image-generation prompt text.'),
+    purpose: stringSchema('Use case such as hero, inline, diagram, or social.'),
+    status: stringSchema('Prompt status such as proposed, approved, generated, or rejected.'),
+    metadata: metadataBagSchema('Optional prompt-specific extension data.'),
+  },
+  ['prompt_id', 'prompt']
+);
+
+const imageAssetJsonSchema = objectSchema(
+  {
+    asset_id: stringSchema('Stable image asset identifier.'),
+    source: stringSchema('Asset source such as upload, generated, remote, or existing_repo.'),
+    url: stringSchema('Public or remote image URL when available.'),
+    repoPath: stringSchema('Repository path for publishable image assets.'),
+    alt: stringSchema('Accessible alt text.'),
+    caption: stringSchema('Optional display caption.'),
+    prompt_id: stringSchema('Image prompt id that produced this asset, if applicable.'),
+    status: stringSchema('Asset status such as proposed, approved, uploaded, or rejected.'),
+    metadata: metadataBagSchema('Optional asset-specific extension data.'),
+  },
+  ['asset_id']
+);
+
+const revisionRequestJsonSchema = objectSchema(
+  {
+    request_id: stringSchema('Stable revision request identifier.'),
+    requested_by_agent: agentNameJsonSchema('Agent requesting the revision.'),
+    target_section_id: stringSchema('Target content section id, if the request is section-specific.'),
+    priority: stringSchema('Priority such as low, normal, high, or blocking.'),
+    instruction: stringSchema('Concrete revision instruction.'),
+    status: stringSchema('Revision status such as open, accepted, rejected, or resolved.'),
+    metadata: metadataBagSchema('Optional revision-specific extension data.'),
+  },
+  ['request_id', 'instruction']
 );
 
 const contentSourceV1JsonSchema = objectSchema(
@@ -239,14 +339,43 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
     media: objectSchema({
       schema_version: constStringSchema('media.v1'),
-      visual_strategy: { description: 'Visual strategy. Intentionally open for agent-generated media planning data.' },
-      image_prompt_register: extensionRegisterSchema(
-        'Agent-generated image prompts keyed by prompt id; extension keys are intentionally allowed.'
+      visual_strategy: objectSchema({
+        primary_image_goal: stringSchema('Primary image goal for the article.'),
+        tone: stringSchema('Visual tone or art direction.'),
+        constraints: stringArraySchema('Visual constraints agents should honor.'),
+        metadata: metadataBagSchema('Optional visual-strategy extension data.'),
+      }),
+      image_prompt_register: {
+        type: 'object',
+        description: 'Agent-generated image prompts keyed by prompt id.',
+        additionalProperties: imagePromptJsonSchema,
+      },
+      image_generation_runs: arraySchema(
+        objectSchema({
+          run_id: stringSchema('Stable generation run identifier.'),
+          prompt_id: stringSchema('Prompt id used for this run.'),
+          provider: stringSchema('Generation provider or tool.'),
+          status: stringSchema('Generation status.'),
+          asset_ids: stringArraySchema('Image asset ids produced by this run.'),
+          metadata: metadataBagSchema('Optional generation-run extension data.'),
+        }),
+        'Image generation run records.'
       ),
-      image_generation_runs: arraySchema({}, 'Image generation run records.'),
-      image_asset_register: arraySchema({}, 'Image asset records.'),
-      image_sets: arraySchema({}, 'Image set records.'),
-      media_revision_summary: { description: 'Media revision summary. Intentionally open for agent-generated data.' },
+      image_asset_register: arraySchema(imageAssetJsonSchema, 'Concrete image asset records.'),
+      image_sets: arraySchema(
+        objectSchema({
+          set_id: stringSchema('Stable image set identifier.'),
+          purpose: stringSchema('Image set purpose such as article, social, or thumbnail.'),
+          asset_ids: stringArraySchema('Assets included in this set.'),
+          metadata: metadataBagSchema('Optional image-set extension data.'),
+        }),
+        'Image set records.'
+      ),
+      media_revision_summary: objectSchema({
+        summary: stringSchema('Summary of media revisions.'),
+        resolved_request_ids: stringArraySchema('Revision request ids resolved by this media pass.'),
+        metadata: metadataBagSchema('Optional media-revision extension data.'),
+      }),
     }),
     editorial: objectSchema({
       schema_version: constStringSchema('editorial.v1'),
@@ -273,18 +402,18 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
     claims: objectSchema({
       schema_version: constStringSchema('claims.v1'),
-      claim_list: arraySchema({}, 'Fact claims. Items are intentionally open for agent-generated claim objects.'),
+      claim_list: arraySchema(claimJsonSchema, 'Fact claims extracted or checked by agents.'),
+      metadata: metadataBagSchema('Optional claims-section extension data.'),
     }),
     compliance: objectSchema({
       schema_version: constStringSchema('compliance.v1'),
-      requirements: arraySchema(
-        {},
-        'Compliance requirements. Items are intentionally open for policy-specific objects.'
-      ),
+      requirements: arraySchema(complianceRequirementJsonSchema, 'Concrete compliance requirements for the article.'),
+      metadata: metadataBagSchema('Optional compliance-section extension data.'),
     }),
     commercial: objectSchema({
       schema_version: constStringSchema('commercial.v1'),
-      offers: arraySchema({}, 'Commercial offer records. Items are intentionally open for offer-specific objects.'),
+      offers: arraySchema(commercialOfferJsonSchema, 'Commercial offer records.'),
+      metadata: metadataBagSchema('Optional commercial-section extension data.'),
     }),
     approvals: objectSchema({
       schema_version: constStringSchema('approvals.v1'),
@@ -300,21 +429,43 @@ const contentSourceV1JsonSchema = objectSchema(
       workflow_id: stringSchema(
         'Workflow identifier agents should preserve across handoffs and backend workflow records.'
       ),
+      current_agent: agentNameJsonSchema('Agent currently responsible for this content-source handoff.'),
+      previous_agent: nullableAgentNameJsonSchema('Agent that handed off this content source, if any.'),
+      next_agent: nullableAgentNameJsonSchema('Agent expected to receive the next handoff, if any.'),
+      handoff_notes: stringSchema('Concise handoff notes for the next agent.'),
+      metadata: metadataBagSchema('Optional workflow-handoff extension data.'),
     }),
     revision_control: objectSchema({
       schema_version: constStringSchema('revision_control.v1'),
-      audit_findings: arraySchema({}, 'Audit findings. Items are intentionally open for agent-generated findings.'),
+      audit_findings: arraySchema(
+        objectSchema({
+          finding_id: stringSchema('Stable audit finding identifier.'),
+          severity: stringSchema('Finding severity.'),
+          finding: stringSchema('Audit finding text.'),
+          metadata: metadataBagSchema('Optional audit-finding extension data.'),
+        }),
+        'Audit findings.'
+      ),
       routing_decisions: arraySchema(
-        {},
-        'Routing decisions. Items are intentionally open for agent-generated decisions.'
+        objectSchema({
+          decision_id: stringSchema('Stable routing decision identifier.'),
+          from_agent: agentNameJsonSchema('Agent making the routing decision.'),
+          to_agent: nullableAgentNameJsonSchema('Agent receiving the next route, or null when complete.'),
+          reason: stringSchema('Routing rationale.'),
+          metadata: metadataBagSchema('Optional routing-decision extension data.'),
+        }),
+        'Routing decisions.'
       ),
-      revision_requests: arraySchema(
-        {},
-        'Revision requests. Items are intentionally open for agent-generated requests.'
-      ),
+      revision_requests: arraySchema(revisionRequestJsonSchema, 'Concrete revision requests.'),
       change_assessments: arraySchema(
-        {},
-        'Change assessments. Items are intentionally open for agent-generated assessments.'
+        objectSchema({
+          assessment_id: stringSchema('Stable change assessment identifier.'),
+          revision_request_id: stringSchema('Revision request id this assessment addresses.'),
+          outcome: stringSchema('Assessment outcome.'),
+          notes: stringSchema('Assessment notes.'),
+          metadata: metadataBagSchema('Optional change-assessment extension data.'),
+        }),
+        'Change assessments.'
       ),
     }),
     versioning: objectSchema({
@@ -416,6 +567,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       'lock_token',
     ]),
   },
+
+  {
+    name: 'save_json_blob_mark_published',
+    description:
+      'Mark a completed workflow record as published after the final article has been validated and publishing has succeeded or been handed off. This tool only updates workflow state; it does not invoke the article publishing endpoint. Server-only publish credentials are never accepted as inputs or returned.',
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema(),
+        lock_token: lockTokenSchema,
+        commit_metadata: {
+          type: 'object',
+          description:
+            'Optional publication result metadata such as commit SHA, commit URL, article path, deploy status, and a human-readable message.',
+          additionalProperties: true,
+        },
+      },
+      ['request_id', 'lock_token', 'commit_metadata']
+    ),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -506,17 +676,34 @@ const isAuthorized = (event: LambdaEvent) => {
   return authorization === `Bearer ${token}`;
 };
 
+const getHeader = (headers: LambdaEvent['headers'], name: string) => {
+  const normalizedName = name.toLowerCase();
+  const entry = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
+
+  return entry?.[1];
+};
+
+const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) => ({
+  ...(event.headers ?? {}),
+  ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
+  ...(getHeader(event.headers, 'x-nf-deploy-id')
+    ? { 'x-nf-deploy-id': getHeader(event.headers, 'x-nf-deploy-id') }
+    : {}),
+  'x-publish-key': publishSecret,
+  'content-type': 'application/json',
+});
+
 const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, unknown>) => {
   const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
 
   if (!publishSecret) {
-    return toolError('NETLIFY_PUBLISH_SECRET is required.');
+    return toolError('Server-side workflow storage credentials are not configured.');
   }
 
   const saveResponse = await saveJsonBlobHandler({
     blobs: event.blobs,
     httpMethod: 'POST',
-    headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+    headers: createSaveJsonBlobHeaders(event, publishSecret),
     body: JSON.stringify(payload),
   });
 
@@ -612,6 +799,17 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callAction(
         event,
         { action: 'checkin_request', request_id: input.request_id, lock_token: input.lock_token },
+        'record'
+      );
+    case 'save_json_blob_mark_published':
+      return callAction(
+        event,
+        {
+          action: 'mark_published',
+          request_id: input.request_id,
+          lock_token: input.lock_token,
+          commit_metadata: input.commit_metadata,
+        },
         'record'
       );
     case 'save_json_blob_force_unlock':

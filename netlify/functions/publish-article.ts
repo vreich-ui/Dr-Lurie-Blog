@@ -211,7 +211,7 @@ const verifyPublisher = async (event: LambdaEvent) => {
 
     if (!publishSecret) {
       return jsonResponse(401, {
-        error: 'Service publishing is not configured. Set PUBLISH_SECRET in Netlify.',
+        error: 'Service publishing is not configured on the server.',
       });
     }
 
