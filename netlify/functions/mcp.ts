@@ -63,6 +63,25 @@ const agentList = () => ALLOWED_AGENTS.join('|');
 const workflowLockInstruction =
   'Agents must call checkout first to acquire a lock_token, then patch output with that lock_token, then mark complete with that lock_token, then check in when done or refresh the lock before it expires as needed.';
 
+const STAGE_TRANSITIONS: Record<
+  (typeof ALLOWED_AGENTS)[number],
+  { nextAgent: string | null; workflowStatus?: string }
+> = {
+  reader_insight: { nextAgent: 'research' },
+  research: { nextAgent: 'angle' },
+  angle: { nextAgent: 'draft' },
+  draft: { nextAgent: 'final_article' },
+  final_article: { nextAgent: null, workflowStatus: 'completed' },
+};
+
+const stageTransitionDescription = (agentName: (typeof ALLOWED_AGENTS)[number]) => {
+  const transition = STAGE_TRANSITIONS[agentName];
+  const nextAgent = transition.nextAgent === null ? 'null' : transition.nextAgent;
+  const workflowStatus = transition.workflowStatus ? ` with workflow_status: "${transition.workflowStatus}"` : '';
+
+  return `Common transition: ${agentName} → ${nextAgent}${workflowStatus}.`;
+};
+
 const normalizeAgentName = (value: unknown, fieldName: string) => {
   if (value === null || value === undefined) return value;
 
@@ -428,15 +447,19 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     },
     {
       name: `${agentName}_mark_complete`,
-      description: `Mark ${agentName} complete with a lock_token, the agent name hardcoded, and optional next_agent normalized. ${workflowLockInstruction}`,
+      description: `Mark ${agentName} complete with the agent name hardcoded and optional current_stage, next_agent, workflow_status, needs_review, last_error, and lock_token forwarded to the backend. ${stageTransitionDescription(agentName)} ${workflowLockInstruction}`,
       inputSchema: objectSchema(
         {
           request_id: stringSchema(),
           expected_record_version: intSchema(),
           lock_token: lockTokenSchema,
+          current_stage: nullableStringSchema(),
           next_agent: nullableStringSchema(),
+          workflow_status: stringSchema(),
+          needs_review: { type: 'boolean' },
+          last_error: nullableStringSchema(),
         },
-        ['request_id', 'expected_record_version', 'lock_token']
+        ['request_id', 'expected_record_version']
       ),
     },
   ]),
@@ -650,7 +673,11 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           agent_name: completeAgent,
           expected_record_version: input.expected_record_version,
           lock_token: input.lock_token,
+          current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
           next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
+          workflow_status: input.workflow_status,
+          needs_review: input.needs_review,
+          last_error: input.last_error,
         }),
         'record'
       );

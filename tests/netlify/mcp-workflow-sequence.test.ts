@@ -109,6 +109,41 @@ test('MCP tools run create → checkout → patch output → mark complete → c
     request_id: requestId,
     lock_token: checkoutRecord.lock.token,
   });
-  const checkedInRecord = checkinResult.record as { lock?: unknown };
+  const checkedInRecord = checkinResult.record as { version: number; lock?: unknown };
   assert.equal(checkedInRecord.lock, undefined);
+
+  const finalCheckoutResult = await callTool('save_json_blob_checkout_request', {
+    request_id: requestId,
+    owner_id: 'mcp-smoke-final-agent',
+    owner_label: 'MCP smoke final agent',
+  });
+  const finalCheckoutRecord = finalCheckoutResult.record as { version: number; lock: { token: string } };
+
+  const finalCompleteResult = await callTool('final_article_mark_complete', {
+    request_id: requestId,
+    expected_record_version: finalCheckoutRecord.version,
+    lock_token: finalCheckoutRecord.lock.token,
+    current_stage: 'final_article',
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  });
+  const finalCompleteRecord = finalCompleteResult.record as {
+    current_stage: string;
+    next_agent: string | null;
+    workflow_status: string;
+    needs_review: boolean;
+    last_error: string | null;
+  };
+  assert.equal(finalCompleteRecord.current_stage, 'final_article');
+  assert.equal(finalCompleteRecord.next_agent, null);
+  assert.equal(finalCompleteRecord.workflow_status, 'completed');
+  assert.equal(finalCompleteRecord.needs_review, false);
+  assert.equal(finalCompleteRecord.last_error, null);
+
+  await callTool('save_json_blob_checkin_request', {
+    request_id: requestId,
+    lock_token: finalCheckoutRecord.lock.token,
+  });
 });

@@ -18,6 +18,22 @@ const agentList = () => ALLOWED_AGENTS.join('|');
 const workflowLockInstruction =
   'Agents must call checkout first to acquire a lock_token, then patch output with that lock_token, then mark complete with that lock_token, then check in when done or refresh the lock before it expires as needed.';
 
+const STAGE_TRANSITIONS = {
+  reader_insight: { nextAgent: 'research' },
+  research: { nextAgent: 'angle' },
+  angle: { nextAgent: 'draft' },
+  draft: { nextAgent: 'final_article' },
+  final_article: { nextAgent: null, workflowStatus: 'completed' },
+};
+
+const stageTransitionDescription = (agentName) => {
+  const transition = STAGE_TRANSITIONS[agentName];
+  const nextAgent = transition.nextAgent === null ? 'null' : transition.nextAgent;
+  const workflowStatus = transition.workflowStatus ? ` with workflow_status: "${transition.workflowStatus}"` : '';
+
+  return `Common transition: ${agentName} → ${nextAgent}${workflowStatus}.`;
+};
+
 const normalizeAgentName = (value, fieldName) => {
   if (value === null || value === undefined) {
     return value;
@@ -404,15 +420,28 @@ export const createServer = () => {
     server.registerTool(
       `${agentName}_mark_complete`,
       {
-        description: `Mark ${agentName} complete with a lock_token, the agent name hardcoded, and optional next_agent normalized. ${workflowLockInstruction}`,
+        description: `Mark ${agentName} complete with the agent name hardcoded and optional current_stage, next_agent, workflow_status, needs_review, last_error, and lock_token forwarded to the backend. ${stageTransitionDescription(agentName)} ${workflowLockInstruction}`,
         inputSchema: {
           request_id: z.string().min(1),
           expected_record_version: z.number().int().nonnegative(),
-          lock_token: z.string().min(1),
+          lock_token: z.string().min(1).optional(),
+          current_stage: z.string().min(1).nullable().optional(),
           next_agent: z.string().min(1).nullable().optional(),
+          workflow_status: z.string().min(1).optional(),
+          needs_review: z.boolean().optional(),
+          last_error: z.string().nullable().optional(),
         },
       },
-      async ({ request_id, expected_record_version, lock_token, next_agent }) =>
+      async ({
+        request_id,
+        expected_record_version,
+        lock_token,
+        current_stage,
+        next_agent,
+        workflow_status,
+        needs_review,
+        last_error,
+      }) =>
         callNormalizedAction(
           () => ({
             action: 'mark_agent_complete',
@@ -420,7 +449,11 @@ export const createServer = () => {
             agent_name: agentName,
             expected_record_version,
             lock_token,
+            current_stage: normalizeOptionalAgentName(current_stage, 'current_stage'),
             next_agent: normalizeOptionalAgentName(next_agent, 'next_agent'),
+            workflow_status,
+            needs_review,
+            last_error,
           }),
           'record'
         )

@@ -355,7 +355,15 @@ Sample tool result:
 The server also registers underscore-only helper tools for every allowed stage (`reader_insight`, `research`, `angle`, `draft`, and `final_article`):
 
 - `<stage>_update_output(request_id: string, output: any, lock_token: string, expected_agent_version?: number)` calls `patch_agent_output` with the stage hardcoded as `agent_name`. If `expected_agent_version` is omitted, it defaults to `0` for the first write.
-- `<stage>_mark_complete(request_id: string, expected_record_version: number, lock_token: string, next_agent?: string | null)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `next_agent` is optional and normalized to the backend allow-list when provided.
+- `<stage>_mark_complete(request_id: string, expected_record_version: number, current_stage?: string | null, next_agent?: string | null, workflow_status?: string, needs_review?: boolean, last_error?: string | null, lock_token?: string)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `current_stage` and `next_agent` are optional and normalized to the backend allow-list when provided. Pass the active `lock_token` from checkout for successful backend mutation.
+
+Common helper transitions:
+
+- `reader_insight_mark_complete`: set `next_agent` to `research`.
+- `research_mark_complete`: set `next_agent` to `angle`.
+- `angle_mark_complete`: set `next_agent` to `draft`.
+- `draft_mark_complete`: set `next_agent` to `final_article`.
+- `final_article_mark_complete`: set `next_agent` to `null` with `workflow_status: "completed"`.
 
 Registered helper tool names:
 
@@ -395,6 +403,24 @@ Complete reader insight and route to research using the latest record snapshot v
     "expected_record_version": 2,
     "lock_token": "lock_123",
     "next_agent": "research"
+  }
+}
+```
+
+Complete final article and close the workflow with no next agent:
+
+```json
+{
+  "tool": "final_article_mark_complete",
+  "arguments": {
+    "request_id": "req_123",
+    "expected_record_version": 10,
+    "lock_token": "lock_123",
+    "current_stage": "final_article",
+    "next_agent": null,
+    "workflow_status": "completed",
+    "needs_review": false,
+    "last_error": null
   }
 }
 ```
