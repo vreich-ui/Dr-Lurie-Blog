@@ -85,3 +85,29 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   assert.equal(media.additionalProperties, false);
   assert.equal(property(media, 'image_prompt_register').additionalProperties, true);
 });
+
+test('workflow mutation tools expose lock_token schemas and lock-aware descriptions', async () => {
+  const body = await listTools();
+  const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
+
+  for (const name of [
+    'save_json_blob_checkout_request',
+    'save_json_blob_refresh_lock',
+    'save_json_blob_checkin_request',
+  ]) {
+    assert.ok(tools.has(name), `Expected ${name} to be registered.`);
+  }
+
+  for (const name of [
+    'save_json_blob_patch_agent_output',
+    'save_json_blob_mark_agent_complete',
+    'reader_insight_update_output',
+    'reader_insight_mark_complete',
+  ]) {
+    const tool = tools.get(name);
+    assert.ok(tool, `Expected ${name} to be registered.`);
+    assert.ok(property(tool.inputSchema, 'lock_token'), `Expected ${name} to accept lock_token.`);
+    assert.match(String((tool as { description?: string }).description), /checkout first/i);
+    assert.match(String((tool as { description?: string }).description), /check in/i);
+  }
+});

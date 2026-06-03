@@ -14,6 +14,8 @@ type BlobsModule = {
 const isNetlifyRuntime = () => process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID);
 
 const loadNetlifyBlobs = async () => {
+  if (!isNetlifyRuntime()) return undefined;
+
   return import('@netlify/blobs').then(
     (mod) => mod as BlobsModule,
     (error: unknown) => {

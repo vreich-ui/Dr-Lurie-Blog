@@ -11,8 +11,12 @@ const REQUIRED_ENV = ['NETLIFY_PUBLISH_SECRET', 'SAVE_JSON_BLOB_BASE_URL'];
 
 const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
 const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
+const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 
 const agentList = () => ALLOWED_AGENTS.join('|');
+
+const workflowLockInstruction =
+  'Agents must call checkout first to acquire a lock_token, then patch output with that lock_token, then mark complete with that lock_token, then check in when done or refresh the lock before it expires as needed.';
 
 const normalizeAgentName = (value, fieldName) => {
   if (value === null || value === undefined) {
@@ -255,21 +259,23 @@ export const createServer = () => {
   server.registerTool(
     'save_json_blob_patch_agent_output',
     {
-      description: 'Patch one agent output for a save-json-blob workflow request and return its record.',
+      description: `Patch one agent output for a save-json-blob workflow request and return its record. ${workflowLockInstruction}`,
       inputSchema: {
         request_id: z.string().min(1),
         agent_name: z.string().min(1),
         expected_agent_version: z.number().int().nonnegative(),
+        lock_token: z.string().min(1),
         output: z.any(),
       },
     },
-    async ({ request_id, agent_name, expected_agent_version, output }) =>
+    async ({ request_id, agent_name, expected_agent_version, lock_token, output }) =>
       callNormalizedAction(
         () => ({
           action: 'patch_agent_output',
           request_id,
           agent_name: normalizeAgentName(agent_name, 'agent_name'),
           expected_agent_version,
+          lock_token,
           output,
         }),
         'record'
@@ -279,11 +285,12 @@ export const createServer = () => {
   server.registerTool(
     'save_json_blob_mark_agent_complete',
     {
-      description: 'Mark one agent complete for a save-json-blob workflow request and return its record.',
+      description: `Mark one agent complete for a save-json-blob workflow request and return its record. ${workflowLockInstruction}`,
       inputSchema: {
         request_id: z.string().min(1),
         agent_name: z.string().min(1),
         expected_record_version: z.number().int().nonnegative(),
+        lock_token: z.string().min(1),
         current_stage: z.string().min(1).nullable().optional(),
         next_agent: z.string().min(1).nullable().optional(),
         workflow_status: z.string().min(1).optional(),
@@ -305,6 +312,61 @@ export const createServer = () => {
   );
 
   server.registerTool(
+    'save_json_blob_checkout_request',
+    {
+      description: `Checkout a save-json-blob workflow request and acquire a lock_token before patching output. ${workflowLockInstruction}`,
+      inputSchema: {
+        request_id: z.string().min(1),
+        owner_id: z.string().min(1),
+        owner_label: z.string().min(1),
+        lease_seconds: z.number().int().positive().optional(),
+      },
+    },
+    async ({ request_id, owner_id, owner_label, lease_seconds }) =>
+      callAction({ action: 'checkout_request', request_id, owner_id, owner_label, lease_seconds }, 'record')
+  );
+
+  server.registerTool(
+    'save_json_blob_refresh_lock',
+    {
+      description: `Refresh an active workflow lock before it expires when more time is needed. ${workflowLockInstruction}`,
+      inputSchema: {
+        request_id: z.string().min(1),
+        lock_token: z.string().min(1),
+        lease_seconds: z.number().int().positive().optional(),
+      },
+    },
+    async ({ request_id, lock_token, lease_seconds }) =>
+      callAction({ action: 'refresh_lock', request_id, lock_token, lease_seconds }, 'record')
+  );
+
+  server.registerTool(
+    'save_json_blob_checkin_request',
+    {
+      description: `Check in a workflow request to release the lock after patching output and marking complete. ${workflowLockInstruction}`,
+      inputSchema: {
+        request_id: z.string().min(1),
+        lock_token: z.string().min(1),
+      },
+    },
+    async ({ request_id, lock_token }) => callAction({ action: 'checkin_request', request_id, lock_token }, 'record')
+  );
+
+  if (ADMIN_TOOLS_ENABLED) {
+    server.registerTool(
+      'save_json_blob_force_unlock',
+      {
+        description:
+          'Admin-only emergency tool that forcefully releases a workflow lock. Prefer checkin_request with the valid lock_token whenever possible.',
+        inputSchema: {
+          request_id: z.string().min(1),
+        },
+      },
+      async ({ request_id }) => callAction({ action: 'force_unlock', request_id }, 'record')
+    );
+  }
+
+  server.registerTool(
     'ping',
     {
       description: 'Diagnostic tool that confirms the MCP server is reachable.',
@@ -317,20 +379,22 @@ export const createServer = () => {
     server.registerTool(
       `${agentName}_update_output`,
       {
-        description: `Patch ${agentName} output and default expected_agent_version to 0 for the first write.`,
+        description: `Patch ${agentName} output with a lock_token and default expected_agent_version to 0 for the first write. ${workflowLockInstruction}`,
         inputSchema: {
           request_id: z.string().min(1),
           output: z.any(),
           expected_agent_version: z.number().int().nonnegative().optional(),
+          lock_token: z.string().min(1),
         },
       },
-      async ({ request_id, output, expected_agent_version }) =>
+      async ({ request_id, output, expected_agent_version, lock_token }) =>
         callAction(
           {
             action: 'patch_agent_output',
             request_id,
             agent_name: agentName,
             expected_agent_version: expected_agent_version ?? 0,
+            lock_token,
             output,
           },
           'record'
@@ -340,20 +404,22 @@ export const createServer = () => {
     server.registerTool(
       `${agentName}_mark_complete`,
       {
-        description: `Mark ${agentName} complete with the agent name hardcoded and optional next_agent normalized.`,
+        description: `Mark ${agentName} complete with a lock_token, the agent name hardcoded, and optional next_agent normalized. ${workflowLockInstruction}`,
         inputSchema: {
           request_id: z.string().min(1),
           expected_record_version: z.number().int().nonnegative(),
+          lock_token: z.string().min(1),
           next_agent: z.string().min(1).nullable().optional(),
         },
       },
-      async ({ request_id, expected_record_version, next_agent }) =>
+      async ({ request_id, expected_record_version, lock_token, next_agent }) =>
         callNormalizedAction(
           () => ({
             action: 'mark_agent_complete',
             request_id,
             agent_name: agentName,
             expected_record_version,
+            lock_token,
             next_agent: normalizeOptionalAgentName(next_agent, 'next_agent'),
           }),
           'record'

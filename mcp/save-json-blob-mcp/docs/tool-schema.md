@@ -30,13 +30,25 @@ reader_insight|research|angle|draft|final_article
 
 Core tool fields that accept an agent/stage name are normalized before the backend call. For example, `reader insight`, `reader-insight`, and `Reader_Insight` normalize to `reader_insight`.
 
+## Locking and recommended agent sequence
+
+Mutating tools require a workflow lock. Agents should use this sequence:
+
+1. Create or fetch the request.
+2. Call `save_json_blob_checkout_request` with `request_id`, `owner_id`, and `owner_label`; copy `record.lock.token`.
+3. Patch output with `save_json_blob_patch_agent_output` or `<stage>_update_output`, passing the copied `lock_token`.
+4. Mark the agent complete with `save_json_blob_mark_agent_complete` or `<stage>_mark_complete`, passing the same `lock_token` and the latest `record.version`.
+5. Call `save_json_blob_checkin_request` with the same `lock_token` to release the lock, or call `save_json_blob_refresh_lock` before expiry if more time is needed.
+
+Admin-only emergency force unlock is intentionally gated by `MCP_ENABLE_ADMIN_TOOLS=true` in local/standalone MCP and production `/mcp`; prefer normal check-in whenever a valid `lock_token` is available.
+
 ## Versioning rules
 
 - `patch_agent_output` uses per-agent output versions. If an agent has not written output yet, the backend treats the existing output version as `0` before incrementing it.
 - Therefore, the first `expected_agent_version` for an agent output write must be `0`.
 - Stage helper tools (`<stage>_update_output`) default omitted `expected_agent_version` to `0` to make first writes safer.
-- Replaying the exact same `patch_agent_output` payload can be idempotent and return the existing record with `idempotent: true`, depending on backend state.
-- `mark_agent_complete` always requires `expected_record_version`. Use the `version` from the latest record snapshot returned by `create_request`, `get_request`, `patch_agent_output`, or a previous completion call.
+- `patch_agent_output` also requires the active `lock_token` from checkout. Replaying the exact same `patch_agent_output` payload can be idempotent and return the existing record with `idempotent: true`, depending on backend state.
+- `mark_agent_complete` always requires the active `lock_token` and `expected_record_version`. Use the `version` from the latest record snapshot returned by `create_request`, `get_request`, `patch_agent_output`, or a previous completion call.
 - If `expected_record_version` is stale and the completion is not already reflected in the record, the backend returns HTTP `409` and the MCP tool returns `conflict`.
 
 ## Core tools
@@ -48,6 +60,10 @@ Registered core tool names:
 - `save_json_blob_list_pending_requests`
 - `save_json_blob_patch_agent_output`
 - `save_json_blob_mark_agent_complete`
+- `save_json_blob_checkout_request`
+- `save_json_blob_refresh_lock`
+- `save_json_blob_checkin_request`
+- `save_json_blob_force_unlock` (admin-only, registered only when `MCP_ENABLE_ADMIN_TOOLS=true`)
 - `ping`
 
 ### `save_json_blob_create_request`
@@ -175,6 +191,92 @@ Sample backend request body:
 }
 ```
 
+### `save_json_blob_checkout_request`
+
+Calls backend action `checkout_request` and returns `record` containing `record.lock.token`. Call this before any output patch or completion mutation.
+
+Required fields:
+
+- `request_id: string`
+- `owner_id: string` - stable id for the agent or process holding the lock.
+- `owner_label: string` - human-readable owner label.
+
+Optional fields:
+
+- `lease_seconds: number` - positive integer; backend default applies when omitted.
+
+Sample backend request body:
+
+```json
+{
+  "action": "checkout_request",
+  "request_id": "req_123",
+  "owner_id": "agent_1",
+  "owner_label": "Research agent",
+  "lease_seconds": 900
+}
+```
+
+### `save_json_blob_refresh_lock`
+
+Calls backend action `refresh_lock` and returns `record`. Use this before the lock expires if the agent needs more time before patching, marking complete, or checking in.
+
+Required fields:
+
+- `request_id: string`
+- `lock_token: string` - token returned by checkout.
+
+Optional fields:
+
+- `lease_seconds: number` - positive integer; backend default applies when omitted.
+
+Sample backend request body:
+
+```json
+{
+  "action": "refresh_lock",
+  "request_id": "req_123",
+  "lock_token": "lock_123",
+  "lease_seconds": 900
+}
+```
+
+### `save_json_blob_checkin_request`
+
+Calls backend action `checkin_request` and returns `record`. Use this after patching output and marking complete to release the lock.
+
+Required fields:
+
+- `request_id: string`
+- `lock_token: string` - token returned by checkout.
+
+Sample backend request body:
+
+```json
+{
+  "action": "checkin_request",
+  "request_id": "req_123",
+  "lock_token": "lock_123"
+}
+```
+
+### `save_json_blob_force_unlock`
+
+Admin-only emergency tool registered only when `MCP_ENABLE_ADMIN_TOOLS=true`. Calls backend action `force_unlock` and returns `record`. Prefer `save_json_blob_checkin_request` when a valid `lock_token` exists.
+
+Required fields:
+
+- `request_id: string`
+
+Sample backend request body:
+
+```json
+{
+  "action": "force_unlock",
+  "request_id": "req_123"
+}
+```
+
 ### `save_json_blob_patch_agent_output`
 
 Calls backend action `patch_agent_output` and returns `record`.
@@ -184,6 +286,7 @@ Required fields:
 - `request_id: string`
 - `agent_name: string` - normalized to the supported agent-name allow-list.
 - `expected_agent_version: number` - nonnegative integer. Use `0` for the first write for that agent.
+- `lock_token: string` - token returned by checkout.
 - `output: any`
 
 Sample backend request body:
@@ -194,6 +297,7 @@ Sample backend request body:
   "request_id": "req_123",
   "agent_name": "research",
   "expected_agent_version": 0,
+  "lock_token": "lock_123",
   "output": { "notes": [] }
 }
 ```
@@ -207,6 +311,7 @@ Required fields:
 - `request_id: string`
 - `agent_name: string` - normalized to the supported agent-name allow-list.
 - `expected_record_version: number` - nonnegative integer from the latest record snapshot.
+- `lock_token: string` - token returned by checkout.
 
 Optional fields:
 
@@ -224,6 +329,7 @@ Sample backend request body:
   "request_id": "req_123",
   "agent_name": "research",
   "expected_record_version": 2,
+  "lock_token": "lock_123",
   "next_agent": "angle",
   "workflow_status": "in_progress"
 }
@@ -248,8 +354,8 @@ Sample tool result:
 
 The server also registers underscore-only helper tools for every allowed stage (`reader_insight`, `research`, `angle`, `draft`, and `final_article`):
 
-- `<stage>_update_output(request_id: string, output: any, expected_agent_version?: number)` calls `patch_agent_output` with the stage hardcoded as `agent_name`. If `expected_agent_version` is omitted, it defaults to `0` for the first write.
-- `<stage>_mark_complete(request_id: string, expected_record_version: number, next_agent?: string | null)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `next_agent` is optional and normalized to the backend allow-list when provided.
+- `<stage>_update_output(request_id: string, output: any, lock_token: string, expected_agent_version?: number)` calls `patch_agent_output` with the stage hardcoded as `agent_name`. If `expected_agent_version` is omitted, it defaults to `0` for the first write.
+- `<stage>_mark_complete(request_id: string, expected_record_version: number, lock_token: string, next_agent?: string | null)` calls `mark_agent_complete` with the stage hardcoded as `agent_name`. `next_agent` is optional and normalized to the backend allow-list when provided.
 
 Registered helper tool names:
 
@@ -273,6 +379,7 @@ First write for reader insight output using the helper default version of `0`:
   "tool": "reader_insight_update_output",
   "arguments": {
     "request_id": "req_123",
+    "lock_token": "lock_123",
     "output": { "reader_need": "Clear explanation for sensitive aging skin." }
   }
 }
@@ -286,6 +393,7 @@ Complete reader insight and route to research using the latest record snapshot v
   "arguments": {
     "request_id": "req_123",
     "expected_record_version": 2,
+    "lock_token": "lock_123",
     "next_agent": "research"
   }
 }
