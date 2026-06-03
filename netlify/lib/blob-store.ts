@@ -11,15 +11,24 @@ type BlobsModule = {
   getStore: (name: string) => BlobStore;
 };
 
-const isNetlifyRuntime = () => process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID);
+type NetlifyLambdaEvent = {
+  blobs?: unknown;
+};
 
-const loadNetlifyBlobs = async () => {
-  if (!isNetlifyRuntime()) return undefined;
+const hasNetlifyBlobContext = (event: unknown) => {
+  return Boolean(event && typeof event === 'object' && 'blobs' in event && (event as NetlifyLambdaEvent).blobs);
+};
+
+const isNetlifyRuntime = (event: unknown) =>
+  process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID) || hasNetlifyBlobContext(event);
+
+const loadNetlifyBlobs = async (event: unknown) => {
+  if (!isNetlifyRuntime(event)) return undefined;
 
   return import('@netlify/blobs').then(
     (mod) => mod as BlobsModule,
     (error: unknown) => {
-      if (isNetlifyRuntime()) {
+      if (isNetlifyRuntime(event)) {
         throw new Error(
           'Netlify Blobs is required in production. Configure npm auth/registry access for @netlify/blobs in Netlify environment variables; do not commit tokens.',
           { cause: error }
@@ -32,7 +41,7 @@ const loadNetlifyBlobs = async () => {
 };
 
 export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> => {
-  const netlifyBlobs = await loadNetlifyBlobs();
+  const netlifyBlobs = await loadNetlifyBlobs(event);
 
   if (netlifyBlobs) {
     netlifyBlobs.connectLambda(event);
@@ -46,7 +55,7 @@ export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> =
 };
 
 export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
-  const netlifyBlobs = await loadNetlifyBlobs();
+  const netlifyBlobs = await loadNetlifyBlobs(event);
 
   if (netlifyBlobs) {
     netlifyBlobs.connectLambda(event);
