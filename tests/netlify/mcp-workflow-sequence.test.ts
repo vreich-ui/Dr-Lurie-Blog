@@ -47,7 +47,7 @@ const callTool = async (name: string, args: Record<string, unknown>) => {
   return body.result.structuredContent;
 };
 
-test('MCP tools run create → checkout → patch output → mark complete → checkin', async () => {
+test('MCP tools run create → checkout → patch output → mark complete → mark published → checkin', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
   process.env.PUBLISH_SECRET = 'mcp-smoke-secret';
   process.env.NETLIFY = 'false';
@@ -141,6 +141,30 @@ test('MCP tools run create → checkout → patch output → mark complete → c
   assert.equal(finalCompleteRecord.workflow_status, 'completed');
   assert.equal(finalCompleteRecord.needs_review, false);
   assert.equal(finalCompleteRecord.last_error, null);
+
+  const publishedResult = await callTool('save_json_blob_mark_published', {
+    request_id: requestId,
+    lock_token: finalCheckoutRecord.lock.token,
+    commit_metadata: {
+      commit: 'abc123',
+      articlePath: 'src/data/post/mcp-smoke.md',
+      deployStatus: 'queued',
+    },
+  });
+  const publishedRecord = publishedResult.record as {
+    workflow_status: string;
+    current_stage: string | null;
+    next_agent: string | null;
+    history: Array<{ action: string; details?: { commit_metadata?: Record<string, unknown> } }>;
+  };
+  assert.equal(publishedRecord.workflow_status, 'published');
+  assert.equal(publishedRecord.current_stage, null);
+  assert.equal(publishedRecord.next_agent, null);
+  assert.deepEqual(publishedRecord.history.at(-1)?.details?.commit_metadata, {
+    commit: 'abc123',
+    articlePath: 'src/data/post/mcp-smoke.md',
+    deployStatus: 'queued',
+  });
 
   await callTool('save_json_blob_checkin_request', {
     request_id: requestId,

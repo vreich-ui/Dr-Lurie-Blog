@@ -21,6 +21,137 @@ const validContentSourceV1 = {
   },
 } as const;
 
+const representativePublishingUiContentSource = {
+  record_type: 'content_source',
+  schema_version: 'content_source.v1',
+  ids: {
+    workflow_id: 'workflow-ui-1',
+  },
+  content: {
+    schema_version: 'content_blocks.v1',
+    title: 'Representative Publishing UI Article',
+    description: 'A payload shaped like the admin publishing UI output.',
+  },
+  workflow: {
+    schema_version: 'content_workflow.v1',
+    workflow_id: 'workflow-ui-1',
+    current_agent: 'final_article',
+    previous_agent: 'draft',
+    next_agent: null,
+    handoff_notes: 'Validated in the publishing UI before handoff.',
+    metadata: { source: 'publishing-ui' },
+  },
+  publication: {
+    schema_version: 'publication.v1',
+    publication_status: 'ready',
+    publish_payload: {
+      slug: 'representative-publishing-ui-article',
+      title: 'Representative Publishing UI Article',
+      content: 'Final body entered through the publishing UI.',
+      articlePath: 'src/data/post/representative-publishing-ui-article.md',
+      publishDate: '2026-06-03T00:00:00.000Z',
+      excerpt: 'Representative UI excerpt.',
+      seoDescription: 'Representative UI SEO description.',
+      ctaText: 'Read more',
+      author: 'Dr. Lurié',
+      tags: ['skin-health'],
+      overwrite: false,
+    },
+  },
+} as const;
+
+const representativeAgentGeneratedContentSource = {
+  record_type: 'content_source',
+  schema_version: 'content_source.v1',
+  content: {
+    schema_version: 'content_blocks.v1',
+    title: 'Representative Agent Article',
+    blocks: [{ block_id: 'intro', block_type: 'markdown', payload: 'Agent draft introduction.' }],
+  },
+  sources: {
+    schema_version: 'sources.v1',
+    source_list: [{ source_id: 'src_1', name: 'Dermatology source', url: 'https://example.com/source' }],
+  },
+  claims: {
+    schema_version: 'claims.v1',
+    claim_list: [
+      {
+        claim_id: 'claim_1',
+        claim_text: 'Skin barrier lipids can shift with age.',
+        claim_type: 'factual',
+        source_ids: ['src_1'],
+        confidence: 0.82,
+        status: 'needs_review',
+      },
+    ],
+  },
+  compliance: {
+    schema_version: 'compliance.v1',
+    requirements: [
+      {
+        requirement_id: 'comp_1',
+        category: 'medical_claim',
+        description: 'Avoid diagnosis or treatment claims.',
+        related_claim_ids: ['claim_1'],
+        status: 'pending',
+      },
+    ],
+  },
+  commercial: {
+    schema_version: 'commercial.v1',
+    offers: [
+      {
+        offer_id: 'offer_1',
+        name: 'Early access',
+        cta_text: 'Join Early Access',
+        placement: 'conclusion',
+        disclosure: 'Product previews are not medical advice.',
+      },
+    ],
+  },
+  media: {
+    schema_version: 'media.v1',
+    image_asset_register: [
+      {
+        asset_id: 'asset_1',
+        source: 'remote',
+        url: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-product-hero.jpg',
+        alt: 'Product bottle preview',
+        status: 'approved',
+      },
+    ],
+  },
+  revision_control: {
+    schema_version: 'revision_control.v1',
+    revision_requests: [
+      {
+        request_id: 'rev_1',
+        requested_by_agent: 'angle',
+        priority: 'normal',
+        instruction: 'Tighten intro before final handoff.',
+        status: 'open',
+      },
+    ],
+  },
+  workflow: {
+    schema_version: 'content_workflow.v1',
+    workflow_id: 'workflow-agent-1',
+    current_agent: 'draft',
+    previous_agent: 'angle',
+    next_agent: 'final_article',
+    handoff_notes: 'Draft is ready for final edit.',
+  },
+  publication: {
+    schema_version: 'publication.v1',
+    publish_payload: {
+      slug: 'representative-agent-article',
+      title: 'Representative Agent Article',
+      markdown: '# Representative Agent Article\n\nFinal body from agent output.',
+      tags: ['skin-health', 'agent-generated'],
+    },
+  },
+} as const;
+
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();
 
@@ -110,4 +241,52 @@ test('create_request returns HTTP 400 for invalid nested publication payloads', 
   assert.ok(
     body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'publication.publish_payload.title')
   );
+});
+
+test('content_source.v1 validates representative publishing UI JSON payloads', async () => {
+  assert.equal(validateContentSourceV1(representativePublishingUiContentSource), true);
+
+  const response = await createWorkflow(representativePublishingUiContentSource);
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(body.ok, true);
+  assert.equal(body.record.input.workflow.current_agent, 'final_article');
+  assert.equal(body.record.input.publication.publish_payload.content, 'Final body entered through the publishing UI.');
+});
+
+test('content_source.v1 validates representative agent-generated JSON payloads', async () => {
+  assert.equal(validateContentSourceV1(representativeAgentGeneratedContentSource), true);
+
+  const response = await createWorkflow(representativeAgentGeneratedContentSource);
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(body.ok, true);
+  assert.equal(body.record.input.claims.claim_list[0].claim_text, 'Skin barrier lipids can shift with age.');
+  assert.equal(body.record.input.media.image_asset_register[0].asset_id, 'asset_1');
+  assert.equal(
+    body.record.input.revision_control.revision_requests[0].instruction,
+    'Tighten intro before final handoff.'
+  );
+});
+
+test('content_source.v1 rejects unbagged extension fields in concrete agent-priority sections', async () => {
+  const response = await createWorkflow({
+    ...representativeAgentGeneratedContentSource,
+    claims: {
+      schema_version: 'claims.v1',
+      claim_list: [
+        {
+          claim_text: 'This claim has an unbagged extension.',
+          unexpected_extension: true,
+        },
+      ],
+    },
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.ok, false);
+  assert.ok(body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'claims.claim_list.0'));
 });
