@@ -1,18 +1,18 @@
 // schema-v1.ts
-import Ajv, { JSONSchemaType } from "ajv";
+import { z } from 'zod';
 
-export type AllowedAgentName = "reader_insight" | "research" | "angle" | "draft" | "final_article";
-export type WorkflowStatus = "pending" | "in_progress" | "completed" | "failed" | "published";
+export type AllowedAgentName = 'reader_insight' | 'research' | 'angle' | 'draft' | 'final_article';
+export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'published';
 
 export type AgentOutputEnvelope = {
-  version: number;             // agent output version (repo contract)
-  updated_at: string;          // ISO
-  output: unknown;             // stage payload (schema-versioned ideally)
+  version: number; // agent output version (repo contract)
+  updated_at: string; // ISO
+  output: unknown; // stage payload (schema-versioned ideally)
   expected_agent_version: number;
 };
 
 export type WorkflowHistoryEntry = {
-  at: string;                  // ISO
+  at: string; // ISO
   action: string;
   agent_name?: AllowedAgentName;
   details?: Record<string, unknown>;
@@ -22,8 +22,8 @@ export type WorkflowLockRecord = {
   token: string;
   owner_id: string;
   owner_label: string;
-  acquired_at: string;         // ISO
-  expires_at: string;          // ISO
+  acquired_at: string; // ISO
+  expires_at: string; // ISO
 };
 
 export type PublishPayload = {
@@ -40,8 +40,8 @@ export type PublishPayload = {
 };
 
 export type ContentSourceV1 = {
-  record_type: "content_source";
-  schema_version: "content_source.v1";
+  record_type: 'content_source';
+  schema_version: 'content_source.v1';
 
   ids?: {
     content_id?: string;
@@ -58,17 +58,17 @@ export type ContentSourceV1 = {
   };
 
   content?: {
-    schema_version?: "content_blocks.v1";
+    schema_version?: 'content_blocks.v1';
     title?: string;
     deck?: string;
     description?: string;
 
     // structured content (future canonical)
     structure?: {
-      schema_version?: "content_structure.v1";
+      schema_version?: 'content_structure.v1';
       sections?: Array<{
         section_id: string;
-        role?: string;          // intro/conclusion/body/etc.
+        role?: string; // intro/conclusion/body/etc.
         name?: string;
         block_refs?: string[];
       }>;
@@ -76,26 +76,26 @@ export type ContentSourceV1 = {
 
     blocks?: Array<{
       block_id: string;
-      block_type: string;       // markdown/image/cta/quiz/etc.
+      block_type: string; // markdown/image/cta/quiz/etc.
       payload?: unknown;
       section_id?: string;
     }>;
   };
 
   taxonomy?: {
-    schema_version?: "taxonomy.v1";
+    schema_version?: 'taxonomy.v1';
     tags?: string[];
   };
 
   seo?: {
-    schema_version?: "seo.v1";
+    schema_version?: 'seo.v1';
     meta_title?: string;
     meta_description?: string;
     canonical_url?: string;
   };
 
   media?: {
-    schema_version?: "media.v1";
+    schema_version?: 'media.v1';
     visual_strategy?: unknown;
     image_prompt_register?: Record<string, unknown>;
     image_generation_runs?: unknown[];
@@ -105,14 +105,14 @@ export type ContentSourceV1 = {
   };
 
   editorial?: {
-    schema_version?: "editorial.v1";
+    schema_version?: 'editorial.v1';
     writer_notes?: string;
     // optional “flat” draft content if agents prefer
     draft_markdown?: string;
   };
 
   emotional_strategy?: {
-    schema_version?: "emotional_strategy.v1";
+    schema_version?: 'emotional_strategy.v1';
     overall_texture_assessment?: string;
     overly_polished_moments?: unknown[];
     opportunities_for_specificity?: unknown[];
@@ -122,7 +122,7 @@ export type ContentSourceV1 = {
   };
 
   sources?: {
-    schema_version?: "sources.v1";
+    schema_version?: 'sources.v1';
     source_list?: Array<{
       source_id?: string;
       name: string;
@@ -133,38 +133,38 @@ export type ContentSourceV1 = {
   };
 
   claims?: {
-    schema_version?: "claims.v1";
+    schema_version?: 'claims.v1';
     claim_list?: unknown[];
   };
 
   compliance?: {
-    schema_version?: "compliance.v1";
+    schema_version?: 'compliance.v1';
     requirements?: unknown[];
   };
 
   commercial?: {
-    schema_version?: "commercial.v1";
+    schema_version?: 'commercial.v1';
     offers?: unknown[];
   };
 
   approvals?: {
-    schema_version?: "approvals.v1";
-    approval_status?: string;   // repo doesn’t enforce; keep open
+    schema_version?: 'approvals.v1';
+    approval_status?: string; // repo doesn’t enforce; keep open
   };
 
   publication?: {
-    schema_version?: "publication.v1";
-    publication_status?: string;          // keep separate from workflow_status
-    publish_payload?: PublishPayload;     // repo naming precedence
+    schema_version?: 'publication.v1';
+    publication_status?: string; // keep separate from workflow_status
+    publish_payload?: PublishPayload; // repo naming precedence
   };
 
   workflow?: {
-    schema_version?: "content_workflow.v1";
+    schema_version?: 'content_workflow.v1';
     workflow_id?: string;
   };
 
   revision_control?: {
-    schema_version?: "revision_control.v1";
+    schema_version?: 'revision_control.v1';
     audit_findings?: unknown[];
     routing_decisions?: unknown[];
     revision_requests?: unknown[];
@@ -172,7 +172,7 @@ export type ContentSourceV1 = {
   };
 
   versioning?: {
-    schema_version?: "versioning.v1";
+    schema_version?: 'versioning.v1';
     record_version?: number;
     previous_version_refs?: string[];
   };
@@ -180,8 +180,8 @@ export type ContentSourceV1 = {
 
 export type WorkflowRecord = {
   request_id: string;
-  created_at: string;          // ISO
-  updated_at: string;          // ISO
+  created_at: string; // ISO
+  updated_at: string; // ISO
   workflow_status: WorkflowStatus;
   current_stage: AllowedAgentName | null;
   next_agent: AllowedAgentName | null;
@@ -193,208 +193,282 @@ export type WorkflowRecord = {
   agent_outputs: Partial<Record<AllowedAgentName, AgentOutputEnvelope>>;
   lock?: WorkflowLockRecord;
   history: WorkflowHistoryEntry[];
-  version: number;             // optimistic concurrency (repo contract)
+  version: number; // optimistic concurrency (repo contract)
 };
 
-// ---------- JSON Schemas ----------
-const contentSourceSchema: JSONSchemaType<ContentSourceV1> = {
-  $id: "content_source.v1",
-  type: "object",
-  properties: {
-    record_type: { const: "content_source" },
-    schema_version: { const: "content_source.v1" },
-    ids: { type: "object", properties: {
-      content_id: { type: "string", nullable: true },
-      publication_id: { type: "string", nullable: true },
-      source_version_id: { type: "string", nullable: true },
-      parent_content_id: { type: "string", nullable: true },
-      workflow_id: { type: "string", nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    publication_context: { type: "object", properties: {
-      publication_name: { type: "string", nullable: true },
-      domain: { type: "string", nullable: true },
-      topic_scope: { type: "string", nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    content: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      title: { type: "string", nullable: true },
-      deck: { type: "string", nullable: true },
-      description: { type: "string", nullable: true },
-      structure: { type: "object", properties: {
-        schema_version: { type: "string", nullable: true },
-        sections: { type: "array", items: {
-          type: "object",
-          properties: {
-            section_id: { type: "string" },
-            role: { type: "string", nullable: true },
-            name: { type: "string", nullable: true },
-            block_refs: { type: "array", items: { type: "string" }, nullable: true }
-          },
-          required: ["section_id"],
-          additionalProperties: true
-        }, nullable: true }
-      }, required: [], additionalProperties: true, nullable: true },
-      blocks: { type: "array", items: {
-        type: "object",
-        properties: {
-          block_id: { type: "string" },
-          block_type: { type: "string" },
-          payload: { nullable: true },
-          section_id: { type: "string", nullable: true }
-        },
-        required: ["block_id", "block_type"],
-        additionalProperties: true
-      }, nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    taxonomy: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      tags: { type: "array", items: { type: "string" }, nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    seo: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      meta_title: { type: "string", nullable: true },
-      meta_description: { type: "string", nullable: true },
-      canonical_url: { type: "string", nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    media: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    editorial: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      writer_notes: { type: "string", nullable: true },
-      draft_markdown: { type: "string", nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    emotional_strategy: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      overall_texture_assessment: { type: "string", nullable: true },
-      lines_to_preserve: { type: "array", items: { type: "string" }, nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    sources: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      source_list: { type: "array", items: {
-        type: "object",
-        properties: {
-          source_id: { type: "string", nullable: true },
-          name: { type: "string" },
-          url: { type: "string" },
-          publisher: { type: "string", nullable: true },
-          accessed_at: { type: "string", nullable: true }
-        },
-        required: ["name", "url"],
-        additionalProperties: true
-      }, nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    claims: { type: "object", properties: {}, required: [], additionalProperties: true, nullable: true },
-    compliance: { type: "object", properties: {}, required: [], additionalProperties: true, nullable: true },
-    commercial: { type: "object", properties: {}, required: [], additionalProperties: true, nullable: true },
-    approvals: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      approval_status: { type: "string", nullable: true }
-    }, required: [], additionalProperties: true, nullable: true },
-    publication: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      publication_status: { type: "string", nullable: true },
-      publish_payload: {
-        type: "object",
-        properties: {
-          slug: { type: "string" },
-          title: { type: "string" },
-          markdown: { type: "string", nullable: true },
-          content: { type: "string", nullable: true },
-          description: { type: "string", nullable: true },
-          publishDate: { type: "string", nullable: true },
-          author: { type: "string", nullable: true },
-          tags: { type: "array", items: { type: "string" }, nullable: true },
-          images: { type: "array", items: {}, nullable: true },
-          overwrite: { type: "boolean", nullable: true }
-        },
-        required: ["slug", "title"],
-        additionalProperties: true,
-        nullable: true
-      }
-    }, required: [], additionalProperties: true, nullable: true },
-    workflow: { type: "object", properties: {}, required: [], additionalProperties: true, nullable: true },
-    revision_control: { type: "object", properties: {}, required: [], additionalProperties: true, nullable: true },
-    versioning: { type: "object", properties: {
-      schema_version: { type: "string", nullable: true },
-      record_version: { type: "number", nullable: true },
-      previous_version_refs: { type: "array", items: { type: "string" }, nullable: true }
-    }, required: [], additionalProperties: true, nullable: true }
-  },
-  required: ["record_type", "schema_version"],
-  additionalProperties: true
+// ---------- Zod Schemas ----------
+const publishPayloadSchema = z
+  .object({
+    slug: z.string(),
+    title: z.string(),
+    markdown: z.string().optional(),
+    content: z.string().optional(),
+    description: z.string().optional(),
+    publishDate: z.string().optional(),
+    author: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    images: z.array(z.unknown()).optional(),
+    overwrite: z.boolean().optional(),
+  })
+  .catchall(z.unknown());
+
+export const contentSourceV1Schema = z
+  .object({
+    record_type: z.literal('content_source'),
+    schema_version: z.literal('content_source.v1'),
+    ids: z
+      .object({
+        content_id: z.string().optional(),
+        publication_id: z.string().optional(),
+        source_version_id: z.string().optional(),
+        parent_content_id: z.string().nullable().optional(),
+        workflow_id: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    publication_context: z
+      .object({
+        publication_name: z.string().optional(),
+        domain: z.string().optional(),
+        topic_scope: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    content: z
+      .object({
+        schema_version: z.literal('content_blocks.v1').optional(),
+        title: z.string().optional(),
+        deck: z.string().optional(),
+        description: z.string().optional(),
+        structure: z
+          .object({
+            schema_version: z.literal('content_structure.v1').optional(),
+            sections: z
+              .array(
+                z
+                  .object({
+                    section_id: z.string(),
+                    role: z.string().optional(),
+                    name: z.string().optional(),
+                    block_refs: z.array(z.string()).optional(),
+                  })
+                  .catchall(z.unknown())
+              )
+              .optional(),
+          })
+          .catchall(z.unknown())
+          .optional(),
+        blocks: z
+          .array(
+            z
+              .object({
+                block_id: z.string(),
+                block_type: z.string(),
+                payload: z.unknown().optional(),
+                section_id: z.string().optional(),
+              })
+              .catchall(z.unknown())
+          )
+          .optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    taxonomy: z
+      .object({
+        schema_version: z.literal('taxonomy.v1').optional(),
+        tags: z.array(z.string()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    seo: z
+      .object({
+        schema_version: z.literal('seo.v1').optional(),
+        meta_title: z.string().optional(),
+        meta_description: z.string().optional(),
+        canonical_url: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    media: z
+      .object({
+        schema_version: z.literal('media.v1').optional(),
+        visual_strategy: z.unknown().optional(),
+        image_prompt_register: z.record(z.string(), z.unknown()).optional(),
+        image_generation_runs: z.array(z.unknown()).optional(),
+        image_asset_register: z.array(z.unknown()).optional(),
+        image_sets: z.array(z.unknown()).optional(),
+        media_revision_summary: z.unknown().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    editorial: z
+      .object({
+        schema_version: z.literal('editorial.v1').optional(),
+        writer_notes: z.string().optional(),
+        draft_markdown: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    emotional_strategy: z
+      .object({
+        schema_version: z.literal('emotional_strategy.v1').optional(),
+        overall_texture_assessment: z.string().optional(),
+        overly_polished_moments: z.array(z.unknown()).optional(),
+        opportunities_for_specificity: z.array(z.unknown()).optional(),
+        rhythm_adjustments: z.array(z.unknown()).optional(),
+        sensory_detail_additions: z.array(z.unknown()).optional(),
+        lines_to_preserve: z.array(z.string()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    sources: z
+      .object({
+        schema_version: z.literal('sources.v1').optional(),
+        source_list: z
+          .array(
+            z
+              .object({
+                source_id: z.string().optional(),
+                name: z.string(),
+                url: z.string(),
+                publisher: z.string().optional(),
+                accessed_at: z.string().optional(),
+              })
+              .catchall(z.unknown())
+          )
+          .optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    claims: z
+      .object({
+        schema_version: z.literal('claims.v1').optional(),
+        claim_list: z.array(z.unknown()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    compliance: z
+      .object({
+        schema_version: z.literal('compliance.v1').optional(),
+        requirements: z.array(z.unknown()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    commercial: z
+      .object({
+        schema_version: z.literal('commercial.v1').optional(),
+        offers: z.array(z.unknown()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    approvals: z
+      .object({
+        schema_version: z.literal('approvals.v1').optional(),
+        approval_status: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    publication: z
+      .object({
+        schema_version: z.literal('publication.v1').optional(),
+        publication_status: z.string().optional(),
+        publish_payload: publishPayloadSchema.optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    workflow: z
+      .object({
+        schema_version: z.literal('content_workflow.v1').optional(),
+        workflow_id: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    revision_control: z
+      .object({
+        schema_version: z.literal('revision_control.v1').optional(),
+        audit_findings: z.array(z.unknown()).optional(),
+        routing_decisions: z.array(z.unknown()).optional(),
+        revision_requests: z.array(z.unknown()).optional(),
+        change_assessments: z.array(z.unknown()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    versioning: z
+      .object({
+        schema_version: z.literal('versioning.v1').optional(),
+        record_version: z.number().optional(),
+        previous_version_refs: z.array(z.string()).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+  })
+  .catchall(z.unknown());
+
+const allowedAgentNameSchema = z.enum(['reader_insight', 'research', 'angle', 'draft', 'final_article']);
+const workflowStatusSchema = z.enum(['pending', 'in_progress', 'completed', 'failed', 'published']);
+
+const agentOutputEnvelopeSchema = z
+  .object({
+    version: z.number(),
+    updated_at: z.string(),
+    output: z.unknown().optional(),
+    expected_agent_version: z.number(),
+  })
+  .catchall(z.unknown());
+
+export const workflowRecordSchema = z
+  .object({
+    request_id: z.string(),
+    created_at: z.string(),
+    updated_at: z.string(),
+    workflow_status: workflowStatusSchema,
+    current_stage: allowedAgentNameSchema.nullable(),
+    next_agent: allowedAgentNameSchema.nullable(),
+    completed_agents: z.array(allowedAgentNameSchema),
+    failed_agents: z.array(allowedAgentNameSchema),
+    last_error: z.string().nullable(),
+    needs_review: z.boolean(),
+    input: contentSourceV1Schema,
+    agent_outputs: z.partialRecord(allowedAgentNameSchema, agentOutputEnvelopeSchema),
+    lock: z
+      .object({
+        token: z.string(),
+        owner_id: z.string(),
+        owner_label: z.string(),
+        acquired_at: z.string(),
+        expires_at: z.string(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    history: z.array(
+      z
+        .object({
+          at: z.string(),
+          action: z.string(),
+          agent_name: allowedAgentNameSchema.optional(),
+          details: z.record(z.string(), z.unknown()).optional(),
+        })
+        .catchall(z.unknown())
+    ),
+    version: z.number(),
+  })
+  .catchall(z.unknown());
+
+export type ContentSourceV1ValidationIssue = z.core.$ZodIssue;
+
+export const getContentSourceV1ValidationIssues = (value: unknown) => {
+  const result = contentSourceV1Schema.safeParse(value);
+
+  return result.success ? [] : result.error.issues;
 };
 
-const agentOutputEnvelopeSchema: JSONSchemaType<AgentOutputEnvelope> = {
-  $id: "agent_output_envelope",
-  type: "object",
-  properties: {
-    version: { type: "number" },
-    updated_at: { type: "string" },
-    output: { nullable: true },
-    expected_agent_version: { type: "number" }
-  },
-  required: ["version", "updated_at", "expected_agent_version"],
-  additionalProperties: true
-};
+export const parseContentSourceV1 = (value: unknown) => contentSourceV1Schema.safeParse(value);
 
-const workflowRecordSchema: JSONSchemaType<WorkflowRecord> = {
-  $id: "workflow_record",
-  type: "object",
-  properties: {
-    request_id: { type: "string" },
-    created_at: { type: "string" },
-    updated_at: { type: "string" },
-    workflow_status: { type: "string", enum: ["pending", "in_progress", "completed", "failed", "published"] },
-    current_stage: { type: "string", nullable: true },
-    next_agent: { type: "string", nullable: true },
-    completed_agents: { type: "array", items: { type: "string" } },
-    failed_agents: { type: "array", items: { type: "string" } },
-    last_error: { type: "string", nullable: true },
-    needs_review: { type: "boolean" },
-    input: { $ref: "content_source.v1#" },
-    agent_outputs: { type: "object", required: [], additionalProperties: { $ref: "agent_output_envelope#" } },
-    lock: {
-      type: "object",
-      properties: {
-        token: { type: "string" },
-        owner_id: { type: "string" },
-        owner_label: { type: "string" },
-        acquired_at: { type: "string" },
-        expires_at: { type: "string" }
-      },
-      required: ["token", "owner_id", "owner_label", "acquired_at", "expires_at"],
-      additionalProperties: true,
-      nullable: true
-    },
-    history: { type: "array", items: { type: "object", properties: {}, required: [], additionalProperties: true } },
-    version: { type: "number" }
-  },
-  required: [
-    "request_id",
-    "created_at",
-    "updated_at",
-    "workflow_status",
-    "current_stage",
-    "next_agent",
-    "completed_agents",
-    "failed_agents",
-    "last_error",
-    "needs_review",
-    "input",
-    "agent_outputs",
-    "history",
-    "version"
-  ],
-  additionalProperties: true
-};
+export const validateContentSourceV1 = (value: unknown): value is ContentSourceV1 =>
+  contentSourceV1Schema.safeParse(value).success;
 
-const ajv = new Ajv({ strict: false });
-ajv.addSchema(contentSourceSchema);
-ajv.addSchema(agentOutputEnvelopeSchema);
-
-export const validateContentSourceV1 = ajv.compile<ContentSourceV1>(contentSourceSchema);
-export const validateWorkflowRecord = ajv.compile<WorkflowRecord>(workflowRecordSchema);
+export const validateWorkflowRecord = (value: unknown): value is WorkflowRecord =>
+  workflowRecordSchema.safeParse(value).success;
 
 export function getAgentOutputVersion(record: WorkflowRecord, agent: AllowedAgentName): number {
   return record.agent_outputs[agent]?.version ?? 0;
@@ -424,10 +498,10 @@ export function patchAgentOutput(
         version: nextVersion,
         updated_at: nowIso,
         output,
-        expected_agent_version: expected_agent_version
-      }
+        expected_agent_version,
+      },
     },
-    version: record.version + 1
+    version: record.version + 1,
   };
 
   return nextRecord;
@@ -459,12 +533,12 @@ export function markAgentComplete(
       ...record.history,
       {
         at: nowIso,
-        action: "mark_agent_complete",
+        action: 'mark_agent_complete',
         agent_name,
-        details: { next_agent, workflow_status }
-      }
+        details: { next_agent, workflow_status },
+      },
     ],
-    version: record.version + 1
+    version: record.version + 1,
   };
 
   return nextRecord;

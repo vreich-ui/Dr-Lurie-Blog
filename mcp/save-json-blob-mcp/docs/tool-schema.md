@@ -56,19 +56,84 @@ Calls backend action `create_request` and returns `record`.
 
 Required fields:
 
-- `input: any`
+- `input: content_source.v1` - structured workflow input with required discriminators `record_type: "content_source"` and `schema_version: "content_source.v1"`.
 
 Optional fields:
 
 - `request_id: string` - generated as `req_<uuid>` by the MCP server when omitted.
 
-Sample backend request body:
+The production Netlify `/mcp` `inputSchema` exposes a structured `content_source.v1` object for `input`, not a generic payload. The top-level schema allows these sections only:
+
+- `ids`
+- `publication_context`
+- `content`
+- `taxonomy`
+- `seo`
+- `media`
+- `editorial`
+- `sources`
+- `claims`
+- `compliance`
+- `commercial`
+- `approvals`
+- `publication`
+- `workflow`
+- `revision_control`
+- `versioning`
+
+Important agent-facing field descriptions:
+
+- `content.title`: working or final article title agents should use for the content source.
+- `editorial.draft_markdown`: Markdown draft body agents can pass between drafting, revision, and publishing steps.
+- `publication.publish_payload`: publication payload used by the publishing step; include `slug`, `title`, and article body fields when ready to publish.
+- `workflow.workflow_id`: workflow identifier agents should preserve across handoffs and backend workflow records.
+- `versioning.record_version`: content-source record version agents should increment or preserve for revision tracking.
+
+`additionalProperties` is disabled for the MCP-exposed structured objects unless extension data is intentionally open, such as agent-generated block payloads, media planning fields, image prompt registers, claims, compliance requirements, commercial offers, and revision-control item arrays.
+
+Minimum sample backend request body:
 
 ```json
 {
   "action": "create_request",
   "request_id": "req_123",
-  "input": { "topic": "Skin barrier" }
+  "input": {
+    "record_type": "content_source",
+    "schema_version": "content_source.v1",
+    "content": {
+      "schema_version": "content_blocks.v1",
+      "title": "Skin barrier basics"
+    },
+    "editorial": {
+      "schema_version": "editorial.v1",
+      "draft_markdown": "# Skin barrier basics\n\nDraft body..."
+    },
+    "workflow": {
+      "schema_version": "content_workflow.v1",
+      "workflow_id": "req_123"
+    },
+    "versioning": {
+      "schema_version": "versioning.v1",
+      "record_version": 1
+    }
+  }
+}
+```
+
+Publication-ready sample fragment:
+
+```json
+{
+  "publication": {
+    "schema_version": "publication.v1",
+    "publication_status": "ready",
+    "publish_payload": {
+      "slug": "skin-barrier-basics",
+      "title": "Skin Barrier Basics",
+      "markdown": "# Skin Barrier Basics\n\nArticle body...",
+      "description": "A practical explanation of the skin barrier."
+    }
+  }
 }
 ```
 

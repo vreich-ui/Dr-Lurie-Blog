@@ -6,7 +6,7 @@
  * Primary record key: workflows/by-id/{request_id}.json
  *
  * Supported actions and example payloads:
- * - create_request: { "action": "create_request", "request_id": "req_123", "input": { "topic": "Skin barrier" } }
+ * - create_request: { "action": "create_request", "request_id": "req_123", "input": { "record_type": "content_source", "schema_version": "content_source.v1", "content": { "title": "Skin barrier" } } }
  * - get_request: { "action": "get_request", "request_id": "req_123" }
  * - list_pending_requests: { "action": "list_pending_requests", "stage": "research", "status": "pending", "limit": 50 }
  * - patch_agent_output: { "action": "patch_agent_output", "request_id": "req_123", "agent_name": "research", "expected_agent_version": 0, "lock_token": "lock_123", "output": { "notes": [] } }
@@ -23,6 +23,7 @@ import { z } from 'zod';
 
 import { getHeader } from '../lib/admin-auth.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -54,7 +55,7 @@ export type WorkflowRecord = {
   failed_agents: AllowedAgentName[];
   last_error: string | null;
   needs_review: boolean;
-  input: unknown;
+  input: ContentSourceV1;
   agent_outputs: Partial<Record<AllowedAgentName, AgentOutputRecord>>;
   lock?: WorkflowLockRecord;
   history: WorkflowHistoryEntry[];
@@ -400,14 +401,23 @@ const requireRequestId = (body: WorkflowRequest) => {
   return undefined;
 };
 
-const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
+
+  const parsedInput = parseContentSourceV1(body.input);
+  if (!parsedInput.success) {
+    return jsonResponse(400, {
+      action: body.action,
+      error: 'Invalid content_source.v1 input.',
+      issues: parsedInput.error.issues,
+    });
+  }
 
   const existingRecord = await loadRecord(store, body.request_id as string);
 
   if (existingRecord) {
-    if (valuesEqual(existingRecord.input, body.input)) {
+    if (valuesEqual(existingRecord.input, parsedInput.data)) {
       return jsonResponse(200, { action: body.action, record: existingRecord, idempotent: true });
     }
 
@@ -426,7 +436,7 @@ const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) =>
     failed_agents: [],
     last_error: null,
     needs_review: false,
-    input: body.input,
+    input: parsedInput.data,
     agent_outputs: {},
     history: [{ at: timestamp, action: body.action }],
     version: 1,

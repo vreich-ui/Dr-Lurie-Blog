@@ -96,6 +96,11 @@ const nullableStringSchema = (description?: string) => ({
   anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }],
   ...(description ? { description } : {}),
 });
+const constStringSchema = (value: string, description?: string) => ({
+  type: 'string',
+  const: value,
+  ...(description ? { description } : {}),
+});
 
 const objectSchema = (
   properties: Record<string, unknown>,
@@ -109,13 +114,192 @@ const objectSchema = (
   additionalProperties: false,
 });
 
+const arraySchema = (items: Record<string, unknown>, description?: string) => ({
+  type: 'array',
+  items,
+  ...(description ? { description } : {}),
+});
+
+const stringArraySchema = (description?: string) => arraySchema({ type: 'string' }, description);
+const extensionRegisterSchema = (description: string) => ({
+  type: 'object',
+  description,
+  additionalProperties: true,
+});
+
+const publishPayloadJsonSchema = objectSchema(
+  {
+    slug: stringSchema('Destination slug for the published article.'),
+    title: stringSchema('Published article title.'),
+    markdown: stringSchema('Markdown body to publish.'),
+    content: stringSchema('Alternate article body content to publish.'),
+    description: stringSchema('Published article summary or meta description.'),
+    publishDate: stringSchema('Publish date string.'),
+    author: stringSchema('Article author name.'),
+    tags: stringArraySchema('Article tags.'),
+    images: arraySchema({}, 'Image metadata or asset references.'),
+    overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
+  },
+  ['slug', 'title'],
+  'Publication payload used by the publishing step; include slug, title, and article body fields when ready to publish.'
+);
+
+const contentBlockJsonSchema = objectSchema(
+  {
+    block_id: stringSchema('Stable block identifier.'),
+    block_type: stringSchema('Block kind such as markdown, image, cta, or quiz.'),
+    payload: { description: 'Block payload. Intentionally open for agent-generated block data.' },
+    section_id: stringSchema('Optional section id this block belongs to.'),
+  },
+  ['block_id', 'block_type']
+);
+
+const contentSourceV1JsonSchema = objectSchema(
+  {
+    record_type: constStringSchema('content_source', 'Required discriminator for workflow content-source records.'),
+    schema_version: constStringSchema('content_source.v1', 'Required schema version discriminator.'),
+    ids: objectSchema({
+      content_id: stringSchema('Stable content id.'),
+      publication_id: stringSchema('Publication id.'),
+      source_version_id: stringSchema('Source version id.'),
+      parent_content_id: nullableStringSchema('Parent content id, if this record derives from another content item.'),
+      workflow_id: stringSchema('Workflow id associated with this content source.'),
+    }),
+    publication_context: objectSchema({
+      publication_name: stringSchema('Publication name.'),
+      domain: stringSchema('Publication domain.'),
+      topic_scope: stringSchema('Topic scope or editorial lane.'),
+    }),
+    content: objectSchema({
+      schema_version: constStringSchema('content_blocks.v1'),
+      title: stringSchema('Working or final article title agents should use for the content source.'),
+      deck: stringSchema('Short deck or subtitle.'),
+      description: stringSchema('Brief content description.'),
+      structure: objectSchema({
+        schema_version: constStringSchema('content_structure.v1'),
+        sections: arraySchema(
+          objectSchema(
+            {
+              section_id: stringSchema('Stable section identifier.'),
+              role: stringSchema('Section role, such as intro, body, or conclusion.'),
+              name: stringSchema('Human-readable section name.'),
+              block_refs: stringArraySchema('Block ids included in this section.'),
+            },
+            ['section_id']
+          )
+        ),
+      }),
+      blocks: arraySchema(contentBlockJsonSchema, 'Structured content blocks.'),
+    }),
+    taxonomy: objectSchema({
+      schema_version: constStringSchema('taxonomy.v1'),
+      tags: stringArraySchema('Taxonomy tags.'),
+    }),
+    seo: objectSchema({
+      schema_version: constStringSchema('seo.v1'),
+      meta_title: stringSchema('SEO meta title.'),
+      meta_description: stringSchema('SEO meta description.'),
+      canonical_url: stringSchema('Canonical URL.'),
+    }),
+    media: objectSchema({
+      schema_version: constStringSchema('media.v1'),
+      visual_strategy: { description: 'Visual strategy. Intentionally open for agent-generated media planning data.' },
+      image_prompt_register: extensionRegisterSchema(
+        'Agent-generated image prompts keyed by prompt id; extension keys are intentionally allowed.'
+      ),
+      image_generation_runs: arraySchema({}, 'Image generation run records.'),
+      image_asset_register: arraySchema({}, 'Image asset records.'),
+      image_sets: arraySchema({}, 'Image set records.'),
+      media_revision_summary: { description: 'Media revision summary. Intentionally open for agent-generated data.' },
+    }),
+    editorial: objectSchema({
+      schema_version: constStringSchema('editorial.v1'),
+      writer_notes: stringSchema('Notes for writers and editors.'),
+      draft_markdown: stringSchema(
+        'Markdown draft body agents can pass between drafting, revision, and publishing steps.'
+      ),
+    }),
+    sources: objectSchema({
+      schema_version: constStringSchema('sources.v1'),
+      source_list: arraySchema(
+        objectSchema(
+          {
+            source_id: stringSchema('Stable source id.'),
+            name: stringSchema('Source name.'),
+            url: stringSchema('Source URL.'),
+            publisher: stringSchema('Source publisher.'),
+            accessed_at: stringSchema('Access timestamp.'),
+          },
+          ['name', 'url']
+        ),
+        'Cited sources.'
+      ),
+    }),
+    claims: objectSchema({
+      schema_version: constStringSchema('claims.v1'),
+      claim_list: arraySchema({}, 'Fact claims. Items are intentionally open for agent-generated claim objects.'),
+    }),
+    compliance: objectSchema({
+      schema_version: constStringSchema('compliance.v1'),
+      requirements: arraySchema(
+        {},
+        'Compliance requirements. Items are intentionally open for policy-specific objects.'
+      ),
+    }),
+    commercial: objectSchema({
+      schema_version: constStringSchema('commercial.v1'),
+      offers: arraySchema({}, 'Commercial offer records. Items are intentionally open for offer-specific objects.'),
+    }),
+    approvals: objectSchema({
+      schema_version: constStringSchema('approvals.v1'),
+      approval_status: stringSchema('Approval status.'),
+    }),
+    publication: objectSchema({
+      schema_version: constStringSchema('publication.v1'),
+      publication_status: stringSchema('Publication status separate from workflow_status.'),
+      publish_payload: publishPayloadJsonSchema,
+    }),
+    workflow: objectSchema({
+      schema_version: constStringSchema('content_workflow.v1'),
+      workflow_id: stringSchema(
+        'Workflow identifier agents should preserve across handoffs and backend workflow records.'
+      ),
+    }),
+    revision_control: objectSchema({
+      schema_version: constStringSchema('revision_control.v1'),
+      audit_findings: arraySchema({}, 'Audit findings. Items are intentionally open for agent-generated findings.'),
+      routing_decisions: arraySchema(
+        {},
+        'Routing decisions. Items are intentionally open for agent-generated decisions.'
+      ),
+      revision_requests: arraySchema(
+        {},
+        'Revision requests. Items are intentionally open for agent-generated requests.'
+      ),
+      change_assessments: arraySchema(
+        {},
+        'Change assessments. Items are intentionally open for agent-generated assessments.'
+      ),
+    }),
+    versioning: objectSchema({
+      schema_version: constStringSchema('versioning.v1'),
+      record_version: intSchema(
+        'Content-source record version agents should increment or preserve for revision tracking.'
+      ),
+      previous_version_refs: stringArraySchema('Previous content-source version references.'),
+    }),
+  },
+  ['record_type', 'schema_version'],
+  'Structured content_source.v1 workflow input.'
+);
+
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_request',
     description: 'Create a save-json-blob workflow request and return its record.',
     inputSchema: objectSchema(
       {
-        input: { description: 'Workflow input payload.' },
+        input: contentSourceV1JsonSchema,
         request_id: stringSchema('Optional request id. A UUID-based id is generated when omitted.'),
       },
       ['input']
