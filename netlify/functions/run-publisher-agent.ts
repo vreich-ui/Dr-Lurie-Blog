@@ -215,19 +215,8 @@ const validateEnvironment = () => {
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const endpoint = process.env.NETLIFY_PUBLISH_ENDPOINT;
   const publishSecret = process.env.NETLIFY_PUBLISH_SECRET;
-  const missing = [
-    !openaiApiKey ? 'OPENAI_API_KEY' : undefined,
-    !endpoint ? 'NETLIFY_PUBLISH_ENDPOINT' : undefined,
-    !publishSecret ? 'NETLIFY_PUBLISH_SECRET' : undefined,
-  ].filter(Boolean);
-
   if (!openaiApiKey || !endpoint || !publishSecret) {
-    throw new RunnerError(
-      500,
-      `Server-side publisher agent is not configured. Missing Netlify environment variable${
-        missing.length === 1 ? '' : 's'
-      }: ${missing.join(', ')}.`
-    );
+    throw new RunnerError(500, 'Server-side publisher agent is not configured.');
   }
 
   return {
