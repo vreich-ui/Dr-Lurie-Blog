@@ -676,6 +676,23 @@ const isAuthorized = (event: LambdaEvent) => {
   return authorization === `Bearer ${token}`;
 };
 
+const getHeader = (headers: LambdaEvent['headers'], name: string) => {
+  const normalizedName = name.toLowerCase();
+  const entry = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
+
+  return entry?.[1];
+};
+
+const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) => ({
+  ...(event.headers ?? {}),
+  ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
+  ...(getHeader(event.headers, 'x-nf-deploy-id')
+    ? { 'x-nf-deploy-id': getHeader(event.headers, 'x-nf-deploy-id') }
+    : {}),
+  'x-publish-key': publishSecret,
+  'content-type': 'application/json',
+});
+
 const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, unknown>) => {
   const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
 
@@ -686,7 +703,7 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
   const saveResponse = await saveJsonBlobHandler({
     blobs: event.blobs,
     httpMethod: 'POST',
-    headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+    headers: createSaveJsonBlobHeaders(event, publishSecret),
     body: JSON.stringify(payload),
   });
 

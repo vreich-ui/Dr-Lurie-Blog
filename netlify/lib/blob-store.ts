@@ -44,7 +44,7 @@ export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> =
   const netlifyBlobs = await loadNetlifyBlobs(event);
 
   if (netlifyBlobs) {
-    netlifyBlobs.connectLambda(event);
+    if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
     return netlifyBlobs.getStore('workflows');
   }
@@ -58,7 +58,7 @@ export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
   const netlifyBlobs = await loadNetlifyBlobs(event);
 
   if (netlifyBlobs) {
-    netlifyBlobs.connectLambda(event);
+    if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
     return netlifyBlobs.getStore('opt-ins');
   }
