@@ -15,7 +15,9 @@ const metadata = {
 <Layout metadata={metadata}>
   <section
     class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
+    data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
+    hidden
   >
     <header class="dashboard-header">
       <div>
@@ -24,6 +26,8 @@ const metadata = {
         <p class="dashboard-intro">A private command center for Dr. Lurié publishing and workflow tools.</p>
       </div>
     </header>
+
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
 
     <section class="dashboard-grid" data-auth-gated hidden>
       <article class="dashboard-card">
@@ -108,6 +112,13 @@ const metadata = {
     font-size: 1.1rem;
   }
 
+  .auth-status {
+    margin: -0.75rem 0 1.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
   .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -161,6 +172,8 @@ const metadata = {
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const adminShell = document.querySelector('[data-admin-shell]');
+    const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
 
     const setGatedContentVisible = (visible) => {
@@ -225,8 +238,33 @@ const metadata = {
       return clerkLoadPromise;
     };
 
+    const setAdminShellVisible = (visible) => {
+      if (adminShell) adminShell.hidden = !visible;
+    };
+
+    const redirectToHome = () => {
+      window.location.replace('/');
+    };
+
+    const authStatusMessages = {
+      checking: 'Checking admin access…',
+      'signed-out': 'Sign in to view admin tools.',
+      forbidden: 'Access denied (not an admin).',
+      error: 'Admin auth failed. Please refresh or contact support.',
+      'signed-in': '',
+    };
+
+    const setAuthStatus = (message) => {
+      if (authStatus) authStatus.textContent = message;
+    };
+
     const setAuthState = (state) => {
-      setGatedContentVisible(state === 'signed-in');
+      const isSignedIn = state === 'signed-in';
+      setAuthStatus(authStatusMessages[state] || '');
+      setAdminShellVisible(isSignedIn);
+      setGatedContentVisible(isSignedIn);
+
+      if (!isSignedIn && state !== 'checking') redirectToHome();
     };
 
     const getAdminStateForClerk = async (clerk) => {
