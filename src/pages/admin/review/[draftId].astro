@@ -2,7 +2,12 @@
 import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
-const pageTitle = 'Admin Dashboard';
+export function getStaticPaths() {
+  return [{ params: { draftId: 'draft' } }];
+}
+
+const routeDraftId = Astro.params.draftId ?? '';
+const pageTitle = 'Review Draft';
 const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
@@ -15,80 +20,70 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
+    class="review-page mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
+    data-route-draft-id={routeDraftId}
     hidden
   >
-    <header class="dashboard-header">
+    <header class="review-header">
       <div>
-        <p class="dashboard-kicker">Admin workspace</p>
+        <p class="review-kicker">Admin workspace</p>
         <h1>{pageTitle}</h1>
-        <p class="dashboard-intro">A private command center for Dr. Lurié publishing and workflow tools.</p>
+        <p class="review-intro">Review a saved workflow draft before continuing the publishing process.</p>
       </div>
+      <a class="btn-secondary" href="/admin/drafts">Back to drafts</a>
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
 
-    <AdminNav />
+    <AdminNav activePath="/admin/review" />
 
-    <section class="dashboard-grid" data-auth-gated hidden>
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">Publishing</p>
-        <h2>Publish Article</h2>
-        <p>Create or update Markdown articles, upload imagery, and queue the GitHub-backed publish flow.</p>
-        <a class="btn-primary" href="/admin/publish">Open publisher</a>
-      </article>
-
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">Draft review</p>
-        <h2>Drafts</h2>
-        <p>Open saved JSON workflow drafts and route them through the gated review workspace.</p>
-        <a class="btn-secondary" href="/admin/drafts">Review drafts</a>
-      </article>
-
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">AI workflow</p>
-        <h2>AI Publisher</h2>
-        <p>
-          Use the ChatKit-powered assistant to prepare approved article payloads and run the server publisher agent.
-        </p>
-        <a class="btn-secondary" href="/admin/agent-admin">Open AI publisher</a>
-      </article>
-
-      <article class="dashboard-card dashboard-card-wide">
-        <p class="dashboard-kicker">Coming soon</p>
-        <h2>Dashboard roadmap</h2>
-        <ul>
-          <li>Review recent publishing activity and deploy status.</li>
-          <li>Manage draft queues and research note handoffs.</li>
-          <li>Monitor admin-only workflow health checks.</li>
-        </ul>
-      </article>
+    <section class="review-card" aria-labelledby="review-heading" data-auth-gated hidden>
+      <p class="review-kicker">Selected draft</p>
+      <h2 id="review-heading">Draft request</h2>
+      <dl class="review-meta">
+        <div>
+          <dt>Request ID</dt>
+          <dd id="draft-id-value">{routeDraftId}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>Ready for gated review tooling</dd>
+        </div>
+      </dl>
+      <p class="hint">
+        This page is intentionally rendered inside the admin gate. Protected workflow data should be fetched only
+        through server-side admin endpoints after Clerk authentication resolves.
+      </p>
+      <div class="review-actions">
+        <a id="edit-draft-link" class="btn-primary" href="/admin/publish">Continue in publisher</a>
+        <a class="btn-secondary" href="/admin/drafts">Choose another draft</a>
+      </div>
     </section>
   </section>
 </Layout>
 
 <style>
-  .admin-dashboard {
+  .review-page {
     color: var(--aw-color-text-default);
   }
 
-  .dashboard-header {
+  .review-header {
     display: flex;
     gap: 1.5rem;
     align-items: flex-start;
     justify-content: space-between;
     margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
     border-bottom: 1px solid rgb(229 231 235);
+    padding-bottom: 1.5rem;
   }
 
-  :global(.dark) .dashboard-header {
+  :global(.dark) .review-header {
     border-color: rgb(30 41 59);
   }
 
-  .dashboard-kicker {
+  .review-kicker {
     margin: 0 0 0.5rem;
     color: var(--aw-color-accent);
     font-size: 0.78rem;
@@ -97,26 +92,25 @@ const metadata = {
     text-transform: uppercase;
   }
 
-  .dashboard-header h1,
-  .dashboard-card h2 {
+  .review-header h1,
+  .review-card h2 {
     margin: 0;
     font-family: var(--aw-font-heading, inherit);
     font-weight: 800;
     line-height: 1.05;
   }
 
-  .dashboard-header h1 {
+  .review-header h1 {
     font-size: clamp(2.35rem, 7vw, 4rem);
   }
 
-  .dashboard-intro,
-  .dashboard-card p,
-  .dashboard-card li,
-  .hint {
+  .review-intro,
+  .hint,
+  .review-meta dt {
     color: var(--aw-color-text-muted);
   }
 
-  .dashboard-intro {
+  .review-intro {
     max-width: 42rem;
     margin: 1rem 0 0;
     font-size: 1.1rem;
@@ -129,48 +123,97 @@ const metadata = {
     font-weight: 700;
   }
 
-  .dashboard-grid {
+  .review-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: rgb(255 255 255 / 0.88);
+    padding: 1.35rem;
+    box-shadow: 0 1.25rem 3rem rgb(15 23 42 / 6%);
+  }
+
+  :global(.dark) .review-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.72);
+    box-shadow: none;
+  }
+
+  .review-meta {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
+    gap: 0.9rem;
+    margin: 1.25rem 0 0;
   }
 
-  .dashboard-card {
+  .review-meta div {
     border: 1px solid rgb(229 231 235);
-    border-radius: 1.5rem;
-    background: rgb(255 255 255 / 0.86);
-    padding: 1.5rem;
-    box-shadow: 0 18px 45px rgb(15 23 42 / 0.07);
+    border-radius: 1rem;
+    padding: 0.9rem;
   }
 
-  :global(.dark) .dashboard-card {
+  :global(.dark) .review-meta div {
     border-color: rgb(30 41 59);
-    background: rgb(15 23 42 / 0.76);
   }
 
-  .dashboard-card p {
-    margin: 0.85rem 0 1.15rem;
+  .review-meta dt {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
 
-  .dashboard-card ul {
+  .review-meta dd {
+    margin: 0.35rem 0 0;
+    overflow-wrap: anywhere;
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  .hint {
     margin: 1rem 0 0;
-    padding-left: 1.25rem;
+    line-height: 1.6;
   }
 
-  .dashboard-card-wide {
-    grid-column: 1 / -1;
+  .review-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.72rem 1rem;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    border: 1px solid rgb(94 140 138 / 55%);
+    background: rgb(94 140 138 / 18%);
+    color: var(--aw-color-text-heading);
+  }
+
+  .btn-secondary {
+    border: 1px solid rgb(209 213 219);
+    color: var(--aw-color-text-heading);
   }
 
   @media (max-width: 767px) {
-    .admin-dashboard {
-      padding-top: 1.5rem;
+    .review-page {
+      padding-top: 2rem;
+      padding-bottom: 2.5rem;
     }
 
-    .dashboard-header {
+    .review-header {
       flex-direction: column;
     }
 
-    .dashboard-grid {
+    .review-meta {
       grid-template-columns: 1fr;
     }
   }
@@ -179,14 +222,25 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
+  const reviewPage = document.querySelector('.review-page');
+  const pathDraftId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) || '');
+  const draftId = pathDraftId || reviewPage?.dataset.routeDraftId || '';
+  const draftIdValue = document.querySelector('#draft-id-value');
+  const editDraftLink = document.querySelector('#edit-draft-link');
+
+  if (draftIdValue) draftIdValue.textContent = draftId;
+  if (editDraftLink && draftId) editDraftLink.href = `/admin/publish?draftId=${encodeURIComponent(draftId)}`;
+</script>
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
   import { loadClerk } from '~/utils/clerkLoader';
 
   (() => {
-    const adminPage = document.querySelector('.admin-dashboard');
+    const adminPage = document.querySelector('[data-admin-shell]');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
-    const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
 
@@ -207,7 +261,7 @@ const metadata = {
     };
 
     const setAdminShellVisible = (visible) => {
-      if (adminShell) adminShell.hidden = !visible;
+      if (adminPage) adminPage.hidden = !visible;
     };
 
     const redirectToHome = () => {

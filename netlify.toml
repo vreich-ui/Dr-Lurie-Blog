@@ -22,6 +22,11 @@
   force = true
 
 [[redirects]]
+  from = "/admin/review/*"
+  to = "/admin/review/draft"
+  status = 200
+
+[[redirects]]
   from = "/blog"
   to = "/learn/library"
   status = 301

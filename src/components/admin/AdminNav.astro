@@ -3,11 +3,17 @@ interface Props {
   activePath?: string;
 }
 
-const normalizePath = (path: string) => (path === '/admin' ? '/admin/' : path);
+const normalizePath = (path: string) => {
+  if (path === '/admin') return '/admin/';
+  if (path.length > 1 && path.endsWith('/')) return path.slice(0, -1);
+
+  return path;
+};
 const currentPath = normalizePath(Astro.props.activePath ?? Astro.url.pathname);
 const navItems = [
   { href: '/admin/', label: 'Dashboard' },
   { href: '/admin/publish', label: 'Publish' },
+  { href: '/admin/drafts', label: 'Drafts', activePaths: ['/admin/drafts', '/admin/review'] },
   { href: '/admin/agent-admin', label: 'AI Publisher' },
 ];
 ---
@@ -17,7 +23,7 @@ const navItems = [
   <div class="admin-nav-pills">
     {
       navItems.map((item) => {
-        const isActive = currentPath === item.href;
+        const isActive = currentPath === item.href || item.activePaths?.some((path) => currentPath.startsWith(path));
         return (
           <a
             class:list={['admin-nav-pill', { 'is-active': isActive }]}
