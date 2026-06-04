@@ -18,7 +18,7 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="admin-page mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14"
+    class="admin-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     data-public-github-branch={publicGitHubBranch}
@@ -40,25 +40,29 @@ const metadata = {
 
     <AdminNav />
 
-    <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
-      <form id="publish-form" class="admin-form">
-        <div class="json-import-card" aria-labelledby="json-import-heading">
-          <div class="json-import-header">
-            <div>
-              <h2 id="json-import-heading">Import JSON</h2>
-              <p class="hint">Paste article JSON or upload a single <code>.json</code> file to populate this form.</p>
-            </div>
-            <label class="json-upload-button" for="json-upload">
-              <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
-              <span>Upload JSON</span>
-            </label>
-            <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
-          </div>
-          <textarea
-            id="json-import"
-            class="json-import-input"
-            rows="6"
-            placeholder='{
+    <div class="publish-workspace" data-auth-gated hidden>
+      <main class="publish-main" aria-label="Publishing editor">
+        <section class="admin-card" aria-label="Publishing form">
+          <form id="publish-form" class="admin-form">
+            <div class="json-import-card" aria-labelledby="json-import-heading">
+              <div class="json-import-header">
+                <div>
+                  <h2 id="json-import-heading">Import JSON</h2>
+                  <p class="hint">
+                    Paste article JSON or upload a single <code>.json</code> file to populate this form.
+                  </p>
+                </div>
+                <label class="json-upload-button" for="json-upload">
+                  <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
+                  <span>Upload JSON</span>
+                </label>
+                <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
+              </div>
+              <textarea
+                id="json-import"
+                class="json-import-input"
+                rows="6"
+                placeholder='{
   "record_type": "content_source",
   "schema_version": "content_source.v1",
   "content": { "title": "Article title" },
@@ -70,210 +74,224 @@ const metadata = {
   },
   "sources": { "source_list": ["Source citation"] }
 }'
-          ></textarea>
-          <div class="json-import-actions">
-            <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
-              <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
-              <span>Update</span>
-            </button>
-            <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
+              ></textarea>
+              <div class="json-import-actions">
+                <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
+                  <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
+                  <span>Update</span>
+                </button>
+                <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
+              </div>
+              <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+            </div>
+
+            <div class="field">
+              <label for="title">Title</label>
+              <input id="title" name="title" type="text" autocomplete="off" />
+            </div>
+
+            <div class="field">
+              <label for="slug">Slug</label>
+              <input
+                id="slug"
+                name="slug"
+                type="text"
+                autocomplete="off"
+                placeholder="article-slug"
+                aria-describedby="slug-edit-hint"
+              />
+              <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
+            </div>
+
+            <div class="field">
+              <label for="excerpt">Excerpt</label>
+              <textarea
+                id="excerpt"
+                name="excerpt"
+                rows="3"
+                maxlength="300"
+                placeholder="Short list-card and topic summary copy."></textarea>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="publish-date">Publish date</label>
+                <input id="publish-date" name="publishDate" type="datetime-local" />
+              </div>
+
+              <div class="field">
+                <label for="author">Author</label>
+                <input id="author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurié" />
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="category">Category</label>
+                <input id="category" name="category" type="text" autocomplete="off" placeholder="Aging skin" />
+              </div>
+
+              <div class="field">
+                <label for="tags">Tags</label>
+                <input id="tags" name="tags" type="text" autocomplete="off" placeholder="barrier function, lipids" />
+              </div>
+            </div>
+
+            <div class="field checkbox-field">
+              <input id="draft" name="draft" type="checkbox" />
+              <label for="draft">Save as draft</label>
+            </div>
+
+            <div class="field">
+              <label for="content">Content</label>
+              <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label for="sources">Sources</label>
+              <textarea
+                id="sources"
+                name="sources"
+                class="sources-input"
+                rows="4"
+                placeholder="One source per line, or comma-separated citations."></textarea>
+              <p class="hint">Imported <code>sources[]</code> are stored as one citation per line.</p>
+            </div>
+
+            <div class="field">
+              <label for="image-upload">Image upload</label>
+              <label class="image-upload-button" for="image-upload">
+                <Icon name="tabler:photo-plus" class="image-upload-icon" aria-hidden="true" />
+                <span>Choose images</span>
+              </label>
+              <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
+              <p class="hint">
+                Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.
+                Allowed types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
+                <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
+              </p>
+              <ul id="image-list" class="image-list" aria-live="polite"></ul>
+            </div>
+
+            <div class="field">
+              <label for="featured-image">Featured image</label>
+              <select id="featured-image" name="featuredImage">
+                <option value="">Select an uploaded image</option>
+              </select>
+              <input id="existing-featured-image-path" name="existingFeaturedImagePath" type="hidden" />
+            </div>
+
+            <div class="field">
+              <label for="video-link">Optional video link</label>
+              <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="cta-link">Optional CTA link</label>
+                <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+              </div>
+
+              <div class="field">
+                <label for="cta-text">Optional CTA text</label>
+                <input id="cta-text" name="ctaText" type="text" placeholder="Learn more" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="seo-description">Optional SEO description</label>
+              <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
+            </div>
+
+            <div class="field checkbox-field">
+              <input id="overwrite-slug" name="overwrite" type="checkbox" />
+              <label for="overwrite-slug">Overwrite an existing article with this slug</label>
+            </div>
+          </form>
+        </section>
+
+        <section class="admin-card admin-panel" aria-labelledby="preview-heading">
+          <h2 id="preview-heading">Preview</h2>
+          <div class="preview-box">
+            <h3 id="preview-title">Untitled article</h3>
+            <p>
+              Featured image path:
+              <span id="preview-featured-image" class="preview-image-path">None selected</span>
+            </p>
+            <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
           </div>
-          <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
-        </div>
+        </section>
+      </main>
 
-        <div class="field">
-          <label for="title">Title</label>
-          <input id="title" name="title" type="text" autocomplete="off" />
-        </div>
+      <aside class="publish-sidebar" aria-labelledby="publish-output-heading">
+        <section class="admin-card admin-panel readiness-card">
+          <p class="sidebar-kicker">Readiness & Actions</p>
+          <h2 id="publish-output-heading">Publish output</h2>
 
-        <div class="field">
-          <label for="slug">Slug</label>
-          <input
-            id="slug"
-            name="slug"
-            type="text"
-            autocomplete="off"
-            placeholder="article-slug"
-            aria-describedby="slug-edit-hint"
-          />
-          <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
-        </div>
-
-        <div class="field">
-          <label for="excerpt">Excerpt</label>
-          <textarea
-            id="excerpt"
-            name="excerpt"
-            rows="3"
-            maxlength="300"
-            placeholder="Short list-card and topic summary copy."></textarea>
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="publish-date">Publish date</label>
-            <input id="publish-date" name="publishDate" type="datetime-local" />
+          <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
+            <h3 id="publish-checklist-heading">Publish readiness checklist</h3>
+            <ul id="publish-checklist" aria-live="polite">
+              <li data-checklist-item="title">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Title present</span>
+              </li>
+              <li data-checklist-item="slug">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Valid slug</span>
+              </li>
+              <li data-checklist-item="content">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Content present</span>
+              </li>
+              <li data-checklist-item="excerpt">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Excerpt</span>
+              </li>
+              <li data-checklist-item="publishDate">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Publish date</span>
+              </li>
+              <li data-checklist-item="sources">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Sources (at least 1)</span>
+              </li>
+              <li data-checklist-item="featuredImage">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Featured image selected</span>
+              </li>
+            </ul>
           </div>
 
-          <div class="field">
-            <label for="author">Author</label>
-            <input id="author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurié" />
-          </div>
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="category">Category</label>
-            <input id="category" name="category" type="text" autocomplete="off" placeholder="Aging skin" />
+          <div class="status-line">
+            <p id="status" class="status" aria-live="polite"></p>
+            <span id="unsaved-changes" class="unsaved-changes" aria-live="polite" hidden>Unsaved changes</span>
           </div>
 
-          <div class="field">
-            <label for="tags">Tags</label>
-            <input id="tags" name="tags" type="text" autocomplete="off" placeholder="barrier function, lipids" />
-          </div>
-        </div>
-
-        <div class="field checkbox-field">
-          <input id="draft" name="draft" type="checkbox" />
-          <label for="draft">Save as draft</label>
-        </div>
-
-        <div class="field">
-          <label for="content">Content</label>
-          <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
-          ></textarea>
-        </div>
-
-        <div class="field">
-          <label for="sources">Sources</label>
-          <textarea
-            id="sources"
-            name="sources"
-            class="sources-input"
-            rows="4"
-            placeholder="One source per line, or comma-separated citations."></textarea>
-          <p class="hint">Imported <code>sources[]</code> are stored as one citation per line.</p>
-        </div>
-
-        <div class="field">
-          <label for="image-upload">Image upload</label>
-          <label class="image-upload-button" for="image-upload">
-            <Icon name="tabler:photo-plus" class="image-upload-icon" aria-hidden="true" />
-            <span>Choose images</span>
-          </label>
-          <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
-          <p class="hint">
-            Selected images will be committed with the article under <code>src/assets/images/uploads/</code>. Allowed
-            types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
-            <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
-          </p>
-          <ul id="image-list" class="image-list" aria-live="polite"></ul>
-        </div>
-
-        <div class="field">
-          <label for="featured-image">Featured image</label>
-          <select id="featured-image" name="featuredImage">
-            <option value="">Select an uploaded image</option>
-          </select>
-          <input id="existing-featured-image-path" name="existingFeaturedImagePath" type="hidden" />
-        </div>
-
-        <div class="field">
-          <label for="video-link">Optional video link</label>
-          <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="cta-link">Optional CTA link</label>
-            <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+          <div class="publish-output-summary" aria-label="Publish output summary">
+            <p class="summary-label">Suggested destination</p>
+            <p id="suggested-location" class="suggestion">src/data/post/slug.md</p>
+            <p class="publish-message">
+              Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.
+            </p>
           </div>
 
-          <div class="field">
-            <label for="cta-text">Optional CTA text</label>
-            <input id="cta-text" name="ctaText" type="text" placeholder="Learn more" />
+          <div class="actions">
+            <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
+            <button id="publish" class="btn-primary" type="button">Publish Article</button>
+            <button id="preview" class="btn-secondary" type="button">Preview</button>
+            <a class="btn-secondary" href="/admin/drafts">Drafts</a>
           </div>
-        </div>
 
-        <div class="field">
-          <label for="seo-description">Optional SEO description</label>
-          <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
-        </div>
-
-        <div class="field checkbox-field">
-          <input id="overwrite-slug" name="overwrite" type="checkbox" />
-          <label for="overwrite-slug">Overwrite an existing article with this slug</label>
-        </div>
-
-        <div class="actions">
-          <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
-          <a class="btn-secondary" href="/admin/drafts">Drafts</a>
-          <button id="preview" class="btn-secondary" type="button">Preview</button>
-          <button id="publish" class="btn-secondary" type="button">Publish Article</button>
-        </div>
-        <div class="status-line">
-          <p id="status" class="status" aria-live="polite"></p>
-          <span id="unsaved-changes" class="unsaved-changes" aria-live="polite" hidden>Unsaved changes</span>
-        </div>
-      </form>
-    </section>
-
-    <section class="admin-card admin-panel" aria-labelledby="preview-heading" data-auth-gated hidden>
-      <h2 id="preview-heading">Preview</h2>
-      <div class="preview-box">
-        <h3 id="preview-title">Untitled article</h3>
-        <p>
-          Featured image path:
-          <span id="preview-featured-image" class="preview-image-path">None selected</span>
-        </p>
-        <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
-      </div>
-    </section>
-
-    <section class="admin-card admin-panel" aria-labelledby="publish-output-heading" data-auth-gated hidden>
-      <h2 id="publish-output-heading">Publish output</h2>
-      <p>
-        Suggested destination: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
-      </p>
-      <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
-        <h3 id="publish-checklist-heading">Publish readiness checklist</h3>
-        <ul id="publish-checklist" aria-live="polite">
-          <li data-checklist-item="title">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Title present</span>
-          </li>
-          <li data-checklist-item="slug">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Valid slug</span>
-          </li>
-          <li data-checklist-item="content">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Content present</span>
-          </li>
-          <li data-checklist-item="excerpt">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Excerpt</span>
-          </li>
-          <li data-checklist-item="publishDate">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Publish date</span>
-          </li>
-          <li data-checklist-item="sources">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Sources (at least 1)</span>
-          </li>
-          <li data-checklist-item="featuredImage">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Featured image selected</span>
-          </li>
-        </ul>
-      </div>
-      <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button>
-      <textarea id="output-markdown" class="output-markdown" readonly></textarea>
-      <p class="publish-message">
-        Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.
-      </p>
-    </section>
+          <details class="markdown-backup" open>
+            <summary>Markdown backup</summary>
+            <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button
+            >
+            <textarea id="output-markdown" class="output-markdown" readonly></textarea>
+          </details>
+        </section>
+      </aside>
+    </div>
 
     <div id="toast" class="toast" aria-live="polite" hidden></div>
   </section>
@@ -289,6 +307,44 @@ const metadata = {
     color: var(--aw-color-text-muted);
     font-size: 0.95rem;
     font-weight: 700;
+  }
+
+  .publish-workspace[hidden] {
+    display: none;
+  }
+
+  .publish-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 23rem);
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .publish-main {
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  .publish-sidebar {
+    position: sticky;
+    top: 1rem;
+    min-width: 0;
+  }
+
+  .readiness-card {
+    max-height: calc(100vh - 2rem);
+    margin-top: 0;
+    overflow: auto;
+  }
+
+  .sidebar-kicker {
+    margin: 0 0 0.35rem;
+    color: var(--aw-color-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
 
   .toast {
@@ -482,6 +538,11 @@ const metadata = {
     margin-top: 1.5rem;
   }
 
+  .publish-main .admin-panel,
+  .publish-sidebar .admin-panel {
+    margin-top: 0;
+  }
+
   .admin-panel h2 {
     margin: 0 0 0.9rem;
     color: var(--aw-color-text-heading);
@@ -663,14 +724,20 @@ const metadata = {
   }
 
   .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1.4rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    margin-top: 1rem;
   }
 
-  .copy-button {
-    margin-bottom: 0.8rem;
+  .actions > button,
+  .actions > a {
+    width: 100%;
+  }
+
+  .markdown-backup .copy-button {
+    width: 100%;
+    margin: 0.8rem 0;
   }
 
   .publish-checklist {
@@ -701,6 +768,10 @@ const metadata = {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .publish-sidebar .publish-checklist ul {
+    grid-template-columns: 1fr;
   }
 
   .publish-checklist li {
@@ -774,16 +845,54 @@ const metadata = {
     background: var(--aw-color-bg-surface);
   }
 
+  .publish-output-summary,
+  .markdown-backup {
+    margin-top: 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.dark) .publish-output-summary,
+  :global(.dark) .markdown-backup {
+    border-color: rgb(30 41 59);
+  }
+
+  .summary-label {
+    margin: 0 0 0.35rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .publish-output-summary .suggestion {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .markdown-backup summary {
+    color: var(--aw-color-text-heading);
+    cursor: pointer;
+    font-weight: 800;
+  }
+
   .output-markdown {
-    min-height: 260px;
+    min-height: 16rem;
+    max-height: 35vh;
     margin-top: 0;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    font-size: 0.9rem;
+    font-size: 0.86rem;
   }
 
   .publish-message {
-    margin: 0.85rem 0 0;
+    margin: 0.75rem 0 0;
     color: var(--aw-color-secondary);
+    font-size: 0.9rem;
     font-weight: 800;
   }
 
@@ -831,10 +940,33 @@ const metadata = {
     color: rgb(253 230 138);
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 1023px) {
+    .publish-workspace {
+      grid-template-columns: 1fr;
+    }
+
+    .publish-sidebar {
+      position: static;
+    }
+
+    .readiness-card {
+      max-height: none;
+      overflow: visible;
+    }
+  }
+
+  @media (max-width: 767px) {
     .admin-page {
       padding-top: 1.5rem;
       padding-bottom: 2.5rem;
+    }
+
+    .publish-workspace {
+      grid-template-columns: 1fr;
+    }
+
+    .publish-sidebar {
+      position: static;
     }
 
     .admin-card {
