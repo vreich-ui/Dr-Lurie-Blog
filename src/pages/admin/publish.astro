@@ -1421,7 +1421,9 @@ const metadata = {
       return duplicates;
     };
 
+    const baselineContentSourceSchemaVersion = 'content_source.v1';
     const contentSourceV1Error = 'Import JSON must use content_source.v1.';
+    let currentContentSourceSchemaVersionPromise;
 
     const isPlainObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
@@ -1446,6 +1448,46 @@ const metadata = {
 
       return { exists: false, value: undefined };
     };
+
+    const getCurrentContentSourceSchemaVersion = async () => {
+      currentContentSourceSchemaVersionPromise ||= (async () => {
+        const response = await fetch('/mcp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 'admin-publish-schema-version', method: 'tools/list' }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Could not verify the current content_source schema version.');
+        }
+
+        const body = await response.json();
+        const tools = Array.isArray(body?.result?.tools) ? body.result.tools : [];
+        const createRequestTool = tools.find((tool) => tool?.name === 'save_json_blob_create_request');
+        const schemaVersion =
+          createRequestTool?.inputSchema?.properties?.input?.properties?.schema_version?.const ||
+          createRequestTool?.inputSchema?.properties?.input?.properties?.schema_version?.enum?.[0];
+
+        if (typeof schemaVersion !== 'string' || !schemaVersion.trim()) {
+          throw new Error('Could not verify the current content_source schema version.');
+        }
+
+        return schemaVersion.trim();
+      })().catch((error) => {
+        currentContentSourceSchemaVersionPromise = undefined;
+        throw error;
+      });
+
+      return currentContentSourceSchemaVersionPromise;
+    };
+
+    const getUnsupportedSchemaMessage = (currentSchemaVersion) =>
+      currentSchemaVersion === baselineContentSourceSchemaVersion
+        ? contentSourceV1Error
+        : `Import JSON must use ${baselineContentSourceSchemaVersion} or ${currentSchemaVersion}.`;
+
+    const getAllowedContentSourceSchemaVersions = (currentSchemaVersion) =>
+      new Set([baselineContentSourceSchemaVersion, currentSchemaVersion].filter(Boolean));
 
     const assertOptionalObject = (object, pathLabel, path) => {
       const result = getPathValue(object, path);
@@ -1488,7 +1530,7 @@ const metadata = {
       }
     };
 
-    const normalizeContentSourceV1Import = (data) => {
+    const normalizeContentSourceImportWrapper = (data, currentSchemaVersion) => {
       if (!isPlainObject(data)) {
         throw new Error(
           'JSON import must be a single top-level object. Arrays or multiple article objects are not supported.'
@@ -1496,8 +1538,9 @@ const metadata = {
       }
 
       const candidate = isPlainObject(data.input) ? data.input : data;
-      if (candidate.record_type !== 'content_source' || candidate.schema_version !== 'content_source.v1') {
-        throw new Error(contentSourceV1Error);
+      const allowedSchemaVersions = getAllowedContentSourceSchemaVersions(currentSchemaVersion);
+      if (candidate.record_type !== 'content_source' || !allowedSchemaVersions.has(candidate.schema_version)) {
+        throw new Error(getUnsupportedSchemaMessage(currentSchemaVersion));
       }
 
       [
@@ -1546,49 +1589,105 @@ const metadata = {
       return candidate;
     };
 
-    const populateTextFieldFromV1Path = (field, contentSource, paths) => {
+    const normalizeTextImportField = (contentSource, paths) => {
       const result = getFirstImportPathValue(contentSource, paths);
-      if (result.exists) field.value = result.value == null ? '' : result.value;
+      return {
+        exists: result.exists,
+        value: result.exists && result.value != null ? result.value : '',
+      };
     };
 
-    const populateFromContentSourceV1Import = (contentSource) => {
-      populateTextFieldFromV1Path(fields.title, contentSource, [
+    const normalizeContentSourceImportToFormData = (contentSource, currentSchemaVersion) => {
+      const title = normalizeTextImportField(contentSource, [
         ['publication', 'publish_payload', 'title'],
         ['content', 'title'],
       ]);
-      populateTextFieldFromV1Path(fields.slug, contentSource, [['publication', 'publish_payload', 'slug']]);
-      populateTextFieldFromV1Path(fields.author, contentSource, [['publication', 'publish_payload', 'author']]);
-      populateTextFieldFromV1Path(fields.excerpt, contentSource, [
+      const slug = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'slug']]);
+      const computedSlug = slugify(slug.value || title.value);
+      const author = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'author']]);
+      const excerpt = normalizeTextImportField(contentSource, [
         ['publication', 'publish_payload', 'excerpt'],
         ['content', 'deck'],
       ]);
-      populateTextFieldFromV1Path(fields.seoDescription, contentSource, [
+      const seoDescription = normalizeTextImportField(contentSource, [
         ['publication', 'publish_payload', 'seoDescription'],
         ['seo', 'meta_description'],
       ]);
-      populateTextFieldFromV1Path(fields.content, contentSource, [
+      const content = normalizeTextImportField(contentSource, [
         ['publication', 'publish_payload', 'content'],
         ['publication', 'publish_payload', 'markdown'],
         ['editorial', 'draft_markdown'],
       ]);
-
       const importedTags = getFirstImportPathValue(contentSource, [
         ['publication', 'publish_payload', 'tags'],
         ['taxonomy', 'tags'],
       ]);
-      if (importedTags.exists) {
-        fields.tags.value = Array.isArray(importedTags.value)
-          ? importedTags.value
-              .map((tag) => tag.trim())
-              .filter(Boolean)
-              .join(', ')
-          : '';
+      const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
+
+      return {
+        schemaVersion: contentSource.schema_version,
+        currentSchemaVersion,
+        title,
+        slug: {
+          exists: slug.exists || Boolean(computedSlug),
+          value: computedSlug,
+        },
+        author,
+        excerpt,
+        seoDescription,
+        content,
+        tags: {
+          exists: importedTags.exists,
+          value: Array.isArray(importedTags.value)
+            ? importedTags.value
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+                .join(', ')
+            : '',
+        },
+        sources: {
+          exists: importedSources.exists,
+          value: Array.isArray(importedSources.value) ? formatImportedList(importedSources.value) : '',
+        },
+      };
+    };
+
+    const validateContentSourceImportFormData = (formData) => {
+      const allowedSchemaVersions = getAllowedContentSourceSchemaVersions(formData.currentSchemaVersion);
+      if (!allowedSchemaVersions.has(formData.schemaVersion)) {
+        throw new Error(getUnsupportedSchemaMessage(formData.currentSchemaVersion));
       }
 
-      const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
-      if (importedSources.exists) {
-        fields.sources.value = Array.isArray(importedSources.value) ? formatImportedList(importedSources.value) : '';
+      if (!formData.title.exists || !formData.title.value.trim()) {
+        throw new Error('Import JSON must include a non-empty title.');
       }
+
+      if (!formData.slug.exists || !formData.slug.value.trim()) {
+        throw new Error('Import JSON must include a slug or enough title text to compute one.');
+      }
+
+      if (!formData.author.exists || !formData.author.value.trim()) {
+        throw new Error('Import JSON must include a non-empty publication.publish_payload.author.');
+      }
+    };
+
+    const parseContentSourceImportFormData = async (data) => {
+      const currentSchemaVersion = await getCurrentContentSourceSchemaVersion();
+      const contentSource = normalizeContentSourceImportWrapper(data, currentSchemaVersion);
+      const formData = normalizeContentSourceImportToFormData(contentSource, currentSchemaVersion);
+      validateContentSourceImportFormData(formData);
+      return formData;
+    };
+
+    const applyContentSourceImportFormData = (formData) => {
+      if (formData.title.exists) fields.title.value = formData.title.value;
+      if (formData.slug.exists) fields.slug.value = formData.slug.value;
+      if (formData.author.exists) fields.author.value = formData.author.value;
+      if (formData.excerpt.exists) fields.excerpt.value = formData.excerpt.value;
+      if (formData.seoDescription.exists) fields.seoDescription.value = formData.seoDescription.value;
+      if (formData.content.exists) fields.content.value = formData.content.value;
+      if (formData.tags.exists) fields.tags.value = formData.tags.value;
+      if (formData.sources.exists) fields.sources.value = formData.sources.value;
 
       updatePreview();
       updatePublishOutput();
@@ -1655,11 +1754,16 @@ const metadata = {
       return candidate.slice(objectStart, objectEnd + 1);
     };
 
-    const loadJsonImport = (rawValue = fields.jsonImport.value) => {
+    const failJsonImport = (message) => {
+      setJsonImportStatus(message, true);
+      window.alert(message);
+    };
+
+    const loadJsonImport = async (rawValue = fields.jsonImport.value) => {
       const rawJson = rawValue.trim();
       if (!rawJson) {
-        setJsonImportStatus('Paste JSON or choose a .json file before loading.', true);
-        return;
+        failJsonImport('Paste JSON or choose a .json file before loading.');
+        return false;
       }
 
       try {
@@ -1672,13 +1776,15 @@ const metadata = {
         }
 
         const data = JSON.parse(objectJson);
-        const contentSource = normalizeContentSourceV1Import(data);
-        populateFromContentSourceV1Import(contentSource);
-        setJsonImportStatus('content_source.v1 JSON loaded into the publishing form.');
+        const formData = await parseContentSourceImportFormData(data);
+        applyContentSourceImportFormData(formData);
+        setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
+        return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
         const isSyntaxError = error instanceof SyntaxError;
-        setJsonImportStatus(isSyntaxError ? `Invalid JSON. ${message}` : message, true);
+        failJsonImport(isSyntaxError ? `Invalid JSON. ${message}` : message);
+        return false;
       }
     };
 
@@ -1700,21 +1806,23 @@ const metadata = {
 
       fields.jsonUploadName.textContent = file.name;
       if (!file.name.toLowerCase().endsWith('.json')) {
-        setJsonImportStatus('Choose a .json file for import.', true);
+        failJsonImport('Choose a .json file for import.');
         fields.jsonUpload.value = '';
         return;
       }
 
       try {
         const rawJson = await readJsonFile(file);
-        fields.jsonImport.value = rawJson;
-        loadJsonImport(rawJson);
+        const loaded = await loadJsonImport(rawJson);
+        if (loaded) fields.jsonImport.value = rawJson;
       } catch (error) {
-        setJsonImportStatus(error instanceof Error ? error.message : 'JSON file could not be read.', true);
+        failJsonImport(error instanceof Error ? error.message : 'JSON file could not be read.');
       }
     });
 
-    document.querySelector('#load-json').addEventListener('click', () => loadJsonImport());
+    document.querySelector('#load-json').addEventListener('click', () => {
+      loadJsonImport();
+    });
 
     fields.imageUpload.addEventListener('change', () => {
       selectedFiles = Array.from(fields.imageUpload.files || []);
