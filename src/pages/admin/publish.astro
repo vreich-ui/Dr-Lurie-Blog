@@ -252,14 +252,6 @@ const metadata = {
                 <span class="checklist-icon" aria-hidden="true">☐</span>
                 <span class="checklist-label">Publish date</span>
               </li>
-              <li data-checklist-item="sources">
-                <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Sources (at least 1)</span>
-              </li>
-              <li data-checklist-item="featuredImage">
-                <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Featured image selected</span>
-              </li>
             </ul>
           </div>
 
@@ -269,11 +261,19 @@ const metadata = {
           </div>
 
           <div class="publish-output-summary" aria-label="Publish output summary">
-            <p class="summary-label">Suggested destination</p>
+            <div class="summary-heading-row">
+              <p class="summary-label">Destination slug</p>
+              <a
+                class="summary-edit-link"
+                href="#slug"
+                aria-label="Edit destination slug"
+                title="Edit destination slug"
+              >
+                <Icon name="tabler:pencil" class="summary-edit-icon" aria-hidden="true" />
+                <span class="sr-only">Edit destination slug</span>
+              </a>
+            </div>
             <p id="suggested-location" class="suggestion">src/data/post/slug.md</p>
-            <p class="publish-message">
-              Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.
-            </p>
           </div>
 
           <div class="actions">
@@ -284,9 +284,16 @@ const metadata = {
           </div>
 
           <details class="markdown-backup" open>
-            <summary>Markdown backup</summary>
-            <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button
-            >
+            <summary>Save backup</summary>
+            <div class="backup-actions">
+              <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown</button>
+              <a
+                id="download-json-backup"
+                class="btn-secondary btn-sm backup-download-link"
+                href="#"
+                download="dr-lurie-draft-backup.json">Download JSON</a
+              >
+            </div>
             <textarea id="output-markdown" class="output-markdown" readonly></textarea>
           </details>
         </section>
@@ -333,9 +340,7 @@ const metadata = {
   }
 
   .readiness-card {
-    max-height: calc(100vh - 2rem);
     margin-top: 0;
-    overflow: auto;
   }
 
   .sidebar-kicker {
@@ -431,7 +436,6 @@ const metadata = {
 
   .json-import-input {
     min-height: 9rem;
-    max-height: 13rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.92rem;
   }
@@ -859,8 +863,16 @@ const metadata = {
     border-color: rgb(30 41 59);
   }
 
+  .summary-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+
   .summary-label {
-    margin: 0 0 0.35rem;
+    margin: 0;
     color: var(--aw-color-text-muted);
     font-size: 0.75rem;
     font-weight: 800;
@@ -875,6 +887,39 @@ const metadata = {
     font-weight: 800;
   }
 
+  .summary-edit-link {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--aw-color-text-muted);
+    text-decoration: none;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .summary-edit-link:hover,
+  .summary-edit-link:focus-visible {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-accent);
+    outline: none;
+  }
+
+  .summary-edit-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .backup-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+
   .markdown-backup summary {
     color: var(--aw-color-text-heading);
     cursor: pointer;
@@ -883,17 +928,11 @@ const metadata = {
 
   .output-markdown {
     min-height: 16rem;
-    max-height: 35vh;
     margin-top: 0;
+    overflow: hidden;
+    resize: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.86rem;
-  }
-
-  .publish-message {
-    margin: 0.75rem 0 0;
-    color: var(--aw-color-secondary);
-    font-size: 0.9rem;
-    font-weight: 800;
   }
 
   .checkbox-field {
@@ -947,11 +986,6 @@ const metadata = {
 
     .publish-sidebar {
       position: static;
-    }
-
-    .readiness-card {
-      max-height: none;
-      overflow: visible;
     }
   }
 
@@ -1049,10 +1083,13 @@ const metadata = {
       markdownPreview: document.querySelector('#markdown-preview'),
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
+      copyOutput: document.querySelector('#copy-output'),
+      downloadJsonBackup: document.querySelector('#download-json-backup'),
       publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
       saveDraft: document.querySelector('#save-draft'),
       publish: document.querySelector('#publish'),
       publishMode: document.querySelector('#publish-mode'),
+      preview: document.querySelector('#preview'),
       toast: document.querySelector('#toast'),
     };
 
@@ -1139,6 +1176,18 @@ const metadata = {
       fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent();
     };
 
+    const getHasPreviewContent = () =>
+      Boolean(
+        fields.title.value.trim() ||
+          fields.content.value.trim() ||
+          fields.excerpt.value.trim() ||
+          getFeaturedImagePath().trim()
+      );
+
+    const updatePreviewButtonState = () => {
+      fields.preview.disabled = !getHasPreviewContent();
+    };
+
     const updatePublishButtonState = () => {
       const hasMinimumPublishContent = Boolean(
         fields.title.value.trim() &&
@@ -1210,6 +1259,7 @@ const metadata = {
       setAdminShellVisible(isAdmin);
       updatePublishButtonState();
       updateSaveDraftButtonState();
+      updatePreviewButtonState();
       setGatedContentVisible(isAdmin);
 
       if (!isAdmin && state !== 'checking') redirectToHome();
@@ -1822,8 +1872,6 @@ const metadata = {
       content: fields.content.value.trim().length > 0,
       excerpt: fields.excerpt.value.trim().length > 0,
       publishDate: fields.publishDate.value.trim().length > 0,
-      sources: parseSources(fields.sources.value).length >= 1,
-      featuredImage: getFeaturedImagePath().length > 0,
     });
 
     const updatePublishChecklist = () => {
@@ -1843,11 +1891,25 @@ const metadata = {
       });
     };
 
+    const updateBackupDownload = () => {
+      const { slug } = buildMarkdown();
+      const backupJson = JSON.stringify(buildContentSourceDraft(), null, 2);
+      fields.downloadJsonBackup.href = `data:application/json;charset=utf-8,${encodeURIComponent(backupJson)}`;
+      fields.downloadJsonBackup.download = `${slug || 'dr-lurie-draft'}-backup.json`;
+    };
+
+    const resizeOutputMarkdown = () => {
+      fields.outputMarkdown.style.height = 'auto';
+      fields.outputMarkdown.style.height = `${fields.outputMarkdown.scrollHeight}px`;
+    };
+
     const updatePublishOutput = () => {
       const { slug, markdown } = buildMarkdown();
       fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
       fields.outputMarkdown.value = markdown;
+      resizeOutputMarkdown();
       updatePublishChecklist();
+      updateBackupDownload();
     };
 
     const saveLocalRecoveryDraft = () => {
@@ -2413,6 +2475,7 @@ const metadata = {
       updatePublishOutput();
       updatePublishButtonState();
       updateSaveDraftButtonState();
+      updatePreviewButtonState();
     };
 
     const getImportJsonObjectText = (text) => {
@@ -2634,11 +2697,13 @@ const metadata = {
       if (previousFeaturedImage) fields.featuredImage.value = previousFeaturedImage;
       updatePreview();
       updatePublishOutput();
+      updatePreviewButtonState();
       setUnsavedChanges(true);
     });
 
     document.querySelector('#save-draft').addEventListener('click', saveDraft);
-    document.querySelector('#preview').addEventListener('click', () => {
+    fields.preview.addEventListener('click', () => {
+      if (fields.preview.disabled) return;
       updatePreview();
       setStatus('Preview updated.');
     });
@@ -2745,7 +2810,7 @@ const metadata = {
     };
 
     fields.publish.addEventListener('click', publishArticle);
-    document.querySelector('#copy-output').addEventListener('click', () => {
+    fields.copyOutput.addEventListener('click', () => {
       updatePublishOutput();
       copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
     });
@@ -2756,6 +2821,7 @@ const metadata = {
         updatePublishOutput();
         updatePublishButtonState();
         updateSaveDraftButtonState();
+        updatePreviewButtonState();
         setUnsavedChanges(true);
       });
     });
@@ -2775,6 +2841,7 @@ const metadata = {
     if (!isEditMode()) loadDraft();
     updatePublishButtonState();
     updateSaveDraftButtonState();
+    updatePreviewButtonState();
     updatePreview();
     updatePublishOutput();
     setUnsavedChanges(false);
