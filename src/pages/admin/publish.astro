@@ -1148,6 +1148,22 @@ const metadata = {
       fields.outputMarkdown.value = markdown;
     };
 
+    const saveLocalRecoveryDraft = () => {
+      try {
+        localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+        return true;
+      } catch (error) {
+        console.warn('Local recovery draft could not be saved.', error);
+        return false;
+      }
+    };
+
+    const clearLocalCheckoutState = () => {
+      sessionStorage.removeItem('dr-lurie-workflow-request-id');
+      sessionStorage.removeItem('dr-lurie-workflow-lock-token');
+      localStorage.removeItem(draftKey);
+    };
+
     const saveDraft = async () => {
       const saveButton = document.querySelector('#save-draft');
       const computedSlug = slugify(fields.slug.value || fields.title.value);
@@ -1185,12 +1201,18 @@ const metadata = {
           throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
         }
 
-        localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+        clearLocalCheckoutState();
         window.location.href = '/admin';
       } catch (error) {
         console.error('JSON draft save failed.', error);
-        localStorage.setItem(draftKey, JSON.stringify(getDraft()));
-        setStatus(error instanceof Error ? error.message : 'JSON draft could not be saved.', false);
+        const recoverySaved = saveLocalRecoveryDraft();
+        const message = error instanceof Error ? error.message : 'JSON draft could not be saved.';
+        setStatus(
+          recoverySaved
+            ? `${message} A local recovery draft was saved, but JSON was not saved to Blobs.`
+            : `${message} JSON was not saved to Blobs and local recovery failed.`,
+          false
+        );
       } finally {
         saveButton.disabled = false;
       }

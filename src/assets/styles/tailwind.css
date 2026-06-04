@@ -4,35 +4,85 @@
 
 @layer utilities {
   /* Deliberate editorial spacing tiers */
-  .dl-mt-xs { margin-top: 8px; }
-  .dl-mb-xs { margin-bottom: 8px; }
-  .dl-pt-xs { padding-top: 8px; }
-  .dl-pb-xs { padding-bottom: 8px; }
-  .dl-gap-xs > * + * { margin-top: 8px; }
+  .dl-mt-xs {
+    margin-top: 8px;
+  }
+  .dl-mb-xs {
+    margin-bottom: 8px;
+  }
+  .dl-pt-xs {
+    padding-top: 8px;
+  }
+  .dl-pb-xs {
+    padding-bottom: 8px;
+  }
+  .dl-gap-xs > * + * {
+    margin-top: 8px;
+  }
 
-  .dl-mt-s { margin-top: 16px; }
-  .dl-mb-s { margin-bottom: 16px; }
-  .dl-pt-s { padding-top: 16px; }
-  .dl-pb-s { padding-bottom: 16px; }
-  .dl-gap-s > * + * { margin-top: 16px; }
+  .dl-mt-s {
+    margin-top: 16px;
+  }
+  .dl-mb-s {
+    margin-bottom: 16px;
+  }
+  .dl-pt-s {
+    padding-top: 16px;
+  }
+  .dl-pb-s {
+    padding-bottom: 16px;
+  }
+  .dl-gap-s > * + * {
+    margin-top: 16px;
+  }
 
-  .dl-mt-m { margin-top: 28px; }
-  .dl-mb-m { margin-bottom: 28px; }
-  .dl-pt-m { padding-top: 28px; }
-  .dl-pb-m { padding-bottom: 28px; }
-  .dl-gap-m > * + * { margin-top: 28px; }
+  .dl-mt-m {
+    margin-top: 28px;
+  }
+  .dl-mb-m {
+    margin-bottom: 28px;
+  }
+  .dl-pt-m {
+    padding-top: 28px;
+  }
+  .dl-pb-m {
+    padding-bottom: 28px;
+  }
+  .dl-gap-m > * + * {
+    margin-top: 28px;
+  }
 
-  .dl-mt-l { margin-top: 48px; }
-  .dl-mb-l { margin-bottom: 48px; }
-  .dl-pt-l { padding-top: 48px; }
-  .dl-pb-l { padding-bottom: 48px; }
-  .dl-gap-l > * + * { margin-top: 48px; }
+  .dl-mt-l {
+    margin-top: 48px;
+  }
+  .dl-mb-l {
+    margin-bottom: 48px;
+  }
+  .dl-pt-l {
+    padding-top: 48px;
+  }
+  .dl-pb-l {
+    padding-bottom: 48px;
+  }
+  .dl-gap-l > * + * {
+    margin-top: 48px;
+  }
 
-  .dl-mt-xl { margin-top: 72px; }
-  .dl-mb-xl { margin-bottom: 72px; }
-  .dl-pt-xl { padding-top: 72px; }
-  .dl-pb-xl { padding-bottom: 72px; }
-  .dl-gap-xl > * + * { margin-top: 72px; }
+  .dl-mt-xl {
+    margin-top: 72px;
+  }
+  .dl-mb-xl {
+    margin-bottom: 72px;
+  }
+  .dl-pt-xl {
+    padding-top: 72px;
+  }
+  .dl-pb-xl {
+    padding-bottom: 72px;
+  }
+  .dl-gap-xl > * + * {
+    margin-top: 72px;
+  }
 
   .bg-page {
     background-color: var(--aw-color-bg-page);
