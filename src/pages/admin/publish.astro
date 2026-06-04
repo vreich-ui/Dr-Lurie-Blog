@@ -82,8 +82,15 @@ const metadata = {
 
         <div class="field">
           <label for="slug">Slug</label>
-          <input id="slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
-          <p id="slug-edit-hint" class="hint" hidden></p>
+          <input
+            id="slug"
+            name="slug"
+            type="text"
+            autocomplete="off"
+            placeholder="article-slug"
+            aria-describedby="slug-edit-hint"
+          />
+          <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
         </div>
 
         <div class="field">
@@ -466,6 +473,19 @@ const metadata = {
     outline: none;
   }
 
+  input.is-error {
+    border-color: var(--aw-color-accent);
+    background: rgb(254 242 242 / 72%);
+  }
+
+  input.is-error:focus {
+    box-shadow: 0 0 0 3px rgb(190 58 58 / 18%);
+  }
+
+  :global(.dark) input.is-error {
+    background: rgb(127 29 29 / 18%);
+  }
+
   textarea {
     min-height: 420px;
     resize: vertical;
@@ -482,6 +502,11 @@ const metadata = {
     margin: 0.45rem 0 0;
     color: var(--aw-color-text-muted);
     font-size: 0.92rem;
+  }
+
+  .hint.is-error {
+    color: var(--aw-color-accent);
+    font-weight: 700;
   }
 
   .image-list {
@@ -687,6 +712,9 @@ const metadata = {
 
     let imageNames = [];
     let selectedFiles = [];
+    let imagePreviewUrls = [];
+    let imageUploadMessage = '';
+    let imageUploadMessageIsError = false;
     let isAdmin = false;
     let editArticleLoaded = false;
 
@@ -695,6 +723,11 @@ const metadata = {
     const publicGitHubBranch = adminPage?.dataset.publicGithubBranch || 'main';
     const publicGitHubRepoUrl = adminPage?.dataset.publicGithubRepoUrl || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const slugInvalidMessage = 'Slug must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
+    const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+    const maxImageFileSizeBytes = 0.5 * 1024 * 1024;
+    const maxImageCount = 10;
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
@@ -705,17 +738,38 @@ const metadata = {
 
     const isEditMode = () => Boolean(getEditSlug());
 
+    const getSlugEditHint = () =>
+      isEditMode() ? `Slug is locked in edit mode. Updates overwrite src/data/post/${getEditSlug()}.md in place.` : '';
+
+    const renderSlugHint = (isInvalid) => {
+      const editHint = getSlugEditHint();
+      fields.slugHint.textContent = isInvalid ? slugInvalidMessage : editHint;
+      fields.slugHint.hidden = !isInvalid && !editHint;
+      fields.slugHint.classList.toggle('is-error', isInvalid);
+    };
+
+    const validateSlug = ({ announce = false } = {}) => {
+      const slug = fields.slug.value.trim();
+      const isInvalid = Boolean(slug) && !slugPattern.test(slug);
+      fields.slug.classList.toggle('is-error', isInvalid);
+      fields.slug.setAttribute('aria-invalid', String(isInvalid));
+      renderSlugHint(isInvalid);
+
+      if (isInvalid && announce) setStatus(slugInvalidMessage, false);
+      return !isInvalid;
+    };
+
+    const updatePublishButtonState = () => {
+      fields.publish.disabled = !isAdmin || !validateSlug();
+    };
+
     const setEditorModeCopy = (mode) => {
       const editing = mode === 'edit';
-      const editSlug = getEditSlug();
       fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
       fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
       fields.overwrite.checked = editing || fields.overwrite.checked;
       fields.slug.disabled = editing;
-      fields.slugHint.hidden = !editing;
-      fields.slugHint.textContent = editing
-        ? `Slug is locked in edit mode. Updates overwrite src/data/post/${editSlug}.md in place.`
-        : '';
+      validateSlug();
     };
 
     const setGatedContentVisible = (visible) => {
@@ -825,7 +879,7 @@ const metadata = {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
       setAdminShellVisible(isAdmin);
-      fields.publish.disabled = !isAdmin;
+      updatePublishButtonState();
       setGatedContentVisible(isAdmin);
 
       if (!isAdmin && state !== 'checking') redirectToHome();
@@ -1213,22 +1267,140 @@ const metadata = {
       }
     };
 
+    const formatFileSize = (bytes) => {
+      if (!Number.isFinite(bytes) || bytes < 0) return 'Unknown size';
+      if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+    };
+
+    const revokeImagePreviews = () => {
+      imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+      imagePreviewUrls = [];
+    };
+
+    const syncImageInputFiles = () => {
+      if (typeof DataTransfer !== 'function') return;
+
+      const dataTransfer = new DataTransfer();
+      selectedFiles.forEach((file) => dataTransfer.items.add(file));
+      fields.imageUpload.files = dataTransfer.files;
+    };
+
+    const setImageUploadMessage = (message, isError = false) => {
+      imageUploadMessage = message;
+      imageUploadMessageIsError = isError;
+    };
+
+    const validateImageFiles = (files) => {
+      const validFiles = [];
+      const errors = [];
+
+      files.forEach((file) => {
+        if (validFiles.length >= maxImageCount) {
+          errors.push(`${file.name} was skipped because only ${maxImageCount} images can be uploaded at once.`);
+          return;
+        }
+
+        if (!allowedImageTypes.has(file.type)) {
+          errors.push(`${file.name} was skipped because ${file.type || 'its file type'} is not supported.`);
+          return;
+        }
+
+        if (file.size > maxImageFileSizeBytes) {
+          errors.push(
+            `${file.name} was skipped because ${formatFileSize(file.size)} exceeds the ${formatFileSize(
+              maxImageFileSizeBytes
+            )} limit.`
+          );
+          return;
+        }
+
+        validFiles.push(file);
+      });
+
+      return { validFiles, errors };
+    };
+
+    const removeSelectedImage = (index) => {
+      const previousFeaturedImage = fields.featuredImage.value;
+      selectedFiles.splice(index, 1);
+      imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
+      syncImageInputFiles();
+      setImageUploadMessage(
+        imageNames.length ? `Removed image. ${imageNames.length} selected.` : 'Removed image.',
+        false
+      );
+      renderImages();
+      if (previousFeaturedImage && imageNames.includes(previousFeaturedImage)) {
+        fields.featuredImage.value = previousFeaturedImage;
+      }
+      updatePreview();
+      updatePublishOutput();
+    };
+
     const renderImages = () => {
+      const previousFeaturedImage = fields.featuredImage.value;
       fields.imageList.innerHTML = '';
       fields.featuredImage.innerHTML = '<option value="">Select an uploaded image</option>';
+      revokeImagePreviews();
 
-      imageNames.forEach((name) => {
+      if (imageUploadMessage) {
+        const messageItem = document.createElement('li');
+        messageItem.setAttribute('role', 'status');
+        messageItem.style.color = imageUploadMessageIsError ? 'var(--aw-color-accent)' : 'var(--aw-color-secondary)';
+        messageItem.style.fontWeight = '700';
+        messageItem.textContent = imageUploadMessage;
+        fields.imageList.append(messageItem);
+      }
+
+      imageNames.forEach((name, index) => {
+        const file = selectedFiles[index];
         const option = document.createElement('option');
         option.value = name;
         option.textContent = name;
         fields.featuredImage.append(option);
 
         const item = document.createElement('li');
+        const details = document.createElement('span');
         const filename = document.createElement('span');
+        const meta = document.createElement('span');
+        const actions = document.createElement('span');
         const copyButton = document.createElement('button');
+        const removeButton = document.createElement('button');
 
+        details.style.display = 'flex';
+        details.style.alignItems = 'center';
+        details.style.gap = '0.75rem';
+        details.style.minWidth = '0';
         filename.className = 'filename';
         filename.textContent = name;
+        meta.textContent = file ? `${formatFileSize(file.size)} • ${file.type || 'unknown type'}` : 'Saved upload';
+        meta.style.display = 'block';
+        meta.style.color = 'var(--aw-color-text-muted)';
+        meta.style.fontSize = '0.85rem';
+        actions.style.display = 'flex';
+        actions.style.flexWrap = 'wrap';
+        actions.style.gap = '0.5rem';
+
+        if (file) {
+          const previewUrl = URL.createObjectURL(file);
+          const thumbnail = document.createElement('img');
+          imagePreviewUrls.push(previewUrl);
+          thumbnail.src = previewUrl;
+          thumbnail.alt = `Preview of ${name}`;
+          thumbnail.loading = 'lazy';
+          thumbnail.style.width = '4rem';
+          thumbnail.style.height = '4rem';
+          thumbnail.style.flex = '0 0 auto';
+          thumbnail.style.borderRadius = '0.75rem';
+          thumbnail.style.objectFit = 'cover';
+          details.append(thumbnail);
+        }
+
+        const text = document.createElement('span');
+        text.append(filename, meta);
+        details.append(text);
+
         copyButton.className = 'btn-secondary btn-sm copy-button';
         copyButton.type = 'button';
         copyButton.textContent = 'Copy Markdown';
@@ -1236,9 +1408,19 @@ const metadata = {
           copyText(`![Alt text](${getUploadPath(name)})`, `Copied Markdown for ${name}.`);
         });
 
-        item.append(filename, copyButton);
+        removeButton.className = 'btn-secondary btn-sm';
+        removeButton.type = 'button';
+        removeButton.textContent = 'Remove';
+        removeButton.addEventListener('click', () => removeSelectedImage(index));
+
+        actions.append(copyButton, removeButton);
+        item.append(details, actions);
         fields.imageList.append(item);
       });
+
+      if (previousFeaturedImage && imageNames.includes(previousFeaturedImage)) {
+        fields.featuredImage.value = previousFeaturedImage;
+      }
     };
 
     const renderMarkdownPreview = (markdown) => {
@@ -1953,6 +2135,14 @@ const metadata = {
 
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
+      updatePublishButtonState();
+    });
+
+    ['input', 'change'].forEach((eventName) => {
+      fields.slug.addEventListener(eventName, () => {
+        validateSlug({ announce: true });
+        updatePublishButtonState();
+      });
     });
 
     fields.jsonUpload.addEventListener('change', async () => {
@@ -1980,9 +2170,19 @@ const metadata = {
     });
 
     fields.imageUpload.addEventListener('change', () => {
-      selectedFiles = Array.from(fields.imageUpload.files || []);
-      imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
       const previousFeaturedImage = fields.featuredImage.value;
+      const { validFiles, errors } = validateImageFiles(Array.from(fields.imageUpload.files || []));
+      selectedFiles = validFiles;
+      imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
+      syncImageInputFiles();
+      setImageUploadMessage(
+        errors.length
+          ? errors.join(' ')
+          : imageNames.length
+            ? `${imageNames.length} image${imageNames.length === 1 ? '' : 's'} ready to upload.`
+            : '',
+        errors.length > 0
+      );
       renderImages();
       if (previousFeaturedImage && !imageNames.includes(previousFeaturedImage))
         ensureFeaturedImageOption(previousFeaturedImage);
@@ -2012,6 +2212,11 @@ const metadata = {
       updatePublishOutput();
 
       const { slug } = buildMarkdown();
+      if (!validateSlug({ announce: true })) {
+        updatePublishButtonState();
+        return;
+      }
+
       if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
         setStatus('Title, slug, and Markdown content are required before publishing.', false);
         return;
@@ -2081,7 +2286,7 @@ const metadata = {
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
-        publishButton.disabled = !isAdmin;
+        updatePublishButtonState();
       }
     };
 
@@ -2101,6 +2306,7 @@ const metadata = {
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
     if (!isEditMode()) loadDraft();
+    updatePublishButtonState();
     updatePreview();
     updatePublishOutput();
     initializeClerkAuth();
