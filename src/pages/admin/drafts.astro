@@ -268,8 +268,43 @@ const metadata = {
 
   .draft-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  .icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.35rem;
+    height: 2.35rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 999px;
+    color: var(--aw-color-text-heading);
+    text-decoration: none;
+  }
+
+  .icon-action:hover,
+  .icon-action:focus-visible {
+    border-color: rgb(94 140 138 / 55%);
+    background: rgb(94 140 138 / 12%);
+  }
+
+  .icon-action svg {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+    padding: 0;
   }
 
   .empty-state {
@@ -527,8 +562,20 @@ const metadata = {
               </td>
               <td>
                 <div class="draft-actions">
-                  <a class="btn-secondary btn-sm" href="/admin/publish?draftId=${encodedId}">Open in Editor</a>
-                  <a class="btn-secondary btn-sm" href="/admin/review/${encodedId}">Preview</a>
+                  <a class="icon-action" href="/admin/publish?draftId=${encodedId}" aria-label="Edit draft" title="Edit draft">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                    <span class="sr-only">Edit draft</span>
+                  </a>
+                  <a class="icon-action" href="/admin/review/${encodedId}" aria-label="Preview draft" title="Preview draft">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <span class="sr-only">Preview draft</span>
+                  </a>
                 </div>
               </td>
             </tr>

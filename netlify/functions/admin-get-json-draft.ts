@@ -79,6 +79,7 @@ const toDraftPreview = async (record: WorkflowRecord) => {
 
   return {
     id: record.request_id,
+    input: record.input,
     title,
     slug: toText(payload?.slug),
     author: toText(payload?.author),
@@ -120,7 +121,7 @@ export const handler = async (event: LambdaEvent) => {
 
     const draft = await toDraftPreview(record);
 
-    return jsonResponse(200, { draft });
+    return jsonResponse(200, { draft, input: record.input });
   } catch (error) {
     console.error('Failed to load admin JSON draft.', error);
 

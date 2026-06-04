@@ -1243,7 +1243,8 @@ const metadata = {
 
         if (adminState.isAdmin) {
           setAuthState('signed-in');
-          await initializeEditMode(clerk);
+          const loadedDraft = await loadDraftFromBlobs(clerk);
+          if (!loadedDraft) await initializeEditMode(clerk);
           return;
         }
 
@@ -2475,15 +2476,15 @@ const metadata = {
       return candidate.slice(objectStart, objectEnd + 1);
     };
 
-    const failJsonImport = (message) => {
+    const failJsonImport = (message, { alert = true } = {}) => {
       setJsonImportStatus(message, true);
-      window.alert(message);
+      if (alert) window.alert(message);
     };
 
-    const loadJsonImport = async (rawValue = fields.jsonImport.value) => {
+    const loadJsonImport = async (rawValue = fields.jsonImport.value, { alertOnError = true } = {}) => {
       const rawJson = rawValue.trim();
       if (!rawJson) {
-        failJsonImport('Paste JSON or choose a .json file before loading.');
+        failJsonImport('Paste JSON or choose a .json file before loading.', { alert: alertOnError });
         return false;
       }
 
@@ -2508,7 +2509,7 @@ const metadata = {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
         const isSyntaxError = error instanceof SyntaxError;
-        failJsonImport(isSyntaxError ? `Invalid JSON. ${message}` : message);
+        failJsonImport(isSyntaxError ? `Invalid JSON. ${message}` : message, { alert: alertOnError });
         return false;
       }
     };
@@ -2520,6 +2521,58 @@ const metadata = {
         reader.addEventListener('error', () => reject(reader.error || new Error('JSON file could not be read.')));
         reader.readAsText(file);
       });
+
+    const getQueryDraftId = () => new URLSearchParams(window.location.search).get('draftId')?.trim() || '';
+
+    const loadDraftFromBlobs = async (clerk) => {
+      const draftId = getQueryDraftId();
+      if (!draftId) return false;
+
+      setStatus(`Loading draft ${draftId} from Blobs…`, false);
+
+      try {
+        const token = await clerk.session.getToken();
+        if (!token) throw new Error('Could not retrieve a Clerk session token.');
+
+        const response = await fetch(
+          `/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
+        }
+
+        const draftInput = result.input || result.draft?.input;
+        if (!draftInput) throw new Error('Draft response did not include JSON input.');
+
+        sessionStorage.setItem('dr-lurie-workflow-request-id', draftId);
+        if (result.lock_token || result.lockToken) {
+          sessionStorage.setItem('dr-lurie-workflow-lock-token', result.lock_token || result.lockToken);
+        }
+
+        const loaded = await loadJsonImport(JSON.stringify(draftInput, null, 2), { alertOnError: false });
+        if (!loaded) return false;
+
+        setUnsavedChanges(false);
+        setStatus(`Loaded draft ${draftId}.`, true);
+        return true;
+      } catch (error) {
+        console.error('Draft load failed.', error);
+        setStatus(
+          error instanceof Error ? error.message : 'Draft could not be loaded. You can continue manually.',
+          false
+        );
+        return false;
+      }
+    };
 
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
