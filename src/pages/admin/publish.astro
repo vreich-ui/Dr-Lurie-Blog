@@ -72,7 +72,10 @@ const metadata = {
 }'
           ></textarea>
           <div class="json-import-actions">
-            <button id="load-json" class="btn-secondary btn-sm" type="button">Load JSON</button>
+            <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
+              <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
+              <span>Update</span>
+            </button>
             <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
           </div>
           <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
@@ -136,7 +139,7 @@ const metadata = {
         </div>
 
         <div class="field">
-          <label for="content">Markdown content</label>
+          <label for="content">Content</label>
           <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
           ></textarea>
         </div>
@@ -412,9 +415,28 @@ const metadata = {
   }
 
   .json-upload-icon,
-  .image-upload-icon {
+  .image-upload-icon,
+  .json-update-icon {
     width: 1.05rem;
     height: 1.05rem;
+  }
+
+  .json-update-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  .json-update-button:disabled,
+  .image-upload-button.is-disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .image-upload-button.is-disabled {
+    pointer-events: none;
   }
 
   .json-import-actions {
@@ -874,9 +896,11 @@ const metadata = {
       jsonUpload: document.querySelector('#json-upload'),
       jsonUploadName: document.querySelector('#json-upload-name'),
       jsonImportStatus: document.querySelector('#json-import-status'),
+      loadJson: document.querySelector('#load-json'),
       draft: document.querySelector('#draft'),
       content: document.querySelector('#content'),
       imageUpload: document.querySelector('#image-upload'),
+      imageUploadButton: document.querySelector('.image-upload-button'),
       imageAllowedTypes: document.querySelector('#image-allowed-types'),
       imageMaxFileSize: document.querySelector('#image-max-file-size'),
       imageMaxCount: document.querySelector('#image-max-count'),
@@ -906,6 +930,7 @@ const metadata = {
     let imagePreviewUrls = [];
     let imageUploadMessage = '';
     let imageUploadMessageIsError = false;
+    let lastLoadedJsonImportValue = '';
     let isAdmin = false;
     let editArticleLoaded = false;
     let hasUnsavedChanges = false;
@@ -922,6 +947,18 @@ const metadata = {
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
     let toastTimer;
+
+    const updateJsonImportButtonState = () => {
+      const currentValue = fields.jsonImport.value.trim();
+      fields.loadJson.disabled = !currentValue || currentValue === lastLoadedJsonImportValue;
+    };
+
+    const updateImageUploadAvailability = () => {
+      const imageLimitReached = imageNames.length >= maxImageCount;
+      fields.imageUpload.disabled = imageLimitReached;
+      fields.imageUploadButton.classList.toggle('is-disabled', imageLimitReached);
+      fields.imageUploadButton.setAttribute('aria-disabled', String(imageLimitReached));
+    };
 
     const renderImageRulesHint = () => {
       fields.imageAllowedTypes.textContent = allowedImageTypeLabels.join('/');
@@ -1556,6 +1593,8 @@ const metadata = {
       if (previousFeaturedImage && imageNames.includes(previousFeaturedImage)) {
         fields.featuredImage.value = previousFeaturedImage;
       }
+
+      updateImageUploadAvailability();
     };
 
     const renderMarkdownPreview = (markdown) => {
@@ -2278,6 +2317,9 @@ const metadata = {
 
         const data = JSON.parse(objectJson);
         const formData = await parseContentSourceImportFormData(data);
+        fields.jsonImport.value = rawValue;
+        lastLoadedJsonImportValue = fields.jsonImport.value.trim();
+        updateJsonImportButtonState();
         applyContentSourceImportFormData(formData);
         setUnsavedChanges(true);
         setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
@@ -2323,14 +2365,16 @@ const metadata = {
 
       try {
         const rawJson = await readJsonFile(file);
-        const loaded = await loadJsonImport(rawJson);
-        if (loaded) fields.jsonImport.value = rawJson;
+        await loadJsonImport(rawJson);
       } catch (error) {
         failJsonImport(error instanceof Error ? error.message : 'JSON file could not be read.');
       }
     });
 
-    document.querySelector('#load-json').addEventListener('click', () => {
+    fields.jsonImport.addEventListener('input', updateJsonImportButtonState);
+    fields.jsonImport.addEventListener('change', updateJsonImportButtonState);
+
+    fields.loadJson.addEventListener('click', () => {
       loadJsonImport();
     });
 
@@ -2384,7 +2428,7 @@ const metadata = {
       }
 
       if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
-        setStatus('Title, slug, and Markdown content are required before publishing.', false);
+        setStatus('Title, slug, and content are required before publishing.', false);
         return;
       }
 
@@ -2478,6 +2522,8 @@ const metadata = {
       event.returnValue = '';
     });
 
+    lastLoadedJsonImportValue = fields.jsonImport.value.trim();
+    updateJsonImportButtonState();
     renderImageRulesHint();
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
