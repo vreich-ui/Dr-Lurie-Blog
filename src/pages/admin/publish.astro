@@ -925,6 +925,101 @@ const metadata = {
       overwrite: fields.overwrite.checked,
     });
 
+    const getCheckedOutWorkflowDraft = () => {
+      const params = new URLSearchParams(window.location.search);
+      const requestId = params.get('request_id') || sessionStorage.getItem('dr-lurie-workflow-request-id') || '';
+      const lockToken = params.get('lock_token') || sessionStorage.getItem('dr-lurie-workflow-lock-token') || '';
+
+      return { requestId: requestId.trim(), lockToken: lockToken.trim() };
+    };
+
+    const buildContentSourceDraft = () => {
+      const { slug, markdown } = buildMarkdown();
+      const featuredImage = getFeaturedImagePath();
+      const title = fields.title.value.trim();
+      const author = fields.author.value.trim();
+      const tags = parseTags(fields.tags.value);
+      const publishDate = getPublishDate().toISOString();
+      const payload = {
+        slug,
+        title,
+        markdown,
+        content: fields.content.value,
+        publishDate,
+        author,
+        tags,
+        draft: true,
+        overwrite: fields.overwrite.checked,
+        ...(fields.excerpt.value.trim()
+          ? { excerpt: fields.excerpt.value.trim(), description: fields.excerpt.value.trim() }
+          : {}),
+        ...(fields.category.value.trim() ? { category: fields.category.value.trim() } : {}),
+        ...(fields.seoDescription.value.trim() ? { seoDescription: fields.seoDescription.value.trim() } : {}),
+        ...(featuredImage ? { featuredImage } : {}),
+        ...(fields.existingFeaturedImagePath.value.trim()
+          ? { existingFeaturedImagePath: fields.existingFeaturedImagePath.value.trim() }
+          : {}),
+        ...(fields.videoLink.value.trim() ? { videoLink: fields.videoLink.value.trim() } : {}),
+        ...(fields.ctaLink.value.trim() ? { ctaLink: fields.ctaLink.value.trim() } : {}),
+        ...(fields.ctaText.value.trim() ? { ctaText: fields.ctaText.value.trim() } : {}),
+        metadata: {
+          form_schema: 'admin_publish_form.v1',
+          raw_sources: parseSources(fields.sources.value),
+          uploaded_image_names: imageNames,
+        },
+      };
+
+      return {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        content: {
+          schema_version: 'content_blocks.v1',
+          title,
+          ...(fields.excerpt.value.trim()
+            ? { deck: fields.excerpt.value.trim(), description: fields.excerpt.value.trim() }
+            : {}),
+          blocks: fields.content.value.trim()
+            ? [
+                {
+                  block_id: 'admin-draft-markdown',
+                  block_type: 'markdown',
+                  payload: { markdown: fields.content.value },
+                  section_id: 'body',
+                },
+              ]
+            : [],
+        },
+        taxonomy: {
+          schema_version: 'taxonomy.v1',
+          tags,
+        },
+        seo: {
+          schema_version: 'seo.v1',
+          ...(fields.title.value.trim() ? { meta_title: fields.title.value.trim() } : {}),
+          ...(fields.seoDescription.value.trim() ? { meta_description: fields.seoDescription.value.trim() } : {}),
+        },
+        editorial: {
+          schema_version: 'editorial.v1',
+          draft_markdown: fields.content.value,
+        },
+        publication: {
+          schema_version: 'publication.v1',
+          publication_status: 'draft',
+          publish_payload: payload,
+        },
+        workflow: {
+          schema_version: 'content_workflow.v1',
+          current_agent: 'draft',
+          next_agent: 'final_article',
+          handoff_notes: 'Admin JSON draft saved from the publishing form.',
+        },
+        versioning: {
+          schema_version: 'versioning.v1',
+          record_version: 1,
+        },
+      };
+    };
+
     const setStatus = (message, autoClear = true) => {
       fields.status.textContent = message;
       if (message && autoClear) {
@@ -1053,9 +1148,52 @@ const metadata = {
       fields.outputMarkdown.value = markdown;
     };
 
-    const saveDraft = () => {
-      localStorage.setItem(draftKey, JSON.stringify(getDraft()));
-      setStatus('Draft saved.');
+    const saveDraft = async () => {
+      const saveButton = document.querySelector('#save-draft');
+      const computedSlug = slugify(fields.slug.value || fields.title.value);
+      const hasMinimumFields = Boolean(fields.title.value.trim() && computedSlug && fields.author.value.trim());
+
+      if (!hasMinimumFields) {
+        setStatus('Title, slug, and author are required to save JSON draft.', false);
+        return;
+      }
+
+      const confirmed = window.confirm('Save draft JSON to Blobs and return to Admin Dashboard?');
+      if (!confirmed) return;
+
+      saveButton.disabled = true;
+      setStatus('Saving JSON draft to Blobs…', false);
+
+      try {
+        const clerkToken = await getClerkSessionToken();
+        const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+        const response = await fetch('/.netlify/functions/admin-save-json-draft', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...(requestId ? { request_id: requestId } : {}),
+            ...(lockToken ? { lock_token: lockToken } : {}),
+            input: buildContentSourceDraft(),
+          }),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
+        }
+
+        localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+        window.location.href = '/admin';
+      } catch (error) {
+        console.error('JSON draft save failed.', error);
+        localStorage.setItem(draftKey, JSON.stringify(getDraft()));
+        setStatus(error instanceof Error ? error.message : 'JSON draft could not be saved.', false);
+      } finally {
+        saveButton.disabled = false;
+      }
     };
 
     const loadDraft = () => {
