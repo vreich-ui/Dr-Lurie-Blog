@@ -1,0 +1,117 @@
+---
+interface Props {
+  activePath?: string;
+}
+
+const normalizePath = (path: string) => (path === '/admin' ? '/admin/' : path);
+const currentPath = normalizePath(Astro.props.activePath ?? Astro.url.pathname);
+const navItems = [
+  { href: '/admin/', label: 'Dashboard' },
+  { href: '/admin/publish', label: 'Publish' },
+  { href: '/admin/agent-admin', label: 'AI Publisher' },
+];
+---
+
+<nav class="admin-nav" aria-label="Admin navigation" data-auth-gated hidden>
+  <p class="admin-nav-kicker">Admin tools</p>
+  <div class="admin-nav-pills">
+    {
+      navItems.map((item) => {
+        const isActive = currentPath === item.href;
+        return (
+          <a
+            class:list={['admin-nav-pill', { 'is-active': isActive }]}
+            href={item.href}
+            aria-current={isActive ? 'page' : undefined}
+          >
+            {item.label}
+          </a>
+        );
+      })
+    }
+  </div>
+</nav>
+
+<style>
+  .admin-nav[hidden] {
+    display: none;
+  }
+
+  .admin-nav {
+    margin: -0.5rem 0 1.5rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: rgb(255 255 255 / 0.82);
+    padding: 0.8rem;
+    box-shadow: 0 1rem 2.5rem rgb(15 23 42 / 5%);
+  }
+
+  :global(.dark) .admin-nav {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.72);
+    box-shadow: none;
+  }
+
+  .admin-nav-kicker {
+    margin: 0 0 0.55rem;
+    color: var(--aw-color-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .admin-nav-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .admin-nav-pill {
+    border: 1px solid rgb(209 213 219);
+    border-radius: 999px;
+    padding: 0.5rem 0.8rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease;
+  }
+
+  .admin-nav-pill:hover,
+  .admin-nav-pill:focus-visible {
+    border-color: rgb(94 140 138 / 45%);
+    color: var(--aw-color-text-heading);
+    background: rgb(94 140 138 / 10%);
+  }
+
+  .admin-nav-pill.is-active {
+    border-color: rgb(94 140 138 / 55%);
+    color: var(--aw-color-text-heading);
+    background: rgb(94 140 138 / 16%);
+  }
+
+  :global(.dark) .admin-nav-pill {
+    border-color: rgb(51 65 85);
+  }
+
+  @media (max-width: 767px) {
+    .admin-nav {
+      margin-top: -0.25rem;
+      padding: 0.7rem;
+    }
+
+    .admin-nav-pills {
+      display: grid;
+      grid-template-columns: 1fr;
+    }
+
+    .admin-nav-pill {
+      text-align: center;
+    }
+  }
+</style>

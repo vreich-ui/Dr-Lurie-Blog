@@ -1,5 +1,6 @@
 ---
 import { Icon } from 'astro-icon/components';
+import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Dr. Lurié Science Admin';
@@ -36,6 +37,8 @@ const metadata = {
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
+    <AdminNav />
 
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
       <form id="publish-form" class="admin-form">

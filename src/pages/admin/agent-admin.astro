@@ -1,4 +1,5 @@
 ---
+import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 import publishingWidgetBuilderOutputRaw from '~/chatkit/widgets/AI Publishing Workflow.widget?raw';
 
@@ -73,6 +74,8 @@ const metadata = {
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
+    <AdminNav />
 
     <section class="agent-card chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated hidden>
       <div class="chatkit-panel-header">
