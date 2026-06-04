@@ -15,7 +15,7 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="drafts-page mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
+    class="drafts-page mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     hidden
@@ -25,7 +25,7 @@ const metadata = {
         <p class="drafts-kicker">Admin workspace</p>
         <h1>{pageTitle}</h1>
         <p class="drafts-intro">
-          Open saved JSON workflow drafts for review without exposing publish secrets in browser code.
+          Review JSON workflow drafts saved in Netlify Blobs and continue them in the publisher.
         </p>
       </div>
       <a class="btn-secondary" href="/admin/publish">Create draft</a>
@@ -35,22 +35,50 @@ const metadata = {
 
     <AdminNav />
 
-    <section class="drafts-card" aria-labelledby="drafts-open-heading" data-auth-gated hidden>
-      <p class="drafts-kicker">Draft review</p>
-      <h2 id="drafts-open-heading">Open a draft by request ID</h2>
-      <p class="hint">
-        Paste the saved workflow request ID returned by the publisher draft action, then open the dedicated review page.
-      </p>
-      <form id="draft-open-form" class="draft-open-form">
-        <label for="draft-id">Draft request ID</label>
-        <div class="draft-open-row">
-          <input id="draft-id" name="draftId" type="text" placeholder="admin-draft-…" autocomplete="off" required />
-          <button class="btn-primary" type="submit">Review draft</button>
+    <section class="drafts-card" aria-labelledby="drafts-heading" data-auth-gated hidden>
+      <div class="drafts-card-header">
+        <div>
+          <p class="drafts-kicker">Saved JSON drafts</p>
+          <h2 id="drafts-heading">Netlify Blobs drafts</h2>
+          <p class="hint">Draft metadata is loaded through an admin-only server function after Clerk auth resolves.</p>
         </div>
-      </form>
-      <p class="hint compact">
-        Review pages stay auth-gated and use server-side admin checks before any protected workflow data can be shown.
-      </p>
+        <button id="refresh-drafts" class="btn-secondary" type="button">Refresh</button>
+      </div>
+
+      <p id="drafts-list-status" class="list-status" aria-live="polite">Checking admin access…</p>
+
+      <div class="drafts-table-wrap" data-drafts-table-wrap hidden>
+        <table class="drafts-table">
+          <thead>
+            <tr>
+              <th scope="col">Title</th>
+              <th scope="col">Slug</th>
+              <th scope="col">Author</th>
+              <th scope="col">Updated</th>
+              <th scope="col">Readiness</th>
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="drafts-table-body"></tbody>
+        </table>
+      </div>
+
+      <div id="drafts-empty" class="empty-state" hidden>
+        <h3>No JSON drafts found</h3>
+        <p>Save a draft from the publisher, then return here to open it in the editor or preview page.</p>
+        <a class="btn-primary" href="/admin/publish">Create your first draft</a>
+      </div>
+
+      <details class="manual-open-panel">
+        <summary>Open a draft by request ID</summary>
+        <form id="draft-open-form" class="draft-open-form">
+          <label for="draft-id">Draft request ID</label>
+          <div class="draft-open-row">
+            <input id="draft-id" name="draftId" type="text" placeholder="admin-draft-…" autocomplete="off" required />
+            <button class="btn-primary" type="submit">Preview draft</button>
+          </div>
+        </form>
+      </details>
     </section>
   </section>
 </Layout>
@@ -84,7 +112,8 @@ const metadata = {
   }
 
   .drafts-header h1,
-  .drafts-card h2 {
+  .drafts-card h2,
+  .empty-state h3 {
     margin: 0;
     font-family: var(--aw-font-heading, inherit);
     font-weight: 800;
@@ -96,7 +125,9 @@ const metadata = {
   }
 
   .drafts-intro,
-  .hint {
+  .hint,
+  .list-status,
+  .empty-state p {
     color: var(--aw-color-text-muted);
   }
 
@@ -127,17 +158,155 @@ const metadata = {
     box-shadow: none;
   }
 
-  .hint {
+  .drafts-card-header {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+
+  .hint,
+  .list-status {
     margin: 0.75rem 0 0;
     line-height: 1.6;
   }
 
-  .hint.compact {
-    font-size: 0.92rem;
+  .list-status {
+    min-height: 1.5em;
+    font-weight: 700;
+  }
+
+  .list-status.is-error {
+    color: var(--aw-color-accent);
+  }
+
+  .drafts-table-wrap {
+    margin-top: 1rem;
+    overflow-x: auto;
+  }
+
+  .drafts-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 880px;
+    font-size: 0.94rem;
+  }
+
+  .drafts-table th,
+  .drafts-table td {
+    border-bottom: 1px solid rgb(229 231 235);
+    padding: 0.85rem 0.7rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  :global(.dark) .drafts-table th,
+  :global(.dark) .drafts-table td {
+    border-color: rgb(30 41 59);
+  }
+
+  .drafts-table th {
+    color: var(--aw-color-text-heading);
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .draft-title {
+    color: var(--aw-color-text-heading);
+    font-weight: 850;
+  }
+
+  .draft-slug,
+  .draft-id {
+    overflow-wrap: anywhere;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  }
+
+  .draft-id {
+    display: block;
+    margin-top: 0.28rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.78rem;
+  }
+
+  .readiness-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.3rem 0.58rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .readiness-badge.is-ready {
+    background: rgb(34 197 94 / 12%);
+    color: rgb(22 101 52);
+  }
+
+  .readiness-badge.is-draft {
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+  }
+
+  :global(.dark) .readiness-badge.is-ready {
+    color: rgb(187 247 208);
+  }
+
+  :global(.dark) .readiness-badge.is-draft {
+    color: rgb(253 230 138);
+  }
+
+  .readiness-missing {
+    margin: 0.38rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+  }
+
+  .draft-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  .empty-state {
+    margin-top: 1rem;
+    border: 1px dashed rgb(209 213 219);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  :global(.dark) .empty-state {
+    border-color: rgb(51 65 85);
+  }
+
+  .empty-state p {
+    margin: 0.75rem auto 1rem;
+    max-width: 34rem;
+  }
+
+  .manual-open-panel {
+    margin-top: 1.25rem;
+    border-top: 1px solid rgb(229 231 235);
+    padding-top: 1rem;
+  }
+
+  :global(.dark) .manual-open-panel {
+    border-color: rgb(30 41 59);
+  }
+
+  .manual-open-panel summary {
+    color: var(--aw-color-text-heading);
+    cursor: pointer;
+    font-weight: 850;
   }
 
   .draft-open-form {
-    margin-top: 1.25rem;
+    margin-top: 1rem;
   }
 
   .draft-open-form label {
@@ -192,6 +361,11 @@ const metadata = {
     color: var(--aw-color-text-heading);
   }
 
+  .btn-sm {
+    padding: 0.52rem 0.72rem;
+    font-size: 0.84rem;
+  }
+
   @media (max-width: 767px) {
     .drafts-page {
       padding-top: 2rem;
@@ -199,28 +373,20 @@ const metadata = {
     }
 
     .drafts-header,
+    .drafts-card-header,
     .draft-open-row {
       grid-template-columns: 1fr;
       flex-direction: column;
     }
+
+    .drafts-table-wrap {
+      margin-right: -1rem;
+      margin-left: -1rem;
+      padding: 0 1rem;
+    }
   }
 </style>
 
-<script>
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-nocheck
-  const draftOpenForm = document.querySelector('#draft-open-form');
-
-  draftOpenForm?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const formData = new FormData(draftOpenForm);
-    const draftId = String(formData.get('draftId') || '').trim();
-
-    if (!draftId) return;
-
-    window.location.href = `/admin/review/${encodeURIComponent(draftId)}`;
-  });
-</script>
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
@@ -232,7 +398,14 @@ const metadata = {
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const authStatus = document.querySelector('[data-auth-status]');
+    const draftOpenForm = document.querySelector('#draft-open-form');
+    const draftsTableWrap = document.querySelector('[data-drafts-table-wrap]');
+    const draftsTableBody = document.querySelector('#drafts-table-body');
+    const draftsEmpty = document.querySelector('#drafts-empty');
+    const draftsListStatus = document.querySelector('#drafts-list-status');
+    const refreshDraftsButton = document.querySelector('#refresh-drafts');
     let clerkLoadPromise;
+    let activeToken = '';
 
     const setGatedContentVisible = (visible) => {
       gatedContent.forEach((element) => {
@@ -270,6 +443,12 @@ const metadata = {
       if (authStatus) authStatus.textContent = message;
     };
 
+    const setListStatus = (message, isError = false) => {
+      if (!draftsListStatus) return;
+      draftsListStatus.textContent = message;
+      draftsListStatus.classList.toggle('is-error', isError);
+    };
+
     const setAuthState = (state) => {
       const isSignedIn = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
@@ -298,6 +477,97 @@ const metadata = {
         .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
     };
 
+    const escapeHtml = (value) =>
+      String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const formatDate = (value) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Unknown';
+
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(date);
+    };
+
+    const getReadinessLabel = (readiness) => `${readiness?.ready ?? 0}/${readiness?.total ?? 4} ready`;
+
+    const renderDrafts = (drafts) => {
+      const hasDrafts = drafts.length > 0;
+      if (draftsTableWrap) draftsTableWrap.hidden = !hasDrafts;
+      if (draftsEmpty) draftsEmpty.hidden = hasDrafts;
+      if (!draftsTableBody) return;
+
+      draftsTableBody.innerHTML = drafts
+        .map((draft) => {
+          const readiness = draft.readiness || { isReady: false, missing: [], ready: 0, total: 4 };
+          const encodedId = encodeURIComponent(draft.id);
+          const readinessClass = readiness.isReady ? 'is-ready' : 'is-draft';
+          const missing = readiness.missing?.length
+            ? `<p class="readiness-missing">Missing: ${escapeHtml(readiness.missing.join(', '))}</p>`
+            : '';
+
+          return `
+            <tr>
+              <td>
+                <span class="draft-title">${escapeHtml(draft.title || 'Untitled draft')}</span>
+                <span class="draft-id">${escapeHtml(draft.id)}</span>
+              </td>
+              <td class="draft-slug">${escapeHtml(draft.slug || '—')}</td>
+              <td>${escapeHtml(draft.author || '—')}</td>
+              <td>${escapeHtml(formatDate(draft.updatedAt))}</td>
+              <td>
+                <span class="readiness-badge ${readinessClass}">${escapeHtml(getReadinessLabel(readiness))}</span>
+                ${missing}
+              </td>
+              <td>
+                <div class="draft-actions">
+                  <a class="btn-secondary btn-sm" href="/admin/publish?draftId=${encodedId}">Open in Editor</a>
+                  <a class="btn-secondary btn-sm" href="/admin/review/${encodedId}">Preview</a>
+                </div>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    };
+
+    const loadDrafts = async (token = activeToken) => {
+      if (!token) return;
+      activeToken = token;
+      setListStatus('Loading JSON drafts…');
+      if (refreshDraftsButton) refreshDraftsButton.disabled = true;
+
+      try {
+        const response = await fetch('/.netlify/functions/admin-list-json-drafts', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Drafts could not be loaded (${response.status}).`);
+        }
+
+        const drafts = Array.isArray(result.drafts) ? result.drafts : [];
+        renderDrafts(drafts);
+        setListStatus(`${drafts.length} JSON draft${drafts.length === 1 ? '' : 's'} loaded.`);
+      } catch (error) {
+        renderDrafts([]);
+        setListStatus(error instanceof Error ? error.message : 'JSON drafts could not be loaded.', true);
+      } finally {
+        if (refreshDraftsButton) refreshDraftsButton.disabled = false;
+      }
+    };
+
     const renderAuthState = async (clerk) => {
       const signedIn = Boolean(clerk.isSignedIn && clerk.session);
 
@@ -305,7 +575,9 @@ const metadata = {
         const adminState = await getAdminStateForClerk(clerk);
 
         if (adminState.isAdmin) {
+          const token = await clerk.session.getToken();
           setAuthState('signed-in');
+          await loadDrafts(token);
           return;
         }
 
@@ -335,6 +607,22 @@ const metadata = {
         setAuthState('error');
       }
     };
+
+    draftOpenForm?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const formData = new FormData(draftOpenForm);
+      const draftId = String(formData.get('draftId') || '').trim();
+
+      if (!draftId) return;
+
+      window.location.href = `/admin/review/${encodeURIComponent(draftId)}`;
+    });
+
+    refreshDraftsButton?.addEventListener('click', () => {
+      loadDrafts().catch((error) => {
+        console.error('JSON drafts refresh failed.', error);
+      });
+    });
 
     initializeClerkAuth();
   })();

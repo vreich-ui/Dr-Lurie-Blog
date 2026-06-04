@@ -1400,7 +1400,11 @@ const metadata = {
 
     const getCheckedOutWorkflowDraft = () => {
       const params = new URLSearchParams(window.location.search);
-      const requestId = params.get('request_id') || sessionStorage.getItem('dr-lurie-workflow-request-id') || '';
+      const requestId =
+        params.get('draftId') ||
+        params.get('request_id') ||
+        sessionStorage.getItem('dr-lurie-workflow-request-id') ||
+        '';
       const lockToken = params.get('lock_token') || sessionStorage.getItem('dr-lurie-workflow-lock-token') || '';
 
       return { requestId: requestId.trim(), lockToken: lockToken.trim() };
