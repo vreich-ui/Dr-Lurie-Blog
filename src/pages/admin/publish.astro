@@ -4,6 +4,8 @@ import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Dr. Lurié Science Admin';
 const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const publicGitHubRepoUrl = import.meta.env.PUBLIC_GITHUB_REPOSITORY_URL ?? '';
+const publicGitHubBranch = import.meta.env.PUBLIC_GITHUB_BRANCH ?? 'main';
 const metadata = {
   title: pageTitle,
   robots: {
@@ -17,6 +19,8 @@ const metadata = {
   <section
     class="admin-page mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14"
     data-clerk-publishable-key={clerkPublishableKey}
+    data-public-github-branch={publicGitHubBranch}
+    data-public-github-repo-url={publicGitHubRepoUrl}
   >
     <header
       class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
@@ -212,6 +216,8 @@ const metadata = {
         Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.
       </p>
     </section>
+
+    <div id="toast" class="toast" aria-live="polite" hidden></div>
   </section>
 </Layout>
 
@@ -225,6 +231,41 @@ const metadata = {
     color: var(--aw-color-text-muted);
     font-size: 0.95rem;
     font-weight: 700;
+  }
+
+  .toast {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 50;
+    max-width: min(28rem, calc(100vw - 2rem));
+    border: 1px solid rgb(22 163 74 / 30%);
+    border-radius: 1rem;
+    background: rgb(240 253 244 / 96%);
+    box-shadow: 0 1rem 2.5rem rgb(15 23 42 / 16%);
+    color: rgb(22 101 52);
+    padding: 0.9rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .toast a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+
+  .toast-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.45rem;
+  }
+
+  :global(.dark) .toast {
+    border-color: rgb(34 197 94 / 32%);
+    background: rgb(20 83 45 / 94%);
+    color: rgb(220 252 231);
   }
 
   .admin-card {
@@ -639,6 +680,7 @@ const metadata = {
       outputMarkdown: document.querySelector('#output-markdown'),
       publish: document.querySelector('#publish'),
       publishMode: document.querySelector('#publish-mode'),
+      toast: document.querySelector('#toast'),
     };
 
     let imageNames = [];
@@ -648,10 +690,13 @@ const metadata = {
 
     const adminPage = document.querySelector('.admin-page');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+    const publicGitHubBranch = adminPage?.dataset.publicGithubBranch || 'main';
+    const publicGitHubRepoUrl = adminPage?.dataset.publicGithubRepoUrl || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
+    let toastTimer;
 
     const getEditSlug = () => slugify(new URLSearchParams(window.location.search).get('edit') || '');
 
@@ -1057,6 +1102,79 @@ const metadata = {
           if (fields.status.textContent === message) fields.status.textContent = '';
         }, 2500);
       }
+    };
+
+    const getPublicGitHubRepoUrl = () => {
+      if (!publicGitHubRepoUrl) return '';
+
+      try {
+        const url = new URL(publicGitHubRepoUrl);
+        return url.hostname === 'github.com'
+          ? url
+              .toString()
+              .replace(/\.git\/?$/, '')
+              .replace(/\/$/, '')
+          : '';
+      } catch {
+        return '';
+      }
+    };
+
+    const getGitHubToastLinks = ({ articlePath, commit }) => {
+      const repoUrl = getPublicGitHubRepoUrl();
+      if (!repoUrl) return [];
+
+      const links = [];
+      const safeArticlePath = String(articlePath || '').replace(/^\/+/, '');
+      const safeCommit = String(commit || '').trim();
+      const safeBranch = String(publicGitHubBranch || 'main').trim();
+      const fileRef = safeCommit || safeBranch;
+
+      if (safeArticlePath) {
+        links.push({
+          href: `${repoUrl}/blob/${encodeURIComponent(fileRef)}/${safeArticlePath.split('/').map(encodeURIComponent).join('/')}`,
+          label: 'View article on GitHub',
+        });
+      }
+
+      if (safeCommit) {
+        links.push({
+          href: `${repoUrl}/commit/${encodeURIComponent(safeCommit)}`,
+          label: 'View commit',
+        });
+      }
+
+      return links;
+    };
+
+    const showToast = (message, links = []) => {
+      if (!fields.toast) return;
+
+      window.clearTimeout(toastTimer);
+      fields.toast.replaceChildren();
+      const messageElement = document.createElement('div');
+      messageElement.textContent = message;
+      fields.toast.append(messageElement);
+
+      if (links.length) {
+        const linksElement = document.createElement('div');
+        linksElement.className = 'toast-links';
+        links.forEach((link) => {
+          const anchor = document.createElement('a');
+          anchor.href = link.href;
+          anchor.textContent = link.label;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          linksElement.append(anchor);
+        });
+        fields.toast.append(linksElement);
+      }
+
+      fields.toast.hidden = false;
+      toastTimer = window.setTimeout(() => {
+        fields.toast.hidden = true;
+        fields.toast.replaceChildren();
+      }, 4000);
     };
 
     const setJsonImportStatus = (message, isError = false, mirrorGlobal = true) => {
@@ -1937,12 +2055,15 @@ const metadata = {
         }
 
         const publishedPath = result.articlePath || result.path || `src/data/post/${slug}.md`;
-        const shortCommit = String(result.commit || '').slice(0, 7);
+        const commit = String(result.commit || '').trim();
+        const shortCommit = commit.slice(0, 7);
         const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
+        const toastMessage = `Published ${publishedPath}.${commit ? ` Commit: ${commit}` : ''}`;
         setStatus(
           isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`,
           false
         );
+        showToast(toastMessage, getGitHubToastLinks({ articlePath: publishedPath, commit }));
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
