@@ -114,8 +114,8 @@ const metadata = {
           <button id="publish-explicit-button" class="publish-button" type="button" disabled>Publish payload</button>
         </div>
         <label class="auto-publish-toggle" for="auto-publish-toggle">
-          <input id="auto-publish-toggle" type="checkbox" checked />
-          <span>Auto-publish when valid payload is captured</span>
+          <input id="auto-publish-toggle" type="checkbox" />
+          <span id="auto-publish-copy">Auto-publish disabled. Review the payload and click Publish when ready.</span>
         </label>
         <p id="publish-output-meta" class="publish-output-meta">Waiting for workflow output…</p>
         <pre id="publish-output-preview" class="publish-output-preview">No parsed output captured yet.</pre>
@@ -397,6 +397,7 @@ const metadata = {
       autoPublishToggle: document.querySelector('#auto-publish-toggle'),
       publishOutputMeta: document.querySelector('#publish-output-meta'),
       publishOutputPreview: document.querySelector('#publish-output-preview'),
+      autoPublishCopy: document.querySelector('#auto-publish-copy'),
     };
     const debugState = {
       sessionRequestStatus: 'not-started',
@@ -414,7 +415,7 @@ const metadata = {
     let isPublishInFlight = false;
     let chatkitInitialized = false;
     let capturedParsedPayload = null;
-    let autoPublishOnOutput = fields.autoPublishToggle?.checked ?? true;
+    let autoPublishOnOutput = false;
     const autoPublishedPayloadKeys = new Set();
     let clerkLoadPromise;
     const clerkPublishableKey = document.querySelector('.agent-admin-page')?.dataset.clerkPublishableKey || '';
@@ -974,21 +975,48 @@ const metadata = {
       });
     };
 
+    const setAutoPublishCopy = () => {
+      if (!fields.autoPublishCopy) return;
+      fields.autoPublishCopy.textContent = autoPublishOnOutput
+        ? 'Auto-publish enabled. The payload will publish automatically when a valid payload is captured.'
+        : 'Auto-publish disabled. Review the payload and click Publish when ready.';
+    };
+
     setChatkitConfigStatus();
+    setAutoPublishCopy();
     fields.autoPublishToggle?.addEventListener('change', (event) => {
-      autoPublishOnOutput = Boolean(event?.target?.checked);
+      const enabled = Boolean(event?.target?.checked);
+      if (
+        enabled &&
+        !window.confirm(
+          'Enable auto publish? This may commit changes automatically when the workflow captures a payload.'
+        )
+      ) {
+        event.target.checked = false;
+        autoPublishOnOutput = false;
+        setAutoPublishCopy();
+        return;
+      }
+      autoPublishOnOutput = enabled;
+      setAutoPublishCopy();
       if (capturedParsedPayload) {
         updatePublishPreview(
           capturedParsedPayload,
           autoPublishOnOutput
-            ? 'Auto-publish enabled for next valid captured payload.'
-            : 'Auto-publish disabled. Manual publish only.'
+            ? 'Auto-publish enabled. The payload will publish automatically when a valid payload is captured.'
+            : 'Auto-publish disabled. Review the payload and click Publish when ready.'
         );
       }
     });
     fields.publishButton?.addEventListener('click', () => {
       if (!capturedParsedPayload) {
         setStatus('Publish blocked: no parsed End node payload captured yet.', false);
+        return;
+      }
+      if (
+        (Boolean(capturedParsedPayload.overwrite) || Boolean(toText(capturedParsedPayload.markdown))) &&
+        !window.confirm('Publish now? This will commit content to GitHub.')
+      ) {
         return;
       }
       runPublishFromPayload(capturedParsedPayload, 'Manual console/test payload');
