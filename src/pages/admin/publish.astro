@@ -48,9 +48,16 @@ const metadata = {
             class="json-import-input"
             rows="6"
             placeholder='{
-  "title": "Article title",
-  "deck": "Short excerpt",
-  "sources": ["Source citation"]
+  "record_type": "content_source",
+  "schema_version": "content_source.v1",
+  "content": { "title": "Article title" },
+  "publication": {
+    "publish_payload": {
+      "slug": "article-slug",
+      "content": "Markdown content"
+    }
+  },
+  "sources": { "source_list": ["Source citation"] }
 }'
           ></textarea>
           <div class="json-import-actions">
@@ -1414,67 +1421,175 @@ const metadata = {
       return duplicates;
     };
 
-    const getImportArrayKeys = (fieldName) => [fieldName, `${fieldName}[]`];
+    const contentSourceV1Error = 'Import JSON must use content_source.v1.';
 
-    const getImportArrayValue = (data, fieldName) => {
-      const [plainKey, bracketedKey] = getImportArrayKeys(fieldName);
-      return data[plainKey] != null ? data[plainKey] : data[bracketedKey];
+    const isPlainObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+    const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+
+    const getPathValue = (object, path) => {
+      let current = object;
+
+      for (const key of path) {
+        if (!isPlainObject(current) || !hasOwn(current, key)) return { exists: false, value: undefined };
+        current = current[key];
+      }
+
+      return { exists: true, value: current };
     };
 
-    const validateImportArrayField = (data, fieldName) => {
-      getImportArrayKeys(fieldName).forEach((fieldKey) => {
-        if (data[fieldKey] == null) return;
+    const getFirstImportPathValue = (object, paths) => {
+      for (const path of paths) {
+        const result = getPathValue(object, path);
+        if (result.exists) return result;
+      }
 
-        if (!Array.isArray(data[fieldKey])) {
-          throw new Error(`JSON field "${fieldKey}" must be an array.`);
-        }
-
-        const hasInvalidItem = data[fieldKey].some((item) =>
-          fieldName === 'sources' ? typeof item !== 'string' && !isSimpleImportObject(item) : typeof item !== 'string'
-        );
-
-        if (hasInvalidItem) {
-          throw new Error(
-            fieldName === 'sources'
-              ? `JSON field "${fieldKey}" must contain only strings or simple objects.`
-              : `JSON field "${fieldKey}" must contain only strings.`
-          );
-        }
-      });
+      return { exists: false, value: undefined };
     };
 
-    const validateImportShape = (data) => {
-      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    const assertOptionalObject = (object, pathLabel, path) => {
+      const result = getPathValue(object, path);
+      if (result.exists && !isPlainObject(result.value)) {
+        throw new Error(`JSON field "${pathLabel}" must be an object.`);
+      }
+    };
+
+    const assertOptionalTextPath = (object, pathLabel, paths) => {
+      const result = getFirstImportPathValue(object, paths);
+      if (result.exists && result.value != null && typeof result.value !== 'string') {
+        throw new Error(`JSON field "${pathLabel}" must be a string.`);
+      }
+    };
+
+    const assertOptionalStringArrayPath = (object, pathLabel, paths) => {
+      const result = getFirstImportPathValue(object, paths);
+      if (!result.exists || result.value == null) return;
+
+      if (!Array.isArray(result.value)) {
+        throw new Error(`JSON field "${pathLabel}" must be an array.`);
+      }
+
+      if (result.value.some((item) => typeof item !== 'string')) {
+        throw new Error(`JSON field "${pathLabel}" must contain only strings.`);
+      }
+    };
+
+    const assertOptionalSourceListPath = (object) => {
+      const result = getPathValue(object, ['sources', 'source_list']);
+      if (!result.exists || result.value == null) return;
+
+      if (!Array.isArray(result.value)) {
+        throw new Error('JSON field "sources.source_list" must be an array.');
+      }
+
+      const hasInvalidItem = result.value.some((item) => typeof item !== 'string' && !isSimpleImportObject(item));
+      if (hasInvalidItem) {
+        throw new Error('JSON field "sources.source_list" must contain only strings or simple objects.');
+      }
+    };
+
+    const normalizeContentSourceV1Import = (data) => {
+      if (!isPlainObject(data)) {
         throw new Error(
           'JSON import must be a single top-level object. Arrays or multiple article objects are not supported.'
         );
       }
 
-      const textFields = ['title', 'deck', 'description', 'slug', 'content'];
-      const invalidTextField = textFields.find(
-        (fieldName) => data[fieldName] != null && typeof data[fieldName] !== 'string'
-      );
-      if (invalidTextField) throw new Error(`JSON field "${invalidTextField}" must be a string.`);
+      const candidate = isPlainObject(data.input) ? data.input : data;
+      if (candidate.record_type !== 'content_source' || candidate.schema_version !== 'content_source.v1') {
+        throw new Error(contentSourceV1Error);
+      }
 
-      ['tags', 'sources'].forEach((fieldName) => validateImportArrayField(data, fieldName));
+      [
+        ['content', ['content']],
+        ['publication', ['publication']],
+        ['publication.publish_payload', ['publication', 'publish_payload']],
+        ['editorial', ['editorial']],
+        ['seo', ['seo']],
+        ['taxonomy', ['taxonomy']],
+        ['sources', ['sources']],
+      ].forEach(([pathLabel, path]) => assertOptionalObject(candidate, pathLabel, path));
+
+      assertOptionalTextPath(candidate, 'publication.publish_payload.title or content.title', [
+        ['publication', 'publish_payload', 'title'],
+        ['content', 'title'],
+      ]);
+      assertOptionalTextPath(candidate, 'publication.publish_payload.slug', [
+        ['publication', 'publish_payload', 'slug'],
+      ]);
+      assertOptionalTextPath(candidate, 'publication.publish_payload.author', [
+        ['publication', 'publish_payload', 'author'],
+      ]);
+      assertOptionalTextPath(candidate, 'publication.publish_payload.excerpt or content.deck', [
+        ['publication', 'publish_payload', 'excerpt'],
+        ['content', 'deck'],
+      ]);
+      assertOptionalTextPath(candidate, 'publication.publish_payload.seoDescription or seo.meta_description', [
+        ['publication', 'publish_payload', 'seoDescription'],
+        ['seo', 'meta_description'],
+      ]);
+      assertOptionalTextPath(
+        candidate,
+        'publication.publish_payload.content, publication.publish_payload.markdown, or editorial.draft_markdown',
+        [
+          ['publication', 'publish_payload', 'content'],
+          ['publication', 'publish_payload', 'markdown'],
+          ['editorial', 'draft_markdown'],
+        ]
+      );
+      assertOptionalStringArrayPath(candidate, 'publication.publish_payload.tags or taxonomy.tags', [
+        ['publication', 'publish_payload', 'tags'],
+        ['taxonomy', 'tags'],
+      ]);
+      assertOptionalSourceListPath(candidate);
+
+      return candidate;
     };
 
-    const populateFromJsonImport = (data) => {
-      const importedTags = getImportArrayValue(data, 'tags');
-      const importedSources = getImportArrayValue(data, 'sources');
+    const populateTextFieldFromV1Path = (field, contentSource, paths) => {
+      const result = getFirstImportPathValue(contentSource, paths);
+      if (result.exists) field.value = result.value == null ? '' : result.value;
+    };
 
-      fields.title.value = data.title || '';
-      fields.excerpt.value = data.deck || '';
-      fields.seoDescription.value = data.description || '';
-      fields.slug.value = data.slug || '';
-      fields.tags.value = Array.isArray(importedTags)
-        ? importedTags
-            .map((tag) => tag.trim())
-            .filter(Boolean)
-            .join(', ')
-        : '';
-      fields.content.value = data.content || '';
-      fields.sources.value = Array.isArray(importedSources) ? formatImportedList(importedSources) : '';
+    const populateFromContentSourceV1Import = (contentSource) => {
+      populateTextFieldFromV1Path(fields.title, contentSource, [
+        ['publication', 'publish_payload', 'title'],
+        ['content', 'title'],
+      ]);
+      populateTextFieldFromV1Path(fields.slug, contentSource, [['publication', 'publish_payload', 'slug']]);
+      populateTextFieldFromV1Path(fields.author, contentSource, [['publication', 'publish_payload', 'author']]);
+      populateTextFieldFromV1Path(fields.excerpt, contentSource, [
+        ['publication', 'publish_payload', 'excerpt'],
+        ['content', 'deck'],
+      ]);
+      populateTextFieldFromV1Path(fields.seoDescription, contentSource, [
+        ['publication', 'publish_payload', 'seoDescription'],
+        ['seo', 'meta_description'],
+      ]);
+      populateTextFieldFromV1Path(fields.content, contentSource, [
+        ['publication', 'publish_payload', 'content'],
+        ['publication', 'publish_payload', 'markdown'],
+        ['editorial', 'draft_markdown'],
+      ]);
+
+      const importedTags = getFirstImportPathValue(contentSource, [
+        ['publication', 'publish_payload', 'tags'],
+        ['taxonomy', 'tags'],
+      ]);
+      if (importedTags.exists) {
+        fields.tags.value = Array.isArray(importedTags.value)
+          ? importedTags.value
+              .map((tag) => tag.trim())
+              .filter(Boolean)
+              .join(', ')
+          : '';
+      }
+
+      const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
+      if (importedSources.exists) {
+        fields.sources.value = Array.isArray(importedSources.value) ? formatImportedList(importedSources.value) : '';
+      }
+
       updatePreview();
       updatePublishOutput();
     };
@@ -1557,9 +1672,9 @@ const metadata = {
         }
 
         const data = JSON.parse(objectJson);
-        validateImportShape(data);
-        populateFromJsonImport(data);
-        setJsonImportStatus('JSON loaded into the publishing form.');
+        const contentSource = normalizeContentSourceV1Import(data);
+        populateFromContentSourceV1Import(contentSource);
+        setJsonImportStatus('content_source.v1 JSON loaded into the publishing form.');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
         const isSyntaxError = error instanceof SyntaxError;
