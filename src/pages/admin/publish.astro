@@ -212,13 +212,28 @@ const metadata = {
         </section>
 
         <section class="admin-card admin-panel" aria-labelledby="preview-heading">
-          <h2 id="preview-heading">Preview</h2>
+          <div class="module-heading-row">
+            <h2 id="preview-heading">Inline preview</h2>
+            <button
+              id="refresh-preview"
+              class="module-icon-button"
+              type="button"
+              aria-label="Refresh inline preview"
+              title="Refresh inline preview"
+            >
+              <Icon name="tabler:refresh" class="module-action-icon" aria-hidden="true" />
+              <span class="sr-only">Refresh inline preview</span>
+            </button>
+          </div>
           <div class="preview-box">
+            <p id="preview-excerpt" class="preview-excerpt" hidden></p>
+            <img id="preview-image-inline" class="preview-image-inline" alt="" hidden />
             <h3 id="preview-title">Untitled article</h3>
             <p>
               Featured image path:
               <span id="preview-featured-image" class="preview-image-path">None selected</span>
             </p>
+            <div id="preview-meta" class="preview-meta" hidden></div>
             <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
           </div>
         </section>
@@ -227,10 +242,16 @@ const metadata = {
       <aside class="publish-sidebar" aria-labelledby="publish-output-heading">
         <section class="admin-card admin-panel readiness-card">
           <p class="sidebar-kicker">Readiness & Actions</p>
-          <h2 id="publish-output-heading">Publish output</h2>
+          <div class="module-heading-row">
+            <h2 id="publish-output-heading">Content output</h2>
+            <a class="module-icon-button" href="/admin/drafts" aria-label="Open draft list" title="Open draft list">
+              <Icon name="tabler:files" class="module-action-icon" aria-hidden="true" />
+              <span class="sr-only">Open draft list</span>
+            </a>
+          </div>
 
           <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
-            <h3 id="publish-checklist-heading">Publish readiness checklist</h3>
+            <h3 id="publish-checklist-heading">Readiness checklist</h3>
             <ul id="publish-checklist" aria-live="polite">
               <li data-checklist-item="title">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
@@ -260,7 +281,7 @@ const metadata = {
             <span id="unsaved-changes" class="unsaved-changes" aria-live="polite" hidden>Unsaved changes</span>
           </div>
 
-          <div class="publish-output-summary" aria-label="Publish output summary">
+          <div class="publish-output-summary" aria-label="Content output summary">
             <div class="summary-heading-row">
               <p class="summary-label">Destination slug</p>
               <a
@@ -279,11 +300,10 @@ const metadata = {
           <div class="actions">
             <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
             <button id="publish" class="btn-primary" type="button">Publish Article</button>
-            <button id="preview" class="btn-secondary" type="button">Preview</button>
-            <a class="btn-secondary" href="/admin/drafts">Drafts</a>
+            <button id="preview" class="btn-secondary" type="button">Preview page</button>
           </div>
 
-          <details class="markdown-backup" open>
+          <details class="markdown-backup" data-backup-panel open>
             <summary>Save backup</summary>
             <div class="backup-actions" aria-label="Backup actions">
               <button
@@ -740,6 +760,48 @@ const metadata = {
     font-size: 0.9rem;
   }
 
+  .module-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .module-heading-row h2 {
+    margin: 0;
+  }
+
+  .module-icon-button {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .module-icon-button:hover,
+  .module-icon-button:focus-visible {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-accent);
+    outline: none;
+  }
+
+  .module-action-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
   .actions {
     display: grid;
     grid-template-columns: 1fr;
@@ -750,11 +812,6 @@ const metadata = {
   .actions > button,
   .actions > a {
     width: 100%;
-  }
-
-  .markdown-backup .copy-button {
-    width: 100%;
-    margin: 0.8rem 0;
   }
 
   .publish-checklist {
@@ -837,6 +894,42 @@ const metadata = {
     font-family: var(--aw-font-heading);
     font-size: clamp(1.5rem, 3vw, 2rem);
     font-weight: 700;
+  }
+
+  .preview-excerpt {
+    margin: 0 0 0.75rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-style: italic;
+  }
+
+  .preview-image-inline {
+    width: 100%;
+    max-height: 18rem;
+    margin-bottom: 0.9rem;
+    border-radius: 0.85rem;
+    object-fit: cover;
+    background: rgb(229 231 235);
+  }
+
+  .preview-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.75rem 0;
+  }
+
+  .preview-meta span {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  :global(.dark) .preview-meta span {
+    border-color: rgb(30 41 59);
   }
 
   .markdown-preview {
@@ -972,6 +1065,10 @@ const metadata = {
     color: var(--aw-color-text-heading);
     cursor: pointer;
     font-weight: 800;
+  }
+
+  .markdown-backup.is-disabled {
+    opacity: 0.68;
   }
 
   .output-markdown {
@@ -1126,13 +1223,18 @@ const metadata = {
       overwrite: document.querySelector('#overwrite-slug'),
       status: document.querySelector('#status'),
       unsavedChanges: document.querySelector('#unsaved-changes'),
+      refreshPreview: document.querySelector('#refresh-preview'),
       previewTitle: document.querySelector('#preview-title'),
+      previewExcerpt: document.querySelector('#preview-excerpt'),
+      previewImageInline: document.querySelector('#preview-image-inline'),
       previewFeaturedImage: document.querySelector('#preview-featured-image'),
+      previewMeta: document.querySelector('#preview-meta'),
       markdownPreview: document.querySelector('#markdown-preview'),
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
       copyOutput: document.querySelector('#copy-output'),
       downloadJsonBackup: document.querySelector('#download-json-backup'),
+      backupPanel: document.querySelector('[data-backup-panel]'),
       publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
       saveDraft: document.querySelector('#save-draft'),
       publish: document.querySelector('#publish'),
@@ -1195,6 +1297,7 @@ const metadata = {
       if (fields.unsavedChanges) fields.unsavedChanges.hidden = !hasUnsavedChanges;
       updatePublishButtonState();
       updateSaveDraftButtonState();
+      updatePreviewButtonState();
     };
 
     const renderSlugHint = (isInvalid) => {
@@ -1234,14 +1337,21 @@ const metadata = {
           getFeaturedImagePath().trim()
       );
 
+    const getCanOpenPreviewPage = () => {
+      const { requestId } = getCheckedOutWorkflowDraft();
+      const canSaveForPreview = hasUnsavedChanges && getHasMinimumDraftContent();
+      return Boolean(isAdmin && getHasPreviewContent() && (requestId || canSaveForPreview));
+    };
+
     const updatePreviewButtonState = () => {
-      fields.preview.disabled = !getHasPreviewContent();
+      fields.preview.disabled = !getCanOpenPreviewPage();
     };
 
     const updateBackupActionState = () => {
       const backupActionsEnabled = !fields.publish.disabled;
       fields.copyOutput.disabled = !backupActionsEnabled;
       fields.downloadJsonBackup.disabled = !backupActionsEnabled;
+      fields.backupPanel.classList.toggle('is-disabled', !backupActionsEnabled);
     };
 
     const updatePublishButtonState = () => {
@@ -1884,10 +1994,36 @@ const metadata = {
         .join('');
     };
 
+    const getFeaturedImagePreviewUrl = () => {
+      const selectedIndex = imageNames.indexOf(fields.featuredImage.value);
+      if (selectedIndex >= 0 && imagePreviewUrls[selectedIndex]) return imagePreviewUrls[selectedIndex];
+      const featuredPath = getFeaturedImagePath();
+      return featuredPath.startsWith('https://') ? featuredPath : '';
+    };
+
     const updatePreview = () => {
       const featuredPath = getFeaturedImagePath();
+      const imagePreviewUrl = getFeaturedImagePreviewUrl();
+      const excerpt = fields.excerpt.value.trim();
+      const metaItems = [
+        fields.author.value.trim() ? `By ${fields.author.value.trim()}` : '',
+        fields.category.value.trim(),
+        ...parseTags(fields.tags.value).slice(0, 4),
+        fields.videoLink.value.trim() ? 'Video' : '',
+        fields.ctaLink.value.trim() || fields.ctaText.value.trim() ? 'CTA' : '',
+      ].filter(Boolean);
+
       fields.previewTitle.textContent = fields.title.value || 'Untitled article';
+      fields.previewExcerpt.textContent = excerpt;
+      fields.previewExcerpt.hidden = !excerpt;
+      fields.previewImageInline.src = imagePreviewUrl;
+      fields.previewImageInline.alt = fields.title.value
+        ? `${fields.title.value} featured image preview`
+        : 'Featured image preview';
+      fields.previewImageInline.hidden = !imagePreviewUrl;
       fields.previewFeaturedImage.textContent = featuredPath || 'None selected';
+      fields.previewMeta.innerHTML = metaItems.map((item) => `<span>${escapeHtml(item)}</span>`).join('');
+      fields.previewMeta.hidden = metaItems.length === 0;
       fields.markdownPreview.innerHTML = renderMarkdownPreview(fields.content.value);
     };
 
@@ -2761,12 +2897,41 @@ const metadata = {
       setUnsavedChanges(true);
     });
 
-    document.querySelector('#save-draft').addEventListener('click', saveDraft);
-    fields.preview.addEventListener('click', () => {
+    const openDedicatedPreviewPage = async () => {
       if (fields.preview.disabled) return;
+
+      const { requestId } = getCheckedOutWorkflowDraft();
+      if (!hasUnsavedChanges && requestId) {
+        window.location.href = `/admin/review/${encodeURIComponent(requestId)}`;
+        return;
+      }
+
+      if (!getHasMinimumDraftContent()) {
+        setStatus('Title, slug, and author are required before opening the preview page.', false);
+        return;
+      }
+
+      fields.preview.disabled = true;
+      setStatus('Saving draft before opening preview…', false);
+
+      try {
+        const result = await saveJsonDraftToBlobs();
+        const previewRequestId = result.record?.request_id || requestId;
+        if (!previewRequestId) throw new Error('Draft was saved, but no preview ID was returned.');
+        setUnsavedChanges(false);
+        window.location.href = `/admin/review/${encodeURIComponent(previewRequestId)}`;
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Preview page could not be opened.', false);
+        updatePreviewButtonState();
+      }
+    };
+
+    document.querySelector('#save-draft').addEventListener('click', saveDraft);
+    fields.refreshPreview.addEventListener('click', () => {
       updatePreview();
-      setStatus('Preview updated.');
+      setStatus('Inline preview refreshed.');
     });
+    fields.preview.addEventListener('click', openDedicatedPreviewPage);
     const fileToBase64 = (file) =>
       new Promise((resolve, reject) => {
         const reader = new FileReader();
