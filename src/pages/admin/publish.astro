@@ -1427,13 +1427,13 @@ const metadata = {
     const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
-      setAdminShellVisible(isAdmin);
+      setAdminShellVisible(true);
       updatePublishButtonState();
       updateSaveDraftButtonState();
       updatePreviewButtonState();
       setGatedContentVisible(isAdmin);
 
-      if (!isAdmin && state !== 'checking') redirectToHome();
+      if (!isAdmin && state !== 'checking' && state !== 'error') redirectToHome();
     };
 
     const getAdminStateForClerk = async (clerk) => {
@@ -2231,37 +2231,6 @@ const metadata = {
         updateSaveDraftButtonState();
         updatePublishButtonState();
         updatePreviewButtonState();
-      }
-    };
-
-    const loadDraft = () => {
-      const saved = localStorage.getItem(draftKey);
-      if (!saved) return;
-
-      try {
-        const draft = JSON.parse(saved);
-        fields.title.value = draft.title || '';
-        fields.slug.value = draft.slug || '';
-        fields.excerpt.value = draft.excerpt || '';
-        fields.publishDate.value = draft.publishDate || formatDateTimeLocal(new Date());
-        fields.author.value = draft.author || '';
-        fields.category.value = draft.category || '';
-        fields.tags.value = draft.tags || '';
-        fields.draft.checked = Boolean(draft.draft);
-        fields.content.value = draft.content || '';
-        fields.sources.value = draft.sources || '';
-        fields.videoLink.value = draft.videoLink || '';
-        fields.ctaLink.value = draft.ctaLink || '';
-        fields.ctaText.value = draft.ctaText || '';
-        fields.seoDescription.value = draft.seoDescription || '';
-        fields.overwrite.checked = Boolean(draft.overwrite);
-        imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
-        renderImages();
-        fields.existingFeaturedImagePath.value = draft.existingFeaturedImagePath || '';
-        if (draft.existingFeaturedImagePath) ensureFeaturedImageOption(draft.existingFeaturedImagePath);
-        fields.featuredImage.value = draft.featuredImage || draft.existingFeaturedImagePath || '';
-      } catch {
-        localStorage.removeItem(draftKey);
       }
     };
 
@@ -3136,7 +3105,7 @@ const metadata = {
     renderImageRulesHint();
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
-    if (!isEditMode()) loadDraft();
+    if (!isEditMode() && !getQueryDraftId()) localStorage.removeItem(draftKey);
     updatePublishButtonState();
     updateSaveDraftButtonState();
     updatePreviewButtonState();
