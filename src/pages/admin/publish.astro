@@ -1053,9 +1053,143 @@ const metadata = {
       fields.outputMarkdown.value = markdown;
     };
 
-    const saveDraft = () => {
-      localStorage.setItem(draftKey, JSON.stringify(getDraft()));
-      setStatus('Draft saved.');
+    const buildDraftBlobPayload = (requestId, draft) => ({
+      action: 'create_request',
+      request_id: requestId,
+      input: {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        ids: {
+          content_id: draft.slug,
+          workflow_id: requestId,
+        },
+        publication_context: {
+          publication_name: 'Dr. Lurié Science Blog',
+          domain: window.location.hostname,
+          topic_scope: draft.category || undefined,
+        },
+        content: {
+          schema_version: 'content_blocks.v1',
+          title: draft.title,
+          deck: draft.excerpt || undefined,
+          description: draft.seoDescription || draft.excerpt || undefined,
+          blocks: draft.content
+            ? [
+                {
+                  block_id: 'draft-markdown',
+                  block_type: 'markdown',
+                  payload: { markdown: draft.content },
+                },
+              ]
+            : undefined,
+        },
+        taxonomy: {
+          schema_version: 'taxonomy.v1',
+          tags: parseTags(draft.tags),
+        },
+        seo: {
+          schema_version: 'seo.v1',
+          meta_title: draft.title,
+          meta_description: draft.seoDescription || draft.excerpt || undefined,
+        },
+        editorial: {
+          schema_version: 'editorial.v1',
+          writer_notes: draft.sources || undefined,
+          draft_markdown: draft.content || undefined,
+        },
+        publication: {
+          schema_version: 'publication.v1',
+          publication_status: 'draft',
+          publish_payload: {
+            slug: draft.slug,
+            title: draft.title,
+            content: draft.content || undefined,
+            publishDate: draft.publishDate || undefined,
+            author: draft.author,
+            category: draft.category || undefined,
+            tags: parseTags(draft.tags),
+            excerpt: draft.excerpt || undefined,
+            draft: true,
+            featuredImage: draft.featuredImage || undefined,
+            existingFeaturedImagePath: draft.existingFeaturedImagePath || undefined,
+            videoLink: draft.videoLink || undefined,
+            ctaLink: draft.ctaLink || undefined,
+            ctaText: draft.ctaText || undefined,
+            seoDescription: draft.seoDescription || undefined,
+            overwrite: draft.overwrite,
+            metadata: {
+              source: 'admin_publish_save_draft',
+              imageNames: draft.imageNames,
+              sourcesText: draft.sources,
+            },
+          },
+        },
+        workflow: {
+          schema_version: 'content_workflow.v1',
+          workflow_id: requestId,
+          next_agent: 'reader_insight',
+          handoff_notes: 'Saved from the admin Save Draft flow.',
+        },
+      },
+    });
+
+    const saveDraft = async () => {
+      const title = fields.title.value.trim();
+      const slug = getCurrentSlug();
+      const author = fields.author.value.trim();
+
+      if (!title || !slug || !author) {
+        window.alert('Title, slug, and author are required to save JSON draft.');
+        setStatus('Title, slug, and author are required to save JSON draft.', false);
+        return;
+      }
+
+      const confirmed = window.confirm('Save draft JSON to Blobs and return to Admin Dashboard?');
+      if (!confirmed) return;
+
+      const saveButton = document.querySelector('#save-draft');
+      saveButton.disabled = true;
+      setStatus('Saving draft JSON to Blobs…', false);
+
+      const draft = { ...getDraft(), title, slug, author, draft: true };
+      const requestId = `admin-draft-${slug}-${Date.now()}`;
+
+      try {
+        const clerkToken = await getClerkSessionToken();
+        const response = await fetch('/.netlify/functions/save-json-blob', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(buildDraftBlobPayload(requestId, draft)),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || result.ok === false || !result.record?.request_id) {
+          throw new Error(result.error || `Blob save failed with status ${response.status}.`);
+        }
+
+        localStorage.removeItem(draftKey);
+        setStatus(`Draft JSON saved to Blobs as ${result.record.request_id}. Redirecting…`, false);
+        window.location.href = '/admin';
+      } catch (error) {
+        let localRecoverySaved = true;
+        try {
+          localStorage.setItem(draftKey, JSON.stringify(draft));
+        } catch {
+          localRecoverySaved = false;
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown Blob save error.';
+        const fallbackMessage = localRecoverySaved
+          ? `JSON was not saved to Blobs. Local recovery was saved only as fallback. ${message}`
+          : `JSON was not saved to Blobs, and local recovery could not be saved. ${message}`;
+        window.alert(fallbackMessage);
+        setStatus(fallbackMessage, false);
+      } finally {
+        saveButton.disabled = false;
+      }
     };
 
     const loadDraft = () => {
