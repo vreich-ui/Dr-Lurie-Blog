@@ -25,6 +25,8 @@ const metadata = {
       </div>
     </header>
 
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
     <section class="dashboard-grid" data-auth-gated hidden>
       <article class="dashboard-card">
         <p class="dashboard-kicker">Publishing</p>
@@ -108,6 +110,13 @@ const metadata = {
     font-size: 1.1rem;
   }
 
+  .auth-status {
+    margin: -0.75rem 0 1.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
   .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -161,6 +170,7 @@ const metadata = {
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
 
     const setGatedContentVisible = (visible) => {
@@ -225,7 +235,20 @@ const metadata = {
       return clerkLoadPromise;
     };
 
+    const authStatusMessages = {
+      checking: 'Checking admin access…',
+      'signed-out': 'Sign in to view admin tools.',
+      forbidden: 'Access denied (not an admin).',
+      error: 'Admin auth failed. Please refresh or contact support.',
+      'signed-in': '',
+    };
+
+    const setAuthStatus = (message) => {
+      if (authStatus) authStatus.textContent = message;
+    };
+
     const setAuthState = (state) => {
+      setAuthStatus(authStatusMessages[state] || '');
       setGatedContentVisible(state === 'signed-in');
     };
 

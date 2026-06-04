@@ -70,6 +70,8 @@ const metadata = {
       </div>
     </header>
 
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
     <section class="agent-card chatkit-panel" aria-labelledby="chatkit-heading" data-auth-gated hidden>
       <div class="chatkit-panel-header">
         <div>
@@ -137,6 +139,13 @@ const metadata = {
 
   :global(.dark) .agent-header {
     border-color: rgb(30 41 59);
+  }
+
+  .auth-status {
+    margin: -0.5rem 0 1.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
   }
 
   .agent-kicker {
@@ -395,7 +404,7 @@ const metadata = {
       eventLog: [],
     };
 
-    let isAdmin = true;
+    let isAdmin = false;
     let isPublishInFlight = false;
     let chatkitInitialized = false;
     let capturedParsedPayload = null;
@@ -406,6 +415,7 @@ const metadata = {
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const authStatus = document.querySelector('[data-auth-status]');
     const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
 
     const setStatus = (message, isSuccess = true) => {
@@ -444,7 +454,25 @@ const metadata = {
       });
     };
 
-    setGatedContentVisible(isAdmin);
+    const authStatusMessages = {
+      checking: 'Checking admin access…',
+      'signed-out': 'Sign in to view admin tools.',
+      forbidden: 'Access denied (not an admin).',
+      error: 'Admin auth failed. Please refresh or contact support.',
+      'signed-in': '',
+    };
+
+    const setAuthStatus = (message) => {
+      if (authStatus) authStatus.textContent = message;
+    };
+
+    const setAuthState = (state) => {
+      isAdmin = state === 'signed-in';
+      setAuthStatus(authStatusMessages[state] || '');
+      setGatedContentVisible(isAdmin);
+    };
+
+    setAuthState('checking');
 
     const loadClerkScript = () =>
       new Promise((resolve, reject) => {
@@ -498,6 +526,66 @@ const metadata = {
       })();
 
       return clerkLoadPromise;
+    };
+
+    const getAdminStateForClerk = async (clerk) => {
+      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+      const token = await clerk.session.getToken();
+      if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+
+      const response = await fetch('/.netlify/functions/admin-auth-state', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response
+        .json()
+        .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+    };
+
+    const renderAuthState = async (clerk) => {
+      const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+
+      if (signedIn) {
+        const adminState = await getAdminStateForClerk(clerk);
+
+        if (adminState.isAdmin) {
+          setAuthState('signed-in');
+          await initializeChatKit(clerk);
+          return;
+        }
+
+        setAuthState('forbidden');
+        return;
+      }
+
+      setAuthState('signed-out');
+    };
+
+    const initializeClerkAuth = async () => {
+      setAuthState('checking');
+
+      try {
+        const clerk = await getClerk();
+        await renderAuthState(clerk);
+
+        if (typeof clerk.addListener === 'function') {
+          clerk.addListener(() => {
+            renderAuthState(clerk).catch((error) => {
+              console.error('Clerk authentication refresh failed.', error);
+              setAuthState('error');
+            });
+          });
+        }
+      } catch (error) {
+        console.error('Clerk authentication initialization failed.', error);
+        setAuthState('error');
+        setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
+      }
     };
 
     const waitForChatkitElement = async () => {
@@ -820,13 +908,11 @@ const metadata = {
       }
     };
 
-    const initializeChatKit = async () => {
+    const initializeChatKit = async (clerk) => {
       if (chatkitInitialized || !fields.chatkit) return;
 
-      const clerk = await getClerk();
-      if (!clerk.isSignedIn || !clerk.session) {
-        isAdmin = false;
-        setGatedContentVisible(false);
+      if (!clerk.isSignedIn || !clerk.session || !isAdmin) {
+        setAuthState(clerk.isSignedIn ? 'forbidden' : 'signed-out');
         setStatus('Sign in with an active admin session to use the AI publishing workflow.', false);
         return;
       }
@@ -933,10 +1019,7 @@ const metadata = {
       }
       runPublishFromPayload(capturedParsedPayload, 'Manual console/test payload');
     });
-    initializeChatKit().catch((error) => {
-      console.error('ChatKit initialization failed.', error);
-      setStatus(error instanceof Error ? error.message : 'ChatKit could not be initialized.', false);
-    });
+    initializeClerkAuth();
   })();
 </script>
 <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>

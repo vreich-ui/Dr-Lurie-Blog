@@ -29,6 +29,8 @@ const metadata = {
       </div>
     </header>
 
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
     <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
       <form id="publish-form" class="admin-form">
         <div class="json-import-card" aria-labelledby="json-import-heading">
@@ -216,6 +218,13 @@ const metadata = {
 <style>
   .admin-page {
     color: var(--aw-color-text-default);
+  }
+
+  .auth-status {
+    margin: -1rem 0 1.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
   }
 
   .admin-card {
@@ -641,6 +650,7 @@ const metadata = {
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
 
     const getEditSlug = () => slugify(new URLSearchParams(window.location.search).get('edit') || '');
@@ -743,8 +753,21 @@ const metadata = {
       return clerkLoadPromise;
     };
 
+    const authStatusMessages = {
+      checking: 'Checking admin access…',
+      'signed-out': 'Sign in to view admin tools.',
+      forbidden: 'Access denied (not an admin).',
+      error: 'Admin auth failed. Please refresh or contact support.',
+      'signed-in': '',
+    };
+
+    const setAuthStatus = (message) => {
+      if (authStatus) authStatus.textContent = message;
+    };
+
     const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
+      setAuthStatus(authStatusMessages[state] || '');
       fields.publish.disabled = !isAdmin;
       setGatedContentVisible(isAdmin);
     };
