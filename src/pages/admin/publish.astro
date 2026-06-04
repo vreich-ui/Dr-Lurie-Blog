@@ -201,7 +201,10 @@ const metadata = {
           <button id="preview" class="btn-secondary" type="button">Preview</button>
           <button id="publish" class="btn-primary publish-button" type="button">Publish Article</button>
         </div>
-        <p id="status" class="status" aria-live="polite"></p>
+        <div class="status-line">
+          <p id="status" class="status" aria-live="polite"></p>
+          <span id="unsaved-changes" class="unsaved-changes" aria-live="polite" hidden>Unsaved changes</span>
+        </div>
       </form>
     </section>
 
@@ -634,11 +637,33 @@ const metadata = {
     margin-bottom: 0;
   }
 
+  .status-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.75rem;
+    margin-top: 0.9rem;
+  }
+
   .status {
     min-height: 1.3em;
-    margin: 0.9rem 0 0;
+    margin: 0;
     color: var(--aw-color-accent);
     font-weight: 700;
+  }
+
+  .unsaved-changes {
+    border-radius: 999px;
+    background: rgb(245 158 11 / 12%);
+    color: rgb(146 64 14);
+    padding: 0.2rem 0.55rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+
+  :global(.dark) .unsaved-changes {
+    background: rgb(245 158 11 / 18%);
+    color: rgb(253 230 138);
   }
 
   @media (max-width: 640px) {
@@ -707,6 +732,7 @@ const metadata = {
       seoDescription: document.querySelector('#seo-description'),
       overwrite: document.querySelector('#overwrite-slug'),
       status: document.querySelector('#status'),
+      unsavedChanges: document.querySelector('#unsaved-changes'),
       previewTitle: document.querySelector('#preview-title'),
       previewFeaturedImage: document.querySelector('#preview-featured-image'),
       markdownPreview: document.querySelector('#markdown-preview'),
@@ -724,6 +750,7 @@ const metadata = {
     let imageUploadMessageIsError = false;
     let isAdmin = false;
     let editArticleLoaded = false;
+    let hasUnsavedChanges = false;
 
     const adminPage = document.querySelector('.admin-page');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
@@ -747,6 +774,11 @@ const metadata = {
 
     const getSlugEditHint = () =>
       isEditMode() ? `Slug is locked in edit mode. Updates overwrite src/data/post/${getEditSlug()}.md in place.` : '';
+
+    const setUnsavedChanges = (value) => {
+      hasUnsavedChanges = Boolean(value);
+      if (fields.unsavedChanges) fields.unsavedChanges.hidden = !hasUnsavedChanges;
+    };
 
     const renderSlugHint = (isInvalid) => {
       const editHint = getSlugEditHint();
@@ -1279,6 +1311,7 @@ const metadata = {
         false
       );
       renderImages();
+      setUnsavedChanges(true);
       if (previousFeaturedImage && imageNames.includes(previousFeaturedImage)) {
         fields.featuredImage.value = previousFeaturedImage;
       }
@@ -1494,6 +1527,7 @@ const metadata = {
         }
 
         clearLocalCheckoutState();
+        setUnsavedChanges(false);
         window.location.href = '/admin';
       } catch (error) {
         console.error('JSON draft save failed.', error);
@@ -2063,6 +2097,7 @@ const metadata = {
         const data = JSON.parse(objectJson);
         const formData = await parseContentSourceImportFormData(data);
         applyContentSourceImportFormData(formData);
+        setUnsavedChanges(true);
         setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
         return true;
       } catch (error) {
@@ -2137,6 +2172,7 @@ const metadata = {
       if (previousFeaturedImage) fields.featuredImage.value = previousFeaturedImage;
       updatePreview();
       updatePublishOutput();
+      setUnsavedChanges(true);
     });
 
     document.querySelector('#save-draft').addEventListener('click', saveDraft);
@@ -2230,6 +2266,7 @@ const metadata = {
           isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`,
           false
         );
+        setUnsavedChanges(false);
         showToast(toastMessage, getGitHubToastLinks({ articlePath: publishedPath, commit }));
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
@@ -2248,7 +2285,15 @@ const metadata = {
       document.querySelector('#publish-form').addEventListener(eventName, () => {
         updatePreview();
         updatePublishOutput();
+        setUnsavedChanges(true);
       });
+    });
+
+    window.addEventListener('beforeunload', (event) => {
+      if (!hasUnsavedChanges) return;
+
+      event.preventDefault();
+      event.returnValue = '';
     });
 
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
@@ -2257,6 +2302,7 @@ const metadata = {
     updatePublishButtonState();
     updatePreview();
     updatePublishOutput();
+    setUnsavedChanges(false);
     initializeClerkAuth();
   })();
 </script>
