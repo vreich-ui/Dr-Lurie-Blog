@@ -166,7 +166,11 @@ const metadata = {
   }
 </style>
 
-<script is:inline>
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  import { loadClerk } from '~/utils/clerkLoader';
+
   (() => {
     const adminPage = document.querySelector('.admin-dashboard');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
@@ -182,58 +186,12 @@ const metadata = {
       });
     };
 
-    const loadClerkScript = () =>
-      new Promise((resolve, reject) => {
-        if (window.Clerk) {
-          resolve();
-          return;
-        }
-
-        const existingScript = document.querySelector(
-          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
-        );
-        if (existingScript) {
-          existingScript.addEventListener('load', () => resolve(), { once: true });
-          existingScript.addEventListener(
-            'error',
-            () => reject(new Error('Clerk authentication could not be loaded.')),
-            {
-              once: true,
-            }
-          );
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = clerkJsScriptSrc;
-        script.async = true;
-        script.crossOrigin = 'anonymous';
-        script.type = 'text/javascript';
-        script.dataset.drLurieClerkjs = 'true';
-        script.dataset.clerkPublishableKey = clerkPublishableKey;
-        script.addEventListener('load', () => resolve(), { once: true });
-        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
-          once: true,
-        });
-        document.head.append(script);
-      });
-
     const getClerk = async () => {
       if (!clerkPublishableKey) {
         throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
       }
 
-      clerkLoadPromise ||= (async () => {
-        await loadClerkScript();
-
-        if (!window.Clerk) {
-          throw new Error('Clerk authentication could not be initialized.');
-        }
-
-        const clerk = window.Clerk;
-        await clerk.load();
-        return clerk;
-      })();
+      clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
 
       return clerkLoadPromise;
     };
