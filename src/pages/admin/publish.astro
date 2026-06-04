@@ -225,6 +225,39 @@ const metadata = {
       <p>
         Suggested destination: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
       </p>
+      <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
+        <h3 id="publish-checklist-heading">Publish readiness checklist</h3>
+        <ul id="publish-checklist" aria-live="polite">
+          <li data-checklist-item="title">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Title present</span>
+          </li>
+          <li data-checklist-item="slug">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Valid slug</span>
+          </li>
+          <li data-checklist-item="content">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Content present</span>
+          </li>
+          <li data-checklist-item="excerpt">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Excerpt</span>
+          </li>
+          <li data-checklist-item="publishDate">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Publish date</span>
+          </li>
+          <li data-checklist-item="sources">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Sources (at least 1)</span>
+          </li>
+          <li data-checklist-item="featuredImage">
+            <span class="checklist-icon" aria-hidden="true">☐</span>
+            <span class="checklist-label">Featured image selected</span>
+          </li>
+        </ul>
+      </div>
       <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button>
       <textarea id="output-markdown" class="output-markdown" readonly></textarea>
       <p class="publish-message">
@@ -565,6 +598,63 @@ const metadata = {
     margin-bottom: 0.8rem;
   }
 
+  .publish-checklist {
+    margin: 0.8rem 0 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  :global(.dark) .publish-checklist {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 42%);
+  }
+
+  .publish-checklist h3 {
+    margin: 0 0 0.65rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  .publish-checklist ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.45rem 0.85rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .publish-checklist li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.92rem;
+    font-weight: 700;
+  }
+
+  .publish-checklist li.is-complete {
+    color: var(--aw-color-secondary);
+  }
+
+  .publish-checklist li.is-missing {
+    color: rgb(146 64 14);
+  }
+
+  :global(.dark) .publish-checklist li.is-missing {
+    color: rgb(253 230 138);
+  }
+
+  .checklist-icon {
+    flex: 0 0 auto;
+    width: 1.1rem;
+    text-align: center;
+  }
+
   .preview-box,
   .output-box {
     border: 1px solid rgb(229 231 235);
@@ -738,6 +828,7 @@ const metadata = {
       markdownPreview: document.querySelector('#markdown-preview'),
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
+      publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
       publish: document.querySelector('#publish'),
       publishMode: document.querySelector('#publish-mode'),
       toast: document.querySelector('#toast'),
@@ -1467,10 +1558,38 @@ const metadata = {
       };
     };
 
+    const getChecklistState = () => ({
+      title: fields.title.value.trim().length > 0,
+      slug: slugPattern.test(fields.slug.value.trim()),
+      content: fields.content.value.trim().length > 0,
+      excerpt: fields.excerpt.value.trim().length > 0,
+      publishDate: fields.publishDate.value.trim().length > 0,
+      sources: parseSources(fields.sources.value).length >= 1,
+      featuredImage: getFeaturedImagePath().length > 0,
+    });
+
+    const updatePublishChecklist = () => {
+      const checklistState = getChecklistState();
+
+      fields.publishChecklistItems.forEach((item) => {
+        const key = item.dataset.checklistItem;
+        const isComplete = Boolean(checklistState[key]);
+        const icon = item.querySelector('.checklist-icon');
+
+        item.classList.toggle('is-complete', isComplete);
+        item.classList.toggle('is-missing', !isComplete);
+        const label = item.querySelector('.checklist-label')?.textContent.trim() || 'Checklist item';
+
+        item.setAttribute('aria-label', `${label}: ${isComplete ? 'complete' : 'missing'}`);
+        if (icon) icon.textContent = isComplete ? '✓' : '⚠';
+      });
+    };
+
     const updatePublishOutput = () => {
       const { slug, markdown } = buildMarkdown();
       fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
       fields.outputMarkdown.value = markdown;
+      updatePublishChecklist();
     };
 
     const saveLocalRecoveryDraft = () => {
