@@ -20,7 +20,7 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="review-page mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
+    class="review-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     data-route-draft-id={routeDraftId}
@@ -30,36 +30,100 @@ const metadata = {
       <div>
         <p class="review-kicker">Admin workspace</p>
         <h1>{pageTitle}</h1>
-        <p class="review-intro">Review a saved workflow draft before continuing the publishing process.</p>
+        <p class="review-intro">Preview a saved JSON draft with the same article styling used on the public blog.</p>
       </div>
-      <a class="btn-secondary" href="/admin/drafts">Back to drafts</a>
+      <a class="btn-secondary" href="/admin/drafts">Open draft list</a>
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
 
-    <AdminNav activePath="/admin/review" />
+    <section class="review-workspace" data-auth-gated hidden>
+      <AdminNav activePath="/admin/review" />
 
-    <section class="review-card" aria-labelledby="review-heading" data-auth-gated hidden>
-      <p class="review-kicker">Selected draft</p>
-      <h2 id="review-heading">Draft request</h2>
-      <dl class="review-meta">
+      <div class="preview-toolbar" aria-label="Draft preview controls">
         <div>
-          <dt>Request ID</dt>
-          <dd id="draft-id-value">{routeDraftId}</dd>
+          <span class="preview-badge">Preview mode</span>
+          <p id="draft-id-copy" class="draft-id-copy">Loading draft…</p>
         </div>
-        <div>
-          <dt>Status</dt>
-          <dd>Ready for gated review tooling</dd>
+        <div class="review-actions">
+          <a id="edit-draft-link" class="btn-primary" href="/admin/publish">Back to edit</a>
+          <a class="btn-secondary" href="/admin/drafts">Open draft list</a>
         </div>
-      </dl>
-      <p class="hint">
-        This page is intentionally rendered inside the admin gate. Protected workflow data should be fetched only
-        through server-side admin endpoints after Clerk authentication resolves.
-      </p>
-      <div class="review-actions">
-        <a id="edit-draft-link" class="btn-primary" href="/admin/publish">Continue in publisher</a>
-        <a class="btn-secondary" href="/admin/drafts">Choose another draft</a>
       </div>
+
+      <p id="review-load-status" class="review-load-status" aria-live="polite">Loading draft preview…</p>
+
+      <section id="not-found-panel" class="review-card not-found-panel" hidden>
+        <p class="review-kicker">Draft not found</p>
+        <h2>We could not load this draft.</h2>
+        <p class="hint">Check that the draft still exists in Netlify Blobs, or return to the draft list.</p>
+        <div class="review-actions">
+          <a class="btn-primary" href="/admin/drafts">Open draft list</a>
+          <a id="not-found-edit-link" class="btn-secondary" href="/admin/publish">Back to editor</a>
+        </div>
+      </section>
+
+      <section id="draft-preview" class="draft-preview dl-pt-s dl-pb-l sm:py-8 lg:py-10 mx-auto" hidden>
+        <article data-print-article data-post-unpublished="true">
+          <header class="intersect-once intersect-quarter">
+            <h1
+              id="preview-title"
+              class="px-4 sm:px-6 max-w-[720px] mx-auto font-serif text-4xl md:text-5xl font-bold leading-tighter tracking-tighter"
+            >
+              Untitled draft
+            </h1>
+            <p
+              id="preview-excerpt"
+              class="line-clamp-3 max-w-[720px] mx-auto dl-mt-s dl-mb-s px-4 sm:px-6 text-[0.7875rem] sm:text-sm leading-normal italic text-muted dark:text-slate-400"
+            >
+            </p>
+
+            <div class="max-w-[720px] mx-auto dl-mb-s flex items-center gap-3 px-4 sm:px-6">
+              <p class="inline-flex flex-wrap items-center gap-2 text-xs text-muted dark:text-slate-400">
+                <span id="preview-reading-time" hidden></span>
+                <span id="preview-reading-separator" aria-hidden="true" hidden>·</span>
+                <time id="preview-date" datetime=""></time>
+              </p>
+              <span
+                class="ml-auto inline-flex rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
+              >
+                Preview / Unpublished draft
+              </span>
+            </div>
+
+            <img
+              id="preview-image"
+              class="w-full max-w-[720px] aspect-[16/9] object-cover mx-auto dl-mb-s sm:rounded-md bg-gray-400 dark:bg-slate-700"
+              alt=""
+              loading="eager"
+              decoding="async"
+              hidden
+            />
+            <div id="preview-divider" class="max-w-[720px] mx-auto px-4 sm:px-6">
+              <div class="border-t dark:border-slate-700"></div>
+            </div>
+
+            <div id="preview-video-wrap" class="mx-auto dl-mt-m max-w-[720px] px-4 sm:px-6" hidden>
+              <div
+                class="overflow-hidden rounded-2xl border border-gray-200 bg-gray-100 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <iframe
+                  id="preview-video"
+                  class="aspect-video w-full"
+                  title="Draft video"
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen></iframe>
+              </div>
+            </div>
+
+            <div id="preview-cta-wrap" class="mx-auto dl-mt-m max-w-[720px] px-4 sm:px-6" hidden>
+              <a id="preview-cta" class="btn-primary" href="#">Learn more</a>
+            </div>
+          </header>
+          <div id="preview-content" class="editorial-prose px-6 sm:px-6 dl-mt-s dl-gap-m"></div>
+        </article>
+      </section>
     </section>
   </section>
 </Layout>
@@ -106,7 +170,8 @@ const metadata = {
 
   .review-intro,
   .hint,
-  .review-meta dt {
+  .review-load-status,
+  .draft-id-copy {
     color: var(--aw-color-text-muted);
   }
 
@@ -123,49 +188,88 @@ const metadata = {
     font-weight: 700;
   }
 
+  .review-workspace[hidden] {
+    display: none;
+  }
+
+  .preview-toolbar,
   .review-card {
     border: 1px solid rgb(229 231 235);
     border-radius: 1.25rem;
     background: rgb(255 255 255 / 0.88);
-    padding: 1.35rem;
+    padding: 1rem;
     box-shadow: 0 1.25rem 3rem rgb(15 23 42 / 6%);
   }
 
+  :global(.dark) .preview-toolbar,
   :global(.dark) .review-card {
     border-color: rgb(30 41 59);
     background: rgb(15 23 42 / 0.72);
     box-shadow: none;
   }
 
-  .review-meta {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.9rem;
-    margin: 1.25rem 0 0;
+  .preview-toolbar {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
   }
 
-  .review-meta div {
-    border: 1px solid rgb(229 231 235);
-    border-radius: 1rem;
-    padding: 0.9rem;
-  }
-
-  :global(.dark) .review-meta div {
-    border-color: rgb(30 41 59);
-  }
-
-  .review-meta dt {
-    font-size: 0.75rem;
-    font-weight: 800;
-    letter-spacing: 0.14em;
+  .preview-badge {
+    display: inline-flex;
+    border-radius: 999px;
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+    padding: 0.3rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
-  .review-meta dd {
-    margin: 0.35rem 0 0;
+  :global(.dark) .preview-badge {
+    color: rgb(253 230 138);
+  }
+
+  .draft-id-copy {
+    margin: 0.5rem 0 0;
     overflow-wrap: anywhere;
-    color: var(--aw-color-text-heading);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.86rem;
     font-weight: 800;
+  }
+
+  .review-load-status {
+    min-height: 1.5em;
+    margin: 1rem 0;
+    font-weight: 800;
+  }
+
+  .review-load-status.is-error {
+    color: var(--aw-color-accent);
+  }
+
+  .draft-preview[hidden],
+  .not-found-panel[hidden] {
+    display: none;
+  }
+
+  .draft-preview {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.5rem;
+    background: rgb(255 255 255 / 0.92);
+    box-shadow: 0 1.25rem 3rem rgb(15 23 42 / 6%);
+  }
+
+  :global(.dark) .draft-preview {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.72);
+    box-shadow: none;
+  }
+
+  [data-print-article][data-post-unpublished='true'] {
+    opacity: 0.92;
   }
 
   .hint {
@@ -177,7 +281,7 @@ const metadata = {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
-    margin-top: 1.25rem;
+    align-items: center;
   }
 
   .btn-primary,
@@ -209,28 +313,18 @@ const metadata = {
       padding-bottom: 2.5rem;
     }
 
-    .review-header {
+    .review-header,
+    .preview-toolbar {
       flex-direction: column;
+      align-items: stretch;
     }
 
-    .review-meta {
-      grid-template-columns: 1fr;
+    .review-actions > a {
+      width: 100%;
     }
   }
 </style>
 
-<script>
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-nocheck
-  const reviewPage = document.querySelector('.review-page');
-  const pathDraftId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) || '');
-  const draftId = pathDraftId || reviewPage?.dataset.routeDraftId || '';
-  const draftIdValue = document.querySelector('#draft-id-value');
-  const editDraftLink = document.querySelector('#edit-draft-link');
-
-  if (draftIdValue) draftIdValue.textContent = draftId;
-  if (editDraftLink && draftId) editDraftLink.href = `/admin/publish?draftId=${encodeURIComponent(draftId)}`;
-</script>
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
@@ -242,12 +336,49 @@ const metadata = {
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const authStatus = document.querySelector('[data-auth-status]');
+    const routeDraftId = adminPage?.dataset.routeDraftId || '';
+    const pathDraftId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) || '');
+    const draftId = pathDraftId || routeDraftId;
+    const fields = {
+      draftIdCopy: document.querySelector('#draft-id-copy'),
+      editDraftLink: document.querySelector('#edit-draft-link'),
+      notFoundEditLink: document.querySelector('#not-found-edit-link'),
+      loadStatus: document.querySelector('#review-load-status'),
+      notFoundPanel: document.querySelector('#not-found-panel'),
+      preview: document.querySelector('#draft-preview'),
+      title: document.querySelector('#preview-title'),
+      excerpt: document.querySelector('#preview-excerpt'),
+      readingTime: document.querySelector('#preview-reading-time'),
+      readingSeparator: document.querySelector('#preview-reading-separator'),
+      date: document.querySelector('#preview-date'),
+      image: document.querySelector('#preview-image'),
+      divider: document.querySelector('#preview-divider'),
+      videoWrap: document.querySelector('#preview-video-wrap'),
+      video: document.querySelector('#preview-video'),
+      ctaWrap: document.querySelector('#preview-cta-wrap'),
+      cta: document.querySelector('#preview-cta'),
+      content: document.querySelector('#preview-content'),
+    };
     let clerkLoadPromise;
 
     const setGatedContentVisible = (visible) => {
       gatedContent.forEach((element) => {
         element.hidden = !visible;
       });
+    };
+
+    const setAdminShellVisible = (visible) => {
+      if (adminPage) adminPage.hidden = !visible;
+    };
+
+    const setAuthStatus = (message) => {
+      if (authStatus) authStatus.textContent = message;
+    };
+
+    const setLoadStatus = (message, isError = false) => {
+      if (!fields.loadStatus) return;
+      fields.loadStatus.textContent = message;
+      fields.loadStatus.classList.toggle('is-error', isError);
     };
 
     const getClerk = async () => {
@@ -260,29 +391,20 @@ const metadata = {
       return clerkLoadPromise;
     };
 
-    const setAdminShellVisible = (visible) => {
-      if (adminPage) adminPage.hidden = !visible;
-    };
-
     const redirectToHome = () => {
       window.location.replace('/');
     };
 
-    const authStatusMessages = {
-      checking: 'Checking admin access…',
-      'signed-out': 'Sign in to view admin tools.',
-      forbidden: 'Access denied (not an admin).',
-      error: 'Admin auth failed. Please refresh or contact support.',
-      'signed-in': '',
-    };
-
-    const setAuthStatus = (message) => {
-      if (authStatus) authStatus.textContent = message;
-    };
-
     const setAuthState = (state) => {
       const isSignedIn = state === 'signed-in';
-      setAuthStatus(authStatusMessages[state] || '');
+      const messages = {
+        checking: 'Checking admin access…',
+        'signed-out': 'Sign in to view admin tools.',
+        forbidden: 'Access denied (not an admin).',
+        error: 'Admin auth failed. Please refresh or contact support.',
+        'signed-in': '',
+      };
+      setAuthStatus(messages[state] || '');
       setAdminShellVisible(isSignedIn);
       setGatedContentVisible(isSignedIn);
 
@@ -308,6 +430,109 @@ const metadata = {
         .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
     };
 
+    const formatDate = (value) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return { display: 'Draft date unavailable', iso: '' };
+
+      return {
+        display: new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date),
+        iso: date.toISOString(),
+      };
+    };
+
+    const setText = (element, value) => {
+      if (element) element.textContent = value || '';
+    };
+
+    const setPreviewMedia = (draft) => {
+      const image = String(draft.image || '').trim();
+      const canRenderImage = image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/');
+      if (fields.image) {
+        fields.image.hidden = !canRenderImage;
+        if (canRenderImage) fields.image.src = image;
+        fields.image.alt = draft.excerpt || draft.title || '';
+      }
+      if (fields.divider) fields.divider.hidden = canRenderImage;
+
+      if (fields.videoWrap && fields.video) {
+        fields.videoWrap.hidden = !draft.video;
+        if (draft.video) {
+          fields.video.src = draft.video;
+          fields.video.title = `${draft.title || 'Draft'} video`;
+        }
+      }
+
+      if (fields.ctaWrap && fields.cta) {
+        fields.ctaWrap.hidden = !draft.ctaLink;
+        if (draft.ctaLink) {
+          fields.cta.href = draft.ctaLink;
+          fields.cta.textContent = draft.ctaText || 'Learn more';
+        }
+      }
+    };
+
+    const renderDraft = (draft) => {
+      const date = formatDate(draft.publishDate || draft.updatedAt);
+      setText(fields.title, draft.title || 'Untitled draft');
+      setText(fields.excerpt, draft.excerpt || '');
+      setText(fields.date, date.display);
+      if (fields.date) fields.date.dateTime = date.iso;
+
+      const readingTime = Number(draft.readingTime);
+      const hasReadingTime = Number.isFinite(readingTime) && readingTime > 0;
+      if (fields.readingTime) {
+        fields.readingTime.hidden = !hasReadingTime;
+        fields.readingTime.textContent = hasReadingTime ? `${readingTime} min read` : '';
+      }
+      if (fields.readingSeparator) fields.readingSeparator.hidden = !hasReadingTime;
+      if (fields.content) fields.content.innerHTML = draft.html || '';
+      setPreviewMedia(draft);
+
+      if (fields.preview) fields.preview.hidden = false;
+      if (fields.notFoundPanel) fields.notFoundPanel.hidden = true;
+      setLoadStatus('');
+    };
+
+    const showNotFound = (message) => {
+      if (fields.preview) fields.preview.hidden = true;
+      if (fields.notFoundPanel) fields.notFoundPanel.hidden = false;
+      setLoadStatus(message || 'Draft was not found.', true);
+    };
+
+    const loadDraft = async (token) => {
+      if (!draftId) {
+        showNotFound('No draft id was provided.');
+        return;
+      }
+
+      setLoadStatus('Loading draft preview…');
+
+      try {
+        const response = await fetch(
+          `/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        const result = await response.json().catch(() => ({}));
+
+        if (response.status === 404 || result.not_found) {
+          showNotFound(result.error || 'Draft was not found.');
+          return;
+        }
+
+        if (!response.ok) throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
+
+        renderDraft(result.draft || {});
+      } catch (error) {
+        showNotFound(error instanceof Error ? error.message : 'Draft could not be loaded.');
+      }
+    };
+
     const renderAuthState = async (clerk) => {
       const signedIn = Boolean(clerk.isSignedIn && clerk.session);
 
@@ -315,7 +540,9 @@ const metadata = {
         const adminState = await getAdminStateForClerk(clerk);
 
         if (adminState.isAdmin) {
+          const token = await clerk.session.getToken();
           setAuthState('signed-in');
+          await loadDraft(token);
           return;
         }
 
@@ -345,6 +572,11 @@ const metadata = {
         setAuthState('error');
       }
     };
+
+    const encodedDraftId = encodeURIComponent(draftId || '');
+    setText(fields.draftIdCopy, draftId ? `Draft ID: ${draftId}` : 'No draft id provided');
+    if (fields.editDraftLink) fields.editDraftLink.href = `/admin/publish?draftId=${encodedDraftId}`;
+    if (fields.notFoundEditLink) fields.notFoundEditLink.href = `/admin/publish?draftId=${encodedDraftId}`;
 
     initializeClerkAuth();
   })();
