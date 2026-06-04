@@ -82,8 +82,15 @@ const metadata = {
 
         <div class="field">
           <label for="slug">Slug</label>
-          <input id="slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" />
-          <p id="slug-edit-hint" class="hint" hidden></p>
+          <input
+            id="slug"
+            name="slug"
+            type="text"
+            autocomplete="off"
+            placeholder="article-slug"
+            aria-describedby="slug-edit-hint"
+          />
+          <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
         </div>
 
         <div class="field">
@@ -466,6 +473,19 @@ const metadata = {
     outline: none;
   }
 
+  input.is-error {
+    border-color: var(--aw-color-accent);
+    background: rgb(254 242 242 / 72%);
+  }
+
+  input.is-error:focus {
+    box-shadow: 0 0 0 3px rgb(190 58 58 / 18%);
+  }
+
+  :global(.dark) input.is-error {
+    background: rgb(127 29 29 / 18%);
+  }
+
   textarea {
     min-height: 420px;
     resize: vertical;
@@ -482,6 +502,11 @@ const metadata = {
     margin: 0.45rem 0 0;
     color: var(--aw-color-text-muted);
     font-size: 0.92rem;
+  }
+
+  .hint.is-error {
+    color: var(--aw-color-accent);
+    font-weight: 700;
   }
 
   .image-list {
@@ -698,6 +723,8 @@ const metadata = {
     const publicGitHubBranch = adminPage?.dataset.publicGithubBranch || 'main';
     const publicGitHubRepoUrl = adminPage?.dataset.publicGithubRepoUrl || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+    const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+    const slugInvalidMessage = 'Slug must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
     const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
     const maxImageFileSizeBytes = 0.5 * 1024 * 1024;
     const maxImageCount = 10;
@@ -711,17 +738,38 @@ const metadata = {
 
     const isEditMode = () => Boolean(getEditSlug());
 
+    const getSlugEditHint = () =>
+      isEditMode() ? `Slug is locked in edit mode. Updates overwrite src/data/post/${getEditSlug()}.md in place.` : '';
+
+    const renderSlugHint = (isInvalid) => {
+      const editHint = getSlugEditHint();
+      fields.slugHint.textContent = isInvalid ? slugInvalidMessage : editHint;
+      fields.slugHint.hidden = !isInvalid && !editHint;
+      fields.slugHint.classList.toggle('is-error', isInvalid);
+    };
+
+    const validateSlug = ({ announce = false } = {}) => {
+      const slug = fields.slug.value.trim();
+      const isInvalid = Boolean(slug) && !slugPattern.test(slug);
+      fields.slug.classList.toggle('is-error', isInvalid);
+      fields.slug.setAttribute('aria-invalid', String(isInvalid));
+      renderSlugHint(isInvalid);
+
+      if (isInvalid && announce) setStatus(slugInvalidMessage, false);
+      return !isInvalid;
+    };
+
+    const updatePublishButtonState = () => {
+      fields.publish.disabled = !isAdmin || !validateSlug();
+    };
+
     const setEditorModeCopy = (mode) => {
       const editing = mode === 'edit';
-      const editSlug = getEditSlug();
       fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
       fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
       fields.overwrite.checked = editing || fields.overwrite.checked;
       fields.slug.disabled = editing;
-      fields.slugHint.hidden = !editing;
-      fields.slugHint.textContent = editing
-        ? `Slug is locked in edit mode. Updates overwrite src/data/post/${editSlug}.md in place.`
-        : '';
+      validateSlug();
     };
 
     const setGatedContentVisible = (visible) => {
@@ -831,7 +879,7 @@ const metadata = {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
       setAdminShellVisible(isAdmin);
-      fields.publish.disabled = !isAdmin;
+      updatePublishButtonState();
       setGatedContentVisible(isAdmin);
 
       if (!isAdmin && state !== 'checking') redirectToHome();
@@ -2087,6 +2135,14 @@ const metadata = {
 
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
+      updatePublishButtonState();
+    });
+
+    ['input', 'change'].forEach((eventName) => {
+      fields.slug.addEventListener(eventName, () => {
+        validateSlug({ announce: true });
+        updatePublishButtonState();
+      });
     });
 
     fields.jsonUpload.addEventListener('change', async () => {
@@ -2156,6 +2212,11 @@ const metadata = {
       updatePublishOutput();
 
       const { slug } = buildMarkdown();
+      if (!validateSlug({ announce: true })) {
+        updatePublishButtonState();
+        return;
+      }
+
       if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
         setStatus('Title, slug, and Markdown content are required before publishing.', false);
         return;
@@ -2225,7 +2286,7 @@ const metadata = {
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
-        publishButton.disabled = !isAdmin;
+        updatePublishButtonState();
       }
     };
 
@@ -2245,6 +2306,7 @@ const metadata = {
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
     if (!isEditMode()) loadDraft();
+    updatePublishButtonState();
     updatePreview();
     updatePublishOutput();
     initializeClerkAuth();
