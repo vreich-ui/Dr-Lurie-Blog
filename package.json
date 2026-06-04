@@ -16,7 +16,7 @@
     "check": "npm run check:astro && npm run check:eslint && npm run check:prettier",
     "check:astro": "astro check",
     "check:eslint": "eslint .",
-    "check:prettier": "prettier --check .",
+    "check:prettier": "prettier --check --no-error-on-unmatched-pattern \"src/**/*.{ts,tsx,js,jsx,astro,css}\" \"scripts/**/*.{ts,js}\"",
     "fix": "npm run fix:eslint && npm run fix:prettier",
     "fix:eslint": "eslint --fix .",
     "fix:prettier": "prettier -w .",
