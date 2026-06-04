@@ -997,8 +997,18 @@ const metadata = {
       return !isInvalid;
     };
 
+    const getMarkdownWordCount = () => fields.content.value.trim().split(/\s+/).filter(Boolean).length;
+
     const updatePublishButtonState = () => {
-      fields.publish.disabled = !isAdmin || !validateSlug();
+      const hasMinimumPublishContent = Boolean(
+        fields.title.value.trim() &&
+          fields.author.value.trim() &&
+          slugPattern.test(fields.slug.value.trim()) &&
+          getMarkdownWordCount() >= 5 &&
+          isAdmin
+      );
+      fields.publish.disabled = !hasMinimumPublishContent;
+      validateSlug();
     };
 
     const setEditorModeCopy = (mode) => {
@@ -1710,6 +1720,30 @@ const metadata = {
       localStorage.removeItem(draftKey);
     };
 
+    const saveJsonDraftToBlobs = async () => {
+      const clerkToken = await getClerkSessionToken();
+      const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+      const response = await fetch('/.netlify/functions/admin-save-json-draft', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...(requestId ? { request_id: requestId } : {}),
+          ...(lockToken ? { lock_token: lockToken } : {}),
+          input: buildContentSourceDraft(),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
+      }
+
+      return result;
+    };
+
     const saveDraft = async () => {
       const saveButton = document.querySelector('#save-draft');
       const computedSlug = slugify(fields.slug.value || fields.title.value);
@@ -1838,6 +1872,7 @@ const metadata = {
       }
       updatePreview();
       updatePublishOutput();
+      updatePublishButtonState();
     };
 
     const initializeEditMode = async (clerk) => {
@@ -2231,6 +2266,7 @@ const metadata = {
 
       updatePreview();
       updatePublishOutput();
+      updatePublishButtonState();
     };
 
     const getImportJsonObjectText = (text) => {
@@ -2427,8 +2463,13 @@ const metadata = {
         return;
       }
 
-      if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
-        setStatus('Title, slug, and content are required before publishing.', false);
+      if (
+        !fields.title.value.trim() ||
+        !slugPattern.test(fields.slug.value.trim()) ||
+        !fields.author.value.trim() ||
+        getMarkdownWordCount() < 5
+      ) {
+        setStatus('Title, slug, author, and Markdown content (5+ words) are required before publishing.', false);
         return;
       }
 
@@ -2438,6 +2479,8 @@ const metadata = {
 
       try {
         const clerkToken = await getClerkSessionToken();
+        setStatus('Saving JSON draft to Blobs…', false);
+        await saveJsonDraftToBlobs();
         setStatus('Publishing article to GitHub…', false);
 
         const files = await Promise.all(
@@ -2511,6 +2554,7 @@ const metadata = {
       document.querySelector('#publish-form').addEventListener(eventName, () => {
         updatePreview();
         updatePublishOutput();
+        updatePublishButtonState();
         setUnsavedChanges(true);
       });
     });
