@@ -160,7 +160,9 @@ const metadata = {
           </label>
           <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
           <p class="hint">
-            Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.
+            Selected images will be committed with the article under <code>src/assets/images/uploads/</code>. Allowed
+            types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
+            <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
           </p>
           <ul id="image-list" class="image-list" aria-live="polite"></ul>
         </div>
@@ -849,6 +851,13 @@ const metadata = {
   // @ts-nocheck
   import { loadClerk } from '~/utils/clerkLoader';
 
+  const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+  const allowedImageTypeLabels = ['png', 'jpg', 'webp'];
+  const maxImageFileSizeBytes = 0.5 * 1024 * 1024;
+  const maxImageCount = 10;
+
+  const formatImageRuleFileSize = (bytes) => `${Number((bytes / (1024 * 1024)).toFixed(2))}MB`;
+
   (() => {
     const draftKey = 'dr-lurie-admin-draft';
     const fields = {
@@ -868,6 +877,9 @@ const metadata = {
       draft: document.querySelector('#draft'),
       content: document.querySelector('#content'),
       imageUpload: document.querySelector('#image-upload'),
+      imageAllowedTypes: document.querySelector('#image-allowed-types'),
+      imageMaxFileSize: document.querySelector('#image-max-file-size'),
+      imageMaxCount: document.querySelector('#image-max-count'),
       imageList: document.querySelector('#image-list'),
       featuredImage: document.querySelector('#featured-image'),
       existingFeaturedImagePath: document.querySelector('#existing-featured-image-path'),
@@ -905,14 +917,18 @@ const metadata = {
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const slugInvalidMessage = 'Slug must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
-    const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
-    const maxImageFileSizeBytes = 0.5 * 1024 * 1024;
-    const maxImageCount = 10;
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
     const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
     let toastTimer;
+
+    const renderImageRulesHint = () => {
+      fields.imageAllowedTypes.textContent = allowedImageTypeLabels.join('/');
+      fields.imageMaxFileSize.textContent = formatImageRuleFileSize(maxImageFileSizeBytes);
+      fields.imageMaxCount.textContent = String(maxImageCount);
+      fields.imageUpload.accept = Array.from(allowedImageTypes).join(',');
+    };
 
     const getEditSlug = () => slugify(new URLSearchParams(window.location.search).get('edit') || '');
 
@@ -1428,13 +1444,15 @@ const metadata = {
         }
 
         if (!allowedImageTypes.has(file.type)) {
-          errors.push(`${file.name} was skipped because ${file.type || 'its file type'} is not supported.`);
+          errors.push(
+            `${file.name} was skipped because ${file.type || 'its file type'} is not supported. Allowed types: ${allowedImageTypeLabels.join('/')}.`
+          );
           return;
         }
 
         if (file.size > maxImageFileSizeBytes) {
           errors.push(
-            `${file.name} was skipped because ${formatFileSize(file.size)} exceeds the ${formatFileSize(
+            `${file.name} was skipped because ${formatFileSize(file.size)} exceeds the ${formatImageRuleFileSize(
               maxImageFileSizeBytes
             )} limit.`
           );
@@ -2460,6 +2478,7 @@ const metadata = {
       event.returnValue = '';
     });
 
+    renderImageRulesHint();
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
     if (!isEditMode()) loadDraft();
