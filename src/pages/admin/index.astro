@@ -15,7 +15,9 @@ const metadata = {
 <Layout metadata={metadata}>
   <section
     class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
+    data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
+    hidden
   >
     <header class="dashboard-header">
       <div>
@@ -170,6 +172,7 @@ const metadata = {
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
 
@@ -235,6 +238,14 @@ const metadata = {
       return clerkLoadPromise;
     };
 
+    const setAdminShellVisible = (visible) => {
+      if (adminShell) adminShell.hidden = !visible;
+    };
+
+    const redirectToHome = () => {
+      window.location.replace('/');
+    };
+
     const authStatusMessages = {
       checking: 'Checking admin access…',
       'signed-out': 'Sign in to view admin tools.',
@@ -248,8 +259,12 @@ const metadata = {
     };
 
     const setAuthState = (state) => {
+      const isSignedIn = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
-      setGatedContentVisible(state === 'signed-in');
+      setAdminShellVisible(isSignedIn);
+      setGatedContentVisible(isSignedIn);
+
+      if (!isSignedIn && state !== 'checking') redirectToHome();
     };
 
     const getAdminStateForClerk = async (clerk) => {

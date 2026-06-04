@@ -18,9 +18,11 @@ const metadata = {
 <Layout metadata={metadata}>
   <section
     class="admin-page mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14"
+    data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     data-public-github-branch={publicGitHubBranch}
     data-public-github-repo-url={publicGitHubRepoUrl}
+    hidden
   >
     <header
       class="admin-header mb-8 flex flex-col gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800"
@@ -694,6 +696,7 @@ const metadata = {
     const publicGitHubRepoUrl = adminPage?.dataset.publicGithubRepoUrl || '';
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
     let toastTimer;
@@ -798,6 +801,14 @@ const metadata = {
       return clerkLoadPromise;
     };
 
+    const setAdminShellVisible = (visible) => {
+      if (adminShell) adminShell.hidden = !visible;
+    };
+
+    const redirectToHome = () => {
+      window.location.replace('/');
+    };
+
     const authStatusMessages = {
       checking: 'Checking admin access…',
       'signed-out': 'Sign in to view admin tools.',
@@ -813,8 +824,11 @@ const metadata = {
     const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
+      setAdminShellVisible(isAdmin);
       fields.publish.disabled = !isAdmin;
       setGatedContentVisible(isAdmin);
+
+      if (!isAdmin && state !== 'checking') redirectToHome();
     };
 
     const getAdminStateForClerk = async (clerk) => {

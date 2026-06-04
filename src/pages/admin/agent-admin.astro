@@ -58,7 +58,9 @@ const metadata = {
 <Layout metadata={metadata}>
   <section
     class="agent-admin-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
+    data-admin-shell
     data-clerk-publishable-key={import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? ''}
+    hidden
   >
     <header class="agent-header">
       <div>
@@ -415,6 +417,7 @@ const metadata = {
     const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
 
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+    const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
     const chatkitWidgetConfig = fields.chatkitConfig ? JSON.parse(fields.chatkitConfig.textContent || '{}') : {};
 
@@ -454,6 +457,14 @@ const metadata = {
       });
     };
 
+    const setAdminShellVisible = (visible) => {
+      if (adminShell) adminShell.hidden = !visible;
+    };
+
+    const redirectToHome = () => {
+      window.location.replace('/');
+    };
+
     const authStatusMessages = {
       checking: 'Checking admin access…',
       'signed-out': 'Sign in to view admin tools.',
@@ -469,7 +480,10 @@ const metadata = {
     const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
+      setAdminShellVisible(isAdmin);
       setGatedContentVisible(isAdmin);
+
+      if (!isAdmin && state !== 'checking') redirectToHome();
     };
 
     setAuthState('checking');
