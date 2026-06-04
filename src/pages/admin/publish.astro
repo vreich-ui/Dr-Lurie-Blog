@@ -285,14 +285,27 @@ const metadata = {
 
           <details class="markdown-backup" open>
             <summary>Save backup</summary>
-            <div class="backup-actions">
-              <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown</button>
-              <a
-                id="download-json-backup"
-                class="btn-secondary btn-sm backup-download-link"
-                href="#"
-                download="dr-lurie-draft-backup.json">Download JSON</a
+            <div class="backup-actions" aria-label="Backup actions">
+              <button
+                id="copy-output"
+                class="icon-button backup-icon-button"
+                type="button"
+                aria-label="Copy Markdown backup"
+                title="Copy Markdown backup"
               >
+                <Icon name="tabler:copy" class="backup-action-icon" aria-hidden="true" />
+                <span class="sr-only">Copy Markdown backup</span>
+              </button>
+              <button
+                id="download-json-backup"
+                class="icon-button backup-icon-button"
+                type="button"
+                aria-label="Download JSON backup"
+                title="Download JSON backup"
+              >
+                <Icon name="tabler:download" class="backup-action-icon" aria-hidden="true" />
+                <span class="sr-only">Download JSON backup</span>
+              </button>
             </div>
             <textarea id="output-markdown" class="output-markdown" readonly></textarea>
           </details>
@@ -914,10 +927,45 @@ const metadata = {
   }
 
   .backup-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     margin-top: 0.75rem;
+  }
+
+  .backup-icon-button {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .backup-icon-button:not(:disabled):hover,
+  .backup-icon-button:not(:disabled):focus-visible {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-accent);
+    outline: none;
+  }
+
+  .backup-icon-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .backup-action-icon {
+    width: 1rem;
+    height: 1rem;
   }
 
   .markdown-backup summary {
@@ -1145,6 +1193,8 @@ const metadata = {
     const setUnsavedChanges = (value) => {
       hasUnsavedChanges = Boolean(value);
       if (fields.unsavedChanges) fields.unsavedChanges.hidden = !hasUnsavedChanges;
+      updatePublishButtonState();
+      updateSaveDraftButtonState();
     };
 
     const renderSlugHint = (isInvalid) => {
@@ -1173,7 +1223,7 @@ const metadata = {
       );
 
     const updateSaveDraftButtonState = () => {
-      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent();
+      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent() || !hasUnsavedChanges;
     };
 
     const getHasPreviewContent = () =>
@@ -1188,15 +1238,23 @@ const metadata = {
       fields.preview.disabled = !getHasPreviewContent();
     };
 
+    const updateBackupActionState = () => {
+      const backupActionsEnabled = !fields.publish.disabled;
+      fields.copyOutput.disabled = !backupActionsEnabled;
+      fields.downloadJsonBackup.disabled = !backupActionsEnabled;
+    };
+
     const updatePublishButtonState = () => {
       const hasMinimumPublishContent = Boolean(
         fields.title.value.trim() &&
           fields.author.value.trim() &&
           slugPattern.test(fields.slug.value.trim()) &&
           getMarkdownWordCount() >= 5 &&
-          isAdmin
+          isAdmin &&
+          hasUnsavedChanges
       );
       fields.publish.disabled = !hasMinimumPublishContent;
+      updateBackupActionState();
       validateSlug();
     };
 
@@ -1894,8 +1952,8 @@ const metadata = {
     const updateBackupDownload = () => {
       const { slug } = buildMarkdown();
       const backupJson = JSON.stringify(buildContentSourceDraft(), null, 2);
-      fields.downloadJsonBackup.href = `data:application/json;charset=utf-8,${encodeURIComponent(backupJson)}`;
-      fields.downloadJsonBackup.download = `${slug || 'dr-lurie-draft'}-backup.json`;
+      fields.downloadJsonBackup.dataset.href = `data:application/json;charset=utf-8,${encodeURIComponent(backupJson)}`;
+      fields.downloadJsonBackup.dataset.download = `${slug || 'dr-lurie-draft'}-backup.json`;
     };
 
     const resizeOutputMarkdown = () => {
@@ -1960,7 +2018,7 @@ const metadata = {
         return;
       }
 
-      const confirmed = window.confirm('Save draft JSON to Blobs and return to Admin Dashboard?');
+      const confirmed = window.confirm('Save draft JSON to Blobs?');
       if (!confirmed) return;
 
       saveButton.disabled = true;
@@ -1989,7 +2047,8 @@ const metadata = {
 
         clearLocalCheckoutState();
         setUnsavedChanges(false);
-        window.location.href = '/admin';
+        const savedRequestId = result.record?.request_id ? ` (${result.record.request_id})` : '';
+        setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
       } catch (error) {
         console.error('JSON draft save failed.', error);
         const recoverySaved = saveLocalRecoveryDraft();
@@ -2002,6 +2061,7 @@ const metadata = {
         );
       } finally {
         updateSaveDraftButtonState();
+        updatePublishButtonState();
       }
     };
 
@@ -2806,13 +2866,26 @@ const metadata = {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
         updatePublishButtonState();
+        updateSaveDraftButtonState();
       }
     };
 
     fields.publish.addEventListener('click', publishArticle);
     fields.copyOutput.addEventListener('click', () => {
+      if (fields.copyOutput.disabled) return;
       updatePublishOutput();
       copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
+    });
+
+    fields.downloadJsonBackup.addEventListener('click', () => {
+      if (fields.downloadJsonBackup.disabled) return;
+      updatePublishOutput();
+      const link = document.createElement('a');
+      link.href = fields.downloadJsonBackup.dataset.href || '#';
+      link.download = fields.downloadJsonBackup.dataset.download || 'dr-lurie-draft-backup.json';
+      document.body.append(link);
+      link.click();
+      link.remove();
     });
 
     ['input', 'change'].forEach((eventName) => {
