@@ -920,6 +920,7 @@ const metadata = {
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
       publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
+      saveDraft: document.querySelector('#save-draft'),
       publish: document.querySelector('#publish'),
       publishMode: document.querySelector('#publish-mode'),
       toast: document.querySelector('#toast'),
@@ -999,6 +1000,15 @@ const metadata = {
 
     const getMarkdownWordCount = () => fields.content.value.trim().split(/\s+/).filter(Boolean).length;
 
+    const getHasMinimumDraftContent = () =>
+      Boolean(
+        fields.title.value.trim() && slugify(fields.slug.value || fields.title.value) && fields.author.value.trim()
+      );
+
+    const updateSaveDraftButtonState = () => {
+      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent();
+    };
+
     const updatePublishButtonState = () => {
       const hasMinimumPublishContent = Boolean(
         fields.title.value.trim() &&
@@ -1069,6 +1079,7 @@ const metadata = {
       setAuthStatus(authStatusMessages[state] || '');
       setAdminShellVisible(isAdmin);
       updatePublishButtonState();
+      updateSaveDraftButtonState();
       setGatedContentVisible(isAdmin);
 
       if (!isAdmin && state !== 'checking') redirectToHome();
@@ -1745,11 +1756,9 @@ const metadata = {
     };
 
     const saveDraft = async () => {
-      const saveButton = document.querySelector('#save-draft');
-      const computedSlug = slugify(fields.slug.value || fields.title.value);
-      const hasMinimumFields = Boolean(fields.title.value.trim() && computedSlug && fields.author.value.trim());
+      const saveButton = fields.saveDraft;
 
-      if (!hasMinimumFields) {
+      if (!getHasMinimumDraftContent()) {
         setStatus('Title, slug, and author are required to save JSON draft.', false);
         return;
       }
@@ -1795,7 +1804,7 @@ const metadata = {
           false
         );
       } finally {
-        saveButton.disabled = false;
+        updateSaveDraftButtonState();
       }
     };
 
@@ -1873,6 +1882,7 @@ const metadata = {
       updatePreview();
       updatePublishOutput();
       updatePublishButtonState();
+      updateSaveDraftButtonState();
     };
 
     const initializeEditMode = async (clerk) => {
@@ -2267,6 +2277,7 @@ const metadata = {
       updatePreview();
       updatePublishOutput();
       updatePublishButtonState();
+      updateSaveDraftButtonState();
     };
 
     const getImportJsonObjectText = (text) => {
@@ -2379,12 +2390,14 @@ const metadata = {
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
       updatePublishButtonState();
+      updateSaveDraftButtonState();
     });
 
     ['input', 'change'].forEach((eventName) => {
       fields.slug.addEventListener(eventName, () => {
         validateSlug({ announce: true });
         updatePublishButtonState();
+        updateSaveDraftButtonState();
       });
     });
 
@@ -2555,6 +2568,7 @@ const metadata = {
         updatePreview();
         updatePublishOutput();
         updatePublishButtonState();
+        updateSaveDraftButtonState();
         setUnsavedChanges(true);
       });
     });
@@ -2573,6 +2587,7 @@ const metadata = {
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
     if (!isEditMode()) loadDraft();
     updatePublishButtonState();
+    updateSaveDraftButtonState();
     updatePreview();
     updatePublishOutput();
     setUnsavedChanges(false);
