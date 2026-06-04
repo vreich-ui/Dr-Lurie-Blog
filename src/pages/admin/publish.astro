@@ -174,7 +174,7 @@ const metadata = {
         <div class="actions">
           <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
           <button id="preview" class="btn-secondary" type="button">Preview</button>
-          <button id="publish" class="btn-primary publish-button" type="button">Publish Article</button>
+          <button id="publish" class="btn-primary publish-button" type="button" disabled>Publish Article</button>
         </div>
         <p id="status" class="status" aria-live="polite"></p>
       </form>
@@ -736,9 +736,35 @@ const metadata = {
       return clerkLoadPromise;
     };
 
+    const getMarkdownWordCount = (value) =>
+      String(value)
+        .trim()
+        .match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)?.length || 0;
+
+    const getPublishReadiness = () => {
+      const slug = getCurrentSlug();
+      const markdownWordCount = getMarkdownWordCount(fields.content.value);
+
+      return {
+        ready: Boolean(
+          fields.title.value.trim() &&
+            slug &&
+            fields.author.value.trim() &&
+            fields.content.value.trim() &&
+            markdownWordCount >= 5
+        ),
+        slug,
+        markdownWordCount,
+      };
+    };
+
+    const updatePublishButtonState = () => {
+      fields.publish.disabled = !isAdmin || !getPublishReadiness().ready;
+    };
+
     const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
-      fields.publish.disabled = !isAdmin;
+      updatePublishButtonState();
       setGatedContentVisible(isAdmin);
     };
 
@@ -1051,11 +1077,155 @@ const metadata = {
       const { slug, markdown } = buildMarkdown();
       fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
       fields.outputMarkdown.value = markdown;
+      updatePublishButtonState();
     };
 
-    const saveDraft = () => {
-      localStorage.setItem(draftKey, JSON.stringify(getDraft()));
-      setStatus('Draft saved.');
+    const buildArticleBlobPayload = ({ requestId, article, publicationStatus, source, handoffNotes }) => ({
+      action: 'create_request',
+      request_id: requestId,
+      input: {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        ids: {
+          content_id: article.slug,
+          workflow_id: requestId,
+        },
+        publication_context: {
+          publication_name: 'Dr. Lurié Science Blog',
+          domain: window.location.hostname,
+          topic_scope: article.category || undefined,
+        },
+        content: {
+          schema_version: 'content_blocks.v1',
+          title: article.title,
+          deck: article.excerpt || undefined,
+          description: article.seoDescription || article.excerpt || undefined,
+          blocks: article.content
+            ? [
+                {
+                  block_id: 'draft-markdown',
+                  block_type: 'markdown',
+                  payload: { markdown: article.content },
+                },
+              ]
+            : undefined,
+        },
+        taxonomy: {
+          schema_version: 'taxonomy.v1',
+          tags: parseTags(article.tags),
+        },
+        seo: {
+          schema_version: 'seo.v1',
+          meta_title: article.title,
+          meta_description: article.seoDescription || article.excerpt || undefined,
+        },
+        editorial: {
+          schema_version: 'editorial.v1',
+          writer_notes: article.sources || undefined,
+          draft_markdown: article.content || undefined,
+        },
+        publication: {
+          schema_version: 'publication.v1',
+          publication_status: publicationStatus,
+          publish_payload: {
+            slug: article.slug,
+            title: article.title,
+            content: article.content || undefined,
+            markdown: article.markdown || undefined,
+            publishDate: article.publishDate || undefined,
+            author: article.author,
+            category: article.category || undefined,
+            tags: parseTags(article.tags),
+            excerpt: article.excerpt || undefined,
+            draft: article.draft,
+            featuredImage: article.featuredImage || undefined,
+            existingFeaturedImagePath: article.existingFeaturedImagePath || undefined,
+            videoLink: article.videoLink || undefined,
+            ctaLink: article.ctaLink || undefined,
+            ctaText: article.ctaText || undefined,
+            seoDescription: article.seoDescription || undefined,
+            overwrite: article.overwrite,
+            metadata: {
+              source,
+              imageNames: article.imageNames,
+              sourcesText: article.sources,
+            },
+          },
+        },
+        workflow: {
+          schema_version: 'content_workflow.v1',
+          workflow_id: requestId,
+          next_agent: 'reader_insight',
+          handoff_notes: handoffNotes,
+        },
+      },
+    });
+
+    const saveDraft = async () => {
+      const title = fields.title.value.trim();
+      const slug = getCurrentSlug();
+      const author = fields.author.value.trim();
+
+      if (!title || !slug || !author) {
+        window.alert('Title, slug, and author are required to save JSON draft.');
+        setStatus('Title, slug, and author are required to save JSON draft.', false);
+        return;
+      }
+
+      const confirmed = window.confirm('Save draft JSON to Blobs and return to Admin Dashboard?');
+      if (!confirmed) return;
+
+      const saveButton = document.querySelector('#save-draft');
+      saveButton.disabled = true;
+      setStatus('Saving draft JSON to Blobs…', false);
+
+      const draft = { ...getDraft(), title, slug, author, draft: true };
+      const requestId = `admin-draft-${slug}-${Date.now()}`;
+
+      try {
+        const clerkToken = await getClerkSessionToken();
+        const response = await fetch('/.netlify/functions/save-json-blob', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(
+            buildArticleBlobPayload({
+              requestId,
+              article: draft,
+              publicationStatus: 'draft',
+              source: 'admin_publish_save_draft',
+              handoffNotes: 'Saved from the admin Save Draft flow.',
+            })
+          ),
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || result.ok === false || !result.record?.request_id) {
+          throw new Error(result.error || `Blob save failed with status ${response.status}.`);
+        }
+
+        localStorage.removeItem(draftKey);
+        setStatus(`Draft JSON saved to Blobs as ${result.record.request_id}. Redirecting…`, false);
+        window.location.href = '/admin';
+      } catch (error) {
+        let localRecoverySaved = true;
+        try {
+          localStorage.setItem(draftKey, JSON.stringify(draft));
+        } catch {
+          localRecoverySaved = false;
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown Blob save error.';
+        const fallbackMessage = localRecoverySaved
+          ? `JSON was not saved to Blobs. Local recovery was saved only as fallback. ${message}`
+          : `JSON was not saved to Blobs, and local recovery could not be saved. ${message}`;
+        window.alert(fallbackMessage);
+        setStatus(fallbackMessage, false);
+      } finally {
+        saveButton.disabled = false;
+      }
     };
 
     const loadDraft = () => {
@@ -1473,9 +1643,13 @@ const metadata = {
       updatePreview();
       updatePublishOutput();
 
-      const { slug } = buildMarkdown();
-      if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
-        setStatus('Title, slug, and Markdown content are required before publishing.', false);
+      const { ready, slug, markdownWordCount } = getPublishReadiness();
+      if (!ready) {
+        setStatus(
+          `Title, slug, author, and Markdown content with at least five words are required before publishing. Current Markdown word count: ${markdownWordCount}.`,
+          false
+        );
+        updatePublishButtonState();
         return;
       }
 
@@ -1485,7 +1659,59 @@ const metadata = {
 
       try {
         const clerkToken = await getClerkSessionToken();
-        setStatus('Publishing article to GitHub…', false);
+        const publishDate = getPublishDate().toISOString();
+        const article = {
+          ...getDraft(),
+          title: fields.title.value.trim(),
+          slug,
+          author: fields.author.value.trim(),
+          content: fields.content.value.trim(),
+          markdown: fields.outputMarkdown.value,
+          publishDate,
+          draft: fields.draft.checked,
+        };
+        const requestId = `admin-publish-${slug}-${Date.now()}`;
+
+        setStatus('Saving finished JSON to Blobs…', false);
+        const blobResponse = await fetch('/.netlify/functions/save-json-blob', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(
+            buildArticleBlobPayload({
+              requestId,
+              article,
+              publicationStatus: fields.draft.checked ? 'draft' : 'published',
+              source: 'admin_publish_article',
+              handoffNotes: 'Saved from the admin Publish Article flow before publishing to GitHub.',
+            })
+          ),
+        });
+        const blobResult = await blobResponse.json().catch(() => ({}));
+
+        if (!blobResponse.ok || blobResult.ok === false || !blobResult.record?.request_id) {
+          let localRecoverySaved = true;
+          try {
+            localStorage.setItem(draftKey, JSON.stringify(article));
+          } catch {
+            localRecoverySaved = false;
+          }
+
+          const message = blobResult.error || `Blob save failed with status ${blobResponse.status}.`;
+          const fallbackMessage = localRecoverySaved
+            ? `Finished JSON was not saved to Blobs, so the article was not published. Local recovery was saved only as fallback. ${message}`
+            : `Finished JSON was not saved to Blobs, so the article was not published, and local recovery could not be saved. ${message}`;
+          window.alert(fallbackMessage);
+          setStatus(fallbackMessage, false);
+          return;
+        }
+
+        setStatus(
+          `Finished JSON saved to Blobs as ${blobResult.record.request_id}. Publishing article to GitHub…`,
+          false
+        );
 
         const files = await Promise.all(
           selectedFiles.map(async (file) => ({
@@ -1504,7 +1730,7 @@ const metadata = {
             title: fields.title.value,
             slug,
             excerpt: fields.excerpt.value,
-            publishDate: getPublishDate().toISOString(),
+            publishDate,
             author: fields.author.value,
             category: fields.category.value,
             tags: parseTags(fields.tags.value),
@@ -1534,13 +1760,15 @@ const metadata = {
         const shortCommit = String(result.commit || '').slice(0, 7);
         const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
         setStatus(
-          isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`,
+          isEditMode()
+            ? `Updated ${publishedPath} in place${commitText}; Blob JSON saved as ${blobResult.record.request_id}.`
+            : `Published ${publishedPath}${commitText}; Blob JSON saved as ${blobResult.record.request_id}.`,
           false
         );
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
-        publishButton.disabled = !isAdmin;
+        updatePublishButtonState();
       }
     };
 

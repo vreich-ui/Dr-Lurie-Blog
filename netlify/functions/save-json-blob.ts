@@ -1,7 +1,7 @@
 /**
  * Function name: Save_JSON_Blob
  * Required method: POST
- * Required header: x-publish-key
+ * Required auth: x-publish-key or a Clerk admin Bearer token
  * Store name: workflows
  * Primary record key: workflows/by-id/{request_id}.json
  *
@@ -21,7 +21,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { z } from 'zod';
 
-import { getHeader } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
 
@@ -194,6 +194,21 @@ const verifyPublishKey = (event: LambdaEvent, action?: WorkflowAction) => {
   }
 
   return undefined;
+};
+
+const verifyBlobWriteAuth = async (event: LambdaEvent, action?: WorkflowAction) => {
+  const publishKeyFailure = verifyPublishKey(event, action);
+  if (!publishKeyFailure) return undefined;
+
+  if (!getHeader(event.headers, 'authorization')) return publishKeyFailure;
+
+  const adminState = await getAdminStateFromEvent(event);
+  if (adminState.isAdmin) return undefined;
+
+  return jsonResponse(adminState.authenticated ? 403 : 401, {
+    action,
+    error: adminState.error || 'Admin access is required to save JSON blobs.',
+  });
 };
 
 const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
@@ -886,7 +901,7 @@ export const handler = async (event: LambdaEvent) => {
     return jsonResponse(400, { error: 'Invalid request fields.', issues: parsedBody.error.issues });
   }
 
-  const authFailure = verifyPublishKey(event, parsedBody.data.action);
+  const authFailure = await verifyBlobWriteAuth(event, parsedBody.data.action);
   if (authFailure) return authFailure;
 
   const fieldFailure = validateBodyFields(parsedBody.data);
