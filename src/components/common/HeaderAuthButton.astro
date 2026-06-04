@@ -138,7 +138,11 @@ const authRootAttributes = {
   )
 }
 
-<script is:inline>
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  import { loadClerk } from '~/utils/clerkLoader';
+
   (() => {
     if (!window.__drLurieHeaderAuth) {
       window.__drLurieHeaderAuth = {
@@ -204,67 +208,17 @@ const authRootAttributes = {
       authMenuCloseTimer = window.setTimeout(() => setMenuOpen(root, false), 180);
     };
 
-    const loadClerkScript = () =>
-      new Promise((resolve, reject) => {
-        const { clerkPublishableKey, clerkJsScriptSrc } = getHeaderAuthConfig();
-
-        if (window.Clerk) {
-          resolve();
-          return;
-        }
-
-        const existingScript = document.querySelector(
-          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
-        );
-
-        if (existingScript) {
-          existingScript.addEventListener('load', () => resolve(), { once: true });
-          existingScript.addEventListener(
-            'error',
-            () => reject(new Error('Clerk authentication could not be loaded.')),
-            {
-              once: true,
-            }
-          );
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = clerkJsScriptSrc;
-        script.async = true;
-        script.crossOrigin = 'anonymous';
-        script.dataset.drLurieClerkjs = 'true';
-        script.dataset.clerkPublishableKey = clerkPublishableKey;
-        script.addEventListener('load', () => resolve(), { once: true });
-        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
-          once: true,
-        });
-        document.head.append(script);
-      });
-
     const getClerk = async () => {
-      const { clerkPublishableKey } = getHeaderAuthConfig();
+      const { clerkPublishableKey, clerkJsScriptSrc } = getHeaderAuthConfig();
 
       if (!clerkPublishableKey) {
         throw new Error('Header authentication is not configured.');
       }
 
-      headerAuthState.clerkLoadPromise ||= (async () => {
-        await loadClerkScript();
-
-        let clerk = window.Clerk;
-        if (typeof clerk === 'function') {
-          clerk = new clerk(clerkPublishableKey);
-          window.Clerk = clerk;
-        }
-
-        if (!clerk || typeof clerk.load !== 'function') {
-          throw new Error('Clerk authentication could not be initialized.');
-        }
-
-        await clerk.load();
-        return clerk;
-      })();
+      headerAuthState.clerkLoadPromise ||= loadClerk({
+        publishableKey: clerkPublishableKey,
+        scriptSrc: clerkJsScriptSrc,
+      });
 
       return headerAuthState.clerkLoadPromise;
     };

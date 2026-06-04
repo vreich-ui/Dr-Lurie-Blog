@@ -39,7 +39,11 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   }
 </style>
 
-<script is:inline>
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  import { loadClerk } from '~/utils/clerkLoader';
+
   const registerBlogPreviewAdminControls = () => {
     const list = document.querySelector('[data-blog-list]');
     const modeControls = document.querySelector('[data-admin-library-mode-controls]');
@@ -162,64 +166,13 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
       list.innerHTML = drafts.map((post) => renderDraftPreview(post)).join('');
     };
 
-    const loadClerkScript = () =>
-      new Promise((resolve, reject) => {
-        if (window.Clerk) {
-          resolve();
-          return;
-        }
-
-        const resolveWhenClerkExists = () => {
-          if (!window.Clerk) {
-            reject(new Error('Clerk authentication could not be initialized.'));
-            return;
-          }
-
-          resolve();
-        };
-
-        const existingScript = document.querySelector(
-          `script[data-dr-lurie-clerkjs="true"], script[src="${clerkJsScriptSrc}"]`
-        );
-        if (existingScript) {
-          existingScript.addEventListener('load', resolveWhenClerkExists, { once: true });
-          existingScript.addEventListener(
-            'error',
-            () => reject(new Error('Clerk authentication could not be loaded.')),
-            {
-              once: true,
-            }
-          );
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = clerkJsScriptSrc;
-        script.async = true;
-        script.crossOrigin = 'anonymous';
-        script.type = 'text/javascript';
-        script.dataset.drLurieClerkjs = 'true';
-        script.dataset.clerkPublishableKey = clerkPublishableKey;
-        script.addEventListener('load', resolveWhenClerkExists, { once: true });
-        script.addEventListener('error', () => reject(new Error('Clerk authentication could not be loaded.')), {
-          once: true,
-        });
-        document.head.append(script);
-      });
-
     const getClerk = async () => {
-      clerkLoadPromise ||= (async () => {
-        await loadClerkScript();
-
-        if (!window.Clerk) {
-          throw new Error('Clerk authentication could not be initialized.');
+      clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc }).then(
+        (clerk) => {
+          activeClerk = clerk;
+          return clerk;
         }
-
-        const clerk = window.Clerk;
-        await clerk.load();
-        activeClerk = clerk;
-        return clerk;
-      })();
+      );
 
       return clerkLoadPromise;
     };
