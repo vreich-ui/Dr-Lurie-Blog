@@ -114,7 +114,9 @@ const metadata = {
       <section class="publish-output-panel" aria-labelledby="publish-output-heading">
         <div class="publish-output-header">
           <h3 id="publish-output-heading">End node payload</h3>
-          <button id="publish-explicit-button" class="publish-button" type="button" disabled>Publish payload</button>
+          <button id="publish-explicit-button" class="btn-secondary btn-sm" type="button" disabled
+            >Publish payload</button
+          >
         </div>
         <label class="auto-publish-toggle" for="auto-publish-toggle">
           <input id="auto-publish-toggle" type="checkbox" />
@@ -311,18 +313,6 @@ const metadata = {
     margin: 0;
     font-size: 1rem;
     color: var(--aw-color-text-heading);
-  }
-  .publish-button {
-    border: 1px solid rgb(22 163 74 / 40%);
-    background: rgb(22 163 74 / 12%);
-    color: rgb(22 101 52);
-    padding: 0.45rem 0.75rem;
-    border-radius: 0.65rem;
-    font-weight: 700;
-  }
-  .publish-button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
   }
   .publish-output-meta {
     margin: 0.75rem 0 0;
@@ -600,7 +590,7 @@ const metadata = {
           ? JSON.stringify(payload, null, 2)
           : 'No parsed output captured yet.';
       }
-      if (fields.publishButton) fields.publishButton.disabled = !payload || isPublishInFlight;
+      if (fields.publishButton) fields.publishButton.disabled = !hasPublishReadyPayload(payload) || isPublishInFlight;
     };
     const parseOutputObject = (value) => {
       if (value && typeof value === 'object') return value;
@@ -630,6 +620,10 @@ const metadata = {
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
     const toText = (value) => (typeof value === 'string' ? value.trim() : '');
+    const getMarkdownWordCount = (value) => toText(value).split(/\s+/).filter(Boolean).length;
+    const getHasMinimumMarkdown = (payload) => getMarkdownWordCount(payload?.markdown) >= 5;
+    const hasPublishReadyPayload = (payload) =>
+      Boolean(payload && toText(payload.slug) && getHasMinimumMarkdown(payload));
     const getPayloadFingerprint = (payload) => {
       const slug = toText(payload?.slug);
       const commitMessage = toText(payload?.commitMessage);
@@ -672,6 +666,7 @@ const metadata = {
       const slug = toText(payload.slug);
       const markdown = toText(payload.markdown);
       const content = toText(payload.content);
+      const hasMinimumMarkdown = getHasMinimumMarkdown(payload);
       const images = normalizePublishImages(payload.images);
       const rawImages = Array.isArray(payload.images) ? payload.images : [];
       const invalidImageCount = rawImages.length - images.length;
@@ -683,8 +678,12 @@ const metadata = {
         );
         return;
       }
-      if (!markdown && !content) {
-        setStatus('missing required field: markdown or content is required.', false);
+      if (!markdown) {
+        setStatus('missing required field: markdown is required.', false);
+        return;
+      }
+      if (!hasMinimumMarkdown) {
+        setStatus('Markdown must be at least 5 words to publish.', false);
         return;
       }
       if (invalidImageCount > 0) {
@@ -748,7 +747,7 @@ const metadata = {
         setStatus(`Published ${articlePath}. commit=${commit || 'n/a'} deploy=${deployStatus}. ${message}`);
       } finally {
         isPublishInFlight = false;
-        if (fields.publishButton) fields.publishButton.disabled = !capturedParsedPayload;
+        if (fields.publishButton) fields.publishButton.disabled = !hasPublishReadyPayload(capturedParsedPayload);
       }
     };
 
@@ -759,18 +758,28 @@ const metadata = {
       try {
         const parsed = parseOutputObject(rawCandidate);
         capturedParsedPayload = parsed;
-        const publishLooking = Boolean(
-          parsed && toText(parsed.slug) && (toText(parsed.markdown) || toText(parsed.content))
-        );
+        const hasMinimumMarkdown = getHasMinimumMarkdown(parsed);
+        const publishLooking = Boolean(parsed && toText(parsed.slug) && hasMinimumMarkdown);
         debugState.publishPayloadDetected = String(publishLooking);
         if (!parsed) {
           updatePublishPreview(null, `Event ${sourceLabel} captured but payload is not an object.`);
           setDebugLine();
           return;
         }
-        if (!publishLooking) {
+        if (!toText(parsed.slug) || !toText(parsed.markdown)) {
           updatePublishPreview(parsed, `Event ${sourceLabel} captured output, but required fields are missing.`);
-          setStatus('missing required field: output must include slug and either markdown or content.', false);
+          setStatus('missing required field: output must include slug and markdown.', false);
+          setDebugLine();
+          return;
+        }
+        if (!hasMinimumMarkdown) {
+          updatePublishPreview(parsed, 'Markdown must be at least 5 words to publish.');
+          setStatus(
+            autoPublishOnOutput
+              ? 'Auto-publish skipped: Markdown must be at least 5 words to publish.'
+              : 'Markdown must be at least 5 words to publish.',
+            false
+          );
           setDebugLine();
           return;
         }
@@ -1014,6 +1023,10 @@ const metadata = {
     fields.publishButton?.addEventListener('click', () => {
       if (!capturedParsedPayload) {
         setStatus('Publish blocked: no parsed End node payload captured yet.', false);
+        return;
+      }
+      if (!getHasMinimumMarkdown(capturedParsedPayload)) {
+        setStatus('Markdown must be at least 5 words to publish.', false);
         return;
       }
       if (

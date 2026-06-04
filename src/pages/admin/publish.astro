@@ -208,7 +208,7 @@ const metadata = {
         <div class="actions">
           <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
           <button id="preview" class="btn-secondary" type="button">Preview</button>
-          <button id="publish" class="btn-primary publish-button" type="button">Publish Article</button>
+          <button id="publish" class="btn-secondary" type="button">Publish Article</button>
         </div>
         <div class="status-line">
           <p id="status" class="status" aria-live="polite"></p>
@@ -668,10 +668,6 @@ const metadata = {
     margin-top: 1.4rem;
   }
 
-  .publish-button {
-    box-shadow: 0 0.9rem 1.8rem rgb(46 111 149 / 20%);
-  }
-
   .copy-button {
     margin-bottom: 0.8rem;
   }
@@ -920,6 +916,7 @@ const metadata = {
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
       publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
+      saveDraft: document.querySelector('#save-draft'),
       publish: document.querySelector('#publish'),
       publishMode: document.querySelector('#publish-mode'),
       toast: document.querySelector('#toast'),
@@ -997,8 +994,27 @@ const metadata = {
       return !isInvalid;
     };
 
+    const getMarkdownWordCount = () => fields.content.value.trim().split(/\s+/).filter(Boolean).length;
+
+    const getHasMinimumDraftContent = () =>
+      Boolean(
+        fields.title.value.trim() && slugify(fields.slug.value || fields.title.value) && fields.author.value.trim()
+      );
+
+    const updateSaveDraftButtonState = () => {
+      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent();
+    };
+
     const updatePublishButtonState = () => {
-      fields.publish.disabled = !isAdmin || !validateSlug();
+      const hasMinimumPublishContent = Boolean(
+        fields.title.value.trim() &&
+          fields.author.value.trim() &&
+          slugPattern.test(fields.slug.value.trim()) &&
+          getMarkdownWordCount() >= 5 &&
+          isAdmin
+      );
+      fields.publish.disabled = !hasMinimumPublishContent;
+      validateSlug();
     };
 
     const setEditorModeCopy = (mode) => {
@@ -1059,6 +1075,7 @@ const metadata = {
       setAuthStatus(authStatusMessages[state] || '');
       setAdminShellVisible(isAdmin);
       updatePublishButtonState();
+      updateSaveDraftButtonState();
       setGatedContentVisible(isAdmin);
 
       if (!isAdmin && state !== 'checking') redirectToHome();
@@ -1710,12 +1727,34 @@ const metadata = {
       localStorage.removeItem(draftKey);
     };
 
-    const saveDraft = async () => {
-      const saveButton = document.querySelector('#save-draft');
-      const computedSlug = slugify(fields.slug.value || fields.title.value);
-      const hasMinimumFields = Boolean(fields.title.value.trim() && computedSlug && fields.author.value.trim());
+    const saveJsonDraftToBlobs = async () => {
+      const clerkToken = await getClerkSessionToken();
+      const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+      const response = await fetch('/.netlify/functions/admin-save-json-draft', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...(requestId ? { request_id: requestId } : {}),
+          ...(lockToken ? { lock_token: lockToken } : {}),
+          input: buildContentSourceDraft(),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
 
-      if (!hasMinimumFields) {
+      if (!response.ok) {
+        throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
+      }
+
+      return result;
+    };
+
+    const saveDraft = async () => {
+      const saveButton = fields.saveDraft;
+
+      if (!getHasMinimumDraftContent()) {
         setStatus('Title, slug, and author are required to save JSON draft.', false);
         return;
       }
@@ -1761,7 +1800,7 @@ const metadata = {
           false
         );
       } finally {
-        saveButton.disabled = false;
+        updateSaveDraftButtonState();
       }
     };
 
@@ -1838,6 +1877,8 @@ const metadata = {
       }
       updatePreview();
       updatePublishOutput();
+      updatePublishButtonState();
+      updateSaveDraftButtonState();
     };
 
     const initializeEditMode = async (clerk) => {
@@ -2231,6 +2272,8 @@ const metadata = {
 
       updatePreview();
       updatePublishOutput();
+      updatePublishButtonState();
+      updateSaveDraftButtonState();
     };
 
     const getImportJsonObjectText = (text) => {
@@ -2343,12 +2386,14 @@ const metadata = {
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
       updatePublishButtonState();
+      updateSaveDraftButtonState();
     });
 
     ['input', 'change'].forEach((eventName) => {
       fields.slug.addEventListener(eventName, () => {
         validateSlug({ announce: true });
         updatePublishButtonState();
+        updateSaveDraftButtonState();
       });
     });
 
@@ -2427,8 +2472,13 @@ const metadata = {
         return;
       }
 
-      if (!fields.title.value.trim() || !slug || !fields.content.value.trim()) {
-        setStatus('Title, slug, and content are required before publishing.', false);
+      if (
+        !fields.title.value.trim() ||
+        !slugPattern.test(fields.slug.value.trim()) ||
+        !fields.author.value.trim() ||
+        getMarkdownWordCount() < 5
+      ) {
+        setStatus('Title, slug, author, and Markdown content (5+ words) are required before publishing.', false);
         return;
       }
 
@@ -2438,6 +2488,8 @@ const metadata = {
 
       try {
         const clerkToken = await getClerkSessionToken();
+        setStatus('Saving JSON draft to Blobs…', false);
+        await saveJsonDraftToBlobs();
         setStatus('Publishing article to GitHub…', false);
 
         const files = await Promise.all(
@@ -2511,6 +2563,8 @@ const metadata = {
       document.querySelector('#publish-form').addEventListener(eventName, () => {
         updatePreview();
         updatePublishOutput();
+        updatePublishButtonState();
+        updateSaveDraftButtonState();
         setUnsavedChanges(true);
       });
     });
@@ -2529,6 +2583,7 @@ const metadata = {
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
     if (!isEditMode()) loadDraft();
     updatePublishButtonState();
+    updateSaveDraftButtonState();
     updatePreview();
     updatePublishOutput();
     setUnsavedChanges(false);
