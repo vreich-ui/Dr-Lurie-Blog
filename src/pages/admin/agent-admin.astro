@@ -114,7 +114,9 @@ const metadata = {
       <section class="publish-output-panel" aria-labelledby="publish-output-heading">
         <div class="publish-output-header">
           <h3 id="publish-output-heading">End node payload</h3>
-          <button id="publish-explicit-button" class="publish-button" type="button" disabled>Publish payload</button>
+          <button id="publish-explicit-button" class="btn-secondary btn-sm" type="button" disabled
+            >Publish payload</button
+          >
         </div>
         <label class="auto-publish-toggle" for="auto-publish-toggle">
           <input id="auto-publish-toggle" type="checkbox" />
@@ -311,18 +313,6 @@ const metadata = {
     margin: 0;
     font-size: 1rem;
     color: var(--aw-color-text-heading);
-  }
-  .publish-button {
-    border: 1px solid rgb(22 163 74 / 40%);
-    background: rgb(22 163 74 / 12%);
-    color: rgb(22 101 52);
-    padding: 0.45rem 0.75rem;
-    border-radius: 0.65rem;
-    font-weight: 700;
-  }
-  .publish-button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
   }
   .publish-output-meta {
     margin: 0.75rem 0 0;
