@@ -2419,6 +2419,19 @@ const metadata = {
       clearLocalCheckoutState();
     };
 
+    const fetchLatestWorkflowRequest = async (requestId) => {
+      if (!requestId) return undefined;
+
+      const result = await mcpToolCall('save_json_blob_get_request', { request_id: requestId });
+      if (result.record?.lock?.token) storeWorkflowLockFromRecord(result.record);
+      return result.record;
+    };
+
+    const getLatestArtifactReferences = (record) => {
+      const artifactReferences = record?.input?.publication?.publish_payload?.artifactReferences;
+      return Array.isArray(artifactReferences) ? artifactReferences : [];
+    };
+
     const resetPublisherForm = () => {
       clearLocalCheckoutState();
       lastSavedDraftId = '';
@@ -3458,6 +3471,16 @@ const metadata = {
         setStatus('Saving JSON draft to Blobs…', false);
         await saveJsonDraftToBlobs();
         const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+        if (!requestId || !lockToken) {
+          throw new Error(
+            'A checked-out workflow lock is required before publishing. Save the draft again to acquire a lock.'
+          );
+        }
+
+        setStatus('Refreshing latest workflow state…', false);
+        const latestWorkflowRecord = await fetchLatestWorkflowRequest(requestId);
+        const artifactReferences = getLatestArtifactReferences(latestWorkflowRecord);
+
         setStatus('Publishing article to GitHub…', false);
 
         const files = await Promise.all(
@@ -3492,8 +3515,10 @@ const metadata = {
             ctaLink: fields.ctaLink.value,
             ctaText: fields.ctaText.value,
             overwrite: fields.overwrite.checked,
-            ...(requestId ? { requestId, request_id: requestId } : {}),
-            ...(lockToken ? { lock_token: lockToken } : {}),
+            requestId,
+            request_id: requestId,
+            lock_token: lockToken,
+            ...(artifactReferences.length ? { artifactReferences } : {}),
             files,
           }),
         });
@@ -3511,24 +3536,21 @@ const metadata = {
         const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
         const toastMessage = `Published ${publishedPath}.${commit ? ` Commit: ${commit}` : ''}`;
         let workflowWarning = '';
-        if (requestId && lockToken) {
+        try {
+          await mcpToolCall('save_json_blob_mark_published', {
+            request_id: requestId,
+            lock_token: lockToken,
+            commit_metadata: { commit, articlePath: publishedPath },
+          });
           try {
-            await mcpToolCall('save_json_blob_mark_published', {
-              request_id: requestId,
-              lock_token: lockToken,
-              commit_metadata: { commit, articlePath: publishedPath },
-            });
+            await checkinWorkflowRequest();
           } catch (error) {
-            console.warn('Published workflow status update failed.', error);
-            workflowWarning = ' Workflow status was not updated.';
-          } finally {
-            try {
-              await checkinWorkflowRequest();
-            } catch (error) {
-              console.warn('Published workflow check-in failed.', error);
-              workflowWarning += ' Workflow lock could not be released automatically.';
-            }
+            console.warn('Published workflow check-in failed.', error);
+            workflowWarning = ' Workflow lock could not be released automatically.';
           }
+        } catch (error) {
+          console.warn('Published workflow status update failed.', error);
+          workflowWarning = ' Workflow status was not updated, so the workflow lock remains checked out.';
         }
 
         setStatus(

@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import test from 'node:test';
+
+const publishPagePath = 'src/pages/admin/publish.astro';
+
+const readPublishPage = () => readFile(publishPagePath, 'utf8');
+
+const indexAfter = (source: string, pattern: string, startIndex: number) => {
+  const index = source.indexOf(pattern, startIndex);
+  assert.notEqual(index, -1, `Expected to find ${pattern}`);
+  return index;
+};
+
+test('admin publish flow re-fetches workflow state and requires lock before publishing', async () => {
+  const source = await readPublishPage();
+
+  const saveDraftIndex = indexAfter(source, 'await saveJsonDraftToBlobs();', 0);
+  const requireLockIndex = indexAfter(source, 'if (!requestId || !lockToken)', saveDraftIndex);
+  const refetchIndex = indexAfter(source, 'await fetchLatestWorkflowRequest(requestId);', requireLockIndex);
+  const publishIndex = indexAfter(source, "fetch('/.netlify/functions/publish-article'", refetchIndex);
+  const artifactReferenceIndex = indexAfter(
+    source,
+    '...(artifactReferences.length ? { artifactReferences } : {}),',
+    publishIndex
+  );
+
+  assert.ok(requireLockIndex > saveDraftIndex, 'Publish must require the checked-out workflow lock after saving.');
+  assert.ok(refetchIndex > requireLockIndex, 'Publish must re-fetch the latest workflow state after requiring a lock.');
+  assert.ok(publishIndex > refetchIndex, 'Article publishing must start after latest workflow state is fetched.');
+  assert.ok(artifactReferenceIndex > publishIndex, 'Publish payload must use latest artifact references.');
+});
+
+test('admin publish flow sends lock_token to mark_published and checks in after success', async () => {
+  const source = await readPublishPage();
+  const markIndex = indexAfter(source, "mcpToolCall('save_json_blob_mark_published'", 0);
+  const requestIdIndex = indexAfter(source, 'request_id: requestId,', markIndex);
+  const lockTokenIndex = indexAfter(source, 'lock_token: lockToken,', requestIdIndex);
+  const commitMetadataIndex = indexAfter(
+    source,
+    'commit_metadata: { commit, articlePath: publishedPath },',
+    lockTokenIndex
+  );
+  const checkinIndex = indexAfter(source, 'await checkinWorkflowRequest();', commitMetadataIndex);
+  const catchIndex = indexAfter(source, "console.warn('Published workflow status update failed.'", checkinIndex);
+
+  assert.ok(lockTokenIndex > requestIdIndex, 'mark_published payload must include lock_token with request_id.');
+  assert.ok(commitMetadataIndex > lockTokenIndex, 'mark_published payload must include commit metadata.');
+  assert.ok(checkinIndex > commitMetadataIndex, 'Workflow check-in must happen after mark_published succeeds.');
+  assert.ok(catchIndex > checkinIndex, 'mark_published failure handling must not check in before the success path.');
+});
