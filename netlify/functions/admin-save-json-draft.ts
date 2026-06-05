@@ -206,14 +206,14 @@ export const saveAdminJsonDraft = async (store: WorkflowBlobStore, body: AdminDr
         ? previousRecord.workflow_status
         : 'in_progress',
       input: withDraftPublication(parsedInput.data, previousRecord.input),
-      lock: undefined,
+      lock: previousRecord.lock,
       history: [
         ...previousRecord.history,
         {
           at: timestamp,
           action: 'admin_save_draft',
           details: {
-            checked_in: true,
+            checked_in: false,
             owner_id: previousRecord.lock?.owner_id,
             owner_label: previousRecord.lock?.owner_label,
           },
@@ -225,7 +225,7 @@ export const saveAdminJsonDraft = async (store: WorkflowBlobStore, body: AdminDr
     await saveRecord(store, nextRecord);
     await updateIndexes(store, previousRecord, nextRecord);
 
-    return jsonResponse(200, { action: 'admin_save_draft', record: nextRecord, checked_in: true });
+    return jsonResponse(200, { action: 'admin_save_draft', record: nextRecord, checked_in: false });
   }
 
   const requestId = `admin-draft-${randomUUID()}`;

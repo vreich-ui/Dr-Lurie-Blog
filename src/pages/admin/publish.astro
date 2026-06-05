@@ -1420,6 +1420,10 @@ const metadata = {
     let editArticleLoaded = false;
     let hasUnsavedChanges = false;
     let lastSavedDraftId = '';
+    let workflowRequestId = '';
+    let workflowLockToken = '';
+    let workflowLockExpiresAt = '';
+    let workflowLockRefreshTimer;
 
     const adminPage = document.querySelector('.admin-page');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
@@ -1788,11 +1792,13 @@ const metadata = {
     const getCheckedOutWorkflowDraft = () => {
       const params = new URLSearchParams(window.location.search);
       const requestId =
+        workflowRequestId ||
         params.get('draftId') ||
         params.get('request_id') ||
         sessionStorage.getItem('dr-lurie-workflow-request-id') ||
         '';
-      const lockToken = params.get('lock_token') || sessionStorage.getItem('dr-lurie-workflow-lock-token') || '';
+      const lockToken =
+        workflowLockToken || params.get('lock_token') || sessionStorage.getItem('dr-lurie-workflow-lock-token') || '';
 
       return { requestId: requestId.trim(), lockToken: lockToken.trim() };
     };
@@ -2292,10 +2298,125 @@ const metadata = {
       }
     };
 
+    const clearWorkflowLockRefreshTimer = () => {
+      if (workflowLockRefreshTimer) window.clearTimeout(workflowLockRefreshTimer);
+      workflowLockRefreshTimer = undefined;
+    };
+
     const clearLocalCheckoutState = () => {
+      workflowRequestId = '';
+      workflowLockToken = '';
+      workflowLockExpiresAt = '';
+      clearWorkflowLockRefreshTimer();
       sessionStorage.removeItem('dr-lurie-workflow-request-id');
       sessionStorage.removeItem('dr-lurie-workflow-lock-token');
+      sessionStorage.removeItem('dr-lurie-workflow-lock-expires-at');
       localStorage.removeItem(draftKey);
+    };
+
+    const mcpToolCall = async (name, args) => {
+      const response = await fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `admin-publish-${name}-${Date.now()}`,
+          method: 'tools/call',
+          params: { name, arguments: args },
+        }),
+      });
+      const rpc = await response.json().catch(() => ({}));
+      const result = rpc.result || {};
+
+      if (!response.ok || rpc.error || result.isError) {
+        const message =
+          rpc.error?.message || result.content?.[0]?.text || `${name} failed with status ${response.status}.`;
+        throw new Error(message);
+      }
+
+      return result.structuredContent || {};
+    };
+
+    const scheduleWorkflowLockRefresh = () => {
+      clearWorkflowLockRefreshTimer();
+      if (!workflowRequestId || !workflowLockToken || !workflowLockExpiresAt) return;
+
+      const refreshInMs = Math.max(1000, Date.parse(workflowLockExpiresAt) - Date.now() - 120000);
+      workflowLockRefreshTimer = window.setTimeout(() => {
+        refreshWorkflowLock().catch((error) => {
+          console.warn('Workflow lock refresh failed.', error);
+        });
+      }, refreshInMs);
+    };
+
+    const storeWorkflowLockFromRecord = (record) => {
+      const requestId = record?.request_id || workflowRequestId;
+      const lock = record?.lock || {};
+      if (!requestId || !lock.token) return;
+
+      workflowRequestId = requestId;
+      workflowLockToken = lock.token;
+      workflowLockExpiresAt = lock.expires_at || '';
+      sessionStorage.setItem('dr-lurie-workflow-request-id', workflowRequestId);
+      sessionStorage.setItem('dr-lurie-workflow-lock-token', workflowLockToken);
+      if (workflowLockExpiresAt) sessionStorage.setItem('dr-lurie-workflow-lock-expires-at', workflowLockExpiresAt);
+      scheduleWorkflowLockRefresh();
+    };
+
+    const checkoutWorkflowRequest = async (requestId) => {
+      const result = await mcpToolCall('save_json_blob_checkout_request', {
+        request_id: requestId,
+        owner_id: 'admin-publish-ui',
+        owner_label: 'Admin publish UI',
+        lease_seconds: 900,
+      });
+      storeWorkflowLockFromRecord(result.record);
+      return result.record;
+    };
+
+    const refreshWorkflowLock = async () => {
+      const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+      if (!requestId || !lockToken) return undefined;
+
+      try {
+        const result = await mcpToolCall('save_json_blob_refresh_lock', {
+          request_id: requestId,
+          lock_token: lockToken,
+          lease_seconds: 900,
+        });
+        storeWorkflowLockFromRecord(result.record);
+        return result.record;
+      } catch {
+        workflowLockToken = '';
+        workflowLockExpiresAt = '';
+        sessionStorage.removeItem('dr-lurie-workflow-lock-token');
+        sessionStorage.removeItem('dr-lurie-workflow-lock-expires-at');
+        return checkoutWorkflowRequest(requestId);
+      }
+    };
+
+    const ensureWorkflowLock = async (requestId) => {
+      if (!requestId) return undefined;
+      const current = getCheckedOutWorkflowDraft();
+      workflowRequestId = requestId;
+
+      if (current.lockToken && current.requestId === requestId) {
+        const expiresAt = workflowLockExpiresAt || sessionStorage.getItem('dr-lurie-workflow-lock-expires-at') || '';
+        if (Date.parse(expiresAt) - Date.now() > 120000) return current.lockToken;
+        await refreshWorkflowLock();
+        return workflowLockToken;
+      }
+
+      await checkoutWorkflowRequest(requestId);
+      return workflowLockToken;
+    };
+
+    const checkinWorkflowRequest = async () => {
+      const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+      if (!requestId || !lockToken) return;
+
+      await mcpToolCall('save_json_blob_checkin_request', { request_id: requestId, lock_token: lockToken });
+      clearLocalCheckoutState();
     };
 
     const resetPublisherForm = () => {
@@ -2341,9 +2462,7 @@ const metadata = {
       fields.title.focus();
     };
 
-    const saveJsonDraftToBlobs = async () => {
-      const clerkToken = await getClerkSessionToken();
-      const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+    const postJsonDraftToBlobs = async (clerkToken, requestId, lockToken) => {
       const response = await fetch('/.netlify/functions/admin-save-json-draft', {
         method: 'POST',
         headers: {
@@ -2358,8 +2477,33 @@ const metadata = {
       });
       const result = await response.json().catch(() => ({}));
 
+      return { response, result };
+    };
+
+    const saveJsonDraftToBlobs = async () => {
+      const clerkToken = await getClerkSessionToken();
+      const checkedOut = getCheckedOutWorkflowDraft();
+      if (checkedOut.requestId) await ensureWorkflowLock(checkedOut.requestId);
+
+      let { requestId, lockToken } = getCheckedOutWorkflowDraft();
+      let { response, result } = await postJsonDraftToBlobs(clerkToken, requestId, lockToken);
+
+      if (!response.ok && requestId && (result.lock_expired || result.error === 'lock_expired')) {
+        await refreshWorkflowLock();
+        ({ requestId, lockToken } = getCheckedOutWorkflowDraft());
+        ({ response, result } = await postJsonDraftToBlobs(clerkToken, requestId, lockToken));
+      }
+
       if (!response.ok) {
         throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
+      }
+
+      const savedRequestId = result.record?.request_id || requestId;
+      if (savedRequestId) {
+        workflowRequestId = savedRequestId;
+        sessionStorage.setItem('dr-lurie-workflow-request-id', savedRequestId);
+        if (result.record?.lock?.token) storeWorkflowLockFromRecord(result.record);
+        else if (!getCheckedOutWorkflowDraft().lockToken) await checkoutWorkflowRequest(savedRequestId);
       }
 
       return result;
@@ -2383,8 +2527,7 @@ const metadata = {
 
       try {
         const result = await saveJsonDraftToBlobs();
-        clearLocalCheckoutState();
-        lastSavedDraftId = result.record?.request_id || '';
+        lastSavedDraftId = result.record?.request_id || workflowRequestId || '';
         setUnsavedChanges(false);
         const savedRequestId = lastSavedDraftId ? ` (${lastSavedDraftId})` : '';
         setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
@@ -2992,13 +3135,11 @@ const metadata = {
       return { draftInput, result };
     };
 
-    const applyBlobDraftInput = async (draftId, draftInput, result = {}) => {
-      sessionStorage.setItem('dr-lurie-workflow-request-id', draftId);
-      if (result.lock_token || result.lockToken) {
-        sessionStorage.setItem('dr-lurie-workflow-lock-token', result.lock_token || result.lockToken);
-      }
+    const applyBlobDraftInput = async (draftId, draftInput) => {
+      const checkedOutRecord = await checkoutWorkflowRequest(draftId);
+      const checkedOutInput = checkedOutRecord?.input || draftInput;
 
-      const loaded = await loadJsonImport(JSON.stringify(draftInput, null, 2), { alertOnError: false });
+      const loaded = await loadJsonImport(JSON.stringify(checkedOutInput, null, 2), { alertOnError: false });
       if (!loaded) return false;
 
       lastSavedDraftId = draftId;
@@ -3316,6 +3457,7 @@ const metadata = {
         const clerkToken = await getClerkSessionToken();
         setStatus('Saving JSON draft to Blobs…', false);
         await saveJsonDraftToBlobs();
+        const { requestId, lockToken } = getCheckedOutWorkflowDraft();
         setStatus('Publishing article to GitHub…', false);
 
         const files = await Promise.all(
@@ -3350,6 +3492,8 @@ const metadata = {
             ctaLink: fields.ctaLink.value,
             ctaText: fields.ctaText.value,
             overwrite: fields.overwrite.checked,
+            ...(requestId ? { requestId, request_id: requestId } : {}),
+            ...(lockToken ? { lock_token: lockToken } : {}),
             files,
           }),
         });
@@ -3366,8 +3510,29 @@ const metadata = {
         const shortCommit = commit.slice(0, 7);
         const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
         const toastMessage = `Published ${publishedPath}.${commit ? ` Commit: ${commit}` : ''}`;
+        let workflowWarning = '';
+        if (requestId && lockToken) {
+          try {
+            await mcpToolCall('save_json_blob_mark_published', {
+              request_id: requestId,
+              lock_token: lockToken,
+              commit_metadata: { commit, articlePath: publishedPath },
+            });
+          } catch (error) {
+            console.warn('Published workflow status update failed.', error);
+            workflowWarning = ' Workflow status was not updated.';
+          } finally {
+            try {
+              await checkinWorkflowRequest();
+            } catch (error) {
+              console.warn('Published workflow check-in failed.', error);
+              workflowWarning += ' Workflow lock could not be released automatically.';
+            }
+          }
+        }
+
         setStatus(
-          isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`,
+          `${isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`}${workflowWarning}`,
           false
         );
         setUnsavedChanges(false);
