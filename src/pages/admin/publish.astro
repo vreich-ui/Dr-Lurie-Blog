@@ -108,6 +108,7 @@ const metadata = {
                   <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
                     Select a saved JSON draft to load into the Import JSON module.
                   </p>
+                  <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
                   <div id="json-draft-list" class="json-draft-list"></div>
                 </div>
               </dialog>
@@ -641,10 +642,18 @@ const metadata = {
     color: var(--aw-color-text-muted);
     font-size: 0.93rem;
     font-weight: 700;
+    white-space: pre-line;
   }
 
   .json-draft-modal-status.is-error {
     color: var(--aw-color-accent);
+  }
+
+  .json-draft-modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin: -0.15rem 0 0.9rem;
   }
 
   .json-draft-list {
@@ -1370,6 +1379,7 @@ const metadata = {
       jsonDraftModal: document.querySelector('#json-draft-modal'),
       jsonDraftModalClose: document.querySelector('#json-draft-modal-close'),
       jsonDraftModalStatus: document.querySelector('#json-draft-modal-status'),
+      jsonDraftModalActions: document.querySelector('#json-draft-modal-actions'),
       jsonDraftList: document.querySelector('#json-draft-list'),
       loadJson: document.querySelector('#load-json'),
       draft: document.querySelector('#draft'),
@@ -1424,6 +1434,8 @@ const metadata = {
     let workflowLockToken = '';
     let workflowLockExpiresAt = '';
     let workflowLockRefreshTimer;
+    let workflowReadOnlyMode = false;
+    const workflowLockOwnerId = 'admin-publish-ui';
     const workflowLockOwnerLabel = 'Admin publish UI';
     const workflowLockStorageKey = 'dr-lurie-admin-publish-active-workflow-lock';
 
@@ -1500,7 +1512,8 @@ const metadata = {
       );
 
     const updateSaveDraftButtonState = () => {
-      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent() || !hasUnsavedChanges;
+      fields.saveDraft.disabled =
+        workflowReadOnlyMode || !isAdmin || !getHasMinimumDraftContent() || !hasUnsavedChanges;
     };
 
     const getHasPreviewContent = () =>
@@ -1514,7 +1527,12 @@ const metadata = {
     const getCanOpenPreviewPage = () => {
       const { requestId } = getCheckedOutWorkflowDraft();
       const canSaveForPreview = hasUnsavedChanges && getHasMinimumDraftContent();
-      return Boolean(isAdmin && getHasPreviewContent() && (requestId || lastSavedDraftId || canSaveForPreview));
+      return Boolean(
+        !workflowReadOnlyMode &&
+          isAdmin &&
+          getHasPreviewContent() &&
+          (requestId || lastSavedDraftId || canSaveForPreview)
+      );
     };
 
     const updatePreviewButtonState = () => {
@@ -1535,6 +1553,7 @@ const metadata = {
           slugPattern.test(fields.slug.value.trim()) &&
           getMarkdownWordCount() >= 5 &&
           isAdmin &&
+          !workflowReadOnlyMode &&
           hasUnsavedChanges
       );
       fields.publish.disabled = !hasMinimumPublishContent;
@@ -2332,6 +2351,48 @@ const metadata = {
     const getStoredActiveWorkflowLock = () =>
       readActiveWorkflowLock(localStorage) || readActiveWorkflowLock(sessionStorage);
 
+    const getWorkflowLockFromPayload = (payload) => payload?.lock || payload?.lock_public || payload?.details?.lock;
+
+    const createWorkflowLockError = (message, payload = {}, statusCode = 423) => {
+      const error = new Error(message || 'This draft is currently checked out (locked).');
+      error.name = 'WorkflowLockError';
+      error.statusCode = statusCode;
+      error.payload = payload;
+      error.lock = getWorkflowLockFromPayload(payload);
+      return error;
+    };
+
+    const isWorkflowLockPayload = (payload) =>
+      Boolean(
+        payload?.locked || payload?.lock || payload?.lock_public || payload?.error_code === 'lock_token_mismatch'
+      );
+
+    const isWorkflowLockError = (error) =>
+      Boolean(
+        error?.name === 'WorkflowLockError' || error?.statusCode === 423 || error?.payload?.locked || error?.lock
+      );
+
+    const formatWorkflowLockMessage = (error) => {
+      const lock = error?.lock || getWorkflowLockFromPayload(error?.payload) || {};
+      return [
+        'This draft is currently checked out (locked).',
+        `Owner: ${lock.owner_label || 'Unknown'}`,
+        `Acquired: ${lock.acquired_at || 'Unknown'}`,
+        `Expires at: ${lock.expires_at || 'Unknown'}`,
+      ].join('\n');
+    };
+
+    const parseJsonContentText = (content) => {
+      const text = content?.[0]?.text;
+      if (!text) return undefined;
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        return undefined;
+      }
+    };
+
     const persistActiveWorkflowLock = ({ request_id: requestId, lock_token: lockToken, owner_label: ownerLabel }) => {
       const lockState = {
         request_id: String(requestId || '').trim(),
@@ -2361,6 +2422,7 @@ const metadata = {
       workflowRequestId = '';
       workflowLockToken = '';
       workflowLockExpiresAt = '';
+      workflowReadOnlyMode = false;
       clearWorkflowLockRefreshTimer();
       clearStoredWorkflowLockState();
       localStorage.removeItem(draftKey);
@@ -2381,8 +2443,15 @@ const metadata = {
       const result = rpc.result || {};
 
       if (!response.ok || rpc.error || result.isError) {
+        const payload = result.structuredContent || parseJsonContentText(result.content) || {};
         const message =
-          rpc.error?.message || result.content?.[0]?.text || `${name} failed with status ${response.status}.`;
+          rpc.error?.message ||
+          payload.message ||
+          payload.error ||
+          result.content?.[0]?.text ||
+          `${name} failed with status ${response.status}.`;
+        const statusCode = payload.statusCode || response.status;
+        if (statusCode === 423 || isWorkflowLockPayload(payload)) throw createWorkflowLockError(message, payload, 423);
         throw new Error(message);
       }
 
@@ -2409,6 +2478,7 @@ const metadata = {
       workflowRequestId = requestId;
       workflowLockToken = lock.token;
       workflowLockExpiresAt = lock.expires_at || '';
+      workflowReadOnlyMode = false;
       sessionStorage.setItem('dr-lurie-workflow-request-id', workflowRequestId);
       sessionStorage.setItem('dr-lurie-workflow-lock-token', workflowLockToken);
       if (workflowLockExpiresAt) sessionStorage.setItem('dr-lurie-workflow-lock-expires-at', workflowLockExpiresAt);
@@ -2423,7 +2493,7 @@ const metadata = {
     const checkoutWorkflowRequest = async (requestId) => {
       const result = await mcpToolCall('save_json_blob_checkout_request', {
         request_id: requestId,
-        owner_id: 'admin-publish-ui',
+        owner_id: workflowLockOwnerId,
         owner_label: workflowLockOwnerLabel,
         lease_seconds: 900,
       });
@@ -2611,7 +2681,10 @@ const metadata = {
       }
 
       if (!response.ok) {
-        throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
+        const message = result.message || result.error || `JSON draft could not be saved (${response.status}).`;
+        if (response.status === 423 || isWorkflowLockPayload(result))
+          throw createWorkflowLockError(message, result, response.status);
+        throw new Error(message);
       }
 
       const savedRequestId = result.record?.request_id || requestId;
@@ -2651,7 +2724,11 @@ const metadata = {
       } catch (error) {
         console.error('JSON draft save failed.', error);
         const recoverySaved = saveLocalRecoveryDraft();
-        const message = error instanceof Error ? error.message : 'JSON draft could not be saved.';
+        const message = isWorkflowLockError(error)
+          ? formatWorkflowLockMessage(error)
+          : error instanceof Error
+            ? error.message
+            : 'JSON draft could not be saved.';
         setStatus(
           recoverySaved
             ? `${message} A local recovery draft was saved, but JSON was not saved to Blobs.`
@@ -3242,7 +3319,10 @@ const metadata = {
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
+        const message = result.message || result.error || `Draft could not be loaded (${response.status}).`;
+        if (response.status === 423 || isWorkflowLockPayload(result))
+          throw createWorkflowLockError(message, result, response.status);
+        throw new Error(message);
       }
 
       const draftInput = result.input || result.draft?.input;
@@ -3251,15 +3331,31 @@ const metadata = {
       return { draftInput, result };
     };
 
-    const applyBlobDraftInput = async (draftId, draftInput) => {
-      const checkedOutRecord = await checkoutWorkflowRequest(draftId);
-      const checkedOutInput = checkedOutRecord?.input || draftInput;
+    const applyBlobDraftInput = async (draftId, draftInput, { readOnly = false } = {}) => {
+      let input = draftInput;
+      if (!readOnly) {
+        await ensureWorkflowLock(draftId);
+        const checkedOutRecord = await fetchLatestWorkflowRequest(draftId);
+        input = checkedOutRecord?.input || draftInput;
+      }
 
-      const loaded = await loadJsonImport(JSON.stringify(checkedOutInput, null, 2), { alertOnError: false });
+      const loaded = await loadJsonImport(JSON.stringify(input, null, 2), { alertOnError: false });
       if (!loaded) return false;
 
       lastSavedDraftId = draftId;
+      if (readOnly) {
+        workflowRequestId = '';
+        workflowLockToken = '';
+        workflowLockExpiresAt = '';
+        workflowReadOnlyMode = true;
+        clearWorkflowLockRefreshTimer();
+        fields.jsonUploadName.textContent = `${draftId} (read-only)`;
+        setJsonImportStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`);
+      }
       setUnsavedChanges(false);
+      updatePublishButtonState();
+      updateSaveDraftButtonState();
+      updatePreviewButtonState();
       return true;
     };
 
@@ -3269,18 +3365,25 @@ const metadata = {
 
       setStatus(`Loading draft ${draftId} from Blobs…`, false);
 
+      let draftInput;
       try {
         const token = await clerk.session.getToken();
         if (!token) throw new Error('Could not retrieve a Clerk session token.');
 
-        const { draftInput, result } = await fetchJsonDraftInput(draftId, token);
-        const loaded = await applyBlobDraftInput(draftId, draftInput, result);
+        const result = await fetchJsonDraftInput(draftId, token);
+        draftInput = result.draftInput;
+        const loaded = await applyBlobDraftInput(draftId, draftInput, result.result);
         if (!loaded) return false;
 
         setStatus(`Loaded draft ${draftId}.`, true);
         return true;
       } catch (error) {
         console.error('Draft load failed.', error);
+        if (isWorkflowLockError(error) && draftInput) {
+          setStatus(formatWorkflowLockMessage(error), false);
+          showWorkflowLockActions({ draftId, draftInput, error });
+          return false;
+        }
         setStatus(
           error instanceof Error ? error.message : 'Draft could not be loaded. You can continue manually.',
           false
@@ -3289,9 +3392,97 @@ const metadata = {
       }
     };
 
+    const clearJsonDraftModalActions = () => {
+      fields.jsonDraftModalActions.innerHTML = '';
+      fields.jsonDraftModalActions.hidden = true;
+    };
+
     const setJsonDraftModalStatus = (message, isError = false) => {
       fields.jsonDraftModalStatus.textContent = message;
       fields.jsonDraftModalStatus.classList.toggle('is-error', isError);
+      if (!isError) clearJsonDraftModalActions();
+    };
+
+    const showJsonDraftModal = () => {
+      if (fields.jsonDraftModal?.open) return;
+      if (fields.jsonDraftModal?.showModal) {
+        fields.jsonDraftModal.showModal();
+      } else {
+        fields.jsonDraftModal?.setAttribute('open', '');
+      }
+    };
+
+    const recoverStoredWorkflowSession = async (draftId, draftInput) => {
+      const storedLock = getStoredActiveWorkflowLock();
+      if (!storedLock || storedLock.request_id !== draftId) throw new Error('No recoverable workflow lock was found.');
+
+      workflowRequestId = storedLock.request_id;
+      workflowLockToken = storedLock.lock_token;
+      workflowLockExpiresAt = sessionStorage.getItem('dr-lurie-workflow-lock-expires-at') || '';
+      await refreshWorkflowLock();
+      const loaded = await applyBlobDraftInput(draftId, draftInput);
+      if (!loaded) throw new Error('Recovered workflow lock could not be applied to the form.');
+    };
+
+    const showWorkflowLockActions = ({ draftId, draftInput, error }) => {
+      setJsonDraftModalStatus(formatWorkflowLockMessage(error), true);
+      fields.jsonDraftList.innerHTML = '';
+      fields.jsonDraftModalActions.hidden = false;
+
+      const lock = error?.lock || getWorkflowLockFromPayload(error?.payload) || {};
+      const storedLock = getStoredActiveWorkflowLock();
+      const canRecover =
+        lock.owner_id === workflowLockOwnerId && storedLock?.request_id === draftId && Boolean(storedLock.lock_token);
+
+      fields.jsonDraftModalActions.innerHTML = `
+        <button class="btn-secondary btn-sm" type="button" data-lock-action="open-read-only">Open read-only</button>
+        ${canRecover ? '<button class="btn-primary btn-sm" type="button" data-lock-action="recover-session">Recover session</button>' : ''}
+        <button class="btn-secondary btn-sm" type="button" data-lock-action="try-again-later">Try again later</button>
+      `;
+
+      fields.jsonDraftModalActions
+        .querySelector('[data-lock-action="open-read-only"]')
+        ?.addEventListener('click', async () => {
+          try {
+            const loaded = await applyBlobDraftInput(draftId, draftInput, { readOnly: true });
+            if (!loaded) throw new Error('Saved JSON draft could not be opened read-only.');
+            setStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`, false);
+            closeJsonDraftModal();
+          } catch (readOnlyError) {
+            setJsonDraftModalStatus(
+              readOnlyError instanceof Error
+                ? readOnlyError.message
+                : 'Saved JSON draft could not be opened read-only.',
+              true
+            );
+          }
+        });
+
+      fields.jsonDraftModalActions
+        .querySelector('[data-lock-action="recover-session"]')
+        ?.addEventListener('click', async () => {
+          try {
+            await recoverStoredWorkflowSession(draftId, draftInput);
+            fields.jsonUploadName.textContent = draftId;
+            setJsonImportStatus(`Recovered saved JSON ${draftId}.`);
+            setStatus(`Recovered saved JSON ${draftId}.`, true);
+            closeJsonDraftModal();
+          } catch (recoverError) {
+            setJsonDraftModalStatus(
+              recoverError instanceof Error ? recoverError.message : 'Saved JSON draft session could not be recovered.',
+              true
+            );
+          }
+        });
+
+      fields.jsonDraftModalActions
+        .querySelector('[data-lock-action="try-again-later"]')
+        ?.addEventListener('click', () => {
+          clearJsonDraftModalActions();
+          setJsonDraftModalStatus('Try again after the current lock expires or the owner checks in the draft.');
+        });
+
+      showJsonDraftModal();
     };
 
     const closeJsonDraftModal = () => {
@@ -3362,11 +3553,7 @@ const metadata = {
     };
 
     const openJsonDraftModal = () => {
-      if (fields.jsonDraftModal?.showModal) {
-        fields.jsonDraftModal.showModal();
-      } else {
-        fields.jsonDraftModal?.setAttribute('open', '');
-      }
+      showJsonDraftModal();
       loadJsonDraftChoices();
     };
 
@@ -3381,10 +3568,12 @@ const metadata = {
 
       setJsonDraftModalStatus(`Opening ${draftId}…`);
 
+      let draftInput;
       try {
         const token = await getClerkSessionToken();
-        const { draftInput, result } = await fetchJsonDraftInput(draftId, token);
-        const loaded = await applyBlobDraftInput(draftId, draftInput, result);
+        const draftResult = await fetchJsonDraftInput(draftId, token);
+        draftInput = draftResult.draftInput;
+        const loaded = await applyBlobDraftInput(draftId, draftInput, draftResult.result);
         if (!loaded) throw new Error('Saved JSON draft could not be applied to the form.');
 
         fields.jsonUploadName.textContent = draftId;
@@ -3393,6 +3582,10 @@ const metadata = {
         closeJsonDraftModal();
       } catch (error) {
         console.error('Saved JSON draft open failed.', error);
+        if (isWorkflowLockError(error) && draftInput) {
+          showWorkflowLockActions({ draftId, draftInput, error });
+          return;
+        }
         setJsonDraftModalStatus(error instanceof Error ? error.message : 'Saved JSON draft could not be opened.', true);
       }
     };
@@ -3663,7 +3856,14 @@ const metadata = {
         setUnsavedChanges(false);
         showToast(toastMessage, getGitHubToastLinks({ articlePath: publishedPath, commit }));
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
+        setStatus(
+          isWorkflowLockError(error)
+            ? formatWorkflowLockMessage(error)
+            : error instanceof Error
+              ? error.message
+              : 'Article could not be published.',
+          false
+        );
       } finally {
         updatePublishButtonState();
         updateSaveDraftButtonState();

@@ -55,10 +55,30 @@ const toolResult = (payload: Record<string, unknown>) => ({
   structuredContent: payload,
 });
 
-const toolError = (message: string) => ({
+const toolError = (message: string, payload: Record<string, unknown> = {}) => ({
   isError: true,
   content: textContent(message),
+  structuredContent: { error: message, ...payload },
 });
+
+const sanitizeWorkflowLock = (lock: unknown) => {
+  if (!lock || typeof lock !== 'object') return undefined;
+
+  const record = lock as Record<string, unknown>;
+  return {
+    owner_id: record.owner_id,
+    owner_label: record.owner_label,
+    acquired_at: record.acquired_at,
+    expires_at: record.expires_at,
+  };
+};
+
+const sanitizeWorkflowErrorPayload = (payload: Record<string, unknown>) => {
+  const sanitized: Record<string, unknown> = { ...payload };
+  const lock = sanitizeWorkflowLock(payload.lock);
+  if (lock) sanitized.lock = lock;
+  return sanitized;
+};
 
 const agentList = () => ALLOWED_AGENTS.join('|');
 
@@ -780,7 +800,8 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
 
   if (saveResponse.statusCode < 200 || saveResponse.statusCode >= 300) {
     return toolError(
-      typeof parsedBody.error === 'string' ? parsedBody.error : `HTTP ${saveResponse.statusCode}: ${bodyText}`
+      typeof parsedBody.error === 'string' ? parsedBody.error : `HTTP ${saveResponse.statusCode}: ${bodyText}`,
+      { statusCode: saveResponse.statusCode, ...sanitizeWorkflowErrorPayload(parsedBody) }
     );
   }
 

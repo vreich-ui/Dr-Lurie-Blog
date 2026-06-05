@@ -178,20 +178,33 @@ const missingLockTokenResponse = () =>
     message: missingLockTokenMessage,
   });
 
-const lockExpiredResponse = () =>
+const sanitizeWorkflowLock = (lock: WorkflowRecord['lock']) => {
+  if (!lock) return undefined;
+
+  return {
+    owner_id: lock.owner_id,
+    owner_label: lock.owner_label,
+    acquired_at: lock.acquired_at,
+    expires_at: lock.expires_at,
+  };
+};
+
+const lockExpiredResponse = (lock?: WorkflowRecord['lock']) =>
   jsonResponse(423, {
     error: 'lock_expired',
     error_code: 'lock_expired',
     message: lockExpiredMessage,
     lock_expired: true,
+    ...(lock ? { lock: sanitizeWorkflowLock(lock) } : {}),
   });
 
-const lockMismatchResponse = () =>
+const lockMismatchResponse = (lock?: WorkflowRecord['lock']) =>
   jsonResponse(423, {
     error: 'lock_token_mismatch',
     error_code: 'lock_token_mismatch',
     message: lockMismatchMessage,
     locked: true,
+    ...(lock ? { lock: sanitizeWorkflowLock(lock) } : {}),
   });
 
 const notFoundResponse = () =>
@@ -203,8 +216,9 @@ const notFoundResponse = () =>
   });
 
 const validateActiveLock = (record: WorkflowRecord, lockToken: string) => {
-  if (!record.lock || getLockExpirationMs(record.lock.expires_at) <= Date.now()) return lockExpiredResponse();
-  if (record.lock.token !== lockToken) return lockMismatchResponse();
+  if (!record.lock || getLockExpirationMs(record.lock.expires_at) <= Date.now())
+    return lockExpiredResponse(record.lock);
+  if (record.lock.token !== lockToken) return lockMismatchResponse(record.lock);
 
   return undefined;
 };
