@@ -1,4 +1,5 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
+import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
 
@@ -42,7 +43,7 @@ type PublisherRequest = {
 
 type NormalizedPublisherRequest = {
   images: PublishImageInput[];
-  artifactReferences: unknown[];
+  artifactReferences: ArtifactReference[];
   markdown: string;
   overwrite: boolean;
   slug: string;
@@ -228,24 +229,23 @@ const validateEnvironment = () => {
   };
 };
 
-const hasRealBase64Image = (image: PublishImageInput) => {
-  const base64 = toStringValue(image.base64) ?? toStringValue(image.content);
+const assertNoInlineAgentImages = (images: unknown) => {
+  if (images === undefined || images === null) return [];
+  if (!Array.isArray(images)) throw new RunnerError(400, 'images must be an array when provided.');
+  if (!images.length) return [];
 
-  if (!base64) return false;
-
-  const compact = base64.replace(/^data:[^;]+;base64,/i, '').replace(/\s/g, '');
-  if (compact.length < 16) return false;
-
-  return /^[A-Za-z0-9+/]+={0,2}$/.test(compact);
+  throw new RunnerError(
+    400,
+    'Publisher agent media must be uploaded with save_artifact or save_artifact_chunk first; pass only returned ArtifactReference objects in artifactReferences.'
+  );
 };
 
-const normalizeImages = (images: unknown) => {
-  if (!Array.isArray(images)) return [];
-
-  return images.filter((image): image is PublishImageInput => {
-    if (!image || typeof image !== 'object') return false;
-    return hasRealBase64Image(image as PublishImageInput);
-  });
+const normalizeArtifactReferences = (value: unknown) => {
+  try {
+    return requireArtifactReferenceArray(value);
+  } catch (error) {
+    throw new RunnerError(400, error instanceof Error ? error.message : 'Invalid artifactReferences.');
+  }
 };
 
 const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest => {
@@ -262,8 +262,8 @@ const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest =
   }
 
   return {
-    images: normalizeImages(input.images),
-    artifactReferences: Array.isArray(input.artifactReferences) ? input.artifactReferences : [],
+    images: assertNoInlineAgentImages(input.images),
+    artifactReferences: normalizeArtifactReferences(input.artifactReferences),
     markdown: markdown ?? '',
     overwrite: toBooleanValue(input.overwrite),
     slug: slug ?? '',
@@ -298,8 +298,8 @@ const createPublishTool = ({
       const markdown = toStringValue(parsed.markdown) ?? defaultInput.markdown;
       const title = toStringValue(parsed.title) ?? defaultInput.title;
       const articlePath = `${repoContentRoot}/${slug}.md`;
-      const normalizedImages = normalizeImages(parsed.images ?? defaultInput.images);
-      const artifactReferences = parsed.artifactReferences ?? defaultInput.artifactReferences;
+      const normalizedImages = assertNoInlineAgentImages(parsed.images ?? defaultInput.images);
+      const artifactReferences = normalizeArtifactReferences(parsed.artifactReferences ?? defaultInput.artifactReferences);
       const payload = {
         slug,
         articlePath,
@@ -377,7 +377,8 @@ export const createPublisherAgent = ({
       'You run server-side publishing for already-approved Dr. Lurié article data.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',
       'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences when present.',
-      'Do not invent blob keys or credentials; artifact references must already come from server-side artifact tools.',
+      'If image, audio, video, binary, or markdown artifact bytes are created upstream, they must be uploaded immediately with save_artifact or save_artifact_chunk and stored only as the returned ArtifactReference objects.',
+      'Do not invent or store deterministic blob keys, URLs, repo paths, or inline base64 media; artifact references must already come from server-side artifact tools.',
       'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
     ].join('\n'),

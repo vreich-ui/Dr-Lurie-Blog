@@ -231,6 +231,9 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
   assert.ok(property(saveArtifact.inputSchema, 'payload'));
   assert.ok(property(saveArtifact.inputSchema, 'metadata'));
+  assert.match(String((saveArtifact as { description?: string }).description), /immediately after creating/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /store only the returned ArtifactReference/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /never invent blobKey/i);
   assert.match(String((saveArtifact as { description?: string }).description), /Writes final artifact bytes/i);
   assert.match(String((saveArtifact as { description?: string }).description), /ArtifactReference index/i);
   assert.match(String((saveArtifact as { description?: string }).description), /dedup is success/i);
@@ -248,6 +251,9 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
   assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
   assert.ok(property(saveChunk.inputSchema, 'totalChunks'));
+  assert.match(String((saveChunk as { description?: string }).description), /immediately for large created artifacts/i);
+  assert.match(String((saveChunk as { description?: string }).description), /store only the final returned ArtifactReference/i);
+  assert.match(String((saveChunk as { description?: string }).description), /never invent blobKey/i);
   assert.match(String((saveChunk as { description?: string }).description), /Writes one chunk blob/i);
   assert.match(String((saveChunk as { description?: string }).description), /assembles final artifact bytes/i);
   assert.match(String((saveChunk as { description?: string }).description), /complete=false/i);

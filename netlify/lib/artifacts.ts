@@ -36,6 +36,8 @@ type CreateArtifactReferenceOptions = {
   createdAtISO?: string;
 };
 
+const allowedArtifactReferenceKeys = new Set(['blobKey', 'sizeBytes', 'sha256', 'contentType', 'createdAtISO', 'metadata']);
+
 const safePathSegment = (value: string): string => {
   return value
     .trim()
@@ -87,4 +89,61 @@ export const createArtifactReference = ({
     createdAtISO,
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+};
+
+export const isValidArtifactBlobKey = (blobKey: string, sha256: string): boolean => {
+  const [kind, requestId, filename, ...extra] = blobKey.split('/');
+  const validKinds = new Set(Object.values(ArtifactKind));
+
+  return Boolean(
+    !extra.length &&
+      validKinds.has(kind as ArtifactKind) &&
+      safePathSegment(requestId) === requestId &&
+      requestId.length > 0 &&
+      filename &&
+      filename.startsWith(sha256) &&
+      /^[a-f0-9]{64}(\.[a-z0-9]+)?$/i.test(filename)
+  );
+};
+
+export const getArtifactReferenceIssue = (value: unknown): string | undefined => {
+  if (!isRecord(value)) return 'expected an ArtifactReference object';
+
+  const unexpectedKeys = Object.keys(value).filter((key) => !allowedArtifactReferenceKeys.has(key));
+  if (unexpectedKeys.length) return `unexpected top-level keys: ${unexpectedKeys.join(', ')}`;
+
+  const { blobKey, sizeBytes, sha256, contentType, createdAtISO, metadata } = value;
+  if (typeof blobKey !== 'string' || !blobKey.trim()) return 'blobKey must be a non-empty string';
+  if (typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(sha256)) return 'sha256 must be a 64-character hex string';
+  if (!isValidArtifactBlobKey(blobKey, sha256)) return 'blobKey must match the server ArtifactReference path format';
+  if (typeof sizeBytes !== 'number' || !Number.isFinite(sizeBytes) || sizeBytes < 0) {
+    return 'sizeBytes must be a non-negative number';
+  }
+  if (typeof contentType !== 'string' || !contentType.trim()) return 'contentType must be a non-empty string';
+  if (typeof createdAtISO !== 'string' || Number.isNaN(Date.parse(createdAtISO))) {
+    return 'createdAtISO must be a valid ISO date string';
+  }
+  if (metadata !== undefined && !isRecord(metadata)) return 'metadata must be an object when provided';
+
+  return undefined;
+};
+
+export const isArtifactReference = (value: unknown): value is ArtifactReference => {
+  return getArtifactReferenceIssue(value) === undefined;
+};
+
+export const requireArtifactReferenceArray = (value: unknown, fieldName = 'artifactReferences'): ArtifactReference[] => {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new Error(`${fieldName} must be an array of ArtifactReference objects.`);
+
+  return value.map((reference, index) => {
+    const issue = getArtifactReferenceIssue(reference);
+    if (issue) throw new Error(`${fieldName}[${index}] is not a valid ArtifactReference: ${issue}.`);
+
+    return reference;
+  });
 };

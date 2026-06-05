@@ -613,7 +613,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_artifact',
     description:
-      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
+      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, audio, video, binary, or markdown bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -630,7 +630,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_artifact_chunk',
     description:
-      'Chunked byte upload. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.',
+      'Chunked byte upload. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Agents must call this immediately for large created artifacts and store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),

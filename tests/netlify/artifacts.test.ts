@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ArtifactKind, createArtifactBlobKey, createArtifactReference } from '../../netlify/lib/artifacts.js';
+import {
+  ArtifactKind,
+  createArtifactBlobKey,
+  createArtifactReference,
+  getArtifactReferenceIssue,
+  isArtifactReference,
+} from '../../netlify/lib/artifacts.js';
 import { sha256Hex } from '../../netlify/lib/crypto.js';
 
 test('sha256Hex returns lowercase hexadecimal digests', () => {
@@ -37,5 +43,30 @@ test('artifact blob keys fall back safely when request IDs are not path-safe', (
       filename: 'notes.md',
     }),
     'markdown/request/abc123.md'
+  );
+});
+
+
+test('ArtifactReference validation rejects invented media handles and incomplete references', () => {
+  const bytes = Buffer.from('validated artifact');
+  const reference = createArtifactReference({
+    input: {
+      requestId: 'validation-request',
+      artifactKind: ArtifactKind.Image,
+      contentType: 'image/png',
+      filename: 'validated.png',
+    },
+    bytes,
+    createdAtISO: '2026-06-05T00:00:00.000Z',
+  });
+
+  assert.equal(isArtifactReference(reference), true);
+  assert.equal(
+    getArtifactReferenceIssue({ ...reference, url: 'https://example.com/deterministic.png' }),
+    'unexpected top-level keys: url'
+  );
+  assert.match(
+    getArtifactReferenceIssue({ blobKey: reference.blobKey, sha256: reference.sha256 }) ?? '',
+    /sizeBytes must be a non-negative number/
   );
 });

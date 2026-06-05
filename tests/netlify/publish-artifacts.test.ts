@@ -132,3 +132,37 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('publish-article fails fast when artifactReferences contains non-ArtifactReference media', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = (async () => {
+    fetchCount += 1;
+    return new Response('unexpected fetch', { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'invalid-artifact-reference',
+        title: 'Invalid Artifact Reference',
+        markdown: '# Invalid artifact reference',
+        artifactReferences: [{ blobKey: 'image/request/invented.png', url: 'https://example.com/invented.png' }],
+      }),
+    });
+
+    assert.equal(response.statusCode, 400, response.body);
+    assert.match(JSON.parse(response.body).error, /not a valid ArtifactReference/);
+    assert.equal(fetchCount, 0, 'Invalid artifactReferences should fail before GitHub requests.');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
