@@ -1481,9 +1481,7 @@ const metadata = {
     const setUnsavedChanges = (value) => {
       hasUnsavedChanges = Boolean(value);
       if (fields.unsavedChanges) fields.unsavedChanges.hidden = !hasUnsavedChanges;
-      updatePublishButtonState();
-      updateSaveDraftButtonState();
-      updatePreviewButtonState();
+      recalculateButtonState();
     };
 
     const renderSlugHint = (isInvalid) => {
@@ -1511,11 +1509,6 @@ const metadata = {
         fields.title.value.trim() && slugify(fields.slug.value || fields.title.value) && fields.author.value.trim()
       );
 
-    const updateSaveDraftButtonState = () => {
-      fields.saveDraft.disabled =
-        workflowReadOnlyMode || !isAdmin || !getHasMinimumDraftContent() || !hasUnsavedChanges;
-    };
-
     const getHasPreviewContent = () =>
       Boolean(
         fields.title.value.trim() ||
@@ -1524,40 +1517,44 @@ const metadata = {
           getFeaturedImagePath().trim()
       );
 
-    const getCanOpenPreviewPage = () => {
-      const { requestId } = getCheckedOutWorkflowDraft();
-      const canSaveForPreview = hasUnsavedChanges && getHasMinimumDraftContent();
-      return Boolean(
+    const hasCurrentWorkflowLock = () => {
+      const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+      if (!requestId) return true;
+      if (!lockToken) return false;
+
+      const expiresAt = workflowLockExpiresAt || sessionStorage.getItem('dr-lurie-workflow-lock-expires-at') || '';
+      if (!expiresAt) return true;
+
+      const expiresAtMs = Date.parse(expiresAt);
+      return Number.isNaN(expiresAtMs) || expiresAtMs > Date.now();
+    };
+
+    const recalculateButtonState = () => {
+      const hasDraftFields = getHasMinimumDraftContent();
+      const hasValidSlug = slugPattern.test(fields.slug.value.trim());
+      const canUseWorkflowLock = hasCurrentWorkflowLock();
+      const canSaveDraft = !workflowReadOnlyMode && isAdmin && hasDraftFields && hasUnsavedChanges;
+      const canPreview =
+        !workflowReadOnlyMode &&
+        isAdmin &&
+        getHasPreviewContent() &&
+        (getCheckedOutWorkflowDraft().requestId || lastSavedDraftId || (hasUnsavedChanges && hasDraftFields));
+      const canPublish = Boolean(
         !workflowReadOnlyMode &&
           isAdmin &&
-          getHasPreviewContent() &&
-          (requestId || lastSavedDraftId || canSaveForPreview)
-      );
-    };
-
-    const updatePreviewButtonState = () => {
-      fields.preview.disabled = !getCanOpenPreviewPage();
-    };
-
-    const updateBackupActionState = () => {
-      const backupActionsEnabled = !fields.publish.disabled;
-      fields.copyOutput.disabled = !backupActionsEnabled;
-      fields.downloadJsonBackup.disabled = !backupActionsEnabled;
-      fields.backupPanel.classList.toggle('is-disabled', !backupActionsEnabled);
-    };
-
-    const updatePublishButtonState = () => {
-      const hasMinimumPublishContent = Boolean(
-        fields.title.value.trim() &&
+          fields.title.value.trim() &&
           fields.author.value.trim() &&
-          slugPattern.test(fields.slug.value.trim()) &&
+          hasValidSlug &&
           getMarkdownWordCount() >= 5 &&
-          isAdmin &&
-          !workflowReadOnlyMode &&
-          hasUnsavedChanges
+          canUseWorkflowLock
       );
-      fields.publish.disabled = !hasMinimumPublishContent;
-      updateBackupActionState();
+
+      fields.saveDraft.disabled = !canSaveDraft;
+      fields.preview.disabled = !canPreview;
+      fields.publish.disabled = !canPublish;
+      fields.copyOutput.disabled = !canPublish;
+      fields.downloadJsonBackup.disabled = !canPublish;
+      fields.backupPanel.classList.toggle('is-disabled', !canPublish);
       validateSlug();
     };
 
@@ -1618,9 +1615,7 @@ const metadata = {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
       setAdminShellVisible(true);
-      updatePublishButtonState();
-      updateSaveDraftButtonState();
-      updatePreviewButtonState();
+      recalculateButtonState();
       setGatedContentVisible(isAdmin);
 
       if (!isAdmin && state !== 'checking' && state !== 'error') redirectToHome();
@@ -2426,6 +2421,7 @@ const metadata = {
       clearWorkflowLockRefreshTimer();
       clearStoredWorkflowLockState();
       localStorage.removeItem(draftKey);
+      recalculateButtonState();
     };
 
     const mcpToolCall = async (name, args) => {
@@ -2488,6 +2484,7 @@ const metadata = {
         owner_label: lock.owner_label || record?.lock?.owner_label || workflowLockOwnerLabel,
       });
       scheduleWorkflowLockRefresh();
+      recalculateButtonState();
     };
 
     const checkoutWorkflowRequest = async (requestId) => {
@@ -2562,6 +2559,7 @@ const metadata = {
         workflowLockExpiresAt = '';
         clearWorkflowLockRefreshTimer();
         clearStoredWorkflowLockState();
+        recalculateButtonState();
       }
     };
 
@@ -2737,9 +2735,7 @@ const metadata = {
         );
         return false;
       } finally {
-        updateSaveDraftButtonState();
-        updatePublishButtonState();
-        updatePreviewButtonState();
+        recalculateButtonState();
       }
     };
 
@@ -2786,8 +2782,7 @@ const metadata = {
       updatePreview();
       updatePublishOutput();
       syncJsonImportFromCurrentForm('Existing article JSON loaded into the Import JSON module.');
-      updatePublishButtonState();
-      updateSaveDraftButtonState();
+      recalculateButtonState();
     };
 
     const initializeEditMode = async (clerk) => {
@@ -3181,9 +3176,7 @@ const metadata = {
 
       updatePreview();
       updatePublishOutput();
-      updatePublishButtonState();
-      updateSaveDraftButtonState();
-      updatePreviewButtonState();
+      recalculateButtonState();
     };
 
     const getImportJsonObjectText = (text) => {
@@ -3353,9 +3346,7 @@ const metadata = {
         setJsonImportStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`);
       }
       setUnsavedChanges(false);
-      updatePublishButtonState();
-      updateSaveDraftButtonState();
-      updatePreviewButtonState();
+      recalculateButtonState();
       return true;
     };
 
@@ -3592,15 +3583,11 @@ const metadata = {
 
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
-      updatePublishButtonState();
-      updateSaveDraftButtonState();
     });
 
     ['input', 'change'].forEach((eventName) => {
       fields.slug.addEventListener(eventName, () => {
         validateSlug({ announce: true });
-        updatePublishButtonState();
-        updateSaveDraftButtonState();
       });
     });
 
@@ -3662,7 +3649,7 @@ const metadata = {
       if (previousFeaturedImage) fields.featuredImage.value = previousFeaturedImage;
       updatePreview();
       updatePublishOutput();
-      updatePreviewButtonState();
+      recalculateButtonState();
       setUnsavedChanges(true);
     });
 
@@ -3693,7 +3680,7 @@ const metadata = {
         window.location.href = `/admin/review/${encodeURIComponent(previewRequestId)}`;
       } catch (error) {
         setStatus(error instanceof Error ? error.message : 'Preview page could not be opened.', false);
-        updatePreviewButtonState();
+        recalculateButtonState();
       }
     };
 
@@ -3739,7 +3726,7 @@ const metadata = {
 
       const { slug } = buildMarkdown();
       if (!validateSlug({ announce: true })) {
-        updatePublishButtonState();
+        recalculateButtonState();
         return;
       }
 
@@ -3865,8 +3852,7 @@ const metadata = {
           false
         );
       } finally {
-        updatePublishButtonState();
-        updateSaveDraftButtonState();
+        recalculateButtonState();
       }
     };
 
@@ -3892,9 +3878,6 @@ const metadata = {
       document.querySelector('#publish-form').addEventListener(eventName, () => {
         updatePreview();
         updatePublishOutput();
-        updatePublishButtonState();
-        updateSaveDraftButtonState();
-        updatePreviewButtonState();
         setUnsavedChanges(true);
       });
     });
@@ -3917,9 +3900,7 @@ const metadata = {
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
     if (!isEditMode() && !getQueryDraftId()) localStorage.removeItem(draftKey);
-    updatePublishButtonState();
-    updateSaveDraftButtonState();
-    updatePreviewButtonState();
+    recalculateButtonState();
     updatePreview();
     updatePublishOutput();
     setUnsavedChanges(false);
