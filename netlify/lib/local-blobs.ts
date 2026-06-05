@@ -7,8 +7,10 @@ const toPath = (storeName: string, key: string) => join(localBlobsRoot, storeNam
 
 const toBlobKey = (storeRoot: string, filePath: string) => relative(storeRoot, filePath).split(sep).join('/');
 
+export type LocalBlobValue = string | Buffer | Uint8Array | ArrayBuffer;
+
 export type LocalBlobStore = {
-  set: (key: string, value: string) => Promise<void>;
+  set: (key: string, value: LocalBlobValue) => Promise<void>;
   get: (key: string) => Promise<string | null>;
   del: (key: string) => Promise<void>;
   setJSON: (key: string, value: unknown) => Promise<void>;
@@ -47,7 +49,7 @@ export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
       const filePath = toPath(storeName, key);
 
       await mkdir(dirname(filePath), { recursive: true });
-      await writeFile(filePath, value, 'utf8');
+      await writeFile(filePath, typeof value === 'string' ? value : new Uint8Array(value));
     },
 
     async get(key) {
