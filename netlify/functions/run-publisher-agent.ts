@@ -376,7 +376,9 @@ export const createPublisherAgent = ({
     instructions: [
       'You run server-side publishing for already-approved Dr. Lurié article data.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',
-      'Call publish_approved_article once with the approved fields exactly as provided.',
+      'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences when present.',
+      'Do not invent blob keys or credentials; artifact references must already come from server-side artifact tools.',
+      'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
     ].join('\n'),
     tools: [createPublishTool({ endpoint, defaultInput, publishSecret, onPublishResult })],
