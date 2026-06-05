@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
+import { getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
@@ -878,8 +879,9 @@ const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) =
   const store = await getArtifactIndexBlobStore(event);
   const prefix = `request-artifacts/${encodeURIComponent(requestId)}/`;
   const result = await store.list({ prefix });
+  const blobs = getBlobListItems(result);
   const artifacts = await Promise.all(
-    result.blobs.map(async (blob) => {
+    blobs.map(async (blob) => {
       const text = await store.get(blob.key);
 
       if (!text) return undefined;

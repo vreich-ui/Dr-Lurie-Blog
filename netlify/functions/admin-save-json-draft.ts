@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import type { BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
   parseContentSourceV1,
@@ -30,11 +31,6 @@ type LambdaEvent = {
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   isBase64Encoded?: boolean;
-};
-
-type BlobListResult = {
-  blobs: Array<{ key: string }>;
-  directories?: string[];
 };
 
 type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {

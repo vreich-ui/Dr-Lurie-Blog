@@ -22,6 +22,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
 import { getHeader } from '../lib/admin-auth.js';
+import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
 
@@ -90,11 +91,6 @@ type LambdaEvent = {
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   isBase64Encoded?: boolean;
-};
-
-type BlobListResult = {
-  blobs: Array<{ key: string }>;
-  directories?: string[];
 };
 
 type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {
@@ -357,15 +353,7 @@ const listIndexRequestIds = async (store: WorkflowBlobStore, prefix: string) => 
   }
 
   const result = await store.list({ prefix, directories: false, paginate: true });
-  const blobs: Array<{ key: string }> = [];
-
-  if (Symbol.asyncIterator in Object(result)) {
-    for await (const page of result as unknown as AsyncIterable<BlobListResult>) {
-      blobs.push(...page.blobs);
-    }
-  } else {
-    blobs.push(...(result as BlobListResult).blobs);
-  }
+  const blobs = await collectBlobListItems(result);
 
   return new Set(blobs.map((blob) => blob.key.slice(prefix.length)).filter(Boolean));
 };

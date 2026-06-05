@@ -1,4 +1,5 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import type { ContentSourceV1, WorkflowRecord } from '../../src/schema/schema-v1.js';
 
@@ -11,11 +12,6 @@ type LambdaEvent = {
   blobs?: string;
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
-};
-
-type BlobListResult = {
-  blobs: Array<{ key: string }>;
-  directories?: string[];
 };
 
 type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {
@@ -117,15 +113,7 @@ const listBlobKeys = async (store: WorkflowBlobStore, prefix: string) => {
   }
 
   const result = await store.list({ prefix, directories: false, paginate: true });
-  const blobs: Array<{ key: string }> = [];
-
-  if (Symbol.asyncIterator in Object(result)) {
-    for await (const page of result as AsyncIterable<BlobListResult>) {
-      blobs.push(...page.blobs);
-    }
-  } else {
-    blobs.push(...(result as BlobListResult).blobs);
-  }
+  const blobs = await collectBlobListItems(result);
 
   return blobs.map((blob) => blob.key).filter((key) => key.endsWith('.json'));
 };
