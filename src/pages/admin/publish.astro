@@ -1424,6 +1424,8 @@ const metadata = {
     let workflowLockToken = '';
     let workflowLockExpiresAt = '';
     let workflowLockRefreshTimer;
+    const workflowLockOwnerLabel = 'Admin publish UI';
+    const workflowLockStorageKey = 'dr-lurie-admin-publish-active-workflow-lock';
 
     const adminPage = document.querySelector('.admin-page');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
@@ -1791,14 +1793,20 @@ const metadata = {
 
     const getCheckedOutWorkflowDraft = () => {
       const params = new URLSearchParams(window.location.search);
+      const storedLock = getStoredActiveWorkflowLock();
       const requestId =
         workflowRequestId ||
         params.get('draftId') ||
         params.get('request_id') ||
+        storedLock?.request_id ||
         sessionStorage.getItem('dr-lurie-workflow-request-id') ||
         '';
       const lockToken =
-        workflowLockToken || params.get('lock_token') || sessionStorage.getItem('dr-lurie-workflow-lock-token') || '';
+        workflowLockToken ||
+        params.get('lock_token') ||
+        storedLock?.lock_token ||
+        sessionStorage.getItem('dr-lurie-workflow-lock-token') ||
+        '';
 
       return { requestId: requestId.trim(), lockToken: lockToken.trim() };
     };
@@ -2303,14 +2311,58 @@ const metadata = {
       workflowLockRefreshTimer = undefined;
     };
 
+    const readActiveWorkflowLock = (storage) => {
+      try {
+        const raw = storage.getItem(workflowLockStorageKey);
+        if (!raw) return undefined;
+
+        const parsed = JSON.parse(raw);
+        const requestId = String(parsed?.request_id || '').trim();
+        const lockToken = String(parsed?.lock_token || '').trim();
+        const ownerLabel = String(parsed?.owner_label || '').trim();
+        if (!requestId || !lockToken || ownerLabel !== workflowLockOwnerLabel) return undefined;
+
+        return { request_id: requestId, lock_token: lockToken, owner_label: ownerLabel };
+      } catch (error) {
+        console.warn('Stored workflow lock state could not be read.', error);
+        return undefined;
+      }
+    };
+
+    const getStoredActiveWorkflowLock = () =>
+      readActiveWorkflowLock(localStorage) || readActiveWorkflowLock(sessionStorage);
+
+    const persistActiveWorkflowLock = ({ request_id: requestId, lock_token: lockToken, owner_label: ownerLabel }) => {
+      const lockState = {
+        request_id: String(requestId || '').trim(),
+        lock_token: String(lockToken || '').trim(),
+        owner_label: String(ownerLabel || '').trim(),
+      };
+      if (!lockState.request_id || !lockState.lock_token || lockState.owner_label !== workflowLockOwnerLabel) return;
+
+      const serialized = JSON.stringify(lockState);
+      try {
+        localStorage.setItem(workflowLockStorageKey, serialized);
+        sessionStorage.setItem(workflowLockStorageKey, serialized);
+      } catch (error) {
+        console.warn('Workflow lock state could not be persisted.', error);
+      }
+    };
+
+    const clearStoredWorkflowLockState = () => {
+      localStorage.removeItem(workflowLockStorageKey);
+      sessionStorage.removeItem(workflowLockStorageKey);
+      sessionStorage.removeItem('dr-lurie-workflow-request-id');
+      sessionStorage.removeItem('dr-lurie-workflow-lock-token');
+      sessionStorage.removeItem('dr-lurie-workflow-lock-expires-at');
+    };
+
     const clearLocalCheckoutState = () => {
       workflowRequestId = '';
       workflowLockToken = '';
       workflowLockExpiresAt = '';
       clearWorkflowLockRefreshTimer();
-      sessionStorage.removeItem('dr-lurie-workflow-request-id');
-      sessionStorage.removeItem('dr-lurie-workflow-lock-token');
-      sessionStorage.removeItem('dr-lurie-workflow-lock-expires-at');
+      clearStoredWorkflowLockState();
       localStorage.removeItem(draftKey);
     };
 
@@ -2360,6 +2412,11 @@ const metadata = {
       sessionStorage.setItem('dr-lurie-workflow-request-id', workflowRequestId);
       sessionStorage.setItem('dr-lurie-workflow-lock-token', workflowLockToken);
       if (workflowLockExpiresAt) sessionStorage.setItem('dr-lurie-workflow-lock-expires-at', workflowLockExpiresAt);
+      persistActiveWorkflowLock({
+        request_id: workflowRequestId,
+        lock_token: workflowLockToken,
+        owner_label: lock.owner_label || record?.lock?.owner_label || workflowLockOwnerLabel,
+      });
       scheduleWorkflowLockRefresh();
     };
 
@@ -2367,7 +2424,7 @@ const metadata = {
       const result = await mcpToolCall('save_json_blob_checkout_request', {
         request_id: requestId,
         owner_id: 'admin-publish-ui',
-        owner_label: 'Admin publish UI',
+        owner_label: workflowLockOwnerLabel,
         lease_seconds: 900,
       });
       storeWorkflowLockFromRecord(result.record);
@@ -2389,8 +2446,7 @@ const metadata = {
       } catch {
         workflowLockToken = '';
         workflowLockExpiresAt = '';
-        sessionStorage.removeItem('dr-lurie-workflow-lock-token');
-        sessionStorage.removeItem('dr-lurie-workflow-lock-expires-at');
+        clearStoredWorkflowLockState();
         return checkoutWorkflowRequest(requestId);
       }
     };
@@ -2417,6 +2473,53 @@ const metadata = {
 
       await mcpToolCall('save_json_blob_checkin_request', { request_id: requestId, lock_token: lockToken });
       clearLocalCheckoutState();
+    };
+
+    const releaseStoredWorkflowLockOnLoad = async () => {
+      const storedLock = getStoredActiveWorkflowLock();
+      if (!storedLock) return;
+
+      try {
+        await mcpToolCall('save_json_blob_checkin_request', {
+          request_id: storedLock.request_id,
+          lock_token: storedLock.lock_token,
+        });
+      } catch (error) {
+        console.warn('Stored workflow lock could not be released on page load; clearing stale lock state.', error);
+      } finally {
+        if (workflowRequestId === storedLock.request_id) workflowRequestId = '';
+        if (workflowLockToken === storedLock.lock_token) workflowLockToken = '';
+        workflowLockExpiresAt = '';
+        clearWorkflowLockRefreshTimer();
+        clearStoredWorkflowLockState();
+      }
+    };
+
+    const sendWorkflowCheckinOnUnload = () => {
+      const storedLock = getStoredActiveWorkflowLock();
+      if (!storedLock) return;
+
+      const body = JSON.stringify({
+        jsonrpc: '2.0',
+        id: `admin-publish-checkin-unload-${Date.now()}`,
+        method: 'tools/call',
+        params: {
+          name: 'save_json_blob_checkin_request',
+          arguments: { request_id: storedLock.request_id, lock_token: storedLock.lock_token },
+        },
+      });
+      const blob = new Blob([body], { type: 'application/json' });
+
+      if (navigator.sendBeacon?.('/mcp', blob)) return;
+
+      fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch((error) => {
+        console.warn('Workflow lock check-in during unload could not be queued.', error);
+      });
     };
 
     const fetchLatestWorkflowRequest = async (requestId) => {
@@ -3596,13 +3699,18 @@ const metadata = {
       });
     });
 
+    window.addEventListener('pagehide', sendWorkflowCheckinOnUnload);
     window.addEventListener('beforeunload', (event) => {
-      if (!hasUnsavedChanges) return;
+      if (!hasUnsavedChanges) {
+        sendWorkflowCheckinOnUnload();
+        return;
+      }
 
       event.preventDefault();
       event.returnValue = '';
     });
 
+    releaseStoredWorkflowLockOnLoad();
     lastLoadedJsonImportValue = fields.jsonImport.value.trim();
     updateJsonImportButtonState();
     renderImageRulesHint();
