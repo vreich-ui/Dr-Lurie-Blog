@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
-import { type ArtifactReference } from '../lib/artifacts.js';
+import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
 import { getArtifactBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
@@ -206,12 +206,6 @@ const extensionForContentType = (contentType: string) => {
   return normalized ? (extensionMap[normalized] ?? '.bin') : '.bin';
 };
 
-const isValidArtifactBlobKey = (blobKey: string) => {
-  return Boolean(normalizeRepoPath(blobKey) && !blobKey.startsWith('../') && !blobKey.includes('..'));
-};
-
-const isValidSha256Hex = (value: string) => /^[a-f0-9]{64}$/i.test(value);
-
 const getArtifactRequestId = (reference: ArtifactReference, fallback: string) => {
   const metadataRequestId = toStringValue(reference.metadata?.requestId);
   if (metadataRequestId) return metadataRequestId;
@@ -239,22 +233,11 @@ const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: st
 };
 
 const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
-  if (!Array.isArray(value)) return [];
-
-  return value.filter((reference): reference is ArtifactReference => {
-    if (!reference || typeof reference !== 'object') return false;
-
-    const candidate = reference as Partial<ArtifactReference>;
-    return Boolean(
-      toStringValue(candidate.blobKey) &&
-        isValidArtifactBlobKey(toStringValue(candidate.blobKey) ?? '') &&
-        typeof candidate.sizeBytes === 'number' &&
-        toStringValue(candidate.sha256) &&
-        isValidSha256Hex(toStringValue(candidate.sha256) ?? '') &&
-        toStringValue(candidate.contentType) &&
-        toStringValue(candidate.createdAtISO)
-    );
-  });
+  try {
+    return requireArtifactReferenceArray(value);
+  } catch (error) {
+    throw new PublishError(400, error instanceof Error ? error.message : 'Invalid artifactReferences.');
+  }
 };
 
 const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string) => {
@@ -466,7 +449,12 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const getMediaEntries = async (event: LambdaEvent, input: PublishInput, slug: string): Promise<MediaEntry[]> => {
+const getMediaEntries = async (
+  event: LambdaEvent,
+  input: PublishInput,
+  slug: string,
+  artifactReferences: ArtifactReference[]
+): Promise<MediaEntry[]> => {
   const files = Array.isArray(input.files) ? (input.files as PublishFile[]) : [];
   const uploadedFiles = files
     .map((file) => ({
@@ -546,7 +534,6 @@ const getMediaEntries = async (event: LambdaEvent, input: PublishInput, slug: st
     };
   });
 
-  const artifactReferences = normalizeArtifactReferences(input.artifactReferences);
   const artifactStore = artifactReferences.length ? await getArtifactBlobStore(event) : undefined;
   const fallbackRequestId = toStringValue(input.requestId) ?? slug;
   const artifactEntries = await Promise.all(
@@ -645,6 +632,15 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const overwrite = input.overwrite === true || input.overwrite === 'true';
+  let artifactReferences: ArtifactReference[];
+
+  try {
+    artifactReferences = normalizeArtifactReferences(input.artifactReferences);
+  } catch (error) {
+    if (error instanceof PublishError) return jsonResponse(error.statusCode, { error: error.message });
+    return jsonResponse(400, { error: 'Invalid artifactReferences.' });
+  }
+
   let publishImagePaths: string[] = [];
 
   try {
@@ -658,7 +654,7 @@ export const handler = async (event: LambdaEvent) => {
       });
     }
 
-    const mediaEntries = await getMediaEntries(event, input, slug);
+    const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences);
     publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
     const selectedFeatured = featuredImage ? sanitizeFilename(featuredImage) : undefined;

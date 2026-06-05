@@ -13,6 +13,7 @@ import { z } from 'zod';
 import {
   ArtifactKind,
   createArtifactReference,
+  isArtifactReference,
   type ArtifactReference,
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
@@ -187,17 +188,6 @@ const saveFinalArtifact = async (store: BlobStore, reference: ArtifactReference,
   });
 
   return { deduped: false };
-};
-
-const isArtifactReference = (value: unknown): value is ArtifactReference => {
-  return Boolean(
-    value &&
-      typeof value === 'object' &&
-      'blobKey' in value &&
-      typeof value.blobKey === 'string' &&
-      'sha256' in value &&
-      typeof value.sha256 === 'string'
-  );
 };
 
 const getExistingReference = async (store: BlobStore, requestId: string, sha256: string) => {

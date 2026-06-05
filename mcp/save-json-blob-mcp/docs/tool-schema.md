@@ -75,7 +75,7 @@ Artifact tools are registered by the production Netlify `/mcp` entry point. They
 
 ### `save_artifact`
 
-Single-shot byte upload. Writes the final artifact blob and a request artifact index entry.
+Single-shot byte upload. Agents must call this immediately after creating image, audio, video, binary, or markdown bytes, then store only the returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes the final artifact blob and a request artifact index entry.
 
 Required fields:
 
@@ -94,7 +94,7 @@ Success returns the same shape as the upload function: `ok`, `complete: true`, `
 
 ### `save_artifact_chunk`
 
-Chunked byte upload. Writes one chunk blob to the upload session. When all chunks exist, the server assembles the final artifact blob and writes the request artifact index.
+Chunked byte upload. Agents must call this immediately for large created artifacts, then store only the final returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes one chunk blob to the upload session. When all chunks exist, the server assembles the final artifact blob and writes the request artifact index.
 
 Required fields:
 
