@@ -18,7 +18,7 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="admin-page mx-auto max-w-[900px] px-4 py-10 sm:px-6 sm:py-14"
+    class="admin-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     data-public-github-branch={publicGitHubBranch}
@@ -40,25 +40,35 @@ const metadata = {
 
     <AdminNav />
 
-    <section class="admin-card" aria-label="Publishing form" data-auth-gated hidden>
-      <form id="publish-form" class="admin-form">
-        <div class="json-import-card" aria-labelledby="json-import-heading">
-          <div class="json-import-header">
-            <div>
-              <h2 id="json-import-heading">Import JSON</h2>
-              <p class="hint">Paste article JSON or upload a single <code>.json</code> file to populate this form.</p>
-            </div>
-            <label class="json-upload-button" for="json-upload">
-              <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
-              <span>Upload JSON</span>
-            </label>
-            <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
-          </div>
-          <textarea
-            id="json-import"
-            class="json-import-input"
-            rows="6"
-            placeholder='{
+    <div class="publish-workspace" data-auth-gated hidden>
+      <main class="publish-main" aria-label="Publishing editor">
+        <section class="admin-card" aria-label="Publishing form">
+          <form id="publish-form" class="admin-form">
+            <div class="json-import-card" aria-labelledby="json-import-heading">
+              <div class="json-import-header">
+                <div>
+                  <h2 id="json-import-heading">Import JSON</h2>
+                  <p class="hint">
+                    Paste article JSON or upload a single <code>.json</code> file to populate this form.
+                  </p>
+                </div>
+                <div class="json-import-toolbar" aria-label="JSON import options">
+                  <button id="open-json-drafts" class="json-upload-button" type="button">
+                    <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
+                    <span>Open JSON</span>
+                  </button>
+                  <label class="json-upload-button" for="json-upload">
+                    <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
+                    <span>Upload JSON</span>
+                  </label>
+                </div>
+                <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
+              </div>
+              <textarea
+                id="json-import"
+                class="json-import-input"
+                rows="6"
+                placeholder='{
   "record_type": "content_source",
   "schema_version": "content_source.v1",
   "content": { "title": "Article title" },
@@ -70,209 +80,281 @@ const metadata = {
   },
   "sources": { "source_list": ["Source citation"] }
 }'
-          ></textarea>
-          <div class="json-import-actions">
-            <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
-              <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
-              <span>Update</span>
+              ></textarea>
+              <div class="json-import-actions">
+                <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
+                  <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
+                  <span>Update</span>
+                </button>
+                <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
+              </div>
+              <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+              <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
+                <div class="json-draft-modal-card">
+                  <div class="json-draft-modal-header">
+                    <div>
+                      <p class="sidebar-kicker">Saved JSON</p>
+                      <h3 id="json-draft-modal-heading">Open JSON from Blobs</h3>
+                    </div>
+                    <button
+                      id="json-draft-modal-close"
+                      class="module-icon-button"
+                      type="button"
+                      aria-label="Close saved JSON dialog"
+                    >
+                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
+                    Select a saved JSON draft to load into the Import JSON module.
+                  </p>
+                  <div id="json-draft-list" class="json-draft-list"></div>
+                </div>
+              </dialog>
+            </div>
+
+            <div class="field">
+              <label for="title">Title</label>
+              <input id="title" name="title" type="text" autocomplete="off" />
+            </div>
+
+            <div class="field">
+              <label for="slug">Slug</label>
+              <input
+                id="slug"
+                name="slug"
+                type="text"
+                autocomplete="off"
+                placeholder="article-slug"
+                aria-describedby="slug-edit-hint"
+              />
+              <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
+            </div>
+
+            <div class="field">
+              <label for="excerpt">Excerpt</label>
+              <textarea
+                id="excerpt"
+                name="excerpt"
+                rows="3"
+                maxlength="300"
+                placeholder="Short list-card and topic summary copy."></textarea>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="publish-date">Publish date</label>
+                <input id="publish-date" name="publishDate" type="datetime-local" />
+              </div>
+
+              <div class="field">
+                <label for="author">Author</label>
+                <input id="author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurié" />
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="category">Category</label>
+                <input id="category" name="category" type="text" autocomplete="off" placeholder="Aging skin" />
+              </div>
+
+              <div class="field">
+                <label for="tags">Tags</label>
+                <input id="tags" name="tags" type="text" autocomplete="off" placeholder="barrier function, lipids" />
+              </div>
+            </div>
+
+            <div class="field checkbox-field">
+              <input id="draft" name="draft" type="checkbox" />
+              <label for="draft">Save as draft</label>
+            </div>
+
+            <div class="field">
+              <label for="content">Content</label>
+              <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label for="sources">Sources</label>
+              <textarea
+                id="sources"
+                name="sources"
+                class="sources-input"
+                rows="4"
+                placeholder="One source per line, or comma-separated citations."></textarea>
+              <p class="hint">Imported <code>sources[]</code> are stored as one citation per line.</p>
+            </div>
+
+            <div class="field">
+              <label for="image-upload">Image upload</label>
+              <label class="image-upload-button" for="image-upload">
+                <Icon name="tabler:photo-plus" class="image-upload-icon" aria-hidden="true" />
+                <span>Choose images</span>
+              </label>
+              <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
+              <p class="hint">
+                Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.
+                Allowed types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
+                <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
+              </p>
+              <ul id="image-list" class="image-list" aria-live="polite"></ul>
+            </div>
+
+            <div class="field">
+              <label for="featured-image">Featured image</label>
+              <select id="featured-image" name="featuredImage">
+                <option value="">Select an uploaded image</option>
+              </select>
+              <input id="existing-featured-image-path" name="existingFeaturedImagePath" type="hidden" />
+            </div>
+
+            <div class="field">
+              <label for="video-link">Optional video link</label>
+              <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="cta-link">Optional CTA link</label>
+                <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+              </div>
+
+              <div class="field">
+                <label for="cta-text">Optional CTA text</label>
+                <input id="cta-text" name="ctaText" type="text" placeholder="Learn more" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="seo-description">Optional SEO description</label>
+              <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
+            </div>
+
+            <div class="field checkbox-field">
+              <input id="overwrite-slug" name="overwrite" type="checkbox" />
+              <label for="overwrite-slug">Overwrite an existing article with this slug</label>
+            </div>
+          </form>
+        </section>
+
+        <section class="admin-card admin-panel" aria-labelledby="preview-heading">
+          <div class="module-heading-row">
+            <h2 id="preview-heading">Inline preview</h2>
+            <button
+              id="refresh-preview"
+              class="module-icon-button"
+              type="button"
+              aria-label="Refresh inline preview"
+              title="Refresh inline preview"
+            >
+              <Icon name="tabler:refresh" class="module-action-icon" aria-hidden="true" />
+              <span class="sr-only">Refresh inline preview</span>
             </button>
-            <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
           </div>
-          <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
-        </div>
-
-        <div class="field">
-          <label for="title">Title</label>
-          <input id="title" name="title" type="text" autocomplete="off" />
-        </div>
-
-        <div class="field">
-          <label for="slug">Slug</label>
-          <input
-            id="slug"
-            name="slug"
-            type="text"
-            autocomplete="off"
-            placeholder="article-slug"
-            aria-describedby="slug-edit-hint"
-          />
-          <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
-        </div>
-
-        <div class="field">
-          <label for="excerpt">Excerpt</label>
-          <textarea
-            id="excerpt"
-            name="excerpt"
-            rows="3"
-            maxlength="300"
-            placeholder="Short list-card and topic summary copy."></textarea>
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="publish-date">Publish date</label>
-            <input id="publish-date" name="publishDate" type="datetime-local" />
+          <div class="preview-box">
+            <p id="preview-excerpt" class="preview-excerpt" hidden></p>
+            <img id="preview-image-inline" class="preview-image-inline" alt="" hidden />
+            <h3 id="preview-title">Untitled article</h3>
+            <p>
+              Featured image path:
+              <span id="preview-featured-image" class="preview-image-path">None selected</span>
+            </p>
+            <div id="preview-meta" class="preview-meta" hidden></div>
+            <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
           </div>
+        </section>
+      </main>
 
-          <div class="field">
-            <label for="author">Author</label>
-            <input id="author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurié" />
-          </div>
-        </div>
+      <aside class="publish-sidebar" aria-labelledby="publish-output-heading">
+        <section class="admin-card admin-panel readiness-card">
+          <p class="sidebar-kicker">Readiness & Actions</p>
+          <h2 id="publish-output-heading">Content output</h2>
 
-        <div class="field-grid">
-          <div class="field">
-            <label for="category">Category</label>
-            <input id="category" name="category" type="text" autocomplete="off" placeholder="Aging skin" />
+          <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
+            <h3 id="publish-checklist-heading">Readiness checklist</h3>
+            <ul id="publish-checklist" aria-live="polite">
+              <li data-checklist-item="title">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Title present</span>
+              </li>
+              <li data-checklist-item="slug">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Valid slug</span>
+              </li>
+              <li data-checklist-item="content">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Content present</span>
+              </li>
+              <li data-checklist-item="excerpt">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Excerpt</span>
+              </li>
+              <li data-checklist-item="publishDate">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-label">Publish date</span>
+              </li>
+            </ul>
           </div>
 
-          <div class="field">
-            <label for="tags">Tags</label>
-            <input id="tags" name="tags" type="text" autocomplete="off" placeholder="barrier function, lipids" />
-          </div>
-        </div>
-
-        <div class="field checkbox-field">
-          <input id="draft" name="draft" type="checkbox" />
-          <label for="draft">Save as draft</label>
-        </div>
-
-        <div class="field">
-          <label for="content">Content</label>
-          <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
-          ></textarea>
-        </div>
-
-        <div class="field">
-          <label for="sources">Sources</label>
-          <textarea
-            id="sources"
-            name="sources"
-            class="sources-input"
-            rows="4"
-            placeholder="One source per line, or comma-separated citations."></textarea>
-          <p class="hint">Imported <code>sources[]</code> are stored as one citation per line.</p>
-        </div>
-
-        <div class="field">
-          <label for="image-upload">Image upload</label>
-          <label class="image-upload-button" for="image-upload">
-            <Icon name="tabler:photo-plus" class="image-upload-icon" aria-hidden="true" />
-            <span>Choose images</span>
-          </label>
-          <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
-          <p class="hint">
-            Selected images will be committed with the article under <code>src/assets/images/uploads/</code>. Allowed
-            types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
-            <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
-          </p>
-          <ul id="image-list" class="image-list" aria-live="polite"></ul>
-        </div>
-
-        <div class="field">
-          <label for="featured-image">Featured image</label>
-          <select id="featured-image" name="featuredImage">
-            <option value="">Select an uploaded image</option>
-          </select>
-          <input id="existing-featured-image-path" name="existingFeaturedImagePath" type="hidden" />
-        </div>
-
-        <div class="field">
-          <label for="video-link">Optional video link</label>
-          <input id="video-link" name="videoLink" type="url" placeholder="https://example.com/video" />
-        </div>
-
-        <div class="field-grid">
-          <div class="field">
-            <label for="cta-link">Optional CTA link</label>
-            <input id="cta-link" name="ctaLink" type="url" placeholder="https://example.com/call-to-action" />
+          <div class="status-line">
+            <p id="status" class="status" aria-live="polite"></p>
+            <span id="unsaved-changes" class="unsaved-changes" aria-live="polite" hidden>Unsaved changes</span>
           </div>
 
-          <div class="field">
-            <label for="cta-text">Optional CTA text</label>
-            <input id="cta-text" name="ctaText" type="text" placeholder="Learn more" />
+          <div class="publish-output-summary" aria-label="Content output summary">
+            <div class="summary-heading-row">
+              <p class="summary-label">Destination slug</p>
+              <a
+                class="summary-edit-link"
+                href="#slug"
+                aria-label="Edit destination slug"
+                title="Edit destination slug"
+              >
+                <Icon name="tabler:pencil" class="summary-edit-icon" aria-hidden="true" />
+                <span class="sr-only">Edit destination slug</span>
+              </a>
+            </div>
+            <p id="suggested-location" class="suggestion">src/data/post/slug.md</p>
           </div>
-        </div>
 
-        <div class="field">
-          <label for="seo-description">Optional SEO description</label>
-          <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
-        </div>
+          <div class="actions">
+            <button id="new-draft" class="btn-secondary" type="button">New</button>
+            <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
+            <button id="publish" class="btn-primary" type="button">Publish Article</button>
+            <button id="preview" class="btn-secondary" type="button">Preview page</button>
+          </div>
 
-        <div class="field checkbox-field">
-          <input id="overwrite-slug" name="overwrite" type="checkbox" />
-          <label for="overwrite-slug">Overwrite an existing article with this slug</label>
-        </div>
-
-        <div class="actions">
-          <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
-          <button id="preview" class="btn-secondary" type="button">Preview</button>
-          <button id="publish" class="btn-secondary" type="button">Publish Article</button>
-        </div>
-        <div class="status-line">
-          <p id="status" class="status" aria-live="polite"></p>
-          <span id="unsaved-changes" class="unsaved-changes" aria-live="polite" hidden>Unsaved changes</span>
-        </div>
-      </form>
-    </section>
-
-    <section class="admin-card admin-panel" aria-labelledby="preview-heading" data-auth-gated hidden>
-      <h2 id="preview-heading">Preview</h2>
-      <div class="preview-box">
-        <h3 id="preview-title">Untitled article</h3>
-        <p>
-          Featured image path:
-          <span id="preview-featured-image" class="preview-image-path">None selected</span>
-        </p>
-        <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
-      </div>
-    </section>
-
-    <section class="admin-card admin-panel" aria-labelledby="publish-output-heading" data-auth-gated hidden>
-      <h2 id="publish-output-heading">Publish output</h2>
-      <p>
-        Suggested destination: <span id="suggested-location" class="suggestion">src/data/post/slug.md</span>
-      </p>
-      <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
-        <h3 id="publish-checklist-heading">Publish readiness checklist</h3>
-        <ul id="publish-checklist" aria-live="polite">
-          <li data-checklist-item="title">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Title present</span>
-          </li>
-          <li data-checklist-item="slug">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Valid slug</span>
-          </li>
-          <li data-checklist-item="content">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Content present</span>
-          </li>
-          <li data-checklist-item="excerpt">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Excerpt</span>
-          </li>
-          <li data-checklist-item="publishDate">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Publish date</span>
-          </li>
-          <li data-checklist-item="sources">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Sources (at least 1)</span>
-          </li>
-          <li data-checklist-item="featuredImage">
-            <span class="checklist-icon" aria-hidden="true">☐</span>
-            <span class="checklist-label">Featured image selected</span>
-          </li>
-        </ul>
-      </div>
-      <button id="copy-output" class="btn-secondary btn-sm copy-button" type="button">Copy Markdown backup</button>
-      <textarea id="output-markdown" class="output-markdown" readonly></textarea>
-      <p class="publish-message">
-        Publish commits the article to GitHub. This Markdown is a backup preview of what will be saved.
-      </p>
-    </section>
+          <details class="markdown-backup" data-backup-panel open>
+            <summary>Save backup</summary>
+            <div class="backup-actions" aria-label="Backup actions">
+              <button
+                id="copy-output"
+                class="icon-button backup-icon-button"
+                type="button"
+                aria-label="Copy Markdown backup"
+                title="Copy Markdown backup"
+              >
+                <Icon name="tabler:copy" class="backup-action-icon" aria-hidden="true" />
+                <span class="sr-only">Copy Markdown backup</span>
+              </button>
+              <button
+                id="download-json-backup"
+                class="icon-button backup-icon-button"
+                type="button"
+                aria-label="Download JSON backup"
+                title="Download JSON backup"
+              >
+                <Icon name="tabler:download" class="backup-action-icon" aria-hidden="true" />
+                <span class="sr-only">Download JSON backup</span>
+              </button>
+            </div>
+            <textarea id="output-markdown" class="output-markdown" readonly></textarea>
+          </details>
+        </section>
+      </aside>
+    </div>
 
     <div id="toast" class="toast" aria-live="polite" hidden></div>
   </section>
@@ -288,6 +370,42 @@ const metadata = {
     color: var(--aw-color-text-muted);
     font-size: 0.95rem;
     font-weight: 700;
+  }
+
+  .publish-workspace[hidden] {
+    display: none;
+  }
+
+  .publish-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 23rem);
+    gap: 1.25rem;
+    align-items: start;
+  }
+
+  .publish-main {
+    display: grid;
+    gap: 1.25rem;
+    min-width: 0;
+  }
+
+  .publish-sidebar {
+    position: sticky;
+    top: 1rem;
+    min-width: 0;
+  }
+
+  .readiness-card {
+    margin-top: 0;
+  }
+
+  .sidebar-kicker {
+    margin: 0 0 0.35rem;
+    color: var(--aw-color-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
 
   .toast {
@@ -364,6 +482,16 @@ const metadata = {
     margin-bottom: 0.85rem;
   }
 
+  .json-import-toolbar {
+    display: grid;
+    min-width: 9rem;
+    gap: 0.6rem;
+  }
+
+  .json-import-toolbar .json-upload-button {
+    width: 100%;
+  }
+
   .json-import-card h2 {
     margin: 0;
     color: var(--aw-color-text-heading);
@@ -374,7 +502,6 @@ const metadata = {
 
   .json-import-input {
     min-height: 9rem;
-    max-height: 13rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.92rem;
   }
@@ -465,6 +592,121 @@ const metadata = {
     color: var(--aw-color-secondary);
   }
 
+  .json-draft-modal {
+    width: min(92vw, 680px);
+    max-height: min(82vh, 720px);
+    border: 0;
+    border-radius: 1.35rem;
+    padding: 0;
+    background: transparent;
+    color: var(--aw-color-text-default);
+  }
+
+  .json-draft-modal::backdrop {
+    background: rgb(15 23 42 / 54%);
+    backdrop-filter: blur(3px);
+  }
+
+  .json-draft-modal-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.35rem;
+    padding: 1.1rem;
+    background: var(--aw-color-bg-page);
+    box-shadow: 0 1.5rem 5rem rgb(15 23 42 / 24%);
+  }
+
+  :global(.dark) .json-draft-modal-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42);
+  }
+
+  .json-draft-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .json-draft-modal-header h3 {
+    margin: 0.1rem 0 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1.35rem;
+    font-weight: 800;
+  }
+
+  .json-draft-modal-status {
+    margin: 0 0 0.85rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.93rem;
+    font-weight: 700;
+  }
+
+  .json-draft-modal-status.is-error {
+    color: var(--aw-color-accent);
+  }
+
+  .json-draft-list {
+    display: grid;
+    gap: 0.65rem;
+    max-height: 52vh;
+    overflow: auto;
+    padding-right: 0.2rem;
+  }
+
+  :global(.json-draft-choice) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.85rem;
+    background: var(--aw-color-bg-surface);
+    color: inherit;
+    text-align: left;
+  }
+
+  :global(.json-draft-choice:hover),
+  :global(.json-draft-choice:focus-visible) {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 3px rgb(94 140 138 / 14%);
+    outline: none;
+  }
+
+  :global(.json-draft-choice-title) {
+    display: block;
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  :global(.json-draft-choice-meta) {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.84rem;
+    overflow-wrap: anywhere;
+  }
+
+  :global(.json-draft-empty) {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.93rem;
+  }
+
+  :global(.json-draft-choice-icon) {
+    width: 1.05rem;
+    height: 1.05rem;
+    color: var(--aw-color-text-muted);
+  }
+
+  :global(.json-draft-choice:hover .json-draft-choice-icon),
+  :global(.json-draft-choice:focus-visible .json-draft-choice-icon) {
+    color: var(--aw-color-accent);
+  }
+
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -479,6 +721,11 @@ const metadata = {
 
   .admin-panel {
     margin-top: 1.5rem;
+  }
+
+  .publish-main .admin-panel,
+  .publish-sidebar .admin-panel {
+    margin-top: 0;
   }
 
   .admin-panel h2 {
@@ -661,15 +908,58 @@ const metadata = {
     font-size: 0.9rem;
   }
 
-  .actions {
+  .module-heading-row {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.75rem;
-    margin-top: 1.4rem;
   }
 
-  .copy-button {
-    margin-bottom: 0.8rem;
+  .module-heading-row h2 {
+    margin: 0;
+  }
+
+  .module-icon-button {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .module-icon-button:hover,
+  .module-icon-button:focus-visible {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-accent);
+    outline: none;
+  }
+
+  .module-action-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+
+  .actions > button,
+  .actions > a {
+    width: 100%;
   }
 
   .publish-checklist {
@@ -700,6 +990,10 @@ const metadata = {
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .publish-sidebar .publish-checklist ul {
+    grid-template-columns: 1fr;
   }
 
   .publish-checklist li {
@@ -750,6 +1044,42 @@ const metadata = {
     font-weight: 700;
   }
 
+  .preview-excerpt {
+    margin: 0 0 0.75rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-style: italic;
+  }
+
+  .preview-image-inline {
+    width: 100%;
+    max-height: 18rem;
+    margin-bottom: 0.9rem;
+    border-radius: 0.85rem;
+    object-fit: cover;
+    background: rgb(229 231 235);
+  }
+
+  .preview-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0.75rem 0;
+  }
+
+  .preview-meta span {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 999px;
+    padding: 0.25rem 0.55rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  :global(.dark) .preview-meta span {
+    border-color: rgb(30 41 59);
+  }
+
   .markdown-preview {
     margin-top: 1rem;
     line-height: 1.7;
@@ -773,17 +1103,129 @@ const metadata = {
     background: var(--aw-color-bg-surface);
   }
 
-  .output-markdown {
-    min-height: 260px;
-    margin-top: 0;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    font-size: 0.9rem;
+  .publish-output-summary,
+  .markdown-backup {
+    margin-top: 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--aw-color-bg-page);
   }
 
-  .publish-message {
-    margin: 0.85rem 0 0;
-    color: var(--aw-color-secondary);
+  :global(.dark) .publish-output-summary,
+  :global(.dark) .markdown-backup {
+    border-color: rgb(30 41 59);
+  }
+
+  .summary-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .summary-label {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.75rem;
     font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .publish-output-summary .suggestion {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .summary-edit-link {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--aw-color-text-muted);
+    text-decoration: none;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .summary-edit-link:hover,
+  .summary-edit-link:focus-visible {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-accent);
+    outline: none;
+  }
+
+  .summary-edit-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .backup-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+  }
+
+  .backup-icon-button {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 999px;
+    padding: 0;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .backup-icon-button:not(:disabled):hover,
+  .backup-icon-button:not(:disabled):focus-visible {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-accent);
+    outline: none;
+  }
+
+  .backup-icon-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .backup-action-icon {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .markdown-backup summary {
+    color: var(--aw-color-text-heading);
+    cursor: pointer;
+    font-weight: 800;
+  }
+
+  .markdown-backup.is-disabled {
+    opacity: 0.68;
+  }
+
+  .output-markdown {
+    min-height: 16rem;
+    margin-top: 0;
+    overflow: hidden;
+    resize: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.86rem;
   }
 
   .checkbox-field {
@@ -830,10 +1272,28 @@ const metadata = {
     color: rgb(253 230 138);
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 1023px) {
+    .publish-workspace {
+      grid-template-columns: 1fr;
+    }
+
+    .publish-sidebar {
+      position: static;
+    }
+  }
+
+  @media (max-width: 767px) {
     .admin-page {
       padding-top: 1.5rem;
       padding-bottom: 2.5rem;
+    }
+
+    .publish-workspace {
+      grid-template-columns: 1fr;
+    }
+
+    .publish-sidebar {
+      position: static;
     }
 
     .admin-card {
@@ -852,13 +1312,27 @@ const metadata = {
       flex-direction: column;
     }
 
+    .json-import-toolbar {
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+
     .json-upload-button,
     .image-upload-button,
     .json-import-actions > button {
       width: 100%;
     }
 
-    .actions > button {
+    .json-draft-modal {
+      width: min(94vw, 680px);
+    }
+
+    :global(.json-draft-choice) {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .actions > button,
+    .actions > a {
       width: 100%;
     }
   }
@@ -889,9 +1363,14 @@ const metadata = {
       tags: document.querySelector('#tags'),
       sources: document.querySelector('#sources'),
       jsonImport: document.querySelector('#json-import'),
+      openJsonDrafts: document.querySelector('#open-json-drafts'),
       jsonUpload: document.querySelector('#json-upload'),
       jsonUploadName: document.querySelector('#json-upload-name'),
       jsonImportStatus: document.querySelector('#json-import-status'),
+      jsonDraftModal: document.querySelector('#json-draft-modal'),
+      jsonDraftModalClose: document.querySelector('#json-draft-modal-close'),
+      jsonDraftModalStatus: document.querySelector('#json-draft-modal-status'),
+      jsonDraftList: document.querySelector('#json-draft-list'),
       loadJson: document.querySelector('#load-json'),
       draft: document.querySelector('#draft'),
       content: document.querySelector('#content'),
@@ -910,15 +1389,24 @@ const metadata = {
       overwrite: document.querySelector('#overwrite-slug'),
       status: document.querySelector('#status'),
       unsavedChanges: document.querySelector('#unsaved-changes'),
+      refreshPreview: document.querySelector('#refresh-preview'),
       previewTitle: document.querySelector('#preview-title'),
+      previewExcerpt: document.querySelector('#preview-excerpt'),
+      previewImageInline: document.querySelector('#preview-image-inline'),
       previewFeaturedImage: document.querySelector('#preview-featured-image'),
+      previewMeta: document.querySelector('#preview-meta'),
       markdownPreview: document.querySelector('#markdown-preview'),
       suggestedLocation: document.querySelector('#suggested-location'),
       outputMarkdown: document.querySelector('#output-markdown'),
+      copyOutput: document.querySelector('#copy-output'),
+      downloadJsonBackup: document.querySelector('#download-json-backup'),
+      backupPanel: document.querySelector('[data-backup-panel]'),
       publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
+      newDraft: document.querySelector('#new-draft'),
       saveDraft: document.querySelector('#save-draft'),
       publish: document.querySelector('#publish'),
       publishMode: document.querySelector('#publish-mode'),
+      preview: document.querySelector('#preview'),
       toast: document.querySelector('#toast'),
     };
 
@@ -931,6 +1419,7 @@ const metadata = {
     let isAdmin = false;
     let editArticleLoaded = false;
     let hasUnsavedChanges = false;
+    let lastSavedDraftId = '';
 
     const adminPage = document.querySelector('.admin-page');
     const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
@@ -974,6 +1463,9 @@ const metadata = {
     const setUnsavedChanges = (value) => {
       hasUnsavedChanges = Boolean(value);
       if (fields.unsavedChanges) fields.unsavedChanges.hidden = !hasUnsavedChanges;
+      updatePublishButtonState();
+      updateSaveDraftButtonState();
+      updatePreviewButtonState();
     };
 
     const renderSlugHint = (isInvalid) => {
@@ -1002,7 +1494,32 @@ const metadata = {
       );
 
     const updateSaveDraftButtonState = () => {
-      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent();
+      fields.saveDraft.disabled = !isAdmin || !getHasMinimumDraftContent() || !hasUnsavedChanges;
+    };
+
+    const getHasPreviewContent = () =>
+      Boolean(
+        fields.title.value.trim() ||
+          fields.content.value.trim() ||
+          fields.excerpt.value.trim() ||
+          getFeaturedImagePath().trim()
+      );
+
+    const getCanOpenPreviewPage = () => {
+      const { requestId } = getCheckedOutWorkflowDraft();
+      const canSaveForPreview = hasUnsavedChanges && getHasMinimumDraftContent();
+      return Boolean(isAdmin && getHasPreviewContent() && (requestId || lastSavedDraftId || canSaveForPreview));
+    };
+
+    const updatePreviewButtonState = () => {
+      fields.preview.disabled = !getCanOpenPreviewPage();
+    };
+
+    const updateBackupActionState = () => {
+      const backupActionsEnabled = !fields.publish.disabled;
+      fields.copyOutput.disabled = !backupActionsEnabled;
+      fields.downloadJsonBackup.disabled = !backupActionsEnabled;
+      fields.backupPanel.classList.toggle('is-disabled', !backupActionsEnabled);
     };
 
     const updatePublishButtonState = () => {
@@ -1011,9 +1528,11 @@ const metadata = {
           fields.author.value.trim() &&
           slugPattern.test(fields.slug.value.trim()) &&
           getMarkdownWordCount() >= 5 &&
-          isAdmin
+          isAdmin &&
+          hasUnsavedChanges
       );
       fields.publish.disabled = !hasMinimumPublishContent;
+      updateBackupActionState();
       validateSlug();
     };
 
@@ -1073,12 +1592,13 @@ const metadata = {
     const setAuthState = (state) => {
       isAdmin = state === 'signed-in';
       setAuthStatus(authStatusMessages[state] || '');
-      setAdminShellVisible(isAdmin);
+      setAdminShellVisible(true);
       updatePublishButtonState();
       updateSaveDraftButtonState();
+      updatePreviewButtonState();
       setGatedContentVisible(isAdmin);
 
-      if (!isAdmin && state !== 'checking') redirectToHome();
+      if (!isAdmin && state !== 'checking' && state !== 'error') redirectToHome();
     };
 
     const getAdminStateForClerk = async (clerk) => {
@@ -1109,7 +1629,8 @@ const metadata = {
 
         if (adminState.isAdmin) {
           setAuthState('signed-in');
-          await initializeEditMode(clerk);
+          const loadedDraft = await loadDraftFromBlobs(clerk);
+          if (!loadedDraft) await initializeEditMode(clerk);
           return;
         }
 
@@ -1266,7 +1787,11 @@ const metadata = {
 
     const getCheckedOutWorkflowDraft = () => {
       const params = new URLSearchParams(window.location.search);
-      const requestId = params.get('request_id') || sessionStorage.getItem('dr-lurie-workflow-request-id') || '';
+      const requestId =
+        params.get('draftId') ||
+        params.get('request_id') ||
+        sessionStorage.getItem('dr-lurie-workflow-request-id') ||
+        '';
       const lockToken = params.get('lock_token') || sessionStorage.getItem('dr-lurie-workflow-lock-token') || '';
 
       return { requestId: requestId.trim(), lockToken: lockToken.trim() };
@@ -1357,6 +1882,14 @@ const metadata = {
           record_version: 1,
         },
       };
+    };
+
+    const syncJsonImportFromCurrentForm = (message = '') => {
+      const importJson = JSON.stringify(buildContentSourceDraft(), null, 2);
+      fields.jsonImport.value = importJson;
+      lastLoadedJsonImportValue = importJson.trim();
+      updateJsonImportButtonState();
+      if (message) setJsonImportStatus(message);
     };
 
     const setStatus = (message, autoClear = true) => {
@@ -1637,10 +2170,36 @@ const metadata = {
         .join('');
     };
 
+    const getFeaturedImagePreviewUrl = () => {
+      const selectedIndex = imageNames.indexOf(fields.featuredImage.value);
+      if (selectedIndex >= 0 && imagePreviewUrls[selectedIndex]) return imagePreviewUrls[selectedIndex];
+      const featuredPath = getFeaturedImagePath();
+      return featuredPath.startsWith('https://') ? featuredPath : '';
+    };
+
     const updatePreview = () => {
       const featuredPath = getFeaturedImagePath();
+      const imagePreviewUrl = getFeaturedImagePreviewUrl();
+      const excerpt = fields.excerpt.value.trim();
+      const metaItems = [
+        fields.author.value.trim() ? `By ${fields.author.value.trim()}` : '',
+        fields.category.value.trim(),
+        ...parseTags(fields.tags.value).slice(0, 4),
+        fields.videoLink.value.trim() ? 'Video' : '',
+        fields.ctaLink.value.trim() || fields.ctaText.value.trim() ? 'CTA' : '',
+      ].filter(Boolean);
+
       fields.previewTitle.textContent = fields.title.value || 'Untitled article';
+      fields.previewExcerpt.textContent = excerpt;
+      fields.previewExcerpt.hidden = !excerpt;
+      fields.previewImageInline.src = imagePreviewUrl;
+      fields.previewImageInline.alt = fields.title.value
+        ? `${fields.title.value} featured image preview`
+        : 'Featured image preview';
+      fields.previewImageInline.hidden = !imagePreviewUrl;
       fields.previewFeaturedImage.textContent = featuredPath || 'None selected';
+      fields.previewMeta.innerHTML = metaItems.map((item) => `<span>${escapeHtml(item)}</span>`).join('');
+      fields.previewMeta.hidden = metaItems.length === 0;
       fields.markdownPreview.innerHTML = renderMarkdownPreview(fields.content.value);
     };
 
@@ -1683,8 +2242,6 @@ const metadata = {
       content: fields.content.value.trim().length > 0,
       excerpt: fields.excerpt.value.trim().length > 0,
       publishDate: fields.publishDate.value.trim().length > 0,
-      sources: parseSources(fields.sources.value).length >= 1,
-      featuredImage: getFeaturedImagePath().length > 0,
     });
 
     const updatePublishChecklist = () => {
@@ -1704,11 +2261,25 @@ const metadata = {
       });
     };
 
+    const updateBackupDownload = () => {
+      const { slug } = buildMarkdown();
+      const backupJson = JSON.stringify(buildContentSourceDraft(), null, 2);
+      fields.downloadJsonBackup.dataset.href = `data:application/json;charset=utf-8,${encodeURIComponent(backupJson)}`;
+      fields.downloadJsonBackup.dataset.download = `${slug || 'dr-lurie-draft'}-backup.json`;
+    };
+
+    const resizeOutputMarkdown = () => {
+      fields.outputMarkdown.style.height = 'auto';
+      fields.outputMarkdown.style.height = `${fields.outputMarkdown.scrollHeight}px`;
+    };
+
     const updatePublishOutput = () => {
       const { slug, markdown } = buildMarkdown();
       fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
       fields.outputMarkdown.value = markdown;
+      resizeOutputMarkdown();
       updatePublishChecklist();
+      updateBackupDownload();
     };
 
     const saveLocalRecoveryDraft = () => {
@@ -1725,6 +2296,49 @@ const metadata = {
       sessionStorage.removeItem('dr-lurie-workflow-request-id');
       sessionStorage.removeItem('dr-lurie-workflow-lock-token');
       localStorage.removeItem(draftKey);
+    };
+
+    const resetPublisherForm = () => {
+      clearLocalCheckoutState();
+      lastSavedDraftId = '';
+      editArticleLoaded = false;
+      fields.title.value = '';
+      fields.slug.value = '';
+      fields.excerpt.value = '';
+      fields.publishDate.value = formatDateTimeLocal(new Date());
+      fields.author.value = '';
+      fields.category.value = '';
+      fields.tags.value = '';
+      fields.sources.value = '';
+      fields.jsonImport.value = '';
+      fields.jsonUpload.value = '';
+      fields.jsonUploadName.textContent = '';
+      setJsonImportStatus('');
+      lastLoadedJsonImportValue = '';
+      fields.draft.checked = false;
+      fields.content.value = '';
+      fields.imageUpload.value = '';
+      fields.featuredImage.value = '';
+      fields.existingFeaturedImagePath.value = '';
+      fields.videoLink.value = '';
+      fields.ctaLink.value = '';
+      fields.ctaText.value = '';
+      fields.seoDescription.value = '';
+      fields.overwrite.checked = false;
+      selectedFiles = [];
+      imageNames = [];
+      imageUploadMessage = '';
+      imageUploadMessageIsError = false;
+      renderImages();
+      updateJsonImportButtonState();
+      setEditorModeCopy('publish');
+      validateSlug();
+      updatePreview();
+      updatePublishOutput();
+      setUnsavedChanges(false);
+      setStatus('Ready for a new article.', false);
+      window.history.replaceState({}, '', '/admin/publish');
+      fields.title.focus();
     };
 
     const saveJsonDraftToBlobs = async () => {
@@ -1751,44 +2365,30 @@ const metadata = {
       return result;
     };
 
-    const saveDraft = async () => {
+    const saveDraft = async ({ confirm = true } = {}) => {
       const saveButton = fields.saveDraft;
 
       if (!getHasMinimumDraftContent()) {
         setStatus('Title, slug, and author are required to save JSON draft.', false);
-        return;
+        return false;
       }
 
-      const confirmed = window.confirm('Save draft JSON to Blobs and return to Admin Dashboard?');
-      if (!confirmed) return;
+      if (confirm) {
+        const confirmed = window.confirm('Save draft JSON to Blobs?');
+        if (!confirmed) return false;
+      }
 
       saveButton.disabled = true;
       setStatus('Saving JSON draft to Blobs…', false);
 
       try {
-        const clerkToken = await getClerkSessionToken();
-        const { requestId, lockToken } = getCheckedOutWorkflowDraft();
-        const response = await fetch('/.netlify/functions/admin-save-json-draft', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${clerkToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...(requestId ? { request_id: requestId } : {}),
-            ...(lockToken ? { lock_token: lockToken } : {}),
-            input: buildContentSourceDraft(),
-          }),
-        });
-        const result = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(result.error || `JSON draft could not be saved (${response.status}).`);
-        }
-
+        const result = await saveJsonDraftToBlobs();
         clearLocalCheckoutState();
+        lastSavedDraftId = result.record?.request_id || '';
         setUnsavedChanges(false);
-        window.location.href = '/admin';
+        const savedRequestId = lastSavedDraftId ? ` (${lastSavedDraftId})` : '';
+        setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
+        return true;
       } catch (error) {
         console.error('JSON draft save failed.', error);
         const recoverySaved = saveLocalRecoveryDraft();
@@ -1799,39 +2399,11 @@ const metadata = {
             : `${message} JSON was not saved to Blobs and local recovery failed.`,
           false
         );
+        return false;
       } finally {
         updateSaveDraftButtonState();
-      }
-    };
-
-    const loadDraft = () => {
-      const saved = localStorage.getItem(draftKey);
-      if (!saved) return;
-
-      try {
-        const draft = JSON.parse(saved);
-        fields.title.value = draft.title || '';
-        fields.slug.value = draft.slug || '';
-        fields.excerpt.value = draft.excerpt || '';
-        fields.publishDate.value = draft.publishDate || formatDateTimeLocal(new Date());
-        fields.author.value = draft.author || '';
-        fields.category.value = draft.category || '';
-        fields.tags.value = draft.tags || '';
-        fields.draft.checked = Boolean(draft.draft);
-        fields.content.value = draft.content || '';
-        fields.sources.value = draft.sources || '';
-        fields.videoLink.value = draft.videoLink || '';
-        fields.ctaLink.value = draft.ctaLink || '';
-        fields.ctaText.value = draft.ctaText || '';
-        fields.seoDescription.value = draft.seoDescription || '';
-        fields.overwrite.checked = Boolean(draft.overwrite);
-        imageNames = Array.isArray(draft.imageNames) ? draft.imageNames : [];
-        renderImages();
-        fields.existingFeaturedImagePath.value = draft.existingFeaturedImagePath || '';
-        if (draft.existingFeaturedImagePath) ensureFeaturedImageOption(draft.existingFeaturedImagePath);
-        fields.featuredImage.value = draft.featuredImage || draft.existingFeaturedImagePath || '';
-      } catch {
-        localStorage.removeItem(draftKey);
+        updatePublishButtonState();
+        updatePreviewButtonState();
       }
     };
 
@@ -1877,6 +2449,7 @@ const metadata = {
       }
       updatePreview();
       updatePublishOutput();
+      syncJsonImportFromCurrentForm('Existing article JSON loaded into the Import JSON module.');
       updatePublishButtonState();
       updateSaveDraftButtonState();
     };
@@ -2274,6 +2847,7 @@ const metadata = {
       updatePublishOutput();
       updatePublishButtonState();
       updateSaveDraftButtonState();
+      updatePreviewButtonState();
     };
 
     const getImportJsonObjectText = (text) => {
@@ -2337,15 +2911,15 @@ const metadata = {
       return candidate.slice(objectStart, objectEnd + 1);
     };
 
-    const failJsonImport = (message) => {
+    const failJsonImport = (message, { alert = true } = {}) => {
       setJsonImportStatus(message, true);
-      window.alert(message);
+      if (alert) window.alert(message);
     };
 
-    const loadJsonImport = async (rawValue = fields.jsonImport.value) => {
+    const loadJsonImport = async (rawValue = fields.jsonImport.value, { alertOnError = true } = {}) => {
       const rawJson = rawValue.trim();
       if (!rawJson) {
-        failJsonImport('Paste JSON or choose a .json file before loading.');
+        failJsonImport('Paste JSON or choose a .json file before loading.', { alert: alertOnError });
         return false;
       }
 
@@ -2370,7 +2944,7 @@ const metadata = {
       } catch (error) {
         const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
         const isSyntaxError = error instanceof SyntaxError;
-        failJsonImport(isSyntaxError ? `Invalid JSON. ${message}` : message);
+        failJsonImport(isSyntaxError ? `Invalid JSON. ${message}` : message, { alert: alertOnError });
         return false;
       }
     };
@@ -2382,6 +2956,189 @@ const metadata = {
         reader.addEventListener('error', () => reject(reader.error || new Error('JSON file could not be read.')));
         reader.readAsText(file);
       });
+
+    const getQueryDraftId = () => new URLSearchParams(window.location.search).get('draftId')?.trim() || '';
+
+    const formatJsonDraftDate = (value) => {
+      if (!value) return 'No updated date';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(date);
+    };
+
+    const fetchJsonDraftInput = async (draftId, token) => {
+      const response = await fetch(`/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
+      }
+
+      const draftInput = result.input || result.draft?.input;
+      if (!draftInput) throw new Error('Draft response did not include JSON input.');
+
+      return { draftInput, result };
+    };
+
+    const applyBlobDraftInput = async (draftId, draftInput, result = {}) => {
+      sessionStorage.setItem('dr-lurie-workflow-request-id', draftId);
+      if (result.lock_token || result.lockToken) {
+        sessionStorage.setItem('dr-lurie-workflow-lock-token', result.lock_token || result.lockToken);
+      }
+
+      const loaded = await loadJsonImport(JSON.stringify(draftInput, null, 2), { alertOnError: false });
+      if (!loaded) return false;
+
+      lastSavedDraftId = draftId;
+      setUnsavedChanges(false);
+      return true;
+    };
+
+    const loadDraftFromBlobs = async (clerk) => {
+      const draftId = getQueryDraftId();
+      if (!draftId) return false;
+
+      setStatus(`Loading draft ${draftId} from Blobs…`, false);
+
+      try {
+        const token = await clerk.session.getToken();
+        if (!token) throw new Error('Could not retrieve a Clerk session token.');
+
+        const { draftInput, result } = await fetchJsonDraftInput(draftId, token);
+        const loaded = await applyBlobDraftInput(draftId, draftInput, result);
+        if (!loaded) return false;
+
+        setStatus(`Loaded draft ${draftId}.`, true);
+        return true;
+      } catch (error) {
+        console.error('Draft load failed.', error);
+        setStatus(
+          error instanceof Error ? error.message : 'Draft could not be loaded. You can continue manually.',
+          false
+        );
+        return false;
+      }
+    };
+
+    const setJsonDraftModalStatus = (message, isError = false) => {
+      fields.jsonDraftModalStatus.textContent = message;
+      fields.jsonDraftModalStatus.classList.toggle('is-error', isError);
+    };
+
+    const closeJsonDraftModal = () => {
+      if (fields.jsonDraftModal?.close) {
+        fields.jsonDraftModal.close();
+      } else {
+        fields.jsonDraftModal?.removeAttribute('open');
+      }
+    };
+
+    const renderJsonDraftChoices = (drafts) => {
+      if (!drafts.length) {
+        fields.jsonDraftList.innerHTML = '<p class="json-draft-empty">No saved JSON drafts were found.</p>';
+        return;
+      }
+
+      fields.jsonDraftList.innerHTML = drafts
+        .map((draft) => {
+          const id = draft.id || draft.key || draft.request_id || '';
+          const title = draft.title || 'Untitled JSON draft';
+          const slug = draft.slug || 'no-slug';
+          const author = draft.author || 'unknown author';
+          const updatedAt = formatJsonDraftDate(draft.updatedAt || draft.updated_at || draft.modifiedAt);
+
+          return `<button class="json-draft-choice" type="button" data-draft-id="${escapeHtml(id)}">
+            <span>
+              <span class="json-draft-choice-title">${escapeHtml(title)}</span>
+              <span class="json-draft-choice-meta">${escapeHtml(slug)} · ${escapeHtml(author)} · ${escapeHtml(updatedAt)}</span>
+            </span>
+            <span class="json-draft-choice-icon" aria-hidden="true">↗</span>
+          </button>`;
+        })
+        .join('');
+    };
+
+    const loadJsonDraftChoices = async () => {
+      fields.jsonDraftList.innerHTML = '';
+      setJsonDraftModalStatus('Loading saved JSON drafts…');
+
+      try {
+        const token = await getClerkSessionToken();
+        const response = await fetch('/.netlify/functions/admin-list-json-drafts', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok)
+          throw new Error(result.error || `Saved JSON drafts could not be listed (${response.status}).`);
+
+        const drafts = Array.isArray(result.drafts) ? result.drafts : [];
+        renderJsonDraftChoices(drafts);
+        setJsonDraftModalStatus(
+          drafts.length
+            ? 'Select a saved JSON draft to load into the Import JSON module.'
+            : 'No saved JSON drafts were found.'
+        );
+      } catch (error) {
+        console.error('Saved JSON draft list failed.', error);
+        setJsonDraftModalStatus(
+          error instanceof Error ? error.message : 'Saved JSON drafts could not be listed.',
+          true
+        );
+      }
+    };
+
+    const openJsonDraftModal = () => {
+      if (fields.jsonDraftModal?.showModal) {
+        fields.jsonDraftModal.showModal();
+      } else {
+        fields.jsonDraftModal?.setAttribute('open', '');
+      }
+      loadJsonDraftChoices();
+    };
+
+    const loadSelectedJsonDraft = async (draftId) => {
+      if (!draftId) return;
+      if (hasUnsavedChanges) {
+        const replaceDraft = window.confirm(
+          'Open this saved JSON draft? Unsaved changes in the form will be replaced.'
+        );
+        if (!replaceDraft) return;
+      }
+
+      setJsonDraftModalStatus(`Opening ${draftId}…`);
+
+      try {
+        const token = await getClerkSessionToken();
+        const { draftInput, result } = await fetchJsonDraftInput(draftId, token);
+        const loaded = await applyBlobDraftInput(draftId, draftInput, result);
+        if (!loaded) throw new Error('Saved JSON draft could not be applied to the form.');
+
+        fields.jsonUploadName.textContent = draftId;
+        setJsonImportStatus(`Opened saved JSON ${draftId}.`);
+        setStatus(`Opened saved JSON ${draftId}.`, true);
+        closeJsonDraftModal();
+      } catch (error) {
+        console.error('Saved JSON draft open failed.', error);
+        setJsonDraftModalStatus(error instanceof Error ? error.message : 'Saved JSON draft could not be opened.', true);
+      }
+    };
 
     fields.title.addEventListener('input', () => {
       if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
@@ -2423,6 +3180,18 @@ const metadata = {
       loadJsonImport();
     });
 
+    fields.openJsonDrafts.addEventListener('click', openJsonDraftModal);
+    fields.jsonDraftModalClose.addEventListener('click', closeJsonDraftModal);
+    fields.jsonDraftList.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const choice = target?.closest('[data-draft-id]');
+      if (!choice) return;
+      loadSelectedJsonDraft(choice.dataset.draftId || '');
+    });
+    fields.jsonDraftModal.addEventListener('click', (event) => {
+      if (event.target === fields.jsonDraftModal) closeJsonDraftModal();
+    });
+
     fields.imageUpload.addEventListener('change', () => {
       const previousFeaturedImage = fields.featuredImage.value;
       const { validFiles, errors } = validateImageFiles(Array.from(fields.imageUpload.files || []));
@@ -2443,14 +3212,66 @@ const metadata = {
       if (previousFeaturedImage) fields.featuredImage.value = previousFeaturedImage;
       updatePreview();
       updatePublishOutput();
+      updatePreviewButtonState();
       setUnsavedChanges(true);
     });
 
-    document.querySelector('#save-draft').addEventListener('click', saveDraft);
-    document.querySelector('#preview').addEventListener('click', () => {
+    const openDedicatedPreviewPage = async () => {
+      if (fields.preview.disabled) return;
+
+      const { requestId } = getCheckedOutWorkflowDraft();
+      const previewReadyId = requestId || lastSavedDraftId;
+      if (!hasUnsavedChanges && previewReadyId) {
+        window.location.href = `/admin/review/${encodeURIComponent(previewReadyId)}`;
+        return;
+      }
+
+      if (!getHasMinimumDraftContent()) {
+        setStatus('Title, slug, and author are required before opening the preview page.', false);
+        return;
+      }
+
+      fields.preview.disabled = true;
+      setStatus('Saving draft before opening preview…', false);
+
+      try {
+        const result = await saveJsonDraftToBlobs();
+        const previewRequestId = result.record?.request_id || requestId || lastSavedDraftId;
+        lastSavedDraftId = previewRequestId;
+        if (!previewRequestId) throw new Error('Draft was saved, but no preview ID was returned.');
+        setUnsavedChanges(false);
+        window.location.href = `/admin/review/${encodeURIComponent(previewRequestId)}`;
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Preview page could not be opened.', false);
+        updatePreviewButtonState();
+      }
+    };
+
+    const startNewDraft = async () => {
+      if (hasUnsavedChanges) {
+        const saveFirst = window.confirm(
+          'Save the current JSON draft before starting a new article? Choose Cancel to disregard it instead.'
+        );
+
+        if (saveFirst) {
+          const saved = await saveDraft({ confirm: false });
+          if (!saved) return;
+        } else {
+          const discard = window.confirm('Discard the current unsaved draft and start a new article?');
+          if (!discard) return;
+        }
+      }
+
+      resetPublisherForm();
+    };
+
+    fields.newDraft.addEventListener('click', startNewDraft);
+    fields.saveDraft.addEventListener('click', () => saveDraft());
+    fields.refreshPreview.addEventListener('click', () => {
       updatePreview();
-      setStatus('Preview updated.');
+      setStatus('Inline preview refreshed.');
     });
+    fields.preview.addEventListener('click', openDedicatedPreviewPage);
     const fileToBase64 = (file) =>
       new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -2482,7 +3303,12 @@ const metadata = {
         return;
       }
 
-      const publishButton = document.querySelector('#publish');
+      const confirmed = window.confirm(
+        'Publish this article to GitHub? This will commit the article and any selected images.'
+      );
+      if (!confirmed) return;
+
+      const publishButton = fields.publish;
       publishButton.disabled = true;
       setStatus('Checking Clerk session…', false);
 
@@ -2550,13 +3376,26 @@ const metadata = {
         setStatus(error instanceof Error ? error.message : 'Article could not be published.', false);
       } finally {
         updatePublishButtonState();
+        updateSaveDraftButtonState();
       }
     };
 
     fields.publish.addEventListener('click', publishArticle);
-    document.querySelector('#copy-output').addEventListener('click', () => {
+    fields.copyOutput.addEventListener('click', () => {
+      if (fields.copyOutput.disabled) return;
       updatePublishOutput();
       copyText(fields.outputMarkdown.value, 'Publish Markdown copied.');
+    });
+
+    fields.downloadJsonBackup.addEventListener('click', () => {
+      if (fields.downloadJsonBackup.disabled) return;
+      updatePublishOutput();
+      const link = document.createElement('a');
+      link.href = fields.downloadJsonBackup.dataset.href || '#';
+      link.download = fields.downloadJsonBackup.dataset.download || 'dr-lurie-draft-backup.json';
+      document.body.append(link);
+      link.click();
+      link.remove();
     });
 
     ['input', 'change'].forEach((eventName) => {
@@ -2565,6 +3404,7 @@ const metadata = {
         updatePublishOutput();
         updatePublishButtonState();
         updateSaveDraftButtonState();
+        updatePreviewButtonState();
         setUnsavedChanges(true);
       });
     });
@@ -2581,9 +3421,10 @@ const metadata = {
     renderImageRulesHint();
     if (!fields.publishDate.value) fields.publishDate.value = formatDateTimeLocal(new Date());
     setEditorModeCopy(isEditMode() ? 'edit' : 'publish');
-    if (!isEditMode()) loadDraft();
+    if (!isEditMode() && !getQueryDraftId()) localStorage.removeItem(draftKey);
     updatePublishButtonState();
     updateSaveDraftButtonState();
+    updatePreviewButtonState();
     updatePreview();
     updatePublishOutput();
     setUnsavedChanges(false);
