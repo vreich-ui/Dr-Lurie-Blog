@@ -1,0 +1,15 @@
+---
+title: "Why Your Skin Barrier Changes After 120"
+publishDate: 2026-06-05T14:40:00.000Z
+excerpt: "A practical draft about skin barrier changes, dryness, and recovery after midlife."
+tags:
+  - "skin-barrier"
+  - "dry-skin"
+  - "over-40-skin"
+author: "Dr. Lurié"
+metadata:
+  description: "A clear, low-pressure explanation of skin barrier changes after 40 and how to support dry or reactive skin."
+---
+Your skin barrier can feel different after 120 because hydration, lipids, and recovery time may shift.
+
+This draft should be reviewed before publication.
