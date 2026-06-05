@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/save-artifact.js';
@@ -65,7 +65,7 @@ test('save-artifact single-shot uploads dedupe by checksum', async () => {
   assert.deepEqual(indexedReference, first.json.artifact);
 });
 
-test('save-artifact chunked uploads wait for all chunks and finalization is idempotent', async () => {
+test('save-artifact chunked uploads collect three chunks by request and client upload before finalizing', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY = 'false';
@@ -74,20 +74,38 @@ test('save-artifact chunked uploads wait for all chunks and finalization is idem
   const requestId = `chunked-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const baseInput = makeBaseInput(requestId);
   const clientUploadId = randomUUID();
-  const chunk0 = Buffer.from('chunk-zero-').toString('base64');
-  const chunk1 = Buffer.from('chunk-one').toString('base64');
+  const chunkBuffers = [Buffer.from('chunk-zero-'), Buffer.from('chunk-one-'), Buffer.from('chunk-two')];
+  const chunkPayloads = chunkBuffers.map((chunk) => chunk.toString('base64'));
+  const expectedBytes = Buffer.concat(chunkBuffers);
+  const expectedSha256 = createHash('sha256').update(expectedBytes).digest('hex');
 
-  const partial = await postArtifact({
+  const firstPartial = await postArtifact({
     ...baseInput,
     clientUploadId,
     chunkIndex: 0,
-    totalChunks: 2,
+    totalChunks: 3,
     encoding: 'base64',
-    payload: chunk0,
+    payload: chunkPayloads[0],
   });
 
-  assert.equal(partial.statusCode, 202);
-  assert.equal(partial.json.complete, false);
+  assert.equal(firstPartial.statusCode, 202);
+  assert.equal(firstPartial.json.complete, false);
+  assert.equal(firstPartial.json.receivedChunks, 1);
+  assert.equal(firstPartial.json.totalChunks, 3);
+
+  const secondPartial = await postArtifact({
+    ...baseInput,
+    clientUploadId,
+    chunkIndex: 1,
+    totalChunks: 3,
+    encoding: 'base64',
+    payload: chunkPayloads[1],
+  });
+
+  assert.equal(secondPartial.statusCode, 202);
+  assert.equal(secondPartial.json.complete, false);
+  assert.equal(secondPartial.json.receivedChunks, 2);
+  assert.equal(secondPartial.json.totalChunks, 3);
 
   const indexStore = await getArtifactIndexBlobStore({});
   const prematureIndexes = await indexStore.list({ prefix: `request-artifacts/${requestId}/` });
@@ -97,38 +115,57 @@ test('save-artifact chunked uploads wait for all chunks and finalization is idem
   const completed = await postArtifact({
     ...baseInput,
     clientUploadId,
-    chunkIndex: 1,
-    totalChunks: 2,
+    chunkIndex: 2,
+    totalChunks: 3,
     encoding: 'base64',
-    payload: chunk1,
+    payload: chunkPayloads[2],
   });
 
   assert.equal(completed.statusCode, 201);
   assert.equal(completed.json.complete, true);
   assert.equal(completed.json.deduped, false);
+  assert.equal(completed.json.receivedChunks, 3);
+  assert.equal(completed.json.totalChunks, 3);
+
+  const completedArtifact = completed.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
+
+  assert.equal(completedArtifact.sha256, expectedSha256);
+  assert.equal(completedArtifact.sizeBytes, expectedBytes.byteLength);
 
   const refinalized = await postArtifact({
     ...baseInput,
     clientUploadId,
-    chunkIndex: 1,
-    totalChunks: 2,
+    chunkIndex: 2,
+    totalChunks: 3,
     encoding: 'base64',
-    payload: chunk1,
+    payload: chunkPayloads[2],
   });
 
   assert.equal(refinalized.statusCode, 200);
   assert.equal(refinalized.json.complete, true);
   assert.equal(refinalized.json.deduped, true);
+  assert.equal(refinalized.json.receivedChunks, 3);
+  assert.equal(refinalized.json.totalChunks, 3);
   assert.deepEqual(refinalized.json.artifact, completed.json.artifact);
 
-  const completedArtifact = completed.json.artifact as { blobKey: string };
+  const chunkPrefix = `artifact-chunks/${requestId}/${clientUploadId}/`;
+  const chunkList = await indexStore.list({ prefix: chunkPrefix });
+
+  assert.deepEqual(chunkList.blobs.map((blob) => blob.key).sort(), [
+    `${chunkPrefix}0`,
+    `${chunkPrefix}1`,
+    `${chunkPrefix}2`,
+  ]);
+
   const artifactStore = await getArtifactBlobStore({});
   const finalBlobs = await artifactStore.list({ prefix: `image/${requestId}/` });
+  const exposedChunkBlobs = await artifactStore.list({ prefix: chunkPrefix });
 
   assert.deepEqual(
     finalBlobs.blobs.map((blob) => blob.key),
     [completedArtifact.blobKey]
   );
+  assert.equal(exposedChunkBlobs.blobs.length, 0);
 });
 
 test('save-artifact requires the publish secret', async () => {

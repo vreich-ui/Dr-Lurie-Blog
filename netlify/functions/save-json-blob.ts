@@ -715,43 +715,47 @@ const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
-const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
   const missingLockToken = requireStringField(body, 'lock_token');
   if (missingLockToken) return missingLockToken;
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
-  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  const checkedOutRecord = await loadRecord(store, body.request_id as string);
+  if (!checkedOutRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  if (!previousRecord.lock) return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+  const canonicalRecord = await loadRecord(store, body.request_id as string);
+  if (!canonicalRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  if (previousRecord.lock.token !== body.lock_token) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  if (!canonicalRecord.lock)
+    return jsonResponse(200, { action: body.action, record: canonicalRecord, idempotent: true });
+
+  if (canonicalRecord.lock.token !== body.lock_token) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: canonicalRecord.lock });
   }
 
   const timestamp = nowIso();
   const nextRecord: WorkflowRecord = {
-    ...previousRecord,
+    ...canonicalRecord,
     updated_at: timestamp,
     lock: undefined,
     history: [
-      ...previousRecord.history,
+      ...canonicalRecord.history,
       {
         at: timestamp,
         action: body.action,
         details: {
-          owner_id: previousRecord.lock.owner_id,
-          owner_label: previousRecord.lock.owner_label,
+          owner_id: canonicalRecord.lock.owner_id,
+          owner_label: canonicalRecord.lock.owner_label,
         },
       },
     ],
-    version: previousRecord.version + 1,
+    version: canonicalRecord.version + 1,
   };
 
   await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  await updateIndexes(store, canonicalRecord, nextRecord);
 
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
