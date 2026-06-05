@@ -137,6 +137,24 @@ test('admin JSON draft save creates a new blob draft workflow record', async () 
   assert.equal(store.blobs.has(recordKey(record.request_id)), true);
 });
 
+test('admin JSON draft save rejects existing-record updates without the current lock token using the documented message', async () => {
+  const store = createMemoryStore();
+  const existing = checkedOutRecord();
+  await store.setJSON(recordKey(existing.request_id), existing);
+
+  const response = await saveAdminJsonDraft(store, {
+    request_id: existing.request_id,
+    input: validInput(),
+  });
+  const body = parseBody(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error_code, 'missing_lock_token');
+  assert.equal(body.error, 'lock_token is required to update a checked-out draft.');
+  assert.equal(body.message, 'lock_token is required to update a checked-out draft.');
+});
+
 test('admin JSON draft save updates a checked-out blob record with its active lock token', async () => {
   const store = createMemoryStore();
   const existing = checkedOutRecord();
@@ -175,7 +193,49 @@ test('admin JSON draft save rejects checked-out updates when the lock token mism
   assert.equal(body.error, 'lock_token_mismatch');
 });
 
-test('admin JSON draft save checkin clears the lock after a successful checked-out update', async () => {
+test('admin JSON draft save rejects checked-out updates when the lock is expired', async () => {
+  const store = createMemoryStore();
+  const existing = checkedOutRecord();
+  existing.lock = {
+    ...existing.lock!,
+    expires_at: new Date(Date.now() - 60 * 1000).toISOString(),
+  };
+  await store.setJSON(recordKey(existing.request_id), existing);
+
+  const response = await saveAdminJsonDraft(store, {
+    request_id: existing.request_id,
+    lock_token: 'lock_valid',
+    input: validInput(),
+  });
+  const body = parseBody(response);
+
+  assert.equal(response.statusCode, 423);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'lock_expired');
+  assert.equal(body.error_code, 'lock_expired');
+  assert.equal(body.message, 'The workflow lock has expired. Check out the draft again and retry.');
+  assert.equal(body.lock_expired, true);
+});
+
+test('admin JSON draft save rejects existing-record updates when the workflow record is not found', async () => {
+  const store = createMemoryStore();
+
+  const response = await saveAdminJsonDraft(store, {
+    request_id: 'req_missing',
+    lock_token: 'lock_valid',
+    input: validInput(),
+  });
+  const body = parseBody(response);
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'not_found');
+  assert.equal(body.error_code, 'not_found');
+  assert.equal(body.message, 'Workflow record was not found.');
+  assert.equal(body.not_found, true);
+});
+
+test('admin JSON draft save keeps the existing lock after a successful checked-out update', async () => {
   const store = createMemoryStore();
   const existing = checkedOutRecord();
   await store.setJSON(recordKey(existing.request_id), existing);
@@ -190,7 +250,7 @@ test('admin JSON draft save checkin clears the lock after a successful checked-o
   const persisted = JSON.parse((await store.get(recordKey(existing.request_id))) ?? '{}') as WorkflowRecord;
 
   assert.equal(response.statusCode, 200);
-  assert.equal(record.lock, undefined);
-  assert.equal(persisted.lock, undefined);
-  assert.equal(body.checked_in, true);
+  assert.equal(record.lock?.token, 'lock_valid');
+  assert.equal(persisted.lock?.token, 'lock_valid');
+  assert.equal(body.checked_in, false);
 });
