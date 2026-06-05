@@ -18,6 +18,7 @@ import {
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
 import { getHeader } from '../lib/admin-auth.js';
+import { getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
@@ -141,7 +142,7 @@ const requestArtifactIndexKey = (requestId: string, sha256: string) => {
 
 const getChunkStatus = async (store: BlobStore, clientUploadId: string, totalChunks: number): Promise<ChunkStatus> => {
   const result = await store.list({ prefix: `uploads/${clientUploadId}/` });
-  const receivedChunks = result.blobs.filter((blob) => /\/chunk-\d{6}\.bin$/.test(blob.key)).length;
+  const receivedChunks = getBlobListItems(result).filter((blob) => /\/chunk-\d{6}\.bin$/.test(blob.key)).length;
 
   return {
     complete: receivedChunks >= totalChunks,
