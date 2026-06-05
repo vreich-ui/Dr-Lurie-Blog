@@ -48,8 +48,12 @@ const listFiles = async (current: string): Promise<string[]> => {
 
 export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
   const storeRoot = join(localBlobsRoot, storeName);
-  const getBlob = async (key: string, options?: { type?: 'arrayBuffer' | 'text' }) => {
+  const getBlob = async (key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) => {
     try {
+      if (options?.type === 'buffer') {
+        return await readFile(toPath(storeName, key));
+      }
+
       if (options?.type === 'arrayBuffer') {
         const bytes = await readFile(toPath(storeName, key));
 
