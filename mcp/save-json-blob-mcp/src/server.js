@@ -206,6 +206,14 @@ const callNormalizedAction = async (createPayload, resultKey) => {
   }
 };
 
+const createMarkAgentCompletePayload = (input, agentName) => ({
+  action: 'mark_agent_complete',
+  ...input,
+  agent_name: agentName,
+  current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
+  next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
+});
+
 export const createServer = () => {
   logStartup('Server startup.');
   validateEnvironmentForStartup();
@@ -316,13 +324,7 @@ export const createServer = () => {
     },
     async (input) =>
       callNormalizedAction(
-        () => ({
-          action: 'mark_agent_complete',
-          ...input,
-          agent_name: normalizeAgentName(input.agent_name, 'agent_name'),
-          current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
-          next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
-        }),
+        () => createMarkAgentCompletePayload(input, normalizeAgentName(input.agent_name, 'agent_name')),
         'record'
       )
   );
@@ -424,7 +426,7 @@ export const createServer = () => {
         inputSchema: {
           request_id: z.string().min(1),
           expected_record_version: z.number().int().nonnegative(),
-          lock_token: z.string().min(1).optional(),
+          lock_token: z.string().min(1),
           current_stage: z.string().min(1).nullable().optional(),
           next_agent: z.string().min(1).nullable().optional(),
           workflow_status: z.string().min(1).optional(),
@@ -432,31 +434,7 @@ export const createServer = () => {
           last_error: z.string().nullable().optional(),
         },
       },
-      async ({
-        request_id,
-        expected_record_version,
-        lock_token,
-        current_stage,
-        next_agent,
-        workflow_status,
-        needs_review,
-        last_error,
-      }) =>
-        callNormalizedAction(
-          () => ({
-            action: 'mark_agent_complete',
-            request_id,
-            agent_name: agentName,
-            expected_record_version,
-            lock_token,
-            current_stage: normalizeOptionalAgentName(current_stage, 'current_stage'),
-            next_agent: normalizeOptionalAgentName(next_agent, 'next_agent'),
-            workflow_status,
-            needs_review,
-            last_error,
-          }),
-          'record'
-        )
+      async (input) => callNormalizedAction(() => createMarkAgentCompletePayload(input, agentName), 'record')
     );
   }
 

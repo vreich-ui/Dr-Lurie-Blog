@@ -710,7 +710,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           needs_review: { type: 'boolean' },
           last_error: nullableStringSchema(),
         },
-        ['request_id', 'expected_record_version']
+        ['request_id', 'expected_record_version', 'lock_token']
       ),
     },
   ]),
@@ -871,6 +871,14 @@ const callNormalizedAction = async (
   }
 };
 
+const createMarkAgentCompletePayload = (input: Record<string, unknown>, agentName: string) => ({
+  action: 'mark_agent_complete',
+  ...input,
+  agent_name: agentName,
+  current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
+  next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
+});
+
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
   if (typeof requestId !== 'string' || requestId.trim().length === 0) {
     return toolError('requestId is required.');
@@ -1006,13 +1014,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'save_json_blob_mark_agent_complete':
       return callNormalizedAction(
         event,
-        () => ({
-          action: 'mark_agent_complete',
-          ...input,
-          agent_name: normalizeAgentName(input.agent_name, 'agent_name'),
-          current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
-          next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
-        }),
+        () => createMarkAgentCompletePayload(input, normalizeAgentName(input.agent_name, 'agent_name') as string),
         'record'
       );
     default:
@@ -1038,22 +1040,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
 
     const completeAgent = ALLOWED_AGENTS.find((agentName) => name === `${agentName}_mark_complete`);
     if (completeAgent) {
-      return callNormalizedAction(
-        event,
-        () => ({
-          action: 'mark_agent_complete',
-          request_id: input.request_id,
-          agent_name: completeAgent,
-          expected_record_version: input.expected_record_version,
-          lock_token: input.lock_token,
-          current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
-          next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
-          workflow_status: input.workflow_status,
-          needs_review: input.needs_review,
-          last_error: input.last_error,
-        }),
-        'record'
-      );
+      return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, completeAgent), 'record');
     }
   }
 
