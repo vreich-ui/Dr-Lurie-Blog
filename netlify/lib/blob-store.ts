@@ -1,10 +1,19 @@
 import { createLocalBlobStore, type LocalBlobStore, type LocalBlobValue } from './local-blobs.js';
 
 type BlobMetadata = Record<string, string>;
+type BlobSetOptions = { metadata?: BlobMetadata; onlyIfNew?: boolean };
 
-type BlobStore = Omit<LocalBlobStore, 'set'> & {
-  set: (key: string, value: LocalBlobValue, options?: { metadata?: BlobMetadata }) => Promise<void>;
-  setJSON: (key: string, value: unknown, options?: { metadata?: BlobMetadata }) => Promise<void>;
+type BlobStore = Omit<LocalBlobStore, 'set' | 'setJSON'> & {
+  set: (
+    key: string,
+    value: LocalBlobValue,
+    options?: BlobSetOptions
+  ) => Promise<void | { modified: boolean; etag?: string }>;
+  setJSON: (
+    key: string,
+    value: unknown,
+    options?: BlobSetOptions
+  ) => Promise<void | { modified: boolean; etag?: string }>;
 };
 
 type BlobsModule = {

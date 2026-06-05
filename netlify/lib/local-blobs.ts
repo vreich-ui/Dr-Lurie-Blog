@@ -33,7 +33,12 @@ const listFiles = async (current: string): Promise<string[]> => {
 
     return files.flat();
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
       return [];
     }
 
@@ -43,6 +48,23 @@ const listFiles = async (current: string): Promise<string[]> => {
 
 export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
   const storeRoot = join(localBlobsRoot, storeName);
+  const getBlob = async (key: string, options?: { type?: 'arrayBuffer' | 'text' }) => {
+    try {
+      if (options?.type === 'arrayBuffer') {
+        const bytes = await readFile(toPath(storeName, key));
+
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      return await readFile(toPath(storeName, key), 'utf8');
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        return null;
+      }
+
+      throw error;
+    }
+  };
 
   return {
     async set(key, value) {
@@ -52,17 +74,7 @@ export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
       await writeFile(filePath, typeof value === 'string' ? value : new Uint8Array(value));
     },
 
-    async get(key) {
-      try {
-        return await readFile(toPath(storeName, key), 'utf8');
-      } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-          return null;
-        }
-
-        throw error;
-      }
-    },
+    get: getBlob as LocalBlobStore['get'],
 
     async del(key) {
       await rm(toPath(storeName, key), { force: true });
