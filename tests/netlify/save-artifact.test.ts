@@ -146,3 +146,53 @@ test('save-artifact requires the publish secret', async () => {
 
   assert.equal(response.statusCode, 401);
 });
+
+test('MCP artifact tools upload bytes and list request references', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const { handler: mcpHandler } = await import('../../netlify/functions/mcp.js');
+  const requestId = `mcp-artifact-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const uploadResponse = await mcpHandler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: {
+        name: 'save_artifact',
+        arguments: {
+          ...makeBaseInput(requestId),
+          payload: Buffer.from('mcp artifact bytes').toString('base64'),
+        },
+      },
+    }),
+  });
+
+  assert.equal(uploadResponse.statusCode, 200);
+  const uploadBody = JSON.parse(uploadResponse.body) as {
+    result: { structuredContent: { artifact: { sha256: string }; complete: boolean } };
+  };
+  assert.equal(uploadBody.result.structuredContent.complete, true);
+
+  const listResponse = await mcpHandler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'list_artifacts_for_request', arguments: { requestId } },
+    }),
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  const listBody = JSON.parse(listResponse.body) as {
+    result: { structuredContent: { artifacts: Array<{ sha256: string }> } };
+  };
+
+  assert.deepEqual(listBody.result.structuredContent.artifacts, [uploadBody.result.structuredContent.artifact]);
+});

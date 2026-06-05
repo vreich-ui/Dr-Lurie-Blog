@@ -64,7 +64,61 @@ Registered core tool names:
 - `save_json_blob_refresh_lock`
 - `save_json_blob_checkin_request`
 - `save_json_blob_force_unlock` (admin-only, registered only when `MCP_ENABLE_ADMIN_TOOLS=true`)
+- `save_artifact`
+- `save_artifact_chunk`
+- `list_artifacts_for_request`
 - `ping`
+
+## Artifact tools
+
+Artifact tools are registered by the production Netlify `/mcp` entry point. They store binary bytes in the artifact blob store and keep workflow state/reference metadata in MCP-managed indexes.
+
+### `save_artifact`
+
+Single-shot byte upload. Writes the final artifact blob and a request artifact index entry.
+
+Required fields:
+
+- `requestId: string` - workflow request id that owns the artifact.
+- `artifactKind: "image" | "audio" | "video" | "binary" | "markdown"` - storage routing kind.
+- `contentType: string` - MIME type for the artifact bytes.
+- `payload: string` - artifact bytes, base64 by default.
+
+Optional fields:
+
+- `filename: string` - used only for the final blob extension.
+- `encoding: "base64" | "binary"` - defaults to `base64`.
+- `metadata: object` - saved in the returned `ArtifactReference`.
+
+Success returns the same shape as the upload function: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist for the checksum, `deduped: true` is a successful response and bytes are not rewritten.
+
+### `save_artifact_chunk`
+
+Chunked byte upload. Writes one chunk blob to the upload session. When all chunks exist, the server assembles the final artifact blob and writes the request artifact index.
+
+Required fields:
+
+- `requestId: string` - workflow request id that owns the artifact.
+- `artifactKind: "image" | "audio" | "video" | "binary" | "markdown"` - storage routing kind.
+- `contentType: string` - MIME type for the complete artifact bytes.
+- `clientUploadId: string` - stable UUID shared by every chunk in this upload.
+- `chunkIndex: integer` - zero-based chunk index.
+- `totalChunks: integer` - total chunks in the upload.
+- `payload: string` - chunk bytes, base64 by default.
+
+Optional fields: `filename`, `encoding`, and `metadata` match `save_artifact`.
+
+Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is safe; checksum dedup returns success and does not rewrite final bytes.
+
+### `list_artifacts_for_request`
+
+Lists request artifact references from the artifact index only. This tool reads metadata and does not read or write artifact bytes.
+
+Required fields:
+
+- `requestId: string` - workflow request id whose artifact references should be listed.
+
+Success returns `artifacts: ArtifactReference[]`.
 
 ### `save_json_blob_create_request`
 

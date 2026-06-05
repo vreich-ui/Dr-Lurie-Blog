@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
+import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
+import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
   blobs?: string;
@@ -172,6 +174,18 @@ const nullableAgentNameJsonSchema = (description?: string) => ({
   anyOf: [{ type: 'string', enum: ALLOWED_AGENTS }, { type: 'null' }],
   ...(description ? { description } : {}),
 });
+
+const artifactKindJsonSchema = (description?: string) => ({
+  type: 'string',
+  enum: ['image', 'audio', 'video', 'binary', 'markdown'],
+  ...(description ? { description } : {}),
+});
+const artifactEncodingJsonSchema = (description?: string) => ({
+  type: 'string',
+  enum: ['base64', 'binary'],
+  ...(description ? { description } : {}),
+});
+const artifactMetadataJsonSchema = metadataBagSchema('Optional artifact metadata saved in the artifact reference.');
 
 const publishPayloadJsonSchema = objectSchema(
   {
@@ -597,6 +611,52 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ]
     : []),
   {
+    name: 'save_artifact',
+    description:
+      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns this artifact.'),
+        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+        contentType: stringSchema('MIME type for the artifact bytes.'),
+        filename: stringSchema('Optional original filename used only for the blob extension.'),
+        encoding: artifactEncodingJsonSchema('Payload encoding; defaults to base64.'),
+        payload: stringSchema('Artifact bytes as base64 unless encoding is binary.'),
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['requestId', 'artifactKind', 'contentType', 'payload']
+    ),
+  },
+  {
+    name: 'save_artifact_chunk',
+    description:
+      'Chunked byte upload. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns this artifact.'),
+        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+        contentType: stringSchema('MIME type for the complete artifact bytes.'),
+        clientUploadId: stringSchema('Stable UUID shared by every chunk in this upload.'),
+        chunkIndex: intSchema('Zero-based chunk index.'),
+        totalChunks: { type: 'integer', minimum: 1, description: 'Total number of chunks in this upload.' },
+        filename: stringSchema('Optional original filename used only for the final blob extension.'),
+        encoding: artifactEncodingJsonSchema('Chunk payload encoding; defaults to base64.'),
+        payload: stringSchema('Chunk bytes as base64 unless encoding is binary.'),
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['requestId', 'artifactKind', 'contentType', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload']
+    ),
+  },
+  {
+    name: 'list_artifacts_for_request',
+    description:
+      'List ArtifactReference metadata for a requestId. Required: requestId. Reads the request artifact index only; it does not read or write artifact bytes. Returns artifacts array.',
+    inputSchema: objectSchema(
+      { requestId: stringSchema('Workflow request id whose artifact references should be listed.') },
+      ['requestId']
+    ),
+  },
+  {
     name: 'ping',
     description: 'Diagnostic tool that confirms the MCP server is reachable.',
     inputSchema: objectSchema({}),
@@ -727,6 +787,48 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
   return parsedBody;
 };
 
+const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Server-side artifact storage is not configured.');
+  }
+
+  const saveResponse = await saveArtifactHandler({
+    blobs: event.blobs,
+    httpMethod: 'POST',
+    headers: createSaveJsonBlobHeaders(event, publishSecret),
+    body: JSON.stringify(payload),
+  });
+
+  const bodyText = saveResponse.body ?? '';
+  let parsedBody: Record<string, unknown> = {};
+
+  if (bodyText) {
+    try {
+      parsedBody = JSON.parse(bodyText) as Record<string, unknown>;
+    } catch {
+      return toolError(`HTTP ${saveResponse.statusCode}: ${bodyText}`);
+    }
+  }
+
+  if (saveResponse.statusCode < 200 || saveResponse.statusCode >= 300) {
+    return toolError(
+      typeof parsedBody.error === 'string' ? parsedBody.error : `HTTP ${saveResponse.statusCode}: ${bodyText}`
+    );
+  }
+
+  return parsedBody;
+};
+
+const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const result = await invokeSaveArtifact(event, payload);
+
+  if ('isError' in result) return result;
+
+  return toolResult(result);
+};
+
 const callAction = async (event: LambdaEvent, payload: Record<string, unknown>, resultKey: string) => {
   const result = await invokeSaveJsonBlob(event, payload);
 
@@ -745,6 +847,31 @@ const callNormalizedAction = async (
   } catch (error) {
     return toolError(error instanceof Error ? error.message : String(error));
   }
+};
+
+const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
+  if (typeof requestId !== 'string' || requestId.trim().length === 0) {
+    return toolError('requestId is required.');
+  }
+
+  const store = await getArtifactIndexBlobStore(event);
+  const prefix = `request-artifacts/${encodeURIComponent(requestId)}/`;
+  const result = await store.list({ prefix });
+  const artifacts = await Promise.all(
+    result.blobs.map(async (blob) => {
+      const text = await store.get(blob.key);
+
+      if (!text) return undefined;
+
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        return undefined;
+      }
+    })
+  );
+
+  return toolResult({ artifacts: artifacts.filter((artifact) => artifact !== undefined) });
 };
 
 const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
@@ -815,6 +942,31 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
+    case 'save_artifact':
+      return callArtifactUpload(event, {
+        requestId: input.requestId,
+        artifactKind: input.artifactKind,
+        contentType: input.contentType,
+        filename: input.filename,
+        encoding: input.encoding,
+        payload: input.payload,
+        metadata: input.metadata,
+      });
+    case 'save_artifact_chunk':
+      return callArtifactUpload(event, {
+        requestId: input.requestId,
+        artifactKind: input.artifactKind,
+        contentType: input.contentType,
+        filename: input.filename,
+        clientUploadId: input.clientUploadId,
+        chunkIndex: input.chunkIndex,
+        totalChunks: input.totalChunks,
+        encoding: input.encoding,
+        payload: input.payload,
+        metadata: input.metadata,
+      });
+    case 'list_artifacts_for_request':
+      return listArtifactsForRequest(event, input.requestId);
     case 'save_json_blob_patch_agent_output':
       return callNormalizedAction(
         event,
