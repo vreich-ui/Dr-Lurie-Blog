@@ -52,10 +52,16 @@ const metadata = {
                     Paste article JSON or upload a single <code>.json</code> file to populate this form.
                   </p>
                 </div>
-                <label class="json-upload-button" for="json-upload">
-                  <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
-                  <span>Upload JSON</span>
-                </label>
+                <div class="json-import-toolbar" aria-label="JSON import options">
+                  <button id="open-json-drafts" class="json-upload-button" type="button">
+                    <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
+                    <span>Open JSON</span>
+                  </button>
+                  <label class="json-upload-button" for="json-upload">
+                    <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
+                    <span>Upload JSON</span>
+                  </label>
+                </div>
                 <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
               </div>
               <textarea
@@ -83,6 +89,28 @@ const metadata = {
                 <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
               </div>
               <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+              <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
+                <div class="json-draft-modal-card">
+                  <div class="json-draft-modal-header">
+                    <div>
+                      <p class="sidebar-kicker">Saved JSON</p>
+                      <h3 id="json-draft-modal-heading">Open JSON from Blobs</h3>
+                    </div>
+                    <button
+                      id="json-draft-modal-close"
+                      class="module-icon-button"
+                      type="button"
+                      aria-label="Close saved JSON dialog"
+                    >
+                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
+                    Select a saved JSON draft to load into the Import JSON module.
+                  </p>
+                  <div id="json-draft-list" class="json-draft-list"></div>
+                </div>
+              </dialog>
             </div>
 
             <div class="field">
@@ -242,13 +270,7 @@ const metadata = {
       <aside class="publish-sidebar" aria-labelledby="publish-output-heading">
         <section class="admin-card admin-panel readiness-card">
           <p class="sidebar-kicker">Readiness & Actions</p>
-          <div class="module-heading-row">
-            <h2 id="publish-output-heading">Content output</h2>
-            <a class="module-icon-button" href="/admin/drafts" aria-label="Open draft list" title="Open draft list">
-              <Icon name="tabler:files" class="module-action-icon" aria-hidden="true" />
-              <span class="sr-only">Open draft list</span>
-            </a>
-          </div>
+          <h2 id="publish-output-heading">Content output</h2>
 
           <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
             <h3 id="publish-checklist-heading">Readiness checklist</h3>
@@ -460,6 +482,16 @@ const metadata = {
     margin-bottom: 0.85rem;
   }
 
+  .json-import-toolbar {
+    display: grid;
+    min-width: 9rem;
+    gap: 0.6rem;
+  }
+
+  .json-import-toolbar .json-upload-button {
+    width: 100%;
+  }
+
   .json-import-card h2 {
     margin: 0;
     color: var(--aw-color-text-heading);
@@ -558,6 +590,121 @@ const metadata = {
 
   .json-import-status.is-success {
     color: var(--aw-color-secondary);
+  }
+
+  .json-draft-modal {
+    width: min(92vw, 680px);
+    max-height: min(82vh, 720px);
+    border: 0;
+    border-radius: 1.35rem;
+    padding: 0;
+    background: transparent;
+    color: var(--aw-color-text-default);
+  }
+
+  .json-draft-modal::backdrop {
+    background: rgb(15 23 42 / 54%);
+    backdrop-filter: blur(3px);
+  }
+
+  .json-draft-modal-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.35rem;
+    padding: 1.1rem;
+    background: var(--aw-color-bg-page);
+    box-shadow: 0 1.5rem 5rem rgb(15 23 42 / 24%);
+  }
+
+  :global(.dark) .json-draft-modal-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42);
+  }
+
+  .json-draft-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .json-draft-modal-header h3 {
+    margin: 0.1rem 0 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1.35rem;
+    font-weight: 800;
+  }
+
+  .json-draft-modal-status {
+    margin: 0 0 0.85rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.93rem;
+    font-weight: 700;
+  }
+
+  .json-draft-modal-status.is-error {
+    color: var(--aw-color-accent);
+  }
+
+  .json-draft-list {
+    display: grid;
+    gap: 0.65rem;
+    max-height: 52vh;
+    overflow: auto;
+    padding-right: 0.2rem;
+  }
+
+  :global(.json-draft-choice) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.85rem;
+    background: var(--aw-color-bg-surface);
+    color: inherit;
+    text-align: left;
+  }
+
+  :global(.json-draft-choice:hover),
+  :global(.json-draft-choice:focus-visible) {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 3px rgb(94 140 138 / 14%);
+    outline: none;
+  }
+
+  :global(.json-draft-choice-title) {
+    display: block;
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  :global(.json-draft-choice-meta) {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.84rem;
+    overflow-wrap: anywhere;
+  }
+
+  :global(.json-draft-empty) {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.93rem;
+  }
+
+  :global(.json-draft-choice-icon) {
+    width: 1.05rem;
+    height: 1.05rem;
+    color: var(--aw-color-text-muted);
+  }
+
+  :global(.json-draft-choice:hover .json-draft-choice-icon),
+  :global(.json-draft-choice:focus-visible .json-draft-choice-icon) {
+    color: var(--aw-color-accent);
   }
 
   .visually-hidden {
@@ -1165,10 +1312,23 @@ const metadata = {
       flex-direction: column;
     }
 
+    .json-import-toolbar {
+      grid-template-columns: 1fr;
+      width: 100%;
+    }
+
     .json-upload-button,
     .image-upload-button,
     .json-import-actions > button {
       width: 100%;
+    }
+
+    .json-draft-modal {
+      width: min(94vw, 680px);
+    }
+
+    :global(.json-draft-choice) {
+      grid-template-columns: minmax(0, 1fr) auto;
     }
 
     .actions > button,
@@ -1203,9 +1363,14 @@ const metadata = {
       tags: document.querySelector('#tags'),
       sources: document.querySelector('#sources'),
       jsonImport: document.querySelector('#json-import'),
+      openJsonDrafts: document.querySelector('#open-json-drafts'),
       jsonUpload: document.querySelector('#json-upload'),
       jsonUploadName: document.querySelector('#json-upload-name'),
       jsonImportStatus: document.querySelector('#json-import-status'),
+      jsonDraftModal: document.querySelector('#json-draft-modal'),
+      jsonDraftModalClose: document.querySelector('#json-draft-modal-close'),
+      jsonDraftModalStatus: document.querySelector('#json-draft-modal-status'),
+      jsonDraftList: document.querySelector('#json-draft-list'),
       loadJson: document.querySelector('#load-json'),
       draft: document.querySelector('#draft'),
       content: document.querySelector('#content'),
@@ -1717,6 +1882,14 @@ const metadata = {
           record_version: 1,
         },
       };
+    };
+
+    const syncJsonImportFromCurrentForm = (message = '') => {
+      const importJson = JSON.stringify(buildContentSourceDraft(), null, 2);
+      fields.jsonImport.value = importJson;
+      lastLoadedJsonImportValue = importJson.trim();
+      updateJsonImportButtonState();
+      if (message) setJsonImportStatus(message);
     };
 
     const setStatus = (message, autoClear = true) => {
@@ -2276,6 +2449,7 @@ const metadata = {
       }
       updatePreview();
       updatePublishOutput();
+      syncJsonImportFromCurrentForm('Existing article JSON loaded into the Import JSON module.');
       updatePublishButtonState();
       updateSaveDraftButtonState();
     };
@@ -2785,6 +2959,53 @@ const metadata = {
 
     const getQueryDraftId = () => new URLSearchParams(window.location.search).get('draftId')?.trim() || '';
 
+    const formatJsonDraftDate = (value) => {
+      if (!value) return 'No updated date';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return new Intl.DateTimeFormat(undefined, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(date);
+    };
+
+    const fetchJsonDraftInput = async (draftId, token) => {
+      const response = await fetch(`/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
+      }
+
+      const draftInput = result.input || result.draft?.input;
+      if (!draftInput) throw new Error('Draft response did not include JSON input.');
+
+      return { draftInput, result };
+    };
+
+    const applyBlobDraftInput = async (draftId, draftInput, result = {}) => {
+      sessionStorage.setItem('dr-lurie-workflow-request-id', draftId);
+      if (result.lock_token || result.lockToken) {
+        sessionStorage.setItem('dr-lurie-workflow-lock-token', result.lock_token || result.lockToken);
+      }
+
+      const loaded = await loadJsonImport(JSON.stringify(draftInput, null, 2), { alertOnError: false });
+      if (!loaded) return false;
+
+      lastSavedDraftId = draftId;
+      setUnsavedChanges(false);
+      return true;
+    };
+
     const loadDraftFromBlobs = async (clerk) => {
       const draftId = getQueryDraftId();
       if (!draftId) return false;
@@ -2795,35 +3016,10 @@ const metadata = {
         const token = await clerk.session.getToken();
         if (!token) throw new Error('Could not retrieve a Clerk session token.');
 
-        const response = await fetch(
-          `/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-        const result = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
-        }
-
-        const draftInput = result.input || result.draft?.input;
-        if (!draftInput) throw new Error('Draft response did not include JSON input.');
-
-        sessionStorage.setItem('dr-lurie-workflow-request-id', draftId);
-        if (result.lock_token || result.lockToken) {
-          sessionStorage.setItem('dr-lurie-workflow-lock-token', result.lock_token || result.lockToken);
-        }
-
-        const loaded = await loadJsonImport(JSON.stringify(draftInput, null, 2), { alertOnError: false });
+        const { draftInput, result } = await fetchJsonDraftInput(draftId, token);
+        const loaded = await applyBlobDraftInput(draftId, draftInput, result);
         if (!loaded) return false;
 
-        lastSavedDraftId = draftId;
-        setUnsavedChanges(false);
         setStatus(`Loaded draft ${draftId}.`, true);
         return true;
       } catch (error) {
@@ -2833,6 +3029,114 @@ const metadata = {
           false
         );
         return false;
+      }
+    };
+
+    const setJsonDraftModalStatus = (message, isError = false) => {
+      fields.jsonDraftModalStatus.textContent = message;
+      fields.jsonDraftModalStatus.classList.toggle('is-error', isError);
+    };
+
+    const closeJsonDraftModal = () => {
+      if (fields.jsonDraftModal?.close) {
+        fields.jsonDraftModal.close();
+      } else {
+        fields.jsonDraftModal?.removeAttribute('open');
+      }
+    };
+
+    const renderJsonDraftChoices = (drafts) => {
+      if (!drafts.length) {
+        fields.jsonDraftList.innerHTML = '<p class="json-draft-empty">No saved JSON drafts were found.</p>';
+        return;
+      }
+
+      fields.jsonDraftList.innerHTML = drafts
+        .map((draft) => {
+          const id = draft.id || draft.key || draft.request_id || '';
+          const title = draft.title || 'Untitled JSON draft';
+          const slug = draft.slug || 'no-slug';
+          const author = draft.author || 'unknown author';
+          const updatedAt = formatJsonDraftDate(draft.updatedAt || draft.updated_at || draft.modifiedAt);
+
+          return `<button class="json-draft-choice" type="button" data-draft-id="${escapeHtml(id)}">
+            <span>
+              <span class="json-draft-choice-title">${escapeHtml(title)}</span>
+              <span class="json-draft-choice-meta">${escapeHtml(slug)} · ${escapeHtml(author)} · ${escapeHtml(updatedAt)}</span>
+            </span>
+            <span class="json-draft-choice-icon" aria-hidden="true">↗</span>
+          </button>`;
+        })
+        .join('');
+    };
+
+    const loadJsonDraftChoices = async () => {
+      fields.jsonDraftList.innerHTML = '';
+      setJsonDraftModalStatus('Loading saved JSON drafts…');
+
+      try {
+        const token = await getClerkSessionToken();
+        const response = await fetch('/.netlify/functions/admin-list-json-drafts', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok)
+          throw new Error(result.error || `Saved JSON drafts could not be listed (${response.status}).`);
+
+        const drafts = Array.isArray(result.drafts) ? result.drafts : [];
+        renderJsonDraftChoices(drafts);
+        setJsonDraftModalStatus(
+          drafts.length
+            ? 'Select a saved JSON draft to load into the Import JSON module.'
+            : 'No saved JSON drafts were found.'
+        );
+      } catch (error) {
+        console.error('Saved JSON draft list failed.', error);
+        setJsonDraftModalStatus(
+          error instanceof Error ? error.message : 'Saved JSON drafts could not be listed.',
+          true
+        );
+      }
+    };
+
+    const openJsonDraftModal = () => {
+      if (fields.jsonDraftModal?.showModal) {
+        fields.jsonDraftModal.showModal();
+      } else {
+        fields.jsonDraftModal?.setAttribute('open', '');
+      }
+      loadJsonDraftChoices();
+    };
+
+    const loadSelectedJsonDraft = async (draftId) => {
+      if (!draftId) return;
+      if (hasUnsavedChanges) {
+        const replaceDraft = window.confirm(
+          'Open this saved JSON draft? Unsaved changes in the form will be replaced.'
+        );
+        if (!replaceDraft) return;
+      }
+
+      setJsonDraftModalStatus(`Opening ${draftId}…`);
+
+      try {
+        const token = await getClerkSessionToken();
+        const { draftInput, result } = await fetchJsonDraftInput(draftId, token);
+        const loaded = await applyBlobDraftInput(draftId, draftInput, result);
+        if (!loaded) throw new Error('Saved JSON draft could not be applied to the form.');
+
+        fields.jsonUploadName.textContent = draftId;
+        setJsonImportStatus(`Opened saved JSON ${draftId}.`);
+        setStatus(`Opened saved JSON ${draftId}.`, true);
+        closeJsonDraftModal();
+      } catch (error) {
+        console.error('Saved JSON draft open failed.', error);
+        setJsonDraftModalStatus(error instanceof Error ? error.message : 'Saved JSON draft could not be opened.', true);
       }
     };
 
@@ -2874,6 +3178,18 @@ const metadata = {
 
     fields.loadJson.addEventListener('click', () => {
       loadJsonImport();
+    });
+
+    fields.openJsonDrafts.addEventListener('click', openJsonDraftModal);
+    fields.jsonDraftModalClose.addEventListener('click', closeJsonDraftModal);
+    fields.jsonDraftList.addEventListener('click', (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const choice = target?.closest('[data-draft-id]');
+      if (!choice) return;
+      loadSelectedJsonDraft(choice.dataset.draftId || '');
+    });
+    fields.jsonDraftModal.addEventListener('click', (event) => {
+      if (event.target === fields.jsonDraftModal) closeJsonDraftModal();
     });
 
     fields.imageUpload.addEventListener('change', () => {
