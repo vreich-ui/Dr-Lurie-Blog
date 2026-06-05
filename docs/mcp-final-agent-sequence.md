@@ -8,9 +8,9 @@ This separation keeps publication credentials in server-only runtimes, avoids ad
 
 ## Final-agent sequence
 
-1. **Validate final article output.** The final agent must verify that the final article has a destination `slug`, a `title`, and one article body field (`markdown` preferred, `content` acceptable). It should also validate optional metadata such as `publishDate`, `author`, `tags`, images, SEO/excerpt fields, and overwrite intent before publishing or handoff.
-2. **Produce `publication.publish_payload`.** Store the normalized payload on the workflow input at `publication.publish_payload` (or include an equivalent final article output for the server-side handoff). Use this shape as the source of truth for the publish step.
-3. **Publish or hand off.** MCP does not publish directly. A trusted server-side process may read `record.input.publication.publish_payload` or the final article output, validate it again, invoke the existing publishing endpoint with server-only credentials, and return commit/deploy metadata. If publishing is handled outside the agent runtime, hand off the payload and wait for the same metadata.
+1. **Validate final article output.** The final agent must verify that the final article has a destination `slug`, a `title`, and one article body field (`markdown` preferred, `content` acceptable). It should also validate optional metadata such as `publishDate`, `author`, `tags`, images, `artifactReferences`, SEO/excerpt fields, and overwrite intent before publishing or handoff.
+2. **Produce `publication.publish_payload`.** Store the normalized payload on the workflow input at `publication.publish_payload` (or include an equivalent final article output for the server-side handoff). Include `artifactReferences` for uploaded artifacts and/or `mediaEntries` for existing base64 media. Use this shape as the source of truth for the publish step.
+3. **Re-fetch artifact state, then publish or hand off.** MCP does not publish directly. Before publication, re-fetch the current workflow/request state and use the latest immutable `ArtifactReference` objects; do not publish with stale, guessed, or model-generated blob keys. A trusted server-side process may read `record.input.publication.publish_payload` or the final article output, validate it again, resolve `artifactReferences` to media bytes in the existing publishing endpoint with server-only credentials, and return commit/deploy metadata. If publishing is handled outside the agent runtime, hand off the payload and wait for the same metadata.
 4. **Mark published.** With the workflow lock still held, call `save_json_blob_mark_published` with `request_id`, `lock_token`, and `commit_metadata`. The tool forwards `mark_published` to `save-json-blob.ts` and returns the updated workflow record with `workflow_status: "published"`.
 5. **Check in.** Release the workflow lock with `save_json_blob_checkin_request` after the record is marked published.
 
@@ -21,6 +21,16 @@ This separation keeps publication credentials in server-only runtimes, avoids ad
 - `commit_metadata`: publication result details such as commit SHA, commit URL, article path, deploy status, and a human-readable message.
 
 The mark-published step records publication state only. It must not accept, request, display, or return server publish credentials.
+
+## Artifact handling rules
+
+- When agents generate images, binaries, or other artifacts, call `save_artifact` immediately; use `save_artifact_chunk` when the payload is too large for one tool call.
+- Store the returned `ArtifactReference` in MCP workflow state or the relevant agent output. Persist the whole reference, not just a URL or filename.
+- Never construct deterministic artifact keys in the model. The artifact tool is authoritative for `blobKey`, checksum, size, content type, and creation timestamp.
+- Treat `ArtifactReference` as immutable. Regeneration means a new upload and a new reference.
+- On upload or network failure, retry the same payload/chunk and rely on checksum deduplication; do not create alternate handles manually.
+- Before publishing, re-fetch the current request state and pass `artifactReferences` to the publishing payload. The `publish-article` function resolves artifact references to base64 media entries before committing to GitHub.
+- Agents must never ask for or transmit Netlify/GitHub credentials; upload and publish tools use server-side configuration only.
 
 ## Agent output envelope examples
 
@@ -122,7 +132,8 @@ Each agent should patch its stage output with `save_json_blob_patch_agent_output
         "slug": "example-article",
         "title": "Example Article",
         "markdown": "---\ntitle: Example\n---\n\nFinal body...",
-        "tags": ["skin-health"]
+        "tags": ["skin-health"],
+        "artifactReferences": []
       }
     },
     "validation": {

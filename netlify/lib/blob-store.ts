@@ -1,9 +1,19 @@
-import { createLocalBlobStore, type LocalBlobStore } from './local-blobs.js';
+import { createLocalBlobStore, type LocalBlobStore, type LocalBlobValue } from './local-blobs.js';
 
 type BlobMetadata = Record<string, string>;
+type BlobSetOptions = { metadata?: BlobMetadata; onlyIfNew?: boolean };
 
-type BlobStore = LocalBlobStore & {
-  setJSON: (key: string, value: unknown, options?: { metadata?: BlobMetadata }) => Promise<void>;
+type BlobStore = Omit<LocalBlobStore, 'set' | 'setJSON'> & {
+  set: (
+    key: string,
+    value: LocalBlobValue,
+    options?: BlobSetOptions
+  ) => Promise<void | { modified: boolean; etag?: string }>;
+  setJSON: (
+    key: string,
+    value: unknown,
+    options?: BlobSetOptions
+  ) => Promise<void | { modified: boolean; etag?: string }>;
 };
 
 type BlobsModule = {
@@ -40,30 +50,32 @@ const loadNetlifyBlobs = async (event: unknown) => {
   );
 };
 
-export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> => {
+export const getNetlifyBlobStore = async (storeName: string, event: unknown): Promise<BlobStore> => {
   const netlifyBlobs = await loadNetlifyBlobs(event);
 
   if (netlifyBlobs) {
     if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
-    return netlifyBlobs.getStore('workflows');
+    return netlifyBlobs.getStore(storeName);
   }
 
-  console.log('Using local file-backed workflow blob store because @netlify/blobs is unavailable.');
+  console.warn(`Using local file-backed ${storeName} blob store because @netlify/blobs is unavailable.`);
 
-  return createLocalBlobStore('workflows');
+  return createLocalBlobStore(storeName);
+};
+
+export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore('workflows', event);
 };
 
 export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
-  const netlifyBlobs = await loadNetlifyBlobs(event);
+  return getNetlifyBlobStore('opt-ins', event);
+};
 
-  if (netlifyBlobs) {
-    if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
+export const getArtifactBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore('artifacts', event);
+};
 
-    return netlifyBlobs.getStore('opt-ins');
-  }
-
-  console.warn('Using local file-backed opt-in blob store because @netlify/blobs is unavailable.');
-
-  return createLocalBlobStore('opt-ins');
+export const getArtifactIndexBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore('artifact-index', event);
 };

@@ -10,6 +10,15 @@
 - If ChatGPT reports `No tool was defined under the given paths`, verify the deployed `/mcp` route first with `initialize` and `tools/list` JSON-RPC requests before changing tool names or schemas.
 - Do not expose `NETLIFY_PUBLISH_SECRET` or `PUBLISH_SECRET` to browser code, tool schemas, prompts, or checked-in client configuration. MCP tool calls must use server-side environment variables only.
 
+## Agent artifact workflow rules
+
+- When an agent generates artifacts (images, audio, video, binary files, or markdown files), it must call `save_artifact` immediately, or `save_artifact_chunk` for large payloads, and store the returned `ArtifactReference`/`blobKey` in MCP request state or the relevant agent output.
+- Agents must never attempt to generate deterministic artifact blob keys themselves. Let the artifact tool return `blobKey`, `sha256`, size, content type, and timestamp.
+- Treat every `ArtifactReference` as immutable. If an artifact must be regenerated, upload it again and use the newly returned reference.
+- If an artifact upload tool call fails or times out, retry the exact same upload/chunk call and rely on checksum deduplication instead of inventing a new handle.
+- Before publishing, re-fetch the workflow/request state and use the current `artifactReferences` returned from MCP. Publishing payloads may include `mediaEntries` (existing base64) and/or `artifactReferences`; do not publish until artifact references are present and resolvable by the server-side publishing path.
+- Do not ask users for, display, or pass Netlify/GitHub publishing credentials. Artifact upload, artifact resolution, and publication use server-side environment variables only.
+
 ## /shop mobile layout rule
 
 - Treat `/shop` as the redirected `/solutions/shop-preview` page unless the route changes.

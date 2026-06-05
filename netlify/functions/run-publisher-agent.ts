@@ -32,6 +32,7 @@ type PublisherRequest = {
   action?: unknown;
   articleIdea?: unknown;
   images?: unknown;
+  artifactReferences?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
   publishSecret?: unknown;
@@ -41,6 +42,7 @@ type PublisherRequest = {
 
 type NormalizedPublisherRequest = {
   images: PublishImageInput[];
+  artifactReferences: unknown[];
   markdown: string;
   overwrite: boolean;
   slug: string;
@@ -94,6 +96,7 @@ const publishToolInputSchema = z
     author: z.string().trim().min(1).optional(),
     tags: z.array(z.string().trim().min(1)).optional(),
     images: z.array(publishImageSchema).optional(),
+    artifactReferences: z.array(z.unknown()).optional(),
     overwrite: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
@@ -260,6 +263,7 @@ const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest =
 
   return {
     images: normalizeImages(input.images),
+    artifactReferences: Array.isArray(input.artifactReferences) ? input.artifactReferences : [],
     markdown: markdown ?? '',
     overwrite: toBooleanValue(input.overwrite),
     slug: slug ?? '',
@@ -295,6 +299,7 @@ const createPublishTool = ({
       const title = toStringValue(parsed.title) ?? defaultInput.title;
       const articlePath = `${repoContentRoot}/${slug}.md`;
       const normalizedImages = normalizeImages(parsed.images ?? defaultInput.images);
+      const artifactReferences = parsed.artifactReferences ?? defaultInput.artifactReferences;
       const payload = {
         slug,
         articlePath,
@@ -306,6 +311,7 @@ const createPublishTool = ({
         tags: parsed.tags,
         title,
         images: normalizedImages.length ? normalizedImages : [],
+        artifactReferences,
         commitMessage: `Publish article: ${title}`,
         overwrite: parsed.overwrite ?? defaultInput.overwrite,
       };
@@ -370,7 +376,9 @@ export const createPublisherAgent = ({
     instructions: [
       'You run server-side publishing for already-approved Dr. Lurié article data.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',
-      'Call publish_approved_article once with the approved fields exactly as provided.',
+      'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences when present.',
+      'Do not invent blob keys or credentials; artifact references must already come from server-side artifact tools.',
+      'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
     ].join('\n'),
     tools: [createPublishTool({ endpoint, defaultInput, publishSecret, onPublishResult })],

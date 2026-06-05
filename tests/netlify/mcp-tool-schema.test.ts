@@ -218,3 +218,58 @@ test('save_json_blob_mark_published exposes only workflow-state inputs', async (
   assert.equal(serializedSchema.includes('NETLIFY_PUBLISH_SECRET'), false);
   assert.equal(serializedSchema.includes('PUBLISH_SECRET'), false);
 });
+
+test('artifact MCP tools are registered with precise byte-vs-metadata descriptions', async () => {
+  const body = await listTools();
+  const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
+
+  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+    assert.ok(tools.has(name), `Expected ${name} to be registered.`);
+  }
+
+  const saveArtifact = tools.get('save_artifact')!;
+  assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
+  assert.ok(property(saveArtifact.inputSchema, 'payload'));
+  assert.ok(property(saveArtifact.inputSchema, 'metadata'));
+  assert.match(String((saveArtifact as { description?: string }).description), /Writes final artifact bytes/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /ArtifactReference index/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /dedup is success/i);
+
+  const saveChunk = tools.get('save_artifact_chunk')!;
+  assert.deepEqual(saveChunk.inputSchema.required, [
+    'requestId',
+    'artifactKind',
+    'contentType',
+    'clientUploadId',
+    'chunkIndex',
+    'totalChunks',
+    'payload',
+  ]);
+  assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
+  assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
+  assert.ok(property(saveChunk.inputSchema, 'totalChunks'));
+  assert.match(String((saveChunk as { description?: string }).description), /Writes one chunk blob/i);
+  assert.match(String((saveChunk as { description?: string }).description), /assembles final artifact bytes/i);
+  assert.match(String((saveChunk as { description?: string }).description), /complete=false/i);
+  assert.match(String((saveChunk as { description?: string }).description), /dedup is success/i);
+
+  const listArtifacts = tools.get('list_artifacts_for_request')!;
+  assert.deepEqual(listArtifacts.inputSchema.required, ['requestId']);
+  assert.match(
+    String((listArtifacts as { description?: string }).description),
+    /Reads the request artifact index only/i
+  );
+  assert.match(
+    String((listArtifacts as { description?: string }).description),
+    /does not read or write artifact bytes/i
+  );
+
+  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+    const serialized = JSON.stringify(tools.get(name));
+
+    assert.equal(serialized.includes('NETLIFY_PUBLISH_SECRET'), false);
+    assert.equal(serialized.includes('PUBLISH_SECRET'), false);
+    assert.equal(serialized.includes('secret'), false);
+    assert.equal(serialized.includes('credential'), false);
+  }
+});

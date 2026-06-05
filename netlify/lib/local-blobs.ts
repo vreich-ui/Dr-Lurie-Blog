@@ -7,8 +7,10 @@ const toPath = (storeName: string, key: string) => join(localBlobsRoot, storeNam
 
 const toBlobKey = (storeRoot: string, filePath: string) => relative(storeRoot, filePath).split(sep).join('/');
 
+export type LocalBlobValue = string | Buffer | Uint8Array | ArrayBuffer;
+
 export type LocalBlobStore = {
-  set: (key: string, value: string) => Promise<void>;
+  set: (key: string, value: LocalBlobValue) => Promise<void>;
   get: (key: string) => Promise<string | null>;
   del: (key: string) => Promise<void>;
   setJSON: (key: string, value: unknown) => Promise<void>;
@@ -31,7 +33,12 @@ const listFiles = async (current: string): Promise<string[]> => {
 
     return files.flat();
   } catch (error) {
-    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error.code === 'ENOENT' || error.code === 'ENOTDIR')
+    ) {
       return [];
     }
 
@@ -41,26 +48,37 @@ const listFiles = async (current: string): Promise<string[]> => {
 
 export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
   const storeRoot = join(localBlobsRoot, storeName);
+  const getBlob = async (key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) => {
+    try {
+      if (options?.type === 'buffer') {
+        return await readFile(toPath(storeName, key));
+      }
+
+      if (options?.type === 'arrayBuffer') {
+        const bytes = await readFile(toPath(storeName, key));
+
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      return await readFile(toPath(storeName, key), 'utf8');
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        return null;
+      }
+
+      throw error;
+    }
+  };
 
   return {
     async set(key, value) {
       const filePath = toPath(storeName, key);
 
       await mkdir(dirname(filePath), { recursive: true });
-      await writeFile(filePath, value, 'utf8');
+      await writeFile(filePath, typeof value === 'string' ? value : new Uint8Array(value));
     },
 
-    async get(key) {
-      try {
-        return await readFile(toPath(storeName, key), 'utf8');
-      } catch (error) {
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-          return null;
-        }
-
-        throw error;
-      }
-    },
+    get: getBlob as LocalBlobStore['get'],
 
     async del(key) {
       await rm(toPath(storeName, key), { force: true });

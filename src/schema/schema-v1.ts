@@ -36,6 +36,8 @@ export type PublishPayload = {
   author?: string;
   tags?: string[];
   images?: unknown[];
+  mediaEntries?: unknown[];
+  artifactReferences?: unknown[];
   overwrite?: boolean;
   draft?: boolean;
   articlePath?: string;
@@ -319,6 +321,8 @@ const publishPayloadSchema = z
     author: z.string().optional(),
     tags: z.array(z.string()).optional(),
     images: z.array(z.unknown()).optional(),
+    mediaEntries: z.array(z.unknown()).optional(),
+    artifactReferences: z.array(z.unknown()).optional(),
     overwrite: z.boolean().optional(),
     draft: z.boolean().optional(),
     articlePath: z.string().optional(),

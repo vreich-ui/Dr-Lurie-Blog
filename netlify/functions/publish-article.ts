@@ -1,6 +1,8 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
+import { type ArtifactReference } from '../lib/artifacts.js';
+import { getArtifactBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -49,6 +51,22 @@ type AgentImageInput = {
   type?: unknown;
 };
 
+type PublishMediaEntryInput = {
+  base64?: unknown;
+  content?: unknown;
+  displayPath?: unknown;
+  encoding?: unknown;
+  name?: unknown;
+  path?: unknown;
+  repoPath?: unknown;
+  type?: unknown;
+};
+
+type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
+type BinaryReadableArtifactBlobStore = Omit<ArtifactBlobStore, 'get'> & {
+  get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | ArrayBuffer | string | null>;
+};
+
 type PublishInput = {
   articlePath?: unknown;
   author?: unknown;
@@ -62,6 +80,9 @@ type PublishInput = {
   featuredImage?: unknown;
   existingFeaturedImagePath?: unknown;
   images?: unknown;
+  mediaEntries?: unknown;
+  artifactReferences?: unknown;
+  requestId?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
   publishDate?: unknown;
@@ -164,6 +185,88 @@ const isValidUploadedImagePath = (path: string) => {
 const isValidImagePath = (path: string, slug: string) => {
   const prefix = `${uploadRoot}/${slug}/`;
   return isValidUploadedImagePath(path) && path.startsWith(prefix) && path.length > prefix.length;
+};
+
+const extensionForContentType = (contentType: string) => {
+  const normalized = contentType.toLowerCase().split(';')[0]?.trim();
+  const extensionMap: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/jpg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'image/svg+xml': '.svg',
+    'audio/mpeg': '.mp3',
+    'audio/mp3': '.mp3',
+    'audio/wav': '.wav',
+    'video/mp4': '.mp4',
+    'text/markdown': '.md',
+  };
+
+  return normalized ? (extensionMap[normalized] ?? '.bin') : '.bin';
+};
+
+const isValidArtifactBlobKey = (blobKey: string) => {
+  return Boolean(normalizeRepoPath(blobKey) && !blobKey.startsWith('../') && !blobKey.includes('..'));
+};
+
+const isValidSha256Hex = (value: string) => /^[a-f0-9]{64}$/i.test(value);
+
+const getArtifactRequestId = (reference: ArtifactReference, fallback: string) => {
+  const metadataRequestId = toStringValue(reference.metadata?.requestId);
+  if (metadataRequestId) return metadataRequestId;
+
+  const [, requestId] = reference.blobKey.split('/');
+  return requestId || fallback;
+};
+
+const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: string) => {
+  const metadataFilename = toStringValue(reference.metadata?.filename);
+  const filename = metadataFilename ? sanitizeFilename(metadataFilename) : undefined;
+
+  if (filename) return filename;
+
+  const requestId = sanitizeFilename(getArtifactRequestId(reference, fallbackRequestId)) ?? fallbackRequestId;
+  const derivedFilename = sanitizeFilename(
+    `${requestId}-${reference.sha256}${extensionForContentType(reference.contentType)}`
+  );
+
+  if (!derivedFilename) {
+    throw new PublishError(400, `Artifact reference has an invalid sha256: ${reference.sha256}`);
+  }
+
+  return derivedFilename;
+};
+
+const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((reference): reference is ArtifactReference => {
+    if (!reference || typeof reference !== 'object') return false;
+
+    const candidate = reference as Partial<ArtifactReference>;
+    return Boolean(
+      toStringValue(candidate.blobKey) &&
+        isValidArtifactBlobKey(toStringValue(candidate.blobKey) ?? '') &&
+        typeof candidate.sizeBytes === 'number' &&
+        toStringValue(candidate.sha256) &&
+        isValidSha256Hex(toStringValue(candidate.sha256) ?? '') &&
+        toStringValue(candidate.contentType) &&
+        toStringValue(candidate.createdAtISO)
+    );
+  });
+};
+
+const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string) => {
+  const binaryStore = store as BinaryReadableArtifactBlobStore;
+  const bytes = await binaryStore.get(blobKey, { type: 'buffer' });
+
+  if (bytes === null) return undefined;
+  if (Buffer.isBuffer(bytes)) return bytes;
+  if (bytes instanceof ArrayBuffer) return Buffer.from(bytes);
+  if (typeof bytes === 'string') return Buffer.from(bytes, 'binary');
+
+  return undefined;
 };
 
 const normalizeExistingFeaturedImagePath = (value: unknown) => {
@@ -363,7 +466,7 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const getMediaEntries = (input: PublishInput, slug: string): MediaEntry[] => {
+const getMediaEntries = async (event: LambdaEvent, input: PublishInput, slug: string): Promise<MediaEntry[]> => {
   const files = Array.isArray(input.files) ? (input.files as PublishFile[]) : [];
   const uploadedFiles = files
     .map((file) => ({
@@ -415,7 +518,61 @@ const getMediaEntries = (input: PublishInput, slug: string): MediaEntry[] => {
     };
   });
 
-  return [...adminEntries, ...agentEntries];
+  const mediaEntryInputs = Array.isArray(input.mediaEntries) ? (input.mediaEntries as PublishMediaEntryInput[]) : [];
+  const directMediaEntries = mediaEntryInputs.map((entry) => {
+    const repoPath = toStringValue(entry.repoPath) ?? toStringValue(entry.path);
+    const filename = toStringValue(entry.name);
+    const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
+    const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
+
+    if (!path || !isValidImagePath(path, slug)) {
+      throw new PublishError(
+        403,
+        `mediaEntries repoPath/path values must be under ${uploadRoot}/${slug}/ and include a filename.`
+      );
+    }
+
+    const content = toStringValue(entry.base64) ?? toStringValue(entry.content);
+
+    if (!content) {
+      throw new PublishError(400, `Media entry content is required for ${path}.`);
+    }
+
+    return {
+      content,
+      displayPath: path.replace(`${uploadRoot}/`, '~/assets/images/uploads/'),
+      encoding: toStringValue(entry.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+      path,
+    };
+  });
+
+  const artifactReferences = normalizeArtifactReferences(input.artifactReferences);
+  const artifactStore = artifactReferences.length ? await getArtifactBlobStore(event) : undefined;
+  const fallbackRequestId = toStringValue(input.requestId) ?? slug;
+  const artifactEntries = await Promise.all(
+    artifactReferences.map(async (reference) => {
+      if (!artifactStore) {
+        throw new PublishError(500, 'Artifact blob store is not available.');
+      }
+
+      const bytes = await readArtifactBytes(artifactStore, reference.blobKey);
+
+      if (!bytes) {
+        throw new PublishError(404, `Artifact blob not found: ${reference.blobKey}`);
+      }
+
+      const filename = getArtifactFilename(reference, fallbackRequestId);
+
+      return {
+        content: bytes.toString('base64'),
+        displayPath: `~/assets/images/uploads/${slug}/${filename}`,
+        encoding: 'base64' as const,
+        path: `${uploadRoot}/${slug}/${filename}`,
+      };
+    })
+  );
+
+  return [...adminEntries, ...agentEntries, ...directMediaEntries, ...artifactEntries];
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -501,7 +658,7 @@ export const handler = async (event: LambdaEvent) => {
       });
     }
 
-    const mediaEntries = getMediaEntries(input, slug);
+    const mediaEntries = await getMediaEntries(event, input, slug);
     publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
     const selectedFeatured = featuredImage ? sanitizeFilename(featuredImage) : undefined;
