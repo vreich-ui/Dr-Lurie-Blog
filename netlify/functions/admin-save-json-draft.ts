@@ -18,6 +18,10 @@ const jsonHeaders = {
 };
 
 const draftError = 'Title, slug, and author are required to save JSON draft.';
+const missingLockTokenMessage = 'lock_token is required to update a checked-out draft.';
+const lockExpiredMessage = 'The workflow lock has expired. Check out the draft again and retry.';
+const lockMismatchMessage = 'The provided lock_token does not match the active workflow lock.';
+const notFoundMessage = 'Workflow record was not found.';
 const draftWorkflowStatuses = new Set<WorkflowStatus>(['pending', 'in_progress']);
 
 type LambdaEvent = {
@@ -167,12 +171,40 @@ const getLockExpirationMs = (expiresAt: string) => {
   return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
 };
 
-const validateActiveLock = (record: WorkflowRecord, lockToken: string | undefined) => {
-  if (!lockToken) return jsonResponse(400, { error: 'lock_token is required to update a checked-out draft.' });
-  if (!record.lock || getLockExpirationMs(record.lock.expires_at) <= Date.now()) {
-    return jsonResponse(423, { error: 'lock_expired', lock_expired: true });
-  }
-  if (record.lock.token !== lockToken) return jsonResponse(423, { error: 'lock_token_mismatch', locked: true });
+const missingLockTokenResponse = () =>
+  jsonResponse(400, {
+    error: missingLockTokenMessage,
+    error_code: 'missing_lock_token',
+    message: missingLockTokenMessage,
+  });
+
+const lockExpiredResponse = () =>
+  jsonResponse(423, {
+    error: 'lock_expired',
+    error_code: 'lock_expired',
+    message: lockExpiredMessage,
+    lock_expired: true,
+  });
+
+const lockMismatchResponse = () =>
+  jsonResponse(423, {
+    error: 'lock_token_mismatch',
+    error_code: 'lock_token_mismatch',
+    message: lockMismatchMessage,
+    locked: true,
+  });
+
+const notFoundResponse = () =>
+  jsonResponse(404, {
+    error: 'not_found',
+    error_code: 'not_found',
+    message: notFoundMessage,
+    not_found: true,
+  });
+
+const validateActiveLock = (record: WorkflowRecord, lockToken: string) => {
+  if (!record.lock || getLockExpirationMs(record.lock.expires_at) <= Date.now()) return lockExpiredResponse();
+  if (record.lock.token !== lockToken) return lockMismatchResponse();
 
   return undefined;
 };
@@ -193,8 +225,10 @@ export const saveAdminJsonDraft = async (store: WorkflowBlobStore, body: AdminDr
   const timestamp = nowIso();
 
   if (body.request_id) {
+    if (!body.lock_token) return missingLockTokenResponse();
+
     const previousRecord = await loadRecord(store, body.request_id);
-    if (!previousRecord) return jsonResponse(404, { not_found: true, error: 'Workflow record was not found.' });
+    if (!previousRecord) return notFoundResponse();
 
     const lockFailure = validateActiveLock(previousRecord, body.lock_token);
     if (lockFailure) return lockFailure;
