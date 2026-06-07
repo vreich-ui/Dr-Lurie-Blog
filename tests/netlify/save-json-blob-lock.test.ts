@@ -444,3 +444,76 @@ test('refresh_lock recovers when a stale expired-lock snapshot is followed by an
   );
   assert.equal(returnedExpiredSnapshot, true);
 });
+
+test('final_article completion preserves output when first completion read is stale without final_article output', async () => {
+  const store = createMemoryStore();
+  const requestId = `final-output-stale-complete-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lock.token,
+    output: { title: 'Preserved final article', body: 'The final article output must survive completion.' },
+  });
+  const patchBody = parseBody(patchResponse);
+  const patchedRecord = patchBody.record;
+
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+  assert.ok(patchedRecord?.agent_outputs.final_article, 'patch should write final_article output');
+
+  const staleCompletionSnapshot: WorkflowRecord = {
+    ...(patchedRecord as WorkflowRecord),
+    agent_outputs: {},
+  };
+  const originalGet = store.get.bind(store);
+  let returnedStaleCompletionSnapshot = false;
+  store.get = async (key: string) => {
+    if (!returnedStaleCompletionSnapshot && key === recordKey(requestId)) {
+      returnedStaleCompletionSnapshot = true;
+      return JSON.stringify(staleCompletionSnapshot);
+    }
+
+    return originalGet(key);
+  };
+
+  const completeResponse = await markAgentComplete(store, {
+    action: 'mark_agent_complete',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_record_version: (patchedRecord as WorkflowRecord).version,
+    lock_token: lock.token,
+    current_stage: null,
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  });
+  const completeBody = parseBody(completeResponse);
+
+  assert.equal(completeResponse.statusCode, 200, completeResponse.body);
+  assert.equal(returnedStaleCompletionSnapshot, true);
+  assert.deepEqual(
+    completeBody.record?.agent_outputs.final_article,
+    patchedRecord?.agent_outputs.final_article,
+    'completion response should preserve the previously written final_article output'
+  );
+  assert.equal(completeBody.record?.workflow_status, 'completed');
+  assert.equal(completeBody.record?.completed_agents.includes('final_article'), true);
+
+  const getResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const getBody = parseBody(getResponse);
+
+  assert.equal(getResponse.statusCode, 200, getResponse.body);
+  assert.deepEqual(
+    getBody.record?.agent_outputs.final_article,
+    patchedRecord?.agent_outputs.final_article,
+    'durable get_request should preserve the previously written final_article output'
+  );
+  assert.equal(getBody.record?.workflow_status, 'completed');
+});

@@ -115,7 +115,7 @@ test('checkout_request stabilizes transient not-found reads after create before 
       saw_transient_null_reads: true,
       stabilization_delay_ms: 100,
     });
-    assert.equal(recordGetAttempts, 7);
+    assert.equal(recordGetAttempts, 10);
     assert.equal(warnings.length, 6);
     assert.deepEqual(
       warnings.map((warning) => (warning[1] as { attempts: number }).attempts),

@@ -161,6 +161,8 @@ const jsonResponse = (status: number, body: Record<string, unknown>) => {
   };
 };
 
+type JsonResponse = ReturnType<typeof jsonResponse>;
+
 const safeJsonParse = (event: LambdaEvent) => {
   if (!event.body) return { ok: false as const, error: 'missing_body' };
 
@@ -467,20 +469,103 @@ const saveRecord = async (store: WorkflowBlobStore, record: WorkflowRecord) => {
   await store.setJSON(recordKey(record.request_id), record);
 };
 
+const agentOutputKeys = (record: WorkflowRecord) => Object.keys(record.agent_outputs) as AllowedAgentName[];
+
+const hasAgentOutput = (record: WorkflowRecord, agentName: AllowedAgentName) =>
+  Boolean(record.agent_outputs[agentName]);
+
+const isPreferredAgentOutputCandidate = (
+  candidate: WorkflowRecord,
+  current: WorkflowRecord | undefined,
+  requiredAgentName?: AllowedAgentName
+) => {
+  if (!current) return true;
+
+  if (requiredAgentName) {
+    const candidateHasRequiredOutput = hasAgentOutput(candidate, requiredAgentName);
+    const currentHasRequiredOutput = hasAgentOutput(current, requiredAgentName);
+    if (candidateHasRequiredOutput !== currentHasRequiredOutput) return candidateHasRequiredOutput;
+  }
+
+  if (candidate.version !== current.version) return candidate.version > current.version;
+
+  const candidateOutputCount = agentOutputKeys(candidate).length;
+  const currentOutputCount = agentOutputKeys(current).length;
+  if (candidateOutputCount !== currentOutputCount) return candidateOutputCount > currentOutputCount;
+
+  return candidate.history.length > current.history.length;
+};
+
+const loadLatestRecordForAgentOutputs = async (
+  store: WorkflowBlobStore,
+  requestId: string,
+  initialRecord?: WorkflowRecord,
+  requiredAgentName?: AllowedAgentName
+) => {
+  let latestRecord = initialRecord;
+
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const candidate = await loadRecord(store, requestId);
+
+    if (candidate && isPreferredAgentOutputCandidate(candidate, latestRecord, requiredAgentName)) {
+      latestRecord = latestRecord ? preserveAgentOutputs(candidate, latestRecord) : candidate;
+    } else if (candidate && latestRecord) {
+      latestRecord = preserveAgentOutputs(latestRecord, candidate);
+    }
+
+    if (requiredAgentName && latestRecord && hasAgentOutput(latestRecord, requiredAgentName)) break;
+
+    if (attempt < WORKFLOW_MUTATION_MAX_RETRIES - 1) {
+      await delay(GET_REQUEST_STALE_READ_RETRY_DELAY_MS);
+    }
+  }
+
+  return latestRecord;
+};
+
+const preserveAgentOutputs = (record: WorkflowRecord, sourceRecord: WorkflowRecord) => ({
+  ...record,
+  agent_outputs: {
+    ...sourceRecord.agent_outputs,
+    ...record.agent_outputs,
+  },
+});
+
+const saveWorkflowMutationRecord = async (
+  store: WorkflowBlobStore,
+  previousRecord: WorkflowRecord,
+  nextRecord: WorkflowRecord
+) => {
+  const latestRecord = await loadLatestRecordForAgentOutputs(store, nextRecord.request_id, nextRecord);
+  const recordToSave = latestRecord ? preserveAgentOutputs(nextRecord, latestRecord) : nextRecord;
+
+  await saveRecord(store, recordToSave);
+  await updateIndexes(store, previousRecord, recordToSave);
+
+  return recordToSave;
+};
+
+type SaveRecordIfVersionUnchangedResult =
+  | { saved: true; record: WorkflowRecord }
+  | { saved: false; notFound: true }
+  | { saved: false; latestRecord: WorkflowRecord };
+
 const saveRecordIfVersionUnchanged = async (
   store: WorkflowBlobStore,
   expectedRecord: WorkflowRecord,
   nextRecord: WorkflowRecord
-) => {
-  const latestRecord = await loadRecord(store, expectedRecord.request_id);
+): Promise<SaveRecordIfVersionUnchangedResult> => {
+  const latestRecord = await loadLatestRecordForAgentOutputs(store, expectedRecord.request_id);
 
   if (!latestRecord) return { saved: false as const, notFound: true as const };
   if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, latestRecord, nextRecord);
+  const recordToSave = preserveAgentOutputs(nextRecord, latestRecord);
 
-  return { saved: true as const };
+  await saveRecord(store, recordToSave);
+  await updateIndexes(store, latestRecord, recordToSave);
+
+  return { saved: true as const, record: recordToSave };
 };
 
 const hasHistoryAction = (record: WorkflowRecord, action: WorkflowAction) => {
@@ -534,16 +619,18 @@ const saveCheckinIfLatestRecordUnchanged = async (
   store: WorkflowBlobStore,
   expectedRecord: WorkflowRecord,
   nextRecord: WorkflowRecord
-) => {
+): Promise<SaveRecordIfVersionUnchangedResult> => {
   const latestRecord = await loadLatestRecordForCheckin(store, expectedRecord.request_id);
 
   if (!latestRecord) return { saved: false as const, notFound: true as const };
   if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, latestRecord, nextRecord);
+  const recordToSave = preserveAgentOutputs(nextRecord, latestRecord);
 
-  return { saved: true as const };
+  await saveRecord(store, recordToSave);
+  await updateIndexes(store, latestRecord, recordToSave);
+
+  return { saved: true as const, record: recordToSave };
 };
 
 const deleteBlob = async (store: WorkflowBlobStore, key: string) => {
@@ -776,10 +863,9 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
     version: previousRecord.version + 1,
   };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(200, { action: body.action, record: savedRecord });
 };
 
 const completionAlreadyReflected = (record: WorkflowRecord, agentName: AllowedAgentName, body: WorkflowRequest) => {
@@ -820,7 +906,29 @@ const loadRecordAtExpectedVersion = async (
   return { record: latestRecord };
 };
 
-export const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+const stabilizeFinalArticleCompletionSource = async (
+  store: WorkflowBlobStore,
+  requestId: string,
+  record: WorkflowRecord
+): Promise<{ record: WorkflowRecord } | { error: JsonResponse }> => {
+  if (hasAgentOutput(record, 'final_article')) return { record };
+
+  const stabilizedRecord = await loadLatestRecordForAgentOutputs(store, requestId, record, 'final_article');
+
+  if (stabilizedRecord && hasAgentOutput(stabilizedRecord, 'final_article')) {
+    return { record: stabilizedRecord };
+  }
+
+  return {
+    error: jsonResponse(409, {
+      action: 'mark_agent_complete',
+      conflict: true,
+      error: 'final_article output must be present before final_article can be completed.',
+    }),
+  };
+};
+
+export const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest): Promise<JsonResponse> => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
   if (body.expected_record_version === undefined) {
@@ -847,6 +955,15 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
 
   let lockFailure = validateMutationLock(previousRecord, body);
   if (lockFailure) return lockFailure;
+
+  if (agentName === 'final_article') {
+    const stabilizedSource = await stabilizeFinalArticleCompletionSource(store, requestId, previousRecord);
+    if ('error' in stabilizedSource) return stabilizedSource.error;
+
+    previousRecord = stabilizedSource.record;
+    lockFailure = validateMutationLock(previousRecord, body);
+    if (lockFailure) return lockFailure;
+  }
 
   if (previousRecord.version !== body.expected_record_version) {
     if (completionAlreadyReflected(previousRecord, agentName, body)) {
@@ -879,6 +996,15 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
     }
   }
 
+  if (agentName === 'final_article') {
+    const stabilizedSource = await stabilizeFinalArticleCompletionSource(store, requestId, previousRecord);
+    if ('error' in stabilizedSource) return stabilizedSource.error;
+
+    previousRecord = stabilizedSource.record;
+    lockFailure = validateMutationLock(previousRecord, body);
+    if (lockFailure) return lockFailure;
+  }
+
   const timestamp = nowIso();
   const completedAgents = previousRecord.completed_agents.includes(agentName)
     ? previousRecord.completed_agents
@@ -898,10 +1024,9 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
     version: previousRecord.version + 1,
   };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(200, { action: body.action, record: savedRecord });
 };
 
 export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
@@ -955,12 +1080,11 @@ export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRe
     version: previousRecord.version + 1,
   };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
 
   return jsonResponse(200, {
     action: body.action,
-    record: nextRecord,
+    record: savedRecord,
     diagnostics,
   });
 };
@@ -1014,10 +1138,9 @@ export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowReques
     version: previousRecord.version + 1,
   };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(200, { action: body.action, record: savedRecord });
 };
 
 export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
@@ -1058,8 +1181,8 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
 
     const saveResult = await saveCheckinIfLatestRecordUnchanged(store, latestRecord, nextRecord);
 
-    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: nextRecord });
-    if (saveResult.notFound) return jsonResponse(404, { action: body.action, not_found: true });
+    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: saveResult.record });
+    if ('notFound' in saveResult) return jsonResponse(404, { action: body.action, not_found: true });
   }
 
   return jsonResponse(409, { action: body.action, conflict: true });
@@ -1094,10 +1217,9 @@ const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
     version: previousRecord.version + 1,
   };
 
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(200, { action: body.action, record: savedRecord });
 };
 
 const getPublishPreconditionFailure = (record: WorkflowRecord) => {
@@ -1178,8 +1300,8 @@ export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequ
 
     const saveResult = await saveRecordIfVersionUnchanged(store, latestRecord, nextRecord);
 
-    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: nextRecord });
-    if (saveResult.notFound) return jsonResponse(404, { action: body.action, not_found: true });
+    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: saveResult.record });
+    if ('notFound' in saveResult) return jsonResponse(404, { action: body.action, not_found: true });
   }
 
   return jsonResponse(409, { action: body.action, conflict: true });
