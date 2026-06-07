@@ -1359,7 +1359,16 @@ const metadata = {
 
   const formatImageRuleFileSize = (bytes) => `${Number((bytes / (1024 * 1024)).toFixed(2))}MB`;
 
-  (() => {
+  const initializeAdminPublishPage = () => {
+    const adminShell = document.querySelector('[data-admin-shell]');
+    if (!adminShell || adminShell.dataset.adminPublishInitialized === 'true') return;
+
+    adminShell.dataset.adminPublishInitialized = 'true';
+
+    const initializationCleanupController = new AbortController();
+    const initializationCleanupSignal = initializationCleanupController.signal;
+    let unsubscribeClerkListener;
+
     const draftKey = 'dr-lurie-admin-draft';
     const fields = {
       title: document.querySelector('#title'),
@@ -1447,7 +1456,6 @@ const metadata = {
     const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     const slugInvalidMessage = 'Slug must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
     const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
-    const adminShell = document.querySelector('[data-admin-shell]');
     const authStatus = document.querySelector('[data-auth-status]');
     let clerkLoadPromise;
     let toastTimer;
@@ -1669,7 +1677,7 @@ const metadata = {
         await renderAuthState(clerk);
 
         if (typeof clerk.addListener === 'function') {
-          clerk.addListener(() => {
+          unsubscribeClerkListener = clerk.addListener(() => {
             renderAuthState(clerk).catch((error) => {
               console.error('Clerk authentication refresh failed.', error);
             });
@@ -3882,16 +3890,33 @@ const metadata = {
       });
     });
 
-    window.addEventListener('pagehide', sendWorkflowCheckinOnUnload);
-    window.addEventListener('beforeunload', (event) => {
-      if (!hasUnsavedChanges) {
-        sendWorkflowCheckinOnUnload();
-        return;
-      }
+    const cleanupAdminPublishPage = () => {
+      sendWorkflowCheckinOnUnload();
+      if (workflowLockRefreshTimer) window.clearTimeout(workflowLockRefreshTimer);
+      workflowLockRefreshTimer = undefined;
+      if (typeof unsubscribeClerkListener === 'function') unsubscribeClerkListener();
+      initializationCleanupController.abort();
+      delete adminShell.dataset.adminPublishInitialized;
+    };
 
-      event.preventDefault();
-      event.returnValue = '';
+    document.addEventListener('astro:before-swap', cleanupAdminPublishPage, {
+      once: true,
+      signal: initializationCleanupSignal,
     });
+    window.addEventListener('pagehide', sendWorkflowCheckinOnUnload, { signal: initializationCleanupSignal });
+    window.addEventListener(
+      'beforeunload',
+      (event) => {
+        if (!hasUnsavedChanges) {
+          sendWorkflowCheckinOnUnload();
+          return;
+        }
+
+        event.preventDefault();
+        event.returnValue = '';
+      },
+      { signal: initializationCleanupSignal }
+    );
 
     releaseStoredWorkflowLockOnLoad();
     lastLoadedJsonImportValue = fields.jsonImport.value.trim();
@@ -3905,5 +3930,12 @@ const metadata = {
     updatePublishOutput();
     setUnsavedChanges(false);
     initializeClerkAuth();
-  })();
+  };
+
+  initializeAdminPublishPage();
+
+  if (!window.__drLurieAdminPublishPageLoadListenerRegistered) {
+    document.addEventListener('astro:page-load', initializeAdminPublishPage);
+    window.__drLurieAdminPublishPageLoadListenerRegistered = true;
+  }
 </script>
