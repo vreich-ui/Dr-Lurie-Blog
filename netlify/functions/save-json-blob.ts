@@ -93,7 +93,12 @@ type LambdaEvent = {
   isBase64Encoded?: boolean;
 };
 
-type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {
+type WorkflowBlobReadOptions = {
+  consistency?: 'eventual' | 'strong';
+};
+
+type WorkflowBlobStore = Omit<Awaited<ReturnType<typeof getWorkflowBlobStore>>, 'get'> & {
+  get: (key: string, options?: WorkflowBlobReadOptions) => Promise<string | null>;
   delete?: (key: string) => Promise<void>;
   list?: (options?: {
     prefix?: string;
@@ -341,12 +346,27 @@ const getCommitMetadata = (body: WorkflowRequest) => {
   return Object.keys(metadata).length > 0 ? metadata : undefined;
 };
 
-const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
-  const value = await store.get(recordKey(requestId));
+const loadRecord = async (store: WorkflowBlobStore, requestId: string, options?: WorkflowBlobReadOptions) => {
+  const value = await store.get(recordKey(requestId), options);
 
   if (!value) return undefined;
 
   return JSON.parse(value) as WorkflowRecord;
+};
+
+const isStrongConsistencyUnavailableError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes('strong') &&
+    normalizedMessage.includes('consistency') &&
+    (normalizedMessage.includes('unavailable') ||
+      normalizedMessage.includes('not available') ||
+      normalizedMessage.includes('not supported'))
+  );
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -438,6 +458,26 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
     }
 
     nullReadAttempts.push(attempt);
+
+    try {
+      const stronglyConsistentRecord = await loadRecord(store, requestId, { consistency: 'strong' });
+
+      if (stronglyConsistentRecord) {
+        return {
+          diagnostics: checkoutDiagnostics(requestId, {
+            attempts: attempt,
+            first_non_null_attempt: attempt,
+            max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+            null_read_attempts: nullReadAttempts,
+            saw_transient_null_reads: true,
+            stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+          }),
+          record: stronglyConsistentRecord,
+        };
+      }
+    } catch (error) {
+      if (!isStrongConsistencyUnavailableError(error)) throw error;
+    }
 
     if (attempt < CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS) {
       console.warn('checkout_request record fetch returned 404/null; stabilizing before retry.', {

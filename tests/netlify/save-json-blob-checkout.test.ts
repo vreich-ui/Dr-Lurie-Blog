@@ -80,7 +80,11 @@ test('checkout_request stabilizes transient not-found reads after create before 
   let recordGetAttempts = 0;
   const flakyStore = {
     ...store,
-    async get(key: string) {
+    async get(key: string, options?: { consistency?: 'eventual' | 'strong' }) {
+      if (options?.consistency === 'strong') {
+        throw new Error('Strong consistency is not available for this blob store.');
+      }
+
       if (key === recordKey(requestId)) {
         recordGetAttempts += 1;
         if (recordGetAttempts <= 6) return null;
@@ -121,6 +125,70 @@ test('checkout_request stabilizes transient not-found reads after create before 
       warnings.map((warning) => (warning[1] as { attempts: number }).attempts),
       [1, 2, 3, 4, 5, 6]
     );
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('checkout_request can recover with a strong-consistency read when eventual reads stay null', async () => {
+  const store = createMemoryStore();
+  const requestId = `checkout-strong-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const createResponse = await createRequest(store, {
+    action: 'create_request',
+    request_id: requestId,
+    input: contentSourceInput(requestId),
+  });
+  assert.equal(createResponse.statusCode, 201, createResponse.body);
+
+  let eventualRecordGetAttempts = 0;
+  let strongRecordGetAttempts = 0;
+  const strongStore = {
+    ...store,
+    async get(key: string, options?: { consistency?: 'eventual' | 'strong' }) {
+      if (key === recordKey(requestId)) {
+        if (options?.consistency === 'strong') {
+          strongRecordGetAttempts += 1;
+          if (eventualRecordGetAttempts >= 20) return store.get(key);
+          return null;
+        }
+
+        eventualRecordGetAttempts += 1;
+        return null;
+      }
+
+      return store.get(key);
+    },
+  };
+
+  const warnings: unknown[][] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => warnings.push(args);
+  try {
+    const checkoutResponse = await checkoutRequest(strongStore, {
+      action: 'checkout_request',
+      request_id: requestId,
+      owner_id: 'checkout-strong-agent',
+      owner_label: 'Checkout strong agent',
+      lease_seconds: 900,
+    });
+    const body = parseBody(checkoutResponse);
+
+    assert.equal(checkoutResponse.statusCode, 200, checkoutResponse.body);
+    assert.equal(body.record?.request_id, requestId);
+    assert.equal(body.record?.lock?.owner_id, 'checkout-strong-agent');
+    assert.deepEqual(body.diagnostics, {
+      request_id: requestId,
+      attempts: 20,
+      first_non_null_attempt: 20,
+      max_attempts: 20,
+      null_read_attempts: Array.from({ length: 20 }, (_, index) => index + 1),
+      saw_transient_null_reads: true,
+      stabilization_delay_ms: 100,
+    });
+    assert.equal(eventualRecordGetAttempts, 23);
+    assert.equal(strongRecordGetAttempts, 20);
+    assert.equal(warnings.length, 19);
   } finally {
     console.warn = originalWarn;
   }
