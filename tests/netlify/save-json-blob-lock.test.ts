@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   checkoutRequest,
   createRequest,
+  markAgentComplete,
   patchAgentOutput,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
@@ -112,6 +113,66 @@ test('patch_agent_output accepts a fresh UTC lock whose expires_at is several mi
   assert.equal(patchResponse.statusCode, 200, patchResponse.body);
   assert.equal(body.record?.agent_outputs.reader_insight?.version, 1);
   assert.equal(body.record?.lock?.token, lock.token);
+});
+
+test('mark_agent_complete retries when the first read after patch_agent_output is stale', async () => {
+  const store = createMemoryStore();
+  const requestId = `stale-mark-complete-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lock.token,
+    output: { title: 'Retry-visible final article', body: 'Preserved final article output.' },
+  });
+  const patchBody = parseBody(patchResponse);
+
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+  assert.ok(patchBody.record, 'patch should return a workflow record');
+
+  const staleCheckoutSnapshot = JSON.stringify(checkoutRecord);
+  const originalGet = store.get.bind(store);
+  let hidePatchedRecordOnce = true;
+  store.get = async (key: string) => {
+    if (hidePatchedRecordOnce && key === recordKey(requestId)) {
+      hidePatchedRecordOnce = false;
+      return staleCheckoutSnapshot;
+    }
+
+    return originalGet(key);
+  };
+
+  const completeResponse = await markAgentComplete(store, {
+    action: 'mark_agent_complete',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_record_version: patchBody.record.version,
+    lock_token: lock.token,
+    current_stage: null,
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  });
+  const completeBody = parseBody(completeResponse);
+  const completedRecord = completeBody.record;
+
+  assert.equal(completeResponse.statusCode, 200, completeResponse.body);
+  assert.ok(completedRecord, 'mark complete should return a workflow record');
+  assert.equal(completedRecord.workflow_status, 'completed');
+  assert.equal(completedRecord.current_stage, null);
+  assert.equal(completedRecord.next_agent, null);
+  assert.equal(completedRecord.completed_agents.includes('final_article'), true);
+  assert.deepEqual(completedRecord.agent_outputs.final_article?.output, {
+    title: 'Retry-visible final article',
+    body: 'Preserved final article output.',
+  });
 });
 
 test('patch_agent_output lock_expired diagnostics use UTC milliseconds and include deltaMs', async () => {

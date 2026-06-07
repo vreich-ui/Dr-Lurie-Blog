@@ -201,6 +201,8 @@ const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
 const CHECKOUT_NOT_FOUND_MAX_RETRIES = 3;
 const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
 const CHECKOUT_NOT_FOUND_MAX_ATTEMPTS = CHECKOUT_NOT_FOUND_MAX_RETRIES + 1;
+const MARK_COMPLETE_STALE_READ_MAX_RETRIES = 3;
+const MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS = 25;
 const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
@@ -643,7 +645,27 @@ const completionAlreadyReflected = (record: WorkflowRecord, agentName: AllowedAg
   return true;
 };
 
-const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+const loadRecordAtExpectedVersion = async (
+  store: WorkflowBlobStore,
+  body: WorkflowRequest,
+  previousRecord: WorkflowRecord
+) => {
+  let latestRecord = previousRecord;
+
+  for (let retryIndex = 0; retryIndex < MARK_COMPLETE_STALE_READ_MAX_RETRIES; retryIndex += 1) {
+    await delay(MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS);
+
+    const retryRecord = await loadRecord(store, body.request_id as string);
+    if (!retryRecord) return { notFound: true as const };
+
+    latestRecord = retryRecord;
+    if (latestRecord.version >= (body.expected_record_version as number)) break;
+  }
+
+  return { record: latestRecord };
+};
+
+export const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
   if (body.expected_record_version === undefined) {
@@ -662,10 +684,10 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   const workflowStatus = parseOptionalWorkflowStatus(body.workflow_status);
   if (!workflowStatus.ok) return jsonResponse(400, { action: body.action, error: workflowStatus.error });
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
+  let previousRecord = await loadRecord(store, body.request_id as string);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  const lockFailure = validateMutationLock(previousRecord, body);
+  let lockFailure = validateMutationLock(previousRecord, body);
   if (lockFailure) return lockFailure;
 
   if (previousRecord.version !== body.expected_record_version) {
@@ -673,7 +695,22 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
       return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
     }
 
-    return jsonResponse(409, { action: body.action, conflict: true });
+    if (previousRecord.version < body.expected_record_version) {
+      const stabilizedRead = await loadRecordAtExpectedVersion(store, body, previousRecord);
+      if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
+
+      previousRecord = stabilizedRead.record;
+      lockFailure = validateMutationLock(previousRecord, body);
+      if (lockFailure) return lockFailure;
+
+      if (completionAlreadyReflected(previousRecord, agentName, body)) {
+        return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+      }
+    }
+
+    if (previousRecord.version !== body.expected_record_version) {
+      return jsonResponse(409, { action: body.action, conflict: true });
+    }
   }
 
   const timestamp = nowIso();

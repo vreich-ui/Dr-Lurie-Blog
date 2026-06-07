@@ -238,17 +238,26 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
       lease_seconds: 900,
     });
 
+    const checkoutRecord = checkoutResult.record as { version: number; lock: { token: string } };
+    const patchResult = await callTool('final_article_update_output', {
+      request_id: requestId,
+      expected_agent_version: 0,
+      lock_token: checkoutRecord.lock.token,
+      output: { title: 'Final article parity', body: 'Final article body.' },
+    });
+
     return {
       requestId,
-      checkoutRecord: checkoutResult.record as { version: number; lock: { token: string } },
+      checkoutRecord,
+      patchedRecord: patchResult.record as { version: number },
     };
   };
 
   const generic = await checkoutWorkflow('generic');
   const specific = await checkoutWorkflow('specific');
 
-  const finalCompleteArgs = {
-    current_stage: 'final_article',
+  const explicitFinalCompleteArgs = {
+    current_stage: null,
     next_agent: null,
     workflow_status: 'completed',
     needs_review: false,
@@ -258,16 +267,15 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
   const genericResult = await callTool('save_json_blob_mark_agent_complete', {
     request_id: generic.requestId,
     agent_name: 'final_article',
-    expected_record_version: generic.checkoutRecord.version,
+    expected_record_version: generic.patchedRecord.version,
     lock_token: generic.checkoutRecord.lock.token,
-    ...finalCompleteArgs,
+    ...explicitFinalCompleteArgs,
   });
 
   const specificResult = await callTool('final_article_mark_complete', {
     request_id: specific.requestId,
-    expected_record_version: specific.checkoutRecord.version,
+    expected_record_version: specific.patchedRecord.version,
     lock_token: specific.checkoutRecord.lock.token,
-    ...finalCompleteArgs,
   });
 
   type ComparableRecord = {
@@ -280,22 +288,23 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
     needs_review: boolean;
     last_error: string | null;
     lock?: { token: string };
+    agent_outputs: { final_article?: { output: unknown; version: number } };
     history: Array<{ action: string; agent_name?: string }>;
   };
 
   const genericIdempotentResult = await callTool('final_article_mark_complete', {
     request_id: generic.requestId,
     agent_name: 'final_article',
-    expected_record_version: generic.checkoutRecord.version,
+    expected_record_version: generic.patchedRecord.version,
     lock_token: generic.checkoutRecord.lock.token,
-    ...finalCompleteArgs,
+    ...explicitFinalCompleteArgs,
   });
 
   const genericRecord = genericResult.record as ComparableRecord;
   const genericIdempotentRecord = genericIdempotentResult.record as ComparableRecord;
   const specificRecord = specificResult.record as ComparableRecord;
-  const comparableState = (record: ComparableRecord, checkoutVersion: number, lockToken: string) => ({
-    version_increment: record.version - checkoutVersion,
+  const comparableState = (record: ComparableRecord, patchedVersion: number, lockToken: string) => ({
+    version_increment: record.version - patchedVersion,
     workflow_status: record.workflow_status,
     current_stage: record.current_stage,
     next_agent: record.next_agent,
@@ -303,6 +312,8 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
     failed_agents: record.failed_agents,
     needs_review: record.needs_review,
     last_error: record.last_error,
+    final_article_output: record.agent_outputs.final_article?.output,
+    final_article_output_version: record.agent_outputs.final_article?.version,
     lock_token_preserved: record.lock?.token === lockToken,
     history_length: record.history.length,
     last_history_action: record.history.at(-1)?.action,
@@ -310,8 +321,16 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
   });
 
   assert.deepEqual(genericIdempotentRecord, genericRecord);
+  assert.equal(specificRecord.workflow_status, 'completed');
+  assert.equal(specificRecord.current_stage, null);
+  assert.equal(specificRecord.next_agent, null);
+  assert.equal(specificRecord.completed_agents.includes('final_article'), true);
+  assert.deepEqual(specificRecord.agent_outputs.final_article?.output, {
+    title: 'Final article parity',
+    body: 'Final article body.',
+  });
   assert.deepEqual(
-    comparableState(genericRecord, generic.checkoutRecord.version, generic.checkoutRecord.lock.token),
-    comparableState(specificRecord, specific.checkoutRecord.version, specific.checkoutRecord.lock.token)
+    comparableState(genericRecord, generic.patchedRecord.version, generic.checkoutRecord.lock.token),
+    comparableState(specificRecord, specific.patchedRecord.version, specific.checkoutRecord.lock.token)
   );
 });

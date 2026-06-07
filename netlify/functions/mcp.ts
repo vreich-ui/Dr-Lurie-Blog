@@ -880,13 +880,36 @@ const callNormalizedAction = async (
   }
 };
 
-const createMarkAgentCompletePayload = (input: Record<string, unknown>, agentName: string) => ({
-  action: 'mark_agent_complete',
-  ...input,
-  agent_name: agentName,
-  current_stage: normalizeOptionalAgentName(input.current_stage, 'current_stage'),
-  next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
-});
+const defaultFinalArticleCompletionFields = (input: Record<string, unknown>) => {
+  if (Object.hasOwn(input, 'current_stage')) return {};
+
+  return { current_stage: null };
+};
+
+const createMarkAgentCompletePayload = (input: Record<string, unknown>, agentName: string) => {
+  const finalArticleDefaults =
+    agentName === 'final_article'
+      ? {
+          ...defaultFinalArticleCompletionFields(input),
+          ...(Object.hasOwn(input, 'next_agent') ? {} : { next_agent: null }),
+          ...(Object.hasOwn(input, 'workflow_status') ? {} : { workflow_status: 'completed' }),
+          ...(Object.hasOwn(input, 'needs_review') ? {} : { needs_review: false }),
+          ...(Object.hasOwn(input, 'last_error') ? {} : { last_error: null }),
+        }
+      : {};
+  const payload = {
+    action: 'mark_agent_complete',
+    ...finalArticleDefaults,
+    ...input,
+    agent_name: agentName,
+  };
+
+  return {
+    ...payload,
+    current_stage: normalizeOptionalAgentName(payload.current_stage, 'current_stage'),
+    next_agent: normalizeOptionalAgentName(payload.next_agent, 'next_agent'),
+  };
+};
 
 const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown>, agentName: string) => {
   return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, agentName), 'record');
