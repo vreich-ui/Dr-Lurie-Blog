@@ -30,6 +30,8 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
   assert.ok(createTool);
   assert.ok(property(createTool.inputSchema, 'current_agent'));
   assert.ok(property(createTool.inputSchema, 'next_agent'));
+  assert.ok(property(createTool.inputSchema, 'validation_mode'));
+  assert.deepEqual(createTool.inputSchema.required, ['input', 'validation_mode']);
 
   const inputSchema = property(createTool.inputSchema, 'input');
   const inputProperties = inputSchema.properties as Record<string, unknown>;
@@ -83,6 +85,7 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   assert.match(String(property(content, 'title').description), /title/i);
   assert.match(String(property(editorial, 'draft_markdown').description), /Markdown draft body/i);
   assert.match(String(property(publication, 'publish_payload').description), /publishing step/i);
+  assert.match(String(property(publication, 'publish_payload').description), /publication\.publish_payload\.author/i);
   assert.match(String(property(workflow, 'workflow_id').description), /preserve across handoffs/i);
   assert.match(String(property(versioning, 'record_version').description), /revision tracking/i);
 

@@ -150,6 +150,7 @@ const requestSchema = z
     deploy_status: z.string().min(1).optional(),
     deployStatus: z.string().min(1).optional(),
     message: z.string().min(1).optional(),
+    validation_mode: z.enum(['admin_publish_draft']).optional(),
   })
   .strict();
 
@@ -834,6 +835,61 @@ const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, output: u
   };
 };
 
+type AdminPublishDraftIssue = { path: string[]; message: string };
+
+const hasAdminImportableText = (...values: unknown[]) => values.some((value) => nonEmptyText(value) !== undefined);
+
+const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
+  const payload = input.publication?.publish_payload;
+  const issues: AdminPublishDraftIssue[] = [];
+
+  if (!hasAdminImportableText(payload?.title, input.content?.title)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'title'],
+      message: 'Admin-publish drafts require publication.publish_payload.title or content.title.',
+    });
+  }
+
+  if (!hasAdminImportableText(payload?.slug, input.content?.title)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'slug'],
+      message:
+        'Admin-publish drafts require publication.publish_payload.slug or enough content.title text to compute one.',
+    });
+  }
+
+  if (!hasAdminImportableText(payload?.author)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'author'],
+      message: 'Admin-publish drafts require publication.publish_payload.author.',
+    });
+  }
+
+  if (!hasAdminImportableText(payload?.content, payload?.markdown, input.editorial?.draft_markdown)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'content'],
+      message:
+        'Admin-publish drafts require publication.publish_payload.content, publication.publish_payload.markdown, or editorial.draft_markdown.',
+    });
+  }
+
+  return issues;
+};
+
+const getAdminPublishDraftValidationFailure = (input: ContentSourceV1, body: WorkflowRequest) => {
+  if (body.validation_mode !== 'admin_publish_draft') return undefined;
+
+  const issues = validateAdminPublishDraftInput(input);
+  if (issues.length === 0) return undefined;
+
+  return jsonResponse(400, {
+    action: body.action,
+    error: 'Invalid admin-publish draft input.',
+    error_code: 'invalid_admin_publish_draft',
+    issues,
+  });
+};
+
 export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
@@ -846,6 +902,9 @@ export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequ
       issues: parsedInput.error.issues,
     });
   }
+
+  const adminPublishDraftValidationFailure = getAdminPublishDraftValidationFailure(parsedInput.data, body);
+  if (adminPublishDraftValidationFailure) return adminPublishDraftValidationFailure;
 
   const existingRecord = await loadRecord(store, body.request_id as string);
 

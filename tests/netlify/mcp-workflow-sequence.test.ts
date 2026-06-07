@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
@@ -13,6 +13,18 @@ const contentSourceInput = (requestId: string) => ({
     schema_version: 'content_blocks.v1',
     title: 'MCP workflow smoke test',
   },
+  editorial: {
+    schema_version: 'editorial.v1',
+    draft_markdown: 'MCP workflow smoke test body.',
+  },
+  publication: {
+    schema_version: 'publication.v1',
+    publish_payload: {
+      slug: 'mcp-workflow-smoke-test',
+      title: 'MCP workflow smoke test',
+      author: 'Dr. Lurié',
+    },
+  },
   workflow: {
     schema_version: 'content_workflow.v1',
     workflow_id: requestId,
@@ -22,6 +34,33 @@ const contentSourceInput = (requestId: string) => ({
     record_version: 1,
   },
 });
+
+const getText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+const slugifyForImportTest = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+type AdminImportableInput = {
+  publication?: { publish_payload?: Record<string, unknown> };
+  content?: Record<string, unknown>;
+  editorial?: Record<string, unknown>;
+};
+
+const verifyAdminPublishImportable = (input: AdminImportableInput) => {
+  const payload = input.publication?.publish_payload ?? {};
+  const title = getText(payload.title) || getText(input.content?.title);
+  const slug = getText(payload.slug) || slugifyForImportTest(title);
+  const author = getText(payload.author);
+  const body = getText(payload.content) || getText(payload.markdown) || getText(input.editorial?.draft_markdown);
+
+  assert.ok(title, 'admin import requires a title from publication.publish_payload.title or content.title');
+  assert.ok(slug, 'admin import requires publication.publish_payload.slug or enough title text to compute one');
+  assert.ok(author, 'admin import requires publication.publish_payload.author');
+  assert.ok(body, 'admin import requires content, markdown, or editorial.draft_markdown body text');
+};
 
 const callTool = async (name: string, args: Record<string, unknown>) => {
   const response = await handler({
@@ -46,6 +85,70 @@ const callTool = async (name: string, args: Record<string, unknown>) => {
 
   return body.result.structuredContent;
 };
+
+test('MCP create_request minimum admin-publish draft satisfies admin publish import requirements', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  await rm(localBlobRoot, { recursive: true, force: true });
+
+  const publishPageSource = await readFile(`${process.cwd()}/src/pages/admin/publish.astro`, 'utf8');
+  for (const requiredPath of [
+    'publication.publish_payload.title',
+    'publication.publish_payload.slug',
+    'publication.publish_payload.author',
+    'publication.publish_payload.content',
+    'publication.publish_payload.markdown',
+    'editorial.draft_markdown',
+  ]) {
+    assert.match(publishPageSource, new RegExp(requiredPath.replaceAll('.', '\\.')));
+  }
+
+  const requestId = `mcp-admin-publish-minimum-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const createResult = await callTool('save_json_blob_create_request', {
+    request_id: requestId,
+    validation_mode: 'admin_publish_draft',
+    input: {
+      record_type: 'content_source',
+      schema_version: 'content_source.v1',
+      content: {
+        schema_version: 'content_blocks.v1',
+        title: 'Minimum Admin Publish Draft',
+      },
+      editorial: {
+        schema_version: 'editorial.v1',
+        draft_markdown: 'Minimum body imported from editorial markdown.',
+      },
+      publication: {
+        schema_version: 'publication.v1',
+        publish_payload: {
+          slug: 'minimum-admin-publish-draft',
+          title: 'Minimum Admin Publish Draft',
+          author: 'Dr. Lurié',
+        },
+      },
+      workflow: {
+        schema_version: 'content_workflow.v1',
+        workflow_id: requestId,
+        current_agent: 'final_article',
+        next_agent: null,
+      },
+    },
+    current_agent: 'final_article',
+    next_agent: null,
+  });
+  const record = createResult.record as {
+    input: AdminImportableInput;
+    current_stage: string | null;
+    next_agent: string | null;
+  };
+
+  assert.equal(record.current_stage, 'final_article');
+  assert.equal(record.next_agent, null);
+  verifyAdminPublishImportable(record.input);
+});
 
 test('MCP create_request honors explicit initial current and next agents', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
