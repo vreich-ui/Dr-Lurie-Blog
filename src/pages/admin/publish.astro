@@ -1360,9 +1360,35 @@ const metadata = {
   const formatImageRuleFileSize = (bytes) => `${Number((bytes / (1024 * 1024)).toFixed(2))}MB`;
 
   (() => {
+    const publishPageState = (window.__drLurieAdminPublishPageState ||= {
+      cleanup: undefined,
+      listenerRegistered: false,
+      root: undefined,
+    });
+
     const initializeAdminPublishPage = () => {
-      const pageRoot = document.querySelector('.admin-page');
-      if (!pageRoot || pageRoot.dataset.adminPublishInitialized === 'true') return;
+      const pageRoot = document.querySelector('[data-admin-shell]');
+
+      if (!pageRoot) {
+        publishPageState.cleanup?.();
+        publishPageState.cleanup = undefined;
+        publishPageState.root = undefined;
+        return;
+      }
+
+      if (pageRoot.dataset.adminPublishInitialized === 'true') return;
+
+      publishPageState.cleanup?.();
+      const abortController = new AbortController();
+      const cleanupCallbacks = [];
+      const addScopedEventListener = (target, eventName, handler, options) => {
+        target?.addEventListener(eventName, handler, { ...(options || {}), signal: abortController.signal });
+      };
+      publishPageState.cleanup = () => {
+        abortController.abort();
+        cleanupCallbacks.splice(0).forEach((cleanup) => cleanup());
+      };
+      publishPageState.root = pageRoot;
       pageRoot.dataset.adminPublishInitialized = 'true';
 
       const draftKey = 'dr-lurie-admin-draft';
@@ -1673,14 +1699,25 @@ const metadata = {
 
         try {
           const clerk = await getClerk();
+          if (abortController.signal.aborted) return;
+
           await renderAuthState(clerk);
+          if (abortController.signal.aborted) return;
 
           if (typeof clerk.addListener === 'function') {
-            clerk.addListener(() => {
+            const removeClerkListener = clerk.addListener(() => {
               renderAuthState(clerk).catch((error) => {
                 console.error('Clerk authentication refresh failed.', error);
               });
             });
+
+            if (typeof removeClerkListener === 'function') {
+              if (abortController.signal.aborted) {
+                removeClerkListener();
+              } else {
+                cleanupCallbacks.push(removeClerkListener);
+              }
+            }
           }
         } catch (error) {
           console.error('Clerk authentication initialization failed.', error);
@@ -3902,8 +3939,8 @@ const metadata = {
         });
       });
 
-      window.addEventListener('pagehide', sendWorkflowCheckinOnUnload);
-      window.addEventListener('beforeunload', (event) => {
+      addScopedEventListener(window, 'pagehide', sendWorkflowCheckinOnUnload);
+      addScopedEventListener(window, 'beforeunload', (event) => {
         if (!hasUnsavedChanges) {
           sendWorkflowCheckinOnUnload();
           return;
@@ -3911,6 +3948,12 @@ const metadata = {
 
         event.preventDefault();
         event.returnValue = '';
+      });
+      cleanupCallbacks.push(() => {
+        if (workflowLockRefreshTimer) window.clearTimeout(workflowLockRefreshTimer);
+        workflowLockRefreshTimer = undefined;
+        if (toastTimer) window.clearTimeout(toastTimer);
+        toastTimer = undefined;
       });
 
       releaseStoredWorkflowLockOnLoad();
@@ -3927,8 +3970,8 @@ const metadata = {
       initializeClerkAuth();
     };
 
-    if (!window.__drLurieAdminPublishPageLoadListener) {
-      window.__drLurieAdminPublishPageLoadListener = true;
+    if (!publishPageState.listenerRegistered) {
+      publishPageState.listenerRegistered = true;
       document.addEventListener('astro:page-load', initializeAdminPublishPage);
     }
 
