@@ -3,8 +3,8 @@
  * Required method: POST
  * Required header: x-publish-key
  * Stores:
- * - artifacts: final binary artifact bytes
- * - artifact-index: upload chunks and request artifact reference indexes
+ * - artifacts: final binary artifact bytes and temporary upload chunks
+ * - artifact-index: JSON request artifact reference indexes
  */
 import { timingSafeEqual } from 'node:crypto';
 
@@ -20,6 +20,8 @@ import {
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+
+// artifactStore holds binary blobs (final artifacts and temporary chunks); indexStore holds JSON references and indexes.
 
 type LambdaEvent = {
   blobs?: string;
@@ -285,9 +287,13 @@ export const handler = async (event: LambdaEvent) => {
     return finalizeUpload(event, input, bytes);
   }
 
+  const artifactStore = await getArtifactBlobStore(event);
   const indexStore = await getArtifactIndexBlobStore(event);
 
-  await indexStore.set(chunkKey(input.requestId, input.clientUploadId, input.chunkIndex), bytes, {
+  // Keep indexStore initialized in this branch for parity with single-shot finalization, but chunk bytes live in artifactStore.
+  void indexStore;
+
+  await artifactStore.set(chunkKey(input.requestId, input.clientUploadId, input.chunkIndex), bytes, {
     metadata: {
       requestId: input.requestId,
       clientUploadId: input.clientUploadId,
@@ -296,7 +302,7 @@ export const handler = async (event: LambdaEvent) => {
     },
   });
 
-  const status = await getChunkStatus(indexStore, input.requestId, input.clientUploadId, input.totalChunks);
+  const status = await getChunkStatus(artifactStore, input.requestId, input.clientUploadId, input.totalChunks);
 
   if (!status.complete) {
     return jsonResponse(202, {
@@ -307,7 +313,7 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const assembledBytes = await assembleChunks(indexStore, input.requestId, input.clientUploadId, input.totalChunks);
+  const assembledBytes = await assembleChunks(artifactStore, input.requestId, input.clientUploadId, input.totalChunks);
 
   if (!assembledBytes) {
     return jsonResponse(202, {
