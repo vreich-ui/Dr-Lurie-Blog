@@ -259,7 +259,16 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
     history: Array<{ action: string; agent_name?: string }>;
   };
 
+  const genericIdempotentResult = await callTool('final_article_mark_complete', {
+    request_id: generic.requestId,
+    agent_name: 'final_article',
+    expected_record_version: generic.checkoutRecord.version,
+    lock_token: generic.checkoutRecord.lock.token,
+    ...finalCompleteArgs,
+  });
+
   const genericRecord = genericResult.record as ComparableRecord;
+  const genericIdempotentRecord = genericIdempotentResult.record as ComparableRecord;
   const specificRecord = specificResult.record as ComparableRecord;
   const comparableState = (record: ComparableRecord, checkoutVersion: number, lockToken: string) => ({
     version_increment: record.version - checkoutVersion,
@@ -276,6 +285,7 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
     last_history_agent: record.history.at(-1)?.agent_name,
   });
 
+  assert.deepEqual(genericIdempotentRecord, genericRecord);
   assert.deepEqual(
     comparableState(genericRecord, generic.checkoutRecord.version, generic.checkoutRecord.lock.token),
     comparableState(specificRecord, specific.checkoutRecord.version, specific.checkoutRecord.lock.token)

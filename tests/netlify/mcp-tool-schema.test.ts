@@ -181,6 +181,7 @@ test('stage mark-complete helpers expose transition fields and document common r
     assert.ok(tool, `Expected ${name} to be registered.`);
 
     for (const field of [
+      'agent_name',
       'current_stage',
       'next_agent',
       'workflow_status',
