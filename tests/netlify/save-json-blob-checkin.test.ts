@@ -130,8 +130,10 @@ test('checkin_request preserves newer published canonical workflow state over a 
         const readIndex = canonicalGetCount;
         canonicalGetCount += 1;
 
-        // Return stale state for the first mutation read and the first version-check read.
-        if (readIndex === 0 || readIndex === 3) return JSON.stringify(staleCompletedSnapshot);
+        // Return stale state for multiple mutation reads and multiple version-check reads.
+        if (readIndex === 0 || readIndex === 1 || readIndex === 3 || readIndex === 4) {
+          return JSON.stringify(staleCompletedSnapshot);
+        }
       }
 
       return store.get(key);
@@ -146,7 +148,7 @@ test('checkin_request preserves newer published canonical workflow state over a 
     })
   );
 
-  assert.ok(canonicalGetCount > 3, 'checkin should retry after stale mutation and version-check reads');
+  assert.ok(canonicalGetCount > 5, 'checkin should retry after repeated stale mutation and version-check reads');
   assert.equal(checkin.record.workflow_status, 'published');
   assert.equal(checkin.record.current_stage, null);
   assert.equal(checkin.record.next_agent, null);

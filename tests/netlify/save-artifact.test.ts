@@ -30,18 +30,18 @@ const makeBaseInput = (requestId: string) => ({
 test('save-artifact chunk status stays monotonic when an immediate chunk read is stale', async () => {
   type FakeStoreValue = Buffer | string;
   const values = new Map<string, FakeStoreValue>();
-  let hideChunkOneOnce = false;
+  const hiddenImmediateChunkReads = new Set<string>();
   const fakeStore = {
     async set(key: string, value: string | Buffer | Uint8Array | ArrayBuffer) {
       values.set(key, typeof value === 'string' ? value : Buffer.from(value));
-      if (key.endsWith('/1')) hideChunkOneOnce = true;
+      if (key.endsWith('/1') || key.endsWith('/2')) hiddenImmediateChunkReads.add(key);
     },
     async setJSON(key: string, value: unknown) {
       values.set(key, JSON.stringify(value));
     },
     async get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) {
-      if (hideChunkOneOnce && key.endsWith('/1') && options?.type === 'arrayBuffer') {
-        hideChunkOneOnce = false;
+      if (hiddenImmediateChunkReads.has(key) && options?.type === 'arrayBuffer') {
+        hiddenImmediateChunkReads.delete(key);
         return null;
       }
 

@@ -169,6 +169,7 @@ test('MCP tools run create → checkout → patch output → mark complete → m
   assert.equal(finalCompleteRecord.current_stage, null);
   assert.equal(finalCompleteRecord.next_agent, null);
   assert.equal(finalCompleteRecord.workflow_status, 'completed');
+  assert.equal(finalCompleteRecord.completed_agents.includes('final_article'), true);
   assert.equal(finalCompleteRecord.needs_review, false);
   assert.equal(finalCompleteRecord.last_error, null);
   assert.deepEqual(finalCompleteRecord.agent_outputs.final_article?.output, {

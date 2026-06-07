@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   checkoutRequest,
   createRequest,
+  getRequest,
   markAgentComplete,
   markPublished,
   patchAgentOutput,
@@ -249,6 +250,73 @@ test('mark_published stabilizes stale pre-completion reads and preserves complet
   assert.equal(publishedRecord.current_stage, completedRecord.current_stage);
   assert.equal(publishedRecord.next_agent, completedRecord.next_agent);
   assert.deepEqual(publishedRecord.agent_outputs.final_article, completedRecord.agent_outputs.final_article);
+});
+
+test('get_request returns monotonic records when visible versions arrive out of order', async () => {
+  const store = createMemoryStore();
+  const requestId = `monotonic-get-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const completedRecord: WorkflowRecord = {
+    ...checkoutRecord,
+    workflow_status: 'completed',
+    current_stage: null,
+    next_agent: null,
+    completed_agents: [...checkoutRecord.completed_agents, 'final_article'],
+    agent_outputs: {
+      ...checkoutRecord.agent_outputs,
+      final_article: {
+        version: 1,
+        updated_at: new Date().toISOString(),
+        expected_agent_version: 0,
+        output: { title: 'Monotonic get final article' },
+      },
+    },
+    history: [
+      ...checkoutRecord.history,
+      { at: new Date().toISOString(), action: 'mark_agent_complete', agent_name: 'final_article' },
+    ],
+    version: checkoutRecord.version + 1,
+  };
+  const publishedRecord: WorkflowRecord = {
+    ...completedRecord,
+    workflow_status: 'published',
+    lock: undefined,
+    history: [...completedRecord.history, { at: new Date().toISOString(), action: 'mark_published' }],
+    version: completedRecord.version + 1,
+  };
+  const visibleRecords = [
+    publishedRecord,
+    completedRecord,
+    checkoutRecord,
+    completedRecord,
+    checkoutRecord,
+    publishedRecord,
+  ];
+  const originalGet = store.get.bind(store);
+  store.get = async (key: string) => {
+    if (key === recordKey(requestId) && visibleRecords.length > 0) {
+      return JSON.stringify(visibleRecords.shift());
+    }
+
+    return originalGet(key);
+  };
+
+  const firstResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const firstBody = parseBody(firstResponse);
+  const secondResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const secondBody = parseBody(secondResponse);
+
+  assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+  assert.equal(secondResponse.statusCode, 200, secondResponse.body);
+  assert.equal(firstBody.record?.version, publishedRecord.version);
+  assert.equal(secondBody.record?.version, publishedRecord.version);
+  assert.equal(firstBody.record?.workflow_status, 'published');
+  assert.equal(secondBody.record?.workflow_status, 'published');
+  assert.deepEqual(secondBody.record?.agent_outputs.final_article, publishedRecord.agent_outputs.final_article);
 });
 
 test('patch_agent_output lock_expired diagnostics use UTC milliseconds and include deltaMs', async () => {
