@@ -7,7 +7,15 @@ const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 
 type ResponseBody = {
   action: string;
-  diagnostics?: { attempts: number; max_attempts: number; max_retries: number; request_id: string };
+  diagnostics?: {
+    attempts: number;
+    first_non_null_attempt?: number;
+    max_attempts: number;
+    null_read_attempts: number[];
+    request_id: string;
+    saw_transient_null_reads: boolean;
+    stabilization_delay_ms: number;
+  };
   not_found?: boolean;
   record?: WorkflowRecord;
 };
@@ -59,7 +67,7 @@ const contentSourceInput = (requestId: string) => ({
   },
 });
 
-test('checkout_request retries transient not-found reads after create before acquiring a lock', async () => {
+test('checkout_request stabilizes transient not-found reads after create before acquiring a lock', async () => {
   const store = createMemoryStore();
   const requestId = `checkout-retry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -69,15 +77,13 @@ test('checkout_request retries transient not-found reads after create before acq
     input: contentSourceInput(requestId),
   });
   assert.equal(createResponse.statusCode, 201, createResponse.body);
-  assert.ok(await store.get(recordKey(requestId)), 'direct fetch should see the created workflow record');
-
   let recordGetAttempts = 0;
   const flakyStore = {
     ...store,
     async get(key: string) {
       if (key === recordKey(requestId)) {
         recordGetAttempts += 1;
-        if (recordGetAttempts < 3) return null;
+        if (recordGetAttempts <= 6) return null;
       }
 
       return store.get(key);
@@ -100,12 +106,20 @@ test('checkout_request retries transient not-found reads after create before acq
     assert.equal(checkoutResponse.statusCode, 200, checkoutResponse.body);
     assert.equal(body.record?.request_id, requestId);
     assert.equal(body.record?.lock?.owner_id, 'checkout-retry-agent');
-    assert.deepEqual(body.diagnostics, { request_id: requestId, attempts: 3, max_retries: 3, max_attempts: 4 });
-    assert.equal(recordGetAttempts, 3);
-    assert.equal(warnings.length, 2);
+    assert.deepEqual(body.diagnostics, {
+      request_id: requestId,
+      attempts: 7,
+      first_non_null_attempt: 7,
+      max_attempts: 20,
+      null_read_attempts: [1, 2, 3, 4, 5, 6],
+      saw_transient_null_reads: true,
+      stabilization_delay_ms: 100,
+    });
+    assert.equal(recordGetAttempts, 10);
+    assert.equal(warnings.length, 6);
     assert.deepEqual(
       warnings.map((warning) => (warning[1] as { attempts: number }).attempts),
-      [1, 2]
+      [1, 2, 3, 4, 5, 6]
     );
   } finally {
     console.warn = originalWarn;
@@ -131,18 +145,20 @@ test('checkout_request returns final not_found diagnostics only after retry atte
 
     assert.equal(checkoutResponse.statusCode, 404, checkoutResponse.body);
     assert.equal(body.not_found, true);
-    assert.deepEqual(body.diagnostics, { request_id: requestId, attempts: 4, max_retries: 3, max_attempts: 4 });
-    assert.equal(warnings.length, 4);
-    assert.deepEqual(
-      warnings.slice(0, 3).map((warning) => (warning[1] as { attempts: number }).attempts),
-      [1, 2, 3]
-    );
-    assert.deepEqual(warnings.at(-1)?.[1], {
+    assert.deepEqual(body.diagnostics, {
       request_id: requestId,
-      attempts: 4,
-      max_retries: 3,
-      max_attempts: 4,
+      attempts: 20,
+      max_attempts: 20,
+      null_read_attempts: Array.from({ length: 20 }, (_, index) => index + 1),
+      saw_transient_null_reads: true,
+      stabilization_delay_ms: 100,
     });
+    assert.equal(warnings.length, 20);
+    assert.deepEqual(
+      warnings.slice(0, 19).map((warning) => (warning[1] as { attempts: number }).attempts),
+      Array.from({ length: 19 }, (_, index) => index + 1)
+    );
+    assert.deepEqual(warnings.at(-1)?.[1], body.diagnostics);
   } finally {
     console.warn = originalWarn;
   }
