@@ -27,6 +27,12 @@ type BlobsModule = {
   getStore: (input: string | NetlifyBlobStoreOptions) => BlobStore;
 };
 
+let netlifyBlobsModuleForTesting: BlobsModule | undefined;
+
+export const setNetlifyBlobsModuleForTesting = (netlifyBlobs?: BlobsModule) => {
+  netlifyBlobsModuleForTesting = netlifyBlobs;
+};
+
 type NetlifyLambdaEvent = {
   blobs?: unknown;
 };
@@ -55,6 +61,8 @@ const getWorkflowApiStoreConfig = () => {
 
 const loadNetlifyBlobs = async (event: unknown) => {
   if (!isNetlifyRuntime(event)) return undefined;
+
+  if (netlifyBlobsModuleForTesting) return netlifyBlobsModuleForTesting;
 
   return import('@netlify/blobs').then(
     (mod) => mod as BlobsModule,
@@ -97,7 +105,7 @@ export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> =
 
     if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
-    return netlifyBlobs.getStore({ consistency: 'strong', name: 'workflows' });
+    return netlifyBlobs.getStore('workflows');
   }
 
   console.warn('Using local file-backed workflows blob store because @netlify/blobs is unavailable.');
