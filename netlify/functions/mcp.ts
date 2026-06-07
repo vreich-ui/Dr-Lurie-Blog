@@ -1133,8 +1133,15 @@ export const handler = async (event: LambdaEvent) => {
     return response(401, rpcError(null, -32001, 'Unauthorized'));
   }
 
+  let body: JsonRpcRequest | JsonRpcRequest[];
+
   try {
-    const body = parseBody(event);
+    body = parseBody(event);
+  } catch (error) {
+    return response(400, rpcError(null, -32700, 'Parse error', error instanceof Error ? error.message : String(error)));
+  }
+
+  try {
     const requests = Array.isArray(body) ? body : [body];
     const results = (await Promise.all(requests.map((request) => handleRpcRequest(event, request)))).filter(
       (result): result is JsonRpcResponse => Boolean(result)
@@ -1146,6 +1153,8 @@ export const handler = async (event: LambdaEvent) => {
 
     return response(200, Array.isArray(body) ? results : results[0]);
   } catch (error) {
-    return response(400, rpcError(null, -32700, 'Parse error', error instanceof Error ? error.message : String(error)));
+    console.error('Failed to handle MCP JSON-RPC request.', error);
+
+    return response(500, rpcError(null, -32000, 'Internal server error'));
   }
 };
