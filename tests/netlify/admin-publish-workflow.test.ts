@@ -35,7 +35,12 @@ test('admin publish flow sends lock_token to mark_published and checks in after 
   const source = await readPublishPage();
   const markIndex = indexAfter(source, "mcpToolCall('save_json_blob_mark_published'", 0);
   const requestIdIndex = indexAfter(source, 'request_id: requestId,', markIndex);
-  const lockTokenIndex = indexAfter(source, 'lock_token: lockToken,', requestIdIndex);
+  const expectedVersionIndex = indexAfter(
+    source,
+    'expected_record_version: latestWorkflowRecord?.version,',
+    requestIdIndex
+  );
+  const lockTokenIndex = indexAfter(source, 'lock_token: lockToken,', expectedVersionIndex);
   const commitMetadataIndex = indexAfter(
     source,
     'commit_metadata: { commit, articlePath: publishedPath },',
@@ -44,7 +49,11 @@ test('admin publish flow sends lock_token to mark_published and checks in after 
   const checkinIndex = indexAfter(source, 'await checkinWorkflowRequest();', commitMetadataIndex);
   const catchIndex = indexAfter(source, "console.warn('Published workflow status update failed.'", checkinIndex);
 
-  assert.ok(lockTokenIndex > requestIdIndex, 'mark_published payload must include lock_token with request_id.');
+  assert.ok(
+    expectedVersionIndex > requestIdIndex,
+    'mark_published payload must include expected_record_version from the latest workflow state.'
+  );
+  assert.ok(lockTokenIndex > expectedVersionIndex, 'mark_published payload must include lock_token with request_id.');
   assert.ok(commitMetadataIndex > lockTokenIndex, 'mark_published payload must include commit metadata.');
   assert.ok(checkinIndex > commitMetadataIndex, 'Workflow check-in must happen after mark_published succeeds.');
   assert.ok(catchIndex > checkinIndex, 'mark_published failure handling must not check in before the success path.');

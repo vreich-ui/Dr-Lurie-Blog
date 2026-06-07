@@ -82,13 +82,22 @@ test('checkin_request preserves newer published canonical workflow state over a 
   const lockToken = checkout.record.lock?.token;
   assert.ok(lockToken, 'checkout must acquire a lock token');
 
+  const finalOutput = await postWorkflowAction({
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lockToken,
+    output: { title: 'Checkin regression article', body: 'Final article output.' },
+  });
+
   const finalComplete = await postWorkflowAction({
     action: 'mark_agent_complete',
     request_id: requestId,
     agent_name: 'final_article',
-    expected_record_version: checkout.record.version,
+    expected_record_version: finalOutput.record.version,
     lock_token: lockToken,
-    current_stage: 'final_article',
+    current_stage: null,
     next_agent: null,
     workflow_status: 'completed',
     needs_review: false,
@@ -96,7 +105,9 @@ test('checkin_request preserves newer published canonical workflow state over a 
   });
   const staleCompletedSnapshot = finalComplete.record;
   assert.equal(staleCompletedSnapshot.workflow_status, 'completed');
+  assert.equal(staleCompletedSnapshot.current_stage, null);
   assert.equal(staleCompletedSnapshot.completed_agents.includes('final_article'), true);
+  assert.ok(staleCompletedSnapshot.agent_outputs.final_article);
 
   await postWorkflowAction({
     action: 'mark_published',
@@ -115,12 +126,15 @@ test('checkin_request preserves newer published canonical workflow state over a 
   const staleOnceStore = {
     ...store,
     async get(key: string) {
-      if (key === canonicalKey && canonicalGetCount === 0) {
+      if (key === canonicalKey) {
+        const readIndex = canonicalGetCount;
         canonicalGetCount += 1;
-        return JSON.stringify(staleCompletedSnapshot);
-      }
 
-      if (key === canonicalKey) canonicalGetCount += 1;
+        // Return stale state for multiple mutation reads and multiple version-check reads.
+        if (readIndex === 0 || readIndex === 1 || readIndex === 3 || readIndex === 4) {
+          return JSON.stringify(staleCompletedSnapshot);
+        }
+      }
 
       return store.get(key);
     },
@@ -134,9 +148,14 @@ test('checkin_request preserves newer published canonical workflow state over a 
     })
   );
 
+  assert.ok(canonicalGetCount > 5, 'checkin should retry after repeated stale mutation and version-check reads');
   assert.equal(checkin.record.workflow_status, 'published');
+  assert.equal(checkin.record.current_stage, null);
+  assert.equal(checkin.record.next_agent, null);
   assert.equal(checkin.record.lock, undefined);
   assert.equal(checkin.record.completed_agents.includes('final_article'), true);
+  assert.deepEqual(checkin.record.failed_agents, staleCompletedSnapshot.failed_agents);
+  assert.deepEqual(checkin.record.agent_outputs.final_article, staleCompletedSnapshot.agent_outputs.final_article);
   assert.equal(checkin.record.input.publication?.publish_payload?.slug, 'checkin-regression-article');
   assert.ok(checkin.record.history.some((entry) => entry.action === 'mark_published'));
   assert.equal(checkin.record.history.at(-1)?.action, 'checkin_request');
@@ -144,10 +163,14 @@ test('checkin_request preserves newer published canonical workflow state over a 
   const fetched = await postWorkflowAction({ action: 'get_request', request_id: requestId });
 
   assert.equal(fetched.record.workflow_status, 'published');
+  assert.equal(fetched.record.current_stage, null);
+  assert.equal(fetched.record.next_agent, null);
   assert.equal(fetched.record.lock, undefined);
   assert.equal(fetched.record.completed_agents.includes('final_article'), true);
+  assert.deepEqual(fetched.record.agent_outputs.final_article, staleCompletedSnapshot.agent_outputs.final_article);
   assert.equal(fetched.record.input.publication?.publish_payload?.slug, 'checkin-regression-article');
   assert.ok(fetched.record.history.some((entry) => entry.action === 'mark_published'));
+  assert.ok(fetched.record.history.some((entry) => entry.action === 'checkin_request'));
   assert.deepEqual(
     fetched.record.history.find((entry) => entry.action === 'mark_published')?.details?.commit_metadata,
     {

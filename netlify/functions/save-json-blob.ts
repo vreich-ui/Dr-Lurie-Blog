@@ -15,7 +15,7 @@
  * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
  * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
  * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
- * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
+ * - mark_published: { "action": "mark_published", "request_id": "req_123", "expected_record_version": 4, "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -201,6 +201,10 @@ const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
 const CHECKOUT_NOT_FOUND_MAX_RETRIES = 3;
 const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
 const CHECKOUT_NOT_FOUND_MAX_ATTEMPTS = CHECKOUT_NOT_FOUND_MAX_RETRIES + 1;
+const MARK_COMPLETE_STALE_READ_MAX_RETRIES = 3;
+const MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS = 25;
+const CHECKIN_STALE_READ_RETRY_DELAY_MS = 25;
+const GET_REQUEST_STALE_READ_RETRY_DELAY_MS = 25;
 const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
@@ -392,6 +396,69 @@ const saveRecordIfVersionUnchanged = async (
   return { saved: true as const };
 };
 
+const hasHistoryAction = (record: WorkflowRecord, action: WorkflowAction) => {
+  return record.history.some((entry) => entry.action === action);
+};
+
+const isPreferredCheckinCandidate = (candidate: WorkflowRecord, current: WorkflowRecord) => {
+  if (candidate.version !== current.version) return candidate.version > current.version;
+  if (!hasHistoryAction(current, 'mark_published') && hasHistoryAction(candidate, 'mark_published')) return true;
+
+  return candidate.history.length > current.history.length;
+};
+
+const loadLatestRecordForCheckin = async (store: WorkflowBlobStore, requestId: string) => {
+  let latestRecord: WorkflowRecord | undefined;
+
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const candidate = await loadRecord(store, requestId);
+
+    if (candidate && (!latestRecord || isPreferredCheckinCandidate(candidate, latestRecord))) {
+      latestRecord = candidate;
+    }
+
+    if (attempt < WORKFLOW_MUTATION_MAX_RETRIES - 1) {
+      await delay(CHECKIN_STALE_READ_RETRY_DELAY_MS);
+    }
+  }
+
+  return latestRecord;
+};
+
+const loadLatestRecordForGetRequest = async (store: WorkflowBlobStore, requestId: string) => {
+  let latestRecord: WorkflowRecord | undefined;
+
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const candidate = await loadRecord(store, requestId);
+
+    if (candidate && (!latestRecord || isPreferredCheckinCandidate(candidate, latestRecord))) {
+      latestRecord = candidate;
+    }
+
+    if (attempt < WORKFLOW_MUTATION_MAX_RETRIES - 1) {
+      await delay(GET_REQUEST_STALE_READ_RETRY_DELAY_MS);
+    }
+  }
+
+  return latestRecord;
+};
+
+const saveCheckinIfLatestRecordUnchanged = async (
+  store: WorkflowBlobStore,
+  expectedRecord: WorkflowRecord,
+  nextRecord: WorkflowRecord
+) => {
+  const latestRecord = await loadLatestRecordForCheckin(store, expectedRecord.request_id);
+
+  if (!latestRecord) return { saved: false as const, notFound: true as const };
+  if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, latestRecord, nextRecord);
+
+  return { saved: true as const };
+};
+
 const deleteBlob = async (store: WorkflowBlobStore, key: string) => {
   if (typeof store.delete === 'function') {
     await store.delete(key);
@@ -522,11 +589,11 @@ export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequ
   return jsonResponse(201, { action: body.action, record });
 };
 
-const getRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const getRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
-  const record = await loadRecord(store, body.request_id as string);
+  const record = await loadLatestRecordForGetRequest(store, body.request_id as string);
 
   if (!record) return jsonResponse(404, { action: body.action, not_found: true });
 
@@ -643,7 +710,27 @@ const completionAlreadyReflected = (record: WorkflowRecord, agentName: AllowedAg
   return true;
 };
 
-const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+const loadRecordAtExpectedVersion = async (
+  store: WorkflowBlobStore,
+  body: WorkflowRequest,
+  previousRecord: WorkflowRecord
+) => {
+  let latestRecord = previousRecord;
+
+  for (let retryIndex = 0; retryIndex < MARK_COMPLETE_STALE_READ_MAX_RETRIES; retryIndex += 1) {
+    await delay(MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS);
+
+    const retryRecord = await loadRecord(store, body.request_id as string);
+    if (!retryRecord) return { notFound: true as const };
+
+    latestRecord = retryRecord;
+    if (latestRecord.version >= (body.expected_record_version as number)) break;
+  }
+
+  return { record: latestRecord };
+};
+
+export const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
   if (body.expected_record_version === undefined) {
@@ -662,10 +749,10 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   const workflowStatus = parseOptionalWorkflowStatus(body.workflow_status);
   if (!workflowStatus.ok) return jsonResponse(400, { action: body.action, error: workflowStatus.error });
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
+  let previousRecord = await loadRecord(store, body.request_id as string);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  const lockFailure = validateMutationLock(previousRecord, body);
+  let lockFailure = validateMutationLock(previousRecord, body);
   if (lockFailure) return lockFailure;
 
   if (previousRecord.version !== body.expected_record_version) {
@@ -673,7 +760,22 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
       return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
     }
 
-    return jsonResponse(409, { action: body.action, conflict: true });
+    if (previousRecord.version < body.expected_record_version) {
+      const stabilizedRead = await loadRecordAtExpectedVersion(store, body, previousRecord);
+      if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
+
+      previousRecord = stabilizedRead.record;
+      lockFailure = validateMutationLock(previousRecord, body);
+      if (lockFailure) return lockFailure;
+
+      if (completionAlreadyReflected(previousRecord, agentName, body)) {
+        return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+      }
+    }
+
+    if (previousRecord.version !== body.expected_record_version) {
+      return jsonResponse(409, { action: body.action, conflict: true });
+    }
   }
 
   const timestamp = nowIso();
@@ -824,36 +926,35 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
   if (missingLockToken) return missingLockToken;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const canonicalRecord = await loadRecord(store, body.request_id as string);
-    if (!canonicalRecord) return jsonResponse(404, { action: body.action, not_found: true });
+    const latestRecord = await loadLatestRecordForCheckin(store, body.request_id as string);
+    if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-    if (!canonicalRecord.lock)
-      return jsonResponse(200, { action: body.action, record: canonicalRecord, idempotent: true });
+    if (!latestRecord.lock) return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
 
-    if (canonicalRecord.lock.token !== body.lock_token) {
-      return jsonResponse(423, { action: body.action, locked: true, lock: canonicalRecord.lock });
+    if (latestRecord.lock.token !== body.lock_token) {
+      return jsonResponse(423, { action: body.action, locked: true, lock: latestRecord.lock });
     }
 
     const timestamp = nowIso();
     const nextRecord: WorkflowRecord = {
-      ...canonicalRecord,
+      ...latestRecord,
       updated_at: timestamp,
       lock: undefined,
       history: [
-        ...canonicalRecord.history,
+        ...latestRecord.history,
         {
           at: timestamp,
           action: body.action,
           details: {
-            owner_id: canonicalRecord.lock.owner_id,
-            owner_label: canonicalRecord.lock.owner_label,
+            owner_id: latestRecord.lock.owner_id,
+            owner_label: latestRecord.lock.owner_label,
           },
         },
       ],
-      version: canonicalRecord.version + 1,
+      version: latestRecord.version + 1,
     };
 
-    const saveResult = await saveRecordIfVersionUnchanged(store, canonicalRecord, nextRecord);
+    const saveResult = await saveCheckinIfLatestRecordUnchanged(store, latestRecord, nextRecord);
 
     if (saveResult.saved) return jsonResponse(200, { action: body.action, record: nextRecord });
     if (saveResult.notFound) return jsonResponse(404, { action: body.action, not_found: true });
@@ -897,19 +998,48 @@ const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
-const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+const getPublishPreconditionFailure = (record: WorkflowRecord) => {
+  if (record.workflow_status !== 'completed') return 'Workflow must be completed before publishing.';
+  if (!record.completed_agents.includes('final_article')) return 'final_article must be completed before publishing.';
+  if (!record.agent_outputs.final_article) return 'final_article output must be present before publishing.';
+  if (record.current_stage !== null) return 'current_stage must be null before publishing the completed final article.';
+
+  return undefined;
+};
+
+export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const latestRecord = await loadRecord(store, body.request_id as string);
+    let latestRecord = await loadRecord(store, body.request_id as string);
     if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+    if (
+      body.expected_record_version !== undefined &&
+      latestRecord.version < body.expected_record_version &&
+      latestRecord.workflow_status !== 'published'
+    ) {
+      const stabilizedRead = await loadRecordAtExpectedVersion(store, body, latestRecord);
+      if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
+
+      latestRecord = stabilizedRead.record;
+    }
 
     const lockFailure = validateMutationLock(latestRecord, body);
     if (lockFailure) return lockFailure;
 
     if (latestRecord.workflow_status === 'published') {
       return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
+    }
+
+    if (body.expected_record_version !== undefined && latestRecord.version < body.expected_record_version) {
+      return jsonResponse(409, { action: body.action, conflict: true });
+    }
+
+    const preconditionFailure = getPublishPreconditionFailure(latestRecord);
+    if (preconditionFailure) {
+      return jsonResponse(409, { action: body.action, conflict: true, error: preconditionFailure });
     }
 
     const timestamp = nowIso();

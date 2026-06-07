@@ -4,6 +4,9 @@ import test from 'node:test';
 import {
   checkoutRequest,
   createRequest,
+  getRequest,
+  markAgentComplete,
+  markPublished,
   patchAgentOutput,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
@@ -112,6 +115,208 @@ test('patch_agent_output accepts a fresh UTC lock whose expires_at is several mi
   assert.equal(patchResponse.statusCode, 200, patchResponse.body);
   assert.equal(body.record?.agent_outputs.reader_insight?.version, 1);
   assert.equal(body.record?.lock?.token, lock.token);
+});
+
+test('mark_agent_complete retries when the first read after patch_agent_output is stale', async () => {
+  const store = createMemoryStore();
+  const requestId = `stale-mark-complete-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lock.token,
+    output: { title: 'Retry-visible final article', body: 'Preserved final article output.' },
+  });
+  const patchBody = parseBody(patchResponse);
+
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+  assert.ok(patchBody.record, 'patch should return a workflow record');
+
+  const staleCheckoutSnapshot = JSON.stringify(checkoutRecord);
+  const originalGet = store.get.bind(store);
+  let hidePatchedRecordOnce = true;
+  store.get = async (key: string) => {
+    if (hidePatchedRecordOnce && key === recordKey(requestId)) {
+      hidePatchedRecordOnce = false;
+      return staleCheckoutSnapshot;
+    }
+
+    return originalGet(key);
+  };
+
+  const completeResponse = await markAgentComplete(store, {
+    action: 'mark_agent_complete',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_record_version: patchBody.record.version,
+    lock_token: lock.token,
+    current_stage: null,
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  });
+  const completeBody = parseBody(completeResponse);
+  const completedRecord = completeBody.record;
+
+  assert.equal(completeResponse.statusCode, 200, completeResponse.body);
+  assert.ok(completedRecord, 'mark complete should return a workflow record');
+  assert.equal(completedRecord.workflow_status, 'completed');
+  assert.equal(completedRecord.current_stage, null);
+  assert.equal(completedRecord.next_agent, null);
+  assert.equal(completedRecord.completed_agents.includes('final_article'), true);
+  assert.deepEqual(completedRecord.agent_outputs.final_article?.output, {
+    title: 'Retry-visible final article',
+    body: 'Preserved final article output.',
+  });
+});
+
+test('mark_published stabilizes stale pre-completion reads and preserves completed final article state', async () => {
+  const store = createMemoryStore();
+  const requestId = `stale-mark-published-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lock.token,
+    output: { title: 'Published stale-read final article', body: 'Final article output to preserve.' },
+  });
+  const patchBody = parseBody(patchResponse);
+  const preCompletionRecord = patchBody.record;
+
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+  assert.ok(preCompletionRecord, 'patch should return a workflow record');
+  assert.notEqual(preCompletionRecord.workflow_status, 'completed');
+
+  const completeResponse = await markAgentComplete(store, {
+    action: 'mark_agent_complete',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_record_version: preCompletionRecord.version,
+    lock_token: lock.token,
+    current_stage: null,
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  });
+  const completeBody = parseBody(completeResponse);
+  const completedRecord = completeBody.record;
+
+  assert.equal(completeResponse.statusCode, 200, completeResponse.body);
+  assert.ok(completedRecord, 'completion should return a workflow record');
+  assert.equal(completedRecord.workflow_status, 'completed');
+  assert.equal(completedRecord.current_stage, null);
+  assert.equal(completedRecord.next_agent, null);
+  assert.equal(completedRecord.completed_agents.includes('final_article'), true);
+
+  const originalGet = store.get.bind(store);
+  let hideCompletedRecordOnce = true;
+  store.get = async (key: string) => {
+    if (hideCompletedRecordOnce && key === recordKey(requestId)) {
+      hideCompletedRecordOnce = false;
+      return JSON.stringify(preCompletionRecord);
+    }
+
+    return originalGet(key);
+  };
+
+  const publishResponse = await markPublished(store, {
+    action: 'mark_published',
+    request_id: requestId,
+    expected_record_version: completedRecord.version,
+    lock_token: lock.token,
+    commit_metadata: { commit: 'stale-publish-commit', articlePath: 'src/data/post/stale-published.md' },
+  });
+  const publishBody = parseBody(publishResponse);
+  const publishedRecord = publishBody.record;
+
+  assert.equal(publishResponse.statusCode, 200, publishResponse.body);
+  assert.ok(publishedRecord, 'publish should return a workflow record');
+  assert.equal(publishedRecord.workflow_status, 'published');
+  assert.deepEqual(publishedRecord.completed_agents, completedRecord.completed_agents);
+  assert.equal(publishedRecord.current_stage, completedRecord.current_stage);
+  assert.equal(publishedRecord.next_agent, completedRecord.next_agent);
+  assert.deepEqual(publishedRecord.agent_outputs.final_article, completedRecord.agent_outputs.final_article);
+});
+
+test('get_request returns monotonic records when visible versions arrive out of order', async () => {
+  const store = createMemoryStore();
+  const requestId = `monotonic-get-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const completedRecord: WorkflowRecord = {
+    ...checkoutRecord,
+    workflow_status: 'completed',
+    current_stage: null,
+    next_agent: null,
+    completed_agents: [...checkoutRecord.completed_agents, 'final_article'],
+    agent_outputs: {
+      ...checkoutRecord.agent_outputs,
+      final_article: {
+        version: 1,
+        updated_at: new Date().toISOString(),
+        expected_agent_version: 0,
+        output: { title: 'Monotonic get final article' },
+      },
+    },
+    history: [
+      ...checkoutRecord.history,
+      { at: new Date().toISOString(), action: 'mark_agent_complete', agent_name: 'final_article' },
+    ],
+    version: checkoutRecord.version + 1,
+  };
+  const publishedRecord: WorkflowRecord = {
+    ...completedRecord,
+    workflow_status: 'published',
+    lock: undefined,
+    history: [...completedRecord.history, { at: new Date().toISOString(), action: 'mark_published' }],
+    version: completedRecord.version + 1,
+  };
+  const visibleRecords = [
+    publishedRecord,
+    completedRecord,
+    checkoutRecord,
+    completedRecord,
+    checkoutRecord,
+    publishedRecord,
+  ];
+  const originalGet = store.get.bind(store);
+  store.get = async (key: string) => {
+    if (key === recordKey(requestId) && visibleRecords.length > 0) {
+      return JSON.stringify(visibleRecords.shift());
+    }
+
+    return originalGet(key);
+  };
+
+  const firstResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const firstBody = parseBody(firstResponse);
+  const secondResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const secondBody = parseBody(secondResponse);
+
+  assert.equal(firstResponse.statusCode, 200, firstResponse.body);
+  assert.equal(secondResponse.statusCode, 200, secondResponse.body);
+  assert.equal(firstBody.record?.version, publishedRecord.version);
+  assert.equal(secondBody.record?.version, publishedRecord.version);
+  assert.equal(firstBody.record?.workflow_status, 'published');
+  assert.equal(secondBody.record?.workflow_status, 'published');
+  assert.deepEqual(secondBody.record?.agent_outputs.final_article, publishedRecord.agent_outputs.final_article);
 });
 
 test('patch_agent_output lock_expired diagnostics use UTC milliseconds and include deltaMs', async () => {

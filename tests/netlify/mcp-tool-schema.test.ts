@@ -210,6 +210,7 @@ test('save_json_blob_mark_published exposes only workflow-state inputs', async (
   assert.ok(tool, 'Expected save_json_blob_mark_published to be registered.');
   assert.deepEqual(tool.inputSchema.required, ['request_id', 'lock_token', 'commit_metadata']);
   assert.ok(property(tool.inputSchema, 'request_id'));
+  assert.ok(property(tool.inputSchema, 'expected_record_version'));
   assert.ok(property(tool.inputSchema, 'lock_token'));
   assert.ok(property(tool.inputSchema, 'commit_metadata'));
   assert.match(
