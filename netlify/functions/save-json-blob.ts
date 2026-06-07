@@ -198,9 +198,8 @@ const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
 const DEFAULT_LIST_LIMIT = 50;
 const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
-const CHECKOUT_NOT_FOUND_MAX_RETRIES = 3;
-const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
-const CHECKOUT_NOT_FOUND_MAX_ATTEMPTS = CHECKOUT_NOT_FOUND_MAX_RETRIES + 1;
+const CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS = 20;
+const CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS = 100;
 const MARK_COMPLETE_STALE_READ_MAX_RETRIES = 3;
 const MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS = 25;
 const CHECKIN_STALE_READ_RETRY_DELAY_MS = 25;
@@ -346,34 +345,69 @@ const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-const checkoutDiagnostics = (requestId: string, attempts: number) => ({
+type CheckoutLoadDiagnostics = {
+  attempts: number;
+  first_non_null_attempt?: number;
+  max_attempts: number;
+  null_read_attempts: number[];
+  request_id: string;
+  saw_transient_null_reads: boolean;
+  stabilization_delay_ms: number;
+};
+
+const checkoutDiagnostics = (requestId: string, diagnostics: Omit<CheckoutLoadDiagnostics, 'request_id'>) => ({
   request_id: requestId,
-  attempts,
-  max_retries: CHECKOUT_NOT_FOUND_MAX_RETRIES,
-  max_attempts: CHECKOUT_NOT_FOUND_MAX_ATTEMPTS,
+  ...diagnostics,
 });
 
 const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string) => {
-  for (let retryIndex = 0; retryIndex <= CHECKOUT_NOT_FOUND_MAX_RETRIES; retryIndex += 1) {
-    const attempt = retryIndex + 1;
+  const nullReadAttempts: number[] = [];
+
+  for (let attempt = 1; attempt <= CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS; attempt += 1) {
     const record = await loadRecord(store, requestId);
 
-    if (record) return { record, attempts: attempt };
+    if (record) {
+      return {
+        diagnostics: checkoutDiagnostics(requestId, {
+          attempts: attempt,
+          first_non_null_attempt: attempt,
+          max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+          null_read_attempts: nullReadAttempts,
+          saw_transient_null_reads: nullReadAttempts.length > 0,
+          stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+        }),
+        record,
+      };
+    }
 
-    if (retryIndex < CHECKOUT_NOT_FOUND_MAX_RETRIES) {
-      console.warn('checkout_request record fetch returned 404; retrying.', {
-        ...checkoutDiagnostics(requestId, attempt),
+    nullReadAttempts.push(attempt);
+
+    if (attempt < CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS) {
+      console.warn('checkout_request record fetch returned 404/null; stabilizing before retry.', {
+        ...checkoutDiagnostics(requestId, {
+          attempts: attempt,
+          max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+          null_read_attempts: nullReadAttempts,
+          saw_transient_null_reads: nullReadAttempts.length > 0,
+          stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+        }),
         next_attempt: attempt + 1,
       });
-      await delay(CHECKOUT_NOT_FOUND_RETRY_DELAY_MS);
+      await delay(CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS);
     }
   }
 
-  console.warn('checkout_request record fetch returned 404 after retries exhausted.', {
-    ...checkoutDiagnostics(requestId, CHECKOUT_NOT_FOUND_MAX_ATTEMPTS),
+  const diagnostics = checkoutDiagnostics(requestId, {
+    attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+    max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+    null_read_attempts: nullReadAttempts,
+    saw_transient_null_reads: nullReadAttempts.length > 1,
+    stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
   });
 
-  return { record: undefined, attempts: CHECKOUT_NOT_FOUND_MAX_ATTEMPTS };
+  console.warn('checkout_request record fetch returned 404/null after stabilization exhausted.', diagnostics);
+
+  return { diagnostics, record: undefined };
 };
 
 const saveRecord = async (store: WorkflowBlobStore, record: WorkflowRecord) => {
@@ -816,7 +850,7 @@ export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRe
   const requestId = body.request_id as string;
   const checkoutLoad = await loadRecordForCheckout(store, requestId);
   const previousRecord = checkoutLoad.record;
-  const diagnostics = checkoutDiagnostics(requestId, checkoutLoad.attempts);
+  const { diagnostics } = checkoutLoad;
 
   if (!previousRecord) {
     return jsonResponse(404, { action: body.action, not_found: true, diagnostics });

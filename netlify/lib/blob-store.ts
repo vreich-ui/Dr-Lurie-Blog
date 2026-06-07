@@ -1,24 +1,30 @@
-import { createLocalBlobStore, type LocalBlobStore, type LocalBlobValue } from './local-blobs.js';
+import { createLocalBlobStore, type LocalBlobStore } from './local-blobs.js';
 
 type BlobMetadata = Record<string, string>;
 type BlobSetOptions = { metadata?: BlobMetadata; onlyIfNew?: boolean };
 
+type BlobStoreValue = string | Buffer | Uint8Array;
+
 type BlobStore = Omit<LocalBlobStore, 'set' | 'setJSON'> & {
-  set: (
+  set(
     key: string,
-    value: LocalBlobValue,
+    value: BlobStoreValue,
     options?: BlobSetOptions
-  ) => Promise<void | { modified: boolean; etag?: string }>;
-  setJSON: (
-    key: string,
-    value: unknown,
-    options?: BlobSetOptions
-  ) => Promise<void | { modified: boolean; etag?: string }>;
+  ): Promise<void | { modified: boolean; etag?: string }>;
+  setJSON(key: string, value: unknown, options?: BlobSetOptions): Promise<void | { modified: boolean; etag?: string }>;
+};
+
+type NetlifyBlobStoreOptions = {
+  apiURL?: string;
+  consistency?: 'eventual' | 'strong';
+  name: string;
+  siteID?: string;
+  token?: string;
 };
 
 type BlobsModule = {
   connectLambda: (event: unknown) => void;
-  getStore: (name: string) => BlobStore;
+  getStore: (input: string | NetlifyBlobStoreOptions) => BlobStore;
 };
 
 type NetlifyLambdaEvent = {
@@ -31,6 +37,21 @@ const hasNetlifyBlobContext = (event: unknown) => {
 
 const isNetlifyRuntime = (event: unknown) =>
   process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID) || hasNetlifyBlobContext(event);
+
+const getWorkflowApiStoreConfig = () => {
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+
+  if (!siteID || !token) return undefined;
+
+  return {
+    ...(process.env.NETLIFY_BLOBS_API_URL ? { apiURL: process.env.NETLIFY_BLOBS_API_URL } : {}),
+    consistency: 'strong' as const,
+    name: 'workflows',
+    siteID,
+    token,
+  };
+};
 
 const loadNetlifyBlobs = async (event: unknown) => {
   if (!isNetlifyRuntime(event)) return undefined;
@@ -65,7 +86,23 @@ export const getNetlifyBlobStore = async (storeName: string, event: unknown): Pr
 };
 
 export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> => {
-  return getNetlifyBlobStore('workflows', event);
+  const netlifyBlobs = await loadNetlifyBlobs(event);
+
+  if (netlifyBlobs) {
+    const workflowApiStoreConfig = getWorkflowApiStoreConfig();
+
+    if (workflowApiStoreConfig) {
+      return netlifyBlobs.getStore(workflowApiStoreConfig);
+    }
+
+    if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
+
+    return netlifyBlobs.getStore({ consistency: 'strong', name: 'workflows' });
+  }
+
+  console.warn('Using local file-backed workflows blob store because @netlify/blobs is unavailable.');
+
+  return createLocalBlobStore('workflows');
 };
 
 export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
