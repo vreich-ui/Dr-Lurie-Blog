@@ -197,6 +197,8 @@ const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
 const DEFAULT_LIST_LIMIT = 50;
 const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
+const CHECKOUT_NOT_FOUND_MAX_RETRIES = 3;
+const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
@@ -312,6 +314,29 @@ const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
   if (!value) return undefined;
 
   return JSON.parse(value) as WorkflowRecord;
+};
+
+const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string) => {
+  for (let retryIndex = 0; retryIndex <= CHECKOUT_NOT_FOUND_MAX_RETRIES; retryIndex += 1) {
+    const attempt = retryIndex + 1;
+    const record = await loadRecord(store, requestId);
+
+    if (record) return { record, attempts: attempt };
+
+    if (retryIndex < CHECKOUT_NOT_FOUND_MAX_RETRIES) {
+      console.warn('checkout_request record fetch returned 404; retrying.', {
+        request_id: requestId,
+        attempt,
+        next_attempt: attempt + 1,
+        max_attempts: CHECKOUT_NOT_FOUND_MAX_RETRIES + 1,
+      });
+      await delay(CHECKOUT_NOT_FOUND_RETRY_DELAY_MS);
+    }
+  }
+
+  return { record: undefined, attempts: CHECKOUT_NOT_FOUND_MAX_RETRIES + 1 };
 };
 
 const saveRecord = async (store: WorkflowBlobStore, record: WorkflowRecord) => {
@@ -615,7 +640,7 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
-const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
@@ -625,8 +650,14 @@ const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) 
   const missingOwnerLabel = requireStringField(body, 'owner_label');
   if (missingOwnerLabel) return missingOwnerLabel;
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
-  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  const requestId = body.request_id as string;
+  const checkoutLoad = await loadRecordForCheckout(store, requestId);
+  const previousRecord = checkoutLoad.record;
+  const diagnostics = { request_id: requestId, attempts: checkoutLoad.attempts };
+
+  if (!previousRecord) {
+    return jsonResponse(404, { action: body.action, not_found: true, diagnostics });
+  }
 
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
@@ -663,7 +694,11 @@ const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) 
   await saveRecord(store, nextRecord);
   await updateIndexes(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(200, {
+    action: body.action,
+    record: nextRecord,
+    ...(checkoutLoad.attempts > 1 ? { diagnostics } : {}),
+  });
 };
 
 const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
