@@ -3879,6 +3879,7 @@ const metadata = {
           try {
             await mcpToolCall('save_json_blob_mark_published', {
               request_id: requestId,
+              expected_record_version: latestWorkflowRecord?.version,
               lock_token: lockToken,
               commit_metadata: { commit, articlePath: publishedPath },
             });

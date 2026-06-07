@@ -168,7 +168,29 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
   const savedDraftBody = parseJsonBody<{ record: WorkflowRecord }>(savedDraftResponse);
   assert.equal(savedDraftResponse.statusCode, 200, savedDraftResponse.body);
   assert.equal(savedDraftBody.record.lock?.token, lockToken);
-  assert.equal(savedDraftBody.record.input.publication?.publish_payload?.content, 'Edited draft body that should be published.');
+  assert.equal(
+    savedDraftBody.record.input.publication?.publish_payload?.content,
+    'Edited draft body that should be published.'
+  );
+
+  const finalOutputResult = await callTool('final_article_update_output', {
+    request_id: requestId,
+    expected_agent_version: 0,
+    lock_token: lockToken,
+    output: { title: 'Admin Publish E2E Smoke', body: 'Edited draft body that should be published.' },
+  });
+  const finalOutputRecord = finalOutputResult.record as WorkflowRecord;
+
+  const finalCompleteResult = await callTool('final_article_mark_complete', {
+    request_id: requestId,
+    expected_record_version: finalOutputRecord.version,
+    lock_token: lockToken,
+  });
+  const finalCompleteRecord = finalCompleteResult.record as WorkflowRecord;
+  assert.equal(finalCompleteRecord.workflow_status, 'completed');
+  assert.equal(finalCompleteRecord.current_stage, null);
+  assert.equal(finalCompleteRecord.completed_agents.includes('final_article'), true);
+  assert.ok(finalCompleteRecord.agent_outputs.final_article, 'final article output must be preserved before publish');
 
   const github = installGitHubPublishMock();
   try {
@@ -201,11 +223,16 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
 
     const publishedResult = await callTool('save_json_blob_mark_published', {
       request_id: requestId,
+      expected_record_version: finalCompleteRecord.version,
       lock_token: lockToken,
       commit_metadata: { commit: publishBody.commit, articlePath: publishBody.articlePath },
     });
     const publishedRecord = publishedResult.record as WorkflowRecord;
     assert.equal(publishedRecord.workflow_status, 'published');
+    assert.equal(publishedRecord.current_stage, null);
+    assert.equal(publishedRecord.next_agent, null);
+    assert.deepEqual(publishedRecord.completed_agents, finalCompleteRecord.completed_agents);
+    assert.deepEqual(publishedRecord.agent_outputs.final_article, finalCompleteRecord.agent_outputs.final_article);
     assert.equal(publishedRecord.lock?.token, lockToken);
     assert.deepEqual(publishedRecord.history.at(-1)?.details?.commit_metadata, {
       commit: 'published-smoke-commit',

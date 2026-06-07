@@ -82,13 +82,22 @@ test('checkin_request preserves newer published canonical workflow state over a 
   const lockToken = checkout.record.lock?.token;
   assert.ok(lockToken, 'checkout must acquire a lock token');
 
+  const finalOutput = await postWorkflowAction({
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lockToken,
+    output: { title: 'Checkin regression article', body: 'Final article output.' },
+  });
+
   const finalComplete = await postWorkflowAction({
     action: 'mark_agent_complete',
     request_id: requestId,
     agent_name: 'final_article',
-    expected_record_version: checkout.record.version,
+    expected_record_version: finalOutput.record.version,
     lock_token: lockToken,
-    current_stage: 'final_article',
+    current_stage: null,
     next_agent: null,
     workflow_status: 'completed',
     needs_review: false,
@@ -96,7 +105,9 @@ test('checkin_request preserves newer published canonical workflow state over a 
   });
   const staleCompletedSnapshot = finalComplete.record;
   assert.equal(staleCompletedSnapshot.workflow_status, 'completed');
+  assert.equal(staleCompletedSnapshot.current_stage, null);
   assert.equal(staleCompletedSnapshot.completed_agents.includes('final_article'), true);
+  assert.ok(staleCompletedSnapshot.agent_outputs.final_article);
 
   await postWorkflowAction({
     action: 'mark_published',

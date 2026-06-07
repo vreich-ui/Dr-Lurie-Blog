@@ -15,7 +15,7 @@
  * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
  * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
  * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
- * - mark_published: { "action": "mark_published", "request_id": "req_123", "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
+ * - mark_published: { "action": "mark_published", "request_id": "req_123", "expected_record_version": 4, "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -934,19 +934,48 @@ const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
-const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+const getPublishPreconditionFailure = (record: WorkflowRecord) => {
+  if (record.workflow_status !== 'completed') return 'Workflow must be completed before publishing.';
+  if (!record.completed_agents.includes('final_article')) return 'final_article must be completed before publishing.';
+  if (!record.agent_outputs.final_article) return 'final_article output must be present before publishing.';
+  if (record.current_stage !== null) return 'current_stage must be null before publishing the completed final article.';
+
+  return undefined;
+};
+
+export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const latestRecord = await loadRecord(store, body.request_id as string);
+    let latestRecord = await loadRecord(store, body.request_id as string);
     if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+    if (
+      body.expected_record_version !== undefined &&
+      latestRecord.version < body.expected_record_version &&
+      latestRecord.workflow_status !== 'published'
+    ) {
+      const stabilizedRead = await loadRecordAtExpectedVersion(store, body, latestRecord);
+      if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
+
+      latestRecord = stabilizedRead.record;
+    }
 
     const lockFailure = validateMutationLock(latestRecord, body);
     if (lockFailure) return lockFailure;
 
     if (latestRecord.workflow_status === 'published') {
       return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
+    }
+
+    if (body.expected_record_version !== undefined && latestRecord.version < body.expected_record_version) {
+      return jsonResponse(409, { action: body.action, conflict: true });
+    }
+
+    const preconditionFailure = getPublishPreconditionFailure(latestRecord);
+    if (preconditionFailure) {
+      return jsonResponse(409, { action: body.action, conflict: true, error: preconditionFailure });
     }
 
     const timestamp = nowIso();

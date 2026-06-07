@@ -143,32 +143,42 @@ test('MCP tools run create → checkout → patch output → mark complete → m
   });
   const finalCheckoutRecord = finalCheckoutResult.record as { version: number; lock: { token: string } };
 
+  const finalOutputResult = await callTool('final_article_update_output', {
+    request_id: requestId,
+    expected_agent_version: 0,
+    lock_token: finalCheckoutRecord.lock.token,
+    output: { title: 'MCP smoke final article', body: 'Final article body.' },
+  });
+  const finalOutputRecord = finalOutputResult.record as { version: number };
+
   const finalCompleteResult = await callTool('final_article_mark_complete', {
     request_id: requestId,
-    expected_record_version: finalCheckoutRecord.version,
+    expected_record_version: finalOutputRecord.version,
     lock_token: finalCheckoutRecord.lock.token,
-    current_stage: 'final_article',
-    next_agent: null,
-    workflow_status: 'completed',
-    needs_review: false,
-    last_error: null,
   });
   const finalCompleteRecord = finalCompleteResult.record as {
-    current_stage: string;
+    version: number;
+    current_stage: string | null;
     next_agent: string | null;
     workflow_status: string;
     completed_agents: string[];
+    agent_outputs: { final_article?: { output: unknown } };
     needs_review: boolean;
     last_error: string | null;
   };
-  assert.equal(finalCompleteRecord.current_stage, 'final_article');
+  assert.equal(finalCompleteRecord.current_stage, null);
   assert.equal(finalCompleteRecord.next_agent, null);
   assert.equal(finalCompleteRecord.workflow_status, 'completed');
   assert.equal(finalCompleteRecord.needs_review, false);
   assert.equal(finalCompleteRecord.last_error, null);
+  assert.deepEqual(finalCompleteRecord.agent_outputs.final_article?.output, {
+    title: 'MCP smoke final article',
+    body: 'Final article body.',
+  });
 
   const publishedResult = await callTool('save_json_blob_mark_published', {
     request_id: requestId,
+    expected_record_version: finalCompleteRecord.version,
     lock_token: finalCheckoutRecord.lock.token,
     commit_metadata: {
       commit: 'abc123',

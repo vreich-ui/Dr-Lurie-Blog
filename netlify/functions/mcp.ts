@@ -616,6 +616,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
+        expected_record_version: intSchema(
+          'Optional workflow record version that should be visible before marking published.'
+        ),
         lock_token: lockTokenSchema,
         commit_metadata: {
           type: 'object',
@@ -1007,6 +1010,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         {
           action: 'mark_published',
           request_id: input.request_id,
+          expected_record_version: input.expected_record_version,
           lock_token: input.lock_token,
           commit_metadata: input.commit_metadata,
         },
