@@ -93,7 +93,12 @@ type LambdaEvent = {
   isBase64Encoded?: boolean;
 };
 
-type WorkflowBlobStore = Awaited<ReturnType<typeof getWorkflowBlobStore>> & {
+type WorkflowBlobReadOptions = {
+  consistency?: 'eventual' | 'strong';
+};
+
+type WorkflowBlobStore = Omit<Awaited<ReturnType<typeof getWorkflowBlobStore>>, 'get'> & {
+  get: (key: string, options?: WorkflowBlobReadOptions) => Promise<string | null>;
   delete?: (key: string) => Promise<void>;
   list?: (options?: {
     prefix?: string;
@@ -341,12 +346,27 @@ const getCommitMetadata = (body: WorkflowRequest) => {
   return Object.keys(metadata).length > 0 ? metadata : undefined;
 };
 
-const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
-  const value = await store.get(recordKey(requestId));
+const loadRecord = async (store: WorkflowBlobStore, requestId: string, options?: WorkflowBlobReadOptions) => {
+  const value = await store.get(recordKey(requestId), options);
 
   if (!value) return undefined;
 
   return JSON.parse(value) as WorkflowRecord;
+};
+
+const isStrongConsistencyUnavailableError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  const normalizedMessage = message.toLowerCase();
+
+  return (
+    normalizedMessage.includes('strong') &&
+    normalizedMessage.includes('consistency') &&
+    (normalizedMessage.includes('unavailable') ||
+      normalizedMessage.includes('not available') ||
+      normalizedMessage.includes('not supported'))
+  );
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -404,21 +424,30 @@ const loadRecordForLockToken = async (store: WorkflowBlobStore, requestId: strin
 
 type CheckoutLoadDiagnostics = {
   attempts: number;
+  eventual_read_exhausted: boolean;
   first_non_null_attempt?: number;
   max_attempts: number;
   null_read_attempts: number[];
+  record_key: string;
   request_id: string;
   saw_transient_null_reads: boolean;
   stabilization_delay_ms: number;
+  strong_read_attempts: number;
+  strong_read_succeeded: boolean;
 };
 
-const checkoutDiagnostics = (requestId: string, diagnostics: Omit<CheckoutLoadDiagnostics, 'request_id'>) => ({
+const checkoutDiagnostics = (
+  requestId: string,
+  diagnostics: Omit<CheckoutLoadDiagnostics, 'record_key' | 'request_id'>
+) => ({
   request_id: requestId,
+  record_key: recordKey(requestId),
   ...diagnostics,
 });
 
 const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string) => {
   const nullReadAttempts: number[] = [];
+  let strongReadAttempts = 0;
 
   for (let attempt = 1; attempt <= CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS; attempt += 1) {
     const record = await loadRecord(store, requestId);
@@ -427,11 +456,14 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
       return {
         diagnostics: checkoutDiagnostics(requestId, {
           attempts: attempt,
+          eventual_read_exhausted: false,
           first_non_null_attempt: attempt,
           max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
           null_read_attempts: nullReadAttempts,
           saw_transient_null_reads: nullReadAttempts.length > 0,
           stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+          strong_read_attempts: strongReadAttempts,
+          strong_read_succeeded: false,
         }),
         record,
       };
@@ -439,14 +471,41 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
 
     nullReadAttempts.push(attempt);
 
+    try {
+      strongReadAttempts += 1;
+      const stronglyConsistentRecord = await loadRecord(store, requestId, { consistency: 'strong' });
+
+      if (stronglyConsistentRecord) {
+        return {
+          diagnostics: checkoutDiagnostics(requestId, {
+            attempts: attempt,
+            first_non_null_attempt: attempt,
+            max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+            eventual_read_exhausted: attempt === CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+            null_read_attempts: nullReadAttempts,
+            saw_transient_null_reads: true,
+            stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+            strong_read_attempts: strongReadAttempts,
+            strong_read_succeeded: true,
+          }),
+          record: stronglyConsistentRecord,
+        };
+      }
+    } catch (error) {
+      if (!isStrongConsistencyUnavailableError(error)) throw error;
+    }
+
     if (attempt < CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS) {
       console.warn('checkout_request record fetch returned 404/null; stabilizing before retry.', {
         ...checkoutDiagnostics(requestId, {
           attempts: attempt,
+          eventual_read_exhausted: false,
           max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
           null_read_attempts: nullReadAttempts,
           saw_transient_null_reads: nullReadAttempts.length > 0,
           stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+          strong_read_attempts: strongReadAttempts,
+          strong_read_succeeded: false,
         }),
         next_attempt: attempt + 1,
       });
@@ -457,9 +516,12 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
   const diagnostics = checkoutDiagnostics(requestId, {
     attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
     max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+    eventual_read_exhausted: true,
     null_read_attempts: nullReadAttempts,
     saw_transient_null_reads: nullReadAttempts.length > 1,
     stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+    strong_read_attempts: strongReadAttempts,
+    strong_read_succeeded: false,
   });
 
   console.warn('checkout_request record fetch returned 404/null after stabilization exhausted.', diagnostics);
