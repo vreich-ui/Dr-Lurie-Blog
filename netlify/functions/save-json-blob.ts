@@ -200,6 +200,7 @@ const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
 const CHECKOUT_NOT_FOUND_MAX_RETRIES = 3;
 const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
 const CHECKOUT_NOT_FOUND_MAX_ATTEMPTS = CHECKOUT_NOT_FOUND_MAX_RETRIES + 1;
+const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
@@ -372,6 +373,22 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
 
 const saveRecord = async (store: WorkflowBlobStore, record: WorkflowRecord) => {
   await store.setJSON(recordKey(record.request_id), record);
+};
+
+const saveRecordIfVersionUnchanged = async (
+  store: WorkflowBlobStore,
+  expectedRecord: WorkflowRecord,
+  nextRecord: WorkflowRecord
+) => {
+  const latestRecord = await loadRecord(store, expectedRecord.request_id);
+
+  if (!latestRecord) return { saved: false as const, notFound: true as const };
+  if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, latestRecord, nextRecord);
+
+  return { saved: true as const };
 };
 
 const deleteBlob = async (store: WorkflowBlobStore, key: string) => {
@@ -793,42 +810,43 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
   const missingLockToken = requireStringField(body, 'lock_token');
   if (missingLockToken) return missingLockToken;
 
-  const checkedOutRecord = await loadRecord(store, body.request_id as string);
-  if (!checkedOutRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const canonicalRecord = await loadRecord(store, body.request_id as string);
+    if (!canonicalRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  const canonicalRecord = await loadRecord(store, body.request_id as string);
-  if (!canonicalRecord) return jsonResponse(404, { action: body.action, not_found: true });
+    if (!canonicalRecord.lock)
+      return jsonResponse(200, { action: body.action, record: canonicalRecord, idempotent: true });
 
-  if (!canonicalRecord.lock)
-    return jsonResponse(200, { action: body.action, record: canonicalRecord, idempotent: true });
+    if (canonicalRecord.lock.token !== body.lock_token) {
+      return jsonResponse(423, { action: body.action, locked: true, lock: canonicalRecord.lock });
+    }
 
-  if (canonicalRecord.lock.token !== body.lock_token) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: canonicalRecord.lock });
+    const timestamp = nowIso();
+    const nextRecord: WorkflowRecord = {
+      ...canonicalRecord,
+      updated_at: timestamp,
+      lock: undefined,
+      history: [
+        ...canonicalRecord.history,
+        {
+          at: timestamp,
+          action: body.action,
+          details: {
+            owner_id: canonicalRecord.lock.owner_id,
+            owner_label: canonicalRecord.lock.owner_label,
+          },
+        },
+      ],
+      version: canonicalRecord.version + 1,
+    };
+
+    const saveResult = await saveRecordIfVersionUnchanged(store, canonicalRecord, nextRecord);
+
+    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: nextRecord });
+    if (saveResult.notFound) return jsonResponse(404, { action: body.action, not_found: true });
   }
 
-  const timestamp = nowIso();
-  const nextRecord: WorkflowRecord = {
-    ...canonicalRecord,
-    updated_at: timestamp,
-    lock: undefined,
-    history: [
-      ...canonicalRecord.history,
-      {
-        at: timestamp,
-        action: body.action,
-        details: {
-          owner_id: canonicalRecord.lock.owner_id,
-          owner_label: canonicalRecord.lock.owner_label,
-        },
-      },
-    ],
-    version: canonicalRecord.version + 1,
-  };
-
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, canonicalRecord, nextRecord);
-
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(409, { action: body.action, conflict: true });
 };
 
 const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
@@ -870,45 +888,45 @@ const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) =>
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
-  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const latestRecord = await loadRecord(store, body.request_id as string);
+    if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  const lockFailure = validateMutationLock(previousRecord, body);
-  if (lockFailure) return lockFailure;
+    const lockFailure = validateMutationLock(latestRecord, body);
+    if (lockFailure) return lockFailure;
 
-  if (previousRecord.workflow_status === 'published') {
-    return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+    if (latestRecord.workflow_status === 'published') {
+      return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
+    }
+
+    const timestamp = nowIso();
+    const commitMetadata = getCommitMetadata(body);
+    const nextRecord: WorkflowRecord = {
+      ...latestRecord,
+      updated_at: timestamp,
+      workflow_status: 'published',
+      history: [
+        ...latestRecord.history,
+        {
+          at: timestamp,
+          action: body.action,
+          details: {
+            owner_id: latestRecord.lock?.owner_id,
+            owner_label: latestRecord.lock?.owner_label,
+            ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
+          },
+        },
+      ],
+      version: latestRecord.version + 1,
+    };
+
+    const saveResult = await saveRecordIfVersionUnchanged(store, latestRecord, nextRecord);
+
+    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: nextRecord });
+    if (saveResult.notFound) return jsonResponse(404, { action: body.action, not_found: true });
   }
 
-  const timestamp = nowIso();
-  const commitMetadata = getCommitMetadata(body);
-  const nextRecord: WorkflowRecord = {
-    ...previousRecord,
-    updated_at: timestamp,
-    workflow_status: 'published',
-    current_stage: null,
-    next_agent: null,
-    last_error: null,
-    needs_review: false,
-    history: [
-      ...previousRecord.history,
-      {
-        at: timestamp,
-        action: body.action,
-        details: {
-          owner_id: previousRecord.lock?.owner_id,
-          owner_label: previousRecord.lock?.owner_label,
-          ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
-        },
-      },
-    ],
-    version: previousRecord.version + 1,
-  };
-
-  await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
-
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(409, { action: body.action, conflict: true });
 };
 
 const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {

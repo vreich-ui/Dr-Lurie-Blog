@@ -287,11 +287,10 @@ export const handler = async (event: LambdaEvent) => {
     return finalizeUpload(event, input, bytes);
   }
 
-  const artifactStore = await getArtifactBlobStore(event);
-  const indexStore = await getArtifactIndexBlobStore(event);
-
-  // Keep indexStore initialized in this branch for parity with single-shot finalization, but chunk bytes live in artifactStore.
-  void indexStore;
+  const [artifactStore, _indexStore] = await Promise.all([
+    getArtifactBlobStore(event),
+    getArtifactIndexBlobStore(event),
+  ]);
 
   await artifactStore.set(chunkKey(input.requestId, input.clientUploadId, input.chunkIndex), bytes, {
     metadata: {
