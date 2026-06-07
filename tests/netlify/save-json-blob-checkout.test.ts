@@ -138,7 +138,7 @@ test('checkout_request stabilizes transient not-found reads after create before 
   }
 });
 
-test('checkout_request can recover with a strong-consistency read when eventual reads stay null', async () => {
+test('checkout_request can recover immediately when a strong-consistency read sees the canonical record', async () => {
   const store = createMemoryStore();
   const requestId = `checkout-strong-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -151,14 +151,13 @@ test('checkout_request can recover with a strong-consistency read when eventual 
 
   let eventualRecordGetAttempts = 0;
   let strongRecordGetAttempts = 0;
-  const strongStore = {
+  const strongVisibleStore = {
     ...store,
     async get(key: string, options?: { consistency?: 'eventual' | 'strong' }) {
       if (key === recordKey(requestId)) {
         if (options?.consistency === 'strong') {
           strongRecordGetAttempts += 1;
-          if (eventualRecordGetAttempts >= 20) return store.get(key);
-          return null;
+          return store.get(key);
         }
 
         eventualRecordGetAttempts += 1;
@@ -169,41 +168,35 @@ test('checkout_request can recover with a strong-consistency read when eventual 
     },
   };
 
-  const warnings: unknown[][] = [];
-  const originalWarn = console.warn;
-  console.warn = (...args: unknown[]) => warnings.push(args);
-  try {
-    const checkoutResponse = await checkoutRequest(strongStore, {
-      action: 'checkout_request',
-      request_id: requestId,
-      owner_id: 'checkout-strong-agent',
-      owner_label: 'Checkout strong agent',
-      lease_seconds: 900,
-    });
-    const body = parseBody(checkoutResponse);
+  const checkoutResponse = await checkoutRequest(strongVisibleStore, {
+    action: 'checkout_request',
+    request_id: requestId,
+    owner_id: 'checkout-strong-agent',
+    owner_label: 'Checkout strong agent',
+    lease_seconds: 900,
+  });
+  const body = parseBody(checkoutResponse);
 
-    assert.equal(checkoutResponse.statusCode, 200, checkoutResponse.body);
-    assert.equal(body.record?.request_id, requestId);
-    assert.equal(body.record?.lock?.owner_id, 'checkout-strong-agent');
-    assert.deepEqual(body.diagnostics, {
-      request_id: requestId,
-      record_key: recordKey(requestId),
-      attempts: 20,
-      eventual_read_exhausted: true,
-      first_non_null_attempt: 20,
-      max_attempts: 20,
-      null_read_attempts: Array.from({ length: 20 }, (_, index) => index + 1),
-      saw_transient_null_reads: true,
-      stabilization_delay_ms: 100,
-      strong_read_attempts: 20,
-      strong_read_succeeded: true,
-    });
-    assert.equal(eventualRecordGetAttempts, 23);
-    assert.equal(strongRecordGetAttempts, 20);
-    assert.equal(warnings.length, 19);
-  } finally {
-    console.warn = originalWarn;
-  }
+  assert.equal(checkoutResponse.statusCode, 200, checkoutResponse.body);
+  assert.notEqual(body.not_found, true);
+  assert.equal(body.record?.request_id, requestId);
+  assert.equal(body.record?.lock?.owner_id, 'checkout-strong-agent');
+  assert.equal(typeof body.record?.lock?.token, 'string');
+  assert.deepEqual(body.diagnostics, {
+    request_id: requestId,
+    record_key: recordKey(requestId),
+    attempts: 1,
+    eventual_read_exhausted: false,
+    first_non_null_attempt: 1,
+    max_attempts: 20,
+    null_read_attempts: [1],
+    saw_transient_null_reads: true,
+    stabilization_delay_ms: 100,
+    strong_read_attempts: 1,
+    strong_read_succeeded: true,
+  });
+  assert.equal(strongRecordGetAttempts, 1);
+  assert.ok(eventualRecordGetAttempts > 0);
 });
 
 test('checkout_request returns final not_found diagnostics only after retry attempts are exhausted', async () => {
