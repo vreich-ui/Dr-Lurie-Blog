@@ -228,6 +228,14 @@ const publishPayloadJsonSchema = objectSchema(
     author: stringSchema('Article author name; required for admin import.'),
     tags: stringArraySchema('Article tags.'),
     images: arraySchema({}, 'Image metadata or asset references.'),
+    mediaEntries: arraySchema(
+      {},
+      'Permissive media entry payloads accepted by the runtime publisher; use for existing base64 media entries when needed.'
+    ),
+    artifactReferences: arraySchema(
+      {},
+      'ArtifactReference objects returned by save_artifact or save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
+    ),
     overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
     draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
     articlePath: stringSchema('Optional normalized repository path, usually src/data/post/{slug}.md.'),
