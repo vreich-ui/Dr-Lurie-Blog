@@ -331,253 +331,266 @@ const metadata = {
   import { loadClerk } from '~/utils/clerkLoader';
 
   (() => {
-    const adminPage = document.querySelector('[data-admin-shell]');
-    const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
-    const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
-    const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
-    const authStatus = document.querySelector('[data-auth-status]');
-    const routeDraftId = adminPage?.dataset.routeDraftId || '';
-    const pathDraftId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) || '');
-    const draftId = pathDraftId || routeDraftId;
-    const fields = {
-      draftIdCopy: document.querySelector('#draft-id-copy'),
-      editDraftLink: document.querySelector('#edit-draft-link'),
-      notFoundEditLink: document.querySelector('#not-found-edit-link'),
-      loadStatus: document.querySelector('#review-load-status'),
-      notFoundPanel: document.querySelector('#not-found-panel'),
-      preview: document.querySelector('#draft-preview'),
-      title: document.querySelector('#preview-title'),
-      excerpt: document.querySelector('#preview-excerpt'),
-      readingTime: document.querySelector('#preview-reading-time'),
-      readingSeparator: document.querySelector('#preview-reading-separator'),
-      date: document.querySelector('#preview-date'),
-      image: document.querySelector('#preview-image'),
-      divider: document.querySelector('#preview-divider'),
-      videoWrap: document.querySelector('#preview-video-wrap'),
-      video: document.querySelector('#preview-video'),
-      ctaWrap: document.querySelector('#preview-cta-wrap'),
-      cta: document.querySelector('#preview-cta'),
-      content: document.querySelector('#preview-content'),
-    };
-    let clerkLoadPromise;
+    const initializeAdminReviewPage = () => {
+      const pageRoot = document.querySelector('.review-page');
+      if (!pageRoot || pageRoot.dataset.adminReviewInitialized === 'true') return;
+      pageRoot.dataset.adminReviewInitialized = 'true';
 
-    const setGatedContentVisible = (visible) => {
-      gatedContent.forEach((element) => {
-        element.hidden = !visible;
-      });
-    };
-
-    const setAdminShellVisible = (visible) => {
-      if (adminPage) adminPage.hidden = !visible;
-    };
-
-    const setAuthStatus = (message) => {
-      if (authStatus) authStatus.textContent = message;
-    };
-
-    const setLoadStatus = (message, isError = false) => {
-      if (!fields.loadStatus) return;
-      fields.loadStatus.textContent = message;
-      fields.loadStatus.classList.toggle('is-error', isError);
-    };
-
-    const getClerk = async () => {
-      if (!clerkPublishableKey) {
-        throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
-      }
-
-      clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
-
-      return clerkLoadPromise;
-    };
-
-    const redirectToHome = () => {
-      window.location.replace('/');
-    };
-
-    const setAuthState = (state) => {
-      const isSignedIn = state === 'signed-in';
-      const messages = {
-        checking: 'Checking admin access…',
-        'signed-out': 'Sign in to view admin tools.',
-        forbidden: 'Access denied (not an admin).',
-        error: 'Admin auth failed. Please refresh or contact support.',
-        'signed-in': '',
+      const adminPage = pageRoot;
+      const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+      const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+      const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+      const authStatus = document.querySelector('[data-auth-status]');
+      const routeDraftId = adminPage?.dataset.routeDraftId || '';
+      const pathDraftId = decodeURIComponent(window.location.pathname.split('/').filter(Boolean).at(-1) || '');
+      const draftId = pathDraftId || routeDraftId;
+      const fields = {
+        draftIdCopy: document.querySelector('#draft-id-copy'),
+        editDraftLink: document.querySelector('#edit-draft-link'),
+        notFoundEditLink: document.querySelector('#not-found-edit-link'),
+        loadStatus: document.querySelector('#review-load-status'),
+        notFoundPanel: document.querySelector('#not-found-panel'),
+        preview: document.querySelector('#draft-preview'),
+        title: document.querySelector('#preview-title'),
+        excerpt: document.querySelector('#preview-excerpt'),
+        readingTime: document.querySelector('#preview-reading-time'),
+        readingSeparator: document.querySelector('#preview-reading-separator'),
+        date: document.querySelector('#preview-date'),
+        image: document.querySelector('#preview-image'),
+        divider: document.querySelector('#preview-divider'),
+        videoWrap: document.querySelector('#preview-video-wrap'),
+        video: document.querySelector('#preview-video'),
+        ctaWrap: document.querySelector('#preview-cta-wrap'),
+        cta: document.querySelector('#preview-cta'),
+        content: document.querySelector('#preview-content'),
       };
-      setAuthStatus(messages[state] || '');
-      setAdminShellVisible(isSignedIn);
-      setGatedContentVisible(isSignedIn);
+      let clerkLoadPromise;
 
-      if (!isSignedIn && state !== 'checking') redirectToHome();
-    };
-
-    const getAdminStateForClerk = async (clerk) => {
-      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-
-      const token = await clerk.session.getToken();
-      if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
-
-      const response = await fetch('/.netlify/functions/admin-auth-state', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      return response
-        .json()
-        .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
-    };
-
-    const formatDate = (value) => {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return { display: 'Draft date unavailable', iso: '' };
-
-      return {
-        display: new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date),
-        iso: date.toISOString(),
+      const setGatedContentVisible = (visible) => {
+        gatedContent.forEach((element) => {
+          element.hidden = !visible;
+        });
       };
-    };
 
-    const setText = (element, value) => {
-      if (element) element.textContent = value || '';
-    };
+      const setAdminShellVisible = (visible) => {
+        if (adminPage) adminPage.hidden = !visible;
+      };
 
-    const setPreviewMedia = (draft) => {
-      const image = String(draft.image || '').trim();
-      const canRenderImage = image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/');
-      if (fields.image) {
-        fields.image.hidden = !canRenderImage;
-        if (canRenderImage) fields.image.src = image;
-        fields.image.alt = draft.excerpt || draft.title || '';
-      }
-      if (fields.divider) fields.divider.hidden = canRenderImage;
+      const setAuthStatus = (message) => {
+        if (authStatus) authStatus.textContent = message;
+      };
 
-      if (fields.videoWrap && fields.video) {
-        fields.videoWrap.hidden = !draft.video;
-        if (draft.video) {
-          fields.video.src = draft.video;
-          fields.video.title = `${draft.title || 'Draft'} video`;
+      const setLoadStatus = (message, isError = false) => {
+        if (!fields.loadStatus) return;
+        fields.loadStatus.textContent = message;
+        fields.loadStatus.classList.toggle('is-error', isError);
+      };
+
+      const getClerk = async () => {
+        if (!clerkPublishableKey) {
+          throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
         }
-      }
 
-      if (fields.ctaWrap && fields.cta) {
-        fields.ctaWrap.hidden = !draft.ctaLink;
-        if (draft.ctaLink) {
-          fields.cta.href = draft.ctaLink;
-          fields.cta.textContent = draft.ctaText || 'Learn more';
+        clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
+
+        return clerkLoadPromise;
+      };
+
+      const redirectToHome = () => {
+        window.location.replace('/');
+      };
+
+      const setAuthState = (state) => {
+        const isSignedIn = state === 'signed-in';
+        const messages = {
+          checking: 'Checking admin access…',
+          'signed-out': 'Sign in to view admin tools.',
+          forbidden: 'Access denied (not an admin).',
+          error: 'Admin auth failed. Please refresh or contact support.',
+          'signed-in': '',
+        };
+        setAuthStatus(messages[state] || '');
+        setAdminShellVisible(isSignedIn);
+        setGatedContentVisible(isSignedIn);
+
+        if (!isSignedIn && state !== 'checking') redirectToHome();
+      };
+
+      const getAdminStateForClerk = async (clerk) => {
+        if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+        const token = await clerk.session.getToken();
+        if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+
+        const response = await fetch('/.netlify/functions/admin-auth-state', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+      };
+
+      const formatDate = (value) => {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return { display: 'Draft date unavailable', iso: '' };
+
+        return {
+          display: new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date),
+          iso: date.toISOString(),
+        };
+      };
+
+      const setText = (element, value) => {
+        if (element) element.textContent = value || '';
+      };
+
+      const setPreviewMedia = (draft) => {
+        const image = String(draft.image || '').trim();
+        const canRenderImage = image.startsWith('http://') || image.startsWith('https://') || image.startsWith('/');
+        if (fields.image) {
+          fields.image.hidden = !canRenderImage;
+          if (canRenderImage) fields.image.src = image;
+          fields.image.alt = draft.excerpt || draft.title || '';
         }
-      }
-    };
+        if (fields.divider) fields.divider.hidden = canRenderImage;
 
-    const renderDraft = (draft) => {
-      const date = formatDate(draft.publishDate || draft.updatedAt);
-      setText(fields.title, draft.title || 'Untitled draft');
-      setText(fields.excerpt, draft.excerpt || '');
-      setText(fields.date, date.display);
-      if (fields.date) fields.date.dateTime = date.iso;
-
-      const readingTime = Number(draft.readingTime);
-      const hasReadingTime = Number.isFinite(readingTime) && readingTime > 0;
-      if (fields.readingTime) {
-        fields.readingTime.hidden = !hasReadingTime;
-        fields.readingTime.textContent = hasReadingTime ? `${readingTime} min read` : '';
-      }
-      if (fields.readingSeparator) fields.readingSeparator.hidden = !hasReadingTime;
-      if (fields.content) fields.content.innerHTML = draft.html || '';
-      setPreviewMedia(draft);
-
-      if (fields.preview) fields.preview.hidden = false;
-      if (fields.notFoundPanel) fields.notFoundPanel.hidden = true;
-      setLoadStatus('');
-    };
-
-    const showNotFound = (message) => {
-      if (fields.preview) fields.preview.hidden = true;
-      if (fields.notFoundPanel) fields.notFoundPanel.hidden = false;
-      setLoadStatus(message || 'Draft was not found.', true);
-    };
-
-    const loadDraft = async (token) => {
-      if (!draftId) {
-        showNotFound('No draft id was provided.');
-        return;
-      }
-
-      setLoadStatus('Loading draft preview…');
-
-      try {
-        const response = await fetch(
-          `/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
+        if (fields.videoWrap && fields.video) {
+          fields.videoWrap.hidden = !draft.video;
+          if (draft.video) {
+            fields.video.src = draft.video;
+            fields.video.title = `${draft.title || 'Draft'} video`;
           }
-        );
-        const result = await response.json().catch(() => ({}));
+        }
 
-        if (response.status === 404 || result.not_found) {
-          showNotFound(result.error || 'Draft was not found.');
+        if (fields.ctaWrap && fields.cta) {
+          fields.ctaWrap.hidden = !draft.ctaLink;
+          if (draft.ctaLink) {
+            fields.cta.href = draft.ctaLink;
+            fields.cta.textContent = draft.ctaText || 'Learn more';
+          }
+        }
+      };
+
+      const renderDraft = (draft) => {
+        const date = formatDate(draft.publishDate || draft.updatedAt);
+        setText(fields.title, draft.title || 'Untitled draft');
+        setText(fields.excerpt, draft.excerpt || '');
+        setText(fields.date, date.display);
+        if (fields.date) fields.date.dateTime = date.iso;
+
+        const readingTime = Number(draft.readingTime);
+        const hasReadingTime = Number.isFinite(readingTime) && readingTime > 0;
+        if (fields.readingTime) {
+          fields.readingTime.hidden = !hasReadingTime;
+          fields.readingTime.textContent = hasReadingTime ? `${readingTime} min read` : '';
+        }
+        if (fields.readingSeparator) fields.readingSeparator.hidden = !hasReadingTime;
+        if (fields.content) fields.content.innerHTML = draft.html || '';
+        setPreviewMedia(draft);
+
+        if (fields.preview) fields.preview.hidden = false;
+        if (fields.notFoundPanel) fields.notFoundPanel.hidden = true;
+        setLoadStatus('');
+      };
+
+      const showNotFound = (message) => {
+        if (fields.preview) fields.preview.hidden = true;
+        if (fields.notFoundPanel) fields.notFoundPanel.hidden = false;
+        setLoadStatus(message || 'Draft was not found.', true);
+      };
+
+      const loadDraft = async (token) => {
+        if (!draftId) {
+          showNotFound('No draft id was provided.');
           return;
         }
 
-        if (!response.ok) throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
+        setLoadStatus('Loading draft preview…');
 
-        renderDraft(result.draft || {});
-      } catch (error) {
-        showNotFound(error instanceof Error ? error.message : 'Draft could not be loaded.');
-      }
-    };
+        try {
+          const response = await fetch(
+            `/.netlify/functions/admin-get-json-draft?draftId=${encodeURIComponent(draftId)}`,
+            {
+              method: 'GET',
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          const result = await response.json().catch(() => ({}));
 
-    const renderAuthState = async (clerk) => {
-      const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+          if (response.status === 404 || result.not_found) {
+            showNotFound(result.error || 'Draft was not found.');
+            return;
+          }
 
-      if (signedIn) {
-        const adminState = await getAdminStateForClerk(clerk);
+          if (!response.ok) throw new Error(result.error || `Draft could not be loaded (${response.status}).`);
 
-        if (adminState.isAdmin) {
-          const token = await clerk.session.getToken();
-          setAuthState('signed-in');
-          await loadDraft(token);
+          renderDraft(result.draft || {});
+        } catch (error) {
+          showNotFound(error instanceof Error ? error.message : 'Draft could not be loaded.');
+        }
+      };
+
+      const renderAuthState = async (clerk) => {
+        const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+
+        if (signedIn) {
+          const adminState = await getAdminStateForClerk(clerk);
+
+          if (adminState.isAdmin) {
+            const token = await clerk.session.getToken();
+            setAuthState('signed-in');
+            await loadDraft(token);
+            return;
+          }
+
+          setAuthState('forbidden');
           return;
         }
 
-        setAuthState('forbidden');
-        return;
-      }
+        setAuthState('signed-out');
+      };
 
-      setAuthState('signed-out');
-    };
+      const initializeClerkAuth = async () => {
+        setAuthState('checking');
 
-    const initializeClerkAuth = async () => {
-      setAuthState('checking');
+        try {
+          const clerk = await getClerk();
+          await renderAuthState(clerk);
 
-      try {
-        const clerk = await getClerk();
-        await renderAuthState(clerk);
-
-        if (typeof clerk.addListener === 'function') {
-          clerk.addListener(() => {
-            renderAuthState(clerk).catch((error) => {
-              console.error('Clerk authentication refresh failed.', error);
+          if (typeof clerk.addListener === 'function') {
+            clerk.addListener(() => {
+              renderAuthState(clerk).catch((error) => {
+                console.error('Clerk authentication refresh failed.', error);
+              });
             });
-          });
+          }
+        } catch (error) {
+          console.error('Clerk authentication initialization failed.', error);
+          setAuthState('error');
         }
-      } catch (error) {
-        console.error('Clerk authentication initialization failed.', error);
-        setAuthState('error');
-      }
+      };
+
+      const encodedDraftId = encodeURIComponent(draftId || '');
+      setText(fields.draftIdCopy, draftId ? `Draft ID: ${draftId}` : 'No draft id provided');
+      if (fields.editDraftLink) fields.editDraftLink.href = `/admin/publish?draftId=${encodedDraftId}`;
+      if (fields.notFoundEditLink) fields.notFoundEditLink.href = `/admin/publish?draftId=${encodedDraftId}`;
+
+      initializeClerkAuth();
     };
 
-    const encodedDraftId = encodeURIComponent(draftId || '');
-    setText(fields.draftIdCopy, draftId ? `Draft ID: ${draftId}` : 'No draft id provided');
-    if (fields.editDraftLink) fields.editDraftLink.href = `/admin/publish?draftId=${encodedDraftId}`;
-    if (fields.notFoundEditLink) fields.notFoundEditLink.href = `/admin/publish?draftId=${encodedDraftId}`;
+    if (!window.__drLurieAdminReviewPageLoadListener) {
+      window.__drLurieAdminReviewPageLoadListener = true;
+      document.addEventListener('astro:page-load', initializeAdminReviewPage);
+    }
 
-    initializeClerkAuth();
+    initializeAdminReviewPage();
   })();
 </script>
