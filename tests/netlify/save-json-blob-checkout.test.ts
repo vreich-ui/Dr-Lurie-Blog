@@ -7,7 +7,7 @@ const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 
 type ResponseBody = {
   action: string;
-  diagnostics?: { attempts: number; request_id: string };
+  diagnostics?: { attempts: number; max_attempts: number; max_retries: number; request_id: string };
   not_found?: boolean;
   record?: WorkflowRecord;
 };
@@ -100,11 +100,11 @@ test('checkout_request retries transient not-found reads after create before acq
     assert.equal(checkoutResponse.statusCode, 200, checkoutResponse.body);
     assert.equal(body.record?.request_id, requestId);
     assert.equal(body.record?.lock?.owner_id, 'checkout-retry-agent');
-    assert.deepEqual(body.diagnostics, { request_id: requestId, attempts: 3 });
+    assert.deepEqual(body.diagnostics, { request_id: requestId, attempts: 3, max_retries: 3, max_attempts: 4 });
     assert.equal(recordGetAttempts, 3);
     assert.equal(warnings.length, 2);
     assert.deepEqual(
-      warnings.map((warning) => (warning[1] as { attempt: number }).attempt),
+      warnings.map((warning) => (warning[1] as { attempts: number }).attempts),
       [1, 2]
     );
   } finally {
@@ -131,12 +131,18 @@ test('checkout_request returns final not_found diagnostics only after retry atte
 
     assert.equal(checkoutResponse.statusCode, 404, checkoutResponse.body);
     assert.equal(body.not_found, true);
-    assert.deepEqual(body.diagnostics, { request_id: requestId, attempts: 4 });
-    assert.equal(warnings.length, 3);
+    assert.deepEqual(body.diagnostics, { request_id: requestId, attempts: 4, max_retries: 3, max_attempts: 4 });
+    assert.equal(warnings.length, 4);
     assert.deepEqual(
-      warnings.map((warning) => (warning[1] as { attempt: number }).attempt),
+      warnings.slice(0, 3).map((warning) => (warning[1] as { attempts: number }).attempts),
       [1, 2, 3]
     );
+    assert.deepEqual(warnings.at(-1)?.[1], {
+      request_id: requestId,
+      attempts: 4,
+      max_retries: 3,
+      max_attempts: 4,
+    });
   } finally {
     console.warn = originalWarn;
   }
