@@ -126,12 +126,13 @@ test('checkin_request preserves newer published canonical workflow state over a 
   const staleOnceStore = {
     ...store,
     async get(key: string) {
-      if (key === canonicalKey && canonicalGetCount === 0) {
+      if (key === canonicalKey) {
+        const readIndex = canonicalGetCount;
         canonicalGetCount += 1;
-        return JSON.stringify(staleCompletedSnapshot);
-      }
 
-      if (key === canonicalKey) canonicalGetCount += 1;
+        // Return stale state for the first mutation read and the first version-check read.
+        if (readIndex === 0 || readIndex === 3) return JSON.stringify(staleCompletedSnapshot);
+      }
 
       return store.get(key);
     },
@@ -145,9 +146,14 @@ test('checkin_request preserves newer published canonical workflow state over a 
     })
   );
 
+  assert.ok(canonicalGetCount > 3, 'checkin should retry after stale mutation and version-check reads');
   assert.equal(checkin.record.workflow_status, 'published');
+  assert.equal(checkin.record.current_stage, null);
+  assert.equal(checkin.record.next_agent, null);
   assert.equal(checkin.record.lock, undefined);
   assert.equal(checkin.record.completed_agents.includes('final_article'), true);
+  assert.deepEqual(checkin.record.failed_agents, staleCompletedSnapshot.failed_agents);
+  assert.deepEqual(checkin.record.agent_outputs.final_article, staleCompletedSnapshot.agent_outputs.final_article);
   assert.equal(checkin.record.input.publication?.publish_payload?.slug, 'checkin-regression-article');
   assert.ok(checkin.record.history.some((entry) => entry.action === 'mark_published'));
   assert.equal(checkin.record.history.at(-1)?.action, 'checkin_request');
@@ -155,10 +161,14 @@ test('checkin_request preserves newer published canonical workflow state over a 
   const fetched = await postWorkflowAction({ action: 'get_request', request_id: requestId });
 
   assert.equal(fetched.record.workflow_status, 'published');
+  assert.equal(fetched.record.current_stage, null);
+  assert.equal(fetched.record.next_agent, null);
   assert.equal(fetched.record.lock, undefined);
   assert.equal(fetched.record.completed_agents.includes('final_article'), true);
+  assert.deepEqual(fetched.record.agent_outputs.final_article, staleCompletedSnapshot.agent_outputs.final_article);
   assert.equal(fetched.record.input.publication?.publish_payload?.slug, 'checkin-regression-article');
   assert.ok(fetched.record.history.some((entry) => entry.action === 'mark_published'));
+  assert.ok(fetched.record.history.some((entry) => entry.action === 'checkin_request'));
   assert.deepEqual(
     fetched.record.history.find((entry) => entry.action === 'mark_published')?.details?.commit_metadata,
     {

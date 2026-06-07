@@ -203,6 +203,7 @@ const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
 const CHECKOUT_NOT_FOUND_MAX_ATTEMPTS = CHECKOUT_NOT_FOUND_MAX_RETRIES + 1;
 const MARK_COMPLETE_STALE_READ_MAX_RETRIES = 3;
 const MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS = 25;
+const CHECKIN_STALE_READ_RETRY_DELAY_MS = 25;
 const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
@@ -384,6 +385,51 @@ const saveRecordIfVersionUnchanged = async (
   nextRecord: WorkflowRecord
 ) => {
   const latestRecord = await loadRecord(store, expectedRecord.request_id);
+
+  if (!latestRecord) return { saved: false as const, notFound: true as const };
+  if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
+
+  await saveRecord(store, nextRecord);
+  await updateIndexes(store, latestRecord, nextRecord);
+
+  return { saved: true as const };
+};
+
+const hasHistoryAction = (record: WorkflowRecord, action: WorkflowAction) => {
+  return record.history.some((entry) => entry.action === action);
+};
+
+const isPreferredCheckinCandidate = (candidate: WorkflowRecord, current: WorkflowRecord) => {
+  if (candidate.version !== current.version) return candidate.version > current.version;
+  if (!hasHistoryAction(current, 'mark_published') && hasHistoryAction(candidate, 'mark_published')) return true;
+
+  return candidate.history.length > current.history.length;
+};
+
+const loadLatestRecordForCheckin = async (store: WorkflowBlobStore, requestId: string) => {
+  let latestRecord: WorkflowRecord | undefined;
+
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const candidate = await loadRecord(store, requestId);
+
+    if (candidate && (!latestRecord || isPreferredCheckinCandidate(candidate, latestRecord))) {
+      latestRecord = candidate;
+    }
+
+    if (attempt < WORKFLOW_MUTATION_MAX_RETRIES - 1) {
+      await delay(CHECKIN_STALE_READ_RETRY_DELAY_MS);
+    }
+  }
+
+  return latestRecord;
+};
+
+const saveCheckinIfLatestRecordUnchanged = async (
+  store: WorkflowBlobStore,
+  expectedRecord: WorkflowRecord,
+  nextRecord: WorkflowRecord
+) => {
+  const latestRecord = await loadLatestRecordForCheckin(store, expectedRecord.request_id);
 
   if (!latestRecord) return { saved: false as const, notFound: true as const };
   if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
@@ -861,36 +907,35 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
   if (missingLockToken) return missingLockToken;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const canonicalRecord = await loadRecord(store, body.request_id as string);
-    if (!canonicalRecord) return jsonResponse(404, { action: body.action, not_found: true });
+    const latestRecord = await loadLatestRecordForCheckin(store, body.request_id as string);
+    if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-    if (!canonicalRecord.lock)
-      return jsonResponse(200, { action: body.action, record: canonicalRecord, idempotent: true });
+    if (!latestRecord.lock) return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
 
-    if (canonicalRecord.lock.token !== body.lock_token) {
-      return jsonResponse(423, { action: body.action, locked: true, lock: canonicalRecord.lock });
+    if (latestRecord.lock.token !== body.lock_token) {
+      return jsonResponse(423, { action: body.action, locked: true, lock: latestRecord.lock });
     }
 
     const timestamp = nowIso();
     const nextRecord: WorkflowRecord = {
-      ...canonicalRecord,
+      ...latestRecord,
       updated_at: timestamp,
       lock: undefined,
       history: [
-        ...canonicalRecord.history,
+        ...latestRecord.history,
         {
           at: timestamp,
           action: body.action,
           details: {
-            owner_id: canonicalRecord.lock.owner_id,
-            owner_label: canonicalRecord.lock.owner_label,
+            owner_id: latestRecord.lock.owner_id,
+            owner_label: latestRecord.lock.owner_label,
           },
         },
       ],
-      version: canonicalRecord.version + 1,
+      version: latestRecord.version + 1,
     };
 
-    const saveResult = await saveRecordIfVersionUnchanged(store, canonicalRecord, nextRecord);
+    const saveResult = await saveCheckinIfLatestRecordUnchanged(store, latestRecord, nextRecord);
 
     if (saveResult.saved) return jsonResponse(200, { action: body.action, record: nextRecord });
     if (saveResult.notFound) return jsonResponse(404, { action: body.action, not_found: true });
