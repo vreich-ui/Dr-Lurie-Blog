@@ -204,6 +204,8 @@ const MARK_COMPLETE_STALE_READ_MAX_RETRIES = 3;
 const MARK_COMPLETE_STALE_READ_RETRY_DELAY_MS = 25;
 const CHECKIN_STALE_READ_RETRY_DELAY_MS = 25;
 const GET_REQUEST_STALE_READ_RETRY_DELAY_MS = 25;
+const LOCK_TOKEN_STALE_READ_MAX_RETRIES = 5;
+const LOCK_TOKEN_STALE_READ_RETRY_DELAY_MS = 25;
 const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
@@ -344,6 +346,57 @@ const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
 };
 
 const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const hasActiveMatchingLockToken = (record: WorkflowRecord, lockToken: string, nowMs = Date.now()) => {
+  return Boolean(record.lock?.token === lockToken && isLockActive(record.lock, nowMs));
+};
+
+const isPreferredLockTokenCandidate = (
+  candidate: WorkflowRecord,
+  current: WorkflowRecord | undefined,
+  lockToken: string,
+  nowMs = Date.now()
+) => {
+  if (!current) return true;
+  if (candidate.version !== current.version) return candidate.version > current.version;
+
+  const candidateHasActiveMatchingLock = hasActiveMatchingLockToken(candidate, lockToken, nowMs);
+  const currentHasActiveMatchingLock = hasActiveMatchingLockToken(current, lockToken, nowMs);
+  if (candidateHasActiveMatchingLock !== currentHasActiveMatchingLock) return candidateHasActiveMatchingLock;
+
+  const candidateHasMatchingLock = candidate.lock?.token === lockToken;
+  const currentHasMatchingLock = current.lock?.token === lockToken;
+  if (candidateHasMatchingLock !== currentHasMatchingLock) return candidateHasMatchingLock;
+
+  const candidateExpiresAtMs = candidate.lock ? getLockExpirationMs(candidate.lock) : 0;
+  const currentExpiresAtMs = current.lock ? getLockExpirationMs(current.lock) : 0;
+  if (candidateExpiresAtMs !== currentExpiresAtMs) return candidateExpiresAtMs > currentExpiresAtMs;
+
+  return candidate.history.length > current.history.length;
+};
+
+const loadRecordForLockToken = async (store: WorkflowBlobStore, requestId: string, lockToken: string) => {
+  let preferredRecord: WorkflowRecord | undefined;
+
+  for (let attempt = 0; attempt < LOCK_TOKEN_STALE_READ_MAX_RETRIES; attempt += 1) {
+    const candidate = await loadRecord(store, requestId);
+    const nowMs = Date.now();
+
+    if (candidate && isPreferredLockTokenCandidate(candidate, preferredRecord, lockToken, nowMs)) {
+      preferredRecord = candidate;
+    }
+
+    if (candidate && hasActiveMatchingLockToken(candidate, lockToken, nowMs)) {
+      return { record: candidate };
+    }
+
+    if (attempt < LOCK_TOKEN_STALE_READ_MAX_RETRIES - 1) {
+      await delay(LOCK_TOKEN_STALE_READ_RETRY_DELAY_MS);
+    }
+  }
+
+  return { record: preferredRecord };
+};
 
 type CheckoutLoadDiagnostics = {
   attempts: number;
@@ -675,7 +728,10 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
   const agentName = parseRequiredAgentName(body.agent_name);
   if (!agentName) return jsonResponse(400, { action: body.action, error: 'Invalid agent_name.' });
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
+  const requestId = body.request_id as string;
+  const previousRecord = body.lock_token
+    ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
+    : await loadRecord(store, requestId);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
   const lockFailure = validateMutationLock(previousRecord, body);
@@ -783,7 +839,10 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
   const workflowStatus = parseOptionalWorkflowStatus(body.workflow_status);
   if (!workflowStatus.ok) return jsonResponse(400, { action: body.action, error: workflowStatus.error });
 
-  let previousRecord = await loadRecord(store, body.request_id as string);
+  const requestId = body.request_id as string;
+  let previousRecord = body.lock_token
+    ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
+    : await loadRecord(store, requestId);
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
   let lockFailure = validateMutationLock(previousRecord, body);
@@ -798,7 +857,15 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
       const stabilizedRead = await loadRecordAtExpectedVersion(store, body, previousRecord);
       if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
 
-      previousRecord = stabilizedRead.record;
+      if (body.lock_token) {
+        const lockTokenRecord = (await loadRecordForLockToken(store, requestId, body.lock_token)).record;
+        previousRecord =
+          lockTokenRecord && isPreferredLockTokenCandidate(lockTokenRecord, stabilizedRead.record, body.lock_token)
+            ? lockTokenRecord
+            : stabilizedRead.record;
+      } else {
+        previousRecord = stabilizedRead.record;
+      }
       lockFailure = validateMutationLock(previousRecord, body);
       if (lockFailure) return lockFailure;
 
@@ -898,14 +965,15 @@ export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRe
   });
 };
 
-const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
   const missingLockToken = requireStringField(body, 'lock_token');
   if (missingLockToken) return missingLockToken;
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
+  const requestId = body.request_id as string;
+  const previousRecord = (await loadRecordForLockToken(store, requestId, body.lock_token as string)).record;
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
   if (!previousRecord.lock) return jsonResponse(409, { action: body.action, error: 'No lock is currently held.' });
   if (previousRecord.lock.token !== body.lock_token) {
@@ -1046,7 +1114,10 @@ export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequ
   if (missingRequestId) return missingRequestId;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    let latestRecord = await loadRecord(store, body.request_id as string);
+    const requestId = body.request_id as string;
+    let latestRecord = body.lock_token
+      ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
+      : await loadRecord(store, requestId);
     if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
     if (
@@ -1057,7 +1128,15 @@ export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequ
       const stabilizedRead = await loadRecordAtExpectedVersion(store, body, latestRecord);
       if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
 
-      latestRecord = stabilizedRead.record;
+      if (body.lock_token) {
+        const lockTokenRecord = (await loadRecordForLockToken(store, requestId, body.lock_token)).record;
+        latestRecord =
+          lockTokenRecord && isPreferredLockTokenCandidate(lockTokenRecord, stabilizedRead.record, body.lock_token)
+            ? lockTokenRecord
+            : stabilizedRead.record;
+      } else {
+        latestRecord = stabilizedRead.record;
+      }
     }
 
     const lockFailure = validateMutationLock(latestRecord, body);

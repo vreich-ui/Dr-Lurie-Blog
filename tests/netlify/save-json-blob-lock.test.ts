@@ -8,6 +8,7 @@ import {
   markAgentComplete,
   markPublished,
   patchAgentOutput,
+  refreshLock,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
 
@@ -353,4 +354,93 @@ test('patch_agent_output lock_expired diagnostics use UTC milliseconds and inclu
   assert.equal(body.diagnostics?.acquiredAtISO, expiredRecord.lock?.acquired_at);
   assert.ok(typeof body.diagnostics?.nowISO === 'string');
   assert.ok(typeof body.diagnostics?.deltaMs === 'number' && body.diagnostics.deltaMs < 0);
+});
+
+test('patch_agent_output recovers when a stale expired-lock snapshot is followed by an active matching lock', async () => {
+  const store = createMemoryStore();
+  const requestId = `stale-expired-patch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const expiredSnapshot: WorkflowRecord = {
+    ...checkoutRecord,
+    lock: {
+      ...lock,
+      acquired_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() - 60 * 1000).toISOString(),
+    },
+  };
+  const originalGet = store.get.bind(store);
+  let returnedExpiredSnapshot = false;
+  store.get = async (key: string) => {
+    if (!returnedExpiredSnapshot && key === recordKey(requestId)) {
+      returnedExpiredSnapshot = true;
+      return JSON.stringify(expiredSnapshot);
+    }
+
+    return originalGet(key);
+  };
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'reader_insight',
+    expected_agent_version: 0,
+    lock_token: lock.token,
+    output: { summary: 'Recovered after a stale expired lock read.' },
+  });
+  const body = parseBody(patchResponse);
+
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+  assert.notEqual(body.lock_expired, true);
+  assert.equal(body.record?.lock?.token, lock.token);
+  assert.equal(body.record?.agent_outputs.reader_insight?.version, 1);
+  assert.equal(returnedExpiredSnapshot, true);
+});
+
+test('refresh_lock recovers when a stale expired-lock snapshot is followed by an active matching lock', async () => {
+  const store = createMemoryStore();
+  const requestId = `stale-expired-refresh-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const expiredSnapshot: WorkflowRecord = {
+    ...checkoutRecord,
+    lock: {
+      ...lock,
+      acquired_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() - 60 * 1000).toISOString(),
+    },
+  };
+  const originalGet = store.get.bind(store);
+  let returnedExpiredSnapshot = false;
+  store.get = async (key: string) => {
+    if (!returnedExpiredSnapshot && key === recordKey(requestId)) {
+      returnedExpiredSnapshot = true;
+      return JSON.stringify(expiredSnapshot);
+    }
+
+    return originalGet(key);
+  };
+
+  const refreshResponse = await refreshLock(store, {
+    action: 'refresh_lock',
+    request_id: requestId,
+    lock_token: lock.token,
+    lease_seconds: 300,
+  });
+  const body = parseBody(refreshResponse);
+
+  assert.equal(refreshResponse.statusCode, 200, refreshResponse.body);
+  assert.notEqual(body.lock_expired, true);
+  assert.equal(body.record?.lock?.token, lock.token);
+  assert.ok(
+    Date.parse(body.record?.lock?.expires_at ?? '') > Date.parse(lock.expires_at),
+    'refresh should extend the active matching lock rather than fail on the stale expired snapshot'
+  );
+  assert.equal(returnedExpiredSnapshot, true);
 });
