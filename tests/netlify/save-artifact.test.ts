@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
-import { handler } from '../../netlify/functions/save-artifact.js';
+import { handler, saveUploadedChunk } from '../../netlify/functions/save-artifact.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../../netlify/lib/blob-store.js';
 
 const publishSecret = 'artifact-test-secret';
@@ -25,6 +25,68 @@ const makeBaseInput = (requestId: string) => ({
   artifactKind: 'image',
   contentType: 'image/png',
   filename: 'hero.png',
+});
+
+test('save-artifact chunk status stays monotonic when an immediate chunk read is stale', async () => {
+  type FakeStoreValue = Buffer | string;
+  const values = new Map<string, FakeStoreValue>();
+  let hideChunkOneOnce = false;
+  const fakeStore = {
+    async set(key: string, value: string | Buffer | Uint8Array | ArrayBuffer) {
+      values.set(key, typeof value === 'string' ? value : Buffer.from(value));
+      if (key.endsWith('/1')) hideChunkOneOnce = true;
+    },
+    async setJSON(key: string, value: unknown) {
+      values.set(key, JSON.stringify(value));
+    },
+    async get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) {
+      if (hideChunkOneOnce && key.endsWith('/1') && options?.type === 'arrayBuffer') {
+        hideChunkOneOnce = false;
+        return null;
+      }
+
+      const value = values.get(key);
+      if (value === undefined) return null;
+
+      if (options?.type === 'arrayBuffer') {
+        const bytes = typeof value === 'string' ? Buffer.from(value) : value;
+
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      if (options?.type === 'buffer') return typeof value === 'string' ? Buffer.from(value) : value;
+
+      return typeof value === 'string' ? value : value.toString('utf8');
+    },
+    async del(key: string) {
+      values.delete(key);
+    },
+    async list() {
+      return { blobs: [...values.keys()].map((key) => ({ key, etag: '' })), directories: [] };
+    },
+  };
+
+  const requestId = `stale-status-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const clientUploadId = randomUUID();
+  const statuses: Array<{ receivedChunks: number }> = [];
+
+  for (const chunkIndex of [0, 1, 2]) {
+    statuses.push(
+      await saveUploadedChunk(
+        fakeStore as Parameters<typeof saveUploadedChunk>[0],
+        requestId,
+        clientUploadId,
+        chunkIndex,
+        3,
+        Buffer.from(`chunk-${chunkIndex}`)
+      )
+    );
+  }
+
+  assert.deepEqual(
+    statuses.map((status) => status.receivedChunks),
+    [1, 2, 3]
+  );
 });
 
 test('save-artifact single-shot uploads dedupe by checksum', async () => {
@@ -181,6 +243,7 @@ test('save-artifact chunked uploads collect three chunks by request and client u
     `${chunkPrefix}0`,
     `${chunkPrefix}1`,
     `${chunkPrefix}2`,
+    `${chunkPrefix}manifest.json`,
   ]);
 });
 
