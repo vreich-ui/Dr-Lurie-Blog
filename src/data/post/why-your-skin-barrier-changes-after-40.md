@@ -1,6 +1,6 @@
 ---
-title: "Why Your Skin Barrier Changes After 41"
-publishDate: 2026-06-07T07:54:00.000Z
+title: "Why Your Skin Barrier Changes After 40"
+publishDate: 2026-06-07T17:39:00.000Z
 excerpt: "A practical draft about skin barrier changes, dryness, and recovery after midlife."
 tags:
   - "skin-barrier"
