@@ -197,6 +197,9 @@ const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
 const DEFAULT_LIST_LIMIT = 50;
 const DEFAULT_LOCK_LEASE_SECONDS = 15 * 60;
+const CHECKOUT_NOT_FOUND_MAX_RETRIES = 3;
+const CHECKOUT_NOT_FOUND_RETRY_DELAY_MS = 50;
+const CHECKOUT_NOT_FOUND_MAX_ATTEMPTS = CHECKOUT_NOT_FOUND_MAX_RETRIES + 1;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 
@@ -271,16 +274,37 @@ const getLockExpirationMs = (lock: WorkflowLockRecord) => {
   return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
 };
 
+const getLockTimestampDiagnostics = (lock: WorkflowLockRecord, nowMs: number) => {
+  const expiresAtMs = getLockExpirationMs(lock);
+  const acquiredAtMs = Date.parse(lock.acquired_at);
+  const finiteExpiresAtMs = Number.isFinite(expiresAtMs) && expiresAtMs > 0;
+  const finiteAcquiredAtMs = Number.isFinite(acquiredAtMs);
+
+  return {
+    nowISO: new Date(nowMs).toISOString(),
+    acquiredAtISO: finiteAcquiredAtMs ? new Date(acquiredAtMs).toISOString() : lock.acquired_at,
+    expiresAtISO: finiteExpiresAtMs ? new Date(expiresAtMs).toISOString() : lock.expires_at,
+    deltaMs: finiteExpiresAtMs ? expiresAtMs - nowMs : null,
+  };
+};
+
 const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
   Boolean(lock && getLockExpirationMs(lock) > nowMs);
 
-const lockExpiredResponse = (body: WorkflowRequest) =>
-  jsonResponse(423, { action: body.action, error: 'lock_expired', lock_expired: true });
+const lockExpiredResponse = (body: WorkflowRequest, lock?: WorkflowLockRecord, nowMs = Date.now()) =>
+  jsonResponse(423, {
+    action: body.action,
+    error: 'lock_expired',
+    lock_expired: true,
+    ...(lock ? { diagnostics: getLockTimestampDiagnostics(lock, nowMs) } : {}),
+  });
 
 const validateMutationLock = (record: WorkflowRecord, body: WorkflowRequest) => {
-  if (!body.lock_token || !record.lock) return lockExpiredResponse(body);
-  if (record.lock.token !== body.lock_token) return lockExpiredResponse(body);
-  if (!isLockActive(record.lock, Date.now())) return lockExpiredResponse(body);
+  const nowMs = Date.now();
+
+  if (!body.lock_token || !record.lock) return lockExpiredResponse(body, record.lock, nowMs);
+  if (record.lock.token !== body.lock_token) return lockExpiredResponse(body, record.lock, nowMs);
+  if (!isLockActive(record.lock, nowMs)) return lockExpiredResponse(body, record.lock, nowMs);
 
   return undefined;
 };
@@ -312,6 +336,38 @@ const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
   if (!value) return undefined;
 
   return JSON.parse(value) as WorkflowRecord;
+};
+
+const delay = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const checkoutDiagnostics = (requestId: string, attempts: number) => ({
+  request_id: requestId,
+  attempts,
+  max_retries: CHECKOUT_NOT_FOUND_MAX_RETRIES,
+  max_attempts: CHECKOUT_NOT_FOUND_MAX_ATTEMPTS,
+});
+
+const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string) => {
+  for (let retryIndex = 0; retryIndex <= CHECKOUT_NOT_FOUND_MAX_RETRIES; retryIndex += 1) {
+    const attempt = retryIndex + 1;
+    const record = await loadRecord(store, requestId);
+
+    if (record) return { record, attempts: attempt };
+
+    if (retryIndex < CHECKOUT_NOT_FOUND_MAX_RETRIES) {
+      console.warn('checkout_request record fetch returned 404; retrying.', {
+        ...checkoutDiagnostics(requestId, attempt),
+        next_attempt: attempt + 1,
+      });
+      await delay(CHECKOUT_NOT_FOUND_RETRY_DELAY_MS);
+    }
+  }
+
+  console.warn('checkout_request record fetch returned 404 after retries exhausted.', {
+    ...checkoutDiagnostics(requestId, CHECKOUT_NOT_FOUND_MAX_ATTEMPTS),
+  });
+
+  return { record: undefined, attempts: CHECKOUT_NOT_FOUND_MAX_ATTEMPTS };
 };
 
 const saveRecord = async (store: WorkflowBlobStore, record: WorkflowRecord) => {
@@ -478,7 +534,7 @@ const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowReque
   return jsonResponse(200, { action: body.action, records: summaries });
 };
 
-const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
   if (body.expected_agent_version === undefined) {
@@ -615,7 +671,7 @@ const markAgentComplete = async (store: WorkflowBlobStore, body: WorkflowRequest
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
-const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
@@ -625,13 +681,19 @@ const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) 
   const missingOwnerLabel = requireStringField(body, 'owner_label');
   if (missingOwnerLabel) return missingOwnerLabel;
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
-  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  const requestId = body.request_id as string;
+  const checkoutLoad = await loadRecordForCheckout(store, requestId);
+  const previousRecord = checkoutLoad.record;
+  const diagnostics = checkoutDiagnostics(requestId, checkoutLoad.attempts);
+
+  if (!previousRecord) {
+    return jsonResponse(404, { action: body.action, not_found: true, diagnostics });
+  }
 
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
   if (isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock, diagnostics });
   }
 
   const nextRecord: WorkflowRecord = {
@@ -663,7 +725,11 @@ const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) 
   await saveRecord(store, nextRecord);
   await updateIndexes(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, { action: body.action, record: nextRecord });
+  return jsonResponse(200, {
+    action: body.action,
+    record: nextRecord,
+    diagnostics,
+  });
 };
 
 const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
@@ -683,7 +749,12 @@ const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
   if (!isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(409, { action: body.action, error: 'Lock has expired.', lock: previousRecord.lock });
+    return jsonResponse(409, {
+      action: body.action,
+      error: 'Lock has expired.',
+      lock: previousRecord.lock,
+      diagnostics: getLockTimestampDiagnostics(previousRecord.lock, timestampMs),
+    });
   }
 
   const leaseSeconds = getLeaseSeconds(body);
@@ -715,43 +786,47 @@ const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };
 
-const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
   const missingLockToken = requireStringField(body, 'lock_token');
   if (missingLockToken) return missingLockToken;
 
-  const previousRecord = await loadRecord(store, body.request_id as string);
-  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+  const checkedOutRecord = await loadRecord(store, body.request_id as string);
+  if (!checkedOutRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  if (!previousRecord.lock) return jsonResponse(200, { action: body.action, record: previousRecord, idempotent: true });
+  const canonicalRecord = await loadRecord(store, body.request_id as string);
+  if (!canonicalRecord) return jsonResponse(404, { action: body.action, not_found: true });
 
-  if (previousRecord.lock.token !== body.lock_token) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+  if (!canonicalRecord.lock)
+    return jsonResponse(200, { action: body.action, record: canonicalRecord, idempotent: true });
+
+  if (canonicalRecord.lock.token !== body.lock_token) {
+    return jsonResponse(423, { action: body.action, locked: true, lock: canonicalRecord.lock });
   }
 
   const timestamp = nowIso();
   const nextRecord: WorkflowRecord = {
-    ...previousRecord,
+    ...canonicalRecord,
     updated_at: timestamp,
     lock: undefined,
     history: [
-      ...previousRecord.history,
+      ...canonicalRecord.history,
       {
         at: timestamp,
         action: body.action,
         details: {
-          owner_id: previousRecord.lock.owner_id,
-          owner_label: previousRecord.lock.owner_label,
+          owner_id: canonicalRecord.lock.owner_id,
+          owner_label: canonicalRecord.lock.owner_label,
         },
       },
     ],
-    version: previousRecord.version + 1,
+    version: canonicalRecord.version + 1,
   };
 
   await saveRecord(store, nextRecord);
-  await updateIndexes(store, previousRecord, nextRecord);
+  await updateIndexes(store, canonicalRecord, nextRecord);
 
   return jsonResponse(200, { action: body.action, record: nextRecord });
 };

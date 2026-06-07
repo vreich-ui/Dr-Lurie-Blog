@@ -171,3 +171,94 @@ test('MCP tools run create → checkout → patch output → mark complete → m
     lock_token: finalCheckoutRecord.lock.token,
   });
 });
+
+test('final_article_mark_complete matches generic mark_agent_complete state changes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  await rm(localBlobRoot, { recursive: true, force: true });
+
+  const checkoutWorkflow = async (suffix: string) => {
+    const requestId = `mcp-final-equivalence-${suffix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    await callTool('save_json_blob_create_request', {
+      request_id: requestId,
+      input: contentSourceInput(requestId),
+    });
+
+    const checkoutResult = await callTool('save_json_blob_checkout_request', {
+      request_id: requestId,
+      owner_id: 'mcp-final-equivalence-agent',
+      owner_label: 'MCP final equivalence agent',
+      lease_seconds: 900,
+    });
+
+    return {
+      requestId,
+      checkoutRecord: checkoutResult.record as { version: number; lock: { token: string } },
+    };
+  };
+
+  const generic = await checkoutWorkflow('generic');
+  const specific = await checkoutWorkflow('specific');
+
+  const finalCompleteArgs = {
+    current_stage: 'final_article',
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  };
+
+  const genericResult = await callTool('save_json_blob_mark_agent_complete', {
+    request_id: generic.requestId,
+    agent_name: 'final_article',
+    expected_record_version: generic.checkoutRecord.version,
+    lock_token: generic.checkoutRecord.lock.token,
+    ...finalCompleteArgs,
+  });
+
+  const specificResult = await callTool('final_article_mark_complete', {
+    request_id: specific.requestId,
+    expected_record_version: specific.checkoutRecord.version,
+    lock_token: specific.checkoutRecord.lock.token,
+    ...finalCompleteArgs,
+  });
+
+  type ComparableRecord = {
+    version: number;
+    workflow_status: string;
+    current_stage: string | null;
+    next_agent: string | null;
+    completed_agents: string[];
+    failed_agents: string[];
+    needs_review: boolean;
+    last_error: string | null;
+    lock?: { token: string };
+    history: Array<{ action: string; agent_name?: string }>;
+  };
+
+  const genericRecord = genericResult.record as ComparableRecord;
+  const specificRecord = specificResult.record as ComparableRecord;
+  const comparableState = (record: ComparableRecord, checkoutVersion: number, lockToken: string) => ({
+    version_increment: record.version - checkoutVersion,
+    workflow_status: record.workflow_status,
+    current_stage: record.current_stage,
+    next_agent: record.next_agent,
+    completed_agents: record.completed_agents,
+    failed_agents: record.failed_agents,
+    needs_review: record.needs_review,
+    last_error: record.last_error,
+    lock_token_preserved: record.lock?.token === lockToken,
+    history_length: record.history.length,
+    last_history_action: record.history.at(-1)?.action,
+    last_history_agent: record.history.at(-1)?.agent_name,
+  });
+
+  assert.deepEqual(
+    comparableState(genericRecord, generic.checkoutRecord.version, generic.checkoutRecord.lock.token),
+    comparableState(specificRecord, specific.checkoutRecord.version, specific.checkoutRecord.lock.token)
+  );
+});

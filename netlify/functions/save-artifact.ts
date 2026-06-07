@@ -18,7 +18,7 @@ import {
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
 import { getHeader } from '../lib/admin-auth.js';
-import { getBlobListItems } from '../lib/blob-list.js';
+import { collectBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
@@ -132,20 +132,37 @@ const decodePayload = (input: Pick<UploadRequest, 'encoding' | 'payload'>) => {
   return Buffer.from(input.payload, 'base64');
 };
 
-const chunkKey = (clientUploadId: string, chunkIndex: number) => {
-  return `uploads/${clientUploadId}/chunk-${chunkIndex.toString().padStart(6, '0')}.bin`;
+const chunkUploadPrefix = (requestId: string, clientUploadId: string) => {
+  return `artifact-chunks/${requestId}/${clientUploadId}/`;
+};
+
+const chunkKey = (requestId: string, clientUploadId: string, chunkIndex: number) => {
+  return `${chunkUploadPrefix(requestId, clientUploadId)}${chunkIndex}`;
 };
 
 const requestArtifactIndexKey = (requestId: string, sha256: string) => {
   return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
 };
 
-const getChunkStatus = async (store: BlobStore, clientUploadId: string, totalChunks: number): Promise<ChunkStatus> => {
-  const result = await store.list({ prefix: `uploads/${clientUploadId}/` });
-  const receivedChunks = getBlobListItems(result).filter((blob) => /\/chunk-\d{6}\.bin$/.test(blob.key)).length;
+const getChunkStatus = async (
+  store: BlobStore,
+  requestId: string,
+  clientUploadId: string,
+  totalChunks: number
+): Promise<ChunkStatus> => {
+  const prefix = chunkUploadPrefix(requestId, clientUploadId);
+  const items = await collectBlobListItems(await store.list({ prefix }));
+  const chunkIndexPattern = /^\d+$/;
+  const receivedChunks = items.filter((blob) => {
+    if (!blob.key.startsWith(prefix)) return false;
+
+    const relativeKey = blob.key.slice(prefix.length);
+
+    return chunkIndexPattern.test(relativeKey);
+  }).length;
 
   return {
-    complete: receivedChunks >= totalChunks,
+    complete: receivedChunks === totalChunks,
     receivedChunks,
     totalChunks,
   };
@@ -158,11 +175,11 @@ const getArrayBuffer = async (store: BlobStore, key: string) => {
   return value ? Buffer.from(value) : null;
 };
 
-const assembleChunks = async (store: BlobStore, clientUploadId: string, totalChunks: number) => {
+const assembleChunks = async (store: BlobStore, requestId: string, clientUploadId: string, totalChunks: number) => {
   const chunks: Buffer[] = [];
 
   for (let index = 0; index < totalChunks; index += 1) {
-    const chunk = await getArrayBuffer(store, chunkKey(clientUploadId, index));
+    const chunk = await getArrayBuffer(store, chunkKey(requestId, clientUploadId, index));
 
     if (!chunk) return null;
 
@@ -215,7 +232,7 @@ const saveReference = async (store: BlobStore, requestId: string, reference: Art
   });
 };
 
-const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, bytes: Buffer) => {
+const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, bytes: Buffer, chunkStatus?: ChunkStatus) => {
   const artifactStore = await getArtifactBlobStore(event);
   const indexStore = await getArtifactIndexBlobStore(event);
   const reference = createArtifactReference({ input, bytes });
@@ -234,6 +251,7 @@ const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, bytes: B
     complete: true,
     deduped,
     artifact: responseReference,
+    ...(chunkStatus ? { receivedChunks: chunkStatus.receivedChunks, totalChunks: chunkStatus.totalChunks } : {}),
   });
 };
 
@@ -269,15 +287,16 @@ export const handler = async (event: LambdaEvent) => {
 
   const indexStore = await getArtifactIndexBlobStore(event);
 
-  await indexStore.set(chunkKey(input.clientUploadId, input.chunkIndex), bytes, {
+  await indexStore.set(chunkKey(input.requestId, input.clientUploadId, input.chunkIndex), bytes, {
     metadata: {
+      requestId: input.requestId,
       clientUploadId: input.clientUploadId,
       chunkIndex: String(input.chunkIndex),
       totalChunks: String(input.totalChunks),
     },
   });
 
-  const status = await getChunkStatus(indexStore, input.clientUploadId, input.totalChunks);
+  const status = await getChunkStatus(indexStore, input.requestId, input.clientUploadId, input.totalChunks);
 
   if (!status.complete) {
     return jsonResponse(202, {
@@ -288,7 +307,7 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const assembledBytes = await assembleChunks(indexStore, input.clientUploadId, input.totalChunks);
+  const assembledBytes = await assembleChunks(indexStore, input.requestId, input.clientUploadId, input.totalChunks);
 
   if (!assembledBytes) {
     return jsonResponse(202, {
@@ -299,5 +318,5 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  return finalizeUpload(event, input, assembledBytes);
+  return finalizeUpload(event, input, assembledBytes, status);
 };
