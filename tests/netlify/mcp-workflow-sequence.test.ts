@@ -47,6 +47,30 @@ const callTool = async (name: string, args: Record<string, unknown>) => {
   return body.result.structuredContent;
 };
 
+test('MCP create_request honors explicit initial current and next agents', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  await rm(localBlobRoot, { recursive: true, force: true });
+
+  const requestId = `mcp-explicit-routing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const createResult = await callTool('save_json_blob_create_request', {
+    request_id: requestId,
+    input: contentSourceInput(requestId),
+    current_agent: 'final_article',
+    next_agent: null,
+  });
+  const createdRecord = createResult.record as {
+    current_stage: string | null;
+    next_agent: string | null;
+  };
+
+  assert.equal(createdRecord.current_stage, 'final_article');
+  assert.equal(createdRecord.next_agent, null);
+});
+
 test('MCP tools run create → checkout → patch output → mark complete → mark published → checkin', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
   process.env.PUBLISH_SECRET = 'mcp-smoke-secret';

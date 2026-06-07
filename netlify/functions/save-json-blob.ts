@@ -125,6 +125,7 @@ const requestSchema = z
     merge: z.unknown().optional(),
     stage: z.string().min(1).optional(),
     status: z.string().min(1).optional(),
+    current_agent: z.string().min(1).optional(),
     current_stage: z.string().min(1).nullable().optional(),
     next_agent: z.string().min(1).nullable().optional(),
     workflow_status: z.string().min(1).optional(),
@@ -485,14 +486,26 @@ export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequ
     return jsonResponse(409, { action: body.action, conflict: true, error: 'A workflow record already exists.' });
   }
 
+  const currentAgent = parseOptionalAgentName(
+    body.current_agent ?? body.current_stage ?? parsedInput.data.workflow?.current_agent,
+    'current_agent'
+  );
+  if (!currentAgent.ok) return jsonResponse(400, { action: body.action, error: currentAgent.error });
+
+  const nextAgent = parseOptionalAgentName(
+    body.next_agent !== undefined ? body.next_agent : parsedInput.data.workflow?.next_agent,
+    'next_agent'
+  );
+  if (!nextAgent.ok) return jsonResponse(400, { action: body.action, error: nextAgent.error });
+
   const timestamp = nowIso();
   const record: WorkflowRecord = {
     request_id: body.request_id as string,
     created_at: timestamp,
     updated_at: timestamp,
     workflow_status: 'pending',
-    current_stage: null,
-    next_agent: 'reader_insight',
+    current_stage: currentAgent.value ?? null,
+    next_agent: nextAgent.value !== undefined ? nextAgent.value : 'reader_insight',
     completed_agents: [],
     failed_agents: [],
     last_error: null,

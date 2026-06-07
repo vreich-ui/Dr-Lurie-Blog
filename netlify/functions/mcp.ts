@@ -523,6 +523,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       {
         input: contentSourceV1JsonSchema,
         request_id: stringSchema('Optional request id. A UUID-based id is generated when omitted.'),
+        current_agent: agentNameJsonSchema(
+          'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
+        ),
+        next_agent: nullableAgentNameJsonSchema(
+          'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
+        ),
       },
       ['input']
     ),
@@ -921,7 +927,13 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'save_json_blob_create_request':
       return callAction(
         event,
-        { action: 'create_request', input: input.input, request_id: input.request_id ?? createRequestId() },
+        {
+          action: 'create_request',
+          input: input.input,
+          request_id: input.request_id ?? createRequestId(),
+          current_agent: input.current_agent,
+          next_agent: input.next_agent,
+        },
         'record'
       );
     case 'save_json_blob_get_request':
