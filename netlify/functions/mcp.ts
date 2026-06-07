@@ -523,6 +523,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       {
         input: contentSourceV1JsonSchema,
         request_id: stringSchema('Optional request id. A UUID-based id is generated when omitted.'),
+        current_agent: agentNameJsonSchema(
+          'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
+        ),
+        next_agent: nullableAgentNameJsonSchema(
+          'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
+        ),
       },
       ['input']
     ),
@@ -702,6 +708,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       inputSchema: objectSchema(
         {
           request_id: stringSchema(),
+          agent_name: stringSchema(
+            'Optional for compatibility with save_json_blob_mark_agent_complete; stage helpers always use their hardcoded agent.'
+          ),
           expected_record_version: intSchema(),
           lock_token: lockTokenSchema,
           current_stage: nullableStringSchema(),
@@ -879,6 +888,10 @@ const createMarkAgentCompletePayload = (input: Record<string, unknown>, agentNam
   next_agent: normalizeOptionalAgentName(input.next_agent, 'next_agent'),
 });
 
+const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown>, agentName: string) => {
+  return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, agentName), 'record');
+};
+
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
   if (typeof requestId !== 'string' || requestId.trim().length === 0) {
     return toolError('requestId is required.');
@@ -914,7 +927,13 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'save_json_blob_create_request':
       return callAction(
         event,
-        { action: 'create_request', input: input.input, request_id: input.request_id ?? createRequestId() },
+        {
+          action: 'create_request',
+          input: input.input,
+          request_id: input.request_id ?? createRequestId(),
+          current_agent: input.current_agent,
+          next_agent: input.next_agent,
+        },
         'record'
       );
     case 'save_json_blob_get_request':
@@ -1012,11 +1031,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         'record'
       );
     case 'save_json_blob_mark_agent_complete':
-      return callNormalizedAction(
-        event,
-        () => createMarkAgentCompletePayload(input, normalizeAgentName(input.agent_name, 'agent_name') as string),
-        'record'
-      );
+      return callMarkAgentComplete(event, input, normalizeAgentName(input.agent_name, 'agent_name') as string);
     default:
       break;
   }
@@ -1040,7 +1055,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
 
     const completeAgent = ALLOWED_AGENTS.find((agentName) => name === `${agentName}_mark_complete`);
     if (completeAgent) {
-      return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, completeAgent), 'record');
+      return callMarkAgentComplete(event, input, completeAgent);
     }
   }
 

@@ -201,6 +201,22 @@ test('content_source.v1 payload validates and creates a workflow record', async 
   assert.equal(body.record.input.publication.publish_payload.slug, 'skin-barrier-basics');
 });
 
+test('create_request honors explicit initial routing fields over workflow defaults', async () => {
+  const response = await createRequest(createMemoryStore(), {
+    action: 'create_request',
+    request_id: 'req_explicit_routing_test',
+    input: validContentSourceV1,
+    current_agent: 'final_article',
+    next_agent: null,
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(body.ok, true);
+  assert.equal(body.record.current_stage, 'final_article');
+  assert.equal(body.record.next_agent, null);
+});
+
 test('create_request returns HTTP 400 when required schema discriminator fields are missing', async () => {
   const response = await createWorkflow({ content: { title: 'Missing discriminators' } });
   const body = parseResponseBody(response);
@@ -252,6 +268,8 @@ test('content_source.v1 validates representative publishing UI JSON payloads', a
   assert.equal(response.statusCode, 201);
   assert.equal(body.ok, true);
   assert.equal(body.record.input.workflow.current_agent, 'final_article');
+  assert.equal(body.record.current_stage, 'final_article');
+  assert.equal(body.record.next_agent, null);
   assert.equal(body.record.input.publication.publish_payload.content, 'Final body entered through the publishing UI.');
 });
 

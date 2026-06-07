@@ -47,6 +47,30 @@ const callTool = async (name: string, args: Record<string, unknown>) => {
   return body.result.structuredContent;
 };
 
+test('MCP create_request honors explicit initial current and next agents', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.PUBLISH_SECRET = 'mcp-smoke-secret';
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  await rm(localBlobRoot, { recursive: true, force: true });
+
+  const requestId = `mcp-explicit-routing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const createResult = await callTool('save_json_blob_create_request', {
+    request_id: requestId,
+    input: contentSourceInput(requestId),
+    current_agent: 'final_article',
+    next_agent: null,
+  });
+  const createdRecord = createResult.record as {
+    current_stage: string | null;
+    next_agent: string | null;
+  };
+
+  assert.equal(createdRecord.current_stage, 'final_article');
+  assert.equal(createdRecord.next_agent, null);
+});
+
 test('MCP tools run create → checkout → patch output → mark complete → mark published → checkin', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = 'mcp-smoke-secret';
   process.env.PUBLISH_SECRET = 'mcp-smoke-secret';
@@ -133,6 +157,7 @@ test('MCP tools run create → checkout → patch output → mark complete → m
     current_stage: string;
     next_agent: string | null;
     workflow_status: string;
+    completed_agents: string[];
     needs_review: boolean;
     last_error: string | null;
   };
@@ -155,21 +180,39 @@ test('MCP tools run create → checkout → patch output → mark complete → m
     workflow_status: string;
     current_stage: string | null;
     next_agent: string | null;
+    completed_agents: string[];
     history: Array<{ action: string; details?: { commit_metadata?: Record<string, unknown> } }>;
   };
   assert.equal(publishedRecord.workflow_status, 'published');
-  assert.equal(publishedRecord.current_stage, null);
-  assert.equal(publishedRecord.next_agent, null);
+  assert.equal(publishedRecord.current_stage, finalCompleteRecord.current_stage);
+  assert.equal(publishedRecord.next_agent, finalCompleteRecord.next_agent);
+  assert.deepEqual(publishedRecord.completed_agents, finalCompleteRecord.completed_agents);
   assert.deepEqual(publishedRecord.history.at(-1)?.details?.commit_metadata, {
     commit: 'abc123',
     articlePath: 'src/data/post/mcp-smoke.md',
     deployStatus: 'queued',
   });
 
-  await callTool('save_json_blob_checkin_request', {
+  const finalCheckinResult = await callTool('save_json_blob_checkin_request', {
     request_id: requestId,
     lock_token: finalCheckoutRecord.lock.token,
   });
+  const finalCheckedInRecord = finalCheckinResult.record as {
+    workflow_status: string;
+    completed_agents: string[];
+    lock?: unknown;
+  };
+  assert.equal(finalCheckedInRecord.workflow_status, 'published');
+  assert.equal(finalCheckedInRecord.lock, undefined);
+  assert.deepEqual(finalCheckedInRecord.completed_agents, finalCompleteRecord.completed_agents);
+
+  const fetchedPublishedResult = await callTool('save_json_blob_get_request', { request_id: requestId });
+  const fetchedPublishedRecord = fetchedPublishedResult.record as {
+    workflow_status: string;
+    completed_agents: string[];
+  };
+  assert.equal(fetchedPublishedRecord.workflow_status, 'published');
+  assert.deepEqual(fetchedPublishedRecord.completed_agents, finalCompleteRecord.completed_agents);
 });
 
 test('final_article_mark_complete matches generic mark_agent_complete state changes', async () => {
@@ -240,7 +283,16 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
     history: Array<{ action: string; agent_name?: string }>;
   };
 
+  const genericIdempotentResult = await callTool('final_article_mark_complete', {
+    request_id: generic.requestId,
+    agent_name: 'final_article',
+    expected_record_version: generic.checkoutRecord.version,
+    lock_token: generic.checkoutRecord.lock.token,
+    ...finalCompleteArgs,
+  });
+
   const genericRecord = genericResult.record as ComparableRecord;
+  const genericIdempotentRecord = genericIdempotentResult.record as ComparableRecord;
   const specificRecord = specificResult.record as ComparableRecord;
   const comparableState = (record: ComparableRecord, checkoutVersion: number, lockToken: string) => ({
     version_increment: record.version - checkoutVersion,
@@ -257,6 +309,7 @@ test('final_article_mark_complete matches generic mark_agent_complete state chan
     last_history_agent: record.history.at(-1)?.agent_name,
   });
 
+  assert.deepEqual(genericIdempotentRecord, genericRecord);
   assert.deepEqual(
     comparableState(genericRecord, generic.checkoutRecord.version, generic.checkoutRecord.lock.token),
     comparableState(specificRecord, specific.checkoutRecord.version, specific.checkoutRecord.lock.token)

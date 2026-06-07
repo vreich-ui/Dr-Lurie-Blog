@@ -28,6 +28,8 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
   const createTool = body.result.tools.find((tool) => tool.name === 'save_json_blob_create_request');
 
   assert.ok(createTool);
+  assert.ok(property(createTool.inputSchema, 'current_agent'));
+  assert.ok(property(createTool.inputSchema, 'next_agent'));
 
   const inputSchema = property(createTool.inputSchema, 'input');
   const inputProperties = inputSchema.properties as Record<string, unknown>;
@@ -181,6 +183,7 @@ test('stage mark-complete helpers expose transition fields and document common r
     assert.ok(tool, `Expected ${name} to be registered.`);
 
     for (const field of [
+      'agent_name',
       'current_stage',
       'next_agent',
       'workflow_status',

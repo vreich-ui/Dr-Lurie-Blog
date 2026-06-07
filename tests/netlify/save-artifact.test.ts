@@ -149,23 +149,23 @@ test('save-artifact chunked uploads collect three chunks by request and client u
   assert.deepEqual(refinalized.json.artifact, completed.json.artifact);
 
   const chunkPrefix = `artifact-chunks/${requestId}/${clientUploadId}/`;
-  const chunkList = await indexStore.list({ prefix: chunkPrefix });
+  const indexChunkList = await indexStore.list({ prefix: chunkPrefix });
 
-  assert.deepEqual(chunkList.blobs.map((blob) => blob.key).sort(), [
-    `${chunkPrefix}0`,
-    `${chunkPrefix}1`,
-    `${chunkPrefix}2`,
-  ]);
+  assert.deepEqual(indexChunkList.blobs, []);
 
   const artifactStore = await getArtifactBlobStore({});
   const finalBlobs = await artifactStore.list({ prefix: `image/${requestId}/` });
-  const exposedChunkBlobs = await artifactStore.list({ prefix: chunkPrefix });
+  const chunkList = await artifactStore.list({ prefix: chunkPrefix });
 
   assert.deepEqual(
     finalBlobs.blobs.map((blob) => blob.key),
     [completedArtifact.blobKey]
   );
-  assert.equal(exposedChunkBlobs.blobs.length, 0);
+  assert.deepEqual(chunkList.blobs.map((blob) => blob.key).sort(), [
+    `${chunkPrefix}0`,
+    `${chunkPrefix}1`,
+    `${chunkPrefix}2`,
+  ]);
 });
 
 test('save-artifact requires the publish secret', async () => {
