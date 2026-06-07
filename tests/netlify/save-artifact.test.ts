@@ -132,6 +132,22 @@ test('save-artifact chunked uploads collect three chunks by request and client u
   assert.equal(completedArtifact.sha256, expectedSha256);
   assert.equal(completedArtifact.sizeBytes, expectedBytes.byteLength);
 
+  const completedIndexes = await indexStore.list({ prefix: `request-artifacts/${requestId}/` });
+
+  assert.deepEqual(
+    completedIndexes.blobs.map((blob) => blob.key),
+    [`request-artifacts/${requestId}/${completedArtifact.sha256}.json`]
+  );
+
+  const completedIndexedReferenceText = await indexStore.get(
+    `request-artifacts/${requestId}/${completedArtifact.sha256}.json`
+  );
+  const completedIndexedReference = completedIndexedReferenceText
+    ? (JSON.parse(completedIndexedReferenceText) as unknown)
+    : null;
+
+  assert.deepEqual(completedIndexedReference, completed.json.artifact);
+
   const refinalized = await postArtifact({
     ...baseInput,
     clientUploadId,

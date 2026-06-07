@@ -18,7 +18,6 @@ import {
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
 import { getHeader } from '../lib/admin-auth.js';
-import { collectBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 // artifactStore holds binary blobs (final artifacts and temporary chunks); indexStore holds JSON references and indexes.
@@ -146,35 +145,33 @@ const requestArtifactIndexKey = (requestId: string, sha256: string) => {
   return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
 };
 
+const getArrayBuffer = async (store: BlobStore, key: string) => {
+  const binaryStore = store as BinaryReadableBlobStore;
+  const value = await binaryStore.get(key, { type: 'arrayBuffer' });
+
+  return value ? Buffer.from(value) : null;
+};
+
 const getChunkStatus = async (
   store: BlobStore,
   requestId: string,
   clientUploadId: string,
   totalChunks: number
 ): Promise<ChunkStatus> => {
-  const prefix = chunkUploadPrefix(requestId, clientUploadId);
-  const items = await collectBlobListItems(await store.list({ prefix }));
-  const chunkIndexPattern = /^\d+$/;
-  const receivedChunks = items.filter((blob) => {
-    if (!blob.key.startsWith(prefix)) return false;
+  let receivedChunks = 0;
 
-    const relativeKey = blob.key.slice(prefix.length);
+  // Intentionally avoid prefix listing because list visibility can lag behind recent writes in Netlify Blob runtime.
+  for (let index = 0; index < totalChunks; index += 1) {
+    const chunk = await getArrayBuffer(store, chunkKey(requestId, clientUploadId, index));
 
-    return chunkIndexPattern.test(relativeKey);
-  }).length;
+    if (chunk) receivedChunks += 1;
+  }
 
   return {
     complete: receivedChunks === totalChunks,
     receivedChunks,
     totalChunks,
   };
-};
-
-const getArrayBuffer = async (store: BlobStore, key: string) => {
-  const binaryStore = store as BinaryReadableBlobStore;
-  const value = await binaryStore.get(key, { type: 'arrayBuffer' });
-
-  return value ? Buffer.from(value) : null;
 };
 
 const assembleChunks = async (store: BlobStore, requestId: string, clientUploadId: string, totalChunks: number) => {
