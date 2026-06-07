@@ -208,6 +208,8 @@ const CHECKIN_STALE_READ_RETRY_DELAY_MS = 25;
 const GET_REQUEST_STALE_READ_RETRY_DELAY_MS = 25;
 const LOCK_TOKEN_STALE_READ_MAX_RETRIES = 5;
 const LOCK_TOKEN_STALE_READ_RETRY_DELAY_MS = 25;
+const PUBLISH_READY_STABILIZATION_ATTEMPTS = 5;
+const PUBLISH_READY_STABILIZATION_DELAY_MS = 25;
 const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
@@ -1231,35 +1233,93 @@ const getPublishPreconditionFailure = (record: WorkflowRecord) => {
   return undefined;
 };
 
+const isRecordReadyForPublish = (record: WorkflowRecord, body: WorkflowRequest, nowMs = Date.now()) => {
+  if (body.expected_record_version !== undefined && record.version < body.expected_record_version) return false;
+  if (record.workflow_status !== 'completed') return false;
+  if (!record.completed_agents.includes('final_article')) return false;
+  if (record.current_stage !== null) return false;
+  if (!record.agent_outputs.final_article) return false;
+  if (!body.lock_token || !hasActiveMatchingLockToken(record, body.lock_token, nowMs)) return false;
+
+  return true;
+};
+
+const getPublishReadinessScore = (record: WorkflowRecord, body: WorkflowRequest, nowMs = Date.now()) => {
+  let score = 0;
+
+  if (body.expected_record_version === undefined || record.version >= body.expected_record_version) score += 1;
+  if (record.workflow_status === 'completed') score += 1;
+  if (record.completed_agents.includes('final_article')) score += 1;
+  if (record.current_stage === null) score += 1;
+  if (record.agent_outputs.final_article) score += 1;
+  if (body.lock_token && hasActiveMatchingLockToken(record, body.lock_token, nowMs)) score += 1;
+
+  return score;
+};
+
+const isPreferredPublishCandidate = (
+  candidate: WorkflowRecord,
+  current: WorkflowRecord | undefined,
+  body: WorkflowRequest,
+  nowMs = Date.now()
+) => {
+  if (!current) return true;
+
+  const candidateReady = isRecordReadyForPublish(candidate, body, nowMs);
+  const currentReady = isRecordReadyForPublish(current, body, nowMs);
+  if (candidateReady !== currentReady) return candidateReady;
+
+  const candidateHasFinalOutput = hasAgentOutput(candidate, 'final_article');
+  const currentHasFinalOutput = hasAgentOutput(current, 'final_article');
+  if (candidateHasFinalOutput !== currentHasFinalOutput) return candidateHasFinalOutput;
+
+  const candidateScore = getPublishReadinessScore(candidate, body, nowMs);
+  const currentScore = getPublishReadinessScore(current, body, nowMs);
+  if (candidateScore !== currentScore) return candidateScore > currentScore;
+
+  if (candidate.version !== current.version) return candidate.version > current.version;
+
+  const candidateOutputCount = agentOutputKeys(candidate).length;
+  const currentOutputCount = agentOutputKeys(current).length;
+  if (candidateOutputCount !== currentOutputCount) return candidateOutputCount > currentOutputCount;
+
+  return candidate.history.length > current.history.length;
+};
+
+const loadRecordReadyForPublish = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const requestId = body.request_id as string;
+  let preferredRecord: WorkflowRecord | undefined;
+
+  for (let attempt = 0; attempt < PUBLISH_READY_STABILIZATION_ATTEMPTS; attempt += 1) {
+    const candidate = await loadRecord(store, requestId);
+    const nowMs = Date.now();
+
+    if (candidate && isPreferredPublishCandidate(candidate, preferredRecord, body, nowMs)) {
+      preferredRecord = preferredRecord ? preserveAgentOutputs(candidate, preferredRecord) : candidate;
+    } else if (candidate && preferredRecord) {
+      preferredRecord = preserveAgentOutputs(preferredRecord, candidate);
+    }
+
+    if (preferredRecord && isRecordReadyForPublish(preferredRecord, body, nowMs)) {
+      return { record: preferredRecord };
+    }
+
+    if (attempt < PUBLISH_READY_STABILIZATION_ATTEMPTS - 1) {
+      await delay(PUBLISH_READY_STABILIZATION_DELAY_MS);
+    }
+  }
+
+  return { record: preferredRecord };
+};
+
 export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const requestId = body.request_id as string;
-    let latestRecord = body.lock_token
-      ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
-      : await loadRecord(store, requestId);
+    const publishLoad = await loadRecordReadyForPublish(store, body);
+    const latestRecord = publishLoad.record;
     if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
-
-    if (
-      body.expected_record_version !== undefined &&
-      latestRecord.version < body.expected_record_version &&
-      latestRecord.workflow_status !== 'published'
-    ) {
-      const stabilizedRead = await loadRecordAtExpectedVersion(store, body, latestRecord);
-      if ('notFound' in stabilizedRead) return jsonResponse(404, { action: body.action, not_found: true });
-
-      if (body.lock_token) {
-        const lockTokenRecord = (await loadRecordForLockToken(store, requestId, body.lock_token)).record;
-        latestRecord =
-          lockTokenRecord && isPreferredLockTokenCandidate(lockTokenRecord, stabilizedRead.record, body.lock_token)
-            ? lockTokenRecord
-            : stabilizedRead.record;
-      } else {
-        latestRecord = stabilizedRead.record;
-      }
-    }
 
     const lockFailure = validateMutationLock(latestRecord, body);
     if (lockFailure) return lockFailure;
@@ -1279,24 +1339,27 @@ export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequ
 
     const timestamp = nowIso();
     const commitMetadata = getCommitMetadata(body);
-    const nextRecord: WorkflowRecord = {
-      ...latestRecord,
-      updated_at: timestamp,
-      workflow_status: 'published',
-      history: [
-        ...latestRecord.history,
-        {
-          at: timestamp,
-          action: body.action,
-          details: {
-            owner_id: latestRecord.lock?.owner_id,
-            owner_label: latestRecord.lock?.owner_label,
-            ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
+    const nextRecord: WorkflowRecord = preserveAgentOutputs(
+      {
+        ...latestRecord,
+        updated_at: timestamp,
+        workflow_status: 'published',
+        history: [
+          ...latestRecord.history,
+          {
+            at: timestamp,
+            action: body.action,
+            details: {
+              owner_id: latestRecord.lock?.owner_id,
+              owner_label: latestRecord.lock?.owner_label,
+              ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
+            },
           },
-        },
-      ],
-      version: latestRecord.version + 1,
-    };
+        ],
+        version: latestRecord.version + 1,
+      },
+      latestRecord
+    );
 
     const saveResult = await saveRecordIfVersionUnchanged(store, latestRecord, nextRecord);
 

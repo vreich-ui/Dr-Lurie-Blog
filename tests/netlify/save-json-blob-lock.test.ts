@@ -517,3 +517,98 @@ test('final_article completion preserves output when first completion read is st
   );
   assert.equal(getBody.record?.workflow_status, 'completed');
 });
+
+test('mark_published stabilizes when first publish read omits visible final_article output', async () => {
+  const store = createMemoryStore();
+  const requestId = `publish-stale-missing-final-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const checkoutRecord = await createAndCheckout(store, requestId, 300);
+  const lock = checkoutRecord.lock;
+
+  assert.ok(lock, 'checkout record should have a lock');
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lock.token,
+    output: { title: 'Publish preserved final article', body: 'Publishing must not lose this output.' },
+  });
+  const patchBody = parseBody(patchResponse);
+  const patchedRecord = patchBody.record;
+
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+  assert.ok(patchedRecord?.agent_outputs.final_article, 'patch should write final_article output');
+
+  const completeResponse = await markAgentComplete(store, {
+    action: 'mark_agent_complete',
+    request_id: requestId,
+    agent_name: 'final_article',
+    expected_record_version: (patchedRecord as WorkflowRecord).version,
+    lock_token: lock.token,
+    current_stage: null,
+    next_agent: null,
+    workflow_status: 'completed',
+    needs_review: false,
+    last_error: null,
+  });
+  const completeBody = parseBody(completeResponse);
+  const completedRecord = completeBody.record;
+
+  assert.equal(completeResponse.statusCode, 200, completeResponse.body);
+  assert.ok(completedRecord?.agent_outputs.final_article, 'completion should preserve final_article output');
+
+  const visibleGetResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const visibleGetBody = parseBody(visibleGetResponse);
+
+  assert.equal(visibleGetResponse.statusCode, 200, visibleGetResponse.body);
+  assert.deepEqual(
+    visibleGetBody.record?.agent_outputs.final_article,
+    completedRecord?.agent_outputs.final_article,
+    'get_request should be able to see final_article output before publish'
+  );
+
+  const stalePublishSnapshot: WorkflowRecord = {
+    ...(completedRecord as WorkflowRecord),
+    agent_outputs: {},
+  };
+  const originalGet = store.get.bind(store);
+  let returnedStalePublishSnapshot = false;
+  store.get = async (key: string) => {
+    if (!returnedStalePublishSnapshot && key === recordKey(requestId)) {
+      returnedStalePublishSnapshot = true;
+      return JSON.stringify(stalePublishSnapshot);
+    }
+
+    return originalGet(key);
+  };
+
+  const publishResponse = await markPublished(store, {
+    action: 'mark_published',
+    request_id: requestId,
+    expected_record_version: (completedRecord as WorkflowRecord).version,
+    lock_token: lock.token,
+    commit_metadata: { commit: 'publish-stabilized-final-output' },
+  });
+  const publishBody = parseBody(publishResponse);
+
+  assert.equal(publishResponse.statusCode, 200, publishResponse.body);
+  assert.equal(returnedStalePublishSnapshot, true);
+  assert.equal(publishBody.record?.workflow_status, 'published');
+  assert.deepEqual(
+    publishBody.record?.agent_outputs.final_article,
+    completedRecord?.agent_outputs.final_article,
+    'publish response should preserve final_article output after a stale first read'
+  );
+
+  const durableGetResponse = await getRequest(store, { action: 'get_request', request_id: requestId });
+  const durableGetBody = parseBody(durableGetResponse);
+
+  assert.equal(durableGetResponse.statusCode, 200, durableGetResponse.body);
+  assert.equal(durableGetBody.record?.workflow_status, 'published');
+  assert.deepEqual(
+    durableGetBody.record?.agent_outputs.final_article,
+    completedRecord?.agent_outputs.final_article,
+    'durable get_request should preserve final_article output after publish'
+  );
+});
