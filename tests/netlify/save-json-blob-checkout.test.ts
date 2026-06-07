@@ -9,12 +9,16 @@ type ResponseBody = {
   action: string;
   diagnostics?: {
     attempts: number;
+    eventual_read_exhausted: boolean;
     first_non_null_attempt?: number;
     max_attempts: number;
     null_read_attempts: number[];
+    record_key: string;
     request_id: string;
     saw_transient_null_reads: boolean;
     stabilization_delay_ms: number;
+    strong_read_attempts: number;
+    strong_read_succeeded: boolean;
   };
   not_found?: boolean;
   record?: WorkflowRecord;
@@ -112,12 +116,16 @@ test('checkout_request stabilizes transient not-found reads after create before 
     assert.equal(body.record?.lock?.owner_id, 'checkout-retry-agent');
     assert.deepEqual(body.diagnostics, {
       request_id: requestId,
+      record_key: recordKey(requestId),
       attempts: 7,
+      eventual_read_exhausted: false,
       first_non_null_attempt: 7,
       max_attempts: 20,
       null_read_attempts: [1, 2, 3, 4, 5, 6],
       saw_transient_null_reads: true,
       stabilization_delay_ms: 100,
+      strong_read_attempts: 6,
+      strong_read_succeeded: false,
     });
     assert.equal(recordGetAttempts, 10);
     assert.equal(warnings.length, 6);
@@ -179,12 +187,16 @@ test('checkout_request can recover with a strong-consistency read when eventual 
     assert.equal(body.record?.lock?.owner_id, 'checkout-strong-agent');
     assert.deepEqual(body.diagnostics, {
       request_id: requestId,
+      record_key: recordKey(requestId),
       attempts: 20,
+      eventual_read_exhausted: true,
       first_non_null_attempt: 20,
       max_attempts: 20,
       null_read_attempts: Array.from({ length: 20 }, (_, index) => index + 1),
       saw_transient_null_reads: true,
       stabilization_delay_ms: 100,
+      strong_read_attempts: 20,
+      strong_read_succeeded: true,
     });
     assert.equal(eventualRecordGetAttempts, 23);
     assert.equal(strongRecordGetAttempts, 20);
@@ -215,11 +227,15 @@ test('checkout_request returns final not_found diagnostics only after retry atte
     assert.equal(body.not_found, true);
     assert.deepEqual(body.diagnostics, {
       request_id: requestId,
+      record_key: recordKey(requestId),
       attempts: 20,
+      eventual_read_exhausted: true,
       max_attempts: 20,
       null_read_attempts: Array.from({ length: 20 }, (_, index) => index + 1),
       saw_transient_null_reads: true,
       stabilization_delay_ms: 100,
+      strong_read_attempts: 20,
+      strong_read_succeeded: false,
     });
     assert.equal(warnings.length, 20);
     assert.deepEqual(

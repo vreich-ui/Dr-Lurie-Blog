@@ -424,21 +424,30 @@ const loadRecordForLockToken = async (store: WorkflowBlobStore, requestId: strin
 
 type CheckoutLoadDiagnostics = {
   attempts: number;
+  eventual_read_exhausted: boolean;
   first_non_null_attempt?: number;
   max_attempts: number;
   null_read_attempts: number[];
+  record_key: string;
   request_id: string;
   saw_transient_null_reads: boolean;
   stabilization_delay_ms: number;
+  strong_read_attempts: number;
+  strong_read_succeeded: boolean;
 };
 
-const checkoutDiagnostics = (requestId: string, diagnostics: Omit<CheckoutLoadDiagnostics, 'request_id'>) => ({
+const checkoutDiagnostics = (
+  requestId: string,
+  diagnostics: Omit<CheckoutLoadDiagnostics, 'record_key' | 'request_id'>
+) => ({
   request_id: requestId,
+  record_key: recordKey(requestId),
   ...diagnostics,
 });
 
 const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string) => {
   const nullReadAttempts: number[] = [];
+  let strongReadAttempts = 0;
 
   for (let attempt = 1; attempt <= CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS; attempt += 1) {
     const record = await loadRecord(store, requestId);
@@ -447,11 +456,14 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
       return {
         diagnostics: checkoutDiagnostics(requestId, {
           attempts: attempt,
+          eventual_read_exhausted: false,
           first_non_null_attempt: attempt,
           max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
           null_read_attempts: nullReadAttempts,
           saw_transient_null_reads: nullReadAttempts.length > 0,
           stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+          strong_read_attempts: strongReadAttempts,
+          strong_read_succeeded: false,
         }),
         record,
       };
@@ -460,6 +472,7 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
     nullReadAttempts.push(attempt);
 
     try {
+      strongReadAttempts += 1;
       const stronglyConsistentRecord = await loadRecord(store, requestId, { consistency: 'strong' });
 
       if (stronglyConsistentRecord) {
@@ -468,9 +481,12 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
             attempts: attempt,
             first_non_null_attempt: attempt,
             max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+            eventual_read_exhausted: attempt === CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
             null_read_attempts: nullReadAttempts,
             saw_transient_null_reads: true,
             stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+            strong_read_attempts: strongReadAttempts,
+            strong_read_succeeded: true,
           }),
           record: stronglyConsistentRecord,
         };
@@ -483,10 +499,13 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
       console.warn('checkout_request record fetch returned 404/null; stabilizing before retry.', {
         ...checkoutDiagnostics(requestId, {
           attempts: attempt,
+          eventual_read_exhausted: false,
           max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
           null_read_attempts: nullReadAttempts,
           saw_transient_null_reads: nullReadAttempts.length > 0,
           stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+          strong_read_attempts: strongReadAttempts,
+          strong_read_succeeded: false,
         }),
         next_attempt: attempt + 1,
       });
@@ -497,9 +516,12 @@ const loadRecordForCheckout = async (store: WorkflowBlobStore, requestId: string
   const diagnostics = checkoutDiagnostics(requestId, {
     attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
     max_attempts: CHECKOUT_NOT_FOUND_STABILIZATION_ATTEMPTS,
+    eventual_read_exhausted: true,
     null_read_attempts: nullReadAttempts,
     saw_transient_null_reads: nullReadAttempts.length > 1,
     stabilization_delay_ms: CHECKOUT_NOT_FOUND_STABILIZATION_DELAY_MS,
+    strong_read_attempts: strongReadAttempts,
+    strong_read_succeeded: false,
   });
 
   console.warn('checkout_request record fetch returned 404/null after stabilization exhausted.', diagnostics);
