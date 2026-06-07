@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
-import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -150,6 +150,7 @@ const requestSchema = z
     deploy_status: z.string().min(1).optional(),
     deployStatus: z.string().min(1).optional(),
     message: z.string().min(1).optional(),
+    validation_mode: z.enum(['admin_publish_draft']).optional(),
   })
   .strict();
 
@@ -768,6 +769,127 @@ const requireRequestId = (body: WorkflowRequest) => {
   return undefined;
 };
 
+const isRecordValue = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
+
+const nonEmptyText = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const nonEmptyArray = (value: unknown) => (Array.isArray(value) && value.length > 0 ? value : undefined);
+
+const finalArticleStringKeyMappings: Array<{ from: string; to: keyof PublishPayload }> = [
+  { from: 'title', to: 'title' },
+  { from: 'slug', to: 'slug' },
+  { from: 'author', to: 'author' },
+  { from: 'excerpt', to: 'excerpt' },
+  { from: 'seoDescription', to: 'seoDescription' },
+  { from: 'featuredImage', to: 'featuredImage' },
+  { from: 'content', to: 'content' },
+  { from: 'markdown', to: 'markdown' },
+  { from: 'body', to: 'content' },
+];
+
+const finalArticleArrayKeyMappings: Array<{ from: string; to: keyof PublishPayload }> = [
+  { from: 'tags', to: 'tags' },
+  { from: 'mediaEntries', to: 'mediaEntries' },
+  { from: 'artifactReferences', to: 'artifactReferences' },
+];
+
+const readFinalArticleOutputContainer = (output: unknown) => {
+  if (!isRecordValue(output)) return undefined;
+
+  const nestedPayload = output.publish_payload;
+  if (isRecordValue(nestedPayload)) return { ...output, ...nestedPayload };
+
+  return output;
+};
+
+const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, output: unknown): ContentSourceV1 => {
+  const outputRecord = readFinalArticleOutputContainer(output);
+  const previousPublication = input.publication ?? {};
+  const previousPayload: Partial<PublishPayload> = previousPublication.publish_payload ?? {};
+  const publishPayload: Partial<PublishPayload> = { ...previousPayload };
+
+  if (outputRecord) {
+    for (const { from, to } of finalArticleStringKeyMappings) {
+      const value = nonEmptyText(outputRecord[from]);
+      if (value !== undefined) publishPayload[to] = value as never;
+    }
+
+    for (const { from, to } of finalArticleArrayKeyMappings) {
+      const value = nonEmptyArray(outputRecord[from]);
+      if (value !== undefined) publishPayload[to] = value as never;
+    }
+  }
+
+  return {
+    ...input,
+    publication: {
+      ...previousPublication,
+      schema_version: 'publication.v1',
+      publish_payload: publishPayload as PublishPayload,
+    },
+  };
+};
+
+type AdminPublishDraftIssue = { path: string[]; message: string };
+
+const hasAdminImportableText = (...values: unknown[]) => values.some((value) => nonEmptyText(value) !== undefined);
+
+const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
+  const payload = input.publication?.publish_payload;
+  const issues: AdminPublishDraftIssue[] = [];
+
+  if (!hasAdminImportableText(payload?.title, input.content?.title)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'title'],
+      message: 'Admin-publish drafts require publication.publish_payload.title or content.title.',
+    });
+  }
+
+  if (!hasAdminImportableText(payload?.slug, input.content?.title)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'slug'],
+      message:
+        'Admin-publish drafts require publication.publish_payload.slug or enough content.title text to compute one.',
+    });
+  }
+
+  if (!hasAdminImportableText(payload?.author)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'author'],
+      message: 'Admin-publish drafts require publication.publish_payload.author.',
+    });
+  }
+
+  if (!hasAdminImportableText(payload?.content, payload?.markdown, input.editorial?.draft_markdown)) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'content'],
+      message:
+        'Admin-publish drafts require publication.publish_payload.content, publication.publish_payload.markdown, or editorial.draft_markdown.',
+    });
+  }
+
+  return issues;
+};
+
+const getAdminPublishDraftValidationFailure = (input: ContentSourceV1, body: WorkflowRequest) => {
+  if (body.validation_mode !== 'admin_publish_draft') return undefined;
+
+  const issues = validateAdminPublishDraftInput(input);
+  if (issues.length === 0) return undefined;
+
+  return jsonResponse(400, {
+    action: body.action,
+    error: 'Invalid admin-publish draft input.',
+    error_code: 'invalid_admin_publish_draft',
+    issues,
+  });
+};
+
 export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
@@ -780,6 +902,9 @@ export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequ
       issues: parsedInput.error.issues,
     });
   }
+
+  const adminPublishDraftValidationFailure = getAdminPublishDraftValidationFailure(parsedInput.data, body);
+  if (adminPublishDraftValidationFailure) return adminPublishDraftValidationFailure;
 
   const existingRecord = await loadRecord(store, body.request_id as string);
 
@@ -906,6 +1031,10 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
   const nextRecord: WorkflowRecord = {
     ...previousRecord,
     updated_at: timestamp,
+    input:
+      agentName === 'final_article'
+        ? normalizeFinalArticlePublicationInput(previousRecord.input, body.output)
+        : previousRecord.input,
     agent_outputs: {
       ...previousRecord.agent_outputs,
       [agentName]: {
@@ -1074,9 +1203,14 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
     ? previousRecord.completed_agents
     : [...previousRecord.completed_agents, agentName];
   const failedAgents = previousRecord.failed_agents.filter((failedAgent) => failedAgent !== agentName);
+  const finalArticleOutput = previousRecord.agent_outputs.final_article?.output;
   const nextRecord: WorkflowRecord = {
     ...previousRecord,
     updated_at: timestamp,
+    input:
+      agentName === 'final_article'
+        ? normalizeFinalArticlePublicationInput(previousRecord.input, finalArticleOutput)
+        : previousRecord.input,
     current_stage: currentStage.value !== undefined ? currentStage.value : previousRecord.current_stage,
     next_agent: nextAgent.value !== undefined ? nextAgent.value : previousRecord.next_agent,
     workflow_status: workflowStatus.value ?? previousRecord.workflow_status,

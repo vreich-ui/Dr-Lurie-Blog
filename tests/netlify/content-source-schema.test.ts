@@ -217,6 +217,29 @@ test('create_request honors explicit initial routing fields over workflow defaul
   assert.equal(body.record.next_agent, null);
 });
 
+test('create_request rejects skeletal admin-publish drafts before writing workflow records', async () => {
+  const store = createMemoryStore();
+  const requestId = 'req_admin_publish_validation_test';
+  const response = await createRequest(store, {
+    action: 'create_request',
+    request_id: requestId,
+    input: validContentSourceV1,
+    validation_mode: 'admin_publish_draft',
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error_code, 'invalid_admin_publish_draft');
+  assert.ok(
+    body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'publication.publish_payload.author')
+  );
+  assert.ok(
+    body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'publication.publish_payload.content')
+  );
+  assert.equal(await store.get(`workflows/by-id/${requestId}.json`), null);
+});
+
 test('create_request returns HTTP 400 when required schema discriminator fields are missing', async () => {
   const response = await createWorkflow({ content: { title: 'Missing discriminators' } });
   const body = parseResponseBody(response);

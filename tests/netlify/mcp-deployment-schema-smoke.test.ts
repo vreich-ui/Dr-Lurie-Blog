@@ -21,6 +21,18 @@ const contentSourceInput = (requestId: string) => ({
     schema_version: 'content_blocks.v1',
     title: 'MCP deployment schema smoke test',
   },
+  editorial: {
+    schema_version: 'editorial.v1',
+    draft_markdown: 'MCP deployment schema smoke test body.',
+  },
+  publication: {
+    schema_version: 'publication.v1',
+    publish_payload: {
+      slug: 'mcp-deployment-schema-smoke-test',
+      title: 'MCP deployment schema smoke test',
+      author: 'Dr. Lurié',
+    },
+  },
   workflow: {
     schema_version: 'content_workflow.v1',
     workflow_id: requestId,
