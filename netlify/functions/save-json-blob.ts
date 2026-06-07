@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
-import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -768,6 +768,72 @@ const requireRequestId = (body: WorkflowRequest) => {
   return undefined;
 };
 
+const isRecordValue = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
+
+const nonEmptyText = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const nonEmptyArray = (value: unknown) => (Array.isArray(value) && value.length > 0 ? value : undefined);
+
+const finalArticleStringKeyMappings: Array<{ from: string; to: keyof PublishPayload }> = [
+  { from: 'title', to: 'title' },
+  { from: 'slug', to: 'slug' },
+  { from: 'author', to: 'author' },
+  { from: 'excerpt', to: 'excerpt' },
+  { from: 'seoDescription', to: 'seoDescription' },
+  { from: 'featuredImage', to: 'featuredImage' },
+  { from: 'content', to: 'content' },
+  { from: 'markdown', to: 'markdown' },
+  { from: 'body', to: 'content' },
+];
+
+const finalArticleArrayKeyMappings: Array<{ from: string; to: keyof PublishPayload }> = [
+  { from: 'tags', to: 'tags' },
+  { from: 'mediaEntries', to: 'mediaEntries' },
+  { from: 'artifactReferences', to: 'artifactReferences' },
+];
+
+const readFinalArticleOutputContainer = (output: unknown) => {
+  if (!isRecordValue(output)) return undefined;
+
+  const nestedPayload = output.publish_payload;
+  if (isRecordValue(nestedPayload)) return { ...output, ...nestedPayload };
+
+  return output;
+};
+
+const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, output: unknown): ContentSourceV1 => {
+  const outputRecord = readFinalArticleOutputContainer(output);
+  const previousPublication = input.publication ?? {};
+  const previousPayload: Partial<PublishPayload> = previousPublication.publish_payload ?? {};
+  const publishPayload: Partial<PublishPayload> = { ...previousPayload };
+
+  if (outputRecord) {
+    for (const { from, to } of finalArticleStringKeyMappings) {
+      const value = nonEmptyText(outputRecord[from]);
+      if (value !== undefined) publishPayload[to] = value as never;
+    }
+
+    for (const { from, to } of finalArticleArrayKeyMappings) {
+      const value = nonEmptyArray(outputRecord[from]);
+      if (value !== undefined) publishPayload[to] = value as never;
+    }
+  }
+
+  return {
+    ...input,
+    publication: {
+      ...previousPublication,
+      schema_version: 'publication.v1',
+      publish_payload: publishPayload as PublishPayload,
+    },
+  };
+};
+
 export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
@@ -906,6 +972,10 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
   const nextRecord: WorkflowRecord = {
     ...previousRecord,
     updated_at: timestamp,
+    input:
+      agentName === 'final_article'
+        ? normalizeFinalArticlePublicationInput(previousRecord.input, body.output)
+        : previousRecord.input,
     agent_outputs: {
       ...previousRecord.agent_outputs,
       [agentName]: {
@@ -1074,9 +1144,14 @@ export const markAgentComplete = async (store: WorkflowBlobStore, body: Workflow
     ? previousRecord.completed_agents
     : [...previousRecord.completed_agents, agentName];
   const failedAgents = previousRecord.failed_agents.filter((failedAgent) => failedAgent !== agentName);
+  const finalArticleOutput = previousRecord.agent_outputs.final_article?.output;
   const nextRecord: WorkflowRecord = {
     ...previousRecord,
     updated_at: timestamp,
+    input:
+      agentName === 'final_article'
+        ? normalizeFinalArticlePublicationInput(previousRecord.input, finalArticleOutput)
+        : previousRecord.input,
     current_stage: currentStage.value !== undefined ? currentStage.value : previousRecord.current_stage,
     next_agent: nextAgent.value !== undefined ? nextAgent.value : previousRecord.next_agent,
     workflow_status: workflowStatus.value ?? previousRecord.workflow_status,
