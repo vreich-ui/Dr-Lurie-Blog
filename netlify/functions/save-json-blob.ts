@@ -274,16 +274,37 @@ const getLockExpirationMs = (lock: WorkflowLockRecord) => {
   return Number.isFinite(expiresAtMs) ? expiresAtMs : 0;
 };
 
+const getLockTimestampDiagnostics = (lock: WorkflowLockRecord, nowMs: number) => {
+  const expiresAtMs = getLockExpirationMs(lock);
+  const acquiredAtMs = Date.parse(lock.acquired_at);
+  const finiteExpiresAtMs = Number.isFinite(expiresAtMs) && expiresAtMs > 0;
+  const finiteAcquiredAtMs = Number.isFinite(acquiredAtMs);
+
+  return {
+    nowISO: new Date(nowMs).toISOString(),
+    acquiredAtISO: finiteAcquiredAtMs ? new Date(acquiredAtMs).toISOString() : lock.acquired_at,
+    expiresAtISO: finiteExpiresAtMs ? new Date(expiresAtMs).toISOString() : lock.expires_at,
+    deltaMs: finiteExpiresAtMs ? expiresAtMs - nowMs : null,
+  };
+};
+
 const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
   Boolean(lock && getLockExpirationMs(lock) > nowMs);
 
-const lockExpiredResponse = (body: WorkflowRequest) =>
-  jsonResponse(423, { action: body.action, error: 'lock_expired', lock_expired: true });
+const lockExpiredResponse = (body: WorkflowRequest, lock?: WorkflowLockRecord, nowMs = Date.now()) =>
+  jsonResponse(423, {
+    action: body.action,
+    error: 'lock_expired',
+    lock_expired: true,
+    ...(lock ? { diagnostics: getLockTimestampDiagnostics(lock, nowMs) } : {}),
+  });
 
 const validateMutationLock = (record: WorkflowRecord, body: WorkflowRequest) => {
-  if (!body.lock_token || !record.lock) return lockExpiredResponse(body);
-  if (record.lock.token !== body.lock_token) return lockExpiredResponse(body);
-  if (!isLockActive(record.lock, Date.now())) return lockExpiredResponse(body);
+  const nowMs = Date.now();
+
+  if (!body.lock_token || !record.lock) return lockExpiredResponse(body, record.lock, nowMs);
+  if (record.lock.token !== body.lock_token) return lockExpiredResponse(body, record.lock, nowMs);
+  if (!isLockActive(record.lock, nowMs)) return lockExpiredResponse(body, record.lock, nowMs);
 
   return undefined;
 };
@@ -513,7 +534,7 @@ const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowReque
   return jsonResponse(200, { action: body.action, records: summaries });
 };
 
-const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
   if (body.expected_agent_version === undefined) {
@@ -728,7 +749,12 @@ const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
   if (!isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(409, { action: body.action, error: 'Lock has expired.', lock: previousRecord.lock });
+    return jsonResponse(409, {
+      action: body.action,
+      error: 'Lock has expired.',
+      lock: previousRecord.lock,
+      diagnostics: getLockTimestampDiagnostics(previousRecord.lock, timestampMs),
+    });
   }
 
   const leaseSeconds = getLeaseSeconds(body);
