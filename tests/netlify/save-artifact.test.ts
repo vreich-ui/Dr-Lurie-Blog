@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
+import sharp from 'sharp';
+
 import { handler, saveUploadedChunk } from '../../netlify/functions/save-artifact.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../../netlify/lib/blob-store.js';
 
@@ -125,6 +127,89 @@ test('save-artifact single-shot uploads dedupe by checksum', async () => {
   const indexedReference = indexedReferenceText ? (JSON.parse(indexedReferenceText) as unknown) : null;
 
   assert.deepEqual(indexedReference, first.json.artifact);
+});
+
+test('save-artifact accepts a valid JPEG upload after marker and decoder validation', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `jpeg-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const jpegBytes = await sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: 20, g: 40, b: 60 },
+    },
+  })
+    .jpeg()
+    .toBuffer();
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'photo.jpg',
+    encoding: 'base64',
+    expectedSizeBytes: jpegBytes.byteLength,
+    expectedSha256: createHash('sha256').update(jpegBytes).digest('hex'),
+    payload: jpegBytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json.complete, true);
+  assert.equal(response.json.deduped, false);
+});
+
+test('save-artifact rejects JPEG aliases without required SOI and EOI markers before final persistence', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `jpeg-marker-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpg',
+    filename: 'photo.jpg',
+    encoding: 'base64',
+    payload: Buffer.from('not a jpeg').toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json, { error: 'Invalid JPEG artifact: missing SOI or EOI marker.' });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
+test('save-artifact rejects JPEG bytes that have markers but cannot be decoded before final persistence', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `jpeg-decode-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const invalidJpegBytes = Buffer.from([0xff, 0xd8, 0x00, 0x00, 0xff, 0xd9]);
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'photo.jpg',
+    encoding: 'base64',
+    payload: invalidJpegBytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json, { error: 'Invalid JPEG artifact: image bytes could not be decoded.' });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
 test('save-artifact rejects a single-shot upload when expected size does not match decoded bytes', async () => {

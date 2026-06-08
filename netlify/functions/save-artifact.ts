@@ -8,6 +8,7 @@
  */
 import { timingSafeEqual } from 'node:crypto';
 
+import sharp from 'sharp';
 import { z } from 'zod';
 
 import {
@@ -163,6 +164,35 @@ const validateArtifactIntegrity = (input: UploadRequest, bytes: Buffer) => {
     return jsonResponse(400, {
       error: `Artifact sha256 mismatch: expected ${input.expectedSha256}, received ${sha256}.`,
     });
+  }
+
+  return undefined;
+};
+
+const isJpegContentType = (contentType: string) => {
+  const normalized = contentType.split(';', 1)[0].trim().toLowerCase();
+
+  return normalized === 'image/jpeg' || normalized === 'image/jpg';
+};
+
+const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
+  if (!isJpegContentType(input.contentType)) return undefined;
+
+  const hasJpegMarkers =
+    bytes.length >= 4 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[bytes.length - 2] === 0xff &&
+    bytes[bytes.length - 1] === 0xd9;
+
+  if (!hasJpegMarkers) {
+    return jsonResponse(400, { error: 'Invalid JPEG artifact: missing SOI or EOI marker.' });
+  }
+
+  try {
+    await sharp(bytes).metadata();
+  } catch {
+    return jsonResponse(400, { error: 'Invalid JPEG artifact: image bytes could not be decoded.' });
   }
 
   return undefined;
@@ -368,6 +398,10 @@ const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, bytes: B
   const integrityError = validateArtifactIntegrity(input, bytes);
 
   if (integrityError) return integrityError;
+
+  const imageValidationError = await validateImageArtifact(input, bytes);
+
+  if (imageValidationError) return imageValidationError;
 
   const artifactStore = await getArtifactBlobStore(event);
   const indexStore = await getArtifactIndexBlobStore(event);
