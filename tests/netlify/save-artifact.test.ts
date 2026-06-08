@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
+import sharp from 'sharp';
+
 import { handler, saveUploadedChunk } from '../../netlify/functions/save-artifact.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../../netlify/lib/blob-store.js';
 
@@ -11,6 +13,26 @@ const validJpegBytes = Buffer.from(
   'base64'
 );
 const validJpegSha256 = createHash('sha256').update(validJpegBytes).digest('hex');
+
+const deterministicBytes = (sizeBytes: number) => {
+  const chunks: Buffer[] = [];
+  let counter = 0;
+
+  while (Buffer.concat(chunks).byteLength < sizeBytes) {
+    chunks.push(createHash('sha256').update(`artifact-test-${counter}`).digest());
+    counter += 1;
+  }
+
+  return Buffer.concat(chunks).subarray(0, sizeBytes);
+};
+
+const createNoiseJpeg = async (width: number, height: number, quality: number) => {
+  return sharp(deterministicBytes(width * height * 3), { raw: { width, height, channels: 3 } })
+    .jpeg({ quality })
+    .toBuffer();
+};
+
+const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 
 const postArtifact = async (body: Record<string, unknown>) => {
   const response = await handler({
@@ -31,6 +53,68 @@ const makeBaseInput = (requestId: string) => ({
   contentType: 'image/png',
   filename: 'hero.png',
 });
+
+const listArtifactsWithMcp = async (requestId: string) => {
+  const { handler: mcpHandler } = await import('../../netlify/functions/mcp.js');
+  const listResponse = await mcpHandler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 99,
+      method: 'tools/call',
+      params: { name: 'list_artifacts_for_request', arguments: { requestId } },
+    }),
+  });
+  const listBody = JSON.parse(listResponse.body) as {
+    result: { structuredContent: { artifacts: unknown[] } };
+  };
+
+  return listBody.result.structuredContent.artifacts;
+};
+
+const postChunkedJpeg = async ({
+  requestId,
+  bytes,
+  chunkSizeBytes,
+  expectedSizeBytes = bytes.byteLength,
+  expectedSha256 = sha256(bytes),
+}: {
+  requestId: string;
+  bytes: Buffer;
+  chunkSizeBytes: number;
+  expectedSizeBytes?: number;
+  expectedSha256?: string;
+}) => {
+  const clientUploadId = randomUUID();
+  const totalChunks = Math.ceil(bytes.byteLength / chunkSizeBytes);
+  let response: Awaited<ReturnType<typeof postArtifact>> | undefined;
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+    const chunk = bytes.subarray(
+      chunkIndex * chunkSizeBytes,
+      Math.min(bytes.byteLength, (chunkIndex + 1) * chunkSizeBytes)
+    );
+    response = await postArtifact({
+      ...makeBaseInput(requestId),
+      contentType: 'image/jpeg',
+      filename: 'chunked-regression.jpg',
+      clientUploadId,
+      chunkIndex,
+      totalChunks,
+      encoding: 'base64',
+      expectedSizeBytes,
+      expectedSha256,
+      localSizeBytes: expectedSizeBytes,
+      localSha256: expectedSha256,
+      payload: chunk.toString('base64'),
+    });
+  }
+
+  if (!response) throw new Error('Expected at least one chunk response.');
+
+  return response;
+};
 
 test('save-artifact chunk status stays monotonic when an immediate chunk read is stale', async () => {
   type FakeStoreValue = Buffer | string;
@@ -170,6 +254,30 @@ test('save-artifact accepts a valid JPEG upload with matching expected size and 
 
   assert.ok(Buffer.isBuffer(retrievedBytes));
   assert.equal(createHash('sha256').update(retrievedBytes).digest('hex'), validJpegSha256);
+});
+
+test('save-artifact accepts localSizeBytes and localSha256 as integrity aliases', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `jpeg-local-alias-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'photo.jpg',
+    encoding: 'base64',
+    localSizeBytes: validJpegBytes.byteLength,
+    localSha256: validJpegSha256,
+    payload: validJpegBytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 201);
+  const artifact = response.json.artifact as { sha256: string; sizeBytes: number };
+
+  assert.equal(artifact.sizeBytes, validJpegBytes.byteLength);
+  assert.equal(artifact.sha256, validJpegSha256);
 });
 
 test('save-artifact rejects a truncated JPEG without writing final artifact or index records', async () => {
@@ -664,6 +772,113 @@ test('save-artifact rejects a completed chunked upload when expected sha256 does
   assert.deepEqual(completed.json, {
     error: `Artifact sha256 mismatch: expected ${badSha256}, received ${actualSha256}.`,
   });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
+test('save-artifact preserves a valid 1-2 KB JPEG chunked upload with exact size and sha256', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const jpegBytes = await createNoiseJpeg(48, 48, 85);
+  assert.ok(jpegBytes.byteLength >= 1024 && jpegBytes.byteLength <= 2048);
+
+  const requestId = `chunked-jpeg-small-regression-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const completed = await postChunkedJpeg({ requestId, bytes: jpegBytes, chunkSizeBytes: 257 });
+
+  assert.equal(completed.statusCode, 201);
+  const artifact = completed.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
+  assert.equal(artifact.sizeBytes, jpegBytes.byteLength);
+  assert.equal(artifact.sha256, sha256(jpegBytes));
+
+  const artifactStore = await getArtifactBlobStore({});
+  const storedBytes = await (
+    artifactStore as typeof artifactStore & {
+      get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | null>;
+    }
+  ).get(artifact.blobKey, { type: 'buffer' });
+
+  assert.ok(Buffer.isBuffer(storedBytes));
+  assert.equal(storedBytes.byteLength, jpegBytes.byteLength);
+  assert.equal(sha256(storedBytes), sha256(jpegBytes));
+});
+
+test('save-artifact preserves a valid 20-25 KB JPEG chunked upload with exact size and sha256', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const jpegBytes = await createNoiseJpeg(180, 180, 80);
+  assert.ok(jpegBytes.byteLength >= 20 * 1024 && jpegBytes.byteLength <= 25 * 1024);
+
+  const requestId = `chunked-jpeg-large-regression-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const completed = await postChunkedJpeg({ requestId, bytes: jpegBytes, chunkSizeBytes: 4097 });
+
+  assert.equal(completed.statusCode, 201);
+  const artifact = completed.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
+  assert.equal(artifact.sizeBytes, jpegBytes.byteLength);
+  assert.equal(artifact.sha256, sha256(jpegBytes));
+
+  const artifactStore = await getArtifactBlobStore({});
+  const storedBytes = await (
+    artifactStore as typeof artifactStore & {
+      get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | null>;
+    }
+  ).get(artifact.blobKey, { type: 'buffer' });
+
+  assert.ok(Buffer.isBuffer(storedBytes));
+  assert.equal(storedBytes.byteLength, jpegBytes.byteLength);
+  assert.equal(sha256(storedBytes), sha256(jpegBytes));
+});
+
+test('save-artifact rejects a completed chunked upload when expected size does not match assembled bytes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `chunked-size-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const jpegBytes = await createNoiseJpeg(48, 48, 85);
+  const completed = await postChunkedJpeg({
+    requestId,
+    bytes: jpegBytes,
+    chunkSizeBytes: 311,
+    expectedSizeBytes: jpegBytes.byteLength + 10,
+  });
+
+  assert.equal(completed.statusCode, 400);
+  assert.deepEqual(completed.json, {
+    error: `Artifact size mismatch: expected ${jpegBytes.byteLength + 10} bytes, received ${jpegBytes.byteLength} bytes.`,
+  });
+  assert.deepEqual(await listArtifactsWithMcp(requestId), []);
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
+test('save-artifact rejects a chunked truncated JPEG and leaves no listed artifact', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `chunked-truncated-jpeg-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const truncatedBytes = validJpegBytes.subarray(0, validJpegBytes.byteLength - 2);
+  const completed = await postChunkedJpeg({ requestId, bytes: truncatedBytes, chunkSizeBytes: 17 });
+
+  assert.equal(completed.statusCode, 400);
+  assert.deepEqual(completed.json, { error: 'Invalid JPEG artifact: missing SOI or EOI marker.' });
+  assert.deepEqual(await listArtifactsWithMcp(requestId), []);
 
   const artifactStore = await getArtifactBlobStore({});
   const indexStore = await getArtifactIndexBlobStore({});
