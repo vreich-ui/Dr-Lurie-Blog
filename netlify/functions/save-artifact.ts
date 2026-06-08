@@ -19,6 +19,7 @@ import {
 } from '../lib/artifacts.js';
 import { getHeader } from '../lib/admin-auth.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { sha256Hex } from '../lib/crypto.js';
 
 // artifactStore holds binary blobs (final artifacts and temporary chunks); indexStore holds JSON references and indexes.
 
@@ -146,6 +147,25 @@ const decodePayload = (input: Pick<UploadRequest, 'encoding' | 'payload'>) => {
   if (input.encoding === 'binary') return Buffer.from(input.payload, 'binary');
 
   return Buffer.from(input.payload, 'base64');
+};
+
+const validateArtifactIntegrity = (input: UploadRequest, bytes: Buffer) => {
+  const sizeBytes = bytes.byteLength;
+  const sha256 = sha256Hex(bytes);
+
+  if (input.expectedSizeBytes !== undefined && input.expectedSizeBytes !== sizeBytes) {
+    return jsonResponse(400, {
+      error: `Artifact size mismatch: expected ${input.expectedSizeBytes} bytes, received ${sizeBytes} bytes.`,
+    });
+  }
+
+  if (input.expectedSha256 !== undefined && input.expectedSha256.toLowerCase() !== sha256) {
+    return jsonResponse(400, {
+      error: `Artifact sha256 mismatch: expected ${input.expectedSha256}, received ${sha256}.`,
+    });
+  }
+
+  return undefined;
 };
 
 const chunkUploadPrefix = (requestId: string, clientUploadId: string) => {
@@ -345,6 +365,10 @@ const saveReference = async (store: BlobStore, requestId: string, reference: Art
 };
 
 const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, bytes: Buffer, chunkStatus?: ChunkStatus) => {
+  const integrityError = validateArtifactIntegrity(input, bytes);
+
+  if (integrityError) return integrityError;
+
   const artifactStore = await getArtifactBlobStore(event);
   const indexStore = await getArtifactIndexBlobStore(event);
   const reference = createArtifactReference({ input, bytes });

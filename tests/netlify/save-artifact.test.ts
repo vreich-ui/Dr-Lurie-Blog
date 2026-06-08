@@ -127,6 +127,33 @@ test('save-artifact single-shot uploads dedupe by checksum', async () => {
   assert.deepEqual(indexedReference, first.json.artifact);
 });
 
+test('save-artifact rejects a single-shot upload when expected size does not match decoded bytes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `size-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const bytes = Buffer.from('size checked bytes');
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    encoding: 'base64',
+    expectedSizeBytes: bytes.byteLength + 1,
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.deepEqual(response.json, {
+    error: `Artifact size mismatch: expected ${bytes.byteLength + 1} bytes, received ${bytes.byteLength} bytes.`,
+  });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
 test('save-artifact chunked uploads collect three chunks by request and client upload before finalizing', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
@@ -245,6 +272,53 @@ test('save-artifact chunked uploads collect three chunks by request and client u
     `${chunkPrefix}2`,
     `${chunkPrefix}manifest.json`,
   ]);
+});
+
+test('save-artifact rejects a completed chunked upload when expected sha256 does not match assembled bytes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `sha-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const baseInput = makeBaseInput(requestId);
+  const clientUploadId = randomUUID();
+  const chunkBuffers = [Buffer.from('chunk-zero-'), Buffer.from('chunk-one')];
+  const badSha256 = '0'.repeat(64);
+  const actualSha256 = createHash('sha256').update(Buffer.concat(chunkBuffers)).digest('hex');
+
+  const partial = await postArtifact({
+    ...baseInput,
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    expectedSha256: badSha256,
+    payload: chunkBuffers[0].toString('base64'),
+  });
+
+  assert.equal(partial.statusCode, 202);
+
+  const completed = await postArtifact({
+    ...baseInput,
+    clientUploadId,
+    chunkIndex: 1,
+    totalChunks: 2,
+    encoding: 'base64',
+    expectedSha256: badSha256,
+    payload: chunkBuffers[1].toString('base64'),
+  });
+
+  assert.equal(completed.statusCode, 400);
+  assert.deepEqual(completed.json, {
+    error: `Artifact sha256 mismatch: expected ${badSha256}, received ${actualSha256}.`,
+  });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
 test('save-artifact requires the publish secret', async () => {
