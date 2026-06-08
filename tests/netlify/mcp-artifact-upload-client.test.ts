@@ -101,6 +101,82 @@ test('MCP image artifact upload integrity verification fails on mismatched retur
   );
 });
 
+test('MCP image artifact upload rejects binary encoded payloads before any MCP tool call', async () => {
+  let callCount = 0;
+
+  await assert.rejects(
+    uploadImagesWithIntegrity({
+      images: [
+        {
+          content: 'binary image bytes',
+          encoding: 'binary',
+          name: 'binary.jpg',
+          type: 'image/jpeg',
+        },
+      ],
+      requestId: 'req-integrity-test',
+      mcpToolCall: async () => {
+        callCount += 1;
+        return {};
+      },
+    }),
+    (error: unknown) =>
+      error instanceof ArtifactIntegrityError &&
+      /Artifact upload failed integrity verification/.test(error.message) &&
+      /encoding must be base64, not binary/.test(error.message)
+  );
+
+  assert.equal(callCount, 0);
+});
+
+test('MCP image artifact upload rejects SVG content before upload', async () => {
+  let callCount = 0;
+
+  await assert.rejects(
+    uploadImagesWithIntegrity({
+      images: [
+        {
+          base64: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" />').toString('base64'),
+          name: 'vector.svg',
+          type: 'image/svg+xml',
+        },
+      ],
+      requestId: 'req-integrity-test',
+      mcpToolCall: async () => {
+        callCount += 1;
+        return {};
+      },
+    }),
+    (error: unknown) =>
+      error instanceof ArtifactIntegrityError &&
+      /Artifact upload failed integrity verification/.test(error.message) &&
+      /SVG images are not supported/.test(error.message)
+  );
+
+  assert.equal(callCount, 0);
+});
+
+test('MCP image artifact upload rejects zero-byte images before upload', async () => {
+  let callCount = 0;
+
+  await assert.rejects(
+    uploadImagesWithIntegrity({
+      images: [{ base64: '', name: 'empty.jpg', type: 'image/jpeg' }],
+      requestId: 'req-integrity-test',
+      mcpToolCall: async () => {
+        callCount += 1;
+        return {};
+      },
+    }),
+    (error: unknown) =>
+      error instanceof ArtifactIntegrityError &&
+      /Artifact upload failed integrity verification/.test(error.message) &&
+      /payload is empty/.test(error.message)
+  );
+
+  assert.equal(callCount, 0);
+});
+
 test('verified image blobKey is not attached to final_article when verification fails', async () => {
   const bytes = Buffer.from('bad final article image bytes');
   const finalArticle = { title: 'Final article', artifactReferences: [] };
@@ -115,6 +191,36 @@ test('verified image blobKey is not attached to final_article when verification 
     attachVerifiedArtifactsToFinalArticle(finalArticle, verifiedArtifacts);
   }, /Artifact upload failed integrity verification/);
 
+  assert.deepEqual(finalArticle.artifactReferences, []);
+});
+
+test('verified image blobKeys are not partially attached when image 2 of N fails', async () => {
+  const firstBytes = Buffer.from('first valid image bytes');
+  const secondBytes = Buffer.from('second invalid image bytes');
+  const finalArticle = { title: 'Final article', artifactReferences: [] };
+  let callCount = 0;
+
+  await assert.rejects(async () => {
+    const verifiedArtifacts = await uploadImagesWithIntegrity({
+      images: [createImage(firstBytes), createImage(secondBytes)],
+      requestId: 'req-integrity-test',
+      mcpToolCall: async () => {
+        callCount += 1;
+        if (callCount === 1) {
+          return { ok: true, complete: true, artifact: createArtifact({ bytes: firstBytes }) };
+        }
+
+        return {
+          ok: true,
+          complete: true,
+          artifact: { ...createArtifact({ bytes: secondBytes }), sha256: '0'.repeat(64) },
+        };
+      },
+    });
+    attachVerifiedArtifactsToFinalArticle(finalArticle, verifiedArtifacts);
+  }, /Artifact upload failed integrity verification/);
+
+  assert.equal(callCount, 2);
   assert.deepEqual(finalArticle.artifactReferences, []);
 });
 

@@ -247,7 +247,9 @@ const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string) => {
   if (bytes === null) return undefined;
   if (Buffer.isBuffer(bytes)) return bytes;
   if (bytes instanceof ArrayBuffer) return Buffer.from(bytes);
-  if (typeof bytes === 'string') return Buffer.from(bytes, 'binary');
+  if (typeof bytes === 'string') {
+    throw new PublishError(500, 'Artifact blob store returned text for binary artifact bytes.');
+  }
 
   return undefined;
 };

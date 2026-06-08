@@ -156,10 +156,20 @@ test('save-artifact accepts a valid JPEG upload with matching expected size and 
   assert.equal(response.json.complete, true);
   assert.equal(response.json.deduped, false);
 
-  const artifact = response.json.artifact as { sha256: string; sizeBytes: number };
+  const artifact = response.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
 
   assert.equal(artifact.sizeBytes, validJpegBytes.byteLength);
   assert.equal(artifact.sha256, validJpegSha256);
+
+  const artifactStore = await getArtifactBlobStore({});
+  const retrievedBytes = await (
+    artifactStore as typeof artifactStore & {
+      get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | null>;
+    }
+  ).get(artifact.blobKey, { type: 'buffer' });
+
+  assert.ok(Buffer.isBuffer(retrievedBytes));
+  assert.equal(createHash('sha256').update(retrievedBytes).digest('hex'), validJpegSha256);
 });
 
 test('save-artifact rejects a truncated JPEG without writing final artifact or index records', async () => {
@@ -548,10 +558,20 @@ test('save-artifact finalizes chunked JPEG uploads with matching expected size a
   assert.equal(completed.json.receivedChunks, 2);
   assert.equal(completed.json.totalChunks, 2);
 
-  const artifact = completed.json.artifact as { sha256: string; sizeBytes: number };
+  const artifact = completed.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
 
   assert.equal(artifact.sha256, validJpegSha256);
   assert.equal(artifact.sizeBytes, validJpegBytes.byteLength);
+
+  const artifactStore = await getArtifactBlobStore({});
+  const retrievedBytes = await (
+    artifactStore as typeof artifactStore & {
+      get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | null>;
+    }
+  ).get(artifact.blobKey, { type: 'buffer' });
+
+  assert.ok(Buffer.isBuffer(retrievedBytes));
+  assert.equal(createHash('sha256').update(retrievedBytes).digest('hex'), validJpegSha256);
 });
 
 test('save-artifact rejects completed chunked JPEG only after assembled bytes fail validation', async () => {
