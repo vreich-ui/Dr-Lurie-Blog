@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import sharp from 'sharp';
@@ -139,6 +140,12 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
     assert.equal(blobWrites[2]?.content, explicitBytes.toString('base64'));
     assert.equal(blobWrites[3]?.encoding, 'base64');
     assert.equal(blobWrites[3]?.content, derivedBytes.toString('base64'));
+    assert.equal(
+      createHash('sha256')
+        .update(Buffer.from(blobWrites[3]?.content ?? '', 'base64'))
+        .digest('hex'),
+      String(derivedUpload.artifact.sha256)
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

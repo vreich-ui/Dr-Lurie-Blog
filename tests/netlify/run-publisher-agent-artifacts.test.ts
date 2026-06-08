@@ -5,7 +5,7 @@ import { handler } from '../../netlify/functions/run-publisher-agent.js';
 
 const publishSecret = 'publisher-agent-artifact-test-secret';
 
-test('run-publisher-agent rejects inline image media before publishing', async () => {
+test('run-publisher-agent fails fast when inline image media cannot be uploaded without a requestId', async () => {
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.OPENAI_API_KEY = 'test-openai-key';
@@ -24,8 +24,8 @@ test('run-publisher-agent rejects inline image media before publishing', async (
 
   const body = JSON.parse(response.body) as { error: string };
   assert.equal(response.statusCode, 400, response.body);
-  assert.match(body.error, /save_artifact or save_artifact_chunk/);
-  assert.match(body.error, /ArtifactReference/);
+  assert.match(body.error, /Artifact upload failed integrity verification/);
+  assert.match(body.error, /requestId is required/);
 });
 
 test('run-publisher-agent rejects malformed artifactReferences before publishing', async () => {
