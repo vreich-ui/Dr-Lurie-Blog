@@ -44,7 +44,10 @@ const hasNetlifyBlobContext = (event: unknown) => {
 const isNetlifyRuntime = (event: unknown) =>
   process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID) || hasNetlifyBlobContext(event);
 
-const getWorkflowApiStoreConfig = () => {
+// Build an explicit Netlify Blobs API configuration (siteID + token) for a named store.
+// Returns undefined when credentials are absent, signalling that the caller should fall
+// back to the Lambda-injected blob context instead.
+const getApiStoreConfig = (name: string, consistency?: 'eventual' | 'strong') => {
   const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
   const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
 
@@ -52,8 +55,8 @@ const getWorkflowApiStoreConfig = () => {
 
   return {
     ...(process.env.NETLIFY_BLOBS_API_URL ? { apiURL: process.env.NETLIFY_BLOBS_API_URL } : {}),
-    consistency: 'strong' as const,
-    name: 'workflows',
+    ...(consistency ? { consistency } : {}),
+    name,
     siteID,
     token,
   };
@@ -85,11 +88,19 @@ export const getNetlifyBlobStore = async (
 ): Promise<BlobStore> => {
   const netlifyBlobs = await loadNetlifyBlobs(event);
   const storeName = typeof storeNameOrOptions === 'string' ? storeNameOrOptions : storeNameOrOptions.name;
+  const consistency = typeof storeNameOrOptions === 'string' ? undefined : storeNameOrOptions.consistency;
 
   if (netlifyBlobs) {
+    const apiStoreConfig = getApiStoreConfig(storeName, consistency);
+
+    // Prefer explicit API credentials. Otherwise connect the Lambda blob context and look the
+    // store up by name: a string lookup uses that injected context, whereas an options object
+    // without siteID/token does not, which previously made artifact reads/writes fail with 502.
+    if (apiStoreConfig) return netlifyBlobs.getStore(apiStoreConfig);
+
     if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
-    return netlifyBlobs.getStore(storeNameOrOptions);
+    return netlifyBlobs.getStore(storeName);
   }
 
   console.warn(`Using local file-backed ${storeName} blob store because @netlify/blobs is unavailable.`);
@@ -98,23 +109,7 @@ export const getNetlifyBlobStore = async (
 };
 
 export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> => {
-  const netlifyBlobs = await loadNetlifyBlobs(event);
-
-  if (netlifyBlobs) {
-    const workflowApiStoreConfig = getWorkflowApiStoreConfig();
-
-    if (workflowApiStoreConfig) {
-      return netlifyBlobs.getStore(workflowApiStoreConfig);
-    }
-
-    if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
-
-    return netlifyBlobs.getStore('workflows');
-  }
-
-  console.warn('Using local file-backed workflows blob store because @netlify/blobs is unavailable.');
-
-  return createLocalBlobStore('workflows');
+  return getNetlifyBlobStore({ name: 'workflows', consistency: 'strong' }, event);
 };
 
 export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {

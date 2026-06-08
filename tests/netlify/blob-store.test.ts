@@ -114,7 +114,7 @@ test('getWorkflowBlobStore connects Lambda context and uses Lambda-compatible lo
   });
 });
 
-test('artifact stores request strong consistency for upload verification', async () => {
+test('artifact stores use explicit strong API config when site ID and token are configured', async () => {
   await withCleanWorkflowBlobEnv(async () => {
     const store = createFakeStore();
     const event = { blobs: { context: true } };
@@ -122,6 +122,36 @@ test('artifact stores request strong consistency for upload verification', async
     const connectedEvents: unknown[] = [];
 
     process.env.NETLIFY_SITE_ID = 'site-with-artifacts';
+    process.env.NETLIFY_BLOBS_TOKEN = 'token-xyz';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda(lambdaEvent: unknown) {
+        connectedEvents.push(lambdaEvent);
+      },
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    assert.equal(await getArtifactBlobStore(event), store);
+    assert.equal(await getArtifactIndexBlobStore(event), store);
+    assert.deepEqual(connectedEvents, []);
+    assert.deepEqual(getStoreInputs, [
+      { consistency: 'strong', name: 'artifacts', siteID: 'site-with-artifacts', token: 'token-xyz' },
+      { consistency: 'strong', name: 'artifact-index', siteID: 'site-with-artifacts', token: 'token-xyz' },
+    ]);
+  });
+});
+
+test('artifact stores connect Lambda context and use Lambda-compatible lookup without token config', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const event = { blobs: { context: true } };
+    const getStoreInputs: unknown[] = [];
+    const connectedEvents: unknown[] = [];
+
+    process.env.NETLIFY_SITE_ID = 'site-without-token';
 
     setNetlifyBlobsModuleForTesting({
       connectLambda(lambdaEvent: unknown) {
@@ -136,10 +166,7 @@ test('artifact stores request strong consistency for upload verification', async
     assert.equal(await getArtifactBlobStore(event), store);
     assert.equal(await getArtifactIndexBlobStore(event), store);
     assert.deepEqual(connectedEvents, [event, event]);
-    assert.deepEqual(getStoreInputs, [
-      { name: 'artifacts', consistency: 'strong' },
-      { name: 'artifact-index', consistency: 'strong' },
-    ]);
+    assert.deepEqual(getStoreInputs, ['artifacts', 'artifact-index']);
   });
 });
 
