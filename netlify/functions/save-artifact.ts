@@ -511,12 +511,32 @@ const assembleChunks = async (store: BlobStore, requestId: string, clientUploadI
   return Buffer.concat(chunks);
 };
 
-const readStoredBytes = async (store: BlobStore, key: string) => getArrayBuffer(store, key);
+const waitForStoredBytesRetry = (attemptIndex: number) => {
+  const baseDelayMs = 25 * 2 ** attemptIndex;
+  const jitterMs = Math.floor(Math.random() * 10);
+
+  return new Promise((resolve) => setTimeout(resolve, baseDelayMs + jitterMs));
+};
+
+const readStoredBytes = async (store: BlobStore, key: string, options: { retry?: boolean } = {}) => {
+  const maxAttempts = options.retry === false ? 1 : 5;
+
+  for (let attemptIndex = 0; attemptIndex < maxAttempts; attemptIndex += 1) {
+    const storedBytes = await getArrayBuffer(store, key);
+
+    if (storedBytes) return storedBytes;
+    if (attemptIndex < maxAttempts - 1) await waitForStoredBytesRetry(attemptIndex);
+  }
+
+  return null;
+};
 
 const validateStoredBytes = async (store: BlobStore, reference: ArtifactReference) => {
   const storedBytes = await readStoredBytes(store, reference.blobKey);
 
   if (!storedBytes) {
+    await store.del(reference.blobKey);
+
     return jsonResponse(500, { error: 'Artifact blob write failed: stored bytes could not be read back.' });
   }
 
@@ -535,7 +555,7 @@ const validateStoredBytes = async (store: BlobStore, reference: ArtifactReferenc
 };
 
 const saveFinalArtifact = async (store: BlobStore, reference: ArtifactReference, bytes: Buffer) => {
-  if (await readStoredBytes(store, reference.blobKey)) {
+  if (await readStoredBytes(store, reference.blobKey, { retry: false })) {
     const existingIntegrityError = await validateStoredBytes(store, reference);
 
     if (existingIntegrityError) return { deduped: true, integrityError: existingIntegrityError };
