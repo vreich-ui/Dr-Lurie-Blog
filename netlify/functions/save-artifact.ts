@@ -198,6 +198,14 @@ const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
   return undefined;
 };
 
+const validateFinalArtifact = async (input: UploadRequest, bytes: Buffer) => {
+  const integrityError = validateArtifactIntegrity(input, bytes);
+
+  if (integrityError) return integrityError;
+
+  return validateImageArtifact(input, bytes);
+};
+
 const chunkUploadPrefix = (requestId: string, clientUploadId: string) => {
   return `artifact-chunks/${requestId}/${clientUploadId}/`;
 };
@@ -394,19 +402,20 @@ const saveReference = async (store: BlobStore, requestId: string, reference: Art
   });
 };
 
-const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, bytes: Buffer, chunkStatus?: ChunkStatus) => {
-  const integrityError = validateArtifactIntegrity(input, bytes);
+const finalizeUpload = async (
+  event: LambdaEvent,
+  input: UploadRequest,
+  finalBytes: Buffer,
+  chunkStatus?: ChunkStatus
+) => {
+  const validationError = await validateFinalArtifact(input, finalBytes);
 
-  if (integrityError) return integrityError;
-
-  const imageValidationError = await validateImageArtifact(input, bytes);
-
-  if (imageValidationError) return imageValidationError;
+  if (validationError) return validationError;
 
   const artifactStore = await getArtifactBlobStore(event);
   const indexStore = await getArtifactIndexBlobStore(event);
-  const reference = createArtifactReference({ input, bytes });
-  const { deduped } = await saveFinalArtifact(artifactStore, reference, bytes);
+  const reference = createArtifactReference({ input, bytes: finalBytes });
+  const { deduped } = await saveFinalArtifact(artifactStore, reference, finalBytes);
   const existingReference = deduped
     ? await getExistingReference(indexStore, input.requestId, reference.sha256)
     : undefined;
