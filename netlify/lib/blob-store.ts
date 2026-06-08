@@ -79,13 +79,17 @@ const loadNetlifyBlobs = async (event: unknown) => {
   );
 };
 
-export const getNetlifyBlobStore = async (storeName: string, event: unknown): Promise<BlobStore> => {
+export const getNetlifyBlobStore = async (
+  storeNameOrOptions: string | NetlifyBlobStoreOptions,
+  event: unknown
+): Promise<BlobStore> => {
   const netlifyBlobs = await loadNetlifyBlobs(event);
+  const storeName = typeof storeNameOrOptions === 'string' ? storeNameOrOptions : storeNameOrOptions.name;
 
   if (netlifyBlobs) {
     if (hasNetlifyBlobContext(event)) netlifyBlobs.connectLambda(event);
 
-    return netlifyBlobs.getStore(storeName);
+    return netlifyBlobs.getStore(storeNameOrOptions);
   }
 
   console.warn(`Using local file-backed ${storeName} blob store because @netlify/blobs is unavailable.`);
@@ -118,9 +122,9 @@ export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
 };
 
 export const getArtifactBlobStore = async (event: unknown): Promise<BlobStore> => {
-  return getNetlifyBlobStore('artifacts', event);
+  return getNetlifyBlobStore({ name: 'artifacts', consistency: 'strong' }, event);
 };
 
 export const getArtifactIndexBlobStore = async (event: unknown): Promise<BlobStore> => {
-  return getNetlifyBlobStore('artifact-index', event);
+  return getNetlifyBlobStore({ name: 'artifact-index', consistency: 'strong' }, event);
 };

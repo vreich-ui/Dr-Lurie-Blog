@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getWorkflowBlobStore, setNetlifyBlobsModuleForTesting } from '../../netlify/lib/blob-store.js';
+import {
+  getArtifactBlobStore,
+  getArtifactIndexBlobStore,
+  getWorkflowBlobStore,
+  setNetlifyBlobsModuleForTesting,
+} from '../../netlify/lib/blob-store.js';
 
 const workflowEnvKeys = [
   'NETLIFY',
@@ -106,6 +111,35 @@ test('getWorkflowBlobStore connects Lambda context and uses Lambda-compatible lo
     assert.equal(result, store);
     assert.deepEqual(connectedEvents, [event]);
     assert.deepEqual(getStoreInputs, ['workflows']);
+  });
+});
+
+test('artifact stores request strong consistency for upload verification', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const event = { blobs: { context: true } };
+    const getStoreInputs: unknown[] = [];
+    const connectedEvents: unknown[] = [];
+
+    process.env.NETLIFY_SITE_ID = 'site-with-artifacts';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda(lambdaEvent: unknown) {
+        connectedEvents.push(lambdaEvent);
+      },
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    assert.equal(await getArtifactBlobStore(event), store);
+    assert.equal(await getArtifactIndexBlobStore(event), store);
+    assert.deepEqual(connectedEvents, [event, event]);
+    assert.deepEqual(getStoreInputs, [
+      { name: 'artifacts', consistency: 'strong' },
+      { name: 'artifact-index', consistency: 'strong' },
+    ]);
   });
 });
 
