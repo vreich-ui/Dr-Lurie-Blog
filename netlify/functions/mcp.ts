@@ -196,6 +196,13 @@ const nullableAgentNameJsonSchema = (description?: string) => ({
   ...(description ? { description } : {}),
 });
 
+const adminPublishValidationModeSchema = {
+  type: 'string',
+  enum: ['admin_publish_draft'],
+  description:
+    'Required validation mode for MCP-created admin-publish article drafts. The backend rejects skeletal drafts unless publication.publish_payload.title (or content.title), publication.publish_payload.slug (or content.title), publication.publish_payload.author, and a body field at publication.publish_payload.content, publication.publish_payload.markdown, editorial.draft_markdown, or markdown text in content.blocks are present.',
+};
+
 const artifactKindJsonSchema = (description?: string) => ({
   type: 'string',
   enum: ['image', 'audio', 'video', 'binary', 'markdown'],
@@ -210,15 +217,25 @@ const artifactMetadataJsonSchema = metadataBagSchema('Optional artifact metadata
 
 const publishPayloadJsonSchema = objectSchema(
   {
-    slug: stringSchema('Destination slug for the published article.'),
-    title: stringSchema('Published article title.'),
-    markdown: stringSchema('Markdown body to publish.'),
-    content: stringSchema('Alternate article body content to publish.'),
+    slug: stringSchema(
+      'Destination slug for the published article; admin import requires this or enough content.title text to compute one.'
+    ),
+    title: stringSchema('Published article title; admin import requires this or content.title.'),
+    markdown: stringSchema('Markdown body to publish; one accepted admin-import body field.'),
+    content: stringSchema('Alternate article body content to publish; one accepted admin-import body field.'),
     description: stringSchema('Published article summary or meta description.'),
     publishDate: stringSchema('Publish date string.'),
-    author: stringSchema('Article author name.'),
+    author: stringSchema('Article author name; required for admin import.'),
     tags: stringArraySchema('Article tags.'),
     images: arraySchema({}, 'Image metadata or asset references.'),
+    mediaEntries: arraySchema(
+      {},
+      'Permissive media entry payloads accepted by the runtime publisher; use for existing base64 media entries when needed.'
+    ),
+    artifactReferences: arraySchema(
+      {},
+      'ArtifactReference objects returned by save_artifact or save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
+    ),
     overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
     draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
     articlePath: stringSchema('Optional normalized repository path, usually src/data/post/{slug}.md.'),
@@ -234,7 +251,7 @@ const publishPayloadJsonSchema = objectSchema(
     metadata: metadataBagSchema('Optional publish-payload extension data.'),
   },
   ['slug', 'title'],
-  'Publication payload used by the publishing step; include slug, title, and article body fields when ready to publish.'
+  'Publication payload used by the publishing step. MCP-created admin-publish drafts must include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and one body field: publication.publish_payload.content, publication.publish_payload.markdown, editorial.draft_markdown, or markdown text in content.blocks.'
 );
 
 const contentBlockJsonSchema = objectSchema(
@@ -512,13 +529,14 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
   },
   ['record_type', 'schema_version'],
-  'Structured content_source.v1 workflow input.'
+  'Structured content_source.v1 workflow input. For MCP admin-publish drafts, include importable article fields: publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and publication.publish_payload.content, publication.publish_payload.markdown, editorial.draft_markdown, or markdown text in content.blocks.'
 );
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_request',
-    description: 'Create a save-json-blob workflow request and return its record.',
+    description:
+      'Create a save-json-blob workflow request and return its record. MCP-created article drafts are validated as admin-publish drafts: include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and a body at publication.publish_payload.content, publication.publish_payload.markdown, editorial.draft_markdown, or markdown text in content.blocks.',
     inputSchema: objectSchema(
       {
         input: contentSourceV1JsonSchema,
@@ -529,8 +547,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         next_agent: nullableAgentNameJsonSchema(
           'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
         ),
+        validation_mode: adminPublishValidationModeSchema,
       },
-      ['input']
+      ['input', 'validation_mode']
     ),
   },
   {
@@ -959,6 +978,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           request_id: input.request_id ?? createRequestId(),
           current_agent: input.current_agent,
           next_agent: input.next_agent,
+          validation_mode: input.validation_mode ?? 'admin_publish_draft',
         },
         'record'
       );

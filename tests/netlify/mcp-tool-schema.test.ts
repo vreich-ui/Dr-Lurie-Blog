@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
@@ -30,6 +31,8 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
   assert.ok(createTool);
   assert.ok(property(createTool.inputSchema, 'current_agent'));
   assert.ok(property(createTool.inputSchema, 'next_agent'));
+  assert.ok(property(createTool.inputSchema, 'validation_mode'));
+  assert.deepEqual(createTool.inputSchema.required, ['input', 'validation_mode']);
 
   const inputSchema = property(createTool.inputSchema, 'input');
   const inputProperties = inputSchema.properties as Record<string, unknown>;
@@ -83,7 +86,21 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   assert.match(String(property(content, 'title').description), /title/i);
   assert.match(String(property(editorial, 'draft_markdown').description), /Markdown draft body/i);
   assert.match(String(property(publication, 'publish_payload').description), /publishing step/i);
+  assert.match(String(property(publication, 'publish_payload').description), /publication\.publish_payload\.author/i);
   assert.match(String(property(workflow, 'workflow_id').description), /preserve across handoffs/i);
+
+  const publishPayload = property(publication, 'publish_payload');
+  const mediaEntries = property(publishPayload, 'mediaEntries');
+  const artifactReferences = property(publishPayload, 'artifactReferences');
+
+  assert.equal(mediaEntries.type, 'array');
+  assert.deepEqual(mediaEntries.items, {});
+  assert.match(String(mediaEntries.description), /runtime publisher/i);
+  assert.equal(artifactReferences.type, 'array');
+  assert.deepEqual(artifactReferences.items, {});
+  assert.match(String(artifactReferences.description), /save_artifact/i);
+  assert.match(String(artifactReferences.description), /exactly as returned/i);
+
   assert.match(String(property(versioning, 'record_version').description), /revision tracking/i);
 
   assert.ok(property(workflow, 'current_agent'));
@@ -99,6 +116,26 @@ test('content_source.v1 MCP schema describes high-value agent fields and control
   assert.equal(media.additionalProperties, false);
   assert.notEqual(property(media, 'image_prompt_register').additionalProperties, true);
   assert.equal(property(workflow, 'metadata').additionalProperties, true);
+});
+
+test('admin publish page reads artifactReferences from publication.publish_payload', async () => {
+  const publishPageSource = await readFile(`${process.cwd()}/src/pages/admin/publish.astro`, 'utf8');
+
+  assert.match(publishPageSource, /const getLatestArtifactReferences = \(record\) =>/);
+  assert.match(publishPageSource, /record\?\.input\?\.publication\?\.publish_payload\?\.artifactReferences/);
+  assert.match(publishPageSource, /Array\.isArray\(artifactReferences\) \? artifactReferences : \[\]/);
+});
+
+test('admin publish JSON import can unwrap workflow records and nested content block bodies', async () => {
+  const publishPageSource = await readFile(`${process.cwd()}/src/pages/admin/publish.astro`, 'utf8');
+
+  assert.match(publishPageSource, /const getContentSourceCandidate = \(data\) =>/);
+  assert.match(publishPageSource, /carrier\?\.input/);
+  assert.match(publishPageSource, /const getFinalArticleOutputCandidate = \(data\) =>/);
+  assert.match(publishPageSource, /agent_outputs\?\.final_article\?\.output/);
+  assert.match(publishPageSource, /const extractContentBlocksMarkdown = \(contentSource\) =>/);
+  assert.match(publishPageSource, /contentSource\.content\?\.blocks/);
+  assert.match(publishPageSource, /payload\.markdown, payload\.content, payload\.body, payload\.text/);
 });
 
 test('content_source.v1 MCP schema uses concrete workflow and agent-priority section items', async () => {

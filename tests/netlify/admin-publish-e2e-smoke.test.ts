@@ -173,13 +173,31 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
     'Edited draft body that should be published.'
   );
 
+  const finalArticleBody = 'Completed final_article body that should be imported into the publish form.';
   const finalOutputResult = await callTool('final_article_update_output', {
     request_id: requestId,
     expected_agent_version: 0,
     lock_token: lockToken,
-    output: { title: 'Admin Publish E2E Smoke', body: 'Edited draft body that should be published.' },
+    output: {
+      title: 'Admin Publish E2E Smoke Final',
+      slug: 'admin-publish-e2e-smoke',
+      author: 'Dr. Final',
+      body: finalArticleBody,
+      excerpt: 'Final article excerpt.',
+      seoDescription: 'Final article SEO description.',
+      tags: ['final-article', 'smoke-test'],
+      featuredImage: 'https://kugelmedia.netlify.app/drlurieblog/final-article.jpg',
+      mediaEntries: [{ kind: 'image', alt: 'Final article image' }],
+      artifactReferences: [{ blobKey: 'artifact/final-article-image', contentType: 'image/png' }],
+    },
   });
   const finalOutputRecord = finalOutputResult.record as WorkflowRecord;
+  assert.equal(finalOutputRecord.input.publication?.schema_version, 'publication.v1');
+  assert.equal(finalOutputRecord.input.publication?.publish_payload?.title, 'Admin Publish E2E Smoke Final');
+  assert.equal(finalOutputRecord.input.publication?.publish_payload?.slug, 'admin-publish-e2e-smoke');
+  assert.equal(finalOutputRecord.input.publication?.publish_payload?.author, 'Dr. Final');
+  assert.equal(finalOutputRecord.input.publication?.publish_payload?.content, finalArticleBody);
+  assert.deepEqual(finalOutputRecord.input.publication?.publish_payload?.tags, ['final-article', 'smoke-test']);
 
   const finalCompleteResult = await callTool('final_article_mark_complete', {
     request_id: requestId,
@@ -191,6 +209,33 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
   assert.equal(finalCompleteRecord.current_stage, null);
   assert.equal(finalCompleteRecord.completed_agents.includes('final_article'), true);
   assert.ok(finalCompleteRecord.agent_outputs.final_article, 'final article output must be preserved before publish');
+  assert.equal(finalCompleteRecord.input.publication?.schema_version, 'publication.v1');
+  assert.equal(finalCompleteRecord.input.publication?.publish_payload?.title, 'Admin Publish E2E Smoke Final');
+  assert.equal(finalCompleteRecord.input.publication?.publish_payload?.slug, 'admin-publish-e2e-smoke');
+  assert.equal(finalCompleteRecord.input.publication?.publish_payload?.author, 'Dr. Final');
+  assert.equal(finalCompleteRecord.input.publication?.publish_payload?.content, finalArticleBody);
+  assert.equal(finalCompleteRecord.input.publication?.publish_payload?.excerpt, 'Final article excerpt.');
+  assert.equal(
+    finalCompleteRecord.input.publication?.publish_payload?.seoDescription,
+    'Final article SEO description.'
+  );
+  assert.equal(
+    finalCompleteRecord.input.publication?.publish_payload?.featuredImage,
+    'https://kugelmedia.netlify.app/drlurieblog/final-article.jpg'
+  );
+  assert.deepEqual(finalCompleteRecord.input.publication?.publish_payload?.mediaEntries, [
+    { kind: 'image', alt: 'Final article image' },
+  ]);
+  assert.deepEqual(finalCompleteRecord.input.publication?.publish_payload?.artifactReferences, [
+    { blobKey: 'artifact/final-article-image', contentType: 'image/png' },
+  ]);
+
+  const fetchedDraftResult = await callTool('save_json_blob_get_request', { request_id: requestId });
+  const fetchedDraftRecord = fetchedDraftResult.record as WorkflowRecord;
+  const importedPublishPayload = fetchedDraftRecord.input.publication?.publish_payload;
+  assert.equal(importedPublishPayload?.title, 'Admin Publish E2E Smoke Final');
+  assert.equal(importedPublishPayload?.author, 'Dr. Final');
+  assert.equal(importedPublishPayload?.content, finalArticleBody);
 
   const github = installGitHubPublishMock();
   try {
@@ -199,8 +244,12 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
       headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
       body: JSON.stringify({
         slug: 'admin-publish-e2e-smoke',
-        title: 'Admin Publish E2E Smoke',
-        markdown: savedDraftBody.record.input.publication?.publish_payload?.markdown,
+        title: importedPublishPayload?.title,
+        content: importedPublishPayload?.content,
+        author: importedPublishPayload?.author,
+        excerpt: importedPublishPayload?.excerpt,
+        seoDescription: importedPublishPayload?.seoDescription,
+        tags: importedPublishPayload?.tags,
         overwrite: false,
         requestId,
         request_id: requestId,
@@ -213,7 +262,11 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
     assert.equal(publishBody.success, true);
     assert.equal(publishBody.articlePath, 'src/data/post/admin-publish-e2e-smoke.md');
     assert.equal(publishBody.commit, 'published-smoke-commit');
-    assert.ok(github.blobWrites.some((write) => write.content.includes('Edited draft body that should be published.')));
+    assert.ok(github.blobWrites.some((write) => write.content.includes(finalArticleBody)));
+    assert.equal(
+      github.blobWrites.some((write) => write.content.includes('Edited draft body that should be published.')),
+      false
+    );
 
     const missingPublishLockResult = await callTool('save_json_blob_mark_published', {
       request_id: requestId,

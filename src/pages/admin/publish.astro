@@ -2973,13 +2973,101 @@ const metadata = {
         return { exists: true, value: current };
       };
 
+      const isMeaningfulImportValue = (value) => {
+        if (typeof value === 'string') return value.trim().length > 0;
+        if (Array.isArray(value)) return value.length > 0;
+        return value != null;
+      };
+
       const getFirstImportPathValue = (object, paths) => {
+        let firstExisting = { exists: false, value: undefined };
+
         for (const path of paths) {
           const result = getPathValue(object, path);
-          if (result.exists) return result;
+          if (!result.exists) continue;
+          if (!firstExisting.exists) firstExisting = result;
+          if (isMeaningfulImportValue(result.value)) return result;
         }
 
-        return { exists: false, value: undefined };
+        return firstExisting;
+      };
+
+      const getImportCarrierCandidates = (data) => [
+        data,
+        data?.record,
+        data?.draft,
+        data?.result?.structuredContent,
+        data?.result?.structuredContent?.record,
+        data?.structuredContent,
+        data?.structuredContent?.record,
+      ];
+
+      const getContentSourceCandidate = (data) => {
+        for (const carrier of getImportCarrierCandidates(data)) {
+          if (isPlainObject(carrier?.input)) return carrier.input;
+        }
+
+        return data;
+      };
+
+      const getFinalArticleOutputCandidate = (data) => {
+        for (const carrier of getImportCarrierCandidates(data)) {
+          const output = carrier?.agent_outputs?.final_article?.output;
+          if (isPlainObject(output)) return output;
+        }
+
+        return undefined;
+      };
+
+      const getImportText = (value) => (typeof value === 'string' && value.trim() ? value : '');
+
+      const getImportStringArray = (value) => (Array.isArray(value) && value.length ? value : undefined);
+
+      const readFinalArticleOutputContainer = (output) => {
+        if (!isPlainObject(output)) return undefined;
+        return isPlainObject(output.publish_payload) ? { ...output, ...output.publish_payload } : output;
+      };
+
+      const mergeFinalArticleOutputIntoContentSource = (contentSource, output) => {
+        const outputRecord = readFinalArticleOutputContainer(output);
+        if (!outputRecord) return contentSource;
+
+        const publication = contentSource.publication || {};
+        const publishPayload = { ...(publication.publish_payload || {}) };
+        const textMappings = [
+          ['title', 'title'],
+          ['slug', 'slug'],
+          ['author', 'author'],
+          ['excerpt', 'excerpt'],
+          ['seoDescription', 'seoDescription'],
+          ['featuredImage', 'featuredImage'],
+          ['content', 'content'],
+          ['markdown', 'markdown'],
+          ['body', 'content'],
+        ];
+        const arrayMappings = [
+          ['tags', 'tags'],
+          ['mediaEntries', 'mediaEntries'],
+          ['artifactReferences', 'artifactReferences'],
+        ];
+
+        textMappings.forEach(([from, to]) => {
+          const value = getImportText(outputRecord[from]);
+          if (value) publishPayload[to] = value;
+        });
+        arrayMappings.forEach(([from, to]) => {
+          const value = getImportStringArray(outputRecord[from]);
+          if (value) publishPayload[to] = value;
+        });
+
+        return {
+          ...contentSource,
+          publication: {
+            ...publication,
+            schema_version: 'publication.v1',
+            publish_payload: publishPayload,
+          },
+        };
       };
 
       const getCurrentContentSourceSchemaVersion = async () => {
@@ -3070,7 +3158,10 @@ const metadata = {
           );
         }
 
-        const candidate = isPlainObject(data.input) ? data.input : data;
+        const candidate = mergeFinalArticleOutputIntoContentSource(
+          getContentSourceCandidate(data),
+          getFinalArticleOutputCandidate(data)
+        );
         const allowedSchemaVersions = getAllowedContentSourceSchemaVersions(currentSchemaVersion);
         if (candidate.record_type !== 'content_source' || !allowedSchemaVersions.has(candidate.schema_version)) {
           throw new Error(getUnsupportedSchemaMessage(currentSchemaVersion));
@@ -3130,6 +3221,41 @@ const metadata = {
         };
       };
 
+      const extractMarkdownTextFromPayload = (payload) => {
+        if (typeof payload === 'string') return payload.trim();
+        if (!isPlainObject(payload)) return '';
+
+        return (
+          [payload.markdown, payload.content, payload.body, payload.text]
+            .map((value) => (typeof value === 'string' ? value.trim() : ''))
+            .find(Boolean) || ''
+        );
+      };
+
+      const extractContentBlocksMarkdown = (contentSource) => {
+        const blocks = contentSource.content?.blocks;
+        if (!Array.isArray(blocks)) return { exists: false, value: '' };
+
+        const value = blocks
+          .map((block) => extractMarkdownTextFromPayload(block?.payload))
+          .filter(Boolean)
+          .join('\n\n');
+
+        return { exists: blocks.length > 0, value };
+      };
+
+      const getImportBodyField = (contentSource) => {
+        const body = normalizeTextImportField(contentSource, [
+          ['publication', 'publish_payload', 'content'],
+          ['publication', 'publish_payload', 'markdown'],
+          ['editorial', 'draft_markdown'],
+        ]);
+        if (String(body.value || '').trim()) return body;
+
+        const blockBody = extractContentBlocksMarkdown(contentSource);
+        return blockBody.exists ? blockBody : body;
+      };
+
       const normalizeContentSourceImportToFormData = (contentSource, currentSchemaVersion) => {
         const title = normalizeTextImportField(contentSource, [
           ['publication', 'publish_payload', 'title'],
@@ -3146,11 +3272,7 @@ const metadata = {
           ['publication', 'publish_payload', 'seoDescription'],
           ['seo', 'meta_description'],
         ]);
-        const content = normalizeTextImportField(contentSource, [
-          ['publication', 'publish_payload', 'content'],
-          ['publication', 'publish_payload', 'markdown'],
-          ['editorial', 'draft_markdown'],
-        ]);
+        const content = getImportBodyField(contentSource);
         const importedTags = getFirstImportPathValue(contentSource, [
           ['publication', 'publish_payload', 'tags'],
           ['taxonomy', 'tags'],

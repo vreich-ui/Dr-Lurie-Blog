@@ -217,6 +217,67 @@ test('create_request honors explicit initial routing fields over workflow defaul
   assert.equal(body.record.next_agent, null);
 });
 
+test('create_request rejects skeletal admin-publish drafts before writing workflow records', async () => {
+  const store = createMemoryStore();
+  const requestId = 'req_admin_publish_validation_test';
+  const response = await createRequest(store, {
+    action: 'create_request',
+    request_id: requestId,
+    input: {
+      ...validContentSourceV1,
+      content: { schema_version: 'content_blocks.v1', title: 'Skin barrier basics' },
+    },
+    validation_mode: 'admin_publish_draft',
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error_code, 'invalid_admin_publish_draft');
+  assert.ok(
+    body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'publication.publish_payload.author')
+  );
+  assert.ok(
+    body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'publication.publish_payload.content')
+  );
+  assert.equal(await store.get(`workflows/by-id/${requestId}.json`), null);
+});
+
+test('create_request accepts admin-publish drafts whose body is stored in content blocks', async () => {
+  const response = await createRequest(createMemoryStore(), {
+    action: 'create_request',
+    request_id: 'req_admin_publish_blocks_validation_test',
+    input: {
+      ...validContentSourceV1,
+      content: {
+        schema_version: 'content_blocks.v1',
+        title: 'Block Body Article',
+        blocks: [
+          {
+            block_id: 'body',
+            block_type: 'markdown',
+            payload: { markdown: 'Body imported from a nested content block.' },
+          },
+        ],
+      },
+      publication: {
+        schema_version: 'publication.v1',
+        publish_payload: {
+          slug: 'block-body-article',
+          title: 'Block Body Article',
+          author: 'Dr. Lurié',
+        },
+      },
+    },
+    validation_mode: 'admin_publish_draft',
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 201, response.body);
+  assert.equal(body.ok, true);
+  assert.equal(body.record.input.content.blocks[0].payload.markdown, 'Body imported from a nested content block.');
+});
+
 test('create_request returns HTTP 400 when required schema discriminator fields are missing', async () => {
   const response = await createWorkflow({ content: { title: 'Missing discriminators' } });
   const body = parseResponseBody(response);
