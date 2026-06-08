@@ -535,6 +535,8 @@ const validateStoredBytes = async (store: BlobStore, reference: ArtifactReferenc
   const storedBytes = await readStoredBytes(store, reference.blobKey);
 
   if (!storedBytes) {
+    await store.del(reference.blobKey);
+
     return jsonResponse(500, { error: 'Artifact blob write failed: stored bytes could not be read back.' });
   }
 
