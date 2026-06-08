@@ -243,3 +243,34 @@ test('MCP image artifact chunk indexes are monotonic and deterministic with 4 KB
 
   assert.deepEqual(indexes, [0, 1, 2]);
 });
+
+test('MCP image artifact upload retries the final chunk when completion is delayed', async () => {
+  const bytes = Buffer.alloc(9000, 2);
+  const indexes: unknown[] = [];
+  let finalChunkCalls = 0;
+
+  const artifacts = await uploadImagesWithIntegrity({
+    images: [createImage(bytes)],
+    requestId: 'req-integrity-test',
+    chunkSizeBytes: 4096,
+    mcpToolCall: async (_name, args) => {
+      indexes.push(args.chunkIndex);
+
+      if (args.chunkIndex === 2) {
+        finalChunkCalls += 1;
+      }
+
+      return finalChunkCalls === 2
+        ? { ok: true, complete: true, artifact: createArtifact({ bytes }) }
+        : {
+            ok: true,
+            complete: false,
+            receivedChunks: Math.min(Number(args.chunkIndex) + 1, 3),
+            totalChunks: 3,
+          };
+    },
+  });
+
+  assert.equal(artifacts.length, 1);
+  assert.deepEqual(indexes, [0, 1, 2, 2]);
+});

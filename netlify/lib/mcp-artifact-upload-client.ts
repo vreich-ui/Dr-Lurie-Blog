@@ -31,6 +31,7 @@ type PreparedImageUpload = {
 };
 
 const DEFAULT_IMAGE_CHUNK_SIZE_BYTES = 6 * 1024;
+const FINAL_CHUNK_RETRY_ATTEMPTS = 3;
 
 export class ArtifactIntegrityError extends Error {
   constructor(message: string) {
@@ -177,9 +178,10 @@ const uploadImageWithIntegrity = async ({
   const clientUploadId = randomUUID();
   let completedArtifact: ArtifactReference | undefined;
 
-  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+  const uploadChunk = async (chunkIndex: number) => {
     const chunk = bytes.subarray(chunkIndex * chunkSizeBytes, Math.min(sizeBytes, (chunkIndex + 1) * chunkSizeBytes));
-    const result = await mcpToolCall('save_artifact_chunk', {
+
+    return mcpToolCall('save_artifact_chunk', {
       requestId,
       artifactKind: 'image',
       contentType,
@@ -193,6 +195,18 @@ const uploadImageWithIntegrity = async ({
       payload: chunk.toString('base64'),
       metadata: { source: 'publisher_agent', filename },
     });
+  };
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+    const result = await uploadChunk(chunkIndex);
+
+    if (result.complete === true) {
+      completedArtifact = assertArtifactReference(result.artifact);
+    }
+  }
+
+  for (let attempt = 0; !completedArtifact && attempt < FINAL_CHUNK_RETRY_ATTEMPTS; attempt += 1) {
+    const result = await uploadChunk(totalChunks - 1);
 
     if (result.complete === true) {
       completedArtifact = assertArtifactReference(result.artifact);
