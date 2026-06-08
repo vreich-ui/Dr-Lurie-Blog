@@ -260,6 +260,16 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
   assert.ok(property(saveArtifact.inputSchema, 'payload'));
   assert.ok(property(saveArtifact.inputSchema, 'metadata'));
+  assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSizeBytes'), {
+    type: 'integer',
+    minimum: 0,
+    description: 'Optional expected complete artifact byte size for upload integrity checks.',
+  });
+  assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSha256'), {
+    type: 'string',
+    pattern: '^[a-fA-F0-9]{64}$',
+    description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
+  });
   assert.match(String((saveArtifact as { description?: string }).description), /immediately after creating/i);
   assert.match(
     String((saveArtifact as { description?: string }).description),
@@ -283,6 +293,16 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
   assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
   assert.ok(property(saveChunk.inputSchema, 'totalChunks'));
+  assert.deepEqual(property(saveChunk.inputSchema, 'expectedSizeBytes'), {
+    type: 'integer',
+    minimum: 0,
+    description: 'Optional expected complete artifact byte size for upload integrity checks.',
+  });
+  assert.deepEqual(property(saveChunk.inputSchema, 'expectedSha256'), {
+    type: 'string',
+    pattern: '^[a-fA-F0-9]{64}$',
+    description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
+  });
   assert.match(String((saveChunk as { description?: string }).description), /immediately for large created artifacts/i);
   assert.match(
     String((saveChunk as { description?: string }).description),

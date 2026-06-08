@@ -32,6 +32,8 @@ type LambdaEvent = {
 
 type UploadRequest = ArtifactUploadInput & {
   clientUploadId?: string;
+  expectedSizeBytes?: number;
+  expectedSha256?: string;
 };
 
 type ChunkStatus = {
@@ -68,6 +70,11 @@ const uploadSchema = z
     chunkIndex: z.number().int().nonnegative().optional(),
     totalChunks: z.number().int().positive().max(10_000).optional(),
     encoding: z.enum(['base64', 'binary']).optional(),
+    expectedSizeBytes: z.number().int().nonnegative().optional(),
+    expectedSha256: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/i)
+      .optional(),
     payload: z.string(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })

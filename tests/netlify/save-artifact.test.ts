@@ -271,6 +271,7 @@ test('MCP artifact tools upload bytes and list request references', async () => 
 
   const { handler: mcpHandler } = await import('../../netlify/functions/mcp.js');
   const requestId = `mcp-artifact-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const uploadBytes = Buffer.from('mcp artifact bytes');
   const uploadResponse = await mcpHandler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -282,7 +283,9 @@ test('MCP artifact tools upload bytes and list request references', async () => 
         name: 'save_artifact',
         arguments: {
           ...makeBaseInput(requestId),
-          payload: Buffer.from('mcp artifact bytes').toString('base64'),
+          expectedSizeBytes: uploadBytes.byteLength,
+          expectedSha256: createHash('sha256').update(uploadBytes).digest('hex').toUpperCase(),
+          payload: uploadBytes.toString('base64'),
         },
       },
     }),
