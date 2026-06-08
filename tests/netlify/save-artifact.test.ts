@@ -5,7 +5,11 @@ import test from 'node:test';
 import sharp from 'sharp';
 
 import { handler, saveUploadedChunk } from '../../netlify/functions/save-artifact.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../../netlify/lib/blob-store.js';
+import {
+  getArtifactBlobStore,
+  getArtifactIndexBlobStore,
+  setNetlifyBlobsModuleForTesting,
+} from '../../netlify/lib/blob-store.js';
 
 const publishSecret = 'artifact-test-secret';
 const validJpegBytes = Buffer.from(
@@ -179,6 +183,112 @@ test('save-artifact chunk status stays monotonic when an immediate chunk read is
     statuses.map((status) => status.receivedChunks),
     [1, 2, 3]
   );
+});
+
+test('save-artifact retries stale final artifact readback before saving request index', async () => {
+  type FakeStoreValue = Buffer | string;
+  const previousPublishSecret = process.env.NETLIFY_PUBLISH_SECRET;
+  const previousFallbackSecret = process.env.PUBLISH_SECRET;
+  const previousNetlify = process.env.NETLIFY;
+  const previousSiteId = process.env.NETLIFY_SITE_ID;
+  const artifactValues = new Map<string, FakeStoreValue>();
+  const indexValues = new Map<string, FakeStoreValue>();
+  const hiddenFinalArtifactReads = new Set<string>();
+  const finalArtifactArrayBufferReads = new Map<string, number>();
+  const createFakeStore = (values: Map<string, FakeStoreValue>, hideFirstFinalRead: boolean) => ({
+    async set(key: string, value: string | Buffer | Uint8Array | ArrayBuffer) {
+      values.set(
+        key,
+        typeof value === 'string' ? value : value instanceof ArrayBuffer ? Buffer.from(value) : Buffer.from(value)
+      );
+      if (hideFirstFinalRead && key.startsWith('image/')) hiddenFinalArtifactReads.add(key);
+    },
+    async setJSON(key: string, value: unknown) {
+      values.set(key, JSON.stringify(value));
+    },
+    async get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) {
+      const value = values.get(key);
+      if (value === undefined) return null;
+
+      if (hideFirstFinalRead && key.startsWith('image/') && options?.type === 'arrayBuffer') {
+        finalArtifactArrayBufferReads.set(key, (finalArtifactArrayBufferReads.get(key) ?? 0) + 1);
+        if (hiddenFinalArtifactReads.has(key)) {
+          hiddenFinalArtifactReads.delete(key);
+          return null;
+        }
+      }
+
+      if (options?.type === 'arrayBuffer') {
+        const bytes = typeof value === 'string' ? Buffer.from(value) : value;
+
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      }
+
+      if (options?.type === 'buffer') return typeof value === 'string' ? Buffer.from(value) : value;
+
+      return typeof value === 'string' ? value : value.toString('utf8');
+    },
+    async del(key: string) {
+      values.delete(key);
+    },
+    async list() {
+      return { blobs: [...values.keys()].map((key) => ({ key, etag: '' })), directories: [] };
+    },
+  });
+  const artifactStore = createFakeStore(artifactValues, true);
+  const indexStore = createFakeStore(indexValues, false);
+
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'true';
+  process.env.NETLIFY_SITE_ID = '';
+  setNetlifyBlobsModuleForTesting({
+    connectLambda() {},
+    getStore(input) {
+      const storeName = typeof input === 'string' ? input : input.name;
+
+      if (storeName === 'artifacts')
+        return artifactStore as ReturnType<typeof getArtifactBlobStore> extends Promise<infer Store> ? Store : never;
+      if (storeName === 'artifact-index')
+        return indexStore as ReturnType<typeof getArtifactIndexBlobStore> extends Promise<infer Store> ? Store : never;
+      throw new Error(`Unexpected blob store: ${storeName}`);
+    },
+  });
+
+  try {
+    const requestId = `stale-final-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const payloadBytes = Buffer.from('final artifact bytes eventually visible');
+    const response = await postArtifact({
+      ...makeBaseInput(requestId),
+      encoding: 'base64',
+      payload: payloadBytes.toString('base64'),
+    });
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(response.json.complete, true);
+    assert.equal(response.json.deduped, false);
+
+    const artifact = response.json.artifact as { blobKey: string; sha256: string };
+    assert.equal(finalArtifactArrayBufferReads.get(artifact.blobKey), 2);
+
+    const indexedReferenceText = indexValues.get(`request-artifacts/${requestId}/${artifact.sha256}.json`);
+    assert.equal(typeof indexedReferenceText, 'string');
+    assert.deepEqual(JSON.parse(indexedReferenceText as string), response.json.artifact);
+  } finally {
+    setNetlifyBlobsModuleForTesting(undefined);
+
+    if (previousPublishSecret === undefined) delete process.env.NETLIFY_PUBLISH_SECRET;
+    else process.env.NETLIFY_PUBLISH_SECRET = previousPublishSecret;
+
+    if (previousFallbackSecret === undefined) delete process.env.PUBLISH_SECRET;
+    else process.env.PUBLISH_SECRET = previousFallbackSecret;
+
+    if (previousNetlify === undefined) delete process.env.NETLIFY;
+    else process.env.NETLIFY = previousNetlify;
+
+    if (previousSiteId === undefined) delete process.env.NETLIFY_SITE_ID;
+    else process.env.NETLIFY_SITE_ID = previousSiteId;
+  }
 });
 
 test('save-artifact single-shot uploads dedupe by checksum', async () => {
