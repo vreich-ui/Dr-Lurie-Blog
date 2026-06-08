@@ -241,18 +241,43 @@ const toValidChunkIndexSet = (indexes: unknown, totalChunks: number) => {
   );
 };
 
-const readChunkManifest = async (store: BlobStore, requestId: string, clientUploadId: string, totalChunks: number) => {
+const readChunkManifestRecord = async (store: BlobStore, requestId: string, clientUploadId: string) => {
   const manifest = await store.get(chunkManifestKey(requestId, clientUploadId));
 
-  if (!manifest) return new Set<number>();
+  if (!manifest) return undefined;
 
   try {
-    const parsed = JSON.parse(manifest) as Partial<ChunkManifest>;
+    const parsed = JSON.parse(manifest) as unknown;
 
-    return toValidChunkIndexSet(parsed.receivedChunkIndexes, totalChunks);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Partial<ChunkManifest>)
+      : undefined;
   } catch {
-    return new Set<number>();
+    return undefined;
   }
+};
+
+const readChunkManifest = async (store: BlobStore, requestId: string, clientUploadId: string, totalChunks: number) => {
+  const parsed = await readChunkManifestRecord(store, requestId, clientUploadId);
+
+  return toValidChunkIndexSet(parsed?.receivedChunkIndexes, totalChunks);
+};
+
+const validateChunkUploadTotalChunks = async (
+  store: BlobStore,
+  requestId: string,
+  clientUploadId: string,
+  totalChunks: number
+) => {
+  const parsed = await readChunkManifestRecord(store, requestId, clientUploadId);
+
+  if (parsed?.totalChunks !== undefined && parsed.totalChunks !== totalChunks) {
+    return jsonResponse(400, {
+      error: `Chunk upload totalChunks mismatch for clientUploadId ${clientUploadId}: expected existing total ${parsed.totalChunks}, received ${totalChunks}.`,
+    });
+  }
+
+  return undefined;
 };
 
 const writeChunkManifest = async (
@@ -465,6 +490,14 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const artifactStore = await getArtifactBlobStore(event);
+  const chunkTotalValidationError = await validateChunkUploadTotalChunks(
+    artifactStore,
+    input.requestId,
+    input.clientUploadId,
+    input.totalChunks
+  );
+
+  if (chunkTotalValidationError) return chunkTotalValidationError;
 
   const status = await saveUploadedChunk(
     artifactStore,

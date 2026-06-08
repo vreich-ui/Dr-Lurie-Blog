@@ -269,6 +269,65 @@ test('save-artifact keeps chunked uploads incomplete before validating final exp
   assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
+test('save-artifact rejects chunked upload attempts that change totalChunks for an existing manifest', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `chunked-total-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const clientUploadId = randomUUID();
+  const firstChunk = Buffer.from('first total chunk');
+  const firstPartial = await postArtifact({
+    ...makeBaseInput(requestId),
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    payload: firstChunk.toString('base64'),
+  });
+
+  assert.equal(firstPartial.statusCode, 202);
+  assert.deepEqual(firstPartial.json, { ok: true, complete: false, receivedChunks: 1, totalChunks: 2 });
+
+  const retry = await postArtifact({
+    ...makeBaseInput(requestId),
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    payload: firstChunk.toString('base64'),
+  });
+
+  assert.equal(retry.statusCode, 202);
+  assert.deepEqual(retry.json, { ok: true, complete: false, receivedChunks: 1, totalChunks: 2 });
+
+  const mismatch = await postArtifact({
+    ...makeBaseInput(requestId),
+    clientUploadId,
+    chunkIndex: 1,
+    totalChunks: 3,
+    encoding: 'base64',
+    payload: Buffer.from('second total chunk').toString('base64'),
+  });
+
+  assert.equal(mismatch.statusCode, 400);
+  assert.deepEqual(mismatch.json, {
+    error: `Chunk upload totalChunks mismatch for clientUploadId ${clientUploadId}: expected existing total 2, received 3.`,
+  });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+  const chunkPrefix = `artifact-chunks/${requestId}/${clientUploadId}/`;
+
+  assert.deepEqual((await artifactStore.list({ prefix: chunkPrefix })).blobs.map((blob) => blob.key).sort(), [
+    `${chunkPrefix}0`,
+    `${chunkPrefix}manifest.json`,
+  ]);
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
 test('save-artifact chunked uploads collect three chunks by request and client upload before finalizing', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
