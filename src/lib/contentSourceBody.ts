@@ -5,7 +5,7 @@ const getMarkdownBlockText = (payload: unknown) => {
   if (typeof payload === 'string') return toText(payload);
   if (!isRecord(payload)) return '';
 
-  return toText(payload.markdown) || toText(payload.content) || toText(payload.text);
+  return toText(payload.markdown);
 };
 
 const getMarkdownBlocksText = (input: Record<string, unknown>) => {

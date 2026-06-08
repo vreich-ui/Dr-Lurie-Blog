@@ -397,6 +397,44 @@ test('admin content-source import preserves publish payload description as summa
   assert.equal(formData.content.value, 'Description fallback fixture body has more than five words.');
 });
 
+test('admin-publish draft validation accepts body text only in markdown content blocks', async () => {
+  const bodyVariants = [
+    {
+      label: 'string payload',
+      payload: 'Markdown block string body has more than five words.',
+    },
+    {
+      label: 'object markdown payload',
+      payload: { markdown: 'Markdown block object body has more than five words.' },
+    },
+  ];
+
+  for (const variant of bodyVariants) {
+    const input = adminPublishDraftInputWithBody({
+      content: {
+        blocks: [
+          {
+            block_id: `body-${variant.label.replace(/\s+/g, '-')}`,
+            block_type: 'markdown',
+            payload: variant.payload,
+          },
+        ],
+      },
+    });
+
+    const response = await createRequest(createMemoryStore(), {
+      action: 'create_request',
+      request_id: `req_admin_blocks_${variant.label.replace(/\s+/g, '_')}`,
+      input,
+      validation_mode: 'admin_publish_draft',
+    });
+    const body = parseResponseBody(response);
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(body.ok, true);
+  }
+});
+
 test('shared content source body helper reads every accepted admin body location consistently', async () => {
   const expectedMarkdown = 'Shared helper body has more than five words for preview.';
   const bodyVariants = [

@@ -24,7 +24,6 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
-import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
@@ -840,6 +839,20 @@ type AdminPublishDraftIssue = { path: string[]; message: string };
 
 const hasAdminImportableText = (...values: unknown[]) => values.some((value) => nonEmptyText(value) !== undefined);
 
+const getAdminMarkdownBlockText = (payload: unknown) => {
+  if (typeof payload === 'string') return payload;
+  if (isRecordValue(payload) && typeof payload.markdown === 'string') return payload.markdown;
+
+  return undefined;
+};
+
+const getAdminMarkdownBlocksText = (input: ContentSourceV1) =>
+  input.content?.blocks
+    ?.filter((block) => block.block_type === 'markdown')
+    .map((block) => getAdminMarkdownBlockText(block.payload))
+    .filter((value): value is string => nonEmptyText(value) !== undefined)
+    .join('\n\n');
+
 const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
   const payload = input.publication?.publish_payload;
   const issues: AdminPublishDraftIssue[] = [];
@@ -866,7 +879,14 @@ const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
     });
   }
 
-  if (!getContentSourceMarkdown(input)) {
+  if (
+    !hasAdminImportableText(
+      payload?.markdown,
+      payload?.content,
+      input.editorial?.draft_markdown,
+      getAdminMarkdownBlocksText(input)
+    )
+  ) {
     issues.push({
       path: ['publication', 'publish_payload', 'content'],
       message:
