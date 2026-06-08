@@ -22,6 +22,14 @@ type UploadImagesWithIntegrityInput = {
   chunkSizeBytes?: number;
 };
 
+type PreparedImageUpload = {
+  bytes: Buffer;
+  contentType: string;
+  filename: string;
+  sha256: string;
+  sizeBytes: number;
+};
+
 const DEFAULT_IMAGE_CHUNK_SIZE_BYTES = 6 * 1024;
 
 export class ArtifactIntegrityError extends Error {
@@ -37,7 +45,6 @@ const inferContentTypeFromName = (name: string) => {
   if (lowerName.endsWith('.png')) return 'image/png';
   if (lowerName.endsWith('.webp')) return 'image/webp';
   if (lowerName.endsWith('.gif')) return 'image/gif';
-  if (lowerName.endsWith('.svg')) return 'image/svg+xml';
 
   return 'application/octet-stream';
 };
@@ -51,12 +58,60 @@ const getImageName = (image: UploadableImage, index: number) => {
 };
 
 const decodeImageBytes = (image: UploadableImage) => {
+  const encoding = image.encoding?.trim().toLowerCase() || 'base64';
+  if (encoding === 'binary') {
+    throw new ArtifactIntegrityError(
+      'Artifact upload failed integrity verification: image payload encoding must be base64, not binary.'
+    );
+  }
+  if (encoding !== 'base64') {
+    throw new ArtifactIntegrityError(
+      `Artifact upload failed integrity verification: unsupported image payload encoding "${encoding}".`
+    );
+  }
+
   const payload = image.base64 ?? image.content;
-  if (!payload) {
+  if (payload === undefined || payload === null) {
     throw new ArtifactIntegrityError('Artifact upload failed integrity verification: image payload is missing.');
   }
 
-  return Buffer.from(payload, image.encoding === 'binary' ? 'binary' : 'base64');
+  const bytes = Buffer.from(payload, 'base64');
+  if (bytes.byteLength === 0) {
+    throw new ArtifactIntegrityError('Artifact upload failed integrity verification: image payload is empty.');
+  }
+
+  return bytes;
+};
+
+const getSupportedImageContentType = (image: UploadableImage, filename: string) => {
+  const contentType = normalizeContentType(image.type?.trim() || inferContentTypeFromName(filename));
+  if (contentType === 'image/svg+xml') {
+    throw new ArtifactIntegrityError(
+      'Artifact upload failed integrity verification: SVG images are not supported by this binary image upload path.'
+    );
+  }
+  if (!contentType.startsWith('image/') || contentType === 'application/octet-stream') {
+    throw new ArtifactIntegrityError(
+      `Artifact upload failed integrity verification: unsupported image contentType "${contentType}".`
+    );
+  }
+
+  return contentType;
+};
+
+const prepareImageUpload = (image: UploadableImage, index: number): PreparedImageUpload => {
+  const filename = getImageName(image, index);
+  const contentType = getSupportedImageContentType(image, filename);
+  const bytes = decodeImageBytes(image);
+  const sizeBytes = bytes.byteLength;
+
+  return {
+    bytes,
+    contentType,
+    filename,
+    sha256: sha256Hex(bytes),
+    sizeBytes,
+  };
 };
 
 const assertArtifactReference = (value: unknown): ArtifactReference => {
@@ -108,22 +163,16 @@ const verifyReturnedArtifact = ({
 
 const uploadImageWithIntegrity = async ({
   image,
-  index,
   requestId,
   mcpToolCall,
   chunkSizeBytes,
 }: {
-  image: UploadableImage;
-  index: number;
+  image: PreparedImageUpload;
   requestId: string;
   mcpToolCall: McpToolCall;
   chunkSizeBytes: number;
 }) => {
-  const bytes = decodeImageBytes(image);
-  const filename = getImageName(image, index);
-  const contentType = image.type?.trim() || inferContentTypeFromName(filename);
-  const sizeBytes = bytes.byteLength;
-  const sha256 = sha256Hex(bytes);
+  const { bytes, contentType, filename, sha256, sizeBytes } = image;
   const totalChunks = Math.max(1, Math.ceil(sizeBytes / chunkSizeBytes));
   const clientUploadId = randomUUID();
   let completedArtifact: ArtifactReference | undefined;
@@ -169,9 +218,11 @@ export const uploadImagesWithIntegrity = async ({
   const verifiedArtifacts: ArtifactReference[] = [];
 
   try {
-    for (let index = 0; index < images.length; index += 1) {
+    const preparedImages = images.map((image, index) => prepareImageUpload(image, index));
+
+    for (let index = 0; index < preparedImages.length; index += 1) {
       verifiedArtifacts.push(
-        await uploadImageWithIntegrity({ image: images[index], index, requestId, mcpToolCall, chunkSizeBytes })
+        await uploadImageWithIntegrity({ image: preparedImages[index], requestId, mcpToolCall, chunkSizeBytes })
       );
     }
   } catch (error) {
