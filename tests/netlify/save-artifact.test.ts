@@ -2,12 +2,15 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
-import sharp from 'sharp';
-
 import { handler, saveUploadedChunk } from '../../netlify/functions/save-artifact.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../../netlify/lib/blob-store.js';
 
 const publishSecret = 'artifact-test-secret';
+const validJpegBytes = Buffer.from(
+  '/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAACAAIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAABP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIIAeC//2Q==',
+  'base64'
+);
+const validJpegSha256 = createHash('sha256').update(validJpegBytes).digest('hex');
 
 const postArtifact = async (body: Record<string, unknown>) => {
   const response = await handler({
@@ -129,36 +132,85 @@ test('save-artifact single-shot uploads dedupe by checksum', async () => {
   assert.deepEqual(indexedReference, first.json.artifact);
 });
 
-test('save-artifact accepts a valid JPEG upload after marker and decoder validation', async () => {
+test('save-artifact accepts a valid JPEG upload with matching expected size and sha256', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
   const requestId = `jpeg-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const jpegBytes = await sharp({
-    create: {
-      width: 2,
-      height: 2,
-      channels: 3,
-      background: { r: 20, g: 40, b: 60 },
-    },
-  })
-    .jpeg()
-    .toBuffer();
   const response = await postArtifact({
     ...makeBaseInput(requestId),
     contentType: 'image/jpeg',
     filename: 'photo.jpg',
     encoding: 'base64',
-    expectedSizeBytes: jpegBytes.byteLength,
-    expectedSha256: createHash('sha256').update(jpegBytes).digest('hex'),
-    payload: jpegBytes.toString('base64'),
+    expectedSizeBytes: validJpegBytes.byteLength,
+    expectedSha256: validJpegSha256,
+    payload: validJpegBytes.toString('base64'),
   });
 
   assert.equal(response.statusCode, 201);
   assert.equal(response.json.complete, true);
   assert.equal(response.json.deduped, false);
+
+  const artifact = response.json.artifact as { sha256: string; sizeBytes: number };
+
+  assert.equal(artifact.sizeBytes, validJpegBytes.byteLength);
+  assert.equal(artifact.sha256, validJpegSha256);
+});
+
+test('save-artifact rejects a truncated JPEG without writing final artifact or index records', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `jpeg-truncated-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const truncatedJpegBytes = validJpegBytes.subarray(0, validJpegBytes.byteLength - 2);
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'photo.jpg',
+    encoding: 'base64',
+    expectedSizeBytes: truncatedJpegBytes.byteLength,
+    expectedSha256: createHash('sha256').update(truncatedJpegBytes).digest('hex'),
+    payload: truncatedJpegBytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 400);
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
+test('save-artifact rejects a valid JPEG when expectedSha256 is a valid but wrong digest', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `jpeg-sha-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const wrongSha256 = '0'.repeat(64);
+  const response = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'photo.jpg',
+    encoding: 'base64',
+    expectedSizeBytes: validJpegBytes.byteLength,
+    expectedSha256: wrongSha256,
+    payload: validJpegBytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 400);
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
 test('save-artifact rejects JPEG aliases without required SOI and EOI markers before final persistence', async () => {
@@ -446,6 +498,57 @@ test('save-artifact chunked uploads collect three chunks by request and client u
     `${chunkPrefix}2`,
     `${chunkPrefix}manifest.json`,
   ]);
+});
+
+test('save-artifact finalizes chunked JPEG uploads with matching expected size and sha256', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `chunked-jpeg-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const clientUploadId = randomUUID();
+  const splitIndex = Math.ceil(validJpegBytes.byteLength / 2);
+  const chunkBuffers = [validJpegBytes.subarray(0, splitIndex), validJpegBytes.subarray(splitIndex)];
+
+  const partial = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'chunked.jpg',
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    expectedSizeBytes: validJpegBytes.byteLength,
+    expectedSha256: validJpegSha256,
+    payload: chunkBuffers[0].toString('base64'),
+  });
+
+  assert.equal(partial.statusCode, 202);
+  assert.deepEqual(partial.json, { ok: true, complete: false, receivedChunks: 1, totalChunks: 2 });
+
+  const completed = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/jpeg',
+    filename: 'chunked.jpg',
+    clientUploadId,
+    chunkIndex: 1,
+    totalChunks: 2,
+    encoding: 'base64',
+    expectedSizeBytes: validJpegBytes.byteLength,
+    expectedSha256: validJpegSha256,
+    payload: chunkBuffers[1].toString('base64'),
+  });
+
+  assert.equal(completed.statusCode, 201);
+  assert.equal(completed.json.complete, true);
+  assert.equal(completed.json.receivedChunks, 2);
+  assert.equal(completed.json.totalChunks, 2);
+
+  const artifact = completed.json.artifact as { sha256: string; sizeBytes: number };
+
+  assert.equal(artifact.sha256, validJpegSha256);
+  assert.equal(artifact.sizeBytes, validJpegBytes.byteLength);
 });
 
 test('save-artifact rejects completed chunked JPEG only after assembled bytes fail validation', async () => {
