@@ -1350,7 +1350,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { getContentSourceMarkdown } from '../../lib/contentSourceBody';
+  import { normalizeContentSourceImportToFormData } from '../../lib/contentSourceImportFormData';
   import { loadClerk } from '~/utils/clerkLoader';
 
   const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -1784,21 +1784,6 @@ const metadata = {
             !Array.isArray(value) &&
             Object.values(value).every((item) => item == null || ['string', 'number', 'boolean'].includes(typeof item))
         );
-
-      const formatImportedSource = (source) => {
-        if (typeof source === 'string') return source.trim();
-        if (!isSimpleImportObject(source)) return '';
-
-        return Object.entries(source)
-          .map(([key, value]) => {
-            if (value == null || String(value).trim() === '') return '';
-            return `${key}: ${String(value).trim()}`;
-          })
-          .filter(Boolean)
-          .join('; ');
-      };
-
-      const formatImportedList = (value) => value.map(formatImportedSource).filter(Boolean).join('\n');
 
       const slugify = (value) =>
         String(value)
@@ -3097,14 +3082,24 @@ const metadata = {
         assertOptionalTextPath(candidate, 'publication.publish_payload.author', [
           ['publication', 'publish_payload', 'author'],
         ]);
-        assertOptionalTextPath(candidate, 'publication.publish_payload.excerpt or content.deck', [
-          ['publication', 'publish_payload', 'excerpt'],
-          ['content', 'deck'],
-        ]);
-        assertOptionalTextPath(candidate, 'publication.publish_payload.seoDescription or seo.meta_description', [
-          ['publication', 'publish_payload', 'seoDescription'],
-          ['seo', 'meta_description'],
-        ]);
+        assertOptionalTextPath(
+          candidate,
+          'publication.publish_payload.excerpt, publication.publish_payload.description, or content.deck',
+          [
+            ['publication', 'publish_payload', 'excerpt'],
+            ['publication', 'publish_payload', 'description'],
+            ['content', 'deck'],
+          ]
+        );
+        assertOptionalTextPath(
+          candidate,
+          'publication.publish_payload.seoDescription, seo.meta_description, or publication.publish_payload.description',
+          [
+            ['publication', 'publish_payload', 'seoDescription'],
+            ['seo', 'meta_description'],
+            ['publication', 'publish_payload', 'description'],
+          ]
+        );
         assertOptionalTextPath(
           candidate,
           'publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown',
@@ -3121,69 +3116,6 @@ const metadata = {
         assertOptionalSourceListPath(candidate);
 
         return candidate;
-      };
-
-      const normalizeTextImportField = (contentSource, paths) => {
-        const result = getFirstImportPathValue(contentSource, paths);
-        return {
-          exists: result.exists,
-          value: result.exists && result.value != null ? result.value : '',
-        };
-      };
-
-      const normalizeContentSourceImportToFormData = (contentSource, currentSchemaVersion) => {
-        const title = normalizeTextImportField(contentSource, [
-          ['publication', 'publish_payload', 'title'],
-          ['content', 'title'],
-        ]);
-        const slug = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'slug']]);
-        const computedSlug = slugify(slug.value || title.value);
-        const author = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'author']]);
-        const excerpt = normalizeTextImportField(contentSource, [
-          ['publication', 'publish_payload', 'excerpt'],
-          ['content', 'deck'],
-        ]);
-        const seoDescription = normalizeTextImportField(contentSource, [
-          ['publication', 'publish_payload', 'seoDescription'],
-          ['seo', 'meta_description'],
-        ]);
-        const markdown = getContentSourceMarkdown(contentSource);
-        const content = {
-          exists: Boolean(markdown),
-          value: markdown,
-        };
-        const importedTags = getFirstImportPathValue(contentSource, [
-          ['publication', 'publish_payload', 'tags'],
-          ['taxonomy', 'tags'],
-        ]);
-        const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
-
-        return {
-          schemaVersion: contentSource.schema_version,
-          currentSchemaVersion,
-          title,
-          slug: {
-            exists: slug.exists || Boolean(computedSlug),
-            value: computedSlug,
-          },
-          author,
-          excerpt,
-          seoDescription,
-          content,
-          tags: {
-            exists: importedTags.exists,
-            value: Array.isArray(importedTags.value)
-              ? importedTags.value
-                  .map((tag) => tag.trim())
-                  .filter(Boolean)
-                  .join(', ')
-              : '',
-          },
-          sources: {
-            exists: importedSources.exists,
-            value: Array.isArray(importedSources.value) ? formatImportedList(importedSources.value) : '',
-          },
-        };
       };
 
       const validateContentSourceImportFormData = (formData) => {

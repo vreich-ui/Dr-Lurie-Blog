@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createRequest } from '../../netlify/functions/save-json-blob.js';
+import { normalizeContentSourceImportToFormData } from '../../src/lib/contentSourceImportFormData.js';
 import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import { validateContentSourceV1 } from '../../src/schema/schema-v1.js';
 
@@ -374,6 +375,26 @@ test('content_source.v1 rejects unbagged extension fields in concrete agent-prio
   assert.equal(response.statusCode, 400);
   assert.equal(body.ok, false);
   assert.ok(body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'claims.claim_list.0'));
+});
+
+test('admin content-source import preserves publish payload description as summary and SEO fallback', () => {
+  const description = 'Publication payload description fallback for admin import.';
+  const input = adminPublishDraftInputWithBody({
+    publication: {
+      publish_payload: {
+        description,
+        content: 'Description fallback fixture body has more than five words.',
+      },
+    },
+  });
+
+  const formData = normalizeContentSourceImportToFormData(input, 'content_source.v1');
+
+  assert.equal(formData.excerpt.exists, true);
+  assert.equal(formData.excerpt.value, description);
+  assert.equal(formData.seoDescription.exists, true);
+  assert.equal(formData.seoDescription.value, description);
+  assert.equal(formData.content.value, 'Description fallback fixture body has more than five words.');
 });
 
 test('shared content source body helper reads every accepted admin body location consistently', async () => {
