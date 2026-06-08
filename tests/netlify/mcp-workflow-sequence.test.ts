@@ -3,6 +3,7 @@ import { readFile, rm } from 'node:fs/promises';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
+import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 
 const localBlobRoot = new URL('../../.netlify/local-blobs/workflows/', import.meta.url);
 
@@ -54,12 +55,15 @@ const verifyAdminPublishImportable = (input: AdminImportableInput) => {
   const title = getText(payload.title) || getText(input.content?.title);
   const slug = getText(payload.slug) || slugifyForImportTest(title);
   const author = getText(payload.author);
-  const body = getText(payload.content) || getText(payload.markdown) || getText(input.editorial?.draft_markdown);
+  const body = getContentSourceMarkdown(input);
 
   assert.ok(title, 'admin import requires a title from publication.publish_payload.title or content.title');
   assert.ok(slug, 'admin import requires publication.publish_payload.slug or enough title text to compute one');
   assert.ok(author, 'admin import requires publication.publish_payload.author');
-  assert.ok(body, 'admin import requires content, markdown, or editorial.draft_markdown body text');
+  assert.ok(
+    body,
+    'admin import requires markdown, content, editorial.draft_markdown, or content.blocks markdown body text'
+  );
 };
 
 const callTool = async (name: string, args: Record<string, unknown>) => {
@@ -99,9 +103,10 @@ test('MCP create_request minimum admin-publish draft satisfies admin publish imp
     'publication.publish_payload.title',
     'publication.publish_payload.slug',
     'publication.publish_payload.author',
-    'publication.publish_payload.content',
     'publication.publish_payload.markdown',
+    'publication.publish_payload.content',
     'editorial.draft_markdown',
+    'content.blocks',
   ]) {
     assert.match(publishPageSource, new RegExp(requiredPath.replaceAll('.', '\\.')));
   }

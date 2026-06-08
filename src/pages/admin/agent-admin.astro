@@ -377,6 +377,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
+  import { getContentSourceMarkdown } from '../../lib/contentSourceBody';
   import { loadClerk } from '~/utils/clerkLoader';
 
   (() => {
@@ -625,17 +626,24 @@ const metadata = {
       const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
       const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
       const toText = (value) => (typeof value === 'string' ? value.trim() : '');
+      const isRecord = (value) => Boolean(value && typeof value === 'object');
+      const getPublishPayloadObject = (payload) =>
+        isRecord(payload?.publication?.publish_payload) ? payload.publication.publish_payload : payload;
+      const getPayloadMarkdown = (payload) => {
+        const contentSourceMarkdown = isRecord(payload) ? getContentSourceMarkdown(payload) : '';
+        const payloadObject = getPublishPayloadObject(payload);
+        return contentSourceMarkdown || toText(payloadObject?.markdown) || toText(payloadObject?.content);
+      };
+      const getPayloadText = (payload, field) => toText(getPublishPayloadObject(payload)?.[field]);
       const getMarkdownWordCount = (value) => toText(value).split(/\s+/).filter(Boolean).length;
-      const getHasMinimumMarkdown = (payload) => getMarkdownWordCount(payload?.markdown) >= 5;
+      const getHasMinimumMarkdown = (payload) => getMarkdownWordCount(getPayloadMarkdown(payload)) >= 5;
       const hasPublishReadyPayload = (payload) =>
-        Boolean(payload && toText(payload.slug) && getHasMinimumMarkdown(payload));
+        Boolean(payload && getPayloadText(payload, 'slug') && getHasMinimumMarkdown(payload));
       const getPayloadFingerprint = (payload) => {
-        const slug = toText(payload?.slug);
-        const commitMessage = toText(payload?.commitMessage);
-        const markdown = toText(payload?.markdown);
-        const content = toText(payload?.content);
-        const bodySignature = markdown ? `md:${markdown.length}` : `ct:${content.length}`;
-        return `${slug}|${commitMessage || 'none'}|${bodySignature}`;
+        const slug = getPayloadText(payload, 'slug');
+        const commitMessage = getPayloadText(payload, 'commitMessage');
+        const markdown = getPayloadMarkdown(payload);
+        return `${slug}|${commitMessage || 'none'}|md:${markdown.length}`;
       };
       const isValidImagePath = (value) =>
         typeof value === 'string' && /^(src\/assets\/images\/|public\/|images\/|https?:\/\/)/.test(value.trim());
@@ -668,12 +676,13 @@ const metadata = {
           return;
         }
         const payload = normalizeActionPayload(sourcePayload);
-        const slug = toText(payload.slug);
-        const markdown = toText(payload.markdown);
-        const content = toText(payload.content);
+        const publishPayloadObject = getPublishPayloadObject(payload);
+        const slug = getPayloadText(payload, 'slug');
+        const markdown = getPayloadMarkdown(payload);
+        const content = toText(publishPayloadObject?.content);
         const hasMinimumMarkdown = getHasMinimumMarkdown(payload);
-        const images = normalizePublishImages(payload.images);
-        const rawImages = Array.isArray(payload.images) ? payload.images : [];
+        const images = normalizePublishImages(publishPayloadObject?.images);
+        const rawImages = Array.isArray(publishPayloadObject?.images) ? publishPayloadObject.images : [];
         const invalidImageCount = rawImages.length - images.length;
 
         if (!slug || !slugPattern.test(slug)) {
@@ -701,25 +710,25 @@ const metadata = {
 
         const publishPayload = {
           slug,
-          title: toText(payload.title) || undefined,
+          title: getPayloadText(payload, 'title') || undefined,
           markdown: markdown || undefined,
           content: content || undefined,
-          publishDate: toText(payload.publishDate) || undefined,
-          draft: payload.draft === true,
-          author: toText(payload.author) || undefined,
-          category: toText(payload.category) || undefined,
-          tags: Array.isArray(payload.tags)
-            ? payload.tags.map((tag) => toText(tag)).filter(Boolean)
-            : toText(payload.tags) || undefined,
-          excerpt: toText(payload.excerpt) || undefined,
-          overwrite: Boolean(payload.overwrite),
+          publishDate: getPayloadText(payload, 'publishDate') || undefined,
+          draft: publishPayloadObject?.draft === true,
+          author: getPayloadText(payload, 'author') || undefined,
+          category: getPayloadText(payload, 'category') || undefined,
+          tags: Array.isArray(publishPayloadObject?.tags)
+            ? publishPayloadObject.tags.map((tag) => toText(tag)).filter(Boolean)
+            : toText(publishPayloadObject?.tags) || undefined,
+          excerpt: getPayloadText(payload, 'excerpt') || undefined,
+          overwrite: Boolean(publishPayloadObject?.overwrite),
           images,
-          featuredImage: toText(payload.featuredImage) || undefined,
-          videoLink: toText(payload.videoLink) || undefined,
-          ctaLink: toText(payload.ctaLink) || undefined,
-          ctaText: toText(payload.ctaText) || undefined,
-          seoDescription: toText(payload.seoDescription) || undefined,
-          commitMessage: toText(payload.commitMessage) || undefined,
+          featuredImage: getPayloadText(payload, 'featuredImage') || undefined,
+          videoLink: getPayloadText(payload, 'videoLink') || undefined,
+          ctaLink: getPayloadText(payload, 'ctaLink') || undefined,
+          ctaText: getPayloadText(payload, 'ctaText') || undefined,
+          seoDescription: getPayloadText(payload, 'seoDescription') || undefined,
+          commitMessage: getPayloadText(payload, 'commitMessage') || undefined,
         };
         const payloadKey = getPayloadFingerprint(payload);
         updatePublishPreview(payload, `Payload ready from ${origin}. key=${payloadKey}`);
@@ -771,9 +780,9 @@ const metadata = {
             setDebugLine();
             return;
           }
-          if (!toText(parsed.slug) || !toText(parsed.markdown)) {
+          if (!getPayloadText(parsed, 'slug') || !getPayloadMarkdown(parsed)) {
             updatePublishPreview(parsed, `Event ${sourceLabel} captured output, but required fields are missing.`);
-            setStatus('missing required field: output must include slug and markdown.', false);
+            setStatus('missing required field: output must include slug and importable markdown.', false);
             setDebugLine();
             return;
           }

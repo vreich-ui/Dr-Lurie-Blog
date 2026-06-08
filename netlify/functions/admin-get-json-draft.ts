@@ -2,6 +2,7 @@ import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import type { ContentSourceV1, WorkflowRecord } from '../../src/schema/schema-v1.js';
 import {
   lazyImagesRehypePlugin,
@@ -42,11 +43,7 @@ const stripFrontmatter = (markdown: string) => markdown.replace(/^---\s*\r?\n[\s
 
 const getPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
 
-const getMarkdown = (input: ContentSourceV1) => {
-  const payload = getPayload(input);
-
-  return toText(payload?.markdown) || toText(payload?.content) || toText(input.editorial?.draft_markdown);
-};
+const getMarkdown = (input: ContentSourceV1) => getContentSourceMarkdown(input);
 
 const getDraft = async (store: WorkflowBlobStore, draftId: string) => {
   const raw = await store.get(recordKey(draftId));

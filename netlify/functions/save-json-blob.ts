@@ -839,6 +839,20 @@ type AdminPublishDraftIssue = { path: string[]; message: string };
 
 const hasAdminImportableText = (...values: unknown[]) => values.some((value) => nonEmptyText(value) !== undefined);
 
+const getAdminMarkdownBlockText = (payload: unknown) => {
+  if (typeof payload === 'string') return payload;
+  if (isRecordValue(payload) && typeof payload.markdown === 'string') return payload.markdown;
+
+  return undefined;
+};
+
+const getAdminMarkdownBlocksText = (input: ContentSourceV1) =>
+  input.content?.blocks
+    ?.filter((block) => block.block_type === 'markdown')
+    .map((block) => getAdminMarkdownBlockText(block.payload))
+    .filter((value): value is string => nonEmptyText(value) !== undefined)
+    .join('\n\n');
+
 const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
   const payload = input.publication?.publish_payload;
   const issues: AdminPublishDraftIssue[] = [];
@@ -865,11 +879,18 @@ const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
     });
   }
 
-  if (!hasAdminImportableText(payload?.content, payload?.markdown, input.editorial?.draft_markdown)) {
+  if (
+    !hasAdminImportableText(
+      payload?.markdown,
+      payload?.content,
+      input.editorial?.draft_markdown,
+      getAdminMarkdownBlocksText(input)
+    )
+  ) {
     issues.push({
       path: ['publication', 'publish_payload', 'content'],
       message:
-        'Admin-publish drafts require publication.publish_payload.content, publication.publish_payload.markdown, or editorial.draft_markdown.',
+        'Admin-publish drafts require publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown body text.',
     });
   }
 
