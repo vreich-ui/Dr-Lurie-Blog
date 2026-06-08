@@ -1350,6 +1350,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
+  import { getContentSourceMarkdown } from '../../lib/contentSourceBody';
   import { loadClerk } from '~/utils/clerkLoader';
 
   const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -3106,10 +3107,10 @@ const metadata = {
         ]);
         assertOptionalTextPath(
           candidate,
-          'publication.publish_payload.content, publication.publish_payload.markdown, or editorial.draft_markdown',
+          'publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown',
           [
-            ['publication', 'publish_payload', 'content'],
             ['publication', 'publish_payload', 'markdown'],
+            ['publication', 'publish_payload', 'content'],
             ['editorial', 'draft_markdown'],
           ]
         );
@@ -3146,11 +3147,11 @@ const metadata = {
           ['publication', 'publish_payload', 'seoDescription'],
           ['seo', 'meta_description'],
         ]);
-        const content = normalizeTextImportField(contentSource, [
-          ['publication', 'publish_payload', 'content'],
-          ['publication', 'publish_payload', 'markdown'],
-          ['editorial', 'draft_markdown'],
-        ]);
+        const markdown = getContentSourceMarkdown(contentSource);
+        const content = {
+          exists: Boolean(markdown),
+          value: markdown,
+        };
         const importedTags = getFirstImportPathValue(contentSource, [
           ['publication', 'publish_payload', 'tags'],
           ['taxonomy', 'tags'],

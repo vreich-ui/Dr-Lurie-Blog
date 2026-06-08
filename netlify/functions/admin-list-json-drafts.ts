@@ -1,6 +1,7 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import type { ContentSourceV1, WorkflowRecord } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
@@ -54,11 +55,7 @@ const wordCount = (value: string) => value.trim().split(/\s+/).filter(Boolean).l
 
 const getPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
 
-const getDraftMarkdown = (input: ContentSourceV1) => {
-  const payload = getPayload(input);
-
-  return toText(payload?.markdown) || toText(payload?.content) || toText(input.editorial?.draft_markdown);
-};
+const getDraftMarkdown = (input: ContentSourceV1) => getContentSourceMarkdown(input);
 
 const getDraftFields = (record: WorkflowRecord) => {
   const payload = getPayload(record.input);

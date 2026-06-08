@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createRequest } from '../../netlify/functions/save-json-blob.js';
+import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import { validateContentSourceV1 } from '../../src/schema/schema-v1.js';
 
 const validContentSourceV1 = {
@@ -152,6 +153,46 @@ const representativeAgentGeneratedContentSource = {
   },
 } as const;
 
+const adminPublishDraftInputWithBody = (bodyPatch: Record<string, unknown>) => {
+  const base = {
+    record_type: 'content_source',
+    schema_version: 'content_source.v1',
+    content: {
+      schema_version: 'content_blocks.v1',
+      title: 'Shared Body Location Draft',
+    },
+    publication: {
+      schema_version: 'publication.v1',
+      publication_status: 'draft',
+      publish_payload: {
+        slug: 'shared-body-location-draft',
+        title: 'Shared Body Location Draft',
+        author: 'Dr. Lurié',
+      },
+    },
+  };
+
+  return {
+    ...base,
+    ...bodyPatch,
+    content: {
+      ...base.content,
+      ...((bodyPatch.content as Record<string, unknown> | undefined) ?? {}),
+    },
+    editorial: bodyPatch.editorial,
+    publication: {
+      ...base.publication,
+      ...((bodyPatch.publication as Record<string, unknown> | undefined) ?? {}),
+      publish_payload: {
+        ...base.publication.publish_payload,
+        ...(((bodyPatch.publication as Record<string, unknown> | undefined)?.publish_payload as
+          | Record<string, unknown>
+          | undefined) ?? {}),
+      },
+    },
+  };
+};
+
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();
 
@@ -223,7 +264,10 @@ test('create_request rejects skeletal admin-publish drafts before writing workfl
   const response = await createRequest(store, {
     action: 'create_request',
     request_id: requestId,
-    input: validContentSourceV1,
+    input: {
+      ...validContentSourceV1,
+      content: { schema_version: 'content_blocks.v1', title: 'Skin barrier basics' },
+    },
     validation_mode: 'admin_publish_draft',
   });
   const body = parseResponseBody(response);
@@ -330,4 +374,57 @@ test('content_source.v1 rejects unbagged extension fields in concrete agent-prio
   assert.equal(response.statusCode, 400);
   assert.equal(body.ok, false);
   assert.ok(body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'claims.claim_list.0'));
+});
+
+test('shared content source body helper reads every accepted admin body location consistently', async () => {
+  const expectedMarkdown = 'Shared helper body has more than five words for preview.';
+  const bodyVariants = [
+    adminPublishDraftInputWithBody({ publication: { publish_payload: { markdown: expectedMarkdown } } }),
+    adminPublishDraftInputWithBody({ publication: { publish_payload: { content: expectedMarkdown } } }),
+    adminPublishDraftInputWithBody({ editorial: { schema_version: 'editorial.v1', draft_markdown: expectedMarkdown } }),
+    adminPublishDraftInputWithBody({
+      content: {
+        blocks: [
+          {
+            block_id: 'body',
+            block_type: 'markdown',
+            payload: { markdown: expectedMarkdown },
+          },
+        ],
+      },
+    }),
+  ];
+
+  for (const input of bodyVariants) {
+    assert.equal(getContentSourceMarkdown(input), expectedMarkdown);
+
+    const response = await createRequest(createMemoryStore(), {
+      action: 'create_request',
+      request_id: `req_body_location_${bodyVariants.indexOf(input)}`,
+      input,
+      validation_mode: 'admin_publish_draft',
+    });
+    const body = parseResponseBody(response);
+
+    assert.equal(response.statusCode, 201);
+    assert.equal(body.ok, true);
+    assert.equal(getContentSourceMarkdown(body.record.input), expectedMarkdown);
+  }
+});
+
+test('shared content source body helper preserves documented body precedence', () => {
+  const input = adminPublishDraftInputWithBody({
+    content: {
+      blocks: [{ block_id: 'block-body', block_type: 'markdown', payload: 'Markdown block body.' }],
+    },
+    editorial: { schema_version: 'editorial.v1', draft_markdown: 'Editorial draft body.' },
+    publication: {
+      publish_payload: {
+        markdown: 'Publication markdown body.',
+        content: 'Publication content body.',
+      },
+    },
+  });
+
+  assert.equal(getContentSourceMarkdown(input), 'Publication markdown body.');
 });

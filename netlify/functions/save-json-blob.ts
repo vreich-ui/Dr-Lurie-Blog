@@ -24,6 +24,7 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
@@ -865,11 +866,11 @@ const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
     });
   }
 
-  if (!hasAdminImportableText(payload?.content, payload?.markdown, input.editorial?.draft_markdown)) {
+  if (!getContentSourceMarkdown(input)) {
     issues.push({
       path: ['publication', 'publish_payload', 'content'],
       message:
-        'Admin-publish drafts require publication.publish_payload.content, publication.publish_payload.markdown, or editorial.draft_markdown.',
+        'Admin-publish drafts require publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown body text.',
     });
   }
 
