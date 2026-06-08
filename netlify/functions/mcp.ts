@@ -214,6 +214,14 @@ const artifactEncodingJsonSchema = (description?: string) => ({
   ...(description ? { description } : {}),
 });
 const artifactMetadataJsonSchema = metadataBagSchema('Optional artifact metadata saved in the artifact reference.');
+const expectedSizeBytesJsonSchema = intSchema(
+  'Optional expected complete artifact byte size for upload integrity checks.'
+);
+const expectedSha256JsonSchema = {
+  type: 'string',
+  pattern: '^[a-fA-F0-9]{64}$',
+  description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
+};
 
 const publishPayloadJsonSchema = objectSchema(
   {
@@ -670,6 +678,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         contentType: stringSchema('MIME type for the artifact bytes.'),
         filename: stringSchema('Optional original filename used only for the blob extension.'),
         encoding: artifactEncodingJsonSchema('Payload encoding; defaults to base64.'),
+        expectedSizeBytes: expectedSizeBytesJsonSchema,
+        expectedSha256: expectedSha256JsonSchema,
         payload: stringSchema('Artifact bytes as base64 unless encoding is binary.'),
         metadata: artifactMetadataJsonSchema,
       },
@@ -690,6 +700,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         totalChunks: { type: 'integer', minimum: 1, description: 'Total number of chunks in this upload.' },
         filename: stringSchema('Optional original filename used only for the final blob extension.'),
         encoding: artifactEncodingJsonSchema('Chunk payload encoding; defaults to base64.'),
+        expectedSizeBytes: expectedSizeBytesJsonSchema,
+        expectedSha256: expectedSha256JsonSchema,
         payload: stringSchema('Chunk bytes as base64 unless encoding is binary.'),
         metadata: artifactMetadataJsonSchema,
       },
@@ -1046,6 +1058,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         contentType: input.contentType,
         filename: input.filename,
         encoding: input.encoding,
+        expectedSizeBytes: input.expectedSizeBytes,
+        expectedSha256: input.expectedSha256,
         payload: input.payload,
         metadata: input.metadata,
       });
@@ -1059,6 +1073,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         chunkIndex: input.chunkIndex,
         totalChunks: input.totalChunks,
         encoding: input.encoding,
+        expectedSizeBytes: input.expectedSizeBytes,
+        expectedSha256: input.expectedSha256,
         payload: input.payload,
         metadata: input.metadata,
       });

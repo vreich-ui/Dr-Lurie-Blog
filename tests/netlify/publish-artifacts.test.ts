@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import sharp from 'sharp';
+
 import { handler as publishHandler } from '../../netlify/functions/publish-article.js';
 import { handler as saveArtifactHandler } from '../../netlify/functions/save-artifact.js';
 
@@ -30,7 +32,16 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
   const originalFetch = globalThis.fetch;
   const requestId = `artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const explicitBytes = Buffer.from('explicit filename bytes');
-  const derivedBytes = Buffer.from('derived filename bytes');
+  const derivedBytes = await sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: 80, g: 100, b: 120 },
+    },
+  })
+    .jpeg()
+    .toBuffer();
   const explicitUpload = await postArtifact({
     requestId,
     artifactKind: 'image',
@@ -132,7 +143,6 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
     globalThis.fetch = originalFetch;
   }
 });
-
 
 test('publish-article fails fast when artifactReferences contains non-ArtifactReference media', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
