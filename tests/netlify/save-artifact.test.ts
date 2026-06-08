@@ -38,7 +38,10 @@ test('save-artifact chunk status stays monotonic when an immediate chunk read is
   const hiddenImmediateChunkReads = new Set<string>();
   const fakeStore = {
     async set(key: string, value: string | Buffer | Uint8Array | ArrayBuffer) {
-      values.set(key, typeof value === 'string' ? value : Buffer.from(value));
+      values.set(
+        key,
+        typeof value === 'string' ? value : value instanceof ArrayBuffer ? Buffer.from(value) : Buffer.from(value)
+      );
       if (key.endsWith('/1') || key.endsWith('/2')) hiddenImmediateChunkReads.add(key);
     },
     async setJSON(key: string, value: unknown) {

@@ -1,4 +1,5 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
+import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/mcp-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
@@ -20,20 +21,13 @@ type LambdaEvent = {
   isBase64Encoded?: boolean;
 };
 
-type PublishImageInput = {
-  base64?: unknown;
-  content?: unknown;
-  encoding?: unknown;
-  name?: unknown;
-  repoPath?: unknown;
-  type?: unknown;
-};
-
 type PublisherRequest = {
   action?: unknown;
   articleIdea?: unknown;
   images?: unknown;
   artifactReferences?: unknown;
+  requestId?: unknown;
+  request_id?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
   publishSecret?: unknown;
@@ -42,8 +36,9 @@ type PublisherRequest = {
 };
 
 type NormalizedPublisherRequest = {
-  images: PublishImageInput[];
+  images: UploadableImage[];
   artifactReferences: ArtifactReference[];
+  requestId?: string;
   markdown: string;
   overwrite: boolean;
   slug: string;
@@ -229,15 +224,18 @@ const validateEnvironment = () => {
   };
 };
 
-const assertNoInlineAgentImages = (images: unknown) => {
+const normalizeInlineAgentImages = (images: unknown) => {
   if (images === undefined || images === null) return [];
   if (!Array.isArray(images)) throw new RunnerError(400, 'images must be an array when provided.');
-  if (!images.length) return [];
 
-  throw new RunnerError(
-    400,
-    'Publisher agent media must be uploaded with save_artifact or save_artifact_chunk first; pass only returned ArtifactReference objects in artifactReferences.'
-  );
+  return images.map((image, index) => {
+    const parsed = publishImageSchema.safeParse(image);
+    if (!parsed.success) {
+      throw new RunnerError(400, `images[${index}] must include valid artifact upload fields.`);
+    }
+
+    return parsed.data;
+  });
 };
 
 const normalizeArtifactReferences = (value: unknown) => {
@@ -262,8 +260,9 @@ const normalizeRequest = (input: PublisherRequest): NormalizedPublisherRequest =
   }
 
   return {
-    images: assertNoInlineAgentImages(input.images),
+    images: normalizeInlineAgentImages(input.images),
     artifactReferences: normalizeArtifactReferences(input.artifactReferences),
+    requestId: toStringValue(input.requestId) ?? toStringValue(input.request_id),
     markdown: markdown ?? '',
     overwrite: toBooleanValue(input.overwrite),
     slug: slug ?? '',
@@ -275,6 +274,42 @@ const getActionName = (input: PublisherRequest) => toStringValue(input.action) ?
 
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+const createMcpEndpoint = (publishEndpoint: string) => {
+  const configured = toStringValue(process.env.NETLIFY_MCP_ENDPOINT);
+  if (configured) return configured;
+
+  return new URL('/mcp', publishEndpoint).toString();
+};
+
+const createMcpToolCaller = (endpoint: string) => async (name: string, args: Record<string, unknown>) => {
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: `publisher-agent-${name}-${Date.now()}`,
+      method: 'tools/call',
+      params: { name, arguments: args },
+    }),
+  });
+  const rpc = (await response.json().catch(() => ({}))) as {
+    error?: { message?: string };
+    result?: { isError?: boolean; structuredContent?: Record<string, unknown>; content?: { text?: string }[] };
+  };
+  const result = rpc.result ?? {};
+
+  if (!response.ok || rpc.error || result.isError) {
+    const message =
+      rpc.error?.message ||
+      String(
+        result.structuredContent?.error || result.content?.[0]?.text || `${name} failed with status ${response.status}.`
+      );
+    throw new Error(message);
+  }
+
+  return result.structuredContent ?? {};
+};
 
 const createPublishTool = ({
   endpoint,
@@ -298,8 +333,16 @@ const createPublishTool = ({
       const markdown = toStringValue(parsed.markdown) ?? defaultInput.markdown;
       const title = toStringValue(parsed.title) ?? defaultInput.title;
       const articlePath = `${repoContentRoot}/${slug}.md`;
-      const normalizedImages = assertNoInlineAgentImages(parsed.images ?? defaultInput.images);
-      const artifactReferences = normalizeArtifactReferences(parsed.artifactReferences ?? defaultInput.artifactReferences);
+      const normalizedImages = normalizeInlineAgentImages(parsed.images ?? defaultInput.images);
+      if (normalizedImages.length) {
+        throw new RunnerError(
+          400,
+          'Artifact upload failed integrity verification: publish tool received unverified inline images.'
+        );
+      }
+      const artifactReferences = normalizeArtifactReferences(
+        parsed.artifactReferences ?? defaultInput.artifactReferences
+      );
       const payload = {
         slug,
         articlePath,
@@ -475,6 +518,25 @@ export const handler = async (event: LambdaEvent) => {
       slug: input.slug,
     });
 
+    if (input.images.length) {
+      if (!input.requestId) {
+        throw new RunnerError(
+          400,
+          'Artifact upload failed integrity verification: requestId is required to upload article images.'
+        );
+      }
+
+      const uploadedReferences = await uploadImagesWithIntegrity({
+        images: input.images,
+        requestId: input.requestId,
+        mcpToolCall: createMcpToolCaller(createMcpEndpoint(env.endpoint)),
+        onWorkflowError: (message) => {
+          console.error('Publisher artifact workflow error.', { articlePath, message, slug: input.slug });
+        },
+      });
+      input = { ...input, images: [], artifactReferences: [...input.artifactReferences, ...uploadedReferences] };
+    }
+
     const agent = createPublisherAgent({
       endpoint: env.endpoint,
       defaultInput: input,
@@ -531,6 +593,7 @@ export const handler = async (event: LambdaEvent) => {
       imagePaths: [],
       deployStatus: 'failed',
       message: error instanceof Error ? error.message : 'Publisher agent failed.',
+      error: error instanceof Error ? error.message : 'Publisher agent failed.',
       commit: undefined,
     });
   }
