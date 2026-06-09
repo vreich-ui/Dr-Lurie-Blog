@@ -3729,13 +3729,12 @@ const metadata = {
         } before publishing.`;
       };
 
-      const validateReadableArtifactReferences = async (artifactReferences, clerkToken) => {
-        if (!artifactReferences.length) return artifactReferences;
-
-        setStatus(
-          `Validating ${artifactReferences.length} selected image artifact${artifactReferences.length === 1 ? '' : 's'}…`,
-          false
-        );
+      const checkReadableArtifactReferences = async (
+        artifactReferences,
+        clerkToken,
+        { logContext = 'artifact' } = {}
+      ) => {
+        if (!artifactReferences.length) return { readableReferences: [], failedReferences: [] };
 
         const results = await Promise.all(
           artifactReferences.map(async (reference) => {
@@ -3745,19 +3744,39 @@ const metadata = {
               await response.blob();
               return { reference, readable: true };
             } catch (error) {
-              console.warn('Selected image artifact could not be read before publish.', error);
+              console.warn(`${logContext} image artifact could not be read.`, error);
               return { reference, readable: false };
             }
           })
         );
 
-        const failedReferences = results.filter((result) => !result.readable).map((result) => result.reference);
+        return {
+          readableReferences: results.filter((result) => result.readable).map((result) => result.reference),
+          failedReferences: results.filter((result) => !result.readable).map((result) => result.reference),
+        };
+      };
+
+      const validateReadableArtifactReferences = async (artifactReferences, clerkToken) => {
+        if (!artifactReferences.length) return artifactReferences;
+
+        setStatus(
+          `Validating ${artifactReferences.length} selected image artifact${artifactReferences.length === 1 ? '' : 's'}…`,
+          false
+        );
+
+        const { readableReferences, failedReferences } = await checkReadableArtifactReferences(
+          artifactReferences,
+          clerkToken,
+          {
+            logContext: 'Selected',
+          }
+        );
 
         if (failedReferences.length) {
           throw new Error(formatArtifactReselectionMessage(failedReferences));
         }
 
-        return results.map((result) => result.reference);
+        return readableReferences;
       };
 
       const resetPublisherForm = () => {
@@ -4293,7 +4312,7 @@ const metadata = {
         return formData;
       };
 
-      const applyContentSourceImportFormData = (formData) => {
+      const applyContentSourceImportFormData = async (formData) => {
         if (formData.title.exists) fields.title.value = formData.title.value;
         syncSlugFromTitle();
         if (formData.author.exists) fields.author.value = formData.author.value;
@@ -4306,6 +4325,14 @@ const metadata = {
         const importedArtifactReferences = formData.artifactReferences?.exists
           ? mergeArtifactReferences(formData.artifactReferences.value)
           : [];
+        const {
+          readableReferences: importedReadableArtifactReferences,
+          failedReferences: importedFailedArtifactReferences,
+        } = importedArtifactReferences.length
+          ? await checkReadableArtifactReferences(importedArtifactReferences, await getClerkSessionToken(), {
+              logContext: 'Imported JSON',
+            })
+          : { readableReferences: [], failedReferences: [] };
         const importedMediaEntries = formData.mediaEntries?.exists
           ? mergeMediaEntries(formData.mediaEntries.value)
           : [];
@@ -4317,7 +4344,7 @@ const metadata = {
         selectedImages = [
           ...importedMediaEntries.map(createMediaSelectedImage),
           ...importedImagePathEntries.map(createPathSelectedImage),
-          ...importedArtifactReferences.map(createArtifactSelectedImage),
+          ...importedReadableArtifactReferences.map(createArtifactSelectedImage),
         ];
         syncImageNames();
 
@@ -4329,9 +4356,13 @@ const metadata = {
             !selectedArtifactReferences.some((reference) => getArtifactImageName(reference) === sanitizedName)
           );
         }).length;
-        imageImportWarningMessage = metadataOnlyImageCount
+        const unreadableArtifactWarning = importedFailedArtifactReferences.length
+          ? formatArtifactReselectionMessage(importedFailedArtifactReferences)
+          : '';
+        const metadataOnlyImageWarning = metadataOnlyImageCount
           ? 'Image names were found in JSON, but no blob references or image data were available for thumbnails.'
           : '';
+        imageImportWarningMessage = [unreadableArtifactWarning, metadataOnlyImageWarning].filter(Boolean).join(' ');
         imageUploadMessage = imageNames.length
           ? `${imageNames.length} previewable image${imageNames.length === 1 ? '' : 's'} loaded from JSON.`
           : '';
@@ -4344,7 +4375,9 @@ const metadata = {
         const importedExistingFeaturedImage = formData.existingFeaturedImagePath?.exists
           ? String(formData.existingFeaturedImagePath.value || '').trim()
           : '';
-        fields.existingFeaturedImagePath.value = importedExistingFeaturedImage;
+        fields.existingFeaturedImagePath.value = getPreviewableImagePath(importedExistingFeaturedImage)
+          ? importedExistingFeaturedImage
+          : '';
 
         if (importedFeaturedImage) {
           const matchingArtifactName = selectedArtifactReferences
@@ -4356,17 +4389,38 @@ const metadata = {
           const matchingPathEntry = selectedImagePathEntries.find(
             (entry) => entry.source === importedFeaturedImage || entry.name === sanitizeFilename(importedFeaturedImage)
           );
+          const previewableImportedFeaturedImage = getPreviewableImagePath(importedFeaturedImage)
+            ? importedFeaturedImage
+            : '';
           const featuredValue =
-            matchingArtifactName || matchingMediaEntryName || matchingPathEntry?.source || importedFeaturedImage;
-          const featuredSuffix = matchingArtifactName
-            ? 'publishable blob artifact'
-            : matchingMediaEntryName
-              ? 'embedded media data'
-              : matchingPathEntry
-                ? 'existing preview path'
-                : 'existing path/name only';
-          ensureFeaturedImageOption(featuredValue, featuredSuffix);
-          fields.featuredImage.value = featuredValue;
+            matchingArtifactName ||
+            matchingMediaEntryName ||
+            matchingPathEntry?.source ||
+            previewableImportedFeaturedImage;
+          if (featuredValue) {
+            const featuredSuffix = matchingArtifactName
+              ? 'publishable blob artifact'
+              : matchingMediaEntryName
+                ? 'embedded media data'
+                : matchingPathEntry
+                  ? 'existing preview path'
+                  : 'existing path';
+            ensureFeaturedImageOption(featuredValue, featuredSuffix);
+            fields.featuredImage.value = featuredValue;
+            if (matchingArtifactName || matchingMediaEntryName) fields.existingFeaturedImagePath.value = '';
+          } else {
+            fields.featuredImage.value = '';
+            imageImportWarningMessage = [
+              imageImportWarningMessage,
+              `Featured image ${shortenFilename(importedFeaturedImage, 24)} was found in JSON, but no readable blob artifact, embedded media data, or existing image path was available.`,
+            ]
+              .filter(Boolean)
+              .join(' ');
+            if (fields.imageImportWarning) {
+              fields.imageImportWarning.textContent = imageImportWarningMessage;
+              fields.imageImportWarning.hidden = !imageImportWarningMessage;
+            }
+          }
         } else {
           fields.featuredImage.value = '';
         }
@@ -4463,7 +4517,7 @@ const metadata = {
           fields.jsonImport.value = rawValue;
           lastLoadedJsonImportValue = fields.jsonImport.value.trim();
           updateJsonImportButtonState();
-          applyContentSourceImportFormData(formData);
+          await applyContentSourceImportFormData(formData);
           setUnsavedChanges(true);
           await fetchPublishedArticleStatus({ force: true });
           setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
