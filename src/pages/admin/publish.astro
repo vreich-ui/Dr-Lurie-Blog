@@ -384,13 +384,22 @@ const metadata = {
           </div>
 
           <div class="actions">
-            <p id="publish-blocked-message" class="publish-blocked-message" role="status" aria-live="polite" hidden>
-              Complete required fields before publishing.
-            </p>
-            <button id="publish" class="btn-primary action-primary" type="button">Publish Article</button>
+            <div class="publish-action-group">
+              <button
+                id="publish"
+                class="btn-primary action-primary"
+                type="button"
+                aria-describedby="publish-blocked-message"
+              >
+                Publish Article
+              </button>
+              <p id="publish-blocked-message" class="publish-blocked-message" role="status" aria-live="polite" hidden>
+                Complete required fields before publishing.
+              </p>
+            </div>
             <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
-            <button id="preview" class="btn-secondary" type="button">Preview page</button>
-            <button id="new-draft" class="btn-secondary action-tertiary" type="button">New</button>
+            <button id="preview" class="btn-secondary" type="button">Preview Page</button>
+            <button id="new-draft" class="btn-tertiary action-tertiary" type="button">New/reset</button>
           </div>
 
           <details class="markdown-backup" data-backup-panel open>
@@ -634,7 +643,7 @@ const metadata = {
     height: 1.05rem;
   }
 
-  .admin-page :where(.btn-primary, .btn-secondary) {
+  .admin-page :where(.btn-primary, .btn-secondary, .btn-tertiary) {
     font-weight: 700;
   }
 
@@ -1188,9 +1197,26 @@ const metadata = {
     margin-top: 1rem;
   }
 
+  .publish-action-group {
+    display: grid;
+    gap: 0.45rem;
+  }
+
   .actions .action-primary {
     min-height: 3.2rem;
     font-size: 1.02rem;
+  }
+
+  .actions .action-primary.is-validation-blocked:disabled {
+    border-color: rgb(254 202 202);
+    background: rgb(254 242 242);
+    color: rgb(153 27 27);
+  }
+
+  :global(.dark) .actions .action-primary.is-validation-blocked:disabled {
+    border-color: rgb(127 29 29 / 70%);
+    background: rgb(127 29 29 / 18%);
+    color: rgb(254 202 202);
   }
 
   .actions .action-tertiary {
@@ -1200,7 +1226,8 @@ const metadata = {
   }
 
   .actions > button,
-  .actions > a {
+  .actions > a,
+  .publish-action-group > button {
     width: 100%;
   }
 
@@ -1891,6 +1918,7 @@ const metadata = {
         fields.copyOutput.disabled = !canPublish;
         fields.downloadJsonBackup.disabled = !canPublish;
         fields.backupPanel.classList.toggle('is-disabled', !canPublish);
+        fields.publish.classList.toggle('is-validation-blocked', !hasRequiredValidationFields);
         if (fields.publishBlockedMessage) fields.publishBlockedMessage.hidden = hasRequiredValidationFields;
         validateSlug();
       };
