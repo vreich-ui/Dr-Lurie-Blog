@@ -172,7 +172,7 @@ const metadata = {
             </div>
 
             <div class="field">
-              <label for="content">Content</label>
+              <label for="content">Article Body</label>
               <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
               ></textarea>
             </div>
@@ -190,10 +190,16 @@ const metadata = {
 
             <div class="field">
               <label for="image-upload">Image upload</label>
-              <label class="image-upload-button" for="image-upload">
-                <Icon name="tabler:photo-plus" class="image-upload-icon" aria-hidden="true" />
-                <span>Choose images</span>
-              </label>
+              <div class="image-upload-actions">
+                <label class="image-upload-button" for="image-upload">
+                  <Icon name="tabler:upload" class="image-upload-icon" aria-hidden="true" />
+                  <span>Upload Image</span>
+                </label>
+                <button id="select-blob-image" class="image-upload-button" type="button">
+                  <Icon name="tabler:photo-search" class="image-upload-icon" aria-hidden="true" />
+                  <span>Select Image</span>
+                </button>
+              </div>
               <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
               <p class="hint">
                 Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.
@@ -201,6 +207,33 @@ const metadata = {
                 <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
               </p>
               <ul id="image-list" class="image-list" aria-live="polite"></ul>
+              <dialog id="blob-image-modal" class="json-draft-modal" aria-labelledby="blob-image-modal-heading">
+                <div class="json-draft-modal-card">
+                  <div class="json-draft-modal-header">
+                    <div>
+                      <p class="sidebar-kicker">Saved Images</p>
+                      <h3 id="blob-image-modal-heading">Select Image from Blobs</h3>
+                    </div>
+                    <button
+                      id="blob-image-modal-close"
+                      class="module-icon-button"
+                      type="button"
+                      aria-label="Close saved image dialog"
+                    >
+                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <p id="blob-image-modal-status" class="json-draft-modal-status" aria-live="polite">
+                    Select saved image artifacts to add to this article.
+                  </p>
+                  <div class="blob-image-modal-actions">
+                    <button id="select-marked-blob-images" class="btn-primary btn-sm" type="button"
+                      >Select Marked</button
+                    >
+                  </div>
+                  <div id="blob-image-list" class="json-draft-list blob-image-list"></div>
+                </div>
+              </dialog>
             </div>
 
             <div class="field">
@@ -511,6 +544,12 @@ const metadata = {
     min-height: 7.5rem;
   }
 
+  .image-upload-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
   .json-upload-button,
   .image-upload-button {
     display: inline-flex;
@@ -526,6 +565,7 @@ const metadata = {
     background: var(--aw-color-bg-page);
     cursor: pointer;
     font-size: 0.92rem;
+    font-weight: 400;
     white-space: nowrap;
     transition:
       border-color 180ms ease,
@@ -547,6 +587,10 @@ const metadata = {
   .json-update-icon {
     width: 1.05rem;
     height: 1.05rem;
+  }
+
+  .admin-page :where(.btn-primary, .btn-secondary) {
+    font-weight: 400;
   }
 
   .json-update-button {
@@ -688,7 +732,7 @@ const metadata = {
   :global(.json-draft-choice-title) {
     display: block;
     color: var(--aw-color-text-heading);
-    font-weight: 800;
+    font-weight: 400;
   }
 
   :global(.json-draft-choice-meta) {
@@ -714,6 +758,68 @@ const metadata = {
   :global(.json-draft-choice:hover .json-draft-choice-icon),
   :global(.json-draft-choice:focus-visible .json-draft-choice-icon) {
     color: var(--aw-color-accent);
+  }
+
+  .blob-image-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin: -0.2rem 0 0.85rem;
+  }
+
+  .blob-image-list {
+    grid-template-columns: repeat(auto-fill, minmax(8.25rem, 1fr));
+    max-height: 56vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  :global(.blob-image-choice) {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.55rem;
+  }
+
+  :global(.blob-image-choice-thumb) {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.75rem;
+    background: rgb(229 231 235);
+    object-fit: cover;
+  }
+
+  :global(.blob-image-choice-checkbox) {
+    position: absolute;
+    top: 0.65rem;
+    right: 0.65rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin: 0;
+    accent-color: var(--aw-color-accent);
+  }
+
+  :global(.blob-image-choice-title),
+  :global(.blob-image-choice-meta) {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.blob-image-choice-title) {
+    color: var(--aw-color-text-heading);
+    font-size: 0.82rem;
+    font-weight: 400;
+  }
+
+  :global(.blob-image-choice-meta) {
+    color: var(--aw-color-text-muted);
+    font-size: 0.74rem;
   }
 
   .visually-hidden {
@@ -838,20 +944,22 @@ const metadata = {
 
   .image-list {
     display: grid;
-    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 0.8rem;
     margin: 0.8rem 0 0;
     padding: 0;
     list-style: none;
+    min-width: 0;
   }
 
   .image-list li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    position: relative;
+    display: grid;
+    min-width: 0;
+    overflow: hidden;
     border: 1px solid rgb(229 231 235);
     border-radius: 1rem;
-    padding: 0.75rem;
+    padding: 0.65rem;
     background: var(--aw-color-bg-surface);
   }
 
@@ -861,6 +969,7 @@ const metadata = {
   }
 
   .image-list-message {
+    grid-column: 1 / -1;
     color: var(--aw-color-secondary);
     font-weight: 700;
   }
@@ -870,29 +979,49 @@ const metadata = {
   }
 
   .image-item-details {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    display: grid;
+    gap: 0.45rem;
     min-width: 0;
+  }
+
+  .image-item-text {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    text-align: center;
   }
 
   .image-item-meta {
     display: block;
+    min-width: 0;
+    overflow: hidden;
     color: var(--aw-color-text-muted);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .image-item-thumbnail {
-    flex: 0 0 auto;
-    width: 4rem;
-    height: 4rem;
+  .image-item-thumbnail,
+  .image-item-thumbnail-placeholder {
+    width: 100%;
+    aspect-ratio: 1 / 1;
     border-radius: 0.75rem;
+    background: rgb(229 231 235);
     object-fit: cover;
   }
 
+  .image-item-thumbnail-placeholder {
+    display: grid;
+    place-items: center;
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+  }
+
   .image-item-actions {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
     display: flex;
-    flex-wrap: wrap;
     gap: 0.5rem;
   }
 
@@ -900,8 +1029,13 @@ const metadata = {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 2.35rem;
-    padding-inline: 0.7rem;
+    width: 1.9rem;
+    min-width: 0;
+    height: 1.9rem;
+    border-radius: 999px;
+    padding: 0;
+    background: rgb(255 255 255 / 92%);
+    box-shadow: 0 0.35rem 1rem rgb(15 23 42 / 16%);
     font-size: 1.1rem;
     line-height: 1;
   }
@@ -915,6 +1049,16 @@ const metadata = {
 
   .filename {
     font-size: 0.9rem;
+  }
+
+  .image-item-text .filename {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--aw-color-text-heading);
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .module-heading-row {
@@ -1310,11 +1454,6 @@ const metadata = {
       padding: 1rem;
     }
 
-    .image-list li {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
     .json-import-header,
     .json-import-actions {
       align-items: stretch;
@@ -1417,7 +1556,13 @@ const metadata = {
         draft: document.querySelector('#draft'),
         content: document.querySelector('#content'),
         imageUpload: document.querySelector('#image-upload'),
-        imageUploadButton: document.querySelector('.image-upload-button'),
+        imageUploadButton: document.querySelector('label.image-upload-button'),
+        selectBlobImage: document.querySelector('#select-blob-image'),
+        blobImageModal: document.querySelector('#blob-image-modal'),
+        blobImageModalClose: document.querySelector('#blob-image-modal-close'),
+        blobImageModalStatus: document.querySelector('#blob-image-modal-status'),
+        selectMarkedBlobImages: document.querySelector('#select-marked-blob-images'),
+        blobImageList: document.querySelector('#blob-image-list'),
         imageAllowedTypes: document.querySelector('#image-allowed-types'),
         imageMaxFileSize: document.querySelector('#image-max-file-size'),
         imageMaxCount: document.querySelector('#image-max-count'),
@@ -1454,7 +1599,11 @@ const metadata = {
 
       let imageNames = [];
       let selectedFiles = [];
+      let selectedArtifactReferences = [];
+      let availableBlobImageArtifacts = [];
+      let stagedBlobImageKeys = new Set();
       let imagePreviewUrls = [];
+      const artifactPreviewUrlCache = new Map();
       let imageUploadMessage = '';
       let imageUploadMessageIsError = false;
       let lastLoadedJsonImportValue = '';
@@ -1800,6 +1949,62 @@ const metadata = {
           .replace(/[^a-z0-9._-]+/g, '-')
           .replace(/^-+|-+$/g, '') || 'upload';
 
+      const extensionForContentType = (contentType) => {
+        const normalized = String(contentType || '')
+          .toLowerCase()
+          .split(';')[0]
+          .trim();
+        return (
+          {
+            'image/png': '.png',
+            'image/jpeg': '.jpg',
+            'image/jpg': '.jpg',
+            'image/webp': '.webp',
+            'image/gif': '.gif',
+            'image/svg+xml': '.svg',
+          }[normalized] || ''
+        );
+      };
+
+      const getArtifactRequestId = (reference) => {
+        const metadataRequestId = String(reference?.metadata?.requestId || '').trim();
+        if (metadataRequestId) return metadataRequestId;
+        const [, requestId] = String(reference?.blobKey || '').split('/');
+        return requestId || 'artifact';
+      };
+
+      const getArtifactImageName = (reference) => {
+        const metadataFilename = String(reference?.metadata?.filename || reference?.metadata?.name || '').trim();
+        if (metadataFilename) return sanitizeFilename(metadataFilename);
+        const [, , blobFilename = ''] = String(reference?.blobKey || '').split('/');
+        const extension = extensionForContentType(reference?.contentType);
+        const baseName =
+          blobFilename || `${getArtifactRequestId(reference)}-${reference?.sha256 || 'artifact'}${extension}`;
+        return sanitizeFilename(baseName.includes('.') || !extension ? baseName : `${baseName}${extension}`);
+      };
+
+      const isImageArtifactReference = (reference) =>
+        String(reference?.contentType || '')
+          .toLowerCase()
+          .startsWith('image/') || String(reference?.blobKey || '').startsWith('image/');
+
+      const mergeArtifactReferences = (...groups) => {
+        const byKey = new Map();
+        groups.flat().forEach((reference) => {
+          if (!isImageArtifactReference(reference)) return;
+          const blobKey = String(reference?.blobKey || '').trim();
+          if (blobKey) byKey.set(blobKey, reference);
+        });
+        return Array.from(byKey.values());
+      };
+
+      const syncImageNames = () => {
+        imageNames = [
+          ...selectedFiles.map((file) => sanitizeFilename(file.name)),
+          ...selectedArtifactReferences.map(getArtifactImageName),
+        ];
+      };
+
       const getCurrentSlug = () =>
         isEditMode()
           ? getEditSlug()
@@ -1826,6 +2031,7 @@ const metadata = {
         content: fields.content.value,
         sources: fields.sources.value,
         imageNames,
+        artifactReferences: selectedArtifactReferences,
         featuredImage: fields.featuredImage.value,
         existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
         videoLink: fields.videoLink.value,
@@ -1888,7 +2094,9 @@ const metadata = {
             form_schema: 'admin_publish_form.v1',
             raw_sources: parseSources(fields.sources.value),
             uploaded_image_names: imageNames,
+            ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
           },
+          ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
         };
 
         return {
@@ -2060,9 +2268,51 @@ const metadata = {
         return `${Math.max(1, Math.round(bytes / 1024))} KB`;
       };
 
+      const shortenFilename = (value, maxLength = 24) => {
+        const name = String(value || '').trim();
+        if (name.length <= maxLength) return name;
+        const dotIndex = name.lastIndexOf('.');
+        const extension = dotIndex > 0 ? name.slice(dotIndex) : '';
+        const base = extension ? name.slice(0, dotIndex) : name;
+        const available = Math.max(8, maxLength - extension.length - 1);
+        const frontLength = Math.ceil(available * 0.58);
+        const backLength = Math.max(3, available - frontLength);
+        return `${base.slice(0, frontLength)}…${base.slice(-backLength)}${extension}`;
+      };
+
       const revokeImagePreviews = () => {
         imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
         imagePreviewUrls = [];
+      };
+
+      const fetchArtifactPreviewUrl = async (artifactReference) => {
+        const blobKey = String(artifactReference?.blobKey || '').trim();
+        if (!blobKey) return '';
+        if (artifactPreviewUrlCache.has(blobKey)) return artifactPreviewUrlCache.get(blobKey);
+
+        const token = await getClerkSessionToken();
+        const response = await fetch(
+          `/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(blobKey)}`,
+          {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (!response.ok) throw new Error(`Image preview could not be loaded (${response.status}).`);
+        const objectUrl = URL.createObjectURL(await response.blob());
+        artifactPreviewUrlCache.set(blobKey, objectUrl);
+        return objectUrl;
+      };
+
+      const attachArtifactPreview = (imageElement, artifactReference) => {
+        fetchArtifactPreviewUrl(artifactReference)
+          .then((url) => {
+            if (url) imageElement.src = url;
+          })
+          .catch((error) => {
+            console.warn('Saved image preview could not be loaded.', error);
+          });
       };
 
       const syncImageInputFiles = () => {
@@ -2112,8 +2362,15 @@ const metadata = {
 
       const removeSelectedImage = (index) => {
         const previousFeaturedImage = fields.featuredImage.value;
-        selectedFiles.splice(index, 1);
-        imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
+        if (index < selectedFiles.length) {
+          selectedFiles.splice(index, 1);
+        } else {
+          const removedName = imageNames[index];
+          selectedArtifactReferences = selectedArtifactReferences.filter(
+            (reference) => getArtifactImageName(reference) !== removedName
+          );
+        }
+        syncImageNames();
         syncImageInputFiles();
         setImageUploadMessage(
           imageNames.length ? `Removed image. ${imageNames.length} selected.` : 'Removed image.',
@@ -2144,6 +2401,9 @@ const metadata = {
 
         imageNames.forEach((name, index) => {
           const file = selectedFiles[index];
+          const artifactReference = selectedArtifactReferences.find(
+            (reference) => getArtifactImageName(reference) === name
+          );
           const option = document.createElement('option');
           option.value = name;
           option.textContent = name;
@@ -2154,13 +2414,17 @@ const metadata = {
           const filename = document.createElement('span');
           const meta = document.createElement('span');
           const actions = document.createElement('span');
-          const copyButton = document.createElement('button');
           const removeButton = document.createElement('button');
 
           details.className = 'image-item-details';
           filename.className = 'filename';
-          filename.textContent = name;
-          meta.textContent = file ? `${formatFileSize(file.size)} • ${file.type || 'unknown type'}` : 'Saved upload';
+          filename.textContent = shortenFilename(name, 26);
+          filename.title = name;
+          meta.textContent = file
+            ? `${formatFileSize(file.size)} • ${file.type || 'unknown type'}`
+            : artifactReference
+              ? `${formatFileSize(artifactReference.sizeBytes)} • ${artifactReference.contentType || 'saved image artifact'}`
+              : 'Saved upload';
           meta.className = 'image-item-meta';
           actions.className = 'image-item-actions';
 
@@ -2173,18 +2437,24 @@ const metadata = {
             thumbnail.loading = 'lazy';
             thumbnail.className = 'image-item-thumbnail';
             details.append(thumbnail);
+          } else if (artifactReference) {
+            const thumbnail = document.createElement('img');
+            thumbnail.alt = `Preview of ${name}`;
+            thumbnail.loading = 'lazy';
+            thumbnail.className = 'image-item-thumbnail';
+            attachArtifactPreview(thumbnail, artifactReference);
+            details.append(thumbnail);
+          } else {
+            const placeholder = document.createElement('span');
+            placeholder.className = 'image-item-thumbnail-placeholder';
+            placeholder.textContent = 'Image';
+            details.append(placeholder);
           }
 
           const text = document.createElement('span');
+          text.className = 'image-item-text';
           text.append(filename, meta);
           details.append(text);
-
-          copyButton.className = 'btn-secondary btn-sm copy-button';
-          copyButton.type = 'button';
-          copyButton.textContent = 'Copy Markdown';
-          copyButton.addEventListener('click', () => {
-            copyText(`![Alt text](${getUploadPath(name)})`, `Copied Markdown for ${name}.`);
-          });
 
           removeButton.className = 'btn-secondary btn-sm image-remove-button';
           removeButton.type = 'button';
@@ -2193,7 +2463,7 @@ const metadata = {
           removeButton.textContent = '×';
           removeButton.addEventListener('click', () => removeSelectedImage(index));
 
-          actions.append(copyButton, removeButton);
+          actions.append(removeButton);
           item.append(details, actions);
           fields.imageList.append(item);
         });
@@ -2662,6 +2932,8 @@ const metadata = {
         fields.seoDescription.value = '';
         fields.overwrite.checked = false;
         selectedFiles = [];
+        selectedArtifactReferences = [];
+        availableBlobImageArtifacts = [];
         imageNames = [];
         imageUploadMessage = '';
         imageUploadMessageIsError = false;
@@ -3155,6 +3427,43 @@ const metadata = {
         if (formData.tags.exists) fields.tags.value = formData.tags.value;
         if (formData.sources.exists) fields.sources.value = formData.sources.value;
 
+        if (formData.artifactReferences?.exists) {
+          selectedArtifactReferences = mergeArtifactReferences(formData.artifactReferences.value);
+        }
+
+        selectedFiles = [];
+        const importedImageNames = formData.imageNames?.exists ? formData.imageNames.value.map(sanitizeFilename) : [];
+        const mediaEntryImageNames = formData.mediaEntries?.exists
+          ? formData.mediaEntries.value
+              .map((entry) => sanitizeFilename(entry?.name || entry?.filename || entry?.repoPath || entry?.path || ''))
+              .filter(Boolean)
+          : [];
+        const artifactImageNames = selectedArtifactReferences.map(getArtifactImageName);
+        imageNames = Array.from(new Set([...importedImageNames, ...mediaEntryImageNames, ...artifactImageNames]));
+        imageUploadMessage = imageNames.length
+          ? `${imageNames.length} image${imageNames.length === 1 ? '' : 's'} loaded from JSON.`
+          : '';
+        imageUploadMessageIsError = false;
+        renderImages();
+
+        const importedFeaturedImage = formData.featuredImage?.exists
+          ? String(formData.featuredImage.value || '').trim()
+          : '';
+        const importedExistingFeaturedImage = formData.existingFeaturedImagePath?.exists
+          ? String(formData.existingFeaturedImagePath.value || '').trim()
+          : '';
+        fields.existingFeaturedImagePath.value = importedExistingFeaturedImage;
+
+        if (importedFeaturedImage) {
+          const featuredName = importedFeaturedImage.startsWith('~/assets/images/uploads/')
+            ? sanitizeFilename(importedFeaturedImage)
+            : importedFeaturedImage;
+          ensureFeaturedImageOption(featuredName);
+          fields.featuredImage.value = featuredName;
+        } else {
+          fields.featuredImage.value = '';
+        }
+
         updatePreview();
         updatePublishOutput();
         recalculateButtonState();
@@ -3530,6 +3839,124 @@ const metadata = {
         }
       };
 
+      const setBlobImageModalStatus = (message, isError = false) => {
+        fields.blobImageModalStatus.textContent = message;
+        fields.blobImageModalStatus.classList.toggle('is-error', Boolean(message && isError));
+      };
+
+      const closeBlobImageModal = () => {
+        if (fields.blobImageModal?.close) fields.blobImageModal.close();
+        else fields.blobImageModal?.removeAttribute('open');
+      };
+
+      const showBlobImageModal = () => {
+        if (fields.blobImageModal?.showModal && !fields.blobImageModal.open) fields.blobImageModal.showModal();
+        else fields.blobImageModal?.setAttribute('open', '');
+      };
+
+      const renderBlobImageChoices = (artifacts) => {
+        if (!artifacts.length) {
+          fields.blobImageList.innerHTML =
+            '<p class="json-draft-empty">No saved image artifacts were found for this draft.</p>';
+          return;
+        }
+
+        fields.blobImageList.replaceChildren();
+        artifacts.forEach((artifact, index) => {
+          const name = getArtifactImageName(artifact);
+          const meta = `${artifact.contentType || 'image'} · ${formatFileSize(artifact.sizeBytes)}`;
+          const choice = document.createElement('label');
+          const thumbnail = document.createElement('img');
+          const title = document.createElement('span');
+          const metaElement = document.createElement('span');
+          const checkbox = document.createElement('input');
+
+          choice.className = 'json-draft-choice blob-image-choice';
+          choice.dataset.blobImageIndex = String(index);
+          thumbnail.className = 'blob-image-choice-thumb';
+          thumbnail.alt = `Preview of ${name}`;
+          thumbnail.loading = 'lazy';
+          title.className = 'blob-image-choice-title';
+          title.textContent = shortenFilename(name, 24);
+          title.title = name;
+          metaElement.className = 'blob-image-choice-meta';
+          metaElement.textContent = meta;
+          checkbox.className = 'blob-image-choice-checkbox';
+          checkbox.type = 'checkbox';
+          checkbox.dataset.blobImageCheckbox = String(index);
+          checkbox.checked = stagedBlobImageKeys.has(artifact.blobKey);
+
+          attachArtifactPreview(thumbnail, artifact);
+          choice.append(thumbnail, title, metaElement, checkbox);
+          fields.blobImageList.append(choice);
+        });
+      };
+
+      const loadBlobImageChoices = async () => {
+        fields.blobImageList.innerHTML = '';
+        setBlobImageModalStatus('Loading saved image artifacts…');
+
+        try {
+          const token = await getClerkSessionToken();
+          const response = await fetch('/.netlify/functions/admin-list-blob-images', {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(result.error || `Saved image artifacts could not be listed (${response.status}).`);
+          }
+          availableBlobImageArtifacts = mergeArtifactReferences(selectedArtifactReferences, result.images || []);
+          stagedBlobImageKeys = new Set(selectedArtifactReferences.map((reference) => reference.blobKey));
+
+          renderBlobImageChoices(availableBlobImageArtifacts);
+          setBlobImageModalStatus(
+            availableBlobImageArtifacts.length
+              ? 'Choose saved image artifacts to add to this article.'
+              : 'No saved image artifacts were found for this draft.'
+          );
+        } catch (error) {
+          console.error('Saved image artifact list failed.', error);
+          setBlobImageModalStatus(
+            error instanceof Error ? error.message : 'Saved image artifacts could not be listed.',
+            true
+          );
+        }
+      };
+
+      const openBlobImageModal = () => {
+        showBlobImageModal();
+        loadBlobImageChoices();
+      };
+
+      const toggleStagedBlobImage = (index, selected) => {
+        const artifact = availableBlobImageArtifacts[index];
+        if (!artifact?.blobKey) return;
+        if (selected) stagedBlobImageKeys.add(artifact.blobKey);
+        else stagedBlobImageKeys.delete(artifact.blobKey);
+      };
+
+      const selectMarkedBlobImages = () => {
+        selectedArtifactReferences = availableBlobImageArtifacts.filter((artifact) =>
+          stagedBlobImageKeys.has(artifact.blobKey)
+        );
+        syncImageNames();
+        setImageUploadMessage(
+          selectedArtifactReferences.length
+            ? `${selectedArtifactReferences.length} saved image${selectedArtifactReferences.length === 1 ? '' : 's'} selected.`
+            : 'No saved images selected.',
+          false
+        );
+        renderImages();
+        updatePreview();
+        updatePublishOutput();
+        setUnsavedChanges(true);
+        closeBlobImageModal();
+      };
+
       const openJsonDraftModal = () => {
         showJsonDraftModal();
         loadJsonDraftChoices();
@@ -3608,7 +4035,18 @@ const metadata = {
       });
 
       fields.openJsonDrafts.addEventListener('click', openJsonDraftModal);
+      fields.selectBlobImage.addEventListener('click', openBlobImageModal);
       fields.jsonDraftModalClose.addEventListener('click', closeJsonDraftModal);
+      fields.blobImageModalClose.addEventListener('click', closeBlobImageModal);
+      fields.blobImageList.addEventListener('change', (event) => {
+        const target = event.target instanceof HTMLInputElement ? event.target : null;
+        if (!target?.matches('[data-blob-image-checkbox]')) return;
+        toggleStagedBlobImage(Number(target.dataset.blobImageCheckbox), target.checked);
+      });
+      fields.selectMarkedBlobImages.addEventListener('click', selectMarkedBlobImages);
+      fields.blobImageModal.addEventListener('click', (event) => {
+        if (event.target === fields.blobImageModal) closeBlobImageModal();
+      });
       fields.jsonDraftList.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;
         const choice = target?.closest('[data-draft-id]');
@@ -3623,7 +4061,7 @@ const metadata = {
         const previousFeaturedImage = fields.featuredImage.value;
         const { validFiles, errors } = validateImageFiles(Array.from(fields.imageUpload.files || []));
         selectedFiles = validFiles;
-        imageNames = selectedFiles.map((file) => sanitizeFilename(file.name));
+        syncImageNames();
         syncImageInputFiles();
         setImageUploadMessage(
           errors.length
@@ -3752,12 +4190,15 @@ const metadata = {
 
           setStatus('Refreshing latest workflow state…', false);
           const latestWorkflowRecord = await fetchLatestWorkflowRequest(requestId);
-          const artifactReferences = getLatestArtifactReferences(latestWorkflowRecord);
+          const latestArtifactReferences = getLatestArtifactReferences(latestWorkflowRecord);
+          const artifactReferences = selectedArtifactReferences.length
+            ? selectedArtifactReferences
+            : latestArtifactReferences;
 
           setStatus('Publishing article to GitHub…', false);
 
           const files = await Promise.all(
-            selectedFiles.map(async (file) => ({
+            selectedFiles.filter(Boolean).map(async (file) => ({
               base64: await fileToBase64(file),
               name: sanitizeFilename(file.name),
               type: file.type,
@@ -3888,6 +4329,8 @@ const metadata = {
         workflowLockRefreshTimer = undefined;
         if (toastTimer) window.clearTimeout(toastTimer);
         toastTimer = undefined;
+        artifactPreviewUrlCache.forEach((url) => URL.revokeObjectURL(url));
+        artifactPreviewUrlCache.clear();
       });
 
       releaseStoredWorkflowLockOnLoad();
