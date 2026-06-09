@@ -207,6 +207,7 @@ const metadata = {
                 <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
               </p>
               <ul id="image-list" class="image-list" aria-live="polite"></ul>
+              <p id="image-import-warning" class="hint image-import-warning" role="status" hidden></p>
               <dialog id="blob-image-modal" class="json-draft-modal" aria-labelledby="blob-image-modal-heading">
                 <div class="json-draft-modal-card">
                   <div class="json-draft-modal-header">
@@ -1007,6 +1008,15 @@ const metadata = {
     color: var(--aw-color-accent);
   }
 
+  .image-import-warning {
+    color: #92400e;
+    font-weight: 700;
+  }
+
+  :global(.dark) .image-import-warning {
+    color: #fbbf24;
+  }
+
   .image-item-details {
     display: grid;
     gap: 0.45rem;
@@ -1608,6 +1618,7 @@ const metadata = {
         imageMaxFileSize: document.querySelector('#image-max-file-size'),
         imageMaxCount: document.querySelector('#image-max-count'),
         imageList: document.querySelector('#image-list'),
+        imageImportWarning: document.querySelector('#image-import-warning'),
         featuredImage: document.querySelector('#featured-image'),
         existingFeaturedImagePath: document.querySelector('#existing-featured-image-path'),
         videoLink: document.querySelector('#video-link'),
@@ -1640,6 +1651,8 @@ const metadata = {
 
       let imageNames = [];
       let selectedFiles = [];
+      let selectedMediaEntries = [];
+      let selectedImagePathEntries = [];
       let selectedArtifactReferences = [];
       let availableBlobImageArtifacts = [];
       let stagedBlobImageKeys = new Set();
@@ -1647,6 +1660,7 @@ const metadata = {
       const artifactPreviewUrlCache = new Map();
       let imageUploadMessage = '';
       let imageUploadMessageIsError = false;
+      let imageImportWarningMessage = '';
       let lastLoadedJsonImportValue = '';
       let isAdmin = false;
       let editArticleLoaded = false;
@@ -2039,11 +2053,92 @@ const metadata = {
         return Array.from(byKey.values());
       };
 
+      const toTrimmedString = (value) => (typeof value === 'string' ? value.trim() : '');
+
+      const getMediaEntryContentType = (entry) =>
+        toTrimmedString(entry?.contentType) || toTrimmedString(entry?.type) || toTrimmedString(entry?.mimeType);
+
+      const getMediaEntryContent = (entry) =>
+        toTrimmedString(entry?.base64) || toTrimmedString(entry?.content) || toTrimmedString(entry?.data);
+
+      const getMediaEntryImageName = (entry) =>
+        sanitizeFilename(entry?.name || entry?.filename || entry?.repoPath || entry?.path || 'embedded-image');
+
+      const imagePathPattern = /\.(?:png|jpe?g|webp|gif|svg)(?:[?#].*)?$/i;
+
+      const hasUsableMediaEntryContent = (entry) => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+        const content = getMediaEntryContent(entry);
+        if (!content) return false;
+        const contentType = getMediaEntryContentType(entry).toLowerCase();
+        const kind = toTrimmedString(entry?.kind).toLowerCase();
+        const imageName =
+          toTrimmedString(entry?.name) ||
+          toTrimmedString(entry?.filename) ||
+          toTrimmedString(entry?.repoPath) ||
+          toTrimmedString(entry?.path);
+        return (
+          content.startsWith('data:image/') ||
+          contentType.startsWith('image/') ||
+          kind === 'image' ||
+          imagePathPattern.test(imageName)
+        );
+      };
+
+      const getMediaEntryPreviewSrc = (entry) => {
+        const content = getMediaEntryContent(entry);
+        if (content.startsWith('data:image/')) return content;
+        const contentType = getMediaEntryContentType(entry) || 'image/png';
+        return `data:${contentType};base64,${content}`;
+      };
+
+      const getPreviewableImagePath = (value) => {
+        const raw = toTrimmedString(value);
+        if (!raw || !imagePathPattern.test(raw)) return '';
+        if (/^https?:\/\//i.test(raw) || raw.startsWith('/')) return raw;
+        if (raw.startsWith('~/assets/images/uploads/')) {
+          return raw.replace('~/assets/images/uploads/', 'https://kugelmedia.netlify.app/drlurieblog/uploads/');
+        }
+        if (raw.startsWith('src/assets/images/uploads/')) {
+          return raw.replace('src/assets/images/uploads/', 'https://kugelmedia.netlify.app/drlurieblog/uploads/');
+        }
+        return raw.includes('/') ? raw : '';
+      };
+
+      const getImagePathEntryName = (source) => sanitizeFilename(source);
+
+      const mergeImagePathEntries = (...groups) => {
+        const bySource = new Map();
+        groups.flat().forEach((source) => {
+          const previewSrc = getPreviewableImagePath(source);
+          if (!previewSrc) return;
+          bySource.set(toTrimmedString(source), {
+            name: getImagePathEntryName(source),
+            source: toTrimmedString(source),
+            previewSrc,
+          });
+        });
+        return Array.from(bySource.values());
+      };
+
+      const mergeMediaEntries = (...groups) => {
+        const byNameAndContent = new Map();
+        groups.flat().forEach((entry) => {
+          if (!hasUsableMediaEntryContent(entry)) return;
+          byNameAndContent.set(`${getMediaEntryImageName(entry)}:${getMediaEntryContent(entry)}`, entry);
+        });
+        return Array.from(byNameAndContent.values());
+      };
+
       const syncImageNames = () => {
-        imageNames = [
-          ...selectedFiles.map((file) => sanitizeFilename(file.name)),
-          ...selectedArtifactReferences.map(getArtifactImageName),
-        ];
+        imageNames = Array.from(
+          new Set([
+            ...selectedFiles.map((file) => sanitizeFilename(file.name)),
+            ...selectedMediaEntries.map(getMediaEntryImageName),
+            ...selectedImagePathEntries.map((entry) => entry.name),
+            ...selectedArtifactReferences.map(getArtifactImageName),
+          ])
+        );
       };
 
       const getCurrentSlug = () =>
@@ -2056,7 +2151,12 @@ const metadata = {
       const getFeaturedImagePath = () => {
         const value = fields.featuredImage.value.trim();
         if (!value) return '';
-        if (value.startsWith('~/assets/images/uploads/') || value.startsWith('https://')) return value;
+        if (value.startsWith('src/assets/images/uploads/')) {
+          return value.replace('src/assets/images/uploads/', '~/assets/images/uploads/');
+        }
+        if (value.startsWith('~/assets/images/uploads/') || /^https?:\/\//i.test(value) || value.startsWith('/')) {
+          return value;
+        }
         return getUploadPath(value);
       };
 
@@ -2073,6 +2173,7 @@ const metadata = {
         sources: fields.sources.value,
         imageNames,
         artifactReferences: selectedArtifactReferences,
+        mediaEntries: selectedMediaEntries,
         featuredImage: fields.featuredImage.value,
         existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
         videoLink: fields.videoLink.value,
@@ -2137,6 +2238,7 @@ const metadata = {
             uploaded_image_names: imageNames,
             ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
           },
+          ...(selectedMediaEntries.length ? { mediaEntries: selectedMediaEntries } : {}),
           ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
         };
 
@@ -2331,14 +2433,15 @@ const metadata = {
         if (!blobKey) return '';
         if (artifactPreviewUrlCache.has(blobKey)) return artifactPreviewUrlCache.get(blobKey);
 
+        const params = new URLSearchParams({ blobKey });
+        const contentType = String(artifactReference?.contentType || '').trim();
+        if (contentType) params.set('contentType', contentType);
+
         const token = await getClerkSessionToken();
-        const response = await fetch(
-          `/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(blobKey)}`,
-          {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await fetch(`/.netlify/functions/admin-get-blob-image?${params.toString()}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!response.ok) throw new Error(`Image preview could not be loaded (${response.status}).`);
         const objectUrl = URL.createObjectURL(await response.blob());
@@ -2403,14 +2506,14 @@ const metadata = {
 
       const removeSelectedImage = (index) => {
         const previousFeaturedImage = fields.featuredImage.value;
-        if (index < selectedFiles.length) {
-          selectedFiles.splice(index, 1);
-        } else {
-          const removedName = imageNames[index];
-          selectedArtifactReferences = selectedArtifactReferences.filter(
-            (reference) => getArtifactImageName(reference) !== removedName
-          );
-        }
+        const removedName = imageNames[index];
+        const fileIndex = selectedFiles.findIndex((file) => sanitizeFilename(file.name) === removedName);
+        if (fileIndex >= 0) selectedFiles.splice(fileIndex, 1);
+        selectedMediaEntries = selectedMediaEntries.filter((entry) => getMediaEntryImageName(entry) !== removedName);
+        selectedImagePathEntries = selectedImagePathEntries.filter((entry) => entry.name !== removedName);
+        selectedArtifactReferences = selectedArtifactReferences.filter(
+          (reference) => getArtifactImageName(reference) !== removedName
+        );
         syncImageNames();
         syncImageInputFiles();
         setImageUploadMessage(
@@ -2419,7 +2522,10 @@ const metadata = {
         );
         renderImages();
         setUnsavedChanges(true);
-        if (previousFeaturedImage && imageNames.includes(previousFeaturedImage)) {
+        if (
+          previousFeaturedImage &&
+          Array.from(fields.featuredImage.options).some((option) => option.value === previousFeaturedImage)
+        ) {
           fields.featuredImage.value = previousFeaturedImage;
         }
         updatePreview();
@@ -2430,6 +2536,10 @@ const metadata = {
         const previousFeaturedImage = fields.featuredImage.value;
         fields.imageList.innerHTML = '';
         fields.featuredImage.innerHTML = '<option value="">Select an uploaded image</option>';
+        if (fields.imageImportWarning) {
+          fields.imageImportWarning.textContent = imageImportWarningMessage;
+          fields.imageImportWarning.hidden = !imageImportWarningMessage;
+        }
         revokeImagePreviews();
 
         if (imageUploadMessage) {
@@ -2441,13 +2551,23 @@ const metadata = {
         }
 
         imageNames.forEach((name, index) => {
-          const file = selectedFiles[index];
+          const file = selectedFiles.find((selectedFile) => sanitizeFilename(selectedFile.name) === name);
+          const mediaEntry = selectedMediaEntries.find((entry) => getMediaEntryImageName(entry) === name);
+          const imagePathEntry = selectedImagePathEntries.find((entry) => entry.name === name);
           const artifactReference = selectedArtifactReferences.find(
             (reference) => getArtifactImageName(reference) === name
           );
           const option = document.createElement('option');
-          option.value = name;
-          option.textContent = name;
+          option.value = imagePathEntry ? imagePathEntry.source : name;
+          option.textContent = file
+            ? `${name} (local upload)`
+            : mediaEntry
+              ? `${name} (embedded media data)`
+              : imagePathEntry
+                ? `${name} (existing preview path)`
+                : artifactReference
+                  ? `${name} (publishable blob artifact)`
+                  : name;
           fields.featuredImage.append(option);
 
           const item = document.createElement('li');
@@ -2463,9 +2583,13 @@ const metadata = {
           filename.title = name;
           meta.textContent = file
             ? `${formatFileSize(file.size)} • ${file.type || 'unknown type'}`
-            : artifactReference
-              ? `${formatFileSize(artifactReference.sizeBytes)} • ${artifactReference.contentType || 'saved image artifact'}`
-              : 'Saved upload';
+            : mediaEntry
+              ? `embedded media data • ${getMediaEntryContentType(mediaEntry) || 'image'}`
+              : imagePathEntry
+                ? 'existing preview path • not a blob artifact'
+                : artifactReference
+                  ? `${formatFileSize(artifactReference.sizeBytes)} • ${artifactReference.contentType || 'saved image artifact'}`
+                  : 'Image';
           meta.className = 'image-item-meta';
           actions.className = 'image-item-actions';
 
@@ -2478,6 +2602,20 @@ const metadata = {
             thumbnail.loading = 'lazy';
             thumbnail.className = 'image-item-thumbnail';
             details.append(thumbnail);
+          } else if (mediaEntry) {
+            const thumbnail = document.createElement('img');
+            thumbnail.src = getMediaEntryPreviewSrc(mediaEntry);
+            thumbnail.alt = `Preview of ${name}`;
+            thumbnail.loading = 'lazy';
+            thumbnail.className = 'image-item-thumbnail';
+            details.append(thumbnail);
+          } else if (imagePathEntry) {
+            const thumbnail = document.createElement('img');
+            thumbnail.src = imagePathEntry.previewSrc;
+            thumbnail.alt = `Preview of ${name}`;
+            thumbnail.loading = 'lazy';
+            thumbnail.className = 'image-item-thumbnail';
+            details.append(thumbnail);
           } else if (artifactReference) {
             const thumbnail = document.createElement('img');
             thumbnail.alt = `Preview of ${name}`;
@@ -2485,11 +2623,6 @@ const metadata = {
             thumbnail.className = 'image-item-thumbnail';
             attachArtifactPreview(thumbnail, artifactReference);
             details.append(thumbnail);
-          } else {
-            const placeholder = document.createElement('span');
-            placeholder.className = 'image-item-thumbnail-placeholder';
-            placeholder.textContent = 'Image';
-            details.append(placeholder);
           }
 
           const text = document.createElement('span');
@@ -2509,7 +2642,10 @@ const metadata = {
           fields.imageList.append(item);
         });
 
-        if (previousFeaturedImage && imageNames.includes(previousFeaturedImage)) {
+        if (
+          previousFeaturedImage &&
+          Array.from(fields.featuredImage.options).some((option) => option.value === previousFeaturedImage)
+        ) {
           fields.featuredImage.value = previousFeaturedImage;
         }
 
@@ -2540,10 +2676,20 @@ const metadata = {
       };
 
       const getFeaturedImagePreviewUrl = () => {
-        const selectedIndex = imageNames.indexOf(fields.featuredImage.value);
-        if (selectedIndex >= 0 && imagePreviewUrls[selectedIndex]) return imagePreviewUrls[selectedIndex];
+        const selectedName = fields.featuredImage.value;
+        const selectedFile = selectedFiles.find((file) => sanitizeFilename(file.name) === selectedName);
+        if (selectedFile) {
+          const selectedIndex = imageNames.indexOf(selectedName);
+          if (selectedIndex >= 0 && imagePreviewUrls[selectedIndex]) return imagePreviewUrls[selectedIndex];
+        }
+        const selectedMediaEntry = selectedMediaEntries.find((entry) => getMediaEntryImageName(entry) === selectedName);
+        if (selectedMediaEntry) return getMediaEntryPreviewSrc(selectedMediaEntry);
+        const selectedPathEntry = selectedImagePathEntries.find(
+          (entry) => entry.name === selectedName || entry.source === selectedName
+        );
+        if (selectedPathEntry) return selectedPathEntry.previewSrc;
         const featuredPath = getFeaturedImagePath();
-        return featuredPath.startsWith('https://') ? featuredPath : '';
+        return getPreviewableImagePath(featuredPath);
       };
 
       const updatePreview = () => {
@@ -3007,11 +3153,14 @@ const metadata = {
         fields.seoDescription.value = '';
         fields.overwrite.checked = false;
         selectedFiles = [];
+        selectedMediaEntries = [];
+        selectedImagePathEntries = [];
         selectedArtifactReferences = [];
         availableBlobImageArtifacts = [];
         imageNames = [];
         imageUploadMessage = '';
         imageUploadMessageIsError = false;
+        imageImportWarningMessage = '';
         renderImages();
         updateJsonImportButtonState();
         setEditorModeCopy('publish');
@@ -3117,12 +3266,18 @@ const metadata = {
         }
       };
 
-      const ensureFeaturedImageOption = (value) => {
-        if (!value || Array.from(fields.featuredImage.options).some((option) => option.value === value)) return;
+      const ensureFeaturedImageOption = (value, labelSuffix = 'existing path/name only') => {
+        if (!value) return;
+        const existingOption = Array.from(fields.featuredImage.options).find((option) => option.value === value);
+        if (existingOption) {
+          if (labelSuffix && !existingOption.textContent.includes('('))
+            existingOption.textContent = `${value} (${labelSuffix})`;
+          return;
+        }
 
         const option = document.createElement('option');
         option.value = value;
-        option.textContent = value;
+        option.textContent = labelSuffix ? `${value} (${labelSuffix})` : value;
         fields.featuredImage.append(option);
       };
 
@@ -3151,7 +3306,11 @@ const metadata = {
         fields.overwrite.checked = true;
         fields.existingFeaturedImagePath.value = article.image || article.featuredImage || '';
         selectedFiles = [];
+        selectedMediaEntries = [];
+        selectedImagePathEntries = [];
+        selectedArtifactReferences = [];
         imageNames = [];
+        imageImportWarningMessage = '';
         renderImages();
         if (fields.existingFeaturedImagePath.value) {
           ensureFeaturedImageOption(fields.existingFeaturedImagePath.value);
@@ -3502,21 +3661,31 @@ const metadata = {
         if (formData.tags.exists) fields.tags.value = formData.tags.value;
         if (formData.sources.exists) fields.sources.value = formData.sources.value;
 
-        if (formData.artifactReferences?.exists) {
-          selectedArtifactReferences = mergeArtifactReferences(formData.artifactReferences.value);
-        }
-
         selectedFiles = [];
-        const importedImageNames = formData.imageNames?.exists ? formData.imageNames.value.map(sanitizeFilename) : [];
-        const mediaEntryImageNames = formData.mediaEntries?.exists
-          ? formData.mediaEntries.value
-              .map((entry) => sanitizeFilename(entry?.name || entry?.filename || entry?.repoPath || entry?.path || ''))
-              .filter(Boolean)
+        selectedArtifactReferences = formData.artifactReferences?.exists
+          ? mergeArtifactReferences(formData.artifactReferences.value)
           : [];
-        const artifactImageNames = selectedArtifactReferences.map(getArtifactImageName);
-        imageNames = Array.from(new Set([...importedImageNames, ...mediaEntryImageNames, ...artifactImageNames]));
+        selectedMediaEntries = formData.mediaEntries?.exists ? mergeMediaEntries(formData.mediaEntries.value) : [];
+
+        const importedRawImageNames = formData.imageNames?.exists
+          ? formData.imageNames.value.map((name) => String(name || '').trim()).filter(Boolean)
+          : [];
+        selectedImagePathEntries = mergeImagePathEntries(importedRawImageNames);
+        syncImageNames();
+
+        const metadataOnlyImageCount = importedRawImageNames.filter((name) => {
+          const sanitizedName = sanitizeFilename(name);
+          return (
+            !selectedImagePathEntries.some((entry) => entry.source === name || entry.name === sanitizedName) &&
+            !selectedMediaEntries.some((entry) => getMediaEntryImageName(entry) === sanitizedName) &&
+            !selectedArtifactReferences.some((reference) => getArtifactImageName(reference) === sanitizedName)
+          );
+        }).length;
+        imageImportWarningMessage = metadataOnlyImageCount
+          ? 'Image names were found in JSON, but no blob references or image data were available for thumbnails.'
+          : '';
         imageUploadMessage = imageNames.length
-          ? `${imageNames.length} image${imageNames.length === 1 ? '' : 's'} loaded from JSON.`
+          ? `${imageNames.length} previewable image${imageNames.length === 1 ? '' : 's'} loaded from JSON.`
           : '';
         imageUploadMessageIsError = false;
         renderImages();
@@ -3530,11 +3699,26 @@ const metadata = {
         fields.existingFeaturedImagePath.value = importedExistingFeaturedImage;
 
         if (importedFeaturedImage) {
-          const featuredName = importedFeaturedImage.startsWith('~/assets/images/uploads/')
-            ? sanitizeFilename(importedFeaturedImage)
-            : importedFeaturedImage;
-          ensureFeaturedImageOption(featuredName);
-          fields.featuredImage.value = featuredName;
+          const matchingArtifactName = selectedArtifactReferences
+            .map(getArtifactImageName)
+            .find((name) => name === sanitizeFilename(importedFeaturedImage));
+          const matchingMediaEntryName = selectedMediaEntries
+            .map(getMediaEntryImageName)
+            .find((name) => name === sanitizeFilename(importedFeaturedImage));
+          const matchingPathEntry = selectedImagePathEntries.find(
+            (entry) => entry.source === importedFeaturedImage || entry.name === sanitizeFilename(importedFeaturedImage)
+          );
+          const featuredValue =
+            matchingArtifactName || matchingMediaEntryName || matchingPathEntry?.source || importedFeaturedImage;
+          const featuredSuffix = matchingArtifactName
+            ? 'publishable blob artifact'
+            : matchingMediaEntryName
+              ? 'embedded media data'
+              : matchingPathEntry
+                ? 'existing preview path'
+                : 'existing path/name only';
+          ensureFeaturedImageOption(featuredValue, featuredSuffix);
+          fields.featuredImage.value = featuredValue;
         } else {
           fields.featuredImage.value = '';
         }
@@ -4147,7 +4331,10 @@ const metadata = {
           errors.length > 0
         );
         renderImages();
-        if (previousFeaturedImage && !imageNames.includes(previousFeaturedImage))
+        if (
+          previousFeaturedImage &&
+          !Array.from(fields.featuredImage.options).some((option) => option.value === previousFeaturedImage)
+        )
           ensureFeaturedImageOption(previousFeaturedImage);
         if (previousFeaturedImage) fields.featuredImage.value = previousFeaturedImage;
         updatePreview();
@@ -4317,6 +4504,7 @@ const metadata = {
               requestId,
               request_id: requestId,
               lock_token: lockToken,
+              ...(selectedMediaEntries.length ? { mediaEntries: selectedMediaEntries } : {}),
               ...(artifactReferences.length ? { artifactReferences } : {}),
               files,
             }),

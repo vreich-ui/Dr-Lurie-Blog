@@ -1,5 +1,7 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { getArtifactBlobStore } from '../lib/blob-store.js';
+import { isArtifactReference } from '../lib/artifacts.js';
+import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 const allowedImageBlobKeyPattern = /^image\/[a-z0-9._-]+\/[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i;
 const contentTypeByExtension: Record<string, string> = {
@@ -22,6 +24,14 @@ type BinaryReadableArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlob
   get(key: string, options: { type: 'buffer' }): Promise<Buffer | ArrayBuffer | string | null>;
 };
 
+type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>> & {
+  list?: (options?: {
+    prefix?: string;
+    directories?: boolean;
+    paginate?: boolean;
+  }) => Promise<BlobListResult> | AsyncIterable<BlobListResult>;
+};
+
 const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   statusCode,
   headers: {
@@ -33,9 +43,83 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
 
 const toText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
-const getContentType = (blobKey: string) => {
+const getConcreteImageContentType = (value: unknown) => {
+  const normalized = toText(value).toLowerCase().split(';')[0]?.trim() || '';
+  if (!/^image\/[a-z0-9.+-]+$/.test(normalized) || normalized === 'image/*') return '';
+
+  return normalized;
+};
+
+const getContentTypeFromExtension = (blobKey: string) => {
   const extension = blobKey.split('.').pop()?.toLowerCase() || '';
-  return contentTypeByExtension[extension] || 'image/*';
+  return contentTypeByExtension[extension] || '';
+};
+
+const getShaFromBlobKey = (blobKey: string) => {
+  const [, , filename = ''] = blobKey.split('/');
+  const match = filename.match(/^[a-f0-9]{64}/i);
+
+  return match?.[0]?.toLowerCase() || '';
+};
+
+const getRequestIdFromBlobKey = (blobKey: string) => {
+  const [, requestId = ''] = blobKey.split('/');
+
+  return requestId.trim();
+};
+
+const loadArtifactReference = async (store: ArtifactIndexBlobStore, key: string) => {
+  const raw = await store.get(key);
+  if (!raw) return undefined;
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+
+    return isArtifactReference(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const findArtifactReferenceByBlobKey = async (store: ArtifactIndexBlobStore, blobKey: string) => {
+  const requestId = getRequestIdFromBlobKey(blobKey);
+  const sha = getShaFromBlobKey(blobKey);
+  const directIndexKey = requestId && sha ? `request-artifacts/${encodeURIComponent(requestId)}/${sha}.json` : '';
+
+  if (directIndexKey) {
+    const directReference = await loadArtifactReference(store, directIndexKey);
+    if (directReference?.blobKey === blobKey) return directReference;
+  }
+
+  if (typeof store.list !== 'function') return undefined;
+
+  const result = await store.list({ prefix: 'request-artifacts/', directories: false, paginate: true });
+  const blobs = await collectBlobListItems(result);
+
+  for (const blob of blobs) {
+    if (!blob.key.endsWith('.json') || blob.key === directIndexKey) continue;
+
+    const reference = await loadArtifactReference(store, blob.key);
+    if (reference?.blobKey === blobKey) return reference;
+  }
+
+  return undefined;
+};
+
+const resolveArtifactContentType = async (event: LambdaEvent, blobKey: string) => {
+  try {
+    const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
+    const reference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
+    const indexedContentType = getConcreteImageContentType(reference?.contentType);
+    if (indexedContentType) return indexedContentType;
+  } catch (error) {
+    console.warn('Artifact index lookup failed while resolving image content type.', { blobKey, error });
+  }
+
+  const queryContentType = getConcreteImageContentType(event.queryStringParameters?.contentType);
+  if (queryContentType) return queryContentType;
+
+  return getContentTypeFromExtension(blobKey);
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -60,6 +144,11 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   try {
+    const contentType = await resolveArtifactContentType(event, blobKey);
+    if (!contentType) {
+      return jsonResponse(400, { error: 'A concrete image content type is required for this artifact.' });
+    }
+
     const store = (await getArtifactBlobStore(event)) as BinaryReadableArtifactBlobStore;
     const bytes = await store.get(blobKey, { type: 'buffer' });
 
@@ -72,7 +161,7 @@ export const handler = async (event: LambdaEvent) => {
     return {
       statusCode: 200,
       headers: {
-        'Content-Type': getContentType(blobKey),
+        'Content-Type': contentType,
         'Cache-Control': 'private, max-age=300',
       },
       body: buffer.toString('base64'),
