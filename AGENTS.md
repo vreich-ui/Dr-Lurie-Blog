@@ -1,7 +1,23 @@
-# Repository Notes
+# AGENTS (Project rules)
+
+## Rule summary
+
+- Preserve the repository, remote MCP, and artifact workflow rules below unless a task explicitly changes them.
+- Before starting Codex work, identify the correct base branch and dependency chain.
+- For related or multi-step work, prefer an integration branch or the latest dependent branch instead of assuming `main`.
+- Keep page-specific guidance in focused docs under `docs/agents/`.
+
+## Repository Notes
 
 - Site image assets live under `https://kugelmedia.netlify.app/drlurieblog/`; assume they are always available for this site.
 - Use `https://kugelmedia.netlify.app/favicon.png` for the favicon.
+
+## Codex task sequencing / base branch
+
+- For multi-task plans, do NOT assume `main` as the base branch.
+- Prefer an integration branch like `codex/<feature>` for the plan, or explicitly base from the most recent dependent branch.
+- Include PR dependency note lines like `Depends on: #<PR_NUMBER>` when a PR depends on another PR, and clearly mention the required merge order.
+- Warn before creating parallel PRs that touch the same files, because they are likely to create sequencing conflicts or duplicate work.
 
 ## Remote MCP / ChatGPT connector notes
 
@@ -19,11 +35,6 @@
 - Before publishing, re-fetch the workflow/request state and use the current `artifactReferences` returned from MCP. Publishing payloads may include `mediaEntries` (existing base64) and/or `artifactReferences`; do not publish until artifact references are present and resolvable by the server-side publishing path.
 - Do not ask users for, display, or pass Netlify/GitHub publishing credentials. Artifact upload, artifact resolution, and publication use server-side environment variables only.
 
-## /shop mobile layout rule
+## Page-specific rules
 
-- Treat `/shop` as the redirected `/solutions/shop-preview` page unless the route changes.
-- Mobile-only layout rules must apply at `max-width: 767px`; do not alter desktop or tablet layout to satisfy mobile requirements.
-- On mobile, content order must remain: one short justification line, page title, product image block, supporting copy, then CTA.
-- The first product image must appear within the first 120% of viewport height, ideally around `70vh`; it must not appear after long intro copy or after CTAs.
-- Mobile spacing targets: justification to title `8–12px`, title to first product image `≤16px`, product image block to copy `20–24px`, and product image block to CTA `16–20px`.
-- First visible product image height on mobile must be at least `160px`, preferably `180–220px`, with at least one full or clearly peeking product image visible in the first natural scroll on an iPhone-sized viewport around `390×844`.
+- See `docs/agents/shop-layout.md` for `/shop` mobile rules.
