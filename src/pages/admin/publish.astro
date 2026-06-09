@@ -2904,6 +2904,40 @@ const metadata = {
         return Array.isArray(artifactReferences) ? artifactReferences : [];
       };
 
+      const pluralize = (count, singular, plural = `${singular}s`) => (count === 1 ? singular : plural);
+
+      const getReadableArtifactReferences = async (requestId, artifactReferences, clerkToken) => {
+        if (!artifactReferences.length) return { artifactReferences, skipped: 0 };
+
+        const response = await fetch(
+          `/.netlify/functions/admin-list-blob-images?requestId=${encodeURIComponent(requestId)}`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${clerkToken}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(result.error || `Artifact references could not be verified (${response.status}).`);
+        }
+
+        const readableBlobKeys = new Set(
+          (Array.isArray(result.images) ? result.images : [])
+            .map((image) => (typeof image?.blobKey === 'string' ? image.blobKey : ''))
+            .filter(Boolean)
+        );
+        const skipped = Number.isFinite(Number(result.skipped)) ? Number(result.skipped) : 0;
+
+        return {
+          artifactReferences: artifactReferences.filter((reference) => readableBlobKeys.has(reference?.blobKey)),
+          skipped,
+        };
+      };
+
       const resetPublisherForm = () => {
         clearLocalCheckoutState();
         lastSavedDraftId = '';
@@ -4191,11 +4225,21 @@ const metadata = {
           setStatus('Refreshing latest workflow state…', false);
           const latestWorkflowRecord = await fetchLatestWorkflowRequest(requestId);
           const latestArtifactReferences = getLatestArtifactReferences(latestWorkflowRecord);
-          const artifactReferences = selectedArtifactReferences.length
-            ? selectedArtifactReferences
-            : latestArtifactReferences;
+          const { artifactReferences, skipped: skippedArtifactCount } = await getReadableArtifactReferences(
+            requestId,
+            latestArtifactReferences,
+            clerkToken
+          );
+          const skippedArtifactMessage = skippedArtifactCount
+            ? ` Skipped ${skippedArtifactCount} stale ${pluralize(skippedArtifactCount, 'artifact')} whose blob bytes could not be read.`
+            : '';
 
-          setStatus('Publishing article to GitHub…', false);
+          setStatus(
+            skippedArtifactCount
+              ? `Publishing article to GitHub…${skippedArtifactMessage}`
+              : 'Publishing article to GitHub…',
+            false
+          );
 
           const files = await Promise.all(
             selectedFiles.filter(Boolean).map(async (file) => ({
@@ -4269,7 +4313,7 @@ const metadata = {
           }
 
           setStatus(
-            `${isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`}${workflowWarning}`,
+            `${isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`}${skippedArtifactMessage}${workflowWarning}`,
             false
           );
           setUnsavedChanges(false);
