@@ -122,7 +122,7 @@ const metadata = {
             </div>
 
             <div class="field">
-              <label for="slug">Slug</label>
+              <label for="slug">Publishing target</label>
               <input
                 id="slug"
                 name="slug"
@@ -269,11 +269,6 @@ const metadata = {
               <label for="seo-description">Optional SEO description</label>
               <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
             </div>
-
-            <div class="field checkbox-field">
-              <input id="overwrite-slug" name="overwrite" type="checkbox" />
-              <label for="overwrite-slug">Overwrite an existing article with this slug</label>
-            </div>
           </form>
         </section>
 
@@ -293,6 +288,20 @@ const metadata = {
           <p class="sidebar-kicker">Readiness & Actions</p>
           <h2 id="publish-output-heading">Content output</h2>
 
+          <div id="article-status-card" class="article-status-card article-status-card--draft" aria-live="polite">
+            <h3>Article Status</h3>
+            <div class="article-status-summary">
+              <span id="article-status-icon" class="article-status-icon" aria-hidden="true">○</span>
+              <div>
+                <p id="article-status-title" class="article-status-title">Draft</p>
+                <p id="article-status-subtitle" class="article-status-subtitle">No published article found</p>
+              </div>
+            </div>
+            <div id="article-status-details" class="article-status-details">
+              <p>Saved draft changes are not live until published.</p>
+            </div>
+          </div>
+
           <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
             <h3 id="publish-checklist-heading">Validation checklist</h3>
             <p class="checklist-intro">Review required fields and optional publishing warnings before going live.</p>
@@ -307,7 +316,7 @@ const metadata = {
               <li data-checklist-item="slug">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
                 <span class="checklist-copy">
-                  <span class="checklist-label">Slug</span>
+                  <span class="checklist-label">Publishing target</span>
                   <span class="checklist-message" hidden></span>
                 </span>
               </li>
@@ -370,15 +379,15 @@ const metadata = {
 
           <div class="publish-output-summary" aria-label="Content output summary">
             <div class="summary-heading-row">
-              <p class="summary-label">Destination slug</p>
+              <p class="summary-label">Publishing target</p>
               <a
                 class="summary-edit-link"
                 href="#slug"
-                aria-label="Edit destination slug"
-                title="Edit destination slug"
+                aria-label="Edit publishing target"
+                title="Edit publishing target"
               >
                 <Icon name="tabler:pencil" class="summary-edit-icon" aria-hidden="true" />
-                <span class="sr-only">Edit destination slug</span>
+                <span class="sr-only">Edit publishing target</span>
               </a>
             </div>
             <p id="suggested-location" class="suggestion">src/data/post/slug.md</p>
@@ -386,6 +395,10 @@ const metadata = {
 
           <div class="actions publish-actions" aria-label="Publishing actions">
             <div class="publish-action-group" aria-label="Primary publish action">
+              <label id="overwrite-publish-control" class="overwrite-publish-control" for="overwrite-slug" hidden>
+                <input id="overwrite-slug" name="overwrite" type="checkbox" />
+                <span>Overwrite published article</span>
+              </label>
               <button
                 id="publish"
                 class="btn-primary action-primary"
@@ -805,6 +818,48 @@ const metadata = {
     margin-top: 0.25rem;
     color: var(--aw-color-text-muted);
     font-size: 0.84rem;
+    overflow-wrap: anywhere;
+  }
+
+  :global(.json-draft-lifecycle) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    width: fit-content;
+    margin-top: 0.5rem;
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+  }
+
+  :global(.json-draft-lifecycle.is-published) {
+    background: rgb(22 163 74 / 12%);
+    color: rgb(22 101 52);
+  }
+
+  :global(.json-draft-lifecycle.is-saved) {
+    background: rgb(107 114 128 / 12%);
+    color: rgb(75 85 99);
+  }
+
+  :global(.json-draft-lifecycle.is-modified) {
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+  }
+
+  :global(.json-draft-status-grid) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.15rem 0.45rem;
+    margin-top: 0.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+  }
+
+  :global(.json-draft-status-grid strong) {
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
     overflow-wrap: anywhere;
   }
 
@@ -1241,6 +1296,118 @@ const metadata = {
   .actions > a,
   .publish-action-group > button {
     width: 100%;
+  }
+
+  .article-status-card {
+    margin: 0.8rem 0 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  :global(.dark) .article-status-card {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 42%);
+  }
+
+  .article-status-card h3 {
+    margin: 0 0 0.7rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  .article-status-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .article-status-icon {
+    display: inline-grid;
+    width: 1.6rem;
+    height: 1.6rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+    background: rgb(107 114 128 / 12%);
+    color: rgb(75 85 99);
+    font-weight: 900;
+  }
+
+  .article-status-card--published .article-status-icon {
+    background: rgb(22 163 74 / 12%);
+    color: rgb(22 101 52);
+  }
+
+  .article-status-card--modified .article-status-icon {
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+  }
+
+  .article-status-title {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-size: 1rem;
+    font-weight: 900;
+  }
+
+  .article-status-subtitle,
+  .article-status-details p {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .article-status-details {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+  }
+
+  .article-status-details hr {
+    width: 100%;
+    margin: 0.35rem 0;
+    border: 0;
+    border-top: 1px solid rgb(229 231 235);
+  }
+
+  .article-status-slug {
+    color: var(--aw-color-text-heading) !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    overflow-wrap: anywhere;
+  }
+
+  .overwrite-publish-control {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border: 1px solid rgb(245 158 11 / 42%);
+    border-radius: 0.85rem;
+    padding: 0.72rem 0.85rem;
+    background: rgb(255 251 235);
+    color: rgb(146 64 14);
+    font-size: 0.88rem;
+    font-weight: 900;
+  }
+
+  .overwrite-publish-control[hidden] {
+    display: none;
+  }
+
+  .overwrite-publish-control input {
+    width: auto;
+    margin-top: 0.2rem;
+  }
+
+  :global(.dark) .overwrite-publish-control {
+    border-color: rgb(245 158 11 / 40%);
+    background: rgb(120 53 15 / 18%);
+    color: rgb(253 230 138);
   }
 
   .publish-checklist {
@@ -1759,6 +1926,12 @@ const metadata = {
         ctaText: document.querySelector('#cta-text'),
         seoDescription: document.querySelector('#seo-description'),
         overwrite: document.querySelector('#overwrite-slug'),
+        overwritePublishControl: document.querySelector('#overwrite-publish-control'),
+        articleStatusCard: document.querySelector('#article-status-card'),
+        articleStatusIcon: document.querySelector('#article-status-icon'),
+        articleStatusTitle: document.querySelector('#article-status-title'),
+        articleStatusSubtitle: document.querySelector('#article-status-subtitle'),
+        articleStatusDetails: document.querySelector('#article-status-details'),
         status: document.querySelector('#status'),
         unsavedChanges: document.querySelector('#unsaved-changes'),
         refreshPreview: document.querySelector('#refresh-preview'),
@@ -1801,12 +1974,15 @@ const metadata = {
       let editArticleLoaded = false;
       let hasUnsavedChanges = false;
       let lastSavedDraftId = '';
+      let lastSavedAt = '';
+      let lastSavedBy = '';
       let workflowRequestId = '';
       let workflowLockToken = '';
       let workflowLockExpiresAt = '';
       let workflowLockRefreshTimer;
       let workflowReadOnlyMode = false;
-      let readOnlySourceDraftId = '';
+      let articleStatus = { state: 'draft', published: null, checkedSlug: '' };
+      let articleStatusRequestId = 0;
       const workflowLockOwnerId = 'admin-publish-ui';
       const workflowLockOwnerLabel = 'Admin publish UI';
       const workflowLockStorageKey = 'dr-lurie-admin-publish-active-workflow-lock';
@@ -1817,7 +1993,7 @@ const metadata = {
       const publicGitHubRepoUrl = adminPage?.dataset.publicGithubRepoUrl || '';
       const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
       const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-      const slugInvalidMessage = 'Slug must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
+      const slugInvalidMessage = 'Publishing target must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const adminShell = document.querySelector('[data-admin-shell]');
       const authStatus = document.querySelector('[data-auth-status]');
@@ -1847,7 +2023,7 @@ const metadata = {
 
       const isEditMode = () => Boolean(getEditSlug());
 
-      const getSlugEditHint = () => 'Slug is generated from the title and cannot be edited directly.';
+      const getSlugEditHint = () => 'Publishing target is generated from the title and cannot be edited directly.';
 
       const setUnsavedChanges = (value) => {
         hasUnsavedChanges = Boolean(value);
@@ -1886,6 +2062,146 @@ const metadata = {
             getFeaturedImagePath().trim()
         );
 
+      const formatStatusDate = (value, { includeComma = false } = {}) => {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return new Intl.DateTimeFormat(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+          .format(date)
+          .replace(',', includeComma ? ',' : '');
+      };
+
+      const normalizeMarkdownForStatus = (value) =>
+        String(value || '')
+          .replace(/\s+$/g, '')
+          .trim();
+
+      const getCurrentArticleStatusState = () => {
+        if (!articleStatus.published) return 'draft';
+        return normalizeMarkdownForStatus(fields.outputMarkdown?.value) ===
+          normalizeMarkdownForStatus(articleStatus.published.markdown)
+          ? 'published'
+          : 'modified';
+      };
+
+      const renderArticleStatusCard = () => {
+        const state = getCurrentArticleStatusState();
+        const published = articleStatus.published;
+        const savedDate = lastSavedAt ? formatStatusDate(lastSavedAt) : '';
+        const publishedDate = formatStatusDate(published?.publishDate, { includeComma: true });
+        const publishedAuthor = published?.author || fields.author.value.trim() || 'Unknown';
+
+        fields.articleStatusCard?.classList.remove(
+          'article-status-card--published',
+          'article-status-card--draft',
+          'article-status-card--modified'
+        );
+        fields.articleStatusCard?.classList.add(`article-status-card--${state}`);
+
+        if (state === 'published') {
+          fields.articleStatusIcon.textContent = '✓';
+          fields.articleStatusTitle.textContent = 'Published';
+          fields.articleStatusSubtitle.textContent = publishedDate
+            ? `Published ${publishedDate.replace(',', '')}`
+            : 'Published version exists';
+          fields.articleStatusDetails.innerHTML = `
+            <p>by ${escapeHtml(publishedAuthor)}</p>
+            <hr />
+            <p>✓ Existing published article</p>
+            <p class="article-status-slug">${escapeHtml(fields.slug.value.trim() || 'article-slug')}</p>
+            <p><strong>Published:</strong></p>
+            <p>${escapeHtml(publishedDate || 'Unknown')}</p>`;
+        } else if (state === 'modified') {
+          fields.articleStatusIcon.textContent = '⚠';
+          fields.articleStatusTitle.textContent = 'Modified';
+          fields.articleStatusSubtitle.textContent = 'Published version exists';
+          fields.articleStatusDetails.innerHTML = `
+            <p>Draft changes saved</p>
+            <p>but not published</p>`;
+        } else {
+          fields.articleStatusIcon.textContent = '○';
+          fields.articleStatusTitle.textContent = 'Draft';
+          fields.articleStatusSubtitle.textContent = savedDate
+            ? `Saved ${savedDate}`
+            : 'Saved draft changes are not live';
+          fields.articleStatusDetails.innerHTML = `
+            <p>by ${escapeHtml(lastSavedBy || fields.author.value.trim() || 'Unknown')}</p>`;
+        }
+      };
+
+      const updatePublishDecisionControls = () => {
+        const hasPublishedArticle = Boolean(articleStatus.published);
+        fields.publish.textContent = hasPublishedArticle ? 'Overwrite Published Article' : 'Publish Article';
+        if (fields.overwritePublishControl) fields.overwritePublishControl.hidden = !hasPublishedArticle;
+        if (!hasPublishedArticle) fields.overwrite.checked = false;
+        fields.publish.setAttribute(
+          'aria-describedby',
+          hasPublishedArticle ? 'overwrite-slug publish-blocked-message' : 'publish-blocked-message'
+        );
+        fields.publish.classList.toggle('is-overwrite-required', hasPublishedArticle && !fields.overwrite.checked);
+        renderArticleStatusCard();
+      };
+
+      const updateArticleStatusCard = () => {
+        updatePublishDecisionControls();
+      };
+
+      const fetchPublishedArticleStatus = async ({ force = false } = {}) => {
+        const slug = fields.slug.value.trim();
+        if (!slugPattern.test(slug)) {
+          articleStatus = { state: 'draft', published: null, checkedSlug: '' };
+          updatePublishDecisionControls();
+          return;
+        }
+        if (!force && articleStatus.checkedSlug === slug) {
+          updatePublishDecisionControls();
+          return;
+        }
+
+        const requestId = (articleStatusRequestId += 1);
+        try {
+          const token = await getClerkSessionToken();
+          const response = await fetch(`/.netlify/functions/get-article-for-edit?slug=${encodeURIComponent(slug)}`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          const result = await response.json().catch(() => ({}));
+          if (requestId !== articleStatusRequestId) return;
+          if (response.status === 404) {
+            articleStatus = { state: 'draft', published: null, checkedSlug: slug };
+          } else if (response.ok) {
+            const article = result.article || result;
+            articleStatus = { state: 'published', published: article, checkedSlug: slug };
+          } else {
+            console.warn('Published article status could not be checked.', result.error || response.status);
+            articleStatus = { state: 'draft', published: null, checkedSlug: slug };
+          }
+        } catch (error) {
+          if (requestId !== articleStatusRequestId) return;
+          console.warn('Published article status check failed.', error);
+          articleStatus = { state: 'draft', published: null, checkedSlug: slug };
+        }
+        updatePublishDecisionControls();
+        recalculateButtonState();
+      };
+
+      let articleStatusDebounceTimer;
+      const queuePublishedArticleStatusCheck = () => {
+        window.clearTimeout(articleStatusDebounceTimer);
+        articleStatusDebounceTimer = window.setTimeout(() => {
+          fetchPublishedArticleStatus().catch((error) => {
+            console.warn('Published article status check could not be queued.', error);
+          });
+        }, 350);
+      };
+
       const hasCurrentWorkflowLock = () => {
         const { requestId, lockToken } = getCheckedOutWorkflowDraft();
         if (!requestId) return true;
@@ -1915,7 +2231,8 @@ const metadata = {
             fields.author.value.trim() &&
             hasValidSlug &&
             getMarkdownWordCount() >= 5 &&
-            canUseWorkflowLock
+            canUseWorkflowLock &&
+            (!articleStatus.published || fields.overwrite.checked)
         );
 
         fields.saveDraft.disabled = !canSaveDraft;
@@ -1925,15 +2242,24 @@ const metadata = {
         fields.downloadJsonBackup.disabled = !canPublish;
         fields.backupPanel.classList.toggle('is-disabled', !canPublish);
         fields.publish.classList.toggle('is-validation-blocked', !hasRequiredValidationFields);
-        if (fields.publishBlockedMessage) fields.publishBlockedMessage.hidden = hasRequiredValidationFields;
+        if (fields.publishBlockedMessage) {
+          if (articleStatus.published && hasRequiredValidationFields && !fields.overwrite.checked) {
+            fields.publishBlockedMessage.textContent = 'Check overwrite before replacing the live article.';
+            fields.publishBlockedMessage.hidden = false;
+          } else {
+            fields.publishBlockedMessage.textContent = 'Complete required fields before publishing.';
+            fields.publishBlockedMessage.hidden = hasRequiredValidationFields;
+          }
+        }
+        updatePublishDecisionControls();
         validateSlug();
       };
 
       const setEditorModeCopy = (mode) => {
         const editing = mode === 'edit';
         fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
-        fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
-        fields.overwrite.checked = editing || fields.overwrite.checked;
+        updateArticleStatusCard();
+        fields.overwrite.checked = false;
         fields.slug.readOnly = true;
         fields.slug.disabled = false;
         syncSlugFromTitle();
@@ -2374,7 +2700,12 @@ const metadata = {
       const getCurrentSlug = () => slugify(fields.title.value || 'untitled-article') || 'untitled-article';
 
       const syncSlugFromTitle = () => {
+        const previousSlug = fields.slug.value;
         fields.slug.value = getCurrentSlug();
+        if (previousSlug !== fields.slug.value) {
+          articleStatus = { state: 'draft', published: null, checkedSlug: '' };
+          queuePublishedArticleStatusCheck();
+        }
         validateSlug();
         return fields.slug.value;
       };
@@ -2993,7 +3324,7 @@ const metadata = {
         slug: {
           required: true,
           isComplete: slugPattern.test(fields.slug.value.trim()),
-          message: fields.slug.value.trim() ? slugInvalidMessage : 'Add a valid slug.',
+          message: fields.slug.value.trim() ? slugInvalidMessage : 'Add a valid publishing target.',
         },
         content: {
           required: true,
@@ -3076,6 +3407,7 @@ const metadata = {
         resizeOutputMarkdown();
         updatePublishChecklist();
         updateBackupDownload();
+        updatePublishDecisionControls();
       };
 
       const saveLocalRecoveryDraft = () => {
@@ -3186,7 +3518,6 @@ const metadata = {
         workflowLockToken = '';
         workflowLockExpiresAt = '';
         workflowReadOnlyMode = false;
-        readOnlySourceDraftId = '';
         clearWorkflowLockRefreshTimer();
         clearStoredWorkflowLockState();
         localStorage.removeItem(draftKey);
@@ -3245,7 +3576,6 @@ const metadata = {
         workflowLockToken = lock.token;
         workflowLockExpiresAt = lock.expires_at || '';
         workflowReadOnlyMode = false;
-        readOnlySourceDraftId = '';
         sessionStorage.setItem('dr-lurie-workflow-request-id', workflowRequestId);
         sessionStorage.setItem('dr-lurie-workflow-lock-token', workflowLockToken);
         if (workflowLockExpiresAt) sessionStorage.setItem('dr-lurie-workflow-lock-expires-at', workflowLockExpiresAt);
@@ -3433,9 +3763,11 @@ const metadata = {
       const resetPublisherForm = () => {
         clearLocalCheckoutState();
         lastSavedDraftId = '';
+        lastSavedAt = '';
+        lastSavedBy = '';
         editArticleLoaded = false;
         workflowReadOnlyMode = false;
-        readOnlySourceDraftId = '';
+        articleStatus = { state: 'draft', published: null, checkedSlug: '' };
         fields.title.value = '';
         fields.slug.value = '';
         fields.excerpt.value = '';
@@ -3477,19 +3809,6 @@ const metadata = {
         fields.title.focus();
       };
 
-      const createAbortError = (message) => {
-        const error = new Error(message);
-        error.name = 'AbortError';
-        return error;
-      };
-
-      const isAbortError = (error) => error instanceof Error && error.name === 'AbortError';
-
-      const confirmReadOnlyDraftClone = () =>
-        window.confirm(
-          `This JSON draft${readOnlySourceDraftId ? ` (${readOnlySourceDraftId})` : ''} was opened read-only because another workflow owns it. Create a new JSON draft instance for your changes? The original draft will not be modified.`
-        );
-
       const postJsonDraftToBlobs = async (clerkToken, requestId, lockToken) => {
         const response = await fetch('/.netlify/functions/admin-save-json-draft', {
           method: 'POST',
@@ -3511,9 +3830,6 @@ const metadata = {
       const saveJsonDraftToBlobs = async () => {
         const clerkToken = await getClerkSessionToken();
         const shouldCloneReadOnlyDraft = workflowReadOnlyMode && !workflowRequestId && !workflowLockToken;
-        if (shouldCloneReadOnlyDraft && !confirmReadOnlyDraftClone()) {
-          throw createAbortError('New JSON draft creation was cancelled.');
-        }
 
         const checkedOut = getCheckedOutWorkflowDraft();
         if (!shouldCloneReadOnlyDraft && checkedOut.requestId) await ensureWorkflowLock(checkedOut.requestId);
@@ -3543,7 +3859,6 @@ const metadata = {
           if (result.record?.lock?.token) storeWorkflowLockFromRecord(result.record);
           else if (!getCheckedOutWorkflowDraft().lockToken) await checkoutWorkflowRequest(savedRequestId);
           workflowReadOnlyMode = false;
-          readOnlySourceDraftId = '';
         }
 
         return result;
@@ -3553,7 +3868,7 @@ const metadata = {
         const saveButton = fields.saveDraft;
 
         if (!getHasMinimumDraftContent()) {
-          setStatus('Title, slug, and author are required to save JSON draft.', false);
+          setStatus('Title, publishing target, and author are required to save JSON draft.', false);
           return false;
         }
 
@@ -3568,6 +3883,8 @@ const metadata = {
         try {
           const result = await saveJsonDraftToBlobs();
           lastSavedDraftId = result.record?.request_id || workflowRequestId || '';
+          lastSavedAt = result.record?.updated_at || new Date().toISOString();
+          lastSavedBy = workflowLockOwnerLabel;
           setUnsavedChanges(false);
           const savedRequestId = lastSavedDraftId ? ` (${lastSavedDraftId})` : '';
           setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
@@ -3634,7 +3951,7 @@ const metadata = {
         fields.ctaLink.value = article.ctaLink || '';
         fields.ctaText.value = article.ctaText || '';
         fields.seoDescription.value = article.seoDescription || article.metadata?.description || '';
-        fields.overwrite.checked = true;
+        fields.overwrite.checked = false;
         fields.existingFeaturedImagePath.value = article.image || article.featuredImage || '';
         selectedImages = [];
         syncImageNames();
@@ -3679,7 +3996,7 @@ const metadata = {
           }
 
           populateArticleForEdit(result.article || result);
-          setStatus(`Editing ${editSlug}. Slug is generated from the title.`, false);
+          setStatus(`Editing ${editSlug}. Publishing target is generated from the title.`, false);
         } catch (error) {
           editArticleLoaded = false;
           setStatus(error instanceof Error ? error.message : 'Article could not be loaded for editing.', false);
@@ -3960,7 +4277,7 @@ const metadata = {
         }
 
         if (!slugify(formData.title.value)) {
-          throw new Error('Import JSON title must include enough text to compute a slug.');
+          throw new Error('Import JSON title must include enough text to compute a publishing target.');
         }
 
         if (!formData.author.exists || !formData.author.value.trim()) {
@@ -4148,6 +4465,7 @@ const metadata = {
           updateJsonImportButtonState();
           applyContentSourceImportFormData(formData);
           setUnsavedChanges(true);
+          await fetchPublishedArticleStatus({ force: true });
           setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
           return true;
         } catch (error) {
@@ -4207,8 +4525,30 @@ const metadata = {
         return { draftInput, result };
       };
 
-      const applyBlobDraftInput = async (draftId, draftInput, { readOnly = false } = {}) => {
-        let input = draftInput;
+      const appendCopySuffix = (value, suffix) => {
+        const text = String(value || '').trim();
+        return text ? `${text}${suffix}` : `Untitled${suffix}`;
+      };
+
+      const cloneContentSourceForCopy = (input) => {
+        const copy = typeof structuredClone === 'function' ? structuredClone(input) : JSON.parse(JSON.stringify(input));
+        copy.content ||= {};
+        copy.publication ||= {};
+        copy.publication.publish_payload ||= {};
+        const payload = copy.publication.publish_payload;
+        const currentTitle = payload.title || copy.content.title || 'Untitled article';
+        const currentSlug = slugify(payload.slug || currentTitle) || 'untitled-article';
+        const copyTitle = appendCopySuffix(currentTitle, '-Copy');
+        payload.title = copyTitle;
+        copy.content.title = copyTitle;
+        payload.slug = `${currentSlug}-copy`;
+        payload.overwrite = false;
+        copy.publication.publication_status = 'draft';
+        return copy;
+      };
+
+      const applyBlobDraftInput = async (draftId, draftInput, { readOnly = false, draft = undefined } = {}) => {
+        let input = readOnly ? cloneContentSourceForCopy(draftInput) : draftInput;
         if (!readOnly) {
           await ensureWorkflowLock(draftId);
           const checkedOutRecord = await fetchLatestWorkflowRequest(draftId);
@@ -4218,18 +4558,21 @@ const metadata = {
         const loaded = await loadJsonImport(JSON.stringify(input, null, 2), { alertOnError: false });
         if (!loaded) return false;
 
-        lastSavedDraftId = draftId;
+        lastSavedDraftId = readOnly ? '' : draftId;
+        lastSavedAt = readOnly ? '' : draft?.updatedAt || draft?.updated_at || '';
+        lastSavedBy = readOnly ? '' : draft?.author || fields.author.value.trim();
         if (readOnly) {
           workflowRequestId = '';
           workflowLockToken = '';
           workflowLockExpiresAt = '';
-          workflowReadOnlyMode = true;
-          readOnlySourceDraftId = draftId;
+          workflowReadOnlyMode = false;
+          fields.overwrite.checked = false;
           clearWorkflowLockRefreshTimer();
-          fields.jsonUploadName.textContent = `${draftId} (read-only)`;
-          setJsonImportStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`);
+          fields.jsonUploadName.textContent = `${draftId} (copy)`;
+          setJsonImportStatus(`Opened saved JSON ${draftId} as a new copy. The original draft was not modified.`);
         }
-        setUnsavedChanges(false);
+        await fetchPublishedArticleStatus({ force: true });
+        setUnsavedChanges(readOnly);
         recalculateButtonState();
         return true;
       };
@@ -4371,6 +4714,28 @@ const metadata = {
         }
       };
 
+      const getJsonDraftLifecycleLabel = (draft) => {
+        if (draft.lifecycleStatus === 'modified') return { label: '⚠ Unpublished Changes', className: 'is-modified' };
+        if (draft.published?.exists) return { label: '✓ Published', className: 'is-published' };
+        return { label: '○ Saved Draft', className: 'is-saved' };
+      };
+
+      const renderJsonDraftLifecycleMeta = (draft) => {
+        const status = getJsonDraftLifecycleLabel(draft);
+        const published = draft.published || {};
+        const savedAt = draft.savedAt || draft.updatedAt || draft.updated_at || draft.modifiedAt;
+        const savedBy = draft.savedBy || draft.author || 'Unknown';
+        const publishedRows = published.exists
+          ? `<span>Published:</span><strong>${escapeHtml(formatJsonDraftDate(published.date))}</strong><span>By:</span><strong>${escapeHtml(published.by || 'Unknown')}</strong>`
+          : '';
+        return `<span class="json-draft-lifecycle ${status.className}">${escapeHtml(status.label)}</span>
+          <span class="json-draft-status-grid">
+            ${publishedRows}
+            <span>Saved:</span><strong>${escapeHtml(formatJsonDraftDate(savedAt))}</strong>
+            <span>By:</span><strong>${escapeHtml(savedBy)}</strong>
+          </span>`;
+      };
+
       const renderJsonDraftChoices = (drafts) => {
         if (!drafts.length) {
           fields.jsonDraftList.innerHTML = '<p class="json-draft-empty">No saved JSON drafts were found.</p>';
@@ -4389,6 +4754,7 @@ const metadata = {
             <span>
               <span class="json-draft-choice-title">${escapeHtml(title)}</span>
               <span class="json-draft-choice-meta">${escapeHtml(slug)} · ${escapeHtml(author)} · ${escapeHtml(updatedAt)}</span>
+              ${renderJsonDraftLifecycleMeta(draft)}
             </span>
             <span class="json-draft-choice-icon" aria-hidden="true">↗</span>
           </button>`;
@@ -4684,7 +5050,7 @@ const metadata = {
         }
 
         if (!getHasMinimumDraftContent()) {
-          setStatus('Title, slug, and author are required before opening the preview page.', false);
+          setStatus('Title, publishing target, and author are required before opening the preview page.', false);
           return;
         }
 
@@ -4764,12 +5130,23 @@ const metadata = {
           !fields.author.value.trim() ||
           getMarkdownWordCount() < 5
         ) {
-          setStatus('Title, slug, author, and Markdown content (5+ words) are required before publishing.', false);
+          setStatus(
+            'Title, publishing target, author, and Markdown content (5+ words) are required before publishing.',
+            false
+          );
+          return;
+        }
+
+        if (articleStatus.published && !fields.overwrite.checked) {
+          setStatus('Check overwrite before replacing the live article.', false);
+          recalculateButtonState();
           return;
         }
 
         const confirmed = window.confirm(
-          'Publish this article to GitHub? This will commit the article and any selected images.'
+          articleStatus.published
+            ? 'Overwrite the published article on GitHub? This will replace the live content.'
+            : 'Publish this article to GitHub? This will commit the article and any selected images.'
         );
         if (!confirmed) return;
 
@@ -4850,6 +5227,17 @@ const metadata = {
           const shortCommit = commit.slice(0, 7);
           const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
           const toastMessage = `Published ${publishedPath}.${commit ? ` Commit: ${commit}` : ''}`;
+          articleStatus = {
+            state: 'published',
+            checkedSlug: slug,
+            published: {
+              markdown: fields.outputMarkdown.value,
+              publishDate: getPublishDate().toISOString(),
+              author: fields.author.value.trim(),
+              slug,
+            },
+          };
+          fields.overwrite.checked = false;
           let workflowWarning = '';
           try {
             await mcpToolCall('save_json_blob_mark_published', {
@@ -4908,10 +5296,12 @@ const metadata = {
       });
 
       ['input', 'change'].forEach((eventName) => {
-        document.querySelector('#publish-form').addEventListener(eventName, () => {
+        document.querySelector('#publish-form').addEventListener(eventName, (event) => {
           updatePreview();
           updatePublishOutput();
-          setUnsavedChanges(true);
+          if (event.target !== fields.overwrite) setUnsavedChanges(true);
+          if (event.target === fields.overwrite) recalculateButtonState();
+          else queuePublishedArticleStatusCheck();
         });
       });
 
@@ -4930,6 +5320,7 @@ const metadata = {
         workflowLockRefreshTimer = undefined;
         if (toastTimer) window.clearTimeout(toastTimer);
         toastTimer = undefined;
+        if (articleStatusDebounceTimer) window.clearTimeout(articleStatusDebounceTimer);
         artifactPreviewUrlCache.forEach((url) => URL.revokeObjectURL(url));
         artifactPreviewUrlCache.clear();
       });
