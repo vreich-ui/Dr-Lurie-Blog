@@ -2433,14 +2433,15 @@ const metadata = {
         if (!blobKey) return '';
         if (artifactPreviewUrlCache.has(blobKey)) return artifactPreviewUrlCache.get(blobKey);
 
+        const params = new URLSearchParams({ blobKey });
+        const contentType = String(artifactReference?.contentType || '').trim();
+        if (contentType) params.set('contentType', contentType);
+
         const token = await getClerkSessionToken();
-        const response = await fetch(
-          `/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(blobKey)}`,
-          {
-            method: 'GET',
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await fetch(`/.netlify/functions/admin-get-blob-image?${params.toString()}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!response.ok) throw new Error(`Image preview could not be loaded (${response.status}).`);
         const objectUrl = URL.createObjectURL(await response.blob());
