@@ -94,6 +94,24 @@ export const normalizeContentSourceImportToFormData = (
     ['taxonomy', 'tags'],
   ]);
   const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
+  const featuredImage = normalizeTextImportField(contentSource, [
+    ['publication', 'publish_payload', 'featuredImage'],
+    ['publication', 'publish_payload', 'image'],
+  ]);
+  const existingFeaturedImagePath = normalizeTextImportField(contentSource, [
+    ['publication', 'publish_payload', 'existingFeaturedImagePath'],
+    ['publication', 'publish_payload', 'featuredImage'],
+    ['publication', 'publish_payload', 'image'],
+  ]);
+  const uploadedImageNames = getFirstImportPathValue(contentSource, [
+    ['publication', 'publish_payload', 'metadata', 'uploaded_image_names'],
+    ['publication', 'publish_payload', 'imageNames'],
+  ]);
+  const artifactReferences = getFirstImportPathValue(contentSource, [
+    ['publication', 'publish_payload', 'artifactReferences'],
+    ['publication', 'publish_payload', 'metadata', 'artifactReferences'],
+  ]);
+  const mediaEntries = getPathValue(contentSource, ['publication', 'publish_payload', 'mediaEntries']);
 
   return {
     schemaVersion: contentSource.schema_version,
@@ -119,6 +137,22 @@ export const normalizeContentSourceImportToFormData = (
     sources: {
       exists: importedSources.exists,
       value: Array.isArray(importedSources.value) ? formatImportedList(importedSources.value) : '',
+    },
+    featuredImage,
+    existingFeaturedImagePath,
+    imageNames: {
+      exists: uploadedImageNames.exists,
+      value: Array.isArray(uploadedImageNames.value)
+        ? uploadedImageNames.value.map((name) => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
+        : [],
+    },
+    artifactReferences: {
+      exists: artifactReferences.exists,
+      value: Array.isArray(artifactReferences.value) ? artifactReferences.value : [],
+    },
+    mediaEntries: {
+      exists: mediaEntries.exists,
+      value: Array.isArray(mediaEntries.value) ? mediaEntries.value : [],
     },
   };
 };
