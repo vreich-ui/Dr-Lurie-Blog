@@ -293,27 +293,71 @@ const metadata = {
           <h2 id="publish-output-heading">Content output</h2>
 
           <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
-            <h3 id="publish-checklist-heading">Readiness checklist</h3>
+            <h3 id="publish-checklist-heading">Validation checklist</h3>
+            <p class="checklist-intro">Review required fields and optional publishing warnings before going live.</p>
             <ul id="publish-checklist" aria-live="polite">
               <li data-checklist-item="title">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Title present</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Title</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
               <li data-checklist-item="slug">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Valid slug</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Slug</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
               <li data-checklist-item="content">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Content present</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Content</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
               <li data-checklist-item="excerpt">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Excerpt</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Excerpt</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
-              <li data-checklist-item="publishDate">
+              <li data-checklist-item="featuredImage">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Publish date</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Featured image</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="sources">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Sources</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="seoDescription">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">SEO description</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="category">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Category</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="tags">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Tags</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
             </ul>
           </div>
@@ -340,6 +384,9 @@ const metadata = {
           </div>
 
           <div class="actions">
+            <p id="publish-blocked-message" class="publish-blocked-message" role="status" aria-live="polite" hidden>
+              Complete required fields before publishing.
+            </p>
             <button id="publish" class="btn-primary action-primary" type="button">Publish Article</button>
             <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
             <button id="preview" class="btn-secondary" type="button">Preview page</button>
@@ -1171,17 +1218,24 @@ const metadata = {
   }
 
   .publish-checklist h3 {
-    margin: 0 0 0.65rem;
+    margin: 0 0 0.35rem;
     color: var(--aw-color-text-heading);
     font-family: var(--aw-font-heading);
     font-size: 1rem;
     font-weight: 800;
   }
 
+  .checklist-intro {
+    margin: 0 0 0.85rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
   .publish-checklist ul {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.45rem 0.85rem;
+    gap: 0.55rem 0.85rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1193,22 +1247,31 @@ const metadata = {
 
   .publish-checklist li {
     display: flex;
-    align-items: center;
-    gap: 0.4rem;
+    align-items: flex-start;
+    gap: 0.5rem;
     color: var(--aw-color-text-muted);
     font-size: 0.92rem;
     font-weight: 700;
+    line-height: 1.35;
   }
 
   .publish-checklist li.is-complete {
     color: var(--aw-color-secondary);
   }
 
-  .publish-checklist li.is-missing {
+  .publish-checklist li.is-required-missing {
+    color: rgb(185 28 28);
+  }
+
+  .publish-checklist li.is-optional-missing {
     color: rgb(146 64 14);
   }
 
-  :global(.dark) .publish-checklist li.is-missing {
+  :global(.dark) .publish-checklist li.is-required-missing {
+    color: rgb(252 165 165);
+  }
+
+  :global(.dark) .publish-checklist li.is-optional-missing {
     color: rgb(253 230 138);
   }
 
@@ -1216,6 +1279,36 @@ const metadata = {
     flex: 0 0 auto;
     width: 1.1rem;
     text-align: center;
+    line-height: 1.35;
+  }
+
+  .checklist-copy {
+    display: grid;
+    gap: 0.12rem;
+  }
+
+  .checklist-message {
+    color: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    opacity: 0.86;
+  }
+
+  .publish-blocked-message {
+    margin: 0;
+    border: 1px solid rgb(254 202 202);
+    border-radius: 0.85rem;
+    padding: 0.72rem 0.85rem;
+    background: rgb(254 242 242);
+    color: rgb(153 27 27);
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  :global(.dark) .publish-blocked-message {
+    border-color: rgb(127 29 29 / 70%);
+    background: rgb(127 29 29 / 18%);
+    color: rgb(254 202 202);
   }
 
   .preview-box,
@@ -1642,6 +1735,7 @@ const metadata = {
         downloadJsonBackup: document.querySelector('#download-json-backup'),
         backupPanel: document.querySelector('[data-backup-panel]'),
         publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
+        publishBlockedMessage: document.querySelector('#publish-blocked-message'),
         newDraft: document.querySelector('#new-draft'),
         saveDraft: document.querySelector('#save-draft'),
         publish: document.querySelector('#publish'),
@@ -1772,6 +1866,8 @@ const metadata = {
       const recalculateButtonState = () => {
         const hasDraftFields = getHasMinimumDraftContent();
         const hasValidSlug = slugPattern.test(fields.slug.value.trim());
+        const missingRequiredFields = getMissingRequiredValidationItems();
+        const hasRequiredValidationFields = missingRequiredFields.length === 0;
         const canUseWorkflowLock = hasCurrentWorkflowLock();
         const canSaveDraft = !workflowReadOnlyMode && isAdmin && hasDraftFields && hasUnsavedChanges;
         const canPreview =
@@ -1782,7 +1878,7 @@ const metadata = {
         const canPublish = Boolean(
           !workflowReadOnlyMode &&
             isAdmin &&
-            fields.title.value.trim() &&
+            hasRequiredValidationFields &&
             fields.author.value.trim() &&
             hasValidSlug &&
             getMarkdownWordCount() >= 5 &&
@@ -1795,6 +1891,7 @@ const metadata = {
         fields.copyOutput.disabled = !canPublish;
         fields.downloadJsonBackup.disabled = !canPublish;
         fields.backupPanel.classList.toggle('is-disabled', !canPublish);
+        if (fields.publishBlockedMessage) fields.publishBlockedMessage.hidden = hasRequiredValidationFields;
         validateSlug();
       };
 
@@ -2844,28 +2941,76 @@ const metadata = {
         };
       };
 
-      const getChecklistState = () => ({
-        title: fields.title.value.trim().length > 0,
-        slug: slugPattern.test(fields.slug.value.trim()),
-        content: fields.content.value.trim().length > 0,
-        excerpt: fields.excerpt.value.trim().length > 0,
-        publishDate: fields.publishDate.value.trim().length > 0,
+      const getValidationChecklistState = () => ({
+        title: {
+          required: true,
+          isComplete: fields.title.value.trim().length > 0,
+          message: 'Add a title.',
+        },
+        slug: {
+          required: true,
+          isComplete: slugPattern.test(fields.slug.value.trim()),
+          message: fields.slug.value.trim() ? slugInvalidMessage : 'Add a valid slug.',
+        },
+        content: {
+          required: true,
+          isComplete: getMarkdownWordCount() >= 5,
+          message: 'Add article body content (5+ words).',
+        },
+        excerpt: {
+          required: true,
+          isComplete: fields.excerpt.value.trim().length > 0,
+          message: 'Add a short excerpt.',
+        },
+        featuredImage: {
+          required: false,
+          isComplete: getFeaturedImagePath().trim().length > 0,
+        },
+        sources: {
+          required: false,
+          isComplete: parseSources(fields.sources.value).length > 0,
+        },
+        seoDescription: {
+          required: false,
+          isComplete: fields.seoDescription.value.trim().length > 0,
+        },
+        category: {
+          required: false,
+          isComplete: fields.category.value.trim().length > 0,
+        },
+        tags: {
+          required: false,
+          isComplete: parseTags(fields.tags.value).length > 0,
+        },
       });
 
+      const getMissingRequiredValidationItems = () =>
+        Object.entries(getValidationChecklistState()).filter(([, state]) => state.required && !state.isComplete);
+
       const updatePublishChecklist = () => {
-        const checklistState = getChecklistState();
+        const checklistState = getValidationChecklistState();
 
         fields.publishChecklistItems.forEach((item) => {
           const key = item.dataset.checklistItem;
-          const isComplete = Boolean(checklistState[key]);
+          const state = checklistState[key] || { required: false, isComplete: false };
           const icon = item.querySelector('.checklist-icon');
-
-          item.classList.toggle('is-complete', isComplete);
-          item.classList.toggle('is-missing', !isComplete);
           const label = item.querySelector('.checklist-label')?.textContent.trim() || 'Checklist item';
+          const message = item.querySelector('.checklist-message');
+          const missingRequired = state.required && !state.isComplete;
+          const missingOptional = !state.required && !state.isComplete;
 
-          item.setAttribute('aria-label', `${label}: ${isComplete ? 'complete' : 'missing'}`);
-          if (icon) icon.textContent = isComplete ? '✓' : '⚠';
+          item.classList.toggle('is-complete', state.isComplete);
+          item.classList.toggle('is-required-missing', missingRequired);
+          item.classList.toggle('is-optional-missing', missingOptional);
+          item.setAttribute(
+            'aria-label',
+            `${label}: ${state.isComplete ? 'complete' : state.required ? `missing, ${state.message}` : 'optional warning'}`
+          );
+          if (icon) icon.textContent = state.isComplete ? '✓' : missingRequired ? '!' : '⚠';
+          if (message) {
+            message.textContent = missingRequired ? state.message : '';
+            message.hidden = !missingRequired;
+          }
         });
       };
 
@@ -4535,6 +4680,13 @@ const metadata = {
 
         const { slug } = buildMarkdown();
         if (!validateSlug({ announce: true })) {
+          recalculateButtonState();
+          return;
+        }
+
+        const missingRequiredFields = getMissingRequiredValidationItems();
+        if (missingRequiredFields.length) {
+          setStatus('Complete required fields before publishing.', false);
           recalculateButtonState();
           return;
         }
