@@ -226,7 +226,12 @@ const metadata = {
                   <p id="blob-image-modal-status" class="json-draft-modal-status" aria-live="polite">
                     Select saved image artifacts to add to this article.
                   </p>
-                  <div id="blob-image-list" class="json-draft-list"></div>
+                  <div class="blob-image-modal-actions">
+                    <button id="select-marked-blob-images" class="btn-primary btn-sm" type="button"
+                      >Select Marked</button
+                    >
+                  </div>
+                  <div id="blob-image-list" class="json-draft-list blob-image-list"></div>
                 </div>
               </dialog>
             </div>
@@ -755,6 +760,68 @@ const metadata = {
     color: var(--aw-color-accent);
   }
 
+  .blob-image-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin: -0.2rem 0 0.85rem;
+  }
+
+  .blob-image-list {
+    grid-template-columns: repeat(auto-fill, minmax(8.25rem, 1fr));
+    max-height: 56vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  :global(.blob-image-choice) {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0.55rem;
+  }
+
+  :global(.blob-image-choice-thumb) {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    border-radius: 0.75rem;
+    background: rgb(229 231 235);
+    object-fit: cover;
+  }
+
+  :global(.blob-image-choice-checkbox) {
+    position: absolute;
+    top: 0.65rem;
+    right: 0.65rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin: 0;
+    accent-color: var(--aw-color-accent);
+  }
+
+  :global(.blob-image-choice-title),
+  :global(.blob-image-choice-meta) {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.blob-image-choice-title) {
+    color: var(--aw-color-text-heading);
+    font-size: 0.82rem;
+    font-weight: 400;
+  }
+
+  :global(.blob-image-choice-meta) {
+    color: var(--aw-color-text-muted);
+    font-size: 0.74rem;
+  }
+
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -877,20 +944,22 @@ const metadata = {
 
   .image-list {
     display: grid;
-    gap: 0.6rem;
+    grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+    gap: 0.8rem;
     margin: 0.8rem 0 0;
     padding: 0;
     list-style: none;
+    min-width: 0;
   }
 
   .image-list li {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
+    position: relative;
+    display: grid;
+    min-width: 0;
+    overflow: hidden;
     border: 1px solid rgb(229 231 235);
     border-radius: 1rem;
-    padding: 0.75rem;
+    padding: 0.65rem;
     background: var(--aw-color-bg-surface);
   }
 
@@ -900,6 +969,7 @@ const metadata = {
   }
 
   .image-list-message {
+    grid-column: 1 / -1;
     color: var(--aw-color-secondary);
     font-weight: 700;
   }
@@ -909,29 +979,49 @@ const metadata = {
   }
 
   .image-item-details {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    display: grid;
+    gap: 0.45rem;
     min-width: 0;
+  }
+
+  .image-item-text {
+    display: grid;
+    gap: 0.15rem;
+    min-width: 0;
+    text-align: center;
   }
 
   .image-item-meta {
     display: block;
+    min-width: 0;
+    overflow: hidden;
     color: var(--aw-color-text-muted);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .image-item-thumbnail {
-    flex: 0 0 auto;
-    width: 4rem;
-    height: 4rem;
+  .image-item-thumbnail,
+  .image-item-thumbnail-placeholder {
+    width: 100%;
+    aspect-ratio: 1 / 1;
     border-radius: 0.75rem;
+    background: rgb(229 231 235);
     object-fit: cover;
   }
 
+  .image-item-thumbnail-placeholder {
+    display: grid;
+    place-items: center;
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+  }
+
   .image-item-actions {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
     display: flex;
-    flex-wrap: wrap;
     gap: 0.5rem;
   }
 
@@ -939,8 +1029,13 @@ const metadata = {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 2.35rem;
-    padding-inline: 0.7rem;
+    width: 1.9rem;
+    min-width: 0;
+    height: 1.9rem;
+    border-radius: 999px;
+    padding: 0;
+    background: rgb(255 255 255 / 92%);
+    box-shadow: 0 0.35rem 1rem rgb(15 23 42 / 16%);
     font-size: 1.1rem;
     line-height: 1;
   }
@@ -954,6 +1049,16 @@ const metadata = {
 
   .filename {
     font-size: 0.9rem;
+  }
+
+  .image-item-text .filename {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--aw-color-text-heading);
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .module-heading-row {
@@ -1349,11 +1454,6 @@ const metadata = {
       padding: 1rem;
     }
 
-    .image-list li {
-      align-items: stretch;
-      flex-direction: column;
-    }
-
     .json-import-header,
     .json-import-actions {
       align-items: stretch;
@@ -1461,6 +1561,7 @@ const metadata = {
         blobImageModal: document.querySelector('#blob-image-modal'),
         blobImageModalClose: document.querySelector('#blob-image-modal-close'),
         blobImageModalStatus: document.querySelector('#blob-image-modal-status'),
+        selectMarkedBlobImages: document.querySelector('#select-marked-blob-images'),
         blobImageList: document.querySelector('#blob-image-list'),
         imageAllowedTypes: document.querySelector('#image-allowed-types'),
         imageMaxFileSize: document.querySelector('#image-max-file-size'),
@@ -1500,7 +1601,9 @@ const metadata = {
       let selectedFiles = [];
       let selectedArtifactReferences = [];
       let availableBlobImageArtifacts = [];
+      let stagedBlobImageKeys = new Set();
       let imagePreviewUrls = [];
+      const artifactPreviewUrlCache = new Map();
       let imageUploadMessage = '';
       let imageUploadMessageIsError = false;
       let lastLoadedJsonImportValue = '';
@@ -2165,9 +2268,51 @@ const metadata = {
         return `${Math.max(1, Math.round(bytes / 1024))} KB`;
       };
 
+      const shortenFilename = (value, maxLength = 24) => {
+        const name = String(value || '').trim();
+        if (name.length <= maxLength) return name;
+        const dotIndex = name.lastIndexOf('.');
+        const extension = dotIndex > 0 ? name.slice(dotIndex) : '';
+        const base = extension ? name.slice(0, dotIndex) : name;
+        const available = Math.max(8, maxLength - extension.length - 1);
+        const frontLength = Math.ceil(available * 0.58);
+        const backLength = Math.max(3, available - frontLength);
+        return `${base.slice(0, frontLength)}…${base.slice(-backLength)}${extension}`;
+      };
+
       const revokeImagePreviews = () => {
         imagePreviewUrls.forEach((url) => URL.revokeObjectURL(url));
         imagePreviewUrls = [];
+      };
+
+      const fetchArtifactPreviewUrl = async (artifactReference) => {
+        const blobKey = String(artifactReference?.blobKey || '').trim();
+        if (!blobKey) return '';
+        if (artifactPreviewUrlCache.has(blobKey)) return artifactPreviewUrlCache.get(blobKey);
+
+        const token = await getClerkSessionToken();
+        const response = await fetch(
+          `/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(blobKey)}`,
+          {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (!response.ok) throw new Error(`Image preview could not be loaded (${response.status}).`);
+        const objectUrl = URL.createObjectURL(await response.blob());
+        artifactPreviewUrlCache.set(blobKey, objectUrl);
+        return objectUrl;
+      };
+
+      const attachArtifactPreview = (imageElement, artifactReference) => {
+        fetchArtifactPreviewUrl(artifactReference)
+          .then((url) => {
+            if (url) imageElement.src = url;
+          })
+          .catch((error) => {
+            console.warn('Saved image preview could not be loaded.', error);
+          });
       };
 
       const syncImageInputFiles = () => {
@@ -2269,12 +2414,12 @@ const metadata = {
           const filename = document.createElement('span');
           const meta = document.createElement('span');
           const actions = document.createElement('span');
-          const copyButton = document.createElement('button');
           const removeButton = document.createElement('button');
 
           details.className = 'image-item-details';
           filename.className = 'filename';
-          filename.textContent = name;
+          filename.textContent = shortenFilename(name, 26);
+          filename.title = name;
           meta.textContent = file
             ? `${formatFileSize(file.size)} • ${file.type || 'unknown type'}`
             : artifactReference
@@ -2292,18 +2437,24 @@ const metadata = {
             thumbnail.loading = 'lazy';
             thumbnail.className = 'image-item-thumbnail';
             details.append(thumbnail);
+          } else if (artifactReference) {
+            const thumbnail = document.createElement('img');
+            thumbnail.alt = `Preview of ${name}`;
+            thumbnail.loading = 'lazy';
+            thumbnail.className = 'image-item-thumbnail';
+            attachArtifactPreview(thumbnail, artifactReference);
+            details.append(thumbnail);
+          } else {
+            const placeholder = document.createElement('span');
+            placeholder.className = 'image-item-thumbnail-placeholder';
+            placeholder.textContent = 'Image';
+            details.append(placeholder);
           }
 
           const text = document.createElement('span');
+          text.className = 'image-item-text';
           text.append(filename, meta);
           details.append(text);
-
-          copyButton.className = 'btn-secondary btn-sm copy-button';
-          copyButton.type = 'button';
-          copyButton.textContent = 'Copy Markdown';
-          copyButton.addEventListener('click', () => {
-            copyText(`![Alt text](${getUploadPath(name)})`, `Copied Markdown for ${name}.`);
-          });
 
           removeButton.className = 'btn-secondary btn-sm image-remove-button';
           removeButton.type = 'button';
@@ -2312,7 +2463,7 @@ const metadata = {
           removeButton.textContent = '×';
           removeButton.addEventListener('click', () => removeSelectedImage(index));
 
-          actions.append(copyButton, removeButton);
+          actions.append(removeButton);
           item.append(details, actions);
           fields.imageList.append(item);
         });
@@ -3710,22 +3861,35 @@ const metadata = {
           return;
         }
 
-        const selectedKeys = new Set(selectedArtifactReferences.map((reference) => reference.blobKey));
-        fields.blobImageList.innerHTML = artifacts
-          .map((artifact, index) => {
-            const name = getArtifactImageName(artifact);
-            const createdAt = formatJsonDraftDate(artifact.createdAtISO);
-            const meta = `${artifact.contentType || 'image'} · ${formatFileSize(artifact.sizeBytes)} · ${createdAt}`;
-            const checked = selectedKeys.has(artifact.blobKey) ? ' checked' : '';
-            return `<label class="json-draft-choice" data-blob-image-index="${index}">
-              <span>
-                <span class="json-draft-choice-title">${escapeHtml(name)}</span>
-                <span class="json-draft-choice-meta">${escapeHtml(meta)}</span>
-              </span>
-              <input type="checkbox" data-blob-image-checkbox="${index}"${checked} />
-            </label>`;
-          })
-          .join('');
+        fields.blobImageList.replaceChildren();
+        artifacts.forEach((artifact, index) => {
+          const name = getArtifactImageName(artifact);
+          const meta = `${artifact.contentType || 'image'} · ${formatFileSize(artifact.sizeBytes)}`;
+          const choice = document.createElement('label');
+          const thumbnail = document.createElement('img');
+          const title = document.createElement('span');
+          const metaElement = document.createElement('span');
+          const checkbox = document.createElement('input');
+
+          choice.className = 'json-draft-choice blob-image-choice';
+          choice.dataset.blobImageIndex = String(index);
+          thumbnail.className = 'blob-image-choice-thumb';
+          thumbnail.alt = `Preview of ${name}`;
+          thumbnail.loading = 'lazy';
+          title.className = 'blob-image-choice-title';
+          title.textContent = shortenFilename(name, 24);
+          title.title = name;
+          metaElement.className = 'blob-image-choice-meta';
+          metaElement.textContent = meta;
+          checkbox.className = 'blob-image-choice-checkbox';
+          checkbox.type = 'checkbox';
+          checkbox.dataset.blobImageCheckbox = String(index);
+          checkbox.checked = stagedBlobImageKeys.has(artifact.blobKey);
+
+          attachArtifactPreview(thumbnail, artifact);
+          choice.append(thumbnail, title, metaElement, checkbox);
+          fields.blobImageList.append(choice);
+        });
       };
 
       const loadBlobImageChoices = async () => {
@@ -3746,6 +3910,7 @@ const metadata = {
             throw new Error(result.error || `Saved image artifacts could not be listed (${response.status}).`);
           }
           availableBlobImageArtifacts = mergeArtifactReferences(selectedArtifactReferences, result.images || []);
+          stagedBlobImageKeys = new Set(selectedArtifactReferences.map((reference) => reference.blobKey));
 
           renderBlobImageChoices(availableBlobImageArtifacts);
           setBlobImageModalStatus(
@@ -3767,26 +3932,29 @@ const metadata = {
         loadBlobImageChoices();
       };
 
-      const toggleSelectedBlobImage = (index, selected) => {
+      const toggleStagedBlobImage = (index, selected) => {
         const artifact = availableBlobImageArtifacts[index];
-        if (!artifact) return;
-        const artifactName = getArtifactImageName(artifact);
-        if (selected) {
-          selectedArtifactReferences = mergeArtifactReferences(selectedArtifactReferences, [artifact]);
-        } else {
-          selectedArtifactReferences = selectedArtifactReferences.filter(
-            (reference) => reference.blobKey !== artifact.blobKey
-          );
-        }
+        if (!artifact?.blobKey) return;
+        if (selected) stagedBlobImageKeys.add(artifact.blobKey);
+        else stagedBlobImageKeys.delete(artifact.blobKey);
+      };
+
+      const selectMarkedBlobImages = () => {
+        selectedArtifactReferences = availableBlobImageArtifacts.filter((artifact) =>
+          stagedBlobImageKeys.has(artifact.blobKey)
+        );
         syncImageNames();
         setImageUploadMessage(
-          selected ? `Added saved image ${artifactName}.` : `Removed saved image ${artifactName}.`,
+          selectedArtifactReferences.length
+            ? `${selectedArtifactReferences.length} saved image${selectedArtifactReferences.length === 1 ? '' : 's'} selected.`
+            : 'No saved images selected.',
           false
         );
         renderImages();
         updatePreview();
         updatePublishOutput();
         setUnsavedChanges(true);
+        closeBlobImageModal();
       };
 
       const openJsonDraftModal = () => {
@@ -3873,8 +4041,9 @@ const metadata = {
       fields.blobImageList.addEventListener('change', (event) => {
         const target = event.target instanceof HTMLInputElement ? event.target : null;
         if (!target?.matches('[data-blob-image-checkbox]')) return;
-        toggleSelectedBlobImage(Number(target.dataset.blobImageCheckbox), target.checked);
+        toggleStagedBlobImage(Number(target.dataset.blobImageCheckbox), target.checked);
       });
+      fields.selectMarkedBlobImages.addEventListener('click', selectMarkedBlobImages);
       fields.blobImageModal.addEventListener('click', (event) => {
         if (event.target === fields.blobImageModal) closeBlobImageModal();
       });
@@ -4160,6 +4329,8 @@ const metadata = {
         workflowLockRefreshTimer = undefined;
         if (toastTimer) window.clearTimeout(toastTimer);
         toastTimer = undefined;
+        artifactPreviewUrlCache.forEach((url) => URL.revokeObjectURL(url));
+        artifactPreviewUrlCache.clear();
       });
 
       releaseStoredWorkflowLockOnLoad();
