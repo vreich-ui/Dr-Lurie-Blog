@@ -384,8 +384,8 @@ const metadata = {
             <p id="suggested-location" class="suggestion">src/data/post/slug.md</p>
           </div>
 
-          <div class="actions">
-            <div class="publish-action-group">
+          <div class="actions publish-actions" aria-label="Publishing actions">
+            <div class="publish-action-group" aria-label="Primary publish action">
               <button
                 id="publish"
                 class="btn-primary action-primary"
@@ -1198,6 +1198,10 @@ const metadata = {
     margin-top: 1rem;
   }
 
+  .publish-actions {
+    padding-bottom: 0.25rem;
+  }
+
   .publish-action-group {
     display: grid;
     gap: 0.45rem;
@@ -1224,6 +1228,13 @@ const metadata = {
     border-color: transparent;
     background: transparent;
     color: var(--aw-color-text-muted);
+    box-shadow: none;
+  }
+
+  .actions .action-tertiary:not(:disabled):hover,
+  .actions .action-tertiary:not(:disabled):focus-visible {
+    background: rgb(94 140 138 / 10%);
+    color: var(--aw-color-accent);
   }
 
   .actions > button,
