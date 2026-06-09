@@ -130,6 +130,7 @@ const metadata = {
                 autocomplete="off"
                 placeholder="article-slug"
                 aria-describedby="slug-edit-hint"
+                readonly
               />
               <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
             </div>
@@ -1794,6 +1795,7 @@ const metadata = {
       let workflowLockExpiresAt = '';
       let workflowLockRefreshTimer;
       let workflowReadOnlyMode = false;
+      let readOnlySourceDraftId = '';
       const workflowLockOwnerId = 'admin-publish-ui';
       const workflowLockOwnerLabel = 'Admin publish UI';
       const workflowLockStorageKey = 'dr-lurie-admin-publish-active-workflow-lock';
@@ -1834,10 +1836,7 @@ const metadata = {
 
       const isEditMode = () => Boolean(getEditSlug());
 
-      const getSlugEditHint = () =>
-        isEditMode()
-          ? `Slug is locked in edit mode. Updates overwrite src/data/post/${getEditSlug()}.md in place.`
-          : '';
+      const getSlugEditHint = () => 'Slug is generated from the title and cannot be edited directly.';
 
       const setUnsavedChanges = (value) => {
         hasUnsavedChanges = Boolean(value);
@@ -1866,9 +1865,7 @@ const metadata = {
       const getMarkdownWordCount = () => fields.content.value.trim().split(/\s+/).filter(Boolean).length;
 
       const getHasMinimumDraftContent = () =>
-        Boolean(
-          fields.title.value.trim() && slugify(fields.slug.value || fields.title.value) && fields.author.value.trim()
-        );
+        Boolean(fields.title.value.trim() && slugify(fields.title.value) && fields.author.value.trim());
 
       const getHasPreviewContent = () =>
         Boolean(
@@ -1896,15 +1893,13 @@ const metadata = {
         const missingRequiredFields = getMissingRequiredValidationItems();
         const hasRequiredValidationFields = missingRequiredFields.length === 0;
         const canUseWorkflowLock = hasCurrentWorkflowLock();
-        const canSaveDraft = !workflowReadOnlyMode && isAdmin && hasDraftFields && hasUnsavedChanges;
+        const canSaveDraft = isAdmin && hasDraftFields && hasUnsavedChanges;
         const canPreview =
-          !workflowReadOnlyMode &&
           isAdmin &&
           getHasPreviewContent() &&
           (getCheckedOutWorkflowDraft().requestId || lastSavedDraftId || (hasUnsavedChanges && hasDraftFields));
         const canPublish = Boolean(
-          !workflowReadOnlyMode &&
-            isAdmin &&
+          isAdmin &&
             hasRequiredValidationFields &&
             fields.author.value.trim() &&
             hasValidSlug &&
@@ -1928,7 +1923,9 @@ const metadata = {
         fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
         fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
         fields.overwrite.checked = editing || fields.overwrite.checked;
-        fields.slug.disabled = editing;
+        fields.slug.readOnly = true;
+        fields.slug.disabled = false;
+        syncSlugFromTitle();
         validateSlug();
       };
 
@@ -2363,10 +2360,13 @@ const metadata = {
         imageNames = selectedImages.map((image) => image.name);
       };
 
-      const getCurrentSlug = () =>
-        isEditMode()
-          ? getEditSlug()
-          : slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+      const getCurrentSlug = () => slugify(fields.title.value || 'untitled-article') || 'untitled-article';
+
+      const syncSlugFromTitle = () => {
+        fields.slug.value = getCurrentSlug();
+        validateSlug();
+        return fields.slug.value;
+      };
 
       const getUploadPath = (filename) =>
         getUploadRepoPath(filename).replace('src/assets/images/uploads/', '~/assets/images/uploads/');
@@ -2409,6 +2409,10 @@ const metadata = {
       const getCheckedOutWorkflowDraft = () => {
         const params = new URLSearchParams(window.location.search);
         const storedLock = getStoredActiveWorkflowLock();
+        if (workflowReadOnlyMode && !workflowRequestId && !workflowLockToken) {
+          return { requestId: '', lockToken: '' };
+        }
+
         const requestId =
           workflowRequestId ||
           params.get('draftId') ||
@@ -3171,6 +3175,7 @@ const metadata = {
         workflowLockToken = '';
         workflowLockExpiresAt = '';
         workflowReadOnlyMode = false;
+        readOnlySourceDraftId = '';
         clearWorkflowLockRefreshTimer();
         clearStoredWorkflowLockState();
         localStorage.removeItem(draftKey);
@@ -3229,6 +3234,7 @@ const metadata = {
         workflowLockToken = lock.token;
         workflowLockExpiresAt = lock.expires_at || '';
         workflowReadOnlyMode = false;
+        readOnlySourceDraftId = '';
         sessionStorage.setItem('dr-lurie-workflow-request-id', workflowRequestId);
         sessionStorage.setItem('dr-lurie-workflow-lock-token', workflowLockToken);
         if (workflowLockExpiresAt) sessionStorage.setItem('dr-lurie-workflow-lock-expires-at', workflowLockExpiresAt);
@@ -3417,6 +3423,8 @@ const metadata = {
         clearLocalCheckoutState();
         lastSavedDraftId = '';
         editArticleLoaded = false;
+        workflowReadOnlyMode = false;
+        readOnlySourceDraftId = '';
         fields.title.value = '';
         fields.slug.value = '';
         fields.excerpt.value = '';
@@ -3458,6 +3466,19 @@ const metadata = {
         fields.title.focus();
       };
 
+      const createAbortError = (message) => {
+        const error = new Error(message);
+        error.name = 'AbortError';
+        return error;
+      };
+
+      const isAbortError = (error) => error instanceof Error && error.name === 'AbortError';
+
+      const confirmReadOnlyDraftClone = () =>
+        window.confirm(
+          `This JSON draft${readOnlySourceDraftId ? ` (${readOnlySourceDraftId})` : ''} was opened read-only because another workflow owns it. Create a new JSON draft instance for your changes? The original draft will not be modified.`
+        );
+
       const postJsonDraftToBlobs = async (clerkToken, requestId, lockToken) => {
         const response = await fetch('/.netlify/functions/admin-save-json-draft', {
           method: 'POST',
@@ -3478,10 +3499,17 @@ const metadata = {
 
       const saveJsonDraftToBlobs = async () => {
         const clerkToken = await getClerkSessionToken();
-        const checkedOut = getCheckedOutWorkflowDraft();
-        if (checkedOut.requestId) await ensureWorkflowLock(checkedOut.requestId);
+        const shouldCloneReadOnlyDraft = workflowReadOnlyMode && !workflowRequestId && !workflowLockToken;
+        if (shouldCloneReadOnlyDraft && !confirmReadOnlyDraftClone()) {
+          throw createAbortError('New JSON draft creation was cancelled.');
+        }
 
-        let { requestId, lockToken } = getCheckedOutWorkflowDraft();
+        const checkedOut = getCheckedOutWorkflowDraft();
+        if (!shouldCloneReadOnlyDraft && checkedOut.requestId) await ensureWorkflowLock(checkedOut.requestId);
+
+        let { requestId, lockToken } = shouldCloneReadOnlyDraft
+          ? { requestId: '', lockToken: '' }
+          : getCheckedOutWorkflowDraft();
         let { response, result } = await postJsonDraftToBlobs(clerkToken, requestId, lockToken);
 
         if (!response.ok && requestId && (result.lock_expired || result.error === 'lock_expired')) {
@@ -3503,6 +3531,8 @@ const metadata = {
           sessionStorage.setItem('dr-lurie-workflow-request-id', savedRequestId);
           if (result.record?.lock?.token) storeWorkflowLockFromRecord(result.record);
           else if (!getCheckedOutWorkflowDraft().lockToken) await checkoutWorkflowRequest(savedRequestId);
+          workflowReadOnlyMode = false;
+          readOnlySourceDraftId = '';
         }
 
         return result;
@@ -3532,6 +3562,11 @@ const metadata = {
           setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
           return true;
         } catch (error) {
+          if (isAbortError(error)) {
+            setStatus(error.message, false);
+            return false;
+          }
+
           console.error('JSON draft save failed.', error);
           const recoverySaved = saveLocalRecoveryDraft();
           const message = isWorkflowLockError(error)
@@ -3575,7 +3610,7 @@ const metadata = {
 
       const populateArticleForEdit = (article) => {
         fields.title.value = article.title || '';
-        fields.slug.value = getEditSlug() || article.slug || '';
+        syncSlugFromTitle();
         fields.excerpt.value = article.excerpt || '';
         fields.publishDate.value = formatEditPublishDate(article.publishDate);
         fields.author.value = article.author || '';
@@ -3633,10 +3668,7 @@ const metadata = {
           }
 
           populateArticleForEdit(result.article || result);
-          setStatus(
-            `Editing ${editSlug}. Slug is locked; publishing will update src/data/post/${editSlug}.md in place.`,
-            false
-          );
+          setStatus(`Editing ${editSlug}. Slug is generated from the title.`, false);
         } catch (error) {
           editArticleLoaded = false;
           setStatus(error instanceof Error ? error.message : 'Article could not be loaded for editing.', false);
@@ -3916,8 +3948,8 @@ const metadata = {
           throw new Error('Import JSON must include a non-empty title.');
         }
 
-        if (!formData.slug.exists || !formData.slug.value.trim()) {
-          throw new Error('Import JSON must include a slug or enough title text to compute one.');
+        if (!slugify(formData.title.value)) {
+          throw new Error('Import JSON title must include enough text to compute a slug.');
         }
 
         if (!formData.author.exists || !formData.author.value.trim()) {
@@ -3935,7 +3967,7 @@ const metadata = {
 
       const applyContentSourceImportFormData = (formData) => {
         if (formData.title.exists) fields.title.value = formData.title.value;
-        if (formData.slug.exists) fields.slug.value = formData.slug.value;
+        syncSlugFromTitle();
         if (formData.author.exists) fields.author.value = formData.author.value;
         if (formData.excerpt.exists) fields.excerpt.value = formData.excerpt.value;
         if (formData.seoDescription.exists) fields.seoDescription.value = formData.seoDescription.value;
@@ -4181,6 +4213,7 @@ const metadata = {
           workflowLockToken = '';
           workflowLockExpiresAt = '';
           workflowReadOnlyMode = true;
+          readOnlySourceDraftId = draftId;
           clearWorkflowLockRefreshTimer();
           fields.jsonUploadName.textContent = `${draftId} (read-only)`;
           setJsonImportStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`);
@@ -4547,13 +4580,7 @@ const metadata = {
       };
 
       fields.title.addEventListener('input', () => {
-        if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
-      });
-
-      ['input', 'change'].forEach((eventName) => {
-        fields.slug.addEventListener(eventName, () => {
-          validateSlug({ announce: true });
-        });
+        syncSlugFromTitle();
       });
 
       fields.jsonUpload.addEventListener('change', async () => {
@@ -4707,6 +4734,7 @@ const metadata = {
         updatePublishOutput();
 
         const { slug } = buildMarkdown();
+        syncSlugFromTitle();
         if (!validateSlug({ announce: true })) {
           recalculateButtonState();
           return;
