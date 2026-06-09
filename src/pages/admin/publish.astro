@@ -421,8 +421,6 @@ const metadata = {
     display: grid;
     gap: 1.25rem;
     min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
   }
 
   .publish-sidebar {
@@ -480,20 +478,11 @@ const metadata = {
   }
 
   .admin-card {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
     border: 1px solid rgb(229 231 235);
     border-radius: 1.5rem;
     background: rgb(255 255 255 / 84%);
     box-shadow: 0 1.5rem 4rem rgb(15 23 42 / 6%);
     padding: 1.5rem;
-  }
-
-  .admin-form {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
   }
 
   :global(.dark) .admin-card {
@@ -503,9 +492,6 @@ const metadata = {
   }
 
   .json-import-card {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
     margin-bottom: 1.3rem;
     border: 1px solid rgb(229 231 235);
     border-radius: 1.1rem;
@@ -524,19 +510,10 @@ const metadata = {
     align-items: center;
     justify-content: space-between;
     gap: 0.9rem;
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
   }
 
   .json-import-header {
     margin-bottom: 0.85rem;
-  }
-
-  .json-import-header > div,
-  .json-import-actions > span {
-    min-width: 0;
-    max-width: 100%;
   }
 
   .json-import-toolbar {
@@ -639,25 +616,17 @@ const metadata = {
   }
 
   .json-upload-name {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
     color: var(--aw-color-text-muted);
     font-size: 0.88rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .json-import-status {
-    min-width: 0;
-    max-width: 100%;
     min-height: 1.3em;
     margin: 0.65rem 0 0;
-    overflow: hidden;
     color: var(--aw-color-text-muted);
     font-size: 0.92rem;
     font-weight: 700;
-    overflow-wrap: anywhere;
   }
 
   .json-import-status.is-error {
@@ -910,7 +879,6 @@ const metadata = {
   select,
   textarea {
     width: 100%;
-    max-width: 100%;
     border: 1px solid rgb(209 213 219);
     border-radius: 0.85rem;
     padding: 0.78rem 0.9rem;
@@ -1016,19 +984,19 @@ const metadata = {
     min-width: 0;
   }
 
-  .image-item-details > span {
+  .image-item-text {
+    display: grid;
+    gap: 0.15rem;
     min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
+    text-align: center;
   }
 
   .image-item-meta {
     display: block;
     min-width: 0;
-    max-width: 100%;
     overflow: hidden;
     color: var(--aw-color-text-muted);
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -1075,22 +1043,22 @@ const metadata = {
   .filename,
   .preview-image-path,
   .suggestion {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
+    overflow-wrap: anywhere;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .filename {
-    display: block;
     font-size: 0.9rem;
   }
 
-  .preview-image-path {
-    display: inline-block;
-    vertical-align: bottom;
+  .image-item-text .filename {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--aw-color-text-heading);
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .module-heading-row {
