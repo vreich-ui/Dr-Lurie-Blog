@@ -2066,6 +2066,29 @@ const metadata = {
 
       const imagePathPattern = /\.(?:png|jpe?g|webp|gif|svg)(?:[?#].*)?$/i;
 
+      const getUploadRepoPath = (filename) => `src/assets/images/uploads/${getCurrentSlug()}/${filename}`;
+
+      const normalizeUploadRepoPath = (value) => {
+        const raw = toTrimmedString(value).replace(/[?#].*$/, '');
+        if (!raw) return '';
+        if (raw.startsWith('~/assets/images/uploads/')) {
+          return raw.replace('~/assets/images/uploads/', 'src/assets/images/uploads/');
+        }
+        if (raw.startsWith('/src/assets/images/uploads/')) return raw.slice(1);
+        return raw.startsWith('src/assets/images/uploads/') ? raw : '';
+      };
+
+      const getMediaEntryPathValue = (entry) =>
+        toTrimmedString(entry?.repoPath) || toTrimmedString(entry?.path) || toTrimmedString(entry?.displayPath);
+
+      const getMediaEntryFinalRepoPath = (entry) => {
+        const normalizedPath = normalizeUploadRepoPath(getMediaEntryPathValue(entry));
+        if (normalizedPath && imagePathPattern.test(normalizedPath)) return normalizedPath;
+        return getUploadRepoPath(getMediaEntryImageName(entry));
+      };
+
+      const getMediaEntryPreviewPath = (entry) => getPreviewableImagePath(getMediaEntryPathValue(entry));
+
       const hasUsableMediaEntryContent = (entry) => {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
         const content = getMediaEntryContent(entry);
@@ -2085,11 +2108,17 @@ const metadata = {
         );
       };
 
+      const hasPreviewableMediaEntry = (entry) =>
+        hasUsableMediaEntryContent(entry) || Boolean(getMediaEntryPreviewPath(entry));
+
       const getMediaEntryPreviewSrc = (entry) => {
         const content = getMediaEntryContent(entry);
-        if (content.startsWith('data:image/')) return content;
-        const contentType = getMediaEntryContentType(entry) || 'image/png';
-        return `data:${contentType};base64,${content}`;
+        if (content) {
+          if (content.startsWith('data:image/')) return content;
+          const contentType = getMediaEntryContentType(entry) || 'image/png';
+          return `data:${contentType};base64,${content}`;
+        }
+        return getMediaEntryPreviewPath(entry);
       };
 
       const getPreviewableImagePath = (value) => {
@@ -2122,15 +2151,34 @@ const metadata = {
       };
 
       const mergeMediaEntries = (...groups) => {
-        const byNameAndContent = new Map();
+        const byFinalPath = new Map();
         groups.flat().forEach((entry) => {
-          if (!hasUsableMediaEntryContent(entry)) return;
-          byNameAndContent.set(`${getMediaEntryImageName(entry)}:${getMediaEntryContent(entry)}`, entry);
+          if (!hasPreviewableMediaEntry(entry)) return;
+          byFinalPath.set(getMediaEntryFinalRepoPath(entry).toLowerCase(), entry);
         });
-        return Array.from(byNameAndContent.values());
+        return Array.from(byFinalPath.values());
+      };
+
+      const dedupeSelectedPublishImages = () => {
+        const usedFinalPaths = new Set();
+        const keepPath = (path) => {
+          const key = String(path || '')
+            .trim()
+            .toLowerCase();
+          if (!key || usedFinalPaths.has(key)) return false;
+          usedFinalPaths.add(key);
+          return true;
+        };
+
+        selectedFiles = selectedFiles.filter((file) => keepPath(getUploadRepoPath(sanitizeFilename(file.name))));
+        selectedMediaEntries = selectedMediaEntries.filter((entry) => keepPath(getMediaEntryFinalRepoPath(entry)));
+        selectedArtifactReferences = selectedArtifactReferences.filter((reference) =>
+          keepPath(getUploadRepoPath(getArtifactImageName(reference)))
+        );
       };
 
       const syncImageNames = () => {
+        dedupeSelectedPublishImages();
         imageNames = Array.from(
           new Set([
             ...selectedFiles.map((file) => sanitizeFilename(file.name)),
@@ -2146,7 +2194,8 @@ const metadata = {
           ? getEditSlug()
           : slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
 
-      const getUploadPath = (filename) => `~/assets/images/uploads/${getCurrentSlug()}/${filename}`;
+      const getUploadPath = (filename) =>
+        getUploadRepoPath(filename).replace('src/assets/images/uploads/', '~/assets/images/uploads/');
 
       const getFeaturedImagePath = () => {
         const value = fields.featuredImage.value.trim();
