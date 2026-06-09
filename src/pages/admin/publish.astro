@@ -2428,20 +2428,33 @@ const metadata = {
         imagePreviewUrls = [];
       };
 
+      const getArtifactPreviewParams = (artifactReference) => {
+        const blobKey = String(artifactReference?.blobKey || '').trim();
+        if (!blobKey) return undefined;
+
+        const params = new URLSearchParams({ blobKey });
+        const contentType = String(artifactReference?.contentType || '').trim();
+        if (contentType) params.set('contentType', contentType);
+        return params;
+      };
+
+      const fetchArtifactPreviewResponse = async (artifactReference, clerkToken) => {
+        const params = getArtifactPreviewParams(artifactReference);
+        if (!params) throw new Error('Image artifact reference is missing a blob key.');
+
+        return fetch(`/.netlify/functions/admin-get-blob-image?${params.toString()}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${clerkToken}` },
+        });
+      };
+
       const fetchArtifactPreviewUrl = async (artifactReference) => {
         const blobKey = String(artifactReference?.blobKey || '').trim();
         if (!blobKey) return '';
         if (artifactPreviewUrlCache.has(blobKey)) return artifactPreviewUrlCache.get(blobKey);
 
-        const params = new URLSearchParams({ blobKey });
-        const contentType = String(artifactReference?.contentType || '').trim();
-        if (contentType) params.set('contentType', contentType);
-
         const token = await getClerkSessionToken();
-        const response = await fetch(`/.netlify/functions/admin-get-blob-image?${params.toString()}`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await fetchArtifactPreviewResponse(artifactReference, token);
 
         if (!response.ok) throw new Error(`Image preview could not be loaded (${response.status}).`);
         const objectUrl = URL.createObjectURL(await response.blob());
@@ -3091,38 +3104,60 @@ const metadata = {
         return Array.isArray(artifactReferences) ? artifactReferences : [];
       };
 
-      const pluralize = (count, singular, plural = `${singular}s`) => (count === 1 ? singular : plural);
-
-      const getReadableArtifactReferences = async (requestId, artifactReferences, clerkToken) => {
-        if (!artifactReferences.length) return { artifactReferences, skipped: 0 };
-
-        const response = await fetch(
-          `/.netlify/functions/admin-list-blob-images?requestId=${encodeURIComponent(requestId)}`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${clerkToken}`,
-              'Content-Type': 'application/json',
-            },
-          }
+      const getLatestSelectedArtifactReferences = (latestWorkflowRecord) => {
+        const selectedBlobKeys = new Set(
+          selectedArtifactReferences.map((reference) => String(reference?.blobKey || '').trim()).filter(Boolean)
         );
-        const result = await response.json().catch(() => ({}));
+        if (!selectedBlobKeys.size) return [];
 
-        if (!response.ok) {
-          throw new Error(result.error || `Artifact references could not be verified (${response.status}).`);
+        const latestByBlobKey = new Map(
+          getLatestArtifactReferences(latestWorkflowRecord)
+            .filter((reference) => selectedBlobKeys.has(String(reference?.blobKey || '').trim()))
+            .map((reference) => [String(reference?.blobKey || '').trim(), reference])
+        );
+
+        return selectedArtifactReferences.map((reference) => {
+          const blobKey = String(reference?.blobKey || '').trim();
+          return latestByBlobKey.get(blobKey) || reference;
+        });
+      };
+
+      const formatArtifactReselectionMessage = (references) => {
+        const names = references.map((reference) => shortenFilename(getArtifactImageName(reference), 24));
+        return `Image artifact${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}. Re-select or re-upload ${
+          names.length === 1 ? 'this image' : 'these images'
+        } before publishing.`;
+      };
+
+      const validateReadableArtifactReferences = async (artifactReferences, clerkToken) => {
+        if (!artifactReferences.length) return artifactReferences;
+
+        setStatus(
+          `Validating ${artifactReferences.length} selected image artifact${artifactReferences.length === 1 ? '' : 's'}…`,
+          false
+        );
+
+        const results = await Promise.all(
+          artifactReferences.map(async (reference) => {
+            try {
+              const response = await fetchArtifactPreviewResponse(reference, clerkToken);
+              if (!response.ok) throw new Error(`Image artifact could not be read (${response.status}).`);
+              await response.blob();
+              return { reference, readable: true };
+            } catch (error) {
+              console.warn('Selected image artifact could not be read before publish.', error);
+              return { reference, readable: false };
+            }
+          })
+        );
+
+        const failedReferences = results.filter((result) => !result.readable).map((result) => result.reference);
+
+        if (failedReferences.length) {
+          throw new Error(formatArtifactReselectionMessage(failedReferences));
         }
 
-        const readableBlobKeys = new Set(
-          (Array.isArray(result.images) ? result.images : [])
-            .map((image) => (typeof image?.blobKey === 'string' ? image.blobKey : ''))
-            .filter(Boolean)
-        );
-        const skipped = Number.isFinite(Number(result.skipped)) ? Number(result.skipped) : 0;
-
-        return {
-          artifactReferences: artifactReferences.filter((reference) => readableBlobKeys.has(reference?.blobKey)),
-          skipped,
-        };
+        return results.map((result) => result.reference);
       };
 
       const resetPublisherForm = () => {
@@ -4452,22 +4487,12 @@ const metadata = {
 
           setStatus('Refreshing latest workflow state…', false);
           const latestWorkflowRecord = await fetchLatestWorkflowRequest(requestId);
-          const latestArtifactReferences = getLatestArtifactReferences(latestWorkflowRecord);
-          const { artifactReferences, skipped: skippedArtifactCount } = await getReadableArtifactReferences(
-            requestId,
-            latestArtifactReferences,
+          const artifactReferences = await validateReadableArtifactReferences(
+            getLatestSelectedArtifactReferences(latestWorkflowRecord),
             clerkToken
           );
-          const skippedArtifactMessage = skippedArtifactCount
-            ? ` Skipped ${skippedArtifactCount} stale ${pluralize(skippedArtifactCount, 'artifact')} whose blob bytes could not be read.`
-            : '';
 
-          setStatus(
-            skippedArtifactCount
-              ? `Publishing article to GitHub…${skippedArtifactMessage}`
-              : 'Publishing article to GitHub…',
-            false
-          );
+          setStatus('Publishing article to GitHub…', false);
 
           const files = await Promise.all(
             selectedFiles.filter(Boolean).map(async (file) => ({
@@ -4542,7 +4567,7 @@ const metadata = {
           }
 
           setStatus(
-            `${isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`}${skippedArtifactMessage}${workflowWarning}`,
+            `${isEditMode() ? `Updated ${publishedPath} in place${commitText}.` : `Published ${publishedPath}${commitText}.`}${workflowWarning}`,
             false
           );
           setUnsavedChanges(false);

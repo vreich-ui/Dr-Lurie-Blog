@@ -215,7 +215,7 @@ const getArtifactRequestId = (reference: ArtifactReference, fallback: string) =>
 };
 
 const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: string) => {
-  const metadataFilename = toStringValue(reference.metadata?.filename);
+  const metadataFilename = toStringValue(reference.metadata?.filename) ?? toStringValue(reference.metadata?.name);
   const filename = metadataFilename ? sanitizeFilename(metadataFilename) : undefined;
 
   if (filename) return filename;
@@ -240,18 +240,30 @@ const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
   }
 };
 
-const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string) => {
+const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string, filename: string) => {
   const binaryStore = store as BinaryReadableArtifactBlobStore;
-  const bytes = await binaryStore.get(blobKey, { type: 'buffer' });
+  let bytes: Buffer | ArrayBuffer | string | null;
 
-  if (bytes === null) return undefined;
+  try {
+    bytes = await binaryStore.get(blobKey, { type: 'buffer' });
+  } catch (error) {
+    console.error('Artifact blob store read failed during publish.', { blobKey, filename, error });
+    throw new PublishError(404, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
+  }
+
+  if (bytes === null) {
+    console.warn('Artifact blob was missing during publish.', { blobKey, filename });
+    throw new PublishError(404, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
+  }
   if (Buffer.isBuffer(bytes)) return bytes;
   if (bytes instanceof ArrayBuffer) return Buffer.from(bytes);
   if (typeof bytes === 'string') {
-    throw new PublishError(500, 'Artifact blob store returned text for binary artifact bytes.');
+    console.error('Artifact blob store returned text for binary artifact bytes during publish.', { blobKey, filename });
+    throw new PublishError(500, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
   }
 
-  return undefined;
+  console.warn('Artifact blob store returned unsupported bytes during publish.', { blobKey, filename });
+  throw new PublishError(500, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
 };
 
 const normalizeExistingFeaturedImagePath = (value: unknown) => {
@@ -544,13 +556,8 @@ const getMediaEntries = async (
         throw new PublishError(500, 'Artifact blob store is not available.');
       }
 
-      const bytes = await readArtifactBytes(artifactStore, reference.blobKey);
-
-      if (!bytes) {
-        throw new PublishError(404, `Artifact blob not found: ${reference.blobKey}`);
-      }
-
       const filename = getArtifactFilename(reference, fallbackRequestId);
+      const bytes = await readArtifactBytes(artifactStore, reference.blobKey, filename);
 
       return {
         content: bytes.toString('base64'),
@@ -774,10 +781,6 @@ export const handler = async (event: LambdaEvent) => {
       imagePaths: publishImagePaths,
       error,
     });
-
-    if (error instanceof PublishError) {
-      return jsonResponse(error.statusCode, { error: error.message });
-    }
 
     if (error instanceof PublishError) {
       return jsonResponse(error.statusCode, { error: error.message });
