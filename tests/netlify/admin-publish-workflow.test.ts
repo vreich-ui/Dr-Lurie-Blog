@@ -58,3 +58,25 @@ test('admin publish flow sends lock_token to mark_published and checks in after 
   assert.ok(checkinIndex > commitMetadataIndex, 'Workflow check-in must happen after mark_published succeeds.');
   assert.ok(catchIndex > checkinIndex, 'mark_published failure handling must not check in before the success path.');
 });
+
+test('admin publish JSON import filters unreadable artifact references before selection', async () => {
+  const source = await readPublishPage();
+  const applyIndex = indexAfter(source, 'const applyContentSourceImportFormData = async (formData) =>', 0);
+  const checkIndex = indexAfter(source, 'await checkReadableArtifactReferences(importedArtifactReferences', applyIndex);
+  const selectedIndex = indexAfter(
+    source,
+    '...importedReadableArtifactReferences.map(createArtifactSelectedImage),',
+    checkIndex
+  );
+  const warningIndex = indexAfter(
+    source,
+    'formatArtifactReselectionMessage(importedFailedArtifactReferences)',
+    selectedIndex
+  );
+  const awaitApplyIndex = indexAfter(source, 'await applyContentSourceImportFormData(formData);', warningIndex);
+
+  assert.ok(checkIndex > applyIndex, 'Import should validate artifact bytes before selecting artifacts.');
+  assert.ok(selectedIndex > checkIndex, 'Only readable artifact references should become selected images.');
+  assert.ok(warningIndex > selectedIndex, 'Unreadable imported artifact references should produce a user warning.');
+  assert.ok(awaitApplyIndex > warningIndex, 'JSON load should await asynchronous artifact validation.');
+});
