@@ -18,7 +18,7 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="admin-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14"
+    class="admin-page mx-auto max-w-[1800px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     data-public-github-branch={publicGitHubBranch}
@@ -41,34 +41,32 @@ const metadata = {
     <AdminNav />
 
     <div class="publish-workspace" data-auth-gated hidden>
-      <main class="publish-main" aria-label="Publishing editor">
-        <section class="admin-card" aria-label="Publishing form">
-          <form id="publish-form" class="admin-form">
-            <div class="json-import-card" aria-labelledby="json-import-heading">
-              <div class="json-import-header">
-                <div>
-                  <h2 id="json-import-heading">Import JSON</h2>
-                  <p class="hint">
-                    Paste article JSON or upload a single <code>.json</code> file to populate this form.
-                  </p>
-                </div>
-                <div class="json-import-toolbar" aria-label="JSON import options">
-                  <button id="open-json-drafts" class="json-upload-button" type="button">
-                    <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
-                    <span>Open JSON</span>
-                  </button>
-                  <label class="json-upload-button" for="json-upload">
-                    <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
-                    <span>Upload JSON</span>
-                  </label>
-                </div>
-                <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
-              </div>
-              <textarea
-                id="json-import"
-                class="json-import-input"
-                rows="6"
-                placeholder='{
+      <section class="admin-card json-import-panel" aria-labelledby="json-import-heading">
+        <div class="json-import-card">
+          <div class="json-import-header">
+            <div>
+              <h2 id="json-import-heading">Import JSON</h2>
+              <p class="hint">
+                Paste article JSON or upload a single <code>.json</code> file to populate this form.
+              </p>
+            </div>
+            <div class="json-import-toolbar" aria-label="JSON import options">
+              <button id="open-json-drafts" class="json-upload-button" type="button">
+                <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
+                <span>Open JSON</span>
+              </button>
+              <label class="json-upload-button" for="json-upload">
+                <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
+                <span>Upload JSON</span>
+              </label>
+            </div>
+            <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
+          </div>
+          <textarea
+            id="json-import"
+            class="json-import-input"
+            rows="6"
+            placeholder='{
   "record_type": "content_source",
   "schema_version": "content_source.v1",
   "content": { "title": "Article title" },
@@ -80,40 +78,44 @@ const metadata = {
   },
   "sources": { "source_list": ["Source citation"] }
 }'
-              ></textarea>
-              <div class="json-import-actions">
-                <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
-                  <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
-                  <span>Update</span>
-                </button>
-                <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
-              </div>
-              <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
-              <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
-                <div class="json-draft-modal-card">
-                  <div class="json-draft-modal-header">
-                    <div>
-                      <p class="sidebar-kicker">Saved JSON</p>
-                      <h3 id="json-draft-modal-heading">Open JSON from Blobs</h3>
-                    </div>
-                    <button
-                      id="json-draft-modal-close"
-                      class="module-icon-button"
-                      type="button"
-                      aria-label="Close saved JSON dialog"
-                    >
-                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
-                    </button>
-                  </div>
-                  <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
-                    Select a saved JSON draft to load into the Import JSON module.
-                  </p>
-                  <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
-                  <div id="json-draft-list" class="json-draft-list"></div>
+          ></textarea>
+          <div class="json-import-actions">
+            <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
+              <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
+              <span>Update</span>
+            </button>
+            <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
+          </div>
+          <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+          <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
+            <div class="json-draft-modal-card">
+              <div class="json-draft-modal-header">
+                <div>
+                  <p class="sidebar-kicker">Saved JSON</p>
+                  <h3 id="json-draft-modal-heading">Open JSON from Blobs</h3>
                 </div>
-              </dialog>
+                <button
+                  id="json-draft-modal-close"
+                  class="module-icon-button"
+                  type="button"
+                  aria-label="Close saved JSON dialog"
+                >
+                  <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                </button>
+              </div>
+              <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
+                Select a saved JSON draft to load into the Import JSON module.
+              </p>
+              <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
+              <div id="json-draft-list" class="json-draft-list"></div>
             </div>
+          </dialog>
+        </div>
+      </section>
 
+      <main class="publish-main" aria-label="Publishing editor">
+        <section class="admin-card" aria-label="Publishing form">
+          <form id="publish-form" class="admin-form">
             <div class="field">
               <label for="title">Title</label>
               <input id="title" name="title" type="text" autocomplete="off" />
@@ -274,32 +276,15 @@ const metadata = {
           </form>
         </section>
 
-        <section class="admin-card admin-panel" aria-labelledby="preview-heading">
-          <div class="module-heading-row">
-            <h2 id="preview-heading">Inline preview</h2>
-            <button
-              id="refresh-preview"
-              class="module-icon-button"
-              type="button"
-              aria-label="Refresh inline preview"
-              title="Refresh inline preview"
-            >
-              <Icon name="tabler:refresh" class="module-action-icon" aria-hidden="true" />
-              <span class="sr-only">Refresh inline preview</span>
-            </button>
-          </div>
-          <div class="preview-box">
-            <p id="preview-excerpt" class="preview-excerpt" hidden></p>
-            <img id="preview-image-inline" class="preview-image-inline" alt="" hidden />
-            <h3 id="preview-title">Untitled article</h3>
-            <p>
-              Featured image path:
-              <span id="preview-featured-image" class="preview-image-path">None selected</span>
-            </p>
-            <div id="preview-meta" class="preview-meta" hidden></div>
-            <div id="markdown-preview" class="markdown-preview">Preview will appear here.</div>
-          </div>
-        </section>
+        <div class="preview-runtime" aria-hidden="true" hidden>
+          <button id="refresh-preview" type="button">Refresh inline preview</button>
+          <p id="preview-excerpt" hidden></p>
+          <img id="preview-image-inline" alt="" hidden />
+          <h3 id="preview-title">Untitled article</h3>
+          <span id="preview-featured-image">None selected</span>
+          <div id="preview-meta" hidden></div>
+          <div id="markdown-preview">Preview will appear here.</div>
+        </div>
       </main>
 
       <aside class="publish-sidebar" aria-labelledby="publish-output-heading">
@@ -355,10 +340,10 @@ const metadata = {
           </div>
 
           <div class="actions">
-            <button id="new-draft" class="btn-secondary" type="button">New</button>
+            <button id="publish" class="btn-primary action-primary" type="button">Publish Article</button>
             <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
-            <button id="publish" class="btn-primary" type="button">Publish Article</button>
             <button id="preview" class="btn-secondary" type="button">Preview page</button>
+            <button id="new-draft" class="btn-secondary action-tertiary" type="button">New</button>
           </div>
 
           <details class="markdown-backup" data-backup-panel open>
@@ -413,9 +398,13 @@ const metadata = {
 
   .publish-workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(20rem, 23rem);
-    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 24px;
     align-items: start;
+  }
+
+  .json-import-panel {
+    grid-column: 1 / -1;
   }
 
   .publish-main {
@@ -507,16 +496,6 @@ const metadata = {
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
-    margin-bottom: 1.3rem;
-    border: 1px solid rgb(229 231 235);
-    border-radius: 1.1rem;
-    padding: 1rem;
-    background: var(--aw-color-bg-surface);
-  }
-
-  :global(.dark) .json-import-card {
-    border-color: rgb(30 41 59);
-    background: rgb(2 6 23 / 42%);
   }
 
   .json-import-header,
@@ -535,13 +514,14 @@ const metadata = {
   }
 
   .json-import-toolbar {
-    display: grid;
+    display: flex;
+    flex: 0 0 auto;
     min-width: 9rem;
     gap: 0.6rem;
   }
 
   .json-import-toolbar .json-upload-button {
-    width: 100%;
+    width: auto;
   }
 
   .json-import-card h2 {
@@ -553,7 +533,7 @@ const metadata = {
   }
 
   .json-import-input {
-    min-height: 9rem;
+    min-height: 10rem;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
     font-size: 0.92rem;
   }
@@ -608,7 +588,7 @@ const metadata = {
   }
 
   .admin-page :where(.btn-primary, .btn-secondary) {
-    font-weight: 400;
+    font-weight: 700;
   }
 
   .json-update-button {
@@ -1161,6 +1141,17 @@ const metadata = {
     margin-top: 1rem;
   }
 
+  .actions .action-primary {
+    min-height: 3.2rem;
+    font-size: 1.02rem;
+  }
+
+  .actions .action-tertiary {
+    border-color: transparent;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+  }
+
   .actions > button,
   .actions > a {
     width: 100%;
@@ -1476,9 +1467,19 @@ const metadata = {
     color: rgb(253 230 138);
   }
 
+  @media (min-width: 1536px) {
+    .publish-workspace {
+      grid-template-columns: minmax(0, 1fr) 420px;
+    }
+  }
+
   @media (max-width: 1023px) {
     .publish-workspace {
       grid-template-columns: 1fr;
+    }
+
+    .json-import-panel {
+      grid-column: auto;
     }
 
     .publish-sidebar {
@@ -1512,7 +1513,7 @@ const metadata = {
     }
 
     .json-import-toolbar {
-      grid-template-columns: 1fr;
+      flex-direction: column;
       width: 100%;
     }
 
