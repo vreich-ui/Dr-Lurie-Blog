@@ -1649,6 +1649,7 @@ const metadata = {
         toast: document.querySelector('#toast'),
       };
 
+      let selectedImages = [];
       let imageNames = [];
       let selectedFiles = [];
       let selectedMediaEntries = [];
@@ -2159,34 +2160,81 @@ const metadata = {
         return Array.from(byFinalPath.values());
       };
 
-      const dedupeSelectedPublishImages = () => {
-        const usedFinalPaths = new Set();
-        const keepPath = (path) => {
-          const key = String(path || '')
+      const createFileSelectedImage = (file) => {
+        const name = sanitizeFilename(file.name);
+        return {
+          id: `file:${name}`,
+          kind: 'file',
+          name,
+          finalRepoPath: getUploadRepoPath(name),
+          optionValue: name,
+          file,
+        };
+      };
+
+      const createMediaSelectedImage = (mediaEntry) => {
+        const name = getMediaEntryImageName(mediaEntry);
+        const finalRepoPath = getMediaEntryFinalRepoPath(mediaEntry);
+        return {
+          id: `media:${finalRepoPath.toLowerCase()}`,
+          kind: 'media',
+          name,
+          finalRepoPath,
+          optionValue: name,
+          mediaEntry,
+        };
+      };
+
+      const createPathSelectedImage = (imagePathEntry) => {
+        const finalRepoPath = normalizeUploadRepoPath(imagePathEntry.source) || imagePathEntry.source;
+        return {
+          id: `path:${imagePathEntry.source}`,
+          kind: 'path',
+          name: imagePathEntry.name,
+          finalRepoPath,
+          optionValue: imagePathEntry.source,
+          imagePathEntry,
+        };
+      };
+
+      const createArtifactSelectedImage = (artifactReference) => {
+        const name = getArtifactImageName(artifactReference);
+        const blobKey = String(artifactReference?.blobKey || '').trim();
+        return {
+          id: `artifact:${blobKey}`,
+          kind: 'artifact',
+          name,
+          finalRepoPath: getUploadRepoPath(name),
+          optionValue: name,
+          artifactReference,
+        };
+      };
+
+      const dedupeSelectedImages = (images) => {
+        const byFinalPath = new Map();
+        images.forEach((image) => {
+          const finalPathKey = String(image?.finalRepoPath || image?.id || '')
             .trim()
             .toLowerCase();
-          if (!key || usedFinalPaths.has(key)) return false;
-          usedFinalPaths.add(key);
-          return true;
-        };
-
-        selectedFiles = selectedFiles.filter((file) => keepPath(getUploadRepoPath(sanitizeFilename(file.name))));
-        selectedMediaEntries = selectedMediaEntries.filter((entry) => keepPath(getMediaEntryFinalRepoPath(entry)));
-        selectedArtifactReferences = selectedArtifactReferences.filter((reference) =>
-          keepPath(getUploadRepoPath(getArtifactImageName(reference)))
-        );
+          if (!finalPathKey || byFinalPath.has(finalPathKey)) return;
+          byFinalPath.set(finalPathKey, image);
+        });
+        return Array.from(byFinalPath.values());
       };
 
       const syncImageNames = () => {
-        dedupeSelectedPublishImages();
-        imageNames = Array.from(
-          new Set([
-            ...selectedFiles.map((file) => sanitizeFilename(file.name)),
-            ...selectedMediaEntries.map(getMediaEntryImageName),
-            ...selectedImagePathEntries.map((entry) => entry.name),
-            ...selectedArtifactReferences.map(getArtifactImageName),
-          ])
-        );
+        selectedImages = dedupeSelectedImages(selectedImages);
+        selectedFiles = selectedImages.filter((image) => image.kind === 'file').map((image) => image.file);
+        selectedMediaEntries = selectedImages
+          .filter((image) => image.kind === 'media')
+          .map((image) => image.mediaEntry);
+        selectedImagePathEntries = selectedImages
+          .filter((image) => image.kind === 'path')
+          .map((image) => image.imagePathEntry);
+        selectedArtifactReferences = selectedImages
+          .filter((image) => image.kind === 'artifact')
+          .map((image) => image.artifactReference);
+        imageNames = selectedImages.map((image) => image.name);
       };
 
       const getCurrentSlug = () =>
@@ -2566,16 +2614,9 @@ const metadata = {
         return { validFiles, errors };
       };
 
-      const removeSelectedImage = (index) => {
+      const removeSelectedImage = (id) => {
         const previousFeaturedImage = fields.featuredImage.value;
-        const removedName = imageNames[index];
-        const fileIndex = selectedFiles.findIndex((file) => sanitizeFilename(file.name) === removedName);
-        if (fileIndex >= 0) selectedFiles.splice(fileIndex, 1);
-        selectedMediaEntries = selectedMediaEntries.filter((entry) => getMediaEntryImageName(entry) !== removedName);
-        selectedImagePathEntries = selectedImagePathEntries.filter((entry) => entry.name !== removedName);
-        selectedArtifactReferences = selectedArtifactReferences.filter(
-          (reference) => getArtifactImageName(reference) !== removedName
-        );
+        selectedImages = selectedImages.filter((image) => image.id !== id);
         syncImageNames();
         syncImageInputFiles();
         setImageUploadMessage(
@@ -2592,6 +2633,52 @@ const metadata = {
         }
         updatePreview();
         updatePublishOutput();
+      };
+
+      const getSelectedImageTypeLabel = (image) =>
+        image.kind === 'file'
+          ? 'local upload'
+          : image.kind === 'media'
+            ? 'embedded media data'
+            : image.kind === 'path'
+              ? 'existing preview path'
+              : image.kind === 'artifact'
+                ? 'publishable blob artifact'
+                : 'image';
+
+      const getSelectedImageMeta = (image) => {
+        if (image.kind === 'file') return `${formatFileSize(image.file.size)} • ${image.file.type || 'unknown type'}`;
+        if (image.kind === 'media')
+          return `embedded media data • ${getMediaEntryContentType(image.mediaEntry) || 'image'}`;
+        if (image.kind === 'path') return 'existing preview path • not a blob artifact';
+        if (image.kind === 'artifact') {
+          return `${formatFileSize(image.artifactReference.sizeBytes)} • ${image.artifactReference.contentType || 'saved image artifact'}`;
+        }
+        return 'Image';
+      };
+
+      const attachSelectedImageThumbnail = (details, image) => {
+        const thumbnail = document.createElement('img');
+        thumbnail.alt = `Preview of ${image.name}`;
+        thumbnail.loading = 'lazy';
+        thumbnail.className = 'image-item-thumbnail';
+
+        if (image.kind === 'file') {
+          const previewUrl = URL.createObjectURL(image.file);
+          imagePreviewUrls.push(previewUrl);
+          image.previewSrc = previewUrl;
+          thumbnail.src = previewUrl;
+        } else if (image.kind === 'media') {
+          thumbnail.src = getMediaEntryPreviewSrc(image.mediaEntry);
+        } else if (image.kind === 'path') {
+          thumbnail.src = image.imagePathEntry.previewSrc;
+        } else if (image.kind === 'artifact') {
+          attachArtifactPreview(thumbnail, image.artifactReference);
+        } else {
+          return;
+        }
+
+        details.append(thumbnail);
       };
 
       const renderImages = () => {
@@ -2612,24 +2699,10 @@ const metadata = {
           fields.imageList.append(messageItem);
         }
 
-        imageNames.forEach((name, index) => {
-          const file = selectedFiles.find((selectedFile) => sanitizeFilename(selectedFile.name) === name);
-          const mediaEntry = selectedMediaEntries.find((entry) => getMediaEntryImageName(entry) === name);
-          const imagePathEntry = selectedImagePathEntries.find((entry) => entry.name === name);
-          const artifactReference = selectedArtifactReferences.find(
-            (reference) => getArtifactImageName(reference) === name
-          );
+        selectedImages.forEach((image) => {
           const option = document.createElement('option');
-          option.value = imagePathEntry ? imagePathEntry.source : name;
-          option.textContent = file
-            ? `${name} (local upload)`
-            : mediaEntry
-              ? `${name} (embedded media data)`
-              : imagePathEntry
-                ? `${name} (existing preview path)`
-                : artifactReference
-                  ? `${name} (publishable blob artifact)`
-                  : name;
+          option.value = image.optionValue;
+          option.textContent = `${image.name} (${getSelectedImageTypeLabel(image)})`;
           fields.featuredImage.append(option);
 
           const item = document.createElement('li');
@@ -2641,51 +2714,13 @@ const metadata = {
 
           details.className = 'image-item-details';
           filename.className = 'filename';
-          filename.textContent = shortenFilename(name, 26);
-          filename.title = name;
-          meta.textContent = file
-            ? `${formatFileSize(file.size)} • ${file.type || 'unknown type'}`
-            : mediaEntry
-              ? `embedded media data • ${getMediaEntryContentType(mediaEntry) || 'image'}`
-              : imagePathEntry
-                ? 'existing preview path • not a blob artifact'
-                : artifactReference
-                  ? `${formatFileSize(artifactReference.sizeBytes)} • ${artifactReference.contentType || 'saved image artifact'}`
-                  : 'Image';
+          filename.textContent = shortenFilename(image.name, 26);
+          filename.title = image.name;
+          meta.textContent = getSelectedImageMeta(image);
           meta.className = 'image-item-meta';
           actions.className = 'image-item-actions';
 
-          if (file) {
-            const previewUrl = URL.createObjectURL(file);
-            const thumbnail = document.createElement('img');
-            imagePreviewUrls.push(previewUrl);
-            thumbnail.src = previewUrl;
-            thumbnail.alt = `Preview of ${name}`;
-            thumbnail.loading = 'lazy';
-            thumbnail.className = 'image-item-thumbnail';
-            details.append(thumbnail);
-          } else if (mediaEntry) {
-            const thumbnail = document.createElement('img');
-            thumbnail.src = getMediaEntryPreviewSrc(mediaEntry);
-            thumbnail.alt = `Preview of ${name}`;
-            thumbnail.loading = 'lazy';
-            thumbnail.className = 'image-item-thumbnail';
-            details.append(thumbnail);
-          } else if (imagePathEntry) {
-            const thumbnail = document.createElement('img');
-            thumbnail.src = imagePathEntry.previewSrc;
-            thumbnail.alt = `Preview of ${name}`;
-            thumbnail.loading = 'lazy';
-            thumbnail.className = 'image-item-thumbnail';
-            details.append(thumbnail);
-          } else if (artifactReference) {
-            const thumbnail = document.createElement('img');
-            thumbnail.alt = `Preview of ${name}`;
-            thumbnail.loading = 'lazy';
-            thumbnail.className = 'image-item-thumbnail';
-            attachArtifactPreview(thumbnail, artifactReference);
-            details.append(thumbnail);
-          }
+          attachSelectedImageThumbnail(details, image);
 
           const text = document.createElement('span');
           text.className = 'image-item-text';
@@ -2694,10 +2729,10 @@ const metadata = {
 
           removeButton.className = 'btn-secondary btn-sm image-remove-button';
           removeButton.type = 'button';
-          removeButton.title = `Remove ${name}`;
-          removeButton.setAttribute('aria-label', `Remove ${name}`);
+          removeButton.title = `Remove ${image.name}`;
+          removeButton.setAttribute('aria-label', `Remove ${image.name}`);
           removeButton.textContent = '×';
-          removeButton.addEventListener('click', () => removeSelectedImage(index));
+          removeButton.addEventListener('click', () => removeSelectedImage(image.id));
 
           actions.append(removeButton);
           item.append(details, actions);
@@ -2738,18 +2773,13 @@ const metadata = {
       };
 
       const getFeaturedImagePreviewUrl = () => {
-        const selectedName = fields.featuredImage.value;
-        const selectedFile = selectedFiles.find((file) => sanitizeFilename(file.name) === selectedName);
-        if (selectedFile) {
-          const selectedIndex = imageNames.indexOf(selectedName);
-          if (selectedIndex >= 0 && imagePreviewUrls[selectedIndex]) return imagePreviewUrls[selectedIndex];
-        }
-        const selectedMediaEntry = selectedMediaEntries.find((entry) => getMediaEntryImageName(entry) === selectedName);
-        if (selectedMediaEntry) return getMediaEntryPreviewSrc(selectedMediaEntry);
-        const selectedPathEntry = selectedImagePathEntries.find(
-          (entry) => entry.name === selectedName || entry.source === selectedName
+        const selectedValue = fields.featuredImage.value;
+        const selectedImage = selectedImages.find(
+          (image) => image.optionValue === selectedValue || image.name === selectedValue
         );
-        if (selectedPathEntry) return selectedPathEntry.previewSrc;
+        if (selectedImage?.kind === 'file' && selectedImage.previewSrc) return selectedImage.previewSrc;
+        if (selectedImage?.kind === 'media') return getMediaEntryPreviewSrc(selectedImage.mediaEntry);
+        if (selectedImage?.kind === 'path') return selectedImage.imagePathEntry.previewSrc;
         const featuredPath = getFeaturedImagePath();
         return getPreviewableImagePath(featuredPath);
       };
@@ -3236,12 +3266,9 @@ const metadata = {
         fields.ctaText.value = '';
         fields.seoDescription.value = '';
         fields.overwrite.checked = false;
-        selectedFiles = [];
-        selectedMediaEntries = [];
-        selectedImagePathEntries = [];
-        selectedArtifactReferences = [];
+        selectedImages = [];
+        syncImageNames();
         availableBlobImageArtifacts = [];
-        imageNames = [];
         imageUploadMessage = '';
         imageUploadMessageIsError = false;
         imageImportWarningMessage = '';
@@ -3389,11 +3416,8 @@ const metadata = {
         fields.seoDescription.value = article.seoDescription || article.metadata?.description || '';
         fields.overwrite.checked = true;
         fields.existingFeaturedImagePath.value = article.image || article.featuredImage || '';
-        selectedFiles = [];
-        selectedMediaEntries = [];
-        selectedImagePathEntries = [];
-        selectedArtifactReferences = [];
-        imageNames = [];
+        selectedImages = [];
+        syncImageNames();
         imageImportWarningMessage = '';
         renderImages();
         if (fields.existingFeaturedImagePath.value) {
@@ -3745,16 +3769,22 @@ const metadata = {
         if (formData.tags.exists) fields.tags.value = formData.tags.value;
         if (formData.sources.exists) fields.sources.value = formData.sources.value;
 
-        selectedFiles = [];
-        selectedArtifactReferences = formData.artifactReferences?.exists
+        const importedArtifactReferences = formData.artifactReferences?.exists
           ? mergeArtifactReferences(formData.artifactReferences.value)
           : [];
-        selectedMediaEntries = formData.mediaEntries?.exists ? mergeMediaEntries(formData.mediaEntries.value) : [];
+        const importedMediaEntries = formData.mediaEntries?.exists
+          ? mergeMediaEntries(formData.mediaEntries.value)
+          : [];
 
         const importedRawImageNames = formData.imageNames?.exists
           ? formData.imageNames.value.map((name) => String(name || '').trim()).filter(Boolean)
           : [];
-        selectedImagePathEntries = mergeImagePathEntries(importedRawImageNames);
+        const importedImagePathEntries = mergeImagePathEntries(importedRawImageNames);
+        selectedImages = [
+          ...importedMediaEntries.map(createMediaSelectedImage),
+          ...importedImagePathEntries.map(createPathSelectedImage),
+          ...importedArtifactReferences.map(createArtifactSelectedImage),
+        ];
         syncImageNames();
 
         const metadataOnlyImageCount = importedRawImageNames.filter((name) => {
@@ -4283,9 +4313,10 @@ const metadata = {
       };
 
       const selectMarkedBlobImages = () => {
-        selectedArtifactReferences = availableBlobImageArtifacts.filter((artifact) =>
-          stagedBlobImageKeys.has(artifact.blobKey)
-        );
+        const artifactImages = availableBlobImageArtifacts
+          .filter((artifact) => stagedBlobImageKeys.has(artifact.blobKey))
+          .map(createArtifactSelectedImage);
+        selectedImages = [...selectedImages.filter((image) => image.kind !== 'artifact'), ...artifactImages];
         syncImageNames();
         setImageUploadMessage(
           selectedArtifactReferences.length
@@ -4403,7 +4434,10 @@ const metadata = {
       fields.imageUpload.addEventListener('change', () => {
         const previousFeaturedImage = fields.featuredImage.value;
         const { validFiles, errors } = validateImageFiles(Array.from(fields.imageUpload.files || []));
-        selectedFiles = validFiles;
+        selectedImages = [
+          ...selectedImages.filter((image) => image.kind !== 'file'),
+          ...validFiles.map(createFileSelectedImage),
+        ];
         syncImageNames();
         syncImageInputFiles();
         setImageUploadMessage(
