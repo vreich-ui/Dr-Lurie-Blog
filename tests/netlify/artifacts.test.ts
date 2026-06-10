@@ -77,7 +77,7 @@ const createFakeArtifactStore = (initialValues: Record<string, FakeArtifactStore
   const values = new Map<string, FakeArtifactStoreValue>(Object.entries(initialValues));
 
   const store: ReadableArtifactBlobStore = {
-    async get(key: string, options?: { type?: 'buffer' | 'arrayBuffer' }) {
+    async get(key: string, options: { type: 'arrayBuffer' }) {
       const value = values.get(key);
       if (value === undefined) return null;
       const bytes = typeof value === 'string' ? Buffer.from(value) : value;
@@ -129,6 +129,24 @@ test('reconcileImageArtifactReference reads a valid reference with valid blob by
   assert.equal(result.status === 'found' ? result.bytes.toString() : '', 'image bytes');
 });
 
+test('reconcileImageArtifactReference reads from stores that only support arrayBuffer binary reads', async () => {
+  const reference = makeImageReference('arraybuffer-only', Buffer.from('array buffer bytes'), 'arraybuffer.jpg');
+  const values = new Map([[reference.blobKey, Buffer.from('array buffer bytes')]]);
+  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const store: ReadableArtifactBlobStore = {
+    async get(key: string, options: { type: 'arrayBuffer' }) {
+      assert.equal(options.type, 'arrayBuffer');
+      const value = values.get(key);
+      if (!value) return null;
+      return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength) as ArrayBuffer;
+    },
+  };
+
+  const result = await reconcileImageArtifactReference(reference, store);
+
+  assert.equal(result.status, 'found');
+  assert.equal(result.status === 'found' ? result.bytes.toString() : '', 'array buffer bytes');
+});
 test('reconcileImageArtifactReference reports valid JSON with missing blob bytes as missing', async () => {
   const reference = makeImageReference('missing-reference');
   const { store } = createFakeArtifactStore();

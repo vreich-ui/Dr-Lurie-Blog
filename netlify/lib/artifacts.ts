@@ -20,7 +20,7 @@ export type ArtifactReference = {
 };
 
 export type ReadableArtifactBlobStore = {
-  get(key: string, options: { type: 'buffer' }): Promise<Buffer | ArrayBuffer | string | null>;
+  get(key: string, options: { type: 'arrayBuffer' }): Promise<Buffer | ArrayBuffer | string | null>;
   list?: (options?: {
     prefix?: string;
     directories?: boolean;
@@ -66,7 +66,7 @@ const toBufferOrNull = (value: Buffer | ArrayBuffer | string | null) => {
 
 const tryReadArtifactBytes = async (store: ReadableArtifactBlobStore, key: string) => {
   try {
-    return toBufferOrNull(await store.get(key, { type: 'buffer' }));
+    return toBufferOrNull(await store.get(key, { type: 'arrayBuffer' }));
   } catch {
     return null;
   }
