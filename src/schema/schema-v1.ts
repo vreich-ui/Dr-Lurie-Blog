@@ -7,12 +7,13 @@ export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' 
 export const KNOWN_PUBLICATION_STATUSES = {
   draft: 'Saved admin draft; not publication-ready yet.',
   ready: 'Final article payload is ready for the publishing step.',
+  scheduled: 'Final article payload is scheduled for server-gated publishing at publication.scheduled_for.',
 } as const;
 
 export type KnownPublicationStatus = keyof typeof KNOWN_PUBLICATION_STATUSES;
 
 export const publicationStatusDescription =
-  'Article payload status separate from workflow_status. Known first-party values are draft and ready; published/live/scheduled are not currently publication_status values. Use workflow_status: published after mark_published for the committed live article state.';
+  'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
 
 export type AgentOutputEnvelope = {
   version: number; // agent output version (repo contract)
@@ -269,6 +270,7 @@ export type ContentSourceV1 = {
   publication?: {
     schema_version?: 'publication.v1';
     publication_status?: string; // open string; see publicationStatusDescription for first-party semantics
+    scheduled_for?: string; // ISO timestamp used when publication_status is scheduled
     publish_payload?: PublishPayload; // repo naming precedence
   };
 
@@ -619,6 +621,7 @@ export const contentSourceV1Schema = z
       .object({
         schema_version: z.literal('publication.v1').optional(),
         publication_status: z.string().describe(publicationStatusDescription).optional(),
+        scheduled_for: z.string().optional(),
         publish_payload: publishPayloadSchema.optional(),
       })
       .strict()

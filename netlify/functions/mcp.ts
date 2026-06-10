@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
+import { handler as publishArticleHandler } from './publish-article.js';
 import { getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
@@ -40,7 +41,9 @@ const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_a
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 const PUBLICATION_STATUS_DESCRIPTION =
-  'Article payload status separate from workflow_status. Known first-party values are draft and ready; published/live/scheduled are not currently publication_status values. Use workflow_status: published after mark_published for the committed live article state.';
+  'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
+
+const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 
 const jsonHeaders = {
   'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id',
@@ -52,6 +55,64 @@ const jsonHeaders = {
 };
 
 const textContent = (text: string) => [{ type: 'text', text }];
+
+const toNonEmptyString = (value: unknown) => {
+  if (typeof value !== 'string') return undefined;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const getRecordValue = (value: unknown) =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined;
+
+const safeSecretsMatch = (provided: string, expected: string) => {
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (providedBuffer.length !== expectedBuffer.length) return false;
+
+  return timingSafeEqual(providedBuffer, expectedBuffer);
+};
+
+const verifyScheduledPublishToken = (token: unknown) => {
+  const provided = toNonEmptyString(token);
+  const expected = process.env.SCHEDULED_PUBLISH_TOKEN;
+
+  if (!expected) {
+    return {
+      ok: false as const,
+      error: 'Scheduled publishing is not configured on the server.',
+      error_code: 'scheduled_publish_not_configured',
+    };
+  }
+
+  if (!provided || !safeSecretsMatch(provided, expected)) {
+    return {
+      ok: false as const,
+      error: 'Scheduled publish token is missing or invalid.',
+      error_code: 'invalid_scheduled_publish_token',
+    };
+  }
+
+  return { ok: true as const };
+};
+
+const getScheduledTime = (publication: Record<string, unknown>, publishPayload?: Record<string, unknown>) =>
+  toNonEmptyString(publication.scheduled_for) ??
+  toNonEmptyString(publication.scheduledFor) ??
+  toNonEmptyString(publishPayload?.scheduled_for) ??
+  toNonEmptyString(publishPayload?.scheduledFor);
+
+const parseJsonResponseBody = (bodyText: string | undefined) => {
+  if (!bodyText) return {};
+
+  try {
+    return JSON.parse(bodyText) as Record<string, unknown>;
+  } catch {
+    return { error: bodyText };
+  }
+};
 
 const toolResult = (payload: Record<string, unknown>) => ({
   content: textContent(JSON.stringify(payload, null, 2)),
@@ -484,6 +545,9 @@ const contentSourceV1JsonSchema = objectSchema(
     publication: objectSchema({
       schema_version: constStringSchema('publication.v1'),
       publication_status: stringSchema(PUBLICATION_STATUS_DESCRIPTION),
+      scheduled_for: stringSchema(
+        'ISO timestamp for scheduled publication. Due scheduled-publish calls may publish when this timestamp is now, in the past, or within the short server due window.'
+      ),
       publish_payload: publishPayloadJsonSchema,
     }),
     workflow: objectSchema({
@@ -659,6 +723,27 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ['request_id', 'lock_token', 'commit_metadata']
     ),
   },
+  {
+    name: 'save_json_blob_publish_scheduled',
+    description:
+      'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, publication.scheduled_for due now or in the short server due window, and a server-configured scheduled publish token. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema(),
+        expected_record_version: intSchema(
+          'Optional workflow record version that should be visible before marking published.'
+        ),
+        lock_token: lockTokenSchema,
+        scheduled_publish_token: stringSchema(
+          'One-time or short-lived scheduled publish authorization token provided by an admin-controlled channel.'
+        ),
+        agent_id: stringSchema('Stable identifier for the agent or process requesting scheduled publication.'),
+        agent_owner: stringSchema('Human, team, or admin owner responsible for the scheduled publishing agent.'),
+        agent_label: stringSchema('Optional human-readable label for audit metadata.'),
+      },
+      ['request_id', 'lock_token', 'scheduled_publish_token', 'agent_id', 'agent_owner']
+    ),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -831,7 +916,6 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
   }
 
   const saveResponse = await saveJsonBlobHandler({
-    blobs: event.blobs,
     httpMethod: 'POST',
     headers: createSaveJsonBlobHeaders(event, publishSecret),
     body: JSON.stringify(payload),
@@ -866,7 +950,6 @@ const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, un
   }
 
   const saveResponse = await saveArtifactHandler({
-    blobs: event.blobs,
     httpMethod: 'POST',
     headers: createSaveJsonBlobHeaders(event, publishSecret),
     body: JSON.stringify(payload),
@@ -890,6 +973,147 @@ const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, un
   }
 
   return parsedBody;
+};
+
+const callPublishArticle = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return {
+      ok: false as const,
+      statusCode: 500,
+      body: {
+        error: 'Article publishing is not configured on the server.',
+        error_code: 'article_publish_not_configured',
+      },
+    };
+  }
+
+  const publishResponse = await publishArticleHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
+      ...(getHeader(event.headers, 'x-nf-deploy-id')
+        ? { 'x-nf-deploy-id': getHeader(event.headers, 'x-nf-deploy-id') }
+        : {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = parseJsonResponseBody(publishResponse.body);
+
+  if (publishResponse.statusCode < 200 || publishResponse.statusCode >= 300) {
+    return { ok: false as const, statusCode: publishResponse.statusCode, body };
+  }
+
+  return { ok: true as const, statusCode: publishResponse.statusCode, body };
+};
+
+const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const tokenResult = verifyScheduledPublishToken(input.scheduled_publish_token);
+  if (!tokenResult.ok) return toolError(tokenResult.error, tokenResult);
+
+  const agentId = toNonEmptyString(input.agent_id);
+  const agentOwner = toNonEmptyString(input.agent_owner);
+  const agentLabel = toNonEmptyString(input.agent_label);
+
+  if (!agentId || !agentOwner) {
+    return toolError('agent_id and agent_owner are required for scheduled publishing.', {
+      error_code: 'missing_scheduled_publish_agent_identity',
+    });
+  }
+
+  const requestId = toNonEmptyString(input.request_id);
+  const lockToken = toNonEmptyString(input.lock_token);
+  if (!requestId || !lockToken) return toolError('request_id and lock_token are required.');
+
+  const getResult = await invokeSaveJsonBlob(event, { action: 'get_request', request_id: requestId });
+  if ('isError' in getResult) return getResult;
+
+  const record = getRecordValue(getResult.record);
+  const recordInput = getRecordValue(record?.input);
+  const publication = getRecordValue(recordInput?.publication);
+  const publishPayload = getRecordValue(publication?.publish_payload);
+  const publicationStatus = toNonEmptyString(publication?.publication_status)?.toLowerCase();
+
+  if (publicationStatus !== 'scheduled') {
+    return toolError('Scheduled publish requires publication.publication_status: scheduled.', {
+      error_code: 'publication_not_scheduled',
+      publication_status: publication?.publication_status,
+    });
+  }
+
+  const scheduledFor = publication ? getScheduledTime(publication, publishPayload) : undefined;
+  const scheduledMs = scheduledFor ? Date.parse(scheduledFor) : Number.NaN;
+
+  if (!scheduledFor || Number.isNaN(scheduledMs)) {
+    return toolError('Scheduled publish requires a valid publication.scheduled_for ISO timestamp.', {
+      error_code: 'invalid_scheduled_for',
+      scheduled_for: scheduledFor,
+    });
+  }
+
+  const nowMs = Date.now();
+  if (scheduledMs > nowMs + SCHEDULED_PUBLISH_DUE_WINDOW_MS) {
+    return toolError('Scheduled article is not due for publishing yet.', {
+      error_code: 'scheduled_publish_not_due',
+      scheduled_for: scheduledFor,
+      now: new Date(nowMs).toISOString(),
+      due_window_ms: SCHEDULED_PUBLISH_DUE_WINDOW_MS,
+    });
+  }
+
+  if (!publishPayload) {
+    return toolError('Scheduled publish requires publication.publish_payload.', {
+      error_code: 'missing_publish_payload',
+    });
+  }
+
+  const publishResult = await callPublishArticle(event, {
+    ...publishPayload,
+    requestId,
+    request_id: requestId,
+    lock_token: lockToken,
+  });
+
+  if (!publishResult.ok) {
+    return toolError('Scheduled article was not published.', {
+      error_code: 'scheduled_publish_failed',
+      publish_status: publishResult.statusCode,
+      publish_result: publishResult.body,
+      scheduled_for: scheduledFor,
+    });
+  }
+
+  const commitMetadata = {
+    commit: publishResult.body.commit,
+    articlePath: publishResult.body.articlePath ?? publishResult.body.path,
+    deployStatus: publishResult.body.deployStatus,
+    message: publishResult.body.message,
+    scheduled_for: scheduledFor,
+    scheduled_publish: true,
+    agent_id: agentId,
+    agent_owner: agentOwner,
+    ...(agentLabel ? { agent_label: agentLabel } : {}),
+  };
+
+  const markResult = await invokeSaveJsonBlob(event, {
+    action: 'mark_published',
+    request_id: requestId,
+    expected_record_version: input.expected_record_version,
+    lock_token: lockToken,
+    commit_metadata: commitMetadata,
+  });
+
+  if ('isError' in markResult) return markResult;
+
+  return toolResult({
+    record: markResult.record,
+    publish_result: publishResult.body,
+    commit_metadata: commitMetadata,
+  });
 };
 
 const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, unknown>) => {
@@ -1054,6 +1278,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         },
         'record'
       );
+    case 'save_json_blob_publish_scheduled':
+      return callScheduledPublish(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');

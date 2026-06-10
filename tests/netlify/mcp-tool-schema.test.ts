@@ -66,8 +66,9 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
 
   const publication = inputProperties.publication as Record<string, unknown>;
   const publicationStatus = property(publication, 'publication_status') as { description?: string };
-  assert.match(String(publicationStatus.description), /Known first-party values are draft and ready/);
-  assert.match(String(publicationStatus.description), /published\/live\/scheduled are not currently publication_status values/);
+  assert.match(String(publicationStatus.description), /Known first-party values are draft, ready, and scheduled/);
+  assert.match(String(publicationStatus.description), /published\/live are not publication_status values/);
+  assert.ok(property(publication, 'scheduled_for'));
 });
 
 test('content_source.v1 MCP schema describes high-value agent fields and controlled extensions', async () => {
@@ -231,6 +232,28 @@ test('stage mark-complete helpers expose transition fields and document common r
   const finalTool = tools.get('final_article_mark_complete');
   assert.ok(finalTool);
   assert.match(String((finalTool as { description?: string }).description), /workflow_status: "completed"/);
+});
+
+test('save_json_blob_publish_scheduled exposes gated scheduled publish inputs', async () => {
+  const body = await listTools();
+  const tool = body.result.tools.find((item) => item.name === 'save_json_blob_publish_scheduled');
+
+  assert.ok(tool, 'Expected save_json_blob_publish_scheduled to be registered.');
+  assert.deepEqual(tool.inputSchema.required, [
+    'request_id',
+    'lock_token',
+    'scheduled_publish_token',
+    'agent_id',
+    'agent_owner',
+  ]);
+  assert.ok(property(tool.inputSchema, 'expected_record_version'));
+  assert.ok(property(tool.inputSchema, 'agent_label'));
+  assert.match(String((tool as { description?: string }).description), /publication\.publication_status: scheduled/);
+  assert.match(String((tool as { description?: string }).description), /mark the workflow published/i);
+
+  const serializedSchema = JSON.stringify(tool);
+  assert.equal(serializedSchema.includes('NETLIFY_PUBLISH_SECRET'), false);
+  assert.equal(serializedSchema.includes('PUBLISH_SECRET'), false);
 });
 
 test('save_json_blob_mark_published exposes only workflow-state inputs', async () => {

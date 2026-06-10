@@ -310,6 +310,19 @@ test('create_request returns HTTP 400 when content_source discriminators are inv
   assert.ok(body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'schema_version'));
 });
 
+test('content_source.v1 accepts scheduled publication metadata', () => {
+  const scheduledContentSource = {
+    ...validContentSourceV1,
+    publication: {
+      ...validContentSourceV1.publication,
+      publication_status: 'scheduled',
+      scheduled_for: '2026-06-10T12:00:00.000Z',
+    },
+  };
+
+  assert.equal(validateContentSourceV1(scheduledContentSource), true);
+});
+
 test('publication_status stays open while documenting first-party states separately from workflow_status', () => {
   const futureStatusContentSource = {
     ...validContentSourceV1,
