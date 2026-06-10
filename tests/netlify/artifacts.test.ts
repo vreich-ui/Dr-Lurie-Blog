@@ -171,6 +171,22 @@ test('reconcileImageArtifactReference recovers a blob stored under a leading sla
   assert.equal(result.blobKey, correctedKey);
 });
 
+test('reconcileImageArtifactReference recovers a same-filename blob stored under a different request prefix', async () => {
+  const reference = makeImageReference('stale-request-prefix', Buffer.from('moved bytes'), 'hero.png');
+  const correctedKey = reference.blobKey.replace('image/stale-request-prefix/', 'image/current-request-prefix/');
+  const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('moved bytes') });
+  const { values, store: indexStore } = createFakeIndexStore();
+  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+
+  const result = await reconcileImageArtifactReference(reference, store, indexStore);
+
+  assert.equal(result.status, 'found');
+  assert.equal(result.blobKey, correctedKey);
+  assert.deepEqual(values.get(`request-artifacts/current-request-prefix/${reference.sha256}.json`), {
+    ...reference,
+    blobKey: correctedKey,
+  });
+});
 test('reconcileImageArtifactReference falls back across jpg jpeg png webp extensions by sha basename', async () => {
   const reference = makeImageReference('extension-fallback', Buffer.from('extension bytes'), 'hero.jpg');
   const correctedKey = reference.blobKey.replace(/\.jpg$/, '.jpeg');

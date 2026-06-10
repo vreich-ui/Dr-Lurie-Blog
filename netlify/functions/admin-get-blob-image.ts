@@ -223,6 +223,7 @@ export const handler = async (event: LambdaEvent) => {
       });
 
       return jsonResponse(404, {
+        ...createArtifactDebugFields(event, blobKey, contentTypeSource),
         reason: 'missing-artifact-bytes',
         blobKey,
         store: 'artifacts',
@@ -239,6 +240,7 @@ export const handler = async (event: LambdaEvent) => {
       });
 
       return jsonResponse(409, {
+        ...createArtifactDebugFields(event, blobKey, contentTypeSource),
         error: 'Saved image artifact bytes are ambiguous.',
         blobKey,
         store: 'artifacts',

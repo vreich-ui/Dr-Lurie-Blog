@@ -74,16 +74,12 @@ const tryReadArtifactBytes = async (store: ReadableArtifactBlobStore, key: strin
 
 const uniqueValues = <T>(values: T[]) => [...new Set(values)];
 
-const getNearbyImageArtifactKeys = async (store: ReadableArtifactBlobStore, normalizedBlobKey: string) => {
+const listImageArtifactKeysForPrefixes = async (store: ReadableArtifactBlobStore, prefixes: string[]) => {
   if (typeof store.list !== 'function') return [];
 
-  const prefix = getBlobKeyPrefix(normalizedBlobKey);
-  if (!prefix) return [];
-
-  const prefixes = uniqueValues([prefix, `artifacts/${prefix}`, `/${prefix}`]);
   const keys: string[] = [];
 
-  for (const candidatePrefix of prefixes) {
+  for (const candidatePrefix of uniqueValues(prefixes.filter(Boolean))) {
     try {
       const result = await store.list({ prefix: candidatePrefix, directories: false, paginate: true });
       const items = await collectBlobListItems(result as BlobListResponse);
@@ -94,6 +90,17 @@ const getNearbyImageArtifactKeys = async (store: ReadableArtifactBlobStore, norm
   }
 
   return uniqueValues(keys).sort();
+};
+
+const getNearbyImageArtifactKeys = async (store: ReadableArtifactBlobStore, normalizedBlobKey: string) => {
+  const prefix = getBlobKeyPrefix(normalizedBlobKey);
+  if (!prefix) return [];
+
+  return listImageArtifactKeysForPrefixes(store, [prefix, `artifacts/${prefix}`, `/${prefix}`]);
+};
+
+const getGlobalImageArtifactKeys = async (store: ReadableArtifactBlobStore) => {
+  return listImageArtifactKeysForPrefixes(store, ['image/', 'artifacts/image/', '/image/']);
 };
 
 const getExtension = (filename: string) => filename.split('.').pop()?.toLowerCase() || '';
@@ -185,7 +192,14 @@ export const reconcileImageArtifactReference = async (
   }
 
   const nearbyKeys = await getNearbyImageArtifactKeys(artifactStore, normalizedBlobKey);
-  const matches = getImageArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
+  let matches = getImageArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
+  let searchedKeys = nearbyKeys;
+
+  if (!matches.length) {
+    const globalKeys = await getGlobalImageArtifactKeys(artifactStore);
+    matches = getImageArtifactKeyMatches(globalKeys, normalizedBlobKey);
+    searchedKeys = uniqueValues([...nearbyKeys, ...globalKeys]).sort();
+  }
 
   if (matches.length === 1) {
     const correctedBlobKey = matches[0];
@@ -199,7 +213,7 @@ export const reconcileImageArtifactReference = async (
         blobKey: correctedBlobKey,
         bytes: correctedBytes,
         correctedBlobKey: correctedBlobKey === reference.blobKey ? undefined : correctedBlobKey,
-        nearbyKeys,
+        nearbyKeys: searchedKeys,
       };
     }
   }
@@ -207,14 +221,14 @@ export const reconcileImageArtifactReference = async (
   const exactFilename = basename(normalizedBlobKey);
 
   if (matches.length > 1) {
-    return { status: 'ambiguous', blobKey: normalizedBlobKey, matchingKeys: matches, nearbyKeys };
+    return { status: 'ambiguous', blobKey: normalizedBlobKey, matchingKeys: matches, nearbyKeys: searchedKeys };
   }
 
   return {
     status: 'missing',
     blobKey: normalizedBlobKey,
-    nearbyKeys,
-    exactFilenameExists: nearbyKeys.some((key) => basename(key) === exactFilename),
+    nearbyKeys: searchedKeys,
+    exactFilenameExists: searchedKeys.some((key) => basename(key) === exactFilename),
   };
 };
 

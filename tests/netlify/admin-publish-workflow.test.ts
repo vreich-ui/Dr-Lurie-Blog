@@ -81,21 +81,22 @@ test('admin publish JSON import filters unreadable artifact references before se
   assert.ok(awaitApplyIndex > warningIndex, 'JSON load should await asynchronous artifact validation.');
 });
 
-test('admin publish image picker scopes blob image list to checked-out workflow request when available', async () => {
+test('admin publish image picker lists all saved blob images instead of scoping to a workflow request', async () => {
   const source = await readPublishPage();
   const loadIndex = indexAfter(source, 'const loadBlobImageChoices = async () =>', 0);
   const tokenIndex = indexAfter(source, 'const token = await getClerkSessionToken();', loadIndex);
-  const requestIdIndex = indexAfter(source, 'const { requestId } = getCheckedOutWorkflowDraft();', tokenIndex);
-  const scopedUrlIndex = indexAfter(
+  const fetchIndex = indexAfter(
     source,
-    '? `/.netlify/functions/admin-list-blob-images?requestId=${encodeURIComponent(requestId)}`',
-    requestIdIndex
+    "const response = await fetch('/.netlify/functions/admin-list-blob-images', {",
+    tokenIndex
   );
-  const fallbackUrlIndex = indexAfter(source, ": '/.netlify/functions/admin-list-blob-images';", scopedUrlIndex);
-  const fetchIndex = indexAfter(source, 'const response = await fetch(blobImageListUrl, {', fallbackUrlIndex);
+  const renderIndex = indexAfter(source, 'renderBlobImageChoices(availableBlobImageArtifacts);', fetchIndex);
 
-  assert.ok(requestIdIndex > tokenIndex, 'Image picker should read the checked-out workflow request id.');
-  assert.ok(scopedUrlIndex > requestIdIndex, 'Image picker should pass requestId when one is available.');
-  assert.ok(fallbackUrlIndex > scopedUrlIndex, 'Global image listing should remain only as the no-request fallback.');
-  assert.ok(fetchIndex > fallbackUrlIndex, 'Image picker should fetch the computed scoped-or-fallback URL.');
+  assert.equal(
+    source.includes('admin-list-blob-images?requestId='),
+    false,
+    'Image picker should not limit the saved image list to the checked-out workflow request.'
+  );
+  assert.ok(fetchIndex > tokenIndex, 'Image picker should fetch the global saved image artifact list.');
+  assert.ok(renderIndex > fetchIndex, 'Image picker should render the global saved image artifact list response.');
 });
