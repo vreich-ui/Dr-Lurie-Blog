@@ -200,7 +200,7 @@ metadata:
 title: "Retinol Recovery Rules: When to Pause, Restart, or Scale Back"
 publishDate: 2026-06-09T08:58:00.000Z
 excerpt: "Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset."
-image: "~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back/image/req_retinol-recovery-rules-20260608-001/b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg"
+image: "~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back/req_retinol-recovery-rules-20260608-001/b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg"
 tags:
   - "retinol"
   - "retinoids"
