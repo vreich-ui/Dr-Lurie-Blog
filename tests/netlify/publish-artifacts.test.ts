@@ -245,15 +245,26 @@ test('publish-article reports stale saved image references instead of a generic 
   }
 });
 
-test('publish-article accepts existing site image asset URLs as featured images', async () => {
+test('publish-article ignores a stale existingFeaturedImagePath when the featured image is a selected artifact', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
   process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
   process.env.GITHUB_REPOSITORY = 'owner/repo';
-  process.env.GITHUB_BRANCH = 'main';
+  process.env.GITHUB_BRANCH = 'feature/image-artifacts';
 
+  const requestId = `artifact-featured-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const artifactBytes = Buffer.from('featured artifact bytes');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'featured-artifact.png',
+    encoding: 'base64',
+    payload: artifactBytes.toString('base64'),
+    metadata: { filename: 'Featured Artifact.PNG' },
+  });
   const originalFetch = globalThis.fetch;
   const blobWrites: Array<{ content: string; encoding: string }> = [];
   let treePaths: string[] = [];
@@ -262,11 +273,11 @@ test('publish-article accepts existing site image asset URLs as featured images'
     const url = String(input);
     const method = init?.method ?? 'GET';
 
-    if (url.includes('/contents/src/data/post/site-featured-image-test.md')) {
+    if (url.includes('/contents/src/data/post/artifact-featured-image-test.md')) {
       return new Response('not found', { status: 404 });
     }
 
-    if (url.includes('/git/ref/heads/main')) {
+    if (url.includes('/git/ref/heads/feature%2Fimage-artifacts')) {
       return Response.json({ object: { sha: 'base-sha' } });
     }
 
@@ -292,7 +303,7 @@ test('publish-article accepts existing site image asset URLs as featured images'
       return Response.json({ sha: 'new-commit' });
     }
 
-    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+    if (url.includes('/git/refs/heads/feature%2Fimage-artifacts') && method === 'PATCH') {
       return Response.json({ ok: true });
     }
 
@@ -300,26 +311,30 @@ test('publish-article accepts existing site image asset URLs as featured images'
   }) as typeof fetch;
 
   try {
-    const featuredImage = 'https://kugelmedia.netlify.app/drlurieblog/final-article.jpg';
     const response = await publishHandler({
       httpMethod: 'POST',
       headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
       body: JSON.stringify({
-        slug: 'site-featured-image-test',
-        title: 'Site Featured Image Test',
-        content: 'Site featured image body',
-        featuredImage,
-        existingFeaturedImagePath: featuredImage,
+        slug: 'artifact-featured-image-test',
+        title: 'Artifact Featured Image Test',
+        markdown: '# Artifact featured image test',
+        featuredImage: 'featured-artifact.png',
+        existingFeaturedImagePath: 'https://example.com/stale-image.jpg',
+        artifactReferences: [upload.artifact],
         overwrite: false,
       }),
     });
 
     assert.equal(response.statusCode, 201, response.body);
-    assert.deepEqual(treePaths, ['src/data/post/site-featured-image-test.md']);
+    assert.deepEqual(treePaths, [
+      'src/data/post/artifact-featured-image-test.md',
+      'src/assets/images/uploads/artifact-featured-image-test/featured-artifact.png',
+    ]);
     assert.match(
       blobWrites[0]?.content ?? '',
-      /image: "https:\/\/kugelmedia\.netlify\.app\/drlurieblog\/final-article\.jpg"/
+      /image: "~\/assets\/images\/uploads\/artifact-featured-image-test\/featured-artifact\.png"/
     );
+    assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -100,3 +100,27 @@ test('admin publish image picker lists all saved blob images instead of scoping 
   assert.ok(fetchIndex > tokenIndex, 'Image picker should fetch the global saved image artifact list.');
   assert.ok(renderIndex > fetchIndex, 'Image picker should render the global saved image artifact list response.');
 });
+
+test('admin publish payload omits stale existing featured paths for selected publishable images', async () => {
+  const source = await readPublishPage();
+  const helperIndex = indexAfter(source, 'const getExistingFeaturedImagePathForPayload = () =>', 0);
+  const selectedPublishableIndex = indexAfter(
+    source,
+    'isSelectedPublishableImageValue(fields.featuredImage.value)',
+    helperIndex
+  );
+  const publishPayloadIndex = indexAfter(
+    source,
+    'existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),',
+    selectedPublishableIndex
+  );
+
+  assert.ok(
+    selectedPublishableIndex > helperIndex,
+    'Existing featured path helper should check whether the selected featured image is publishable.'
+  );
+  assert.ok(
+    publishPayloadIndex > selectedPublishableIndex,
+    'Publish payload should use the helper instead of blindly sending the hidden existingFeaturedImagePath value.'
+  );
+});
