@@ -44,6 +44,59 @@ const hasNetlifyBlobContext = (event: unknown) => {
 const isNetlifyRuntime = (event: unknown) =>
   process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID) || hasNetlifyBlobContext(event);
 
+type BlobStoreSource = 'explicit-api-config' | 'lambda-context' | 'netlify-name-lookup' | 'local-file-backed';
+
+export type BlobStoreSourceDiagnostics = {
+  storeName: string;
+  source: BlobStoreSource;
+  explicitApiConfigUsed: boolean;
+  lambdaBlobContextUsed: boolean;
+  siteId: {
+    envVar: 'NETLIFY_SITE_ID' | 'SITE_ID' | undefined;
+    present: boolean;
+    redacted: string;
+  };
+};
+
+const getSiteIdDiagnostic = (): BlobStoreSourceDiagnostics['siteId'] => {
+  const envVar = process.env.NETLIFY_SITE_ID ? 'NETLIFY_SITE_ID' : process.env.SITE_ID ? 'SITE_ID' : undefined;
+  const value = envVar ? process.env[envVar] || '' : '';
+
+  return {
+    envVar,
+    present: Boolean(value),
+    redacted: value ? `…${value.slice(-4)}` : '',
+  };
+};
+
+export const getBlobStoreSourceDiagnostics = (storeName: string, event: unknown): BlobStoreSourceDiagnostics => {
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+  const explicitApiConfigUsed = Boolean(siteID && token);
+  const lambdaBlobContextUsed = !explicitApiConfigUsed && hasNetlifyBlobContext(event);
+  const source = explicitApiConfigUsed
+    ? 'explicit-api-config'
+    : lambdaBlobContextUsed
+      ? 'lambda-context'
+      : isNetlifyRuntime(event)
+        ? 'netlify-name-lookup'
+        : 'local-file-backed';
+
+  return {
+    storeName,
+    source,
+    explicitApiConfigUsed,
+    lambdaBlobContextUsed,
+    siteId: getSiteIdDiagnostic(),
+  };
+};
+
+export const getCoreBlobStoreSourceDiagnostics = (event: unknown) => ({
+  workflows: getBlobStoreSourceDiagnostics('workflows', event),
+  artifactIndex: getBlobStoreSourceDiagnostics('artifact-index', event),
+  artifacts: getBlobStoreSourceDiagnostics('artifacts', event),
+});
+
 // Build an explicit Netlify Blobs API configuration (siteID + token) for a named store.
 // Returns undefined when credentials are absent, signalling that the caller should fall
 // back to the Lambda-injected blob context instead.

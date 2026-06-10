@@ -58,3 +58,69 @@ test('admin publish flow sends lock_token to mark_published and checks in after 
   assert.ok(checkinIndex > commitMetadataIndex, 'Workflow check-in must happen after mark_published succeeds.');
   assert.ok(catchIndex > checkinIndex, 'mark_published failure handling must not check in before the success path.');
 });
+
+test('admin publish JSON import filters unreadable artifact references before selection', async () => {
+  const source = await readPublishPage();
+  const applyIndex = indexAfter(source, 'const applyContentSourceImportFormData = async (formData) =>', 0);
+  const checkIndex = indexAfter(source, 'await checkReadableArtifactReferences(importedArtifactReferences', applyIndex);
+  const selectedIndex = indexAfter(
+    source,
+    '...importedReadableArtifactReferences.map(createArtifactSelectedImage),',
+    checkIndex
+  );
+  const warningIndex = indexAfter(
+    source,
+    'formatArtifactReselectionMessage(importedFailedArtifactReferences)',
+    selectedIndex
+  );
+  const awaitApplyIndex = indexAfter(source, 'await applyContentSourceImportFormData(formData);', warningIndex);
+
+  assert.ok(checkIndex > applyIndex, 'Import should validate artifact bytes before selecting artifacts.');
+  assert.ok(selectedIndex > checkIndex, 'Only readable artifact references should become selected images.');
+  assert.ok(warningIndex > selectedIndex, 'Unreadable imported artifact references should produce a user warning.');
+  assert.ok(awaitApplyIndex > warningIndex, 'JSON load should await asynchronous artifact validation.');
+});
+
+test('admin publish image picker lists all saved blob images instead of scoping to a workflow request', async () => {
+  const source = await readPublishPage();
+  const loadIndex = indexAfter(source, 'const loadBlobImageChoices = async () =>', 0);
+  const tokenIndex = indexAfter(source, 'const token = await getClerkSessionToken();', loadIndex);
+  const fetchIndex = indexAfter(
+    source,
+    "const response = await fetch('/.netlify/functions/admin-list-blob-images', {",
+    tokenIndex
+  );
+  const renderIndex = indexAfter(source, 'renderBlobImageChoices(availableBlobImageArtifacts);', fetchIndex);
+
+  assert.equal(
+    source.includes('admin-list-blob-images?requestId='),
+    false,
+    'Image picker should not limit the saved image list to the checked-out workflow request.'
+  );
+  assert.ok(fetchIndex > tokenIndex, 'Image picker should fetch the global saved image artifact list.');
+  assert.ok(renderIndex > fetchIndex, 'Image picker should render the global saved image artifact list response.');
+});
+
+test('admin publish payload omits stale existing featured paths for selected publishable images', async () => {
+  const source = await readPublishPage();
+  const helperIndex = indexAfter(source, 'const getExistingFeaturedImagePathForPayload = () =>', 0);
+  const selectedPublishableIndex = indexAfter(
+    source,
+    'isSelectedPublishableImageValue(fields.featuredImage.value)',
+    helperIndex
+  );
+  const publishPayloadIndex = indexAfter(
+    source,
+    'existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),',
+    selectedPublishableIndex
+  );
+
+  assert.ok(
+    selectedPublishableIndex > helperIndex,
+    'Existing featured path helper should check whether the selected featured image is publishable.'
+  );
+  assert.ok(
+    publishPayloadIndex > selectedPublishableIndex,
+    'Publish payload should use the helper instead of blindly sending the hidden existingFeaturedImagePath value.'
+  );
+});

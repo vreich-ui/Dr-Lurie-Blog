@@ -122,7 +122,7 @@ const metadata = {
             </div>
 
             <div class="field">
-              <label for="slug">Slug</label>
+              <label for="slug">Publishing target</label>
               <input
                 id="slug"
                 name="slug"
@@ -130,6 +130,7 @@ const metadata = {
                 autocomplete="off"
                 placeholder="article-slug"
                 aria-describedby="slug-edit-hint"
+                readonly
               />
               <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
             </div>
@@ -268,11 +269,6 @@ const metadata = {
               <label for="seo-description">Optional SEO description</label>
               <input id="seo-description" name="seoDescription" type="text" maxlength="180" />
             </div>
-
-            <div class="field checkbox-field">
-              <input id="overwrite-slug" name="overwrite" type="checkbox" />
-              <label for="overwrite-slug">Overwrite an existing article with this slug</label>
-            </div>
           </form>
         </section>
 
@@ -292,28 +288,86 @@ const metadata = {
           <p class="sidebar-kicker">Readiness & Actions</p>
           <h2 id="publish-output-heading">Content output</h2>
 
+          <div id="article-status-card" class="article-status-card article-status-card--draft" aria-live="polite">
+            <h3>Article Status</h3>
+            <div class="article-status-summary">
+              <span id="article-status-icon" class="article-status-icon" aria-hidden="true">○</span>
+              <div>
+                <p id="article-status-title" class="article-status-title">Draft</p>
+                <p id="article-status-subtitle" class="article-status-subtitle">No published article found</p>
+              </div>
+            </div>
+            <div id="article-status-details" class="article-status-details">
+              <p>Saved draft changes are not live until published.</p>
+            </div>
+          </div>
+
           <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
-            <h3 id="publish-checklist-heading">Readiness checklist</h3>
+            <h3 id="publish-checklist-heading">Validation checklist</h3>
+            <p class="checklist-intro">Review required fields and optional publishing warnings before going live.</p>
             <ul id="publish-checklist" aria-live="polite">
               <li data-checklist-item="title">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Title present</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Title</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
               <li data-checklist-item="slug">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Valid slug</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Publishing target</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
               <li data-checklist-item="content">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Content present</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Content</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
               <li data-checklist-item="excerpt">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Excerpt</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Excerpt</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
-              <li data-checklist-item="publishDate">
+              <li data-checklist-item="featuredImage">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
-                <span class="checklist-label">Publish date</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Featured image</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="sources">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Sources</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="seoDescription">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">SEO description</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="category">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Category</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
+              </li>
+              <li data-checklist-item="tags">
+                <span class="checklist-icon" aria-hidden="true">☐</span>
+                <span class="checklist-copy">
+                  <span class="checklist-label">Tags</span>
+                  <span class="checklist-message" hidden></span>
+                </span>
               </li>
             </ul>
           </div>
@@ -325,25 +379,41 @@ const metadata = {
 
           <div class="publish-output-summary" aria-label="Content output summary">
             <div class="summary-heading-row">
-              <p class="summary-label">Destination slug</p>
+              <p class="summary-label">Publishing target</p>
               <a
                 class="summary-edit-link"
                 href="#slug"
-                aria-label="Edit destination slug"
-                title="Edit destination slug"
+                aria-label="Edit publishing target"
+                title="Edit publishing target"
               >
                 <Icon name="tabler:pencil" class="summary-edit-icon" aria-hidden="true" />
-                <span class="sr-only">Edit destination slug</span>
+                <span class="sr-only">Edit publishing target</span>
               </a>
             </div>
             <p id="suggested-location" class="suggestion">src/data/post/slug.md</p>
           </div>
 
-          <div class="actions">
-            <button id="publish" class="btn-primary action-primary" type="button">Publish Article</button>
+          <div class="actions publish-actions" aria-label="Publishing actions">
+            <div class="publish-action-group" aria-label="Primary publish action">
+              <label id="overwrite-publish-control" class="overwrite-publish-control" for="overwrite-slug" hidden>
+                <input id="overwrite-slug" name="overwrite" type="checkbox" />
+                <span>Overwrite published article</span>
+              </label>
+              <button
+                id="publish"
+                class="btn-primary action-primary"
+                type="button"
+                aria-describedby="publish-blocked-message"
+              >
+                Publish Article
+              </button>
+              <p id="publish-blocked-message" class="publish-blocked-message" role="status" aria-live="polite" hidden>
+                Complete required fields before publishing.
+              </p>
+            </div>
             <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
-            <button id="preview" class="btn-secondary" type="button">Preview page</button>
-            <button id="new-draft" class="btn-secondary action-tertiary" type="button">New</button>
+            <button id="preview" class="btn-secondary" type="button">Preview Page</button>
+            <button id="new-draft" class="btn-tertiary action-tertiary" type="button">New/reset</button>
           </div>
 
           <details class="markdown-backup" data-backup-panel open>
@@ -587,7 +657,7 @@ const metadata = {
     height: 1.05rem;
   }
 
-  .admin-page :where(.btn-primary, .btn-secondary) {
+  .admin-page :where(.btn-primary, .btn-secondary, .btn-tertiary) {
     font-weight: 700;
   }
 
@@ -748,6 +818,48 @@ const metadata = {
     margin-top: 0.25rem;
     color: var(--aw-color-text-muted);
     font-size: 0.84rem;
+    overflow-wrap: anywhere;
+  }
+
+  :global(.json-draft-lifecycle) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    width: fit-content;
+    margin-top: 0.5rem;
+    border-radius: 999px;
+    padding: 0.18rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 900;
+  }
+
+  :global(.json-draft-lifecycle.is-published) {
+    background: rgb(22 163 74 / 12%);
+    color: rgb(22 101 52);
+  }
+
+  :global(.json-draft-lifecycle.is-saved) {
+    background: rgb(107 114 128 / 12%);
+    color: rgb(75 85 99);
+  }
+
+  :global(.json-draft-lifecycle.is-modified) {
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+  }
+
+  :global(.json-draft-status-grid) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.15rem 0.45rem;
+    margin-top: 0.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+  }
+
+  :global(.json-draft-status-grid strong) {
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
     overflow-wrap: anywhere;
   }
 
@@ -1141,20 +1253,161 @@ const metadata = {
     margin-top: 1rem;
   }
 
+  .publish-actions {
+    padding-bottom: 0.25rem;
+  }
+
+  .publish-action-group {
+    display: grid;
+    gap: 0.45rem;
+  }
+
   .actions .action-primary {
     min-height: 3.2rem;
     font-size: 1.02rem;
+  }
+
+  .actions .action-primary.is-validation-blocked:disabled {
+    border-color: rgb(254 202 202);
+    background: rgb(254 242 242);
+    color: rgb(153 27 27);
+  }
+
+  :global(.dark) .actions .action-primary.is-validation-blocked:disabled {
+    border-color: rgb(127 29 29 / 70%);
+    background: rgb(127 29 29 / 18%);
+    color: rgb(254 202 202);
   }
 
   .actions .action-tertiary {
     border-color: transparent;
     background: transparent;
     color: var(--aw-color-text-muted);
+    box-shadow: none;
+  }
+
+  .actions .action-tertiary:not(:disabled):hover,
+  .actions .action-tertiary:not(:disabled):focus-visible {
+    background: rgb(94 140 138 / 10%);
+    color: var(--aw-color-accent);
   }
 
   .actions > button,
-  .actions > a {
+  .actions > a,
+  .publish-action-group > button {
     width: 100%;
+  }
+
+  .article-status-card {
+    margin: 0.8rem 0 1rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  :global(.dark) .article-status-card {
+    border-color: rgb(30 41 59);
+    background: rgb(2 6 23 / 42%);
+  }
+
+  .article-status-card h3 {
+    margin: 0 0 0.7rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  .article-status-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .article-status-icon {
+    display: inline-grid;
+    width: 1.6rem;
+    height: 1.6rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: 999px;
+    background: rgb(107 114 128 / 12%);
+    color: rgb(75 85 99);
+    font-weight: 900;
+  }
+
+  .article-status-card--published .article-status-icon {
+    background: rgb(22 163 74 / 12%);
+    color: rgb(22 101 52);
+  }
+
+  .article-status-card--modified .article-status-icon {
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+  }
+
+  .article-status-title {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-size: 1rem;
+    font-weight: 900;
+  }
+
+  .article-status-subtitle,
+  .article-status-details p {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1.45;
+  }
+
+  .article-status-details {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+  }
+
+  .article-status-details hr {
+    width: 100%;
+    margin: 0.35rem 0;
+    border: 0;
+    border-top: 1px solid rgb(229 231 235);
+  }
+
+  .article-status-slug {
+    color: var(--aw-color-text-heading) !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    overflow-wrap: anywhere;
+  }
+
+  .overwrite-publish-control {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border: 1px solid rgb(245 158 11 / 42%);
+    border-radius: 0.85rem;
+    padding: 0.72rem 0.85rem;
+    background: rgb(255 251 235);
+    color: rgb(146 64 14);
+    font-size: 0.88rem;
+    font-weight: 900;
+  }
+
+  .overwrite-publish-control[hidden] {
+    display: none;
+  }
+
+  .overwrite-publish-control input {
+    width: auto;
+    margin-top: 0.2rem;
+  }
+
+  :global(.dark) .overwrite-publish-control {
+    border-color: rgb(245 158 11 / 40%);
+    background: rgb(120 53 15 / 18%);
+    color: rgb(253 230 138);
   }
 
   .publish-checklist {
@@ -1171,17 +1424,24 @@ const metadata = {
   }
 
   .publish-checklist h3 {
-    margin: 0 0 0.65rem;
+    margin: 0 0 0.35rem;
     color: var(--aw-color-text-heading);
     font-family: var(--aw-font-heading);
     font-size: 1rem;
     font-weight: 800;
   }
 
+  .checklist-intro {
+    margin: 0 0 0.85rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
   .publish-checklist ul {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-    gap: 0.45rem 0.85rem;
+    gap: 0.55rem 0.85rem;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -1193,22 +1453,31 @@ const metadata = {
 
   .publish-checklist li {
     display: flex;
-    align-items: center;
-    gap: 0.4rem;
+    align-items: flex-start;
+    gap: 0.5rem;
     color: var(--aw-color-text-muted);
     font-size: 0.92rem;
     font-weight: 700;
+    line-height: 1.35;
   }
 
   .publish-checklist li.is-complete {
     color: var(--aw-color-secondary);
   }
 
-  .publish-checklist li.is-missing {
+  .publish-checklist li.is-required-missing {
+    color: rgb(185 28 28);
+  }
+
+  .publish-checklist li.is-optional-missing {
     color: rgb(146 64 14);
   }
 
-  :global(.dark) .publish-checklist li.is-missing {
+  :global(.dark) .publish-checklist li.is-required-missing {
+    color: rgb(252 165 165);
+  }
+
+  :global(.dark) .publish-checklist li.is-optional-missing {
     color: rgb(253 230 138);
   }
 
@@ -1216,6 +1485,36 @@ const metadata = {
     flex: 0 0 auto;
     width: 1.1rem;
     text-align: center;
+    line-height: 1.35;
+  }
+
+  .checklist-copy {
+    display: grid;
+    gap: 0.12rem;
+  }
+
+  .checklist-message {
+    color: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    opacity: 0.86;
+  }
+
+  .publish-blocked-message {
+    margin: 0;
+    border: 1px solid rgb(254 202 202);
+    border-radius: 0.85rem;
+    padding: 0.72rem 0.85rem;
+    background: rgb(254 242 242);
+    color: rgb(153 27 27);
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  :global(.dark) .publish-blocked-message {
+    border-color: rgb(127 29 29 / 70%);
+    background: rgb(127 29 29 / 18%);
+    color: rgb(254 202 202);
   }
 
   .preview-box,
@@ -1627,6 +1926,12 @@ const metadata = {
         ctaText: document.querySelector('#cta-text'),
         seoDescription: document.querySelector('#seo-description'),
         overwrite: document.querySelector('#overwrite-slug'),
+        overwritePublishControl: document.querySelector('#overwrite-publish-control'),
+        articleStatusCard: document.querySelector('#article-status-card'),
+        articleStatusIcon: document.querySelector('#article-status-icon'),
+        articleStatusTitle: document.querySelector('#article-status-title'),
+        articleStatusSubtitle: document.querySelector('#article-status-subtitle'),
+        articleStatusDetails: document.querySelector('#article-status-details'),
         status: document.querySelector('#status'),
         unsavedChanges: document.querySelector('#unsaved-changes'),
         refreshPreview: document.querySelector('#refresh-preview'),
@@ -1642,6 +1947,7 @@ const metadata = {
         downloadJsonBackup: document.querySelector('#download-json-backup'),
         backupPanel: document.querySelector('[data-backup-panel]'),
         publishChecklistItems: Array.from(document.querySelectorAll('#publish-checklist [data-checklist-item]')),
+        publishBlockedMessage: document.querySelector('#publish-blocked-message'),
         newDraft: document.querySelector('#new-draft'),
         saveDraft: document.querySelector('#save-draft'),
         publish: document.querySelector('#publish'),
@@ -1668,11 +1974,15 @@ const metadata = {
       let editArticleLoaded = false;
       let hasUnsavedChanges = false;
       let lastSavedDraftId = '';
+      let lastSavedAt = '';
+      let lastSavedBy = '';
       let workflowRequestId = '';
       let workflowLockToken = '';
       let workflowLockExpiresAt = '';
       let workflowLockRefreshTimer;
       let workflowReadOnlyMode = false;
+      let articleStatus = { state: 'draft', published: null, checkedSlug: '' };
+      let articleStatusRequestId = 0;
       const workflowLockOwnerId = 'admin-publish-ui';
       const workflowLockOwnerLabel = 'Admin publish UI';
       const workflowLockStorageKey = 'dr-lurie-admin-publish-active-workflow-lock';
@@ -1683,7 +1993,7 @@ const metadata = {
       const publicGitHubRepoUrl = adminPage?.dataset.publicGithubRepoUrl || '';
       const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
       const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-      const slugInvalidMessage = 'Slug must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
+      const slugInvalidMessage = 'Publishing target must contain lowercase letters, numbers, and hyphens (a-z0-9-).';
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const adminShell = document.querySelector('[data-admin-shell]');
       const authStatus = document.querySelector('[data-auth-status]');
@@ -1713,10 +2023,7 @@ const metadata = {
 
       const isEditMode = () => Boolean(getEditSlug());
 
-      const getSlugEditHint = () =>
-        isEditMode()
-          ? `Slug is locked in edit mode. Updates overwrite src/data/post/${getEditSlug()}.md in place.`
-          : '';
+      const getSlugEditHint = () => 'Publishing target is generated from the title and cannot be edited directly.';
 
       const setUnsavedChanges = (value) => {
         hasUnsavedChanges = Boolean(value);
@@ -1745,9 +2052,7 @@ const metadata = {
       const getMarkdownWordCount = () => fields.content.value.trim().split(/\s+/).filter(Boolean).length;
 
       const getHasMinimumDraftContent = () =>
-        Boolean(
-          fields.title.value.trim() && slugify(fields.slug.value || fields.title.value) && fields.author.value.trim()
-        );
+        Boolean(fields.title.value.trim() && slugify(fields.title.value) && fields.author.value.trim());
 
       const getHasPreviewContent = () =>
         Boolean(
@@ -1756,6 +2061,146 @@ const metadata = {
             fields.excerpt.value.trim() ||
             getFeaturedImagePath().trim()
         );
+
+      const formatStatusDate = (value, { includeComma = false } = {}) => {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return String(value);
+        return new Intl.DateTimeFormat(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+          .format(date)
+          .replace(',', includeComma ? ',' : '');
+      };
+
+      const normalizeMarkdownForStatus = (value) =>
+        String(value || '')
+          .replace(/\s+$/g, '')
+          .trim();
+
+      const getCurrentArticleStatusState = () => {
+        if (!articleStatus.published) return 'draft';
+        return normalizeMarkdownForStatus(fields.outputMarkdown?.value) ===
+          normalizeMarkdownForStatus(articleStatus.published.markdown)
+          ? 'published'
+          : 'modified';
+      };
+
+      const renderArticleStatusCard = () => {
+        const state = getCurrentArticleStatusState();
+        const published = articleStatus.published;
+        const savedDate = lastSavedAt ? formatStatusDate(lastSavedAt) : '';
+        const publishedDate = formatStatusDate(published?.publishDate, { includeComma: true });
+        const publishedAuthor = published?.author || fields.author.value.trim() || 'Unknown';
+
+        fields.articleStatusCard?.classList.remove(
+          'article-status-card--published',
+          'article-status-card--draft',
+          'article-status-card--modified'
+        );
+        fields.articleStatusCard?.classList.add(`article-status-card--${state}`);
+
+        if (state === 'published') {
+          fields.articleStatusIcon.textContent = '✓';
+          fields.articleStatusTitle.textContent = 'Published';
+          fields.articleStatusSubtitle.textContent = publishedDate
+            ? `Published ${publishedDate.replace(',', '')}`
+            : 'Published version exists';
+          fields.articleStatusDetails.innerHTML = `
+            <p>by ${escapeHtml(publishedAuthor)}</p>
+            <hr />
+            <p>✓ Existing published article</p>
+            <p class="article-status-slug">${escapeHtml(fields.slug.value.trim() || 'article-slug')}</p>
+            <p><strong>Published:</strong></p>
+            <p>${escapeHtml(publishedDate || 'Unknown')}</p>`;
+        } else if (state === 'modified') {
+          fields.articleStatusIcon.textContent = '⚠';
+          fields.articleStatusTitle.textContent = 'Modified';
+          fields.articleStatusSubtitle.textContent = 'Published version exists';
+          fields.articleStatusDetails.innerHTML = `
+            <p>Draft changes saved</p>
+            <p>but not published</p>`;
+        } else {
+          fields.articleStatusIcon.textContent = '○';
+          fields.articleStatusTitle.textContent = 'Draft';
+          fields.articleStatusSubtitle.textContent = savedDate
+            ? `Saved ${savedDate}`
+            : 'Saved draft changes are not live';
+          fields.articleStatusDetails.innerHTML = `
+            <p>by ${escapeHtml(lastSavedBy || fields.author.value.trim() || 'Unknown')}</p>`;
+        }
+      };
+
+      const updatePublishDecisionControls = () => {
+        const hasPublishedArticle = Boolean(articleStatus.published);
+        fields.publish.textContent = hasPublishedArticle ? 'Overwrite Published Article' : 'Publish Article';
+        if (fields.overwritePublishControl) fields.overwritePublishControl.hidden = !hasPublishedArticle;
+        if (!hasPublishedArticle) fields.overwrite.checked = false;
+        fields.publish.setAttribute(
+          'aria-describedby',
+          hasPublishedArticle ? 'overwrite-slug publish-blocked-message' : 'publish-blocked-message'
+        );
+        fields.publish.classList.toggle('is-overwrite-required', hasPublishedArticle && !fields.overwrite.checked);
+        renderArticleStatusCard();
+      };
+
+      const updateArticleStatusCard = () => {
+        updatePublishDecisionControls();
+      };
+
+      const fetchPublishedArticleStatus = async ({ force = false } = {}) => {
+        const slug = fields.slug.value.trim();
+        if (!slugPattern.test(slug)) {
+          articleStatus = { state: 'draft', published: null, checkedSlug: '' };
+          updatePublishDecisionControls();
+          return;
+        }
+        if (!force && articleStatus.checkedSlug === slug) {
+          updatePublishDecisionControls();
+          return;
+        }
+
+        const requestId = (articleStatusRequestId += 1);
+        try {
+          const token = await getClerkSessionToken();
+          const response = await fetch(`/.netlify/functions/get-article-for-edit?slug=${encodeURIComponent(slug)}`, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          const result = await response.json().catch(() => ({}));
+          if (requestId !== articleStatusRequestId) return;
+          if (response.status === 404) {
+            articleStatus = { state: 'draft', published: null, checkedSlug: slug };
+          } else if (response.ok) {
+            const article = result.article || result;
+            articleStatus = { state: 'published', published: article, checkedSlug: slug };
+          } else {
+            console.warn('Published article status could not be checked.', result.error || response.status);
+            articleStatus = { state: 'draft', published: null, checkedSlug: slug };
+          }
+        } catch (error) {
+          if (requestId !== articleStatusRequestId) return;
+          console.warn('Published article status check failed.', error);
+          articleStatus = { state: 'draft', published: null, checkedSlug: slug };
+        }
+        updatePublishDecisionControls();
+        recalculateButtonState();
+      };
+
+      let articleStatusDebounceTimer;
+      const queuePublishedArticleStatusCheck = () => {
+        window.clearTimeout(articleStatusDebounceTimer);
+        articleStatusDebounceTimer = window.setTimeout(() => {
+          fetchPublishedArticleStatus().catch((error) => {
+            console.warn('Published article status check could not be queued.', error);
+          });
+        }, 350);
+      };
 
       const hasCurrentWorkflowLock = () => {
         const { requestId, lockToken } = getCheckedOutWorkflowDraft();
@@ -1772,21 +2217,22 @@ const metadata = {
       const recalculateButtonState = () => {
         const hasDraftFields = getHasMinimumDraftContent();
         const hasValidSlug = slugPattern.test(fields.slug.value.trim());
+        const missingRequiredFields = getMissingRequiredValidationItems();
+        const hasRequiredValidationFields = missingRequiredFields.length === 0;
         const canUseWorkflowLock = hasCurrentWorkflowLock();
-        const canSaveDraft = !workflowReadOnlyMode && isAdmin && hasDraftFields && hasUnsavedChanges;
+        const canSaveDraft = isAdmin && hasDraftFields && hasUnsavedChanges;
         const canPreview =
-          !workflowReadOnlyMode &&
           isAdmin &&
           getHasPreviewContent() &&
           (getCheckedOutWorkflowDraft().requestId || lastSavedDraftId || (hasUnsavedChanges && hasDraftFields));
         const canPublish = Boolean(
-          !workflowReadOnlyMode &&
-            isAdmin &&
-            fields.title.value.trim() &&
+          isAdmin &&
+            hasRequiredValidationFields &&
             fields.author.value.trim() &&
             hasValidSlug &&
             getMarkdownWordCount() >= 5 &&
-            canUseWorkflowLock
+            canUseWorkflowLock &&
+            (!articleStatus.published || fields.overwrite.checked)
         );
 
         fields.saveDraft.disabled = !canSaveDraft;
@@ -1795,15 +2241,28 @@ const metadata = {
         fields.copyOutput.disabled = !canPublish;
         fields.downloadJsonBackup.disabled = !canPublish;
         fields.backupPanel.classList.toggle('is-disabled', !canPublish);
+        fields.publish.classList.toggle('is-validation-blocked', !hasRequiredValidationFields);
+        if (fields.publishBlockedMessage) {
+          if (articleStatus.published && hasRequiredValidationFields && !fields.overwrite.checked) {
+            fields.publishBlockedMessage.textContent = 'Check overwrite before replacing the live article.';
+            fields.publishBlockedMessage.hidden = false;
+          } else {
+            fields.publishBlockedMessage.textContent = 'Complete required fields before publishing.';
+            fields.publishBlockedMessage.hidden = hasRequiredValidationFields;
+          }
+        }
+        updatePublishDecisionControls();
         validateSlug();
       };
 
       const setEditorModeCopy = (mode) => {
         const editing = mode === 'edit';
         fields.publishMode.textContent = editing ? 'Editing article' : 'Publishing workspace';
-        fields.publish.textContent = editing ? 'Update Article' : 'Publish Article';
-        fields.overwrite.checked = editing || fields.overwrite.checked;
-        fields.slug.disabled = editing;
+        updateArticleStatusCard();
+        fields.overwrite.checked = false;
+        fields.slug.readOnly = true;
+        fields.slug.disabled = false;
+        syncSlugFromTitle();
         validateSlug();
       };
 
@@ -2238,10 +2697,18 @@ const metadata = {
         imageNames = selectedImages.map((image) => image.name);
       };
 
-      const getCurrentSlug = () =>
-        isEditMode()
-          ? getEditSlug()
-          : slugify(fields.slug.value || fields.title.value || 'untitled-article') || 'untitled-article';
+      const getCurrentSlug = () => slugify(fields.title.value || 'untitled-article') || 'untitled-article';
+
+      const syncSlugFromTitle = () => {
+        const previousSlug = fields.slug.value;
+        fields.slug.value = getCurrentSlug();
+        if (previousSlug !== fields.slug.value) {
+          articleStatus = { state: 'draft', published: null, checkedSlug: '' };
+          queuePublishedArticleStatusCheck();
+        }
+        validateSlug();
+        return fields.slug.value;
+      };
 
       const getUploadPath = (filename) =>
         getUploadRepoPath(filename).replace('src/assets/images/uploads/', '~/assets/images/uploads/');
@@ -2256,6 +2723,20 @@ const metadata = {
           return value;
         }
         return getUploadPath(value);
+      };
+
+      const isSelectedPublishableImageValue = (value) => {
+        const normalized = String(value || '').trim();
+        if (!normalized) return false;
+        return selectedImages.some(
+          (image) => image.kind !== 'path' && (image.optionValue === normalized || image.name === normalized)
+        );
+      };
+
+      const getExistingFeaturedImagePathForPayload = () => {
+        return isSelectedPublishableImageValue(fields.featuredImage.value)
+          ? ''
+          : fields.existingFeaturedImagePath.value.trim();
       };
 
       const getDraft = () => ({
@@ -2273,7 +2754,7 @@ const metadata = {
         artifactReferences: selectedArtifactReferences,
         mediaEntries: selectedMediaEntries,
         featuredImage: fields.featuredImage.value,
-        existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
+        existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
         videoLink: fields.videoLink.value,
         ctaLink: fields.ctaLink.value,
         ctaText: fields.ctaText.value,
@@ -2284,6 +2765,10 @@ const metadata = {
       const getCheckedOutWorkflowDraft = () => {
         const params = new URLSearchParams(window.location.search);
         const storedLock = getStoredActiveWorkflowLock();
+        if (workflowReadOnlyMode && !workflowRequestId && !workflowLockToken) {
+          return { requestId: '', lockToken: '' };
+        }
+
         const requestId =
           workflowRequestId ||
           params.get('draftId') ||
@@ -2324,8 +2809,8 @@ const metadata = {
           ...(fields.category.value.trim() ? { category: fields.category.value.trim() } : {}),
           ...(fields.seoDescription.value.trim() ? { seoDescription: fields.seoDescription.value.trim() } : {}),
           ...(featuredImage ? { featuredImage } : {}),
-          ...(fields.existingFeaturedImagePath.value.trim()
-            ? { existingFeaturedImagePath: fields.existingFeaturedImagePath.value.trim() }
+          ...(getExistingFeaturedImagePathForPayload()
+            ? { existingFeaturedImagePath: getExistingFeaturedImagePathForPayload() }
             : {}),
           ...(fields.videoLink.value.trim() ? { videoLink: fields.videoLink.value.trim() } : {}),
           ...(fields.ctaLink.value.trim() ? { ctaLink: fields.ctaLink.value.trim() } : {}),
@@ -2844,28 +3329,76 @@ const metadata = {
         };
       };
 
-      const getChecklistState = () => ({
-        title: fields.title.value.trim().length > 0,
-        slug: slugPattern.test(fields.slug.value.trim()),
-        content: fields.content.value.trim().length > 0,
-        excerpt: fields.excerpt.value.trim().length > 0,
-        publishDate: fields.publishDate.value.trim().length > 0,
+      const getValidationChecklistState = () => ({
+        title: {
+          required: true,
+          isComplete: fields.title.value.trim().length > 0,
+          message: 'Add a title.',
+        },
+        slug: {
+          required: true,
+          isComplete: slugPattern.test(fields.slug.value.trim()),
+          message: fields.slug.value.trim() ? slugInvalidMessage : 'Add a valid publishing target.',
+        },
+        content: {
+          required: true,
+          isComplete: getMarkdownWordCount() >= 5,
+          message: 'Add article body content (5+ words).',
+        },
+        excerpt: {
+          required: true,
+          isComplete: fields.excerpt.value.trim().length > 0,
+          message: 'Add a short excerpt.',
+        },
+        featuredImage: {
+          required: false,
+          isComplete: getFeaturedImagePath().trim().length > 0,
+        },
+        sources: {
+          required: false,
+          isComplete: parseSources(fields.sources.value).length > 0,
+        },
+        seoDescription: {
+          required: false,
+          isComplete: fields.seoDescription.value.trim().length > 0,
+        },
+        category: {
+          required: false,
+          isComplete: fields.category.value.trim().length > 0,
+        },
+        tags: {
+          required: false,
+          isComplete: parseTags(fields.tags.value).length > 0,
+        },
       });
 
+      const getMissingRequiredValidationItems = () =>
+        Object.entries(getValidationChecklistState()).filter(([, state]) => state.required && !state.isComplete);
+
       const updatePublishChecklist = () => {
-        const checklistState = getChecklistState();
+        const checklistState = getValidationChecklistState();
 
         fields.publishChecklistItems.forEach((item) => {
           const key = item.dataset.checklistItem;
-          const isComplete = Boolean(checklistState[key]);
+          const state = checklistState[key] || { required: false, isComplete: false };
           const icon = item.querySelector('.checklist-icon');
-
-          item.classList.toggle('is-complete', isComplete);
-          item.classList.toggle('is-missing', !isComplete);
           const label = item.querySelector('.checklist-label')?.textContent.trim() || 'Checklist item';
+          const message = item.querySelector('.checklist-message');
+          const missingRequired = state.required && !state.isComplete;
+          const missingOptional = !state.required && !state.isComplete;
 
-          item.setAttribute('aria-label', `${label}: ${isComplete ? 'complete' : 'missing'}`);
-          if (icon) icon.textContent = isComplete ? '✓' : '⚠';
+          item.classList.toggle('is-complete', state.isComplete);
+          item.classList.toggle('is-required-missing', missingRequired);
+          item.classList.toggle('is-optional-missing', missingOptional);
+          item.setAttribute(
+            'aria-label',
+            `${label}: ${state.isComplete ? 'complete' : state.required ? `missing, ${state.message}` : 'optional warning'}`
+          );
+          if (icon) icon.textContent = state.isComplete ? '✓' : missingRequired ? '!' : '⚠';
+          if (message) {
+            message.textContent = missingRequired ? state.message : '';
+            message.hidden = !missingRequired;
+          }
         });
       };
 
@@ -2888,6 +3421,7 @@ const metadata = {
         resizeOutputMarkdown();
         updatePublishChecklist();
         updateBackupDownload();
+        updatePublishDecisionControls();
       };
 
       const saveLocalRecoveryDraft = () => {
@@ -3202,11 +3736,115 @@ const metadata = {
         });
       };
 
-      const formatArtifactReselectionMessage = (references) => {
-        const names = references.map((reference) => shortenFilename(getArtifactImageName(reference), 24));
-        return `Image artifact${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}. Re-select or re-upload ${
+      const getArtifactFailureReference = (failure) => failure?.reference || failure;
+
+      const getAdminBlobImageFailureLabel = (status) => {
+        if (status === 400) return '400 bad request';
+        if (status === 401) return '401 auth failure';
+        if (status === 403) return '403 auth/authorization failure';
+        if (status === 404) return '404 artifact bytes missing';
+        if (status >= 500) return `${status} server/config failure`;
+        return `${status} HTTP failure`;
+      };
+
+      const formatBlobStoreDiagnosticSummary = (label, diagnostic) => {
+        if (!diagnostic) return '';
+
+        const site = diagnostic.siteId?.present
+          ? `${diagnostic.siteId.envVar || 'site'}=${diagnostic.siteId.redacted}`
+          : 'siteId=missing';
+
+        return `${label}Source=${diagnostic.source}, ${label}ExplicitApi=${Boolean(
+          diagnostic.explicitApiConfigUsed
+        )}, ${label}LambdaContext=${Boolean(diagnostic.lambdaBlobContextUsed)}, ${label}Site=${site}`;
+      };
+
+      const formatAdminBlobImageFailureDetails = (payload) => {
+        const storeDiagnostics = payload?.blobStoreDiagnostics || {};
+        const readDiagnostics = payload?.diagnostics || {};
+        const nearbyKeys = Array.isArray(readDiagnostics.nearbyKeys) ? readDiagnostics.nearbyKeys.slice(0, 5) : [];
+        const details = [
+          payload?.reason ? `reason=${payload.reason}` : '',
+          payload?.blobKey ? `blobKey=${payload.blobKey}` : '',
+          payload?.store ? `store=${payload.store}` : '',
+          payload?.lookup ? `lookup=${payload.lookup}` : '',
+          payload?.contentTypeSource ? `contentTypeSource=${payload.contentTypeSource}` : '',
+          readDiagnostics.parentPrefix ? `parentPrefix=${readDiagnostics.parentPrefix}` : '',
+          readDiagnostics.exactFilename ? `exactFilename=${readDiagnostics.exactFilename}` : '',
+          typeof readDiagnostics.exactFilenameExists === 'boolean'
+            ? `exactFilenameExists=${readDiagnostics.exactFilenameExists}`
+            : '',
+          nearbyKeys.length ? `nearbyKeys=${nearbyKeys.join('|')}` : '',
+          formatBlobStoreDiagnosticSummary('workflows', storeDiagnostics.workflows),
+          formatBlobStoreDiagnosticSummary('artifactIndex', storeDiagnostics.artifactIndex),
+          formatBlobStoreDiagnosticSummary('artifacts', storeDiagnostics.artifacts),
+        ].filter(Boolean);
+
+        return details.length ? ` (${details.join(', ')})` : '';
+      };
+
+      const readAdminBlobImageFailure = async (response, reference) => {
+        const payload = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
+        const name = shortenFilename(getArtifactImageName(reference), 24);
+        const label = getAdminBlobImageFailureLabel(response.status);
+        const serverMessage = payload?.error ? `: ${payload.error}` : '';
+        const debugDetails = formatAdminBlobImageFailureDetails(payload);
+
+        return `${name} — admin-get-blob-image returned ${label}${serverMessage}${debugDetails}`;
+      };
+
+      const formatArtifactReselectionMessage = (failures) => {
+        const names = failures.map((failure) =>
+          shortenFilename(getArtifactImageName(getArtifactFailureReference(failure)), 24)
+        );
+        const details = failures.map((failure) => failure?.failureMessage).filter(Boolean);
+        const detailMessage = details.length ? ` Details: ${details.join('; ')}.` : '';
+
+        return `Image artifact${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}.${detailMessage} Re-select or re-upload ${
           names.length === 1 ? 'this image' : 'these images'
         } before publishing.`;
+      };
+
+      const checkReadableArtifactReferences = async (
+        artifactReferences,
+        clerkToken,
+        { logContext = 'artifact' } = {}
+      ) => {
+        if (!artifactReferences.length) return { readableReferences: [], failedReferences: [] };
+
+        const results = await Promise.all(
+          artifactReferences.map(async (reference) => {
+            try {
+              const response = await fetchArtifactPreviewResponse(reference, clerkToken);
+              if (!response.ok) {
+                return {
+                  reference,
+                  readable: false,
+                  failureMessage: await readAdminBlobImageFailure(response, reference),
+                };
+              }
+              await response.blob();
+              return { reference, readable: true };
+            } catch (error) {
+              console.warn(`${logContext} image artifact could not be read.`, error);
+              return {
+                reference,
+                readable: false,
+                failureMessage: `${shortenFilename(getArtifactImageName(reference), 24)} — ${
+                  error instanceof Error ? error.message : 'admin-get-blob-image request failed'
+                }`,
+              };
+            }
+          })
+        );
+
+        return {
+          readableReferences: results.filter((result) => result.readable).map((result) => result.reference),
+          failedReferences: results.filter((result) => !result.readable),
+        };
       };
 
       const validateReadableArtifactReferences = async (artifactReferences, clerkToken) => {
@@ -3217,33 +3855,29 @@ const metadata = {
           false
         );
 
-        const results = await Promise.all(
-          artifactReferences.map(async (reference) => {
-            try {
-              const response = await fetchArtifactPreviewResponse(reference, clerkToken);
-              if (!response.ok) throw new Error(`Image artifact could not be read (${response.status}).`);
-              await response.blob();
-              return { reference, readable: true };
-            } catch (error) {
-              console.warn('Selected image artifact could not be read before publish.', error);
-              return { reference, readable: false };
-            }
-          })
+        const { readableReferences, failedReferences } = await checkReadableArtifactReferences(
+          artifactReferences,
+          clerkToken,
+          {
+            logContext: 'Selected',
+          }
         );
-
-        const failedReferences = results.filter((result) => !result.readable).map((result) => result.reference);
 
         if (failedReferences.length) {
           throw new Error(formatArtifactReselectionMessage(failedReferences));
         }
 
-        return results.map((result) => result.reference);
+        return readableReferences;
       };
 
       const resetPublisherForm = () => {
         clearLocalCheckoutState();
         lastSavedDraftId = '';
+        lastSavedAt = '';
+        lastSavedBy = '';
         editArticleLoaded = false;
+        workflowReadOnlyMode = false;
+        articleStatus = { state: 'draft', published: null, checkedSlug: '' };
         fields.title.value = '';
         fields.slug.value = '';
         fields.excerpt.value = '';
@@ -3305,10 +3939,14 @@ const metadata = {
 
       const saveJsonDraftToBlobs = async () => {
         const clerkToken = await getClerkSessionToken();
-        const checkedOut = getCheckedOutWorkflowDraft();
-        if (checkedOut.requestId) await ensureWorkflowLock(checkedOut.requestId);
+        const shouldCloneReadOnlyDraft = workflowReadOnlyMode && !workflowRequestId && !workflowLockToken;
 
-        let { requestId, lockToken } = getCheckedOutWorkflowDraft();
+        const checkedOut = getCheckedOutWorkflowDraft();
+        if (!shouldCloneReadOnlyDraft && checkedOut.requestId) await ensureWorkflowLock(checkedOut.requestId);
+
+        let { requestId, lockToken } = shouldCloneReadOnlyDraft
+          ? { requestId: '', lockToken: '' }
+          : getCheckedOutWorkflowDraft();
         let { response, result } = await postJsonDraftToBlobs(clerkToken, requestId, lockToken);
 
         if (!response.ok && requestId && (result.lock_expired || result.error === 'lock_expired')) {
@@ -3330,6 +3968,7 @@ const metadata = {
           sessionStorage.setItem('dr-lurie-workflow-request-id', savedRequestId);
           if (result.record?.lock?.token) storeWorkflowLockFromRecord(result.record);
           else if (!getCheckedOutWorkflowDraft().lockToken) await checkoutWorkflowRequest(savedRequestId);
+          workflowReadOnlyMode = false;
         }
 
         return result;
@@ -3339,7 +3978,7 @@ const metadata = {
         const saveButton = fields.saveDraft;
 
         if (!getHasMinimumDraftContent()) {
-          setStatus('Title, slug, and author are required to save JSON draft.', false);
+          setStatus('Title, publishing target, and author are required to save JSON draft.', false);
           return false;
         }
 
@@ -3354,11 +3993,18 @@ const metadata = {
         try {
           const result = await saveJsonDraftToBlobs();
           lastSavedDraftId = result.record?.request_id || workflowRequestId || '';
+          lastSavedAt = result.record?.updated_at || new Date().toISOString();
+          lastSavedBy = workflowLockOwnerLabel;
           setUnsavedChanges(false);
           const savedRequestId = lastSavedDraftId ? ` (${lastSavedDraftId})` : '';
           setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
           return true;
         } catch (error) {
+          if (isAbortError(error)) {
+            setStatus(error.message, false);
+            return false;
+          }
+
           console.error('JSON draft save failed.', error);
           const recoverySaved = saveLocalRecoveryDraft();
           const message = isWorkflowLockError(error)
@@ -3402,7 +4048,7 @@ const metadata = {
 
       const populateArticleForEdit = (article) => {
         fields.title.value = article.title || '';
-        fields.slug.value = getEditSlug() || article.slug || '';
+        syncSlugFromTitle();
         fields.excerpt.value = article.excerpt || '';
         fields.publishDate.value = formatEditPublishDate(article.publishDate);
         fields.author.value = article.author || '';
@@ -3415,7 +4061,7 @@ const metadata = {
         fields.ctaLink.value = article.ctaLink || '';
         fields.ctaText.value = article.ctaText || '';
         fields.seoDescription.value = article.seoDescription || article.metadata?.description || '';
-        fields.overwrite.checked = true;
+        fields.overwrite.checked = false;
         fields.existingFeaturedImagePath.value = article.image || article.featuredImage || '';
         selectedImages = [];
         syncImageNames();
@@ -3460,10 +4106,7 @@ const metadata = {
           }
 
           populateArticleForEdit(result.article || result);
-          setStatus(
-            `Editing ${editSlug}. Slug is locked; publishing will update src/data/post/${editSlug}.md in place.`,
-            false
-          );
+          setStatus(`Editing ${editSlug}. Publishing target is generated from the title.`, false);
         } catch (error) {
           editArticleLoaded = false;
           setStatus(error instanceof Error ? error.message : 'Article could not be loaded for editing.', false);
@@ -3743,8 +4386,8 @@ const metadata = {
           throw new Error('Import JSON must include a non-empty title.');
         }
 
-        if (!formData.slug.exists || !formData.slug.value.trim()) {
-          throw new Error('Import JSON must include a slug or enough title text to compute one.');
+        if (!slugify(formData.title.value)) {
+          throw new Error('Import JSON title must include enough text to compute a publishing target.');
         }
 
         if (!formData.author.exists || !formData.author.value.trim()) {
@@ -3760,9 +4403,9 @@ const metadata = {
         return formData;
       };
 
-      const applyContentSourceImportFormData = (formData) => {
+      const applyContentSourceImportFormData = async (formData) => {
         if (formData.title.exists) fields.title.value = formData.title.value;
-        if (formData.slug.exists) fields.slug.value = formData.slug.value;
+        syncSlugFromTitle();
         if (formData.author.exists) fields.author.value = formData.author.value;
         if (formData.excerpt.exists) fields.excerpt.value = formData.excerpt.value;
         if (formData.seoDescription.exists) fields.seoDescription.value = formData.seoDescription.value;
@@ -3773,6 +4416,14 @@ const metadata = {
         const importedArtifactReferences = formData.artifactReferences?.exists
           ? mergeArtifactReferences(formData.artifactReferences.value)
           : [];
+        const {
+          readableReferences: importedReadableArtifactReferences,
+          failedReferences: importedFailedArtifactReferences,
+        } = importedArtifactReferences.length
+          ? await checkReadableArtifactReferences(importedArtifactReferences, await getClerkSessionToken(), {
+              logContext: 'Imported JSON',
+            })
+          : { readableReferences: [], failedReferences: [] };
         const importedMediaEntries = formData.mediaEntries?.exists
           ? mergeMediaEntries(formData.mediaEntries.value)
           : [];
@@ -3784,7 +4435,7 @@ const metadata = {
         selectedImages = [
           ...importedMediaEntries.map(createMediaSelectedImage),
           ...importedImagePathEntries.map(createPathSelectedImage),
-          ...importedArtifactReferences.map(createArtifactSelectedImage),
+          ...importedReadableArtifactReferences.map(createArtifactSelectedImage),
         ];
         syncImageNames();
 
@@ -3796,9 +4447,13 @@ const metadata = {
             !selectedArtifactReferences.some((reference) => getArtifactImageName(reference) === sanitizedName)
           );
         }).length;
-        imageImportWarningMessage = metadataOnlyImageCount
+        const unreadableArtifactWarning = importedFailedArtifactReferences.length
+          ? formatArtifactReselectionMessage(importedFailedArtifactReferences)
+          : '';
+        const metadataOnlyImageWarning = metadataOnlyImageCount
           ? 'Image names were found in JSON, but no blob references or image data were available for thumbnails.'
           : '';
+        imageImportWarningMessage = [unreadableArtifactWarning, metadataOnlyImageWarning].filter(Boolean).join(' ');
         imageUploadMessage = imageNames.length
           ? `${imageNames.length} previewable image${imageNames.length === 1 ? '' : 's'} loaded from JSON.`
           : '';
@@ -3811,7 +4466,9 @@ const metadata = {
         const importedExistingFeaturedImage = formData.existingFeaturedImagePath?.exists
           ? String(formData.existingFeaturedImagePath.value || '').trim()
           : '';
-        fields.existingFeaturedImagePath.value = importedExistingFeaturedImage;
+        fields.existingFeaturedImagePath.value = getPreviewableImagePath(importedExistingFeaturedImage)
+          ? importedExistingFeaturedImage
+          : '';
 
         if (importedFeaturedImage) {
           const matchingArtifactName = selectedArtifactReferences
@@ -3823,17 +4480,38 @@ const metadata = {
           const matchingPathEntry = selectedImagePathEntries.find(
             (entry) => entry.source === importedFeaturedImage || entry.name === sanitizeFilename(importedFeaturedImage)
           );
+          const previewableImportedFeaturedImage = getPreviewableImagePath(importedFeaturedImage)
+            ? importedFeaturedImage
+            : '';
           const featuredValue =
-            matchingArtifactName || matchingMediaEntryName || matchingPathEntry?.source || importedFeaturedImage;
-          const featuredSuffix = matchingArtifactName
-            ? 'publishable blob artifact'
-            : matchingMediaEntryName
-              ? 'embedded media data'
-              : matchingPathEntry
-                ? 'existing preview path'
-                : 'existing path/name only';
-          ensureFeaturedImageOption(featuredValue, featuredSuffix);
-          fields.featuredImage.value = featuredValue;
+            matchingArtifactName ||
+            matchingMediaEntryName ||
+            matchingPathEntry?.source ||
+            previewableImportedFeaturedImage;
+          if (featuredValue) {
+            const featuredSuffix = matchingArtifactName
+              ? 'publishable blob artifact'
+              : matchingMediaEntryName
+                ? 'embedded media data'
+                : matchingPathEntry
+                  ? 'existing preview path'
+                  : 'existing path';
+            ensureFeaturedImageOption(featuredValue, featuredSuffix);
+            fields.featuredImage.value = featuredValue;
+            if (matchingArtifactName || matchingMediaEntryName) fields.existingFeaturedImagePath.value = '';
+          } else {
+            fields.featuredImage.value = '';
+            imageImportWarningMessage = [
+              imageImportWarningMessage,
+              `Featured image ${shortenFilename(importedFeaturedImage, 24)} was found in JSON, but no readable blob artifact, embedded media data, or existing image path was available.`,
+            ]
+              .filter(Boolean)
+              .join(' ');
+            if (fields.imageImportWarning) {
+              fields.imageImportWarning.textContent = imageImportWarningMessage;
+              fields.imageImportWarning.hidden = !imageImportWarningMessage;
+            }
+          }
         } else {
           fields.featuredImage.value = '';
         }
@@ -3930,8 +4608,9 @@ const metadata = {
           fields.jsonImport.value = rawValue;
           lastLoadedJsonImportValue = fields.jsonImport.value.trim();
           updateJsonImportButtonState();
-          applyContentSourceImportFormData(formData);
+          await applyContentSourceImportFormData(formData);
           setUnsavedChanges(true);
+          await fetchPublishedArticleStatus({ force: true });
           setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
           return true;
         } catch (error) {
@@ -3991,8 +4670,30 @@ const metadata = {
         return { draftInput, result };
       };
 
-      const applyBlobDraftInput = async (draftId, draftInput, { readOnly = false } = {}) => {
-        let input = draftInput;
+      const appendCopySuffix = (value, suffix) => {
+        const text = String(value || '').trim();
+        return text ? `${text}${suffix}` : `Untitled${suffix}`;
+      };
+
+      const cloneContentSourceForCopy = (input) => {
+        const copy = typeof structuredClone === 'function' ? structuredClone(input) : JSON.parse(JSON.stringify(input));
+        copy.content ||= {};
+        copy.publication ||= {};
+        copy.publication.publish_payload ||= {};
+        const payload = copy.publication.publish_payload;
+        const currentTitle = payload.title || copy.content.title || 'Untitled article';
+        const currentSlug = slugify(payload.slug || currentTitle) || 'untitled-article';
+        const copyTitle = appendCopySuffix(currentTitle, '-Copy');
+        payload.title = copyTitle;
+        copy.content.title = copyTitle;
+        payload.slug = `${currentSlug}-copy`;
+        payload.overwrite = false;
+        copy.publication.publication_status = 'draft';
+        return copy;
+      };
+
+      const applyBlobDraftInput = async (draftId, draftInput, { readOnly = false, draft = undefined } = {}) => {
+        let input = readOnly ? cloneContentSourceForCopy(draftInput) : draftInput;
         if (!readOnly) {
           await ensureWorkflowLock(draftId);
           const checkedOutRecord = await fetchLatestWorkflowRequest(draftId);
@@ -4002,17 +4703,21 @@ const metadata = {
         const loaded = await loadJsonImport(JSON.stringify(input, null, 2), { alertOnError: false });
         if (!loaded) return false;
 
-        lastSavedDraftId = draftId;
+        lastSavedDraftId = readOnly ? '' : draftId;
+        lastSavedAt = readOnly ? '' : draft?.updatedAt || draft?.updated_at || '';
+        lastSavedBy = readOnly ? '' : draft?.author || fields.author.value.trim();
         if (readOnly) {
           workflowRequestId = '';
           workflowLockToken = '';
           workflowLockExpiresAt = '';
-          workflowReadOnlyMode = true;
+          workflowReadOnlyMode = false;
+          fields.overwrite.checked = false;
           clearWorkflowLockRefreshTimer();
-          fields.jsonUploadName.textContent = `${draftId} (read-only)`;
-          setJsonImportStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`);
+          fields.jsonUploadName.textContent = `${draftId} (copy)`;
+          setJsonImportStatus(`Opened saved JSON ${draftId} as a new copy. The original draft was not modified.`);
         }
-        setUnsavedChanges(false);
+        await fetchPublishedArticleStatus({ force: true });
+        setUnsavedChanges(readOnly);
         recalculateButtonState();
         return true;
       };
@@ -4154,6 +4859,28 @@ const metadata = {
         }
       };
 
+      const getJsonDraftLifecycleLabel = (draft) => {
+        if (draft.lifecycleStatus === 'modified') return { label: '⚠ Unpublished Changes', className: 'is-modified' };
+        if (draft.published?.exists) return { label: '✓ Published', className: 'is-published' };
+        return { label: '○ Saved Draft', className: 'is-saved' };
+      };
+
+      const renderJsonDraftLifecycleMeta = (draft) => {
+        const status = getJsonDraftLifecycleLabel(draft);
+        const published = draft.published || {};
+        const savedAt = draft.savedAt || draft.updatedAt || draft.updated_at || draft.modifiedAt;
+        const savedBy = draft.savedBy || draft.author || 'Unknown';
+        const publishedRows = published.exists
+          ? `<span>Published:</span><strong>${escapeHtml(formatJsonDraftDate(published.date))}</strong><span>By:</span><strong>${escapeHtml(published.by || 'Unknown')}</strong>`
+          : '';
+        return `<span class="json-draft-lifecycle ${status.className}">${escapeHtml(status.label)}</span>
+          <span class="json-draft-status-grid">
+            ${publishedRows}
+            <span>Saved:</span><strong>${escapeHtml(formatJsonDraftDate(savedAt))}</strong>
+            <span>By:</span><strong>${escapeHtml(savedBy)}</strong>
+          </span>`;
+      };
+
       const renderJsonDraftChoices = (drafts) => {
         if (!drafts.length) {
           fields.jsonDraftList.innerHTML = '<p class="json-draft-empty">No saved JSON drafts were found.</p>';
@@ -4172,6 +4899,7 @@ const metadata = {
             <span>
               <span class="json-draft-choice-title">${escapeHtml(title)}</span>
               <span class="json-draft-choice-meta">${escapeHtml(slug)} · ${escapeHtml(author)} · ${escapeHtml(updatedAt)}</span>
+              ${renderJsonDraftLifecycleMeta(draft)}
             </span>
             <span class="json-draft-choice-icon" aria-hidden="true">↗</span>
           </button>`;
@@ -4230,8 +4958,7 @@ const metadata = {
 
       const renderBlobImageChoices = (artifacts) => {
         if (!artifacts.length) {
-          fields.blobImageList.innerHTML =
-            '<p class="json-draft-empty">No saved image artifacts were found for this draft.</p>';
+          fields.blobImageList.innerHTML = '<p class="json-draft-empty">No saved image artifacts were found.</p>';
           return;
         }
 
@@ -4290,7 +5017,7 @@ const metadata = {
           setBlobImageModalStatus(
             availableBlobImageArtifacts.length
               ? 'Choose saved image artifacts to add to this article.'
-              : 'No saved image artifacts were found for this draft.'
+              : 'No saved image artifacts were found.'
           );
         } catch (error) {
           console.error('Saved image artifact list failed.', error);
@@ -4374,13 +5101,7 @@ const metadata = {
       };
 
       fields.title.addEventListener('input', () => {
-        if (!fields.slug.value.trim()) fields.slug.value = slugify(fields.title.value);
-      });
-
-      ['input', 'change'].forEach((eventName) => {
-        fields.slug.addEventListener(eventName, () => {
-          validateSlug({ announce: true });
-        });
+        syncSlugFromTitle();
       });
 
       fields.jsonUpload.addEventListener('change', async () => {
@@ -4473,7 +5194,7 @@ const metadata = {
         }
 
         if (!getHasMinimumDraftContent()) {
-          setStatus('Title, slug, and author are required before opening the preview page.', false);
+          setStatus('Title, publishing target, and author are required before opening the preview page.', false);
           return;
         }
 
@@ -4534,7 +5255,15 @@ const metadata = {
         updatePublishOutput();
 
         const { slug } = buildMarkdown();
+        syncSlugFromTitle();
         if (!validateSlug({ announce: true })) {
+          recalculateButtonState();
+          return;
+        }
+
+        const missingRequiredFields = getMissingRequiredValidationItems();
+        if (missingRequiredFields.length) {
+          setStatus('Complete required fields before publishing.', false);
           recalculateButtonState();
           return;
         }
@@ -4545,12 +5274,23 @@ const metadata = {
           !fields.author.value.trim() ||
           getMarkdownWordCount() < 5
         ) {
-          setStatus('Title, slug, author, and Markdown content (5+ words) are required before publishing.', false);
+          setStatus(
+            'Title, publishing target, author, and Markdown content (5+ words) are required before publishing.',
+            false
+          );
+          return;
+        }
+
+        if (articleStatus.published && !fields.overwrite.checked) {
+          setStatus('Check overwrite before replacing the live article.', false);
+          recalculateButtonState();
           return;
         }
 
         const confirmed = window.confirm(
-          'Publish this article to GitHub? This will commit the article and any selected images.'
+          articleStatus.published
+            ? 'Overwrite the published article on GitHub? This will replace the live content.'
+            : 'Publish this article to GitHub? This will commit the article and any selected images.'
         );
         if (!confirmed) return;
 
@@ -4604,7 +5344,7 @@ const metadata = {
               markdown: fields.outputMarkdown.value,
               sources: parseSources(fields.sources.value),
               featuredImage: fields.featuredImage.value,
-              existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
+              existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
               seoDescription: fields.seoDescription.value,
               videoLink: fields.videoLink.value,
               ctaLink: fields.ctaLink.value,
@@ -4631,6 +5371,17 @@ const metadata = {
           const shortCommit = commit.slice(0, 7);
           const commitText = shortCommit ? ` in commit ${shortCommit}` : '';
           const toastMessage = `Published ${publishedPath}.${commit ? ` Commit: ${commit}` : ''}`;
+          articleStatus = {
+            state: 'published',
+            checkedSlug: slug,
+            published: {
+              markdown: fields.outputMarkdown.value,
+              publishDate: getPublishDate().toISOString(),
+              author: fields.author.value.trim(),
+              slug,
+            },
+          };
+          fields.overwrite.checked = false;
           let workflowWarning = '';
           try {
             await mcpToolCall('save_json_blob_mark_published', {
@@ -4689,10 +5440,12 @@ const metadata = {
       });
 
       ['input', 'change'].forEach((eventName) => {
-        document.querySelector('#publish-form').addEventListener(eventName, () => {
+        document.querySelector('#publish-form').addEventListener(eventName, (event) => {
           updatePreview();
           updatePublishOutput();
-          setUnsavedChanges(true);
+          if (event.target !== fields.overwrite) setUnsavedChanges(true);
+          if (event.target === fields.overwrite) recalculateButtonState();
+          else queuePublishedArticleStatusCheck();
         });
       });
 
@@ -4711,6 +5464,7 @@ const metadata = {
         workflowLockRefreshTimer = undefined;
         if (toastTimer) window.clearTimeout(toastTimer);
         toastTimer = undefined;
+        if (articleStatusDebounceTimer) window.clearTimeout(articleStatusDebounceTimer);
         artifactPreviewUrlCache.forEach((url) => URL.revokeObjectURL(url));
         artifactPreviewUrlCache.clear();
       });
