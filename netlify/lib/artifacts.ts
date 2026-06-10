@@ -32,6 +32,7 @@ export type ArtifactReference = {
   sha256: string;
   contentType: string;
   createdAtISO: string;
+  artifactKind?: ArtifactKind;
   originalFilename?: string;
   label?: string;
   tags?: string[];
@@ -322,6 +323,7 @@ const allowedArtifactReferenceKeys = new Set([
   'sha256',
   'contentType',
   'createdAtISO',
+  'artifactKind',
   'originalFilename',
   'label',
   'tags',
@@ -449,6 +451,7 @@ export const createArtifactReference = ({
     sha256,
     contentType: input.contentType,
     createdAtISO,
+    artifactKind: input.artifactKind,
     originalFilename,
     label,
     ...(tags ? { tags } : {}),
@@ -486,6 +489,7 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
     sha256,
     contentType,
     createdAtISO,
+    artifactKind,
     originalFilename,
     label,
     tags,
@@ -502,6 +506,9 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
   if (typeof contentType !== 'string' || !contentType.trim()) return 'contentType must be a non-empty string';
   if (typeof createdAtISO !== 'string' || Number.isNaN(Date.parse(createdAtISO))) {
     return 'createdAtISO must be a valid ISO date string';
+  }
+  if (artifactKind !== undefined && !artifactKindSet.has(artifactKind as ArtifactKind)) {
+    return `artifactKind must be one of: ${artifactKindValues.join(', ')}`;
   }
   if (originalFilename !== undefined) {
     const issue = getSafeArtifactStringIssue(

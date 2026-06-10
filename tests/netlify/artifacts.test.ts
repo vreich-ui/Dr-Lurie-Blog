@@ -36,6 +36,7 @@ test('artifact helpers produce stable blob keys and references', () => {
   assert.equal(reference.sizeBytes, bytes.byteLength);
   assert.equal(reference.contentType, 'image/png');
   assert.equal(reference.createdAtISO, '2026-06-05T00:00:00.000Z');
+  assert.equal(reference.artifactKind, ArtifactKind.Image);
   assert.equal(reference.originalFilename, 'Hero Preview.PNG');
   assert.equal(reference.label, 'Hero image');
   assert.deepEqual(reference.tags, ['hero', 'homepage']);
@@ -103,6 +104,10 @@ test('ArtifactReference validation rejects invented media handles and incomplete
   assert.match(
     getArtifactReferenceIssue({ ...reference, blobKey: reference.blobKey.replace(/^image\//, 'markdown/') }) ?? '',
     /blobKey must match the server ArtifactReference path format/
+  );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, artifactKind: 'markdown' }) ?? '',
+    /artifactKind must be one of/
   );
   assert.match(
     getArtifactReferenceIssue({ ...reference, originalFilename: '../unsafe.png' }) ?? '',

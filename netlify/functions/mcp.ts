@@ -333,6 +333,10 @@ const artifactReconcileLimitJsonSchema = {
   maximum: ARTIFACT_LIST_MAX_LIMIT,
   description: `Optional maximum number of artifact-index JSON references to reconcile; defaults to ${ARTIFACT_LIST_DEFAULT_LIMIT}, max ${ARTIFACT_LIST_MAX_LIMIT}.`,
 };
+const artifactMigrationDryRunJsonSchema = {
+  type: 'boolean',
+  description: 'When true, report migration actions without writing artifact-index records or pointers.',
+};
 const artifactIncludeDeletedJsonSchema = {
   type: 'boolean',
   description: 'When true, include soft-deleted artifact references. Defaults to false.',
@@ -957,6 +961,16 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       ['requestId', 'sha256']
     ),
+  },
+  {
+    name: 'migrate_artifact_indexes',
+    description:
+      'Admin-only one-time artifact-index migration. Scans request-artifacts/{requestId}/{sha256}.json, fills missing artifactKind/originalFilename/label fields, writes by-kind and by-request pointers, and returns cursor checkpoints for large idempotent batches.',
+    inputSchema: objectSchema({
+      cursor: artifactListCursorJsonSchema,
+      limit: artifactReconcileLimitJsonSchema,
+      dryRun: artifactMigrationDryRunJsonSchema,
+    }),
   },
   {
     name: 'reconcile_artifact_indexes',
@@ -1715,6 +1729,205 @@ const searchArtifacts = async (event: LambdaEvent, input: Record<string, unknown
   return listArtifactsFromPointerPrefixes(event, prefixes, options);
 };
 
+const requestArtifactKeyPattern = /^request-artifacts\/([^/]+)\/([a-f0-9]{64})\.json$/i;
+
+const parseRequestArtifactIndexKey = (key: string) => {
+  const match = key.match(requestArtifactKeyPattern);
+  if (!match) return undefined;
+
+  return { requestId: decodeURIComponent(match[1]), sha256: match[2].toLowerCase() };
+};
+
+const inferArtifactKindFromContentType = (contentType: unknown) => {
+  const normalized = toNonEmptyString(contentType)?.toLowerCase().split(';', 1)[0] ?? '';
+  if (normalized.startsWith('image/')) return 'image';
+  if (normalized.startsWith('video/')) return 'video';
+  if (normalized.startsWith('audio/')) return 'audio';
+  if (normalized === 'application/pdf') return 'pdf';
+  if (
+    normalized.startsWith('text/') ||
+    normalized.includes('document') ||
+    normalized === 'application/msword' ||
+    normalized === 'application/rtf'
+  ) {
+    return 'doc';
+  }
+  if (normalized.includes('json') || normalized.includes('csv') || normalized.includes('xml')) return 'data';
+
+  return 'other';
+};
+
+const getMigrationArtifactKind = (record: Record<string, unknown>, blobKey: string): string => {
+  const explicitKind = toNonEmptyString(record.artifactKind);
+  if (explicitKind && artifactKindValues.includes(explicitKind as (typeof artifactKindValues)[number]))
+    return explicitKind;
+
+  const [blobKeyKind] = normalizeArtifactBlobKey(blobKey).split('/');
+  if (artifactKindValues.includes(blobKeyKind as (typeof artifactKindValues)[number])) return blobKeyKind;
+
+  return inferArtifactKindFromContentType(record.contentType);
+};
+
+const normalizeMigrationFilename = (value: string) => {
+  const filename = value.split(/[\\/]/).pop() || value;
+  const normalized = filename
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f<>\\/]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, artifactReferenceLimits.originalFilename);
+
+  return normalized || 'artifact';
+};
+
+const normalizeMigrationLabel = (value: string) => {
+  const normalized = value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f<>]+/gu, ' ')
+    .slice(0, artifactReferenceLimits.label)
+    .trim();
+
+  return normalized || 'Artifact';
+};
+
+const getMigrationFilename = (record: Record<string, unknown>, blobKey: string, sha256: string) => {
+  const metadata = getRecordValue(record.metadata);
+  const metadataFilename = toNonEmptyString(metadata?.filename) ?? toNonEmptyString(metadata?.name);
+  const existingFilename = toNonEmptyString(record.originalFilename);
+  const blobFilename = normalizeArtifactBlobKey(blobKey).split('/').pop();
+
+  return normalizeMigrationFilename(existingFilename ?? metadataFilename ?? blobFilename ?? sha256);
+};
+
+const getMigrationTags = (value: unknown) => {
+  if (!Array.isArray(value)) return undefined;
+
+  const tags = value.filter((tag): tag is string => typeof tag === 'string' && Boolean(tag.trim()));
+
+  return tags.length ? tags : undefined;
+};
+
+const buildArtifactPointer = (requestId: string, artifact: ArtifactReference) => ({
+  requestId,
+  sha256: artifact.sha256,
+  artifactKind: artifact.artifactKind ?? getArtifactKindFromBlobKey(artifact.blobKey),
+});
+
+const writeMigratedArtifactPointers = async (
+  store: ArtifactIndexStore,
+  requestId: string,
+  artifact: ArtifactReference
+) => {
+  const pointer = buildArtifactPointer(requestId, artifact);
+  const pointerMetadata = { requestId, sha256: artifact.sha256, artifactKind: pointer.artifactKind };
+
+  await Promise.all([
+    store.setJSON(`by-kind/${pointer.artifactKind}/${artifact.sha256}.json`, pointer, { metadata: pointerMetadata }),
+    store.setJSON(
+      `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${artifact.sha256}.json`,
+      pointer,
+      { metadata: pointerMetadata }
+    ),
+  ]);
+};
+
+const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string, input: { dryRun: boolean }) => {
+  const parsedKey = parseRequestArtifactIndexKey(key);
+  if (!parsedKey) return { indexKey: key, status: 'skipped' as const, reason: 'unexpected request artifact key shape' };
+
+  const raw = await parseJsonBlob(store, key);
+  const record = getRecordValue(raw);
+  const blobKey = toNonEmptyString(record?.blobKey);
+  if (!record || !blobKey) return { indexKey: key, status: 'skipped' as const, reason: 'invalid artifact JSON' };
+
+  const normalizedBlobKey = normalizeArtifactBlobKey(blobKey);
+  const artifactKind = getMigrationArtifactKind(record, normalizedBlobKey);
+  const originalFilename = getMigrationFilename(record, normalizedBlobKey, parsedKey.sha256);
+  const label = normalizeMigrationLabel(toNonEmptyString(record.label) ?? originalFilename);
+  const tags = getMigrationTags(record.tags);
+  const migratedRecord = {
+    ...record,
+    blobKey: normalizedBlobKey,
+    sha256: parsedKey.sha256,
+    artifactKind,
+    originalFilename,
+    label,
+    ...(tags ? { tags } : {}),
+  };
+
+  if (!isArtifactReference(migratedRecord)) {
+    return { indexKey: key, status: 'skipped' as const, reason: 'artifact JSON is still invalid after migration' };
+  }
+
+  const referenceChanged = JSON.stringify(record) !== JSON.stringify(migratedRecord);
+  if (!input.dryRun) {
+    if (referenceChanged) await writeArtifactReferenceForAdminMutation(store, parsedKey.requestId, migratedRecord);
+    await writeMigratedArtifactPointers(store, parsedKey.requestId, migratedRecord);
+  }
+
+  return {
+    indexKey: key,
+    requestId: parsedKey.requestId,
+    sha256: parsedKey.sha256,
+    artifactKind,
+    status: input.dryRun ? ('dry_run' as const) : ('migrated' as const),
+    referenceUpdated: referenceChanged,
+    pointersWritten: input.dryRun ? 0 : 2,
+  };
+};
+
+const migrateArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const limit = normalizeArtifactReconcileLimit(input.limit);
+  if (!limit.ok) return toolError(limit.error);
+
+  const cursor = normalizeArtifactBrowseCursor(input.cursor);
+  if (!cursor.ok) return toolError(cursor.error);
+
+  const dryRun = input.dryRun === true;
+  const store = await getArtifactIndexBlobStore(event);
+  const keys = await listPointerKeys(store, ['request-artifacts/']);
+  const pageKeys = keys.slice(cursor.value, cursor.value + limit.value);
+  const results: Array<Awaited<ReturnType<typeof migrateArtifactIndexRecord>>> = [];
+
+  for (const key of pageKeys) {
+    results.push(await migrateArtifactIndexRecord(store, key, { dryRun }));
+  }
+
+  const nextOffset = cursor.value + pageKeys.length;
+  const nextCursor = nextOffset < keys.length ? String(nextOffset) : null;
+  const checkpoint = {
+    cursor: String(cursor.value),
+    nextCursor,
+    lastKey: pageKeys.at(-1) ?? null,
+    processed: results.length,
+    totalKeys: keys.length,
+  };
+  const migrated = results.filter((result) => result.status === 'migrated' || result.status === 'dry_run').length;
+  const skipped = results.filter((result) => result.status === 'skipped').length;
+  const referenceUpdates = results.filter((result) => 'referenceUpdated' in result && result.referenceUpdated).length;
+  const pointerWrites = results.reduce(
+    (count, result) => count + ('pointersWritten' in result ? (result.pointersWritten ?? 0) : 0),
+    0
+  );
+
+  console.info('Artifact index migration checkpoint.', { dryRun, migrated, skipped, referenceUpdates, ...checkpoint });
+
+  return toolResult({
+    dryRun,
+    scanned: pageKeys.length,
+    migrated,
+    skipped,
+    referenceUpdates,
+    pointerWrites,
+    checkpoint,
+    results,
+  });
+};
+
 const softDeleteArtifact = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const adminState = await getAdminToolState(event);
   if ('isError' in adminState) return adminState;
@@ -1926,6 +2139,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return softDeleteArtifact(event, input);
     case 'restore_artifact':
       return restoreArtifact(event, input);
+    case 'migrate_artifact_indexes':
+      return migrateArtifactIndexes(event, input);
     case 'reconcile_artifact_indexes':
       return reconcileArtifactIndexes(event, input);
     case 'save_json_blob_patch_agent_output':
