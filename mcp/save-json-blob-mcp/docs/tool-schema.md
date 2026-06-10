@@ -86,7 +86,9 @@ Required fields:
 
 Optional fields:
 
-- `filename: string` - used only for the final blob extension.
+- `filename: string` - used for the final blob extension and saved as the returned `originalFilename` after server-side safety validation.
+- `label: string` - optional safe human-readable label saved in the returned `ArtifactReference` (max 120 characters).
+- `tags: string[]` - optional safe tags saved in the returned `ArtifactReference` (max 20 tags, 40 characters each).
 - `encoding: "base64" | "binary"` - defaults to `base64`.
 - `expectedSizeBytes: integer` - expected complete artifact byte size; upload is rejected before indexing if assembled bytes differ.
 - `expectedSha256: string` - expected complete artifact SHA-256 hex digest; upload is rejected before indexing if assembled bytes differ.
@@ -110,7 +112,7 @@ Required fields:
 - `totalChunks: integer` - total chunks in the upload.
 - `payload: string` - chunk bytes, base64 by default.
 
-Optional fields: `filename`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata` match `save_artifact`.
+Optional fields: `filename`, `label`, `tags`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata` match `save_artifact`.
 
 Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is safe; checksum dedup returns success and does not rewrite final bytes.
 

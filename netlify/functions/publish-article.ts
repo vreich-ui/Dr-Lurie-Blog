@@ -218,7 +218,11 @@ const getArtifactRequestId = (reference: ArtifactReference, fallback: string) =>
 };
 
 const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: string) => {
-  const metadataFilename = toStringValue(reference.metadata?.filename) ?? toStringValue(reference.metadata?.name);
+  const originalFilename = toStringValue(reference.originalFilename);
+  const metadataFilename =
+    toStringValue(reference.metadata?.filename) ??
+    toStringValue(reference.metadata?.name) ??
+    (originalFilename && originalFilename.includes('.') ? originalFilename : undefined);
   const filename = metadataFilename ? sanitizeFilename(metadataFilename) : undefined;
 
   if (filename) return filename;

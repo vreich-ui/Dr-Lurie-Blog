@@ -13,9 +13,12 @@ import { z } from 'zod';
 
 import {
   ArtifactKind,
+  artifactReferenceLimits,
   artifactKindValues,
   createArtifactReference,
   isArtifactReference,
+  isSafeArtifactFilename,
+  isSafeArtifactText,
   type ArtifactReference,
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
@@ -54,6 +57,8 @@ type ChunkManifest = {
   artifactKind: ArtifactKind;
   contentType: string;
   filename?: string;
+  label?: string;
+  tags?: string[];
   expectedSizeBytes?: number;
   expectedSha256?: string;
   receivedChunkIndexes: number[];
@@ -71,12 +76,39 @@ const jsonHeaders = {
   'Cache-Control': 'no-store',
 };
 
+const safeArtifactFilenameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(artifactReferenceLimits.originalFilename)
+  .refine((value) => isSafeArtifactFilename(value), {
+    message: 'filename must not contain control characters, angle brackets, or path separators.',
+  });
+
+const safeArtifactLabelSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(artifactReferenceLimits.label)
+  .refine((value) => isSafeArtifactText(value, artifactReferenceLimits.label), {
+    message: 'label must not contain control characters or angle brackets.',
+  });
+
+const safeArtifactTagSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(artifactReferenceLimits.tag)
+  .refine((value) => isSafeArtifactText(value, artifactReferenceLimits.tag), {
+    message: 'tags must not contain control characters or angle brackets.',
+  });
+
 const uploadSchema = z
   .object({
     requestId: z.string().min(1),
     artifactKind: z.enum(artifactKindValues),
     contentType: z.string().min(1),
-    filename: z.string().min(1).optional(),
+    filename: safeArtifactFilenameSchema.optional(),
     clientUploadId: z.uuid().optional(),
     chunkIndex: z.number().int().nonnegative().optional(),
     totalChunks: z.number().int().positive().max(10_000).optional(),
@@ -92,6 +124,8 @@ const uploadSchema = z
       .regex(/^[a-f0-9]{64}$/i)
       .optional(),
     payload: z.string(),
+    label: safeArtifactLabelSchema.optional(),
+    tags: z.array(safeArtifactTagSchema).max(artifactReferenceLimits.tags).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
@@ -335,6 +369,12 @@ const validateChunkUploadManifest = async (
     parsed.filename !== undefined && parsed.filename !== input.filename
       ? `filename expected ${parsed.filename} received ${input.filename ?? ''}`
       : undefined,
+    parsed.label !== undefined && parsed.label !== input.label
+      ? `label expected ${parsed.label} received ${input.label ?? ''}`
+      : undefined,
+    parsed.tags !== undefined && (input.tags === undefined || parsed.tags.join('\0') !== input.tags.join('\0'))
+      ? `tags expected ${parsed.tags.join(',')} received ${input.tags?.join(',') ?? ''}`
+      : undefined,
     parsed.expectedSizeBytes !== undefined &&
     expectedSizeBytes !== undefined &&
     parsed.expectedSizeBytes !== expectedSizeBytes
@@ -383,6 +423,8 @@ const writeChunkManifest = async (
     artifactKind: input.artifactKind,
     contentType: input.contentType,
     ...(input.filename ? { filename: input.filename } : {}),
+    ...(input.label ? { label: input.label } : {}),
+    ...(input.tags?.length ? { tags: input.tags } : {}),
     ...(expectedSizeBytes !== undefined ? { expectedSizeBytes } : {}),
     ...(expectedSha256 ? { expectedSha256 } : {}),
     receivedChunkIndexes: [...receivedChunkIndexes].sort((a, b) => a - b),
@@ -493,6 +535,8 @@ const mergeChunkManifestIntegrity = async (
 
   return {
     ...input,
+    label: input.label ?? manifest.label,
+    tags: input.tags ?? manifest.tags,
     expectedSizeBytes: input.expectedSizeBytes ?? input.localSizeBytes ?? manifest.expectedSizeBytes,
     expectedSha256: input.expectedSha256 ?? input.localSha256 ?? manifest.expectedSha256,
   };
@@ -603,6 +647,29 @@ const saveReference = async (store: BlobStore, requestId: string, reference: Art
   });
 };
 
+const mergeArtifactReferenceDisplayFields = (
+  existingReference: ArtifactReference,
+  newReference: ArtifactReference
+) => ({
+  ...existingReference,
+  originalFilename: existingReference.originalFilename ?? newReference.originalFilename,
+  label: existingReference.label ?? newReference.label,
+  tags: existingReference.tags ?? newReference.tags,
+});
+
+const shouldSaveArtifactReference = (
+  existingReference: ArtifactReference | undefined,
+  responseReference: ArtifactReference
+) => {
+  if (!existingReference || existingReference.blobKey !== responseReference.blobKey) return true;
+
+  return (
+    existingReference.originalFilename !== responseReference.originalFilename ||
+    existingReference.label !== responseReference.label ||
+    existingReference.tags?.join('\0') !== responseReference.tags?.join('\0')
+  );
+};
+
 const finalizeUpload = async (
   event: LambdaEvent,
   input: UploadRequest,
@@ -623,9 +690,12 @@ const finalizeUpload = async (
   const existingReference = deduped
     ? await getExistingReference(indexStore, input.requestId, reference.sha256)
     : undefined;
-  const responseReference = existingReference?.blobKey === reference.blobKey ? existingReference : reference;
+  const responseReference =
+    existingReference?.blobKey === reference.blobKey
+      ? mergeArtifactReferenceDisplayFields(existingReference, reference)
+      : reference;
 
-  if (!existingReference || existingReference.blobKey !== reference.blobKey) {
+  if (shouldSaveArtifactReference(existingReference, responseReference)) {
     await saveReference(indexStore, input.requestId, responseReference);
   }
 

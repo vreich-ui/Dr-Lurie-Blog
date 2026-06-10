@@ -5,6 +5,7 @@ import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { artifactReferenceLimits } from '../lib/artifacts.js';
 
 type LambdaEvent = {
   blobs?: string;
@@ -277,6 +278,24 @@ const artifactEncodingJsonSchema = (description?: string) => ({
   ...(description ? { description } : {}),
 });
 const artifactMetadataJsonSchema = metadataBagSchema('Optional artifact metadata saved in the artifact reference.');
+const artifactLabelJsonSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: artifactReferenceLimits.label,
+  pattern: '^[^\\u0000-\\u001f\\u007f<>]+$',
+  description: 'Optional safe human-readable artifact label saved in the ArtifactReference.',
+};
+const artifactTagsJsonSchema = {
+  type: 'array',
+  maxItems: artifactReferenceLimits.tags,
+  items: {
+    type: 'string',
+    minLength: 1,
+    maxLength: artifactReferenceLimits.tag,
+    pattern: '^[^\\u0000-\\u001f\\u007f<>]+$',
+  },
+  description: 'Optional safe ArtifactReference tags for filtering or display.',
+};
 const expectedSizeBytesJsonSchema = intSchema(
   'Optional expected complete artifact byte size for upload integrity checks.'
 );
@@ -763,13 +782,18 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         requestId: stringSchema('Workflow request id that owns this artifact.'),
         artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
         contentType: stringSchema('MIME type for the artifact bytes.'),
-        filename: stringSchema('Optional original filename used only for the blob extension.'),
+        filename: {
+          ...stringSchema('Optional original filename used for blob extension and ArtifactReference originalFilename.'),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
         encoding: artifactEncodingJsonSchema('Payload encoding; defaults to base64.'),
         expectedSizeBytes: expectedSizeBytesJsonSchema,
         expectedSha256: expectedSha256JsonSchema,
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
         payload: stringSchema('Artifact bytes as base64 unless encoding is binary.'),
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
       },
       ['requestId', 'artifactKind', 'contentType', 'payload']
@@ -787,13 +811,20 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         clientUploadId: stringSchema('Stable UUID shared by every chunk in this upload.'),
         chunkIndex: intSchema('Zero-based chunk index.'),
         totalChunks: { type: 'integer', minimum: 1, description: 'Total number of chunks in this upload.' },
-        filename: stringSchema('Optional original filename used only for the final blob extension.'),
+        filename: {
+          ...stringSchema(
+            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
+          ),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
         encoding: artifactEncodingJsonSchema('Chunk payload encoding; defaults to base64.'),
         expectedSizeBytes: expectedSizeBytesJsonSchema,
         expectedSha256: expectedSha256JsonSchema,
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
         payload: stringSchema('Chunk bytes as base64 unless encoding is binary.'),
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
       },
       ['requestId', 'artifactKind', 'contentType', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload']
@@ -1295,6 +1326,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         localSizeBytes: input.localSizeBytes,
         localSha256: input.localSha256,
         payload: input.payload,
+        label: input.label,
+        tags: input.tags,
         metadata: input.metadata,
       });
     case 'save_artifact_chunk':
@@ -1312,6 +1345,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         localSizeBytes: input.localSizeBytes,
         localSha256: input.localSha256,
         payload: input.payload,
+        label: input.label,
+        tags: input.tags,
         metadata: input.metadata,
       });
     case 'list_artifacts_for_request':

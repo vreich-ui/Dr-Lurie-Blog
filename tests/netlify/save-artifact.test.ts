@@ -604,7 +604,7 @@ test('save-artifact rejects JPEG bytes that have markers but cannot be decoded b
   assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
-test('save-artifact rejects client-provided blobKey and non-whitelisted artifactKind before persistence', async () => {
+test('save-artifact saves safe ArtifactReference display fields and rejects unsafe upload fields', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY = 'false';
@@ -612,6 +612,19 @@ test('save-artifact rejects client-provided blobKey and non-whitelisted artifact
 
   const requestId = `schema-reject-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const bytes = Buffer.from('schema checked bytes');
+  const validResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    filename: 'hero safe.png',
+    label: 'Hero Safe Upload',
+    tags: ['hero', 'safe'],
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(validResponse.statusCode, 201);
+  assert.equal((validResponse.json.artifact as { originalFilename: string }).originalFilename, 'hero safe.png');
+  assert.equal((validResponse.json.artifact as { label: string }).label, 'Hero Safe Upload');
+  assert.deepEqual((validResponse.json.artifact as { tags: string[] }).tags, ['hero', 'safe']);
 
   const blobKeyResponse = await postArtifact({
     ...makeBaseInput(requestId),
@@ -635,11 +648,17 @@ test('save-artifact rejects client-provided blobKey and non-whitelisted artifact
   assert.equal(artifactKindResponse.json.error, 'Invalid artifact upload input');
   assert.match(JSON.stringify(artifactKindResponse.json.issues), /artifactKind/);
 
-  const artifactStore = await getArtifactBlobStore({});
-  const indexStore = await getArtifactIndexBlobStore({});
+  const unsafeFieldResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    label: '<unsafe>',
+    tags: ['x'.repeat(41)],
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
 
-  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
-  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+  assert.equal(unsafeFieldResponse.statusCode, 400);
+  assert.equal(unsafeFieldResponse.json.error, 'Invalid artifact upload input');
+  assert.match(JSON.stringify(unsafeFieldResponse.json.issues), /label|tags/);
 });
 
 test('save-artifact rejects a single-shot upload when expected size does not match decoded bytes', async () => {

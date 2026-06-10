@@ -19,12 +19,22 @@ export const ArtifactKind = {
 
 export const artifactKindSet = new Set<ArtifactKind>(artifactKindValues);
 
+export const artifactReferenceLimits = {
+  originalFilename: 160,
+  label: 120,
+  tag: 40,
+  tags: 20,
+} as const;
+
 export type ArtifactReference = {
   blobKey: string;
   sizeBytes: number;
   sha256: string;
   contentType: string;
   createdAtISO: string;
+  originalFilename?: string;
+  label?: string;
+  tags?: string[];
   metadata?: Record<string, unknown>;
 };
 
@@ -250,11 +260,16 @@ export type ArtifactUploadInput = {
   totalChunks?: number;
   encoding?: 'base64' | 'binary';
   payload: string;
+  label?: string;
+  tags?: string[];
   metadata?: Record<string, unknown>;
 };
 
 type CreateArtifactReferenceOptions = {
-  input: Pick<ArtifactUploadInput, 'artifactKind' | 'contentType' | 'filename' | 'metadata' | 'requestId'>;
+  input: Pick<
+    ArtifactUploadInput,
+    'artifactKind' | 'contentType' | 'filename' | 'label' | 'metadata' | 'requestId' | 'tags'
+  >;
   bytes: Buffer | Uint8Array;
   createdAtISO?: string;
 };
@@ -265,6 +280,9 @@ const allowedArtifactReferenceKeys = new Set([
   'sha256',
   'contentType',
   'createdAtISO',
+  'originalFilename',
+  'label',
+  'tags',
   'metadata',
 ]);
 
@@ -285,6 +303,56 @@ export const getArtifactExtension = (filename: string | undefined): string => {
     .replace(/[^a-z0-9.]/g, '');
 
   return extension.length > 1 ? extension : '';
+};
+
+const normalizeArtifactSafeString = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+const hasUnsafeArtifactTextCharacters = (value: string) => /[\u0000-\u001f\u007f<>]/u.test(value);
+
+const hasUnsafeArtifactFilenameCharacters = (value: string) => /[\u0000-\u001f\u007f<>/\\]/u.test(value);
+
+const getSafeArtifactStringIssue = (
+  value: unknown,
+  fieldName: string,
+  maxLength: number,
+  options: { filename?: boolean } = {}
+): string | undefined => {
+  if (typeof value !== 'string') return `${fieldName} must be a string`;
+
+  const normalized = normalizeArtifactSafeString(value);
+  if (!normalized) return `${fieldName} must be a non-empty string`;
+  if (normalized.length > maxLength) return `${fieldName} must be at most ${maxLength} characters`;
+  if (hasUnsafeArtifactTextCharacters(normalized)) {
+    return `${fieldName} must not contain control characters or angle brackets`;
+  }
+  if (options.filename && hasUnsafeArtifactFilenameCharacters(normalized)) {
+    return `${fieldName} must be a filename, not a path`;
+  }
+
+  return undefined;
+};
+
+export const isSafeArtifactText = (value: string, maxLength: number) =>
+  getSafeArtifactStringIssue(value, 'value', maxLength) === undefined;
+
+export const isSafeArtifactFilename = (value: string, maxLength = artifactReferenceLimits.originalFilename) =>
+  getSafeArtifactStringIssue(value, 'value', maxLength, { filename: true }) === undefined;
+
+const toSafeArtifactFilename = (filename: string | undefined, fallback: string) => {
+  const candidate = filename ? basename(filename) : fallback;
+  const normalized = normalizeArtifactSafeString(candidate).replace(/[\u0000-\u001f\u007f<>/\\]+/gu, '-');
+  const truncated = normalized.slice(0, artifactReferenceLimits.originalFilename).replace(/^-+|-+$/g, '');
+
+  return truncated || fallback.slice(0, artifactReferenceLimits.originalFilename);
+};
+
+const toArtifactReferenceTags = (tags: string[] | undefined) => {
+  if (!tags?.length) return undefined;
+
+  const normalizedTags = tags.map(normalizeArtifactSafeString).filter(Boolean);
+  const uniqueTags = [...new Set(normalizedTags)].slice(0, artifactReferenceLimits.tags);
+
+  return uniqueTags.length ? uniqueTags : undefined;
 };
 
 export const createArtifactBlobKey = (input: {
@@ -320,18 +388,26 @@ export const createArtifactReference = ({
   createdAtISO = new Date().toISOString(),
 }: CreateArtifactReferenceOptions): ArtifactReference => {
   const sha256 = sha256Hex(bytes);
+  const blobKey = createArtifactBlobKey({
+    artifactKind: input.artifactKind,
+    requestId: input.requestId,
+    sha256,
+    filename: input.filename,
+  });
+  const fallbackFilename = blobKey.split('/').pop() || sha256;
+  const originalFilename = toSafeArtifactFilename(input.filename, fallbackFilename);
+  const label = normalizeArtifactSafeString(input.label ?? originalFilename).slice(0, artifactReferenceLimits.label);
+  const tags = toArtifactReferenceTags(input.tags);
 
   return {
-    blobKey: createArtifactBlobKey({
-      artifactKind: input.artifactKind,
-      requestId: input.requestId,
-      sha256,
-      filename: input.filename,
-    }),
+    blobKey,
     sizeBytes: bytes.byteLength,
     sha256,
     contentType: input.contentType,
     createdAtISO,
+    originalFilename,
+    label,
+    ...(tags ? { tags } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 };
@@ -360,7 +436,7 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
   const unexpectedKeys = Object.keys(value).filter((key) => !allowedArtifactReferenceKeys.has(key));
   if (unexpectedKeys.length) return `unexpected top-level keys: ${unexpectedKeys.join(', ')}`;
 
-  const { blobKey, sizeBytes, sha256, contentType, createdAtISO, metadata } = value;
+  const { blobKey, sizeBytes, sha256, contentType, createdAtISO, originalFilename, label, tags, metadata } = value;
   if (typeof blobKey !== 'string' || !blobKey.trim()) return 'blobKey must be a non-empty string';
   if (typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(sha256)) return 'sha256 must be a 64-character hex string';
   if (!isValidArtifactBlobKey(blobKey, sha256)) return 'blobKey must match the server ArtifactReference path format';
@@ -370,6 +446,31 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
   if (typeof contentType !== 'string' || !contentType.trim()) return 'contentType must be a non-empty string';
   if (typeof createdAtISO !== 'string' || Number.isNaN(Date.parse(createdAtISO))) {
     return 'createdAtISO must be a valid ISO date string';
+  }
+  if (originalFilename !== undefined) {
+    const issue = getSafeArtifactStringIssue(
+      originalFilename,
+      'originalFilename',
+      artifactReferenceLimits.originalFilename,
+      {
+        filename: true,
+      }
+    );
+    if (issue) return issue;
+  }
+  if (label !== undefined) {
+    const issue = getSafeArtifactStringIssue(label, 'label', artifactReferenceLimits.label);
+    if (issue) return issue;
+  }
+  if (tags !== undefined) {
+    if (!Array.isArray(tags)) return 'tags must be an array when provided';
+    if (tags.length > artifactReferenceLimits.tags) {
+      return `tags must contain at most ${artifactReferenceLimits.tags} values`;
+    }
+    for (const [index, tag] of tags.entries()) {
+      const issue = getSafeArtifactStringIssue(tag, `tags[${index}]`, artifactReferenceLimits.tag);
+      if (issue) return issue;
+    }
   }
   if (metadata !== undefined && !isRecord(metadata)) return 'metadata must be an object when provided';
 
