@@ -2,13 +2,29 @@ import { basename, extname } from 'node:path';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import { sha256Hex } from './crypto.js';
 
-export enum ArtifactKind {
-  Image = 'image',
-  Audio = 'audio',
-  Video = 'video',
-  Binary = 'binary',
-  Markdown = 'markdown',
-}
+export const artifactKindValues = ['image', 'pdf', 'video', 'doc', 'audio', 'data', 'attachment', 'other'] as const;
+
+export type ArtifactKind = (typeof artifactKindValues)[number];
+
+export const ArtifactKind = {
+  Image: 'image',
+  Pdf: 'pdf',
+  Video: 'video',
+  Doc: 'doc',
+  Audio: 'audio',
+  Data: 'data',
+  Attachment: 'attachment',
+  Other: 'other',
+} as const satisfies Record<string, ArtifactKind>;
+
+export const artifactKindSet = new Set<ArtifactKind>(artifactKindValues);
+
+export const artifactReferenceLimits = {
+  originalFilename: 160,
+  label: 120,
+  tag: 40,
+  tags: 20,
+} as const;
 
 export type ArtifactReference = {
   blobKey: string;
@@ -16,7 +32,13 @@ export type ArtifactReference = {
   sha256: string;
   contentType: string;
   createdAtISO: string;
+  artifactKind?: ArtifactKind;
+  originalFilename?: string;
+  label?: string;
+  tags?: string[];
   metadata?: Record<string, unknown>;
+  deletedAtISO?: string;
+  deletedBy?: string;
 };
 
 export type ReadableArtifactBlobStore = {
@@ -32,14 +54,20 @@ export type WritableArtifactIndexStore = {
   setJSON?: (key: string, value: unknown, options?: { metadata?: Record<string, string> }) => Promise<unknown>;
 };
 
-export type ImageArtifactReconciliationResult =
+export type ArtifactReconciliationLogger = {
+  warn?: (message?: unknown, ...optionalParams: unknown[]) => void;
+};
+
+export type ArtifactReconciliationResult =
   | { status: 'found'; blobKey: string; bytes: Buffer; correctedBlobKey?: string; nearbyKeys: string[] }
   | { status: 'missing'; blobKey: string; nearbyKeys: string[]; exactFilenameExists: boolean }
   | { status: 'ambiguous'; blobKey: string; matchingKeys: string[]; nearbyKeys: string[] };
 
+export type ImageArtifactReconciliationResult = ArtifactReconciliationResult;
+
 const imageExtensionFallbacks = new Set(['jpg', 'jpeg', 'png', 'webp']);
 
-const normalizeArtifactBlobKey = (blobKey: string) =>
+export const normalizeArtifactBlobKey = (blobKey: string) =>
   blobKey
     .trim()
     .replace(/^\/+/, '')
@@ -74,7 +102,7 @@ const tryReadArtifactBytes = async (store: ReadableArtifactBlobStore, key: strin
 
 const uniqueValues = <T>(values: T[]) => [...new Set(values)];
 
-const listImageArtifactKeysForPrefixes = async (store: ReadableArtifactBlobStore, prefixes: string[]) => {
+const listArtifactKeysForPrefixes = async (store: ReadableArtifactBlobStore, prefixes: string[]) => {
   if (typeof store.list !== 'function') return [];
 
   const keys: string[] = [];
@@ -96,18 +124,24 @@ const getNearbyImageArtifactKeys = async (store: ReadableArtifactBlobStore, norm
   const prefix = getBlobKeyPrefix(normalizedBlobKey);
   if (!prefix) return [];
 
-  return listImageArtifactKeysForPrefixes(store, [prefix, `artifacts/${prefix}`, `/${prefix}`]);
+  return listArtifactKeysForPrefixes(store, [prefix, `artifacts/${prefix}`, `/${prefix}`]);
 };
 
-const getGlobalImageArtifactKeys = async (store: ReadableArtifactBlobStore) => {
-  return listImageArtifactKeysForPrefixes(store, ['image/', 'artifacts/image/', '/image/']);
+const getGlobalArtifactKeys = async (store: ReadableArtifactBlobStore, normalizedBlobKey: string) => {
+  const [artifactKind] = normalizedBlobKey.split('/');
+  const kinds = artifactKindSet.has(artifactKind as ArtifactKind) ? [artifactKind] : artifactKindValues;
+
+  return listArtifactKeysForPrefixes(
+    store,
+    kinds.flatMap((kind) => [`${kind}/`, `artifacts/${kind}/`, `/${kind}/`])
+  );
 };
 
 const getExtension = (filename: string) => filename.split('.').pop()?.toLowerCase() || '';
 
 const stripExtension = (filename: string) => filename.replace(/\.[^.]+$/, '');
 
-const getImageArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: string) => {
+const getArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: string) => {
   const expectedFilename = basename(normalizedBlobKey);
   const expectedStem = stripExtension(expectedFilename);
 
@@ -123,10 +157,13 @@ const getImageArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: str
   });
 };
 
+const getRequestIdFromArtifactBlobKey = (blobKey: string) => normalizeArtifactBlobKey(blobKey).split('/')[1] || '';
+
 const maybeUpdateArtifactIndexReference = async (
   indexStore: WritableArtifactIndexStore | undefined,
   reference: ArtifactReference,
-  correctedBlobKey: string
+  correctedBlobKey: string,
+  logger?: ArtifactReconciliationLogger
 ) => {
   const indexBlobKey = normalizeArtifactBlobKey(correctedBlobKey);
   if (
@@ -134,23 +171,36 @@ const maybeUpdateArtifactIndexReference = async (
     indexBlobKey === reference.blobKey ||
     !isValidArtifactBlobKey(indexBlobKey, reference.sha256)
   ) {
-    return;
+    return false;
   }
 
-  const [, requestId = ''] = indexBlobKey.split('/');
-  if (!requestId) return;
+  const correctedRequestId = getRequestIdFromArtifactBlobKey(indexBlobKey);
+  if (!correctedRequestId) return false;
 
-  await indexStore.setJSON(
-    requestArtifactIndexKey(requestId, reference.sha256),
-    { ...reference, blobKey: indexBlobKey },
-    {
-      metadata: {
-        requestId,
-        sha256: reference.sha256,
-        contentType: reference.contentType,
-      },
-    }
+  const previousRequestId = getRequestIdFromArtifactBlobKey(reference.blobKey);
+  const requestIds = uniqueValues([previousRequestId, correctedRequestId].filter(Boolean));
+  const correctedReference = { ...reference, blobKey: indexBlobKey };
+
+  await Promise.all(
+    requestIds.map((requestId) =>
+      indexStore.setJSON?.(requestArtifactIndexKey(requestId, reference.sha256), correctedReference, {
+        metadata: {
+          requestId,
+          sha256: reference.sha256,
+          contentType: reference.contentType,
+        },
+      })
+    )
   );
+
+  logger?.warn?.('Corrected artifact-index blobKey drift.', {
+    previousBlobKey: reference.blobKey,
+    correctedBlobKey: indexBlobKey,
+    sha256: reference.sha256,
+    requestIds,
+  });
+
+  return true;
 };
 
 export const getImageArtifactReadDiagnostics = async (
@@ -171,16 +221,17 @@ export const getImageArtifactReadDiagnostics = async (
   };
 };
 
-export const reconcileImageArtifactReference = async (
+export const reconcileArtifactReference = async (
   reference: ArtifactReference,
   artifactStore: ReadableArtifactBlobStore,
-  indexStore?: WritableArtifactIndexStore
-): Promise<ImageArtifactReconciliationResult> => {
+  indexStore?: WritableArtifactIndexStore,
+  options: { logger?: ArtifactReconciliationLogger } = {}
+): Promise<ArtifactReconciliationResult> => {
   const normalizedBlobKey = normalizeArtifactBlobKey(reference.blobKey);
   const directBytes = await tryReadArtifactBytes(artifactStore, normalizedBlobKey);
 
   if (directBytes) {
-    await maybeUpdateArtifactIndexReference(indexStore, reference, normalizedBlobKey);
+    await maybeUpdateArtifactIndexReference(indexStore, reference, normalizedBlobKey, options.logger);
 
     return {
       status: 'found',
@@ -192,12 +243,12 @@ export const reconcileImageArtifactReference = async (
   }
 
   const nearbyKeys = await getNearbyImageArtifactKeys(artifactStore, normalizedBlobKey);
-  let matches = getImageArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
+  let matches = getArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
   let searchedKeys = nearbyKeys;
 
   if (!matches.length) {
-    const globalKeys = await getGlobalImageArtifactKeys(artifactStore);
-    matches = getImageArtifactKeyMatches(globalKeys, normalizedBlobKey);
+    const globalKeys = await getGlobalArtifactKeys(artifactStore, normalizedBlobKey);
+    matches = getArtifactKeyMatches(globalKeys, normalizedBlobKey);
     searchedKeys = uniqueValues([...nearbyKeys, ...globalKeys]).sort();
   }
 
@@ -206,7 +257,7 @@ export const reconcileImageArtifactReference = async (
     const correctedBytes = await tryReadArtifactBytes(artifactStore, correctedBlobKey);
 
     if (correctedBytes) {
-      await maybeUpdateArtifactIndexReference(indexStore, reference, correctedBlobKey);
+      await maybeUpdateArtifactIndexReference(indexStore, reference, correctedBlobKey, options.logger);
 
       return {
         status: 'found',
@@ -232,6 +283,15 @@ export const reconcileImageArtifactReference = async (
   };
 };
 
+export const reconcileImageArtifactReference = (
+  reference: ArtifactReference,
+  artifactStore: ReadableArtifactBlobStore,
+  indexStore?: WritableArtifactIndexStore,
+  options: { logger?: ArtifactReconciliationLogger } = {}
+): Promise<ImageArtifactReconciliationResult> => {
+  return reconcileArtifactReference(reference, artifactStore, indexStore, options);
+};
+
 export type ArtifactUploadInput = {
   requestId: string;
   artifactKind: ArtifactKind;
@@ -241,11 +301,18 @@ export type ArtifactUploadInput = {
   totalChunks?: number;
   encoding?: 'base64' | 'binary';
   payload: string;
+  label?: string;
+  tags?: string[];
   metadata?: Record<string, unknown>;
+  deletedAtISO?: string;
+  deletedBy?: string;
 };
 
 type CreateArtifactReferenceOptions = {
-  input: Pick<ArtifactUploadInput, 'artifactKind' | 'contentType' | 'filename' | 'metadata' | 'requestId'>;
+  input: Pick<
+    ArtifactUploadInput,
+    'artifactKind' | 'contentType' | 'filename' | 'label' | 'metadata' | 'requestId' | 'tags'
+  >;
   bytes: Buffer | Uint8Array;
   createdAtISO?: string;
 };
@@ -256,10 +323,16 @@ const allowedArtifactReferenceKeys = new Set([
   'sha256',
   'contentType',
   'createdAtISO',
+  'artifactKind',
+  'originalFilename',
+  'label',
+  'tags',
   'metadata',
+  'deletedAtISO',
+  'deletedBy',
 ]);
 
-const safePathSegment = (value: string): string => {
+export const safePathSegment = (value: string): string => {
   return value
     .trim()
     .toLowerCase()
@@ -278,16 +351,81 @@ export const getArtifactExtension = (filename: string | undefined): string => {
   return extension.length > 1 ? extension : '';
 };
 
+const normalizeArtifactSafeString = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+const hasUnsafeArtifactTextCharacters = (value: string) => /[\u0000-\u001f\u007f<>]/u.test(value);
+
+const hasUnsafeArtifactFilenameCharacters = (value: string) => /[\u0000-\u001f\u007f<>/\\]/u.test(value);
+
+const getSafeArtifactStringIssue = (
+  value: unknown,
+  fieldName: string,
+  maxLength: number,
+  options: { filename?: boolean } = {}
+): string | undefined => {
+  if (typeof value !== 'string') return `${fieldName} must be a string`;
+
+  const normalized = normalizeArtifactSafeString(value);
+  if (!normalized) return `${fieldName} must be a non-empty string`;
+  if (normalized.length > maxLength) return `${fieldName} must be at most ${maxLength} characters`;
+  if (hasUnsafeArtifactTextCharacters(normalized)) {
+    return `${fieldName} must not contain control characters or angle brackets`;
+  }
+  if (options.filename && hasUnsafeArtifactFilenameCharacters(normalized)) {
+    return `${fieldName} must be a filename, not a path`;
+  }
+
+  return undefined;
+};
+
+export const isSafeArtifactText = (value: string, maxLength: number) =>
+  getSafeArtifactStringIssue(value, 'value', maxLength) === undefined;
+
+export const isSafeArtifactFilename = (value: string, maxLength = artifactReferenceLimits.originalFilename) =>
+  getSafeArtifactStringIssue(value, 'value', maxLength, { filename: true }) === undefined;
+
+const toSafeArtifactFilename = (filename: string | undefined, fallback: string) => {
+  const candidate = filename ? basename(filename) : fallback;
+  const normalized = normalizeArtifactSafeString(candidate).replace(/[\u0000-\u001f\u007f<>/\\]+/gu, '-');
+  const truncated = normalized.slice(0, artifactReferenceLimits.originalFilename).replace(/^-+|-+$/g, '');
+
+  return truncated || fallback.slice(0, artifactReferenceLimits.originalFilename);
+};
+
+const toArtifactReferenceTags = (tags: string[] | undefined) => {
+  if (!tags?.length) return undefined;
+
+  const normalizedTags = tags.map(normalizeArtifactSafeString).filter(Boolean);
+  const uniqueTags = [...new Set(normalizedTags)].slice(0, artifactReferenceLimits.tags);
+
+  return uniqueTags.length ? uniqueTags : undefined;
+};
+
 export const createArtifactBlobKey = (input: {
   artifactKind: ArtifactKind;
   requestId: string;
   sha256: string;
   filename?: string;
 }): string => {
+  if (!artifactKindSet.has(input.artifactKind)) {
+    throw new Error(`artifactKind must be one of: ${artifactKindValues.join(', ')}`);
+  }
+
+  const sha256 = input.sha256.toLowerCase();
+
+  if (!/^[a-f0-9]{64}$/.test(sha256)) {
+    throw new Error('sha256 must be a 64-character hex digest.');
+  }
+
   const requestId = safePathSegment(input.requestId) || 'request';
   const extension = getArtifactExtension(input.filename);
+  const blobKey = `${input.artifactKind}/${requestId}/${sha256}${extension}`;
 
-  return `${input.artifactKind}/${requestId}/${input.sha256}${extension}`;
+  if (!isValidArtifactBlobKey(blobKey, sha256)) {
+    throw new Error('generated artifact blobKey failed validation.');
+  }
+
+  return blobKey;
 };
 
 export const createArtifactReference = ({
@@ -296,18 +434,27 @@ export const createArtifactReference = ({
   createdAtISO = new Date().toISOString(),
 }: CreateArtifactReferenceOptions): ArtifactReference => {
   const sha256 = sha256Hex(bytes);
+  const blobKey = createArtifactBlobKey({
+    artifactKind: input.artifactKind,
+    requestId: input.requestId,
+    sha256,
+    filename: input.filename,
+  });
+  const fallbackFilename = blobKey.split('/').pop() || sha256;
+  const originalFilename = toSafeArtifactFilename(input.filename, fallbackFilename);
+  const label = normalizeArtifactSafeString(input.label ?? originalFilename).slice(0, artifactReferenceLimits.label);
+  const tags = toArtifactReferenceTags(input.tags);
 
   return {
-    blobKey: createArtifactBlobKey({
-      artifactKind: input.artifactKind,
-      requestId: input.requestId,
-      sha256,
-      filename: input.filename,
-    }),
+    blobKey,
     sizeBytes: bytes.byteLength,
     sha256,
     contentType: input.contentType,
     createdAtISO,
+    artifactKind: input.artifactKind,
+    originalFilename,
+    label,
+    ...(tags ? { tags } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };
 };
@@ -318,11 +465,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 export const isValidArtifactBlobKey = (blobKey: string, sha256: string): boolean => {
   const [kind, requestId, filename, ...extra] = blobKey.split('/');
-  const validKinds = new Set(Object.values(ArtifactKind));
 
   return Boolean(
     !extra.length &&
-      validKinds.has(kind as ArtifactKind) &&
+      artifactKindSet.has(kind as ArtifactKind) &&
       safePathSegment(requestId) === requestId &&
       requestId.length > 0 &&
       filename &&
@@ -337,7 +483,20 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
   const unexpectedKeys = Object.keys(value).filter((key) => !allowedArtifactReferenceKeys.has(key));
   if (unexpectedKeys.length) return `unexpected top-level keys: ${unexpectedKeys.join(', ')}`;
 
-  const { blobKey, sizeBytes, sha256, contentType, createdAtISO, metadata } = value;
+  const {
+    blobKey,
+    sizeBytes,
+    sha256,
+    contentType,
+    createdAtISO,
+    artifactKind,
+    originalFilename,
+    label,
+    tags,
+    metadata,
+    deletedAtISO,
+    deletedBy,
+  } = value;
   if (typeof blobKey !== 'string' || !blobKey.trim()) return 'blobKey must be a non-empty string';
   if (typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(sha256)) return 'sha256 must be a 64-character hex string';
   if (!isValidArtifactBlobKey(blobKey, sha256)) return 'blobKey must match the server ArtifactReference path format';
@@ -348,13 +507,52 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
   if (typeof createdAtISO !== 'string' || Number.isNaN(Date.parse(createdAtISO))) {
     return 'createdAtISO must be a valid ISO date string';
   }
+  if (artifactKind !== undefined && !artifactKindSet.has(artifactKind as ArtifactKind)) {
+    return `artifactKind must be one of: ${artifactKindValues.join(', ')}`;
+  }
+  if (originalFilename !== undefined) {
+    const issue = getSafeArtifactStringIssue(
+      originalFilename,
+      'originalFilename',
+      artifactReferenceLimits.originalFilename,
+      {
+        filename: true,
+      }
+    );
+    if (issue) return issue;
+  }
+  if (label !== undefined) {
+    const issue = getSafeArtifactStringIssue(label, 'label', artifactReferenceLimits.label);
+    if (issue) return issue;
+  }
+  if (tags !== undefined) {
+    if (!Array.isArray(tags)) return 'tags must be an array when provided';
+    if (tags.length > artifactReferenceLimits.tags) {
+      return `tags must contain at most ${artifactReferenceLimits.tags} values`;
+    }
+    for (const [index, tag] of tags.entries()) {
+      const issue = getSafeArtifactStringIssue(tag, `tags[${index}]`, artifactReferenceLimits.tag);
+      if (issue) return issue;
+    }
+  }
   if (metadata !== undefined && !isRecord(metadata)) return 'metadata must be an object when provided';
+  if (deletedAtISO !== undefined && (typeof deletedAtISO !== 'string' || Number.isNaN(Date.parse(deletedAtISO)))) {
+    return 'deletedAtISO must be a valid ISO date string when provided';
+  }
+  if (deletedBy !== undefined) {
+    const issue = getSafeArtifactStringIssue(deletedBy, 'deletedBy', artifactReferenceLimits.label);
+    if (issue) return issue;
+  }
 
   return undefined;
 };
 
 export const isArtifactReference = (value: unknown): value is ArtifactReference => {
   return getArtifactReferenceIssue(value) === undefined;
+};
+
+export const isDeletedArtifactReference = (value: unknown): value is ArtifactReference => {
+  return isArtifactReference(value) && Boolean(value.deletedAtISO);
 };
 
 export const requireArtifactReferenceArray = (

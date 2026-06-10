@@ -67,6 +67,13 @@ Registered core tool names:
 - `save_artifact`
 - `save_artifact_chunk`
 - `list_artifacts_for_request`
+- `list_artifacts_by_kind` (admin-only)
+- `list_artifacts_by_request` (admin-only)
+- `search_artifacts` (admin-only)
+- `soft_delete_artifact` (admin-only)
+- `restore_artifact` (admin-only)
+- `migrate_artifact_indexes` (admin-only)
+- `reconcile_artifact_indexes` (admin-only)
 - `ping`
 
 ## Artifact tools
@@ -75,18 +82,20 @@ Artifact tools are registered by the production Netlify `/mcp` entry point. They
 
 ### `save_artifact`
 
-Single-shot byte upload. Agents must call this immediately after creating image, audio, video, binary, or markdown bytes, then store only the returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes the final artifact blob and a request artifact index entry.
+Single-shot byte upload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes, then store only the returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes the final artifact blob and a request artifact index entry.
 
 Required fields:
 
 - `requestId: string` - workflow request id that owns the artifact.
-- `artifactKind: "image" | "audio" | "video" | "binary" | "markdown"` - storage routing kind.
+- `artifactKind: "image" | "pdf" | "video" | "doc" | "audio" | "data" | "attachment" | "other"` - storage routing kind.
 - `contentType: string` - MIME type for the artifact bytes.
 - `payload: string` - artifact bytes, base64 by default.
 
 Optional fields:
 
-- `filename: string` - used only for the final blob extension.
+- `filename: string` - used for the final blob extension and saved as the returned `originalFilename` after server-side safety validation.
+- `label: string` - optional safe human-readable label saved in the returned `ArtifactReference` (max 120 characters).
+- `tags: string[]` - optional safe tags saved in the returned `ArtifactReference` (max 20 tags, 40 characters each).
 - `encoding: "base64" | "binary"` - defaults to `base64`.
 - `expectedSizeBytes: integer` - expected complete artifact byte size; upload is rejected before indexing if assembled bytes differ.
 - `expectedSha256: string` - expected complete artifact SHA-256 hex digest; upload is rejected before indexing if assembled bytes differ.
@@ -94,7 +103,7 @@ Optional fields:
 - `localSha256: string` - accepted legacy alias for `expectedSha256`.
 - `metadata: object` - saved in the returned `ArtifactReference`.
 
-Success returns the same shape as the upload function: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist for the checksum, `deduped: true` is a successful response and bytes are not rewritten.
+Success returns the same shape as the upload function: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist for the checksum, `deduped: true` is a successful response and bytes are not rewritten. Finalization also writes compact artifact-index pointers under `by-kind/{artifactKind}/{sha256}.json`, `by-request/{requestId}/{artifactKind}/{sha256}.json`, and `by-tag/{tag}/{sha256}.json` when tags are present.
 
 ### `save_artifact_chunk`
 
@@ -103,14 +112,14 @@ Chunked byte upload. Agents must call this immediately for large created artifac
 Required fields:
 
 - `requestId: string` - workflow request id that owns the artifact.
-- `artifactKind: "image" | "audio" | "video" | "binary" | "markdown"` - storage routing kind.
+- `artifactKind: "image" | "pdf" | "video" | "doc" | "audio" | "data" | "attachment" | "other"` - storage routing kind.
 - `contentType: string` - MIME type for the complete artifact bytes.
 - `clientUploadId: string` - stable UUID shared by every chunk in this upload.
 - `chunkIndex: integer` - zero-based chunk index.
 - `totalChunks: integer` - total chunks in the upload.
 - `payload: string` - chunk bytes, base64 by default.
 
-Optional fields: `filename`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata` match `save_artifact`.
+Optional fields: `filename`, `label`, `tags`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata` match `save_artifact`.
 
 Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is safe; checksum dedup returns success and does not rewrite final bytes.
 
@@ -123,6 +132,20 @@ Required fields:
 - `requestId: string` - workflow request id whose artifact references should be listed.
 
 Success returns `artifacts: ArtifactReference[]`.
+
+### Admin artifact browsing tools
+
+These tools require Clerk admin authentication and browse compact artifact-index pointers before resolving full `ArtifactReference` JSON. They do not read artifact bytes.
+
+- `list_artifacts_by_kind({ artifactKind, limit?, cursor?, includeDeleted? })` lists `by-kind/{artifactKind}/` pointers.
+- `list_artifacts_by_request({ requestId, artifactKind?, limit?, cursor?, includeDeleted? })` lists `by-request/{requestId}/` pointers, optionally scoped by kind.
+- `search_artifacts({ tag?, createdAfter?, createdBefore?, limit?, cursor?, includeDeleted? })` lists `by-tag/{tag}/` when a tag is provided, otherwise by-kind pointer prefixes, and applies optional `createdAtISO` bounds after resolving references. Soft-deleted records are excluded unless `includeDeleted` is true.
+- `soft_delete_artifact({ requestId, sha256, deletedBy? })` marks the request artifact index JSON with `deletedAtISO` and `deletedBy` while leaving artifact bytes in place.
+- `restore_artifact({ requestId, sha256 })` clears `deletedAtISO` and `deletedBy` on a soft-deleted request artifact index JSON.
+- `migrate_artifact_indexes({ cursor?, limit?, dryRun? })` scans `request-artifacts/{requestId}/{sha256}.json`, fills missing `artifactKind`, `originalFilename`, and `label`, writes `by-kind` and `by-request` pointers, and returns checkpoint cursors for idempotent batches.
+- `reconcile_artifact_indexes({ requestId?, artifactKind?, limit? })` scans `request-artifacts/` JSON references, normalizes stale `blobKey` values, verifies backing artifact bytes, and corrects artifact-index JSON when one matching blob is found.
+
+Browse results include `artifacts`, `limit`, `cursor`, and `nextCursor`. Reconciliation results include compact scan/correction counts plus per-reference diagnostics.
 
 ### `save_json_blob_create_request`
 
@@ -160,6 +183,7 @@ Important agent-facing field descriptions:
 - `content.title`: working or final article title agents should use for the content source.
 - `editorial.draft_markdown`: Markdown draft body agents can pass between drafting, revision, and publishing steps.
 - `publication.publish_payload`: publication payload used by the publishing step; include `slug`, `title`, and article body fields when ready to publish.
+- `publication.publication_status`: article payload status, not the persisted workflow lifecycle. Known first-party values are `draft` (saved admin draft), `ready` (payload is ready for manual publishing), and `scheduled` (payload has `publication.scheduled_for` and requires a server-authorized scheduled publish call when due). The local contract does not define `published` or `live` as publication statuses; successful publication is tracked on the workflow record as `workflow_status: "published"` after `mark_published`.
 - `workflow.workflow_id`: workflow identifier agents should preserve across handoffs and backend workflow records.
 - `versioning.record_version`: content-source record version agents should increment or preserve for revision tracking.
 
@@ -194,7 +218,7 @@ Minimum sample backend request body:
 }
 ```
 
-Publication-ready sample fragment:
+Publication-ready sample fragment (use `ready` for manual publishing handoff; use `scheduled` with `scheduled_for` only for scheduled publishing):
 
 ```json
 {

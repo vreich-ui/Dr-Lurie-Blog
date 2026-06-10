@@ -63,6 +63,12 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
   ]) {
     assert.ok(inputProperties[section], `Expected ${section} in content_source.v1 MCP schema.`);
   }
+
+  const publication = inputProperties.publication as Record<string, unknown>;
+  const publicationStatus = property(publication, 'publication_status') as { description?: string };
+  assert.match(String(publicationStatus.description), /Known first-party values are draft, ready, and scheduled/);
+  assert.match(String(publicationStatus.description), /published\/live are not publication_status values/);
+  assert.ok(property(publication, 'scheduled_for'));
 });
 
 test('content_source.v1 MCP schema describes high-value agent fields and controlled extensions', async () => {
@@ -228,6 +234,28 @@ test('stage mark-complete helpers expose transition fields and document common r
   assert.match(String((finalTool as { description?: string }).description), /workflow_status: "completed"/);
 });
 
+test('save_json_blob_publish_scheduled exposes gated scheduled publish inputs', async () => {
+  const body = await listTools();
+  const tool = body.result.tools.find((item) => item.name === 'save_json_blob_publish_scheduled');
+
+  assert.ok(tool, 'Expected save_json_blob_publish_scheduled to be registered.');
+  assert.deepEqual(tool.inputSchema.required, [
+    'request_id',
+    'lock_token',
+    'scheduled_publish_token',
+    'agent_id',
+    'agent_owner',
+  ]);
+  assert.ok(property(tool.inputSchema, 'expected_record_version'));
+  assert.ok(property(tool.inputSchema, 'agent_label'));
+  assert.match(String((tool as { description?: string }).description), /publication\.publication_status: scheduled/);
+  assert.match(String((tool as { description?: string }).description), /mark the workflow published/i);
+
+  const serializedSchema = JSON.stringify(tool);
+  assert.equal(serializedSchema.includes('NETLIFY_PUBLISH_SECRET'), false);
+  assert.equal(serializedSchema.includes('PUBLISH_SECRET'), false);
+});
+
 test('save_json_blob_mark_published exposes only workflow-state inputs', async () => {
   const body = await listTools();
   const tool = body.result.tools.find((item) => item.name === 'save_json_blob_mark_published');
@@ -252,7 +280,18 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   const body = await listTools();
   const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
 
-  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+  for (const name of [
+    'save_artifact',
+    'save_artifact_chunk',
+    'list_artifacts_for_request',
+    'list_artifacts_by_kind',
+    'list_artifacts_by_request',
+    'search_artifacts',
+    'soft_delete_artifact',
+    'restore_artifact',
+    'migrate_artifact_indexes',
+    'reconcile_artifact_indexes',
+  ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
   }
 
@@ -260,6 +299,19 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
   assert.ok(property(saveArtifact.inputSchema, 'payload'));
   assert.ok(property(saveArtifact.inputSchema, 'metadata'));
+  assert.equal(property(saveArtifact.inputSchema, 'label').maxLength, 120);
+  assert.equal(property(saveArtifact.inputSchema, 'tags').maxItems, 20);
+  assert.equal((property(saveArtifact.inputSchema, 'tags').items as { maxLength: number }).maxLength, 40);
+  assert.deepEqual((property(saveArtifact.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
+    'image',
+    'pdf',
+    'video',
+    'doc',
+    'audio',
+    'data',
+    'attachment',
+    'other',
+  ]);
   assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSizeBytes'), {
     type: 'integer',
     minimum: 0,
@@ -289,6 +341,18 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'chunkIndex',
     'totalChunks',
     'payload',
+  ]);
+  assert.equal(property(saveChunk.inputSchema, 'label').maxLength, 120);
+  assert.equal(property(saveChunk.inputSchema, 'tags').maxItems, 20);
+  assert.deepEqual((property(saveChunk.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
+    'image',
+    'pdf',
+    'video',
+    'doc',
+    'audio',
+    'data',
+    'attachment',
+    'other',
   ]);
   assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
   assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
@@ -325,7 +389,65 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     /does not read or write artifact bytes/i
   );
 
-  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+  const listByKind = tools.get('list_artifacts_by_kind')!;
+  assert.deepEqual(listByKind.inputSchema.required, ['artifactKind']);
+  assert.ok(property(listByKind.inputSchema, 'limit'));
+  assert.ok(property(listByKind.inputSchema, 'cursor'));
+  assert.ok(property(listByKind.inputSchema, 'includeDeleted'));
+  assert.match(String((listByKind as { description?: string }).description), /Admin-only/);
+
+  const listByRequest = tools.get('list_artifacts_by_request')!;
+  assert.deepEqual(listByRequest.inputSchema.required, ['requestId']);
+  assert.ok(property(listByRequest.inputSchema, 'artifactKind'));
+  assert.ok(property(listByRequest.inputSchema, 'includeDeleted'));
+
+  const searchArtifacts = tools.get('search_artifacts')!;
+  assert.ok(property(searchArtifacts.inputSchema, 'tag'));
+  assert.ok(property(searchArtifacts.inputSchema, 'createdAfter'));
+  assert.ok(property(searchArtifacts.inputSchema, 'createdBefore'));
+  assert.match(String((searchArtifacts as { description?: string }).description), /prefix indexes/);
+  assert.ok(property(searchArtifacts.inputSchema, 'includeDeleted'));
+
+  const softDeleteArtifact = tools.get('soft_delete_artifact')!;
+  assert.deepEqual(softDeleteArtifact.inputSchema.required, ['requestId', 'sha256']);
+  assert.ok(property(softDeleteArtifact.inputSchema, 'deletedBy'));
+  assert.match(String((softDeleteArtifact as { description?: string }).description), /soft delete/i);
+
+  const restoreArtifact = tools.get('restore_artifact')!;
+  assert.deepEqual(restoreArtifact.inputSchema.required, ['requestId', 'sha256']);
+  assert.match(String((restoreArtifact as { description?: string }).description), /restore/i);
+
+  const migrateArtifacts = tools.get('migrate_artifact_indexes')!;
+  assert.ok(property(migrateArtifacts.inputSchema, 'cursor'));
+  assert.ok(property(migrateArtifacts.inputSchema, 'limit'));
+  assert.ok(property(migrateArtifacts.inputSchema, 'dryRun'));
+  assert.match(String((migrateArtifacts as { description?: string }).description), /one-time artifact-index migration/);
+
+  const reconcileArtifacts = tools.get('reconcile_artifact_indexes')!;
+  assert.ok(property(reconcileArtifacts.inputSchema, 'requestId'));
+  assert.ok(property(reconcileArtifacts.inputSchema, 'artifactKind'));
+  assert.ok(property(reconcileArtifacts.inputSchema, 'limit'));
+  assert.match(
+    String((reconcileArtifacts as { description?: string }).description),
+    /Admin-only artifact-index correction job/
+  );
+  assert.match(
+    String((reconcileArtifacts as { description?: string }).description),
+    /corrects stale artifact-index blobKey values/
+  );
+
+  for (const name of [
+    'save_artifact',
+    'save_artifact_chunk',
+    'list_artifacts_for_request',
+    'list_artifacts_by_kind',
+    'list_artifacts_by_request',
+    'search_artifacts',
+    'soft_delete_artifact',
+    'restore_artifact',
+    'migrate_artifact_indexes',
+    'reconcile_artifact_indexes',
+  ]) {
     const serialized = JSON.stringify(tools.get(name));
 
     assert.equal(serialized.includes('NETLIFY_PUBLISH_SECRET'), false);

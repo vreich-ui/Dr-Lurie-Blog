@@ -2,7 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import {
-  reconcileImageArtifactReference,
+  normalizeArtifactBlobKey,
+  reconcileArtifactReference,
   requireArtifactReferenceArray,
   type ArtifactReference,
 } from '../lib/artifacts.js';
@@ -218,7 +219,11 @@ const getArtifactRequestId = (reference: ArtifactReference, fallback: string) =>
 };
 
 const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: string) => {
-  const metadataFilename = toStringValue(reference.metadata?.filename) ?? toStringValue(reference.metadata?.name);
+  const originalFilename = toStringValue(reference.originalFilename);
+  const metadataFilename =
+    toStringValue(reference.metadata?.filename) ??
+    toStringValue(reference.metadata?.name) ??
+    (originalFilename && originalFilename.includes('.') ? originalFilename : undefined);
   const filename = metadataFilename ? sanitizeFilename(metadataFilename) : undefined;
 
   if (filename) return filename;
@@ -239,9 +244,11 @@ const replaceAllLiteral = (value: string, search: string, replacement: string) =
   search ? value.split(search).join(replacement) : value;
 
 const getArtifactReplacementValues = (reference: ArtifactReference) =>
-  [reference.blobKey, toStringValue((reference as { url?: unknown }).url)].filter((value): value is string =>
-    Boolean(value)
-  );
+  [
+    reference.blobKey,
+    (reference as PublishArtifactReference)[originalArtifactBlobKey],
+    toStringValue((reference as { url?: unknown }).url),
+  ].filter((value): value is string => Boolean(value));
 
 const getPublishedMediaDisplayPath = (mediaEntries: MediaEntry[], requestedPath: string | undefined) => {
   if (!requestedPath) return undefined;
@@ -269,9 +276,32 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
     );
   }, markdown);
 
+const originalArtifactBlobKey = Symbol('originalArtifactBlobKey');
+
+type PublishArtifactReference = ArtifactReference & { [originalArtifactBlobKey]?: string };
+
+const normalizeArtifactReferenceInputBlobKeys = (value: unknown) => {
+  if (!Array.isArray(value)) return value;
+
+  return value.map((reference) => {
+    if (!reference || typeof reference !== 'object' || Array.isArray(reference)) return reference;
+    const record = reference as Record<string, unknown>;
+    if (typeof record.blobKey !== 'string') return reference;
+
+    const normalizedBlobKey = normalizeArtifactBlobKey(record.blobKey);
+    const normalizedReference = { ...record, blobKey: normalizedBlobKey };
+
+    if (normalizedBlobKey !== record.blobKey) {
+      Object.defineProperty(normalizedReference, originalArtifactBlobKey, { value: record.blobKey });
+    }
+
+    return normalizedReference;
+  });
+};
+
 const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
   try {
-    return requireArtifactReferenceArray(value);
+    return requireArtifactReferenceArray(normalizeArtifactReferenceInputBlobKeys(value));
   } catch (error) {
     throw new PublishError(400, error instanceof Error ? error.message : 'Invalid artifactReferences.');
   }
@@ -286,7 +316,11 @@ const readArtifactBytes = async (
   reference: ArtifactReference,
   filename: string
 ) => {
-  const reconciliation = await reconcileImageArtifactReference(reference, artifactStore, indexStore);
+  const originalBlobKey = (reference as PublishArtifactReference)[originalArtifactBlobKey];
+  const reconciliationReference = originalBlobKey ? { ...reference, blobKey: originalBlobKey } : reference;
+  const reconciliation = await reconcileArtifactReference(reconciliationReference, artifactStore, indexStore, {
+    logger: console,
+  });
 
   if (reconciliation.status === 'found') return reconciliation.bytes;
 
@@ -342,7 +376,7 @@ const verifyPublisher = async (event: LambdaEvent) => {
   const publishKey = getHeader(event.headers, 'x-publish-key').trim();
 
   if (publishKey) {
-    const publishSecret = process.env.PUBLISH_SECRET;
+    const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
     if (!publishSecret) {
       return jsonResponse(401, {
