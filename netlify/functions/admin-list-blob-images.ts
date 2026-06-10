@@ -1,7 +1,7 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { isArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -21,11 +21,6 @@ type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStor
     directories?: boolean;
     paginate?: boolean;
   }) => Promise<BlobListResult> | AsyncIterable<BlobListResult>;
-};
-
-type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
-type BinaryReadableArtifactBlobStore = Omit<ArtifactBlobStore, 'get'> & {
-  get: (key: string, options: { type: 'arrayBuffer' }) => Promise<ArrayBuffer | Buffer | string | null>;
 };
 
 const requestArtifactPrefix = 'request-artifacts/';
@@ -70,53 +65,13 @@ const isImageArtifactReference = (reference: ArtifactReference) => {
   return reference.contentType.toLowerCase().startsWith('image/') || reference.blobKey.startsWith('image/');
 };
 
-const toReadErrorMessage = (error: unknown) => {
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error === 'string' && error) return error;
-
-  return 'Blob bytes could not be read.';
-};
-
-const readArtifactBlob = async (store: ArtifactBlobStore, reference: ArtifactReference) => {
-  const binaryStore = store as BinaryReadableArtifactBlobStore;
-  const value = await binaryStore.get(reference.blobKey, { type: 'arrayBuffer' });
-
-  if (!value) throw new Error('Artifact blob is missing.');
-};
-
-const logSkippedArtifactReference = (reference: ArtifactReference, error: unknown) => {
-  console.warn('Skipping stale image artifact reference because backing bytes could not be read.', {
-    blobKey: reference.blobKey,
-    sha256: reference.sha256,
-    error: toReadErrorMessage(error),
-  });
-};
-
-const listReadableImageArtifacts = async (
-  indexStore: ArtifactIndexBlobStore,
-  artifactStore: ArtifactBlobStore,
-  prefix: string
-) => {
+const listImageArtifacts = async (indexStore: ArtifactIndexBlobStore, prefix: string) => {
   const keys = await listBlobKeys(indexStore, prefix);
   const candidates = await Promise.all(keys.map((key) => loadArtifactReference(indexStore, key)));
-  const images: ArtifactReference[] = [];
-  let skipped = 0;
 
-  await Promise.all(
-    candidates
-      .filter((reference): reference is ArtifactReference => Boolean(reference && isImageArtifactReference(reference)))
-      .map(async (reference) => {
-        try {
-          await readArtifactBlob(artifactStore, reference);
-          images.push(reference);
-        } catch (error) {
-          skipped += 1;
-          logSkippedArtifactReference(reference, error);
-        }
-      })
+  return candidates.filter((reference): reference is ArtifactReference =>
+    Boolean(reference && isImageArtifactReference(reference))
   );
-
-  return { images, skipped };
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -137,11 +92,10 @@ export const handler = async (event: LambdaEvent) => {
 
   try {
     const indexStore = await getArtifactIndexBlobStore(event);
-    const artifactStore = await getArtifactBlobStore(event);
     const prefix = getRequestArtifactPrefix(event.queryStringParameters?.requestId);
-    const { images, skipped } = await listReadableImageArtifacts(indexStore, artifactStore, prefix);
+    const images = await listImageArtifacts(indexStore, prefix);
 
-    return jsonResponse(200, { images, skipped });
+    return jsonResponse(200, { images, skipped: 0 });
   } catch (error) {
     console.error('Failed to list admin blob image artifacts.', error);
 

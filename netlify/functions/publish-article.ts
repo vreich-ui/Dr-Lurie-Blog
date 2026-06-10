@@ -1,8 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
-import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
-import { getArtifactBlobStore } from '../lib/blob-store.js';
+import {
+  reconcileImageArtifactReference,
+  requireArtifactReferenceArray,
+  type ArtifactReference,
+} from '../lib/artifacts.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -63,9 +67,7 @@ type PublishMediaEntryInput = {
 };
 
 type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
-type BinaryReadableArtifactBlobStore = Omit<ArtifactBlobStore, 'get'> & {
-  get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | ArrayBuffer | string | null>;
-};
+type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>>;
 
 type PublishInput = {
   articlePath?: unknown;
@@ -240,36 +242,34 @@ const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
   }
 };
 
-const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string, filename: string) => {
-  const binaryStore = store as BinaryReadableArtifactBlobStore;
-  let bytes: Buffer | ArrayBuffer | string | null;
+const staleImageReferencesMessage =
+  'These saved image references exist in JSON, but the backing blob files are missing or unreadable.';
 
-  try {
-    bytes = await binaryStore.get(blobKey, { type: 'buffer' });
-  } catch (error) {
-    console.error('Artifact blob store read failed during publish.', { blobKey, filename, error });
-    throw new PublishError(404, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
-  }
+const readArtifactBytes = async (
+  artifactStore: ArtifactBlobStore,
+  indexStore: ArtifactIndexBlobStore,
+  reference: ArtifactReference,
+  filename: string
+) => {
+  const reconciliation = await reconcileImageArtifactReference(reference, artifactStore, indexStore);
 
-  if (bytes === null) {
-    console.warn('Artifact blob was missing during publish.', { blobKey, filename });
-    throw new PublishError(404, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
-  }
-  if (Buffer.isBuffer(bytes)) return bytes;
-  if (bytes instanceof ArrayBuffer) return Buffer.from(bytes);
-  if (typeof bytes === 'string') {
-    console.error('Artifact blob store returned text for binary artifact bytes during publish.', { blobKey, filename });
-    throw new PublishError(500, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
-  }
+  if (reconciliation.status === 'found') return reconciliation.bytes;
 
-  console.warn('Artifact blob store returned unsupported bytes during publish.', { blobKey, filename });
-  throw new PublishError(500, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
+  console.warn('Artifact image reference could not be reconciled during publish.', {
+    blobKey: reference.blobKey,
+    filename,
+    status: reconciliation.status,
+    ...(reconciliation.status === 'missing'
+      ? { nearbyKeys: reconciliation.nearbyKeys, exactFilenameExists: reconciliation.exactFilenameExists }
+      : { matchingKeys: reconciliation.matchingKeys, nearbyKeys: reconciliation.nearbyKeys }),
+  });
+
+  throw new PublishError(422, staleImageReferencesMessage);
 };
 
 const normalizeExistingFeaturedImagePath = (value: unknown) => {
   const rawPath = toStringValue(value);
   if (!rawPath) return undefined;
-
   const repoPath = rawPath.startsWith('~/assets/images/uploads/')
     ? rawPath.replace('~/assets/images/uploads/', `${uploadRoot}/`)
     : rawPath.startsWith('/src/assets/images/uploads/')
@@ -549,6 +549,7 @@ const getMediaEntries = async (
   });
 
   const artifactStore = artifactReferences.length ? await getArtifactBlobStore(event) : undefined;
+  const indexStore = artifactReferences.length ? await getArtifactIndexBlobStore(event) : undefined;
   const fallbackRequestId = toStringValue(input.requestId) ?? slug;
   const artifactEntries = await Promise.all(
     artifactReferences.map(async (reference) => {
@@ -557,7 +558,11 @@ const getMediaEntries = async (
       }
 
       const filename = getArtifactFilename(reference, fallbackRequestId);
-      const bytes = await readArtifactBytes(artifactStore, reference.blobKey, filename);
+      if (!indexStore) {
+        throw new PublishError(500, 'Artifact index blob store is not available.');
+      }
+
+      const bytes = await readArtifactBytes(artifactStore, indexStore, reference, filename);
 
       return {
         content: bytes.toString('base64'),

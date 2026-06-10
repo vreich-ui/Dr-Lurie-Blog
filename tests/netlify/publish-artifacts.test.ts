@@ -183,3 +183,159 @@ test('publish-article fails fast when artifactReferences contains non-ArtifactRe
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article reports stale saved image references instead of a generic 500', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `stale-artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'stale.png',
+    encoding: 'base64',
+    payload: Buffer.from('stale image bytes').toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string };
+  const { getArtifactBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const artifactStore = await getArtifactBlobStore({});
+  await artifactStore.del(artifact.blobKey);
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    requestedUrls.push(`${init?.method ?? 'GET'} ${url}`);
+
+    if (url.includes('/contents/src/data/post/stale-artifact-publish-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    return new Response(`unexpected ${init?.method ?? 'GET'} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'stale-artifact-publish-test',
+        title: 'Stale Artifact Publish Test',
+        markdown: '# Stale artifact publish test',
+        artifactReferences: [upload.artifact],
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.deepEqual(JSON.parse(response.body), {
+      error: 'These saved image references exist in JSON, but the backing blob files are missing or unreadable.',
+    });
+    assert.deepEqual(
+      requestedUrls.filter((url) => url.includes('/git/blobs')),
+      []
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article ignores a stale existingFeaturedImagePath when the featured image is a selected artifact', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'feature/image-artifacts';
+
+  const requestId = `artifact-featured-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const artifactBytes = Buffer.from('featured artifact bytes');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'featured-artifact.png',
+    encoding: 'base64',
+    payload: artifactBytes.toString('base64'),
+    metadata: { filename: 'Featured Artifact.PNG' },
+  });
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/artifact-featured-image-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/feature%2Fimage-artifacts')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/feature%2Fimage-artifacts') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'artifact-featured-image-test',
+        title: 'Artifact Featured Image Test',
+        markdown: '# Artifact featured image test',
+        featuredImage: 'featured-artifact.png',
+        existingFeaturedImagePath: 'https://example.com/stale-image.jpg',
+        artifactReferences: [upload.artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.deepEqual(treePaths, [
+      'src/data/post/artifact-featured-image-test.md',
+      'src/assets/images/uploads/artifact-featured-image-test/featured-artifact.png',
+    ]);
+    assert.match(
+      blobWrites[0]?.content ?? '',
+      /image: "~\/assets\/images\/uploads\/artifact-featured-image-test\/featured-artifact\.png"/
+    );
+    assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

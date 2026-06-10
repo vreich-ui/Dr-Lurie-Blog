@@ -622,9 +622,9 @@ const finalizeUpload = async (
   const existingReference = deduped
     ? await getExistingReference(indexStore, input.requestId, reference.sha256)
     : undefined;
-  const responseReference = existingReference ?? reference;
+  const responseReference = existingReference?.blobKey === reference.blobKey ? existingReference : reference;
 
-  if (!existingReference) {
+  if (!existingReference || existingReference.blobKey !== reference.blobKey) {
     await saveReference(indexStore, input.requestId, responseReference);
   }
 

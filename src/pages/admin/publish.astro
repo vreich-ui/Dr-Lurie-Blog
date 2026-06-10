@@ -2725,6 +2725,20 @@ const metadata = {
         return getUploadPath(value);
       };
 
+      const isSelectedPublishableImageValue = (value) => {
+        const normalized = String(value || '').trim();
+        if (!normalized) return false;
+        return selectedImages.some(
+          (image) => image.kind !== 'path' && (image.optionValue === normalized || image.name === normalized)
+        );
+      };
+
+      const getExistingFeaturedImagePathForPayload = () => {
+        return isSelectedPublishableImageValue(fields.featuredImage.value)
+          ? ''
+          : fields.existingFeaturedImagePath.value.trim();
+      };
+
       const getDraft = () => ({
         title: fields.title.value,
         slug: fields.slug.value,
@@ -2740,7 +2754,7 @@ const metadata = {
         artifactReferences: selectedArtifactReferences,
         mediaEntries: selectedMediaEntries,
         featuredImage: fields.featuredImage.value,
-        existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
+        existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
         videoLink: fields.videoLink.value,
         ctaLink: fields.ctaLink.value,
         ctaText: fields.ctaText.value,
@@ -2795,8 +2809,8 @@ const metadata = {
           ...(fields.category.value.trim() ? { category: fields.category.value.trim() } : {}),
           ...(fields.seoDescription.value.trim() ? { seoDescription: fields.seoDescription.value.trim() } : {}),
           ...(featuredImage ? { featuredImage } : {}),
-          ...(fields.existingFeaturedImagePath.value.trim()
-            ? { existingFeaturedImagePath: fields.existingFeaturedImagePath.value.trim() }
+          ...(getExistingFeaturedImagePathForPayload()
+            ? { existingFeaturedImagePath: getExistingFeaturedImagePathForPayload() }
             : {}),
           ...(fields.videoLink.value.trim() ? { videoLink: fields.videoLink.value.trim() } : {}),
           ...(fields.ctaLink.value.trim() ? { ctaLink: fields.ctaLink.value.trim() } : {}),
@@ -3747,11 +3761,20 @@ const metadata = {
 
       const formatAdminBlobImageFailureDetails = (payload) => {
         const storeDiagnostics = payload?.blobStoreDiagnostics || {};
+        const readDiagnostics = payload?.diagnostics || {};
+        const nearbyKeys = Array.isArray(readDiagnostics.nearbyKeys) ? readDiagnostics.nearbyKeys.slice(0, 5) : [];
         const details = [
+          payload?.reason ? `reason=${payload.reason}` : '',
           payload?.blobKey ? `blobKey=${payload.blobKey}` : '',
           payload?.store ? `store=${payload.store}` : '',
           payload?.lookup ? `lookup=${payload.lookup}` : '',
           payload?.contentTypeSource ? `contentTypeSource=${payload.contentTypeSource}` : '',
+          readDiagnostics.parentPrefix ? `parentPrefix=${readDiagnostics.parentPrefix}` : '',
+          readDiagnostics.exactFilename ? `exactFilename=${readDiagnostics.exactFilename}` : '',
+          typeof readDiagnostics.exactFilenameExists === 'boolean'
+            ? `exactFilenameExists=${readDiagnostics.exactFilenameExists}`
+            : '',
+          nearbyKeys.length ? `nearbyKeys=${nearbyKeys.join('|')}` : '',
           formatBlobStoreDiagnosticSummary('workflows', storeDiagnostics.workflows),
           formatBlobStoreDiagnosticSummary('artifactIndex', storeDiagnostics.artifactIndex),
           formatBlobStoreDiagnosticSummary('artifacts', storeDiagnostics.artifacts),
@@ -4935,8 +4958,7 @@ const metadata = {
 
       const renderBlobImageChoices = (artifacts) => {
         if (!artifacts.length) {
-          fields.blobImageList.innerHTML =
-            '<p class="json-draft-empty">No saved image artifacts were found for this draft.</p>';
+          fields.blobImageList.innerHTML = '<p class="json-draft-empty">No saved image artifacts were found.</p>';
           return;
         }
 
@@ -4977,11 +4999,7 @@ const metadata = {
 
         try {
           const token = await getClerkSessionToken();
-          const { requestId } = getCheckedOutWorkflowDraft();
-          const blobImageListUrl = requestId
-            ? `/.netlify/functions/admin-list-blob-images?requestId=${encodeURIComponent(requestId)}`
-            : '/.netlify/functions/admin-list-blob-images';
-          const response = await fetch(blobImageListUrl, {
+          const response = await fetch('/.netlify/functions/admin-list-blob-images', {
             method: 'GET',
             headers: {
               Authorization: `Bearer ${token}`,
@@ -4999,7 +5017,7 @@ const metadata = {
           setBlobImageModalStatus(
             availableBlobImageArtifacts.length
               ? 'Choose saved image artifacts to add to this article.'
-              : 'No saved image artifacts were found for this draft.'
+              : 'No saved image artifacts were found.'
           );
         } catch (error) {
           console.error('Saved image artifact list failed.', error);
@@ -5326,7 +5344,7 @@ const metadata = {
               markdown: fields.outputMarkdown.value,
               sources: parseSources(fields.sources.value),
               featuredImage: fields.featuredImage.value,
-              existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
+              existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
               seoDescription: fields.seoDescription.value,
               videoLink: fields.videoLink.value,
               ctaLink: fields.ctaLink.value,
