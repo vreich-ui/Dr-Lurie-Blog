@@ -1,5 +1,10 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { isArtifactReference } from '../lib/artifacts.js';
+import {
+  getImageArtifactReadDiagnostics,
+  isArtifactReference,
+  reconcileImageArtifactReference,
+  type ArtifactReference,
+} from '../lib/artifacts.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import {
   getArtifactBlobStore,
@@ -22,10 +27,6 @@ type LambdaEvent = {
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   queryStringParameters?: Record<string, string | undefined> | null;
-};
-
-type BinaryReadableArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>> & {
-  get(key: string, options: { type: 'buffer' }): Promise<Buffer | ArrayBuffer | string | null>;
 };
 
 type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>> & {
@@ -65,6 +66,8 @@ type ResolvedArtifactContentType = {
   contentType: string;
   source: ContentTypeSource;
 };
+
+const shouldIncludeArtifactReadDiagnostics = () => process.env.CONTEXT !== 'production';
 
 const createArtifactDebugFields = (
   event: LambdaEvent,
@@ -133,12 +136,16 @@ const findArtifactReferenceByBlobKey = async (store: ArtifactIndexBlobStore, blo
 
 const resolveArtifactContentType = async (
   event: LambdaEvent,
-  blobKey: string
+  blobKey: string,
+  reference?: ArtifactReference
 ): Promise<ResolvedArtifactContentType> => {
   try {
-    const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
-    const reference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
-    const indexedContentType = getConcreteImageContentType(reference?.contentType);
+    let indexedContentType = getConcreteImageContentType(reference?.contentType);
+    if (!indexedContentType) {
+      const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
+      reference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
+      indexedContentType = getConcreteImageContentType(reference?.contentType);
+    }
     if (indexedContentType) return { contentType: indexedContentType, source: 'artifact-index' };
   } catch (error) {
     console.warn('Artifact index lookup failed while resolving image content type.', { blobKey, error });
@@ -180,7 +187,9 @@ export const handler = async (event: LambdaEvent) => {
   let contentTypeSource: ContentTypeSource = 'missing';
 
   try {
-    const resolvedContentType = await resolveArtifactContentType(event, blobKey);
+    const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
+    const indexedReference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
+    const resolvedContentType = await resolveArtifactContentType(event, blobKey, indexedReference);
     const { contentType } = resolvedContentType;
     contentTypeSource = resolvedContentType.source;
     if (!contentType) {
@@ -190,21 +199,56 @@ export const handler = async (event: LambdaEvent) => {
       });
     }
 
-    const store = (await getArtifactBlobStore(event)) as BinaryReadableArtifactBlobStore;
-    const bytes = await store.get(blobKey, { type: 'buffer' });
+    const reference: ArtifactReference = indexedReference ?? {
+      blobKey,
+      sha256: getShaFromBlobKey(blobKey),
+      sizeBytes: 0,
+      contentType,
+      createdAtISO: new Date(0).toISOString(),
+    };
+    const store = await getArtifactBlobStore(event);
+    const reconciliation = await reconcileImageArtifactReference(
+      reference,
+      store,
+      indexedReference ? indexStore : undefined
+    );
 
-    if (!bytes)
+    if (reconciliation.status === 'missing') {
+      const diagnostics = await getImageArtifactReadDiagnostics(store, blobKey, reconciliation.nearbyKeys);
+      console.warn('Saved image artifact JSON reference is stale: backing bytes are missing.', {
+        blobKey,
+        store: 'artifacts',
+        exactFilenameExists: diagnostics.exactFilenameExists,
+        nearbyKeys: diagnostics.nearbyKeys,
+      });
+
       return jsonResponse(404, {
-        error: 'Image artifact was not found.',
-        ...createArtifactDebugFields(event, blobKey, contentTypeSource),
+        reason: 'missing-artifact-bytes',
+        blobKey,
+        store: 'artifacts',
+        ...(shouldIncludeArtifactReadDiagnostics() ? { diagnostics } : {}),
       });
-    if (typeof bytes === 'string')
-      return jsonResponse(500, {
-        error: 'Image artifact returned text instead of bytes.',
-        ...createArtifactDebugFields(event, blobKey, contentTypeSource, { actualValueType: 'string' }),
+    }
+
+    if (reconciliation.status === 'ambiguous') {
+      console.warn('Saved image artifact recovery found multiple possible backing blobs.', {
+        blobKey,
+        store: 'artifacts',
+        matchingKeys: reconciliation.matchingKeys,
+        nearbyKeys: reconciliation.nearbyKeys,
       });
 
-    const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+      return jsonResponse(409, {
+        error: 'Saved image artifact bytes are ambiguous.',
+        blobKey,
+        store: 'artifacts',
+        ...(shouldIncludeArtifactReadDiagnostics()
+          ? { diagnostics: { matchingKeys: reconciliation.matchingKeys, nearbyKeys: reconciliation.nearbyKeys } }
+          : {}),
+      });
+    }
+
+    const buffer = reconciliation.bytes;
 
     return {
       statusCode: 200,

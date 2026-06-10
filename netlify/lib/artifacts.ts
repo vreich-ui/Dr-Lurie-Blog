@@ -1,4 +1,5 @@
-import { extname } from 'node:path';
+import { basename, extname } from 'node:path';
+import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import { sha256Hex } from './crypto.js';
 
 export enum ArtifactKind {
@@ -16,6 +17,205 @@ export type ArtifactReference = {
   contentType: string;
   createdAtISO: string;
   metadata?: Record<string, unknown>;
+};
+
+export type ReadableArtifactBlobStore = {
+  get(key: string, options: { type: 'buffer' }): Promise<Buffer | ArrayBuffer | string | null>;
+  list?: (options?: {
+    prefix?: string;
+    directories?: boolean;
+    paginate?: boolean;
+  }) => Promise<BlobListResponse> | AsyncIterable<BlobListResponse>;
+};
+
+export type WritableArtifactIndexStore = {
+  setJSON?: (key: string, value: unknown, options?: { metadata?: Record<string, string> }) => Promise<unknown>;
+};
+
+export type ImageArtifactReconciliationResult =
+  | { status: 'found'; blobKey: string; bytes: Buffer; correctedBlobKey?: string; nearbyKeys: string[] }
+  | { status: 'missing'; blobKey: string; nearbyKeys: string[]; exactFilenameExists: boolean }
+  | { status: 'ambiguous'; blobKey: string; matchingKeys: string[]; nearbyKeys: string[] };
+
+const imageExtensionFallbacks = new Set(['jpg', 'jpeg', 'png', 'webp']);
+
+const normalizeArtifactBlobKey = (blobKey: string) =>
+  blobKey
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^artifacts\//, '');
+
+const getBlobKeyPrefix = (blobKey: string) => {
+  const parts = blobKey.split('/');
+  if (parts.length < 3) return '';
+
+  return `${parts[0]}/${parts[1]}/`;
+};
+
+const requestArtifactIndexKey = (requestId: string, sha256: string) => {
+  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
+};
+
+const toBufferOrNull = (value: Buffer | ArrayBuffer | string | null) => {
+  if (value === null) return null;
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+
+  return Buffer.from(value);
+};
+
+const tryReadArtifactBytes = async (store: ReadableArtifactBlobStore, key: string) => {
+  try {
+    return toBufferOrNull(await store.get(key, { type: 'buffer' }));
+  } catch {
+    return null;
+  }
+};
+
+const uniqueValues = <T>(values: T[]) => [...new Set(values)];
+
+const getNearbyImageArtifactKeys = async (store: ReadableArtifactBlobStore, normalizedBlobKey: string) => {
+  if (typeof store.list !== 'function') return [];
+
+  const prefix = getBlobKeyPrefix(normalizedBlobKey);
+  if (!prefix) return [];
+
+  const prefixes = uniqueValues([prefix, `artifacts/${prefix}`, `/${prefix}`]);
+  const keys: string[] = [];
+
+  for (const candidatePrefix of prefixes) {
+    try {
+      const result = await store.list({ prefix: candidatePrefix, directories: false, paginate: true });
+      const items = await collectBlobListItems(result as BlobListResponse);
+      keys.push(...items.map((item) => item.key));
+    } catch {
+      // Listing is diagnostic and best-effort. Keep reconciling with any prefixes that do work.
+    }
+  }
+
+  return uniqueValues(keys).sort();
+};
+
+const getExtension = (filename: string) => filename.split('.').pop()?.toLowerCase() || '';
+
+const stripExtension = (filename: string) => filename.replace(/\.[^.]+$/, '');
+
+const getImageArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: string) => {
+  const expectedFilename = basename(normalizedBlobKey);
+  const expectedStem = stripExtension(expectedFilename);
+
+  return nearbyKeys.filter((key) => {
+    const candidateFilename = basename(key);
+    if (candidateFilename === expectedFilename) return true;
+    if (stripExtension(candidateFilename) !== expectedStem) return false;
+
+    const expectedExtension = getExtension(expectedFilename);
+    const candidateExtension = getExtension(candidateFilename);
+
+    return imageExtensionFallbacks.has(expectedExtension) && imageExtensionFallbacks.has(candidateExtension);
+  });
+};
+
+const maybeUpdateArtifactIndexReference = async (
+  indexStore: WritableArtifactIndexStore | undefined,
+  reference: ArtifactReference,
+  correctedBlobKey: string
+) => {
+  const indexBlobKey = normalizeArtifactBlobKey(correctedBlobKey);
+  if (
+    !indexStore?.setJSON ||
+    indexBlobKey === reference.blobKey ||
+    !isValidArtifactBlobKey(indexBlobKey, reference.sha256)
+  ) {
+    return;
+  }
+
+  const [, requestId = ''] = indexBlobKey.split('/');
+  if (!requestId) return;
+
+  await indexStore.setJSON(
+    requestArtifactIndexKey(requestId, reference.sha256),
+    { ...reference, blobKey: indexBlobKey },
+    {
+      metadata: {
+        requestId,
+        sha256: reference.sha256,
+        contentType: reference.contentType,
+      },
+    }
+  );
+};
+
+export const getImageArtifactReadDiagnostics = async (
+  store: ReadableArtifactBlobStore,
+  blobKey: string,
+  nearbyKeys?: string[]
+) => {
+  const normalizedBlobKey = normalizeArtifactBlobKey(blobKey);
+  const keys = nearbyKeys ?? (await getNearbyImageArtifactKeys(store, normalizedBlobKey));
+  const exactFilename = basename(normalizedBlobKey);
+
+  return {
+    normalizedBlobKey,
+    parentPrefix: getBlobKeyPrefix(normalizedBlobKey),
+    exactFilename,
+    exactFilenameExists: keys.some((key) => basename(key) === exactFilename),
+    nearbyKeys: keys.slice(0, 25),
+  };
+};
+
+export const reconcileImageArtifactReference = async (
+  reference: ArtifactReference,
+  artifactStore: ReadableArtifactBlobStore,
+  indexStore?: WritableArtifactIndexStore
+): Promise<ImageArtifactReconciliationResult> => {
+  const normalizedBlobKey = normalizeArtifactBlobKey(reference.blobKey);
+  const directBytes = await tryReadArtifactBytes(artifactStore, normalizedBlobKey);
+
+  if (directBytes) {
+    await maybeUpdateArtifactIndexReference(indexStore, reference, normalizedBlobKey);
+
+    return {
+      status: 'found',
+      blobKey: normalizedBlobKey,
+      bytes: directBytes,
+      correctedBlobKey: normalizedBlobKey === reference.blobKey ? undefined : normalizedBlobKey,
+      nearbyKeys: [],
+    };
+  }
+
+  const nearbyKeys = await getNearbyImageArtifactKeys(artifactStore, normalizedBlobKey);
+  const matches = getImageArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
+
+  if (matches.length === 1) {
+    const correctedBlobKey = matches[0];
+    const correctedBytes = await tryReadArtifactBytes(artifactStore, correctedBlobKey);
+
+    if (correctedBytes) {
+      await maybeUpdateArtifactIndexReference(indexStore, reference, correctedBlobKey);
+
+      return {
+        status: 'found',
+        blobKey: correctedBlobKey,
+        bytes: correctedBytes,
+        correctedBlobKey: correctedBlobKey === reference.blobKey ? undefined : correctedBlobKey,
+        nearbyKeys,
+      };
+    }
+  }
+
+  const exactFilename = basename(normalizedBlobKey);
+
+  if (matches.length > 1) {
+    return { status: 'ambiguous', blobKey: normalizedBlobKey, matchingKeys: matches, nearbyKeys };
+  }
+
+  return {
+    status: 'missing',
+    blobKey: normalizedBlobKey,
+    nearbyKeys,
+    exactFilenameExists: nearbyKeys.some((key) => basename(key) === exactFilename),
+  };
 };
 
 export type ArtifactUploadInput = {
@@ -36,7 +236,14 @@ type CreateArtifactReferenceOptions = {
   createdAtISO?: string;
 };
 
-const allowedArtifactReferenceKeys = new Set(['blobKey', 'sizeBytes', 'sha256', 'contentType', 'createdAtISO', 'metadata']);
+const allowedArtifactReferenceKeys = new Set([
+  'blobKey',
+  'sizeBytes',
+  'sha256',
+  'contentType',
+  'createdAtISO',
+  'metadata',
+]);
 
 const safePathSegment = (value: string): string => {
   return value
@@ -136,7 +343,10 @@ export const isArtifactReference = (value: unknown): value is ArtifactReference 
   return getArtifactReferenceIssue(value) === undefined;
 };
 
-export const requireArtifactReferenceArray = (value: unknown, fieldName = 'artifactReferences'): ArtifactReference[] => {
+export const requireArtifactReferenceArray = (
+  value: unknown,
+  fieldName = 'artifactReferences'
+): ArtifactReference[] => {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) throw new Error(`${fieldName} must be an array of ArtifactReference objects.`);
 

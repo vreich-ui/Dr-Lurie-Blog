@@ -183,3 +183,64 @@ test('publish-article fails fast when artifactReferences contains non-ArtifactRe
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article reports stale saved image references instead of a generic 500', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `stale-artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'stale.png',
+    encoding: 'base64',
+    payload: Buffer.from('stale image bytes').toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string };
+  const { getArtifactBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const artifactStore = await getArtifactBlobStore({});
+  await artifactStore.del(artifact.blobKey);
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    requestedUrls.push(`${init?.method ?? 'GET'} ${url}`);
+
+    if (url.includes('/contents/src/data/post/stale-artifact-publish-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    return new Response(`unexpected ${init?.method ?? 'GET'} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'stale-artifact-publish-test',
+        title: 'Stale Artifact Publish Test',
+        markdown: '# Stale artifact publish test',
+        artifactReferences: [upload.artifact],
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.deepEqual(JSON.parse(response.body), {
+      error: 'These saved image references exist in JSON, but the backing blob files are missing or unreadable.',
+    });
+    assert.deepEqual(
+      requestedUrls.filter((url) => url.includes('/git/blobs')),
+      []
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

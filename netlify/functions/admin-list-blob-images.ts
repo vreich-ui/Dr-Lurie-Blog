@@ -1,5 +1,5 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { isArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
+import { isArtifactReference, reconcileImageArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
@@ -25,7 +25,7 @@ type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStor
 
 type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
 type BinaryReadableArtifactBlobStore = Omit<ArtifactBlobStore, 'get'> & {
-  get: (key: string, options: { type: 'arrayBuffer' }) => Promise<ArrayBuffer | Buffer | string | null>;
+  get: (key: string, options: { type: 'buffer' }) => Promise<ArrayBuffer | Buffer | string | null>;
 };
 
 const requestArtifactPrefix = 'request-artifacts/';
@@ -78,10 +78,10 @@ const toReadErrorMessage = (error: unknown) => {
 };
 
 const readArtifactBlob = async (store: ArtifactBlobStore, reference: ArtifactReference) => {
-  const binaryStore = store as BinaryReadableArtifactBlobStore;
-  const value = await binaryStore.get(reference.blobKey, { type: 'arrayBuffer' });
+  const binaryStore = store as unknown as BinaryReadableArtifactBlobStore;
+  const reconciliation = await reconcileImageArtifactReference(reference, binaryStore);
 
-  if (!value) throw new Error('Artifact blob is missing.');
+  if (reconciliation.status !== 'found') throw new Error(`Artifact blob is ${reconciliation.status}.`);
 };
 
 const logSkippedArtifactReference = (reference: ArtifactReference, error: unknown) => {
