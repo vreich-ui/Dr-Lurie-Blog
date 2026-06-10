@@ -184,6 +184,94 @@ test('publish-article fails fast when artifactReferences contains non-ArtifactRe
   }
 });
 
+test('publish-article rewrites saved artifact blob keys before committing markdown', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'feature/rewrite-artifact-paths';
+
+  const requestId = `artifact-rewrite-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const artifactBytes = Buffer.from('artifact rewrite bytes');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'stored-artifact.png',
+    encoding: 'base64',
+    payload: artifactBytes.toString('base64'),
+    metadata: { filename: 'Hero Selected.PNG' },
+  });
+  const artifact = upload.artifact as { blobKey: string };
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/artifact-rewrite-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/feature%2Frewrite-artifact-paths')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/feature%2Frewrite-artifact-paths') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'artifact-rewrite-test',
+        title: 'Artifact Rewrite Test',
+        markdown: `---\ntitle: "Artifact Rewrite Test"\nimage: "${artifact.blobKey}"\n---\n\n![Hero](${artifact.blobKey})\n`,
+        featuredImage: artifact.blobKey,
+        artifactReferences: [upload.artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.equal(blobWrites[0]?.encoding, 'utf-8');
+    assert.equal(
+      blobWrites[0]?.content,
+      '---\ntitle: "Artifact Rewrite Test"\nimage: "~/assets/images/uploads/artifact-rewrite-test/hero-selected.png"\n---\n\n![Hero](~/assets/images/uploads/artifact-rewrite-test/hero-selected.png)'
+    );
+    assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article reports stale saved image references instead of a generic 500', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;

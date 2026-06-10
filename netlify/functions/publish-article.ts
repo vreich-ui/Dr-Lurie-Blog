@@ -116,6 +116,7 @@ class PublishError extends Error {
 }
 
 type MediaEntry = {
+  artifactReference?: ArtifactReference;
   content: string;
   displayPath: string;
   encoding: 'base64' | 'utf-8';
@@ -233,6 +234,40 @@ const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: st
 
   return derivedFilename;
 };
+
+const replaceAllLiteral = (value: string, search: string, replacement: string) =>
+  search ? value.split(search).join(replacement) : value;
+
+const getArtifactReplacementValues = (reference: ArtifactReference) =>
+  [reference.blobKey, toStringValue((reference as { url?: unknown }).url)].filter((value): value is string =>
+    Boolean(value)
+  );
+
+const getPublishedMediaDisplayPath = (mediaEntries: MediaEntry[], requestedPath: string | undefined) => {
+  if (!requestedPath) return undefined;
+
+  const selectedFilename = sanitizeFilename(requestedPath);
+
+  return mediaEntries.find((entry) => {
+    if (selectedFilename && entry.path.endsWith(`/${selectedFilename}`)) return true;
+    if (!entry.artifactReference) return false;
+
+    return getArtifactReplacementValues(entry.artifactReference).includes(requestedPath);
+  })?.displayPath;
+};
+
+const replacePublishedArtifactReferences = (markdown: string, mediaEntries: MediaEntry[]) =>
+  mediaEntries.reduce((updatedMarkdown, entry) => {
+    const reference = entry.artifactReference;
+    if (!reference) return updatedMarkdown;
+
+    const replacements = getArtifactReplacementValues(reference);
+
+    return replacements.reduce(
+      (currentMarkdown, artifactPath) => replaceAllLiteral(currentMarkdown, artifactPath, entry.displayPath),
+      updatedMarkdown
+    );
+  }, markdown);
 
 const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
   try {
@@ -565,6 +600,7 @@ const getMediaEntries = async (
       const bytes = await readArtifactBytes(artifactStore, indexStore, reference, filename);
 
       return {
+        artifactReference: reference,
         content: bytes.toString('base64'),
         displayPath: `~/assets/images/uploads/${slug}/${filename}`,
         encoding: 'base64' as const,
@@ -671,15 +707,15 @@ export const handler = async (event: LambdaEvent) => {
     const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences);
     publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
-    const selectedFeatured = featuredImage ? sanitizeFilename(featuredImage) : undefined;
-    const uploadedImagePath = selectedFeatured
-      ? mediaEntries.find((entry) => entry.path.endsWith(`/${selectedFeatured}`))?.displayPath
-      : undefined;
+    const existingFeaturedImageInput = toStringValue(input.existingFeaturedImagePath);
+    const uploadedImagePath =
+      getPublishedMediaDisplayPath(mediaEntries, featuredImage) ??
+      getPublishedMediaDisplayPath(mediaEntries, existingFeaturedImageInput);
     const existingFeaturedImage = uploadedImagePath
       ? undefined
-      : normalizeExistingFeaturedImagePath(toStringValue(input.existingFeaturedImagePath) ?? featuredImage);
+      : normalizeExistingFeaturedImagePath(existingFeaturedImageInput ?? featuredImage);
     const imagePath = uploadedImagePath ?? existingFeaturedImage;
-    const markdown = markdownInput
+    const rawMarkdown = markdownInput
       ? hasFrontmatter(markdownInput)
         ? markdownInput
         : buildFrontmatter({
@@ -712,6 +748,7 @@ export const handler = async (event: LambdaEvent) => {
           title: title ?? slug,
           videoLink: toStringValue(input.videoLink),
         });
+    const markdown = replacePublishedArtifactReferences(rawMarkdown, mediaEntries);
 
     const ref = await githubRequest<GitHubRef>(`/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
     const commit = await githubRequest<GitHubCommit>(`/repos/${repo}/git/commits/${ref.object.sha}`, token);
