@@ -104,6 +104,7 @@ const jsonHeaders = {
 const repoContentRoot = 'src/data/post';
 const uploadRoot = 'src/assets/images/uploads';
 const githubApiRoot = 'https://api.github.com';
+const siteImageAssetRoot = 'https://kugelmedia.netlify.app/drlurieblog/';
 
 class PublishError extends Error {
   statusCode: number;
@@ -270,6 +271,7 @@ const readArtifactBytes = async (
 const normalizeExistingFeaturedImagePath = (value: unknown) => {
   const rawPath = toStringValue(value);
   if (!rawPath) return undefined;
+  if (rawPath.startsWith(siteImageAssetRoot) && rawPath.length > siteImageAssetRoot.length) return rawPath;
 
   const repoPath = rawPath.startsWith('~/assets/images/uploads/')
     ? rawPath.replace('~/assets/images/uploads/', `${uploadRoot}/`)
@@ -282,7 +284,10 @@ const normalizeExistingFeaturedImagePath = (value: unknown) => {
   const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
 
   if (!normalizedPath || !isValidUploadedImagePath(normalizedPath)) {
-    throw new PublishError(403, `existingFeaturedImagePath must be under ${uploadRoot}/ and include a filename.`);
+    throw new PublishError(
+      403,
+      `existingFeaturedImagePath must be under ${uploadRoot}/ or ${siteImageAssetRoot} and include a filename.`
+    );
   }
 
   return normalizedPath.replace(`${uploadRoot}/`, '~/assets/images/uploads/');

@@ -244,3 +244,83 @@ test('publish-article reports stale saved image references instead of a generic 
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article accepts existing site image asset URLs as featured images', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/site-featured-image-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const featuredImage = 'https://kugelmedia.netlify.app/drlurieblog/final-article.jpg';
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'site-featured-image-test',
+        title: 'Site Featured Image Test',
+        content: 'Site featured image body',
+        featuredImage,
+        existingFeaturedImagePath: featuredImage,
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.deepEqual(treePaths, ['src/data/post/site-featured-image-test.md']);
+    assert.match(
+      blobWrites[0]?.content ?? '',
+      /image: "https:\/\/kugelmedia\.netlify\.app\/drlurieblog\/final-article\.jpg"/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

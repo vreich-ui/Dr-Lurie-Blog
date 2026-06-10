@@ -2725,6 +2725,20 @@ const metadata = {
         return getUploadPath(value);
       };
 
+      const isSelectedPublishableImageValue = (value) => {
+        const normalized = String(value || '').trim();
+        if (!normalized) return false;
+        return selectedImages.some(
+          (image) => image.kind !== 'path' && (image.optionValue === normalized || image.name === normalized)
+        );
+      };
+
+      const getExistingFeaturedImagePathForPayload = () => {
+        return isSelectedPublishableImageValue(fields.featuredImage.value)
+          ? ''
+          : fields.existingFeaturedImagePath.value.trim();
+      };
+
       const getDraft = () => ({
         title: fields.title.value,
         slug: fields.slug.value,
@@ -2740,7 +2754,7 @@ const metadata = {
         artifactReferences: selectedArtifactReferences,
         mediaEntries: selectedMediaEntries,
         featuredImage: fields.featuredImage.value,
-        existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
+        existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
         videoLink: fields.videoLink.value,
         ctaLink: fields.ctaLink.value,
         ctaText: fields.ctaText.value,
@@ -2795,8 +2809,8 @@ const metadata = {
           ...(fields.category.value.trim() ? { category: fields.category.value.trim() } : {}),
           ...(fields.seoDescription.value.trim() ? { seoDescription: fields.seoDescription.value.trim() } : {}),
           ...(featuredImage ? { featuredImage } : {}),
-          ...(fields.existingFeaturedImagePath.value.trim()
-            ? { existingFeaturedImagePath: fields.existingFeaturedImagePath.value.trim() }
+          ...(getExistingFeaturedImagePathForPayload()
+            ? { existingFeaturedImagePath: getExistingFeaturedImagePathForPayload() }
             : {}),
           ...(fields.videoLink.value.trim() ? { videoLink: fields.videoLink.value.trim() } : {}),
           ...(fields.ctaLink.value.trim() ? { ctaLink: fields.ctaLink.value.trim() } : {}),
@@ -5330,7 +5344,7 @@ const metadata = {
               markdown: fields.outputMarkdown.value,
               sources: parseSources(fields.sources.value),
               featuredImage: fields.featuredImage.value,
-              existingFeaturedImagePath: fields.existingFeaturedImagePath.value,
+              existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
               seoDescription: fields.seoDescription.value,
               videoLink: fields.videoLink.value,
               ctaLink: fields.ctaLink.value,
