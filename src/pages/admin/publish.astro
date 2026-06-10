@@ -230,6 +230,38 @@ const metadata = {
                   <p id="blob-image-modal-status" class="json-draft-modal-status" aria-live="polite">
                     Select saved image artifacts to add to this article.
                   </p>
+                  <div class="blob-image-modal-filters" aria-label="Saved artifact filters">
+                    <label>
+                      <span>Kind</span>
+                      <select id="blob-image-kind-filter">
+                        <option value="image" selected>Image</option>
+                        <option value="pdf">PDF</option>
+                        <option value="video">Video</option>
+                        <option value="doc">Doc</option>
+                        <option value="audio">Audio</option>
+                        <option value="data">Data</option>
+                        <option value="attachment">Attachment</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Request</span>
+                      <select id="blob-image-request-filter">
+                        <option value="current" selected>Current draft/request</option>
+                        <option value="all">All requests</option>
+                      </select>
+                    </label>
+                    <label class="blob-image-search-filter">
+                      <span>Search</span>
+                      <input
+                        id="blob-image-search"
+                        type="search"
+                        placeholder="Label, filename, or tag"
+                        autocomplete="off"
+                      />
+                    </label>
+                    <button id="refresh-blob-images" class="btn-secondary btn-sm" type="button">Refresh</button>
+                  </div>
                   <div class="blob-image-modal-actions">
                     <button id="select-marked-blob-images" class="btn-primary btn-sm" type="button"
                       >Select Marked</button
@@ -878,6 +910,37 @@ const metadata = {
   :global(.json-draft-choice:hover .json-draft-choice-icon),
   :global(.json-draft-choice:focus-visible .json-draft-choice-icon) {
     color: var(--aw-color-accent);
+  }
+
+  .blob-image-modal-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.65rem;
+    align-items: end;
+    margin: -0.2rem 0 0.85rem;
+  }
+
+  .blob-image-modal-filters label {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .blob-image-modal-filters select,
+  .blob-image-modal-filters input {
+    width: 100%;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.65rem;
+    background: var(--aw-color-bg-surface);
+    color: var(--aw-color-text);
+    font: inherit;
+  }
+
+  .blob-image-search-filter {
+    min-width: min(100%, 14rem);
   }
 
   .blob-image-modal-actions {
@@ -1912,6 +1975,10 @@ const metadata = {
         blobImageModal: document.querySelector('#blob-image-modal'),
         blobImageModalClose: document.querySelector('#blob-image-modal-close'),
         blobImageModalStatus: document.querySelector('#blob-image-modal-status'),
+        blobImageKindFilter: document.querySelector('#blob-image-kind-filter'),
+        blobImageRequestFilter: document.querySelector('#blob-image-request-filter'),
+        blobImageSearch: document.querySelector('#blob-image-search'),
+        refreshBlobImages: document.querySelector('#refresh-blob-images'),
         selectMarkedBlobImages: document.querySelector('#select-marked-blob-images'),
         blobImageList: document.querySelector('#blob-image-list'),
         imageAllowedTypes: document.querySelector('#image-allowed-types'),
@@ -2490,7 +2557,9 @@ const metadata = {
       };
 
       const getArtifactImageName = (reference) => {
-        const metadataFilename = String(reference?.metadata?.filename || reference?.metadata?.name || '').trim();
+        const metadataFilename = String(
+          reference?.metadata?.filename || reference?.metadata?.name || reference?.originalFilename || ''
+        ).trim();
         if (metadataFilename) return sanitizeFilename(metadataFilename);
         const [, , blobFilename = ''] = String(reference?.blobKey || '').split('/');
         const extension = extensionForContentType(reference?.contentType);
@@ -2507,7 +2576,6 @@ const metadata = {
       const mergeArtifactReferences = (...groups) => {
         const byKey = new Map();
         groups.flat().forEach((reference) => {
-          if (!isImageArtifactReference(reference)) return;
           const blobKey = String(reference?.blobKey || '').trim();
           if (blobKey) byKey.set(blobKey, reference);
         });
@@ -3538,10 +3606,13 @@ const metadata = {
         recalculateButtonState();
       };
 
-      const mcpToolCall = async (name, args) => {
+      const mcpToolCall = async (name, args, options = {}) => {
         const response = await fetch('/mcp', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.authorization ? { Authorization: options.authorization } : {}),
+          },
           body: JSON.stringify({
             jsonrpc: '2.0',
             id: `admin-publish-${name}-${Date.now()}`,
@@ -4956,16 +5027,119 @@ const metadata = {
         else fields.blobImageModal?.setAttribute('open', '');
       };
 
+      const artifactKindFromReference = (artifact) => String(artifact?.blobKey || '').split('/')[0] || '';
+
+      const getArtifactDisplayLabel = (artifact) =>
+        String(
+          artifact?.label ||
+            artifact?.originalFilename ||
+            artifact?.metadata?.filename ||
+            getArtifactImageName(artifact)
+        ).trim();
+
+      const getCurrentBlobImageRequestId = () => {
+        const { requestId } = getCheckedOutWorkflowDraft();
+        return requestId || workflowRequestId || lastSavedDraftId || '';
+      };
+
+      const getArtifactSearchText = (artifact) =>
+        [
+          artifact?.label,
+          artifact?.originalFilename,
+          artifact?.metadata?.filename,
+          artifact?.metadata?.name,
+          getArtifactImageName(artifact),
+          ...(Array.isArray(artifact?.tags) ? artifact.tags : []),
+        ]
+          .map((value) => String(value || '').toLowerCase())
+          .join(' ');
+
+      const artifactCreatedAtMs = (artifact) => {
+        const timestamp = Date.parse(artifact?.createdAtISO || '');
+        return Number.isFinite(timestamp) ? timestamp : 0;
+      };
+
+      const sortArtifactsByCreatedDesc = (artifacts) =>
+        [...artifacts].sort((left, right) => artifactCreatedAtMs(right) - artifactCreatedAtMs(left));
+
+      const filterBlobImageArtifacts = (artifacts, { artifactKind, requestId, requestScope, searchTerm }) => {
+        const normalizedSearch = String(searchTerm || '')
+          .trim()
+          .toLowerCase();
+        return sortArtifactsByCreatedDesc(
+          artifacts.filter((artifact) => {
+            if (artifactKind && artifactKindFromReference(artifact) !== artifactKind) return false;
+            if (requestScope === 'current' && requestId && getArtifactRequestId(artifact) !== requestId) return false;
+            if (normalizedSearch && !getArtifactSearchText(artifact).includes(normalizedSearch)) return false;
+            return true;
+          })
+        );
+      };
+
+      const mcpAdminArtifactToolCall = async (name, args) => {
+        const token = await getClerkSessionToken();
+        return mcpToolCall(name, args, { authorization: `Bearer ${token}` });
+      };
+
+      const loadAllArtifactBrowsePages = async (toolName, args) => {
+        const artifacts = [];
+        let cursor = args.cursor || '';
+        for (let page = 0; page < 10; page += 1) {
+          const result = await mcpAdminArtifactToolCall(toolName, {
+            ...args,
+            limit: 100,
+            ...(cursor ? { cursor } : {}),
+          });
+          artifacts.push(...(Array.isArray(result.artifacts) ? result.artifacts : []));
+          cursor = result.nextCursor || '';
+          if (!cursor) break;
+        }
+        return artifacts;
+      };
+
+      const loadBlobImageArtifactsFromMcp = async () => {
+        const artifactKind = fields.blobImageKindFilter?.value || 'image';
+        const requestScope = fields.blobImageRequestFilter?.value || 'current';
+        const requestId = getCurrentBlobImageRequestId();
+        const searchTerm = fields.blobImageSearch?.value || '';
+        const baseArgs = { artifactKind };
+        const baseArtifacts =
+          requestScope === 'current' && requestId
+            ? await loadAllArtifactBrowsePages('list_artifacts_by_request', { requestId, ...baseArgs })
+            : await loadAllArtifactBrowsePages('list_artifacts_by_kind', baseArgs);
+        let artifacts = baseArtifacts;
+        const trimmedSearch = searchTerm.trim();
+
+        if (trimmedSearch) {
+          try {
+            const tagArtifacts = await loadAllArtifactBrowsePages('search_artifacts', { tag: trimmedSearch });
+            artifacts = mergeArtifactReferences(artifacts, tagArtifacts);
+          } catch (error) {
+            console.warn('Artifact tag search failed; falling back to loaded artifact metadata search.', error);
+          }
+        }
+
+        return filterBlobImageArtifacts(mergeArtifactReferences(selectedArtifactReferences, artifacts), {
+          artifactKind,
+          requestId,
+          requestScope,
+          searchTerm,
+        });
+      };
+
       const renderBlobImageChoices = (artifacts) => {
         if (!artifacts.length) {
-          fields.blobImageList.innerHTML = '<p class="json-draft-empty">No saved image artifacts were found.</p>';
+          fields.blobImageList.innerHTML = '<p class="json-draft-empty">No saved artifacts matched these filters.</p>';
           return;
         }
 
         fields.blobImageList.replaceChildren();
         artifacts.forEach((artifact, index) => {
           const name = getArtifactImageName(artifact);
-          const meta = `${artifact.contentType || 'image'} · ${formatFileSize(artifact.sizeBytes)}`;
+          const label = getArtifactDisplayLabel(artifact);
+          const tags = Array.isArray(artifact.tags) && artifact.tags.length ? ` · #${artifact.tags.join(' #')}` : '';
+          const createdAt = artifact.createdAtISO ? ` · ${new Date(artifact.createdAtISO).toLocaleDateString()}` : '';
+          const meta = `${artifactKindFromReference(artifact) || 'artifact'} · ${artifact.contentType || 'unknown'} · ${formatFileSize(artifact.sizeBytes)}${createdAt}${tags}`;
           const choice = document.createElement('label');
           const thumbnail = document.createElement('img');
           const title = document.createElement('span');
@@ -4975,19 +5149,21 @@ const metadata = {
           choice.className = 'json-draft-choice blob-image-choice';
           choice.dataset.blobImageIndex = String(index);
           thumbnail.className = 'blob-image-choice-thumb';
-          thumbnail.alt = `Preview of ${name}`;
+          thumbnail.alt = `Preview of ${label || name}`;
           thumbnail.loading = 'lazy';
           title.className = 'blob-image-choice-title';
-          title.textContent = shortenFilename(name, 24);
-          title.title = name;
+          title.textContent = shortenFilename(label || name, 24);
+          title.title = label || name;
           metaElement.className = 'blob-image-choice-meta';
           metaElement.textContent = meta;
+          metaElement.title = meta;
           checkbox.className = 'blob-image-choice-checkbox';
           checkbox.type = 'checkbox';
           checkbox.dataset.blobImageCheckbox = String(index);
           checkbox.checked = stagedBlobImageKeys.has(artifact.blobKey);
 
-          attachArtifactPreview(thumbnail, artifact);
+          if (isImageArtifactReference(artifact)) attachArtifactPreview(thumbnail, artifact);
+          else thumbnail.alt = `${artifactKindFromReference(artifact) || 'Artifact'} preview unavailable`;
           choice.append(thumbnail, title, metaElement, checkbox);
           fields.blobImageList.append(choice);
         });
@@ -4995,34 +5171,22 @@ const metadata = {
 
       const loadBlobImageChoices = async () => {
         fields.blobImageList.innerHTML = '';
-        setBlobImageModalStatus('Loading saved image artifacts…');
+        setBlobImageModalStatus('Loading saved artifacts…');
 
         try {
-          const token = await getClerkSessionToken();
-          const response = await fetch('/.netlify/functions/admin-list-blob-images', {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          const result = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            throw new Error(result.error || `Saved image artifacts could not be listed (${response.status}).`);
-          }
-          availableBlobImageArtifacts = mergeArtifactReferences(selectedArtifactReferences, result.images || []);
+          availableBlobImageArtifacts = await loadBlobImageArtifactsFromMcp();
           stagedBlobImageKeys = new Set(selectedArtifactReferences.map((reference) => reference.blobKey));
 
           renderBlobImageChoices(availableBlobImageArtifacts);
           setBlobImageModalStatus(
             availableBlobImageArtifacts.length
-              ? 'Choose saved image artifacts to add to this article.'
-              : 'No saved image artifacts were found.'
+              ? 'Choose saved artifacts to add to this article. Results are sorted newest first.'
+              : 'No saved artifacts matched these filters.'
           );
         } catch (error) {
-          console.error('Saved image artifact list failed.', error);
+          console.error('Saved artifact list failed.', error);
           setBlobImageModalStatus(
-            error instanceof Error ? error.message : 'Saved image artifacts could not be listed.',
+            error instanceof Error ? error.message : 'Saved artifacts could not be listed.',
             true
           );
         }
@@ -5134,6 +5298,13 @@ const metadata = {
       fields.selectBlobImage.addEventListener('click', openBlobImageModal);
       fields.jsonDraftModalClose.addEventListener('click', closeJsonDraftModal);
       fields.blobImageModalClose.addEventListener('click', closeBlobImageModal);
+      fields.blobImageKindFilter?.addEventListener('change', loadBlobImageChoices);
+      fields.blobImageRequestFilter?.addEventListener('change', loadBlobImageChoices);
+      fields.blobImageSearch?.addEventListener('input', () => {
+        window.clearTimeout(Number(fields.blobImageSearch.dataset.searchTimer || 0));
+        fields.blobImageSearch.dataset.searchTimer = String(window.setTimeout(loadBlobImageChoices, 250));
+      });
+      fields.refreshBlobImages?.addEventListener('click', loadBlobImageChoices);
       fields.blobImageList.addEventListener('change', (event) => {
         const target = event.target instanceof HTMLInputElement ? event.target : null;
         if (!target?.matches('[data-blob-image-checkbox]')) return;
