@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   ArtifactKind,
+  artifactKindValues,
   createArtifactBlobKey,
   createArtifactReference,
   getArtifactReferenceIssue,
@@ -36,14 +37,38 @@ test('artifact helpers produce stable blob keys and references', () => {
 });
 
 test('artifact blob keys fall back safely when request IDs are not path-safe', () => {
+  const digest = 'a'.repeat(64);
+
   assert.equal(
     createArtifactBlobKey({
-      artifactKind: ArtifactKind.Markdown,
+      artifactKind: ArtifactKind.Doc,
       requestId: '///',
-      sha256: 'abc123',
+      sha256: digest,
       filename: 'notes.md',
     }),
-    'markdown/request/abc123.md'
+    `doc/request/${digest}.md`
+  );
+});
+
+test('artifact blob keys enforce the server artifactKind whitelist and sha256 format', () => {
+  assert.deepEqual(artifactKindValues, ['image', 'pdf', 'video', 'doc', 'audio', 'data', 'attachment', 'other']);
+  assert.throws(
+    () =>
+      createArtifactBlobKey({
+        artifactKind: 'markdown' as ArtifactKind,
+        requestId: 'request',
+        sha256: 'a'.repeat(64),
+      }),
+    /artifactKind must be one of/
+  );
+  assert.throws(
+    () =>
+      createArtifactBlobKey({
+        artifactKind: ArtifactKind.Image,
+        requestId: 'request',
+        sha256: 'abc123',
+      }),
+    /sha256 must be a 64-character hex digest/
   );
 });
 
@@ -68,6 +93,10 @@ test('ArtifactReference validation rejects invented media handles and incomplete
   assert.match(
     getArtifactReferenceIssue({ blobKey: reference.blobKey, sha256: reference.sha256 }) ?? '',
     /sizeBytes must be a non-negative number/
+  );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, blobKey: reference.blobKey.replace(/^image\//, 'markdown/') }) ?? '',
+    /blobKey must match the server ArtifactReference path format/
   );
 });
 

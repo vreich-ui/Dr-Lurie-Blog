@@ -75,12 +75,12 @@ Artifact tools are registered by the production Netlify `/mcp` entry point. They
 
 ### `save_artifact`
 
-Single-shot byte upload. Agents must call this immediately after creating image, audio, video, binary, or markdown bytes, then store only the returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes the final artifact blob and a request artifact index entry.
+Single-shot byte upload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes, then store only the returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes the final artifact blob and a request artifact index entry.
 
 Required fields:
 
 - `requestId: string` - workflow request id that owns the artifact.
-- `artifactKind: "image" | "audio" | "video" | "binary" | "markdown"` - storage routing kind.
+- `artifactKind: "image" | "pdf" | "video" | "doc" | "audio" | "data" | "attachment" | "other"` - storage routing kind.
 - `contentType: string` - MIME type for the artifact bytes.
 - `payload: string` - artifact bytes, base64 by default.
 
@@ -103,7 +103,7 @@ Chunked byte upload. Agents must call this immediately for large created artifac
 Required fields:
 
 - `requestId: string` - workflow request id that owns the artifact.
-- `artifactKind: "image" | "audio" | "video" | "binary" | "markdown"` - storage routing kind.
+- `artifactKind: "image" | "pdf" | "video" | "doc" | "audio" | "data" | "attachment" | "other"` - storage routing kind.
 - `contentType: string` - MIME type for the complete artifact bytes.
 - `clientUploadId: string` - stable UUID shared by every chunk in this upload.
 - `chunkIndex: integer` - zero-based chunk index.

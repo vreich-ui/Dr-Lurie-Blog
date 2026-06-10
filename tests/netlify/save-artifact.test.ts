@@ -604,6 +604,44 @@ test('save-artifact rejects JPEG bytes that have markers but cannot be decoded b
   assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
+test('save-artifact rejects client-provided blobKey and non-whitelisted artifactKind before persistence', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `schema-reject-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const bytes = Buffer.from('schema checked bytes');
+
+  const blobKeyResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    blobKey: `image/${requestId}/${'a'.repeat(64)}.png`,
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(blobKeyResponse.statusCode, 400);
+  assert.equal(blobKeyResponse.json.error, 'Invalid artifact upload input');
+  assert.match(JSON.stringify(blobKeyResponse.json.issues), /Unrecognized key/);
+
+  const artifactKindResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    artifactKind: 'markdown',
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(artifactKindResponse.statusCode, 400);
+  assert.equal(artifactKindResponse.json.error, 'Invalid artifact upload input');
+  assert.match(JSON.stringify(artifactKindResponse.json.issues), /artifactKind/);
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
 test('save-artifact rejects a single-shot upload when expected size does not match decoded bytes', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;

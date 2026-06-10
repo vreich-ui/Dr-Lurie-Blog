@@ -268,7 +268,7 @@ const adminPublishValidationModeSchema = {
 
 const artifactKindJsonSchema = (description?: string) => ({
   type: 'string',
-  enum: ['image', 'audio', 'video', 'binary', 'markdown'],
+  enum: ['image', 'pdf', 'video', 'doc', 'audio', 'data', 'attachment', 'other'],
   ...(description ? { description } : {}),
 });
 const artifactEncodingJsonSchema = (description?: string) => ({
@@ -757,7 +757,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_artifact',
     description:
-      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, audio, video, binary, or markdown bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
+      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),

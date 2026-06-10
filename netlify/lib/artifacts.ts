@@ -2,13 +2,22 @@ import { basename, extname } from 'node:path';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import { sha256Hex } from './crypto.js';
 
-export enum ArtifactKind {
-  Image = 'image',
-  Audio = 'audio',
-  Video = 'video',
-  Binary = 'binary',
-  Markdown = 'markdown',
-}
+export const artifactKindValues = ['image', 'pdf', 'video', 'doc', 'audio', 'data', 'attachment', 'other'] as const;
+
+export type ArtifactKind = (typeof artifactKindValues)[number];
+
+export const ArtifactKind = {
+  Image: 'image',
+  Pdf: 'pdf',
+  Video: 'video',
+  Doc: 'doc',
+  Audio: 'audio',
+  Data: 'data',
+  Attachment: 'attachment',
+  Other: 'other',
+} as const satisfies Record<string, ArtifactKind>;
+
+export const artifactKindSet = new Set<ArtifactKind>(artifactKindValues);
 
 export type ArtifactReference = {
   blobKey: string;
@@ -259,7 +268,7 @@ const allowedArtifactReferenceKeys = new Set([
   'metadata',
 ]);
 
-const safePathSegment = (value: string): string => {
+export const safePathSegment = (value: string): string => {
   return value
     .trim()
     .toLowerCase()
@@ -284,10 +293,25 @@ export const createArtifactBlobKey = (input: {
   sha256: string;
   filename?: string;
 }): string => {
+  if (!artifactKindSet.has(input.artifactKind)) {
+    throw new Error(`artifactKind must be one of: ${artifactKindValues.join(', ')}`);
+  }
+
+  const sha256 = input.sha256.toLowerCase();
+
+  if (!/^[a-f0-9]{64}$/.test(sha256)) {
+    throw new Error('sha256 must be a 64-character hex digest.');
+  }
+
   const requestId = safePathSegment(input.requestId) || 'request';
   const extension = getArtifactExtension(input.filename);
+  const blobKey = `${input.artifactKind}/${requestId}/${sha256}${extension}`;
 
-  return `${input.artifactKind}/${requestId}/${input.sha256}${extension}`;
+  if (!isValidArtifactBlobKey(blobKey, sha256)) {
+    throw new Error('generated artifact blobKey failed validation.');
+  }
+
+  return blobKey;
 };
 
 export const createArtifactReference = ({
@@ -318,11 +342,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 export const isValidArtifactBlobKey = (blobKey: string, sha256: string): boolean => {
   const [kind, requestId, filename, ...extra] = blobKey.split('/');
-  const validKinds = new Set(Object.values(ArtifactKind));
 
   return Boolean(
     !extra.length &&
-      validKinds.has(kind as ArtifactKind) &&
+      artifactKindSet.has(kind as ArtifactKind) &&
       safePathSegment(requestId) === requestId &&
       requestId.length > 0 &&
       filename &&

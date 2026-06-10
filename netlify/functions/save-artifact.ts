@@ -13,6 +13,7 @@ import { z } from 'zod';
 
 import {
   ArtifactKind,
+  artifactKindValues,
   createArtifactReference,
   isArtifactReference,
   type ArtifactReference,
@@ -73,7 +74,7 @@ const jsonHeaders = {
 const uploadSchema = z
   .object({
     requestId: z.string().min(1),
-    artifactKind: z.enum(ArtifactKind),
+    artifactKind: z.enum(artifactKindValues),
     contentType: z.string().min(1),
     filename: z.string().min(1).optional(),
     clientUploadId: z.uuid().optional(),
@@ -471,7 +472,7 @@ export const saveUploadedChunk = async (
       clientUploadId,
       chunkIndex,
       totalChunks,
-      artifactKind: ArtifactKind.Binary,
+      artifactKind: ArtifactKind.Data,
       contentType: 'application/octet-stream',
       payload: '',
     },

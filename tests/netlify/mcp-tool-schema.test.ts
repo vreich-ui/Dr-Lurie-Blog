@@ -288,6 +288,16 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
   assert.ok(property(saveArtifact.inputSchema, 'payload'));
   assert.ok(property(saveArtifact.inputSchema, 'metadata'));
+  assert.deepEqual((property(saveArtifact.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
+    'image',
+    'pdf',
+    'video',
+    'doc',
+    'audio',
+    'data',
+    'attachment',
+    'other',
+  ]);
   assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSizeBytes'), {
     type: 'integer',
     minimum: 0,
@@ -317,6 +327,16 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'chunkIndex',
     'totalChunks',
     'payload',
+  ]);
+  assert.deepEqual((property(saveChunk.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
+    'image',
+    'pdf',
+    'video',
+    'doc',
+    'audio',
+    'data',
+    'attachment',
+    'other',
   ]);
   assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
   assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
