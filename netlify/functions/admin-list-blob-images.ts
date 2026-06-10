@@ -1,5 +1,5 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { isArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
+import { isArtifactReference, isDeletedArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
@@ -104,7 +104,7 @@ const listImageArtifacts = async (indexStore: ArtifactIndexBlobStore, requestId:
       );
 
   return candidates.filter((reference): reference is ArtifactReference =>
-    Boolean(reference && isImageArtifactReference(reference))
+    Boolean(reference && !isDeletedArtifactReference(reference) && isImageArtifactReference(reference))
   );
 };
 

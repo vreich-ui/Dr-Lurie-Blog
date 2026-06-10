@@ -113,6 +113,19 @@ test('ArtifactReference validation rejects invented media handles and incomplete
     getArtifactReferenceIssue({ ...reference, tags: ['x'.repeat(41)] }) ?? '',
     /tags\[0\] must be at most 40/
   );
+  assert.equal(
+    getArtifactReferenceIssue({
+      ...reference,
+      deletedAtISO: '2026-06-10T00:00:00.000Z',
+      deletedBy: 'admin@example.com',
+    }),
+    undefined
+  );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, deletedAtISO: 'not-a-date' }) ?? '',
+    /deletedAtISO must be a valid ISO date string/
+  );
+  assert.match(getArtifactReferenceIssue({ ...reference, deletedBy: '<admin>' }) ?? '', /deletedBy must not contain/);
 });
 
 type FakeArtifactStoreValue = Buffer | string;

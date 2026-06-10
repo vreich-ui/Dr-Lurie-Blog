@@ -77,7 +77,7 @@ test('admin artifact browsing and reconciliation MCP tools require admin authent
         jsonrpc: '2.0',
         id: 1,
         method: 'tools/call',
-        params: { name: 'reconcile_artifact_indexes', arguments: { artifactKind: 'image' } },
+        params: { name: 'soft_delete_artifact', arguments: { requestId: 'request', sha256: 'a'.repeat(64) } },
       }),
     });
     const body = JSON.parse(response.body) as {

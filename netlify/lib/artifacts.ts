@@ -36,6 +36,8 @@ export type ArtifactReference = {
   label?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  deletedAtISO?: string;
+  deletedBy?: string;
 };
 
 export type ReadableArtifactBlobStore = {
@@ -301,6 +303,8 @@ export type ArtifactUploadInput = {
   label?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  deletedAtISO?: string;
+  deletedBy?: string;
 };
 
 type CreateArtifactReferenceOptions = {
@@ -322,6 +326,8 @@ const allowedArtifactReferenceKeys = new Set([
   'label',
   'tags',
   'metadata',
+  'deletedAtISO',
+  'deletedBy',
 ]);
 
 export const safePathSegment = (value: string): string => {
@@ -474,7 +480,19 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
   const unexpectedKeys = Object.keys(value).filter((key) => !allowedArtifactReferenceKeys.has(key));
   if (unexpectedKeys.length) return `unexpected top-level keys: ${unexpectedKeys.join(', ')}`;
 
-  const { blobKey, sizeBytes, sha256, contentType, createdAtISO, originalFilename, label, tags, metadata } = value;
+  const {
+    blobKey,
+    sizeBytes,
+    sha256,
+    contentType,
+    createdAtISO,
+    originalFilename,
+    label,
+    tags,
+    metadata,
+    deletedAtISO,
+    deletedBy,
+  } = value;
   if (typeof blobKey !== 'string' || !blobKey.trim()) return 'blobKey must be a non-empty string';
   if (typeof sha256 !== 'string' || !/^[a-f0-9]{64}$/i.test(sha256)) return 'sha256 must be a 64-character hex string';
   if (!isValidArtifactBlobKey(blobKey, sha256)) return 'blobKey must match the server ArtifactReference path format';
@@ -511,12 +529,23 @@ export const getArtifactReferenceIssue = (value: unknown): string | undefined =>
     }
   }
   if (metadata !== undefined && !isRecord(metadata)) return 'metadata must be an object when provided';
+  if (deletedAtISO !== undefined && (typeof deletedAtISO !== 'string' || Number.isNaN(Date.parse(deletedAtISO)))) {
+    return 'deletedAtISO must be a valid ISO date string when provided';
+  }
+  if (deletedBy !== undefined) {
+    const issue = getSafeArtifactStringIssue(deletedBy, 'deletedBy', artifactReferenceLimits.label);
+    if (issue) return issue;
+  }
 
   return undefined;
 };
 
 export const isArtifactReference = (value: unknown): value is ArtifactReference => {
   return getArtifactReferenceIssue(value) === undefined;
+};
+
+export const isDeletedArtifactReference = (value: unknown): value is ArtifactReference => {
+  return isArtifactReference(value) && Boolean(value.deletedAtISO);
 };
 
 export const requireArtifactReferenceArray = (

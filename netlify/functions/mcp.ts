@@ -10,6 +10,8 @@ import {
   artifactKindValues,
   artifactReferenceLimits,
   isArtifactReference,
+  isDeletedArtifactReference,
+  isSafeArtifactText,
   normalizeArtifactBlobKey,
   reconcileArtifactReference,
   safePathSegment,
@@ -331,6 +333,18 @@ const artifactReconcileLimitJsonSchema = {
   maximum: ARTIFACT_LIST_MAX_LIMIT,
   description: `Optional maximum number of artifact-index JSON references to reconcile; defaults to ${ARTIFACT_LIST_DEFAULT_LIMIT}, max ${ARTIFACT_LIST_MAX_LIMIT}.`,
 };
+const artifactIncludeDeletedJsonSchema = {
+  type: 'boolean',
+  description: 'When true, include soft-deleted artifact references. Defaults to false.',
+};
+const artifactDeletedByJsonSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: artifactReferenceLimits.label,
+  pattern: '^[^\u0000-\u001f\u007f<>]+$',
+  description: 'Optional safe actor label recorded as deletedBy; defaults to the authenticated admin email or user id.',
+};
+
 const artifactSearchTagJsonSchema = {
   type: 'string',
   minLength: 1,
@@ -886,6 +900,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         artifactKind: artifactKindJsonSchema('Artifact kind pointer prefix to browse.'),
         limit: artifactListLimitJsonSchema,
         cursor: artifactListCursorJsonSchema,
+        includeDeleted: artifactIncludeDeletedJsonSchema,
       },
       ['artifactKind']
     ),
@@ -900,6 +915,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         artifactKind: artifactKindJsonSchema('Optional artifact kind pointer prefix within the request.'),
         limit: artifactListLimitJsonSchema,
         cursor: artifactListCursorJsonSchema,
+        includeDeleted: artifactIncludeDeletedJsonSchema,
       },
       ['requestId']
     ),
@@ -914,7 +930,33 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       createdBefore: isoDateStringSchema('Optional inclusive upper createdAtISO bound.'),
       limit: artifactListLimitJsonSchema,
       cursor: artifactListCursorJsonSchema,
+      includeDeleted: artifactIncludeDeletedJsonSchema,
     }),
+  },
+  {
+    name: 'soft_delete_artifact',
+    description:
+      'Admin-only soft delete for an ArtifactReference. Marks request-artifacts/{requestId}/{sha256}.json with deletedAtISO/deletedBy and leaves binary artifact bytes in place.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns the artifact reference.'),
+        sha256: expectedSha256JsonSchema,
+        deletedBy: artifactDeletedByJsonSchema,
+      },
+      ['requestId', 'sha256']
+    ),
+  },
+  {
+    name: 'restore_artifact',
+    description:
+      'Admin-only restore for a soft-deleted ArtifactReference. Clears deletedAtISO/deletedBy on request-artifacts/{requestId}/{sha256}.json and keeps existing blob bytes untouched.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns the artifact reference.'),
+        sha256: expectedSha256JsonSchema,
+      },
+      ['requestId', 'sha256']
+    ),
   },
   {
     name: 'reconcile_artifact_indexes',
@@ -1304,6 +1346,7 @@ type ArtifactBrowseOptions = {
   createdAfter?: Date;
   createdBefore?: Date;
   cursor: number;
+  includeDeleted: boolean;
   limit: number;
 };
 
@@ -1462,7 +1505,13 @@ const normalizeArtifactBrowseOptions = (
     return toolError('createdBefore must be a valid ISO date string.');
   }
 
-  return { limit: limit.value, cursor: cursor.value, createdAfter, createdBefore };
+  return {
+    limit: limit.value,
+    cursor: cursor.value,
+    includeDeleted: input.includeDeleted === true,
+    createdAfter,
+    createdBefore,
+  };
 };
 
 const isArtifactBrowseOptions = (
@@ -1488,13 +1537,17 @@ const getArtifactCreatedAtMs = (artifact: unknown) => {
   return createdAtISO ? Date.parse(createdAtISO) : Number.NaN;
 };
 
-const filterArtifactsByCreatedAt = (artifacts: unknown[], options: ArtifactBrowseOptions) => {
-  if (!options.createdAfter && !options.createdBefore) return artifacts;
+const filterArtifactsForBrowse = (artifacts: unknown[], options: ArtifactBrowseOptions) => {
+  const visibleArtifacts = options.includeDeleted
+    ? artifacts
+    : artifacts.filter((artifact) => !isDeletedArtifactReference(artifact));
+
+  if (!options.createdAfter && !options.createdBefore) return visibleArtifacts;
 
   const afterMs = options.createdAfter?.getTime() ?? Number.NEGATIVE_INFINITY;
   const beforeMs = options.createdBefore?.getTime() ?? Number.POSITIVE_INFINITY;
 
-  return artifacts.filter((artifact) => {
+  return visibleArtifacts.filter((artifact) => {
     const createdAtMs = getArtifactCreatedAtMs(artifact);
 
     return Number.isFinite(createdAtMs) && createdAtMs >= afterMs && createdAtMs <= beforeMs;
@@ -1511,7 +1564,7 @@ const listArtifactsFromPointerPrefixes = async (
   const artifacts = await Promise.all(
     pointerKeys.map(async (key) => loadArtifactFromPointer(store, await parseJsonBlob(store, key)))
   );
-  const filteredArtifacts = filterArtifactsByCreatedAt(
+  const filteredArtifacts = filterArtifactsForBrowse(
     artifacts.filter((artifact) => artifact !== undefined),
     options
   );
@@ -1519,13 +1572,19 @@ const listArtifactsFromPointerPrefixes = async (
   return toolResult(paginateArtifacts(filteredArtifacts, options.limit, options.cursor));
 };
 
-const requireAdminToolAccess = async (event: LambdaEvent) => {
+const getAdminToolState = async (event: LambdaEvent) => {
   const adminState = await getAdminStateFromEvent(event);
 
   if (!adminState.authenticated) return toolError(adminState.error || 'A valid admin session token is required.');
   if (!adminState.isAdmin) return toolError('This user is not authorized to browse artifacts.');
 
-  return undefined;
+  return adminState;
+};
+
+const requireAdminToolAccess = async (event: LambdaEvent) => {
+  const adminState = await getAdminToolState(event);
+
+  return 'isError' in adminState ? adminState : undefined;
 };
 
 const normalizeArtifactKindInput = (value: unknown, required: boolean) => {
@@ -1537,6 +1596,51 @@ const normalizeArtifactKindInput = (value: unknown, required: boolean) => {
   }
 
   return { ok: true as const, artifactKind };
+};
+
+const normalizeArtifactSha256Input = (value: unknown) => {
+  const sha256 = toNonEmptyString(value)?.toLowerCase();
+  if (!sha256) return { ok: false as const, error: 'sha256 is required.' };
+  if (!/^[a-f0-9]{64}$/.test(sha256)) return { ok: false as const, error: 'sha256 must be a 64-character hex digest.' };
+
+  return { ok: true as const, sha256 };
+};
+
+const loadArtifactReferenceForAdminMutation = async (store: ArtifactIndexStore, requestId: string, sha256: string) => {
+  const artifact = await parseJsonBlob(store, requestArtifactReferenceKey(requestId, sha256));
+
+  if (!artifact) return { ok: false as const, error: 'Artifact reference was not found.' };
+  if (!isArtifactReference(artifact)) return { ok: false as const, error: 'Artifact reference JSON is invalid.' };
+
+  return { ok: true as const, artifact };
+};
+
+const writeArtifactReferenceForAdminMutation = async (
+  store: ArtifactIndexStore,
+  requestId: string,
+  artifact: ArtifactReference
+) => {
+  await store.setJSON(requestArtifactReferenceKey(requestId, artifact.sha256), artifact, {
+    metadata: {
+      requestId,
+      sha256: artifact.sha256,
+      contentType: artifact.contentType,
+      ...(artifact.deletedAtISO ? { deletedAtISO: artifact.deletedAtISO } : {}),
+    },
+  });
+};
+
+const normalizeDeletedByInput = (value: unknown, fallback: string) => {
+  const deletedBy = toNonEmptyString(value) ?? fallback;
+
+  if (!isSafeArtifactText(deletedBy, artifactReferenceLimits.label)) {
+    return {
+      ok: false as const,
+      error: `deletedBy must be a safe string up to ${artifactReferenceLimits.label} characters.`,
+    };
+  }
+
+  return { ok: true as const, deletedBy };
 };
 
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
@@ -1555,7 +1659,9 @@ const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) =
       )
     : await loadArtifactsFromPrefix(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`);
 
-  return toolResult({ artifacts: artifacts.filter((artifact) => artifact !== undefined) });
+  return toolResult({
+    artifacts: artifacts.filter((artifact) => artifact !== undefined && !isDeletedArtifactReference(artifact)),
+  });
 };
 
 const listArtifactsByKind = async (event: LambdaEvent, input: Record<string, unknown>) => {
@@ -1607,6 +1713,54 @@ const searchArtifacts = async (event: LambdaEvent, input: Record<string, unknown
     : artifactKindValues.map((artifactKind) => `by-kind/${artifactKind}/`);
 
   return listArtifactsFromPointerPrefixes(event, prefixes, options);
+};
+
+const softDeleteArtifact = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const adminState = await getAdminToolState(event);
+  if ('isError' in adminState) return adminState;
+
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return toolError('requestId is required.');
+
+  const sha256 = normalizeArtifactSha256Input(input.sha256);
+  if (!sha256.ok) return toolError(sha256.error);
+
+  const store = await getArtifactIndexBlobStore(event);
+  const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
+  if (!loaded.ok) return toolError(loaded.error);
+
+  const deletedBy = normalizeDeletedByInput(input.deletedBy, adminState.email ?? adminState.userId ?? 'admin');
+  if (!deletedBy.ok) return toolError(deletedBy.error);
+
+  const deletedArtifact: ArtifactReference = {
+    ...loaded.artifact,
+    deletedAtISO: loaded.artifact.deletedAtISO ?? new Date().toISOString(),
+    deletedBy: loaded.artifact.deletedBy ?? deletedBy.deletedBy,
+  };
+
+  await writeArtifactReferenceForAdminMutation(store, requestId, deletedArtifact);
+
+  return toolResult({ artifact: deletedArtifact, deleted: true });
+};
+
+const restoreArtifact = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return toolError('requestId is required.');
+
+  const sha256 = normalizeArtifactSha256Input(input.sha256);
+  if (!sha256.ok) return toolError(sha256.error);
+
+  const store = await getArtifactIndexBlobStore(event);
+  const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
+  if (!loaded.ok) return toolError(loaded.error);
+
+  const { deletedAtISO, deletedBy, ...restoredArtifact } = loaded.artifact;
+  await writeArtifactReferenceForAdminMutation(store, requestId, restoredArtifact);
+
+  return toolResult({ artifact: restoredArtifact, restored: Boolean(deletedAtISO || deletedBy) });
 };
 
 const reconcileArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
@@ -1768,6 +1922,10 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return listArtifactsByRequest(event, input);
     case 'search_artifacts':
       return searchArtifacts(event, input);
+    case 'soft_delete_artifact':
+      return softDeleteArtifact(event, input);
+    case 'restore_artifact':
+      return restoreArtifact(event, input);
     case 'reconcile_artifact_indexes':
       return reconcileArtifactIndexes(event, input);
     case 'save_json_blob_patch_agent_output':

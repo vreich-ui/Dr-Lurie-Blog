@@ -70,6 +70,8 @@ Registered core tool names:
 - `list_artifacts_by_kind` (admin-only)
 - `list_artifacts_by_request` (admin-only)
 - `search_artifacts` (admin-only)
+- `soft_delete_artifact` (admin-only)
+- `restore_artifact` (admin-only)
 - `reconcile_artifact_indexes` (admin-only)
 - `ping`
 
@@ -134,9 +136,11 @@ Success returns `artifacts: ArtifactReference[]`.
 
 These tools require Clerk admin authentication and browse compact artifact-index pointers before resolving full `ArtifactReference` JSON. They do not read artifact bytes.
 
-- `list_artifacts_by_kind({ artifactKind, limit?, cursor? })` lists `by-kind/{artifactKind}/` pointers.
-- `list_artifacts_by_request({ requestId, artifactKind?, limit?, cursor? })` lists `by-request/{requestId}/` pointers, optionally scoped by kind.
-- `search_artifacts({ tag?, createdAfter?, createdBefore?, limit?, cursor? })` lists `by-tag/{tag}/` when a tag is provided, otherwise by-kind pointer prefixes, and applies optional `createdAtISO` bounds after resolving references.
+- `list_artifacts_by_kind({ artifactKind, limit?, cursor?, includeDeleted? })` lists `by-kind/{artifactKind}/` pointers.
+- `list_artifacts_by_request({ requestId, artifactKind?, limit?, cursor?, includeDeleted? })` lists `by-request/{requestId}/` pointers, optionally scoped by kind.
+- `search_artifacts({ tag?, createdAfter?, createdBefore?, limit?, cursor?, includeDeleted? })` lists `by-tag/{tag}/` when a tag is provided, otherwise by-kind pointer prefixes, and applies optional `createdAtISO` bounds after resolving references. Soft-deleted records are excluded unless `includeDeleted` is true.
+- `soft_delete_artifact({ requestId, sha256, deletedBy? })` marks the request artifact index JSON with `deletedAtISO` and `deletedBy` while leaving artifact bytes in place.
+- `restore_artifact({ requestId, sha256 })` clears `deletedAtISO` and `deletedBy` on a soft-deleted request artifact index JSON.
 - `reconcile_artifact_indexes({ requestId?, artifactKind?, limit? })` scans `request-artifacts/` JSON references, normalizes stale `blobKey` values, verifies backing artifact bytes, and corrects artifact-index JSON when one matching blob is found.
 
 Browse results include `artifacts`, `limit`, `cursor`, and `nextCursor`. Reconciliation results include compact scan/correction counts plus per-reference diagnostics.

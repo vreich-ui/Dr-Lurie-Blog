@@ -287,6 +287,8 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
     'search_artifacts',
+    'soft_delete_artifact',
+    'restore_artifact',
     'reconcile_artifact_indexes',
   ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
@@ -390,17 +392,29 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.deepEqual(listByKind.inputSchema.required, ['artifactKind']);
   assert.ok(property(listByKind.inputSchema, 'limit'));
   assert.ok(property(listByKind.inputSchema, 'cursor'));
+  assert.ok(property(listByKind.inputSchema, 'includeDeleted'));
   assert.match(String((listByKind as { description?: string }).description), /Admin-only/);
 
   const listByRequest = tools.get('list_artifacts_by_request')!;
   assert.deepEqual(listByRequest.inputSchema.required, ['requestId']);
   assert.ok(property(listByRequest.inputSchema, 'artifactKind'));
+  assert.ok(property(listByRequest.inputSchema, 'includeDeleted'));
 
   const searchArtifacts = tools.get('search_artifacts')!;
   assert.ok(property(searchArtifacts.inputSchema, 'tag'));
   assert.ok(property(searchArtifacts.inputSchema, 'createdAfter'));
   assert.ok(property(searchArtifacts.inputSchema, 'createdBefore'));
   assert.match(String((searchArtifacts as { description?: string }).description), /prefix indexes/);
+  assert.ok(property(searchArtifacts.inputSchema, 'includeDeleted'));
+
+  const softDeleteArtifact = tools.get('soft_delete_artifact')!;
+  assert.deepEqual(softDeleteArtifact.inputSchema.required, ['requestId', 'sha256']);
+  assert.ok(property(softDeleteArtifact.inputSchema, 'deletedBy'));
+  assert.match(String((softDeleteArtifact as { description?: string }).description), /soft delete/i);
+
+  const restoreArtifact = tools.get('restore_artifact')!;
+  assert.deepEqual(restoreArtifact.inputSchema.required, ['requestId', 'sha256']);
+  assert.match(String((restoreArtifact as { description?: string }).description), /restore/i);
 
   const reconcileArtifacts = tools.get('reconcile_artifact_indexes')!;
   assert.ok(property(reconcileArtifacts.inputSchema, 'requestId'));
@@ -422,6 +436,8 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
     'search_artifacts',
+    'soft_delete_artifact',
+    'restore_artifact',
     'reconcile_artifact_indexes',
   ]) {
     const serialized = JSON.stringify(tools.get(name));
