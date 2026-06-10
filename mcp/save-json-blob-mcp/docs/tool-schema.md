@@ -96,7 +96,7 @@ Optional fields:
 - `localSha256: string` - accepted legacy alias for `expectedSha256`.
 - `metadata: object` - saved in the returned `ArtifactReference`.
 
-Success returns the same shape as the upload function: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist for the checksum, `deduped: true` is a successful response and bytes are not rewritten.
+Success returns the same shape as the upload function: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist for the checksum, `deduped: true` is a successful response and bytes are not rewritten. Finalization also writes compact artifact-index pointers under `by-kind/{artifactKind}/{sha256}.json`, `by-request/{requestId}/{artifactKind}/{sha256}.json`, and `by-tag/{tag}/{sha256}.json` when tags are present.
 
 ### `save_artifact_chunk`
 

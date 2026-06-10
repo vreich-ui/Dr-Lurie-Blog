@@ -19,6 +19,7 @@ import {
   isArtifactReference,
   isSafeArtifactFilename,
   isSafeArtifactText,
+  safePathSegment,
   type ArtifactReference,
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
@@ -298,6 +299,36 @@ const chunkManifestKey = (requestId: string, clientUploadId: string) => {
 
 const requestArtifactIndexKey = (requestId: string, sha256: string) => {
   return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
+};
+
+const getArtifactKindFromReference = (reference: ArtifactReference): ArtifactKind => {
+  const [artifactKind] = reference.blobKey.split('/');
+
+  return artifactKind as ArtifactKind;
+};
+
+const artifactPointerValue = (requestId: string, reference: ArtifactReference) => ({
+  requestId,
+  sha256: reference.sha256,
+  artifactKind: getArtifactKindFromReference(reference),
+});
+
+const artifactKindPointerKey = (reference: ArtifactReference) => {
+  const pointer = artifactPointerValue('', reference);
+
+  return `by-kind/${pointer.artifactKind}/${reference.sha256}.json`;
+};
+
+const artifactRequestPointerKey = (requestId: string, reference: ArtifactReference) => {
+  const pointer = artifactPointerValue(requestId, reference);
+
+  return `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${reference.sha256}.json`;
+};
+
+const artifactTagPointerKeys = (reference: ArtifactReference) => {
+  const tags = reference.tags ?? [];
+
+  return [...new Set(tags.map(safePathSegment).filter(Boolean))].map((tag) => `by-tag/${tag}/${reference.sha256}.json`);
 };
 
 const getArrayBuffer = async (store: BlobStore, key: string) => {
@@ -637,6 +668,22 @@ const getExistingReference = async (store: BlobStore, requestId: string, sha256:
   }
 };
 
+const saveReferencePointers = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
+  const pointer = artifactPointerValue(requestId, reference);
+  const pointerMetadata = {
+    requestId,
+    sha256: reference.sha256,
+    artifactKind: pointer.artifactKind,
+  };
+  const pointerWrites = [
+    store.setJSON(artifactKindPointerKey(reference), pointer, { metadata: pointerMetadata }),
+    store.setJSON(artifactRequestPointerKey(requestId, reference), pointer, { metadata: pointerMetadata }),
+    ...artifactTagPointerKeys(reference).map((key) => store.setJSON(key, pointer, { metadata: pointerMetadata })),
+  ];
+
+  await Promise.all(pointerWrites);
+};
+
 const saveReference = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
   await store.setJSON(requestArtifactIndexKey(requestId, reference.sha256), reference, {
     metadata: {
@@ -645,6 +692,7 @@ const saveReference = async (store: BlobStore, requestId: string, reference: Art
       contentType: reference.contentType,
     },
   });
+  await saveReferencePointers(store, requestId, reference);
 };
 
 const mergeArtifactReferenceDisplayFields = (
@@ -697,6 +745,8 @@ const finalizeUpload = async (
 
   if (shouldSaveArtifactReference(existingReference, responseReference)) {
     await saveReference(indexStore, input.requestId, responseReference);
+  } else {
+    await saveReferencePointers(indexStore, input.requestId, responseReference);
   }
 
   return jsonResponse(deduped ? 200 : 201, {

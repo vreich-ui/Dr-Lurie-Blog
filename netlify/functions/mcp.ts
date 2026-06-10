@@ -1210,28 +1210,59 @@ const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown
   return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, agentName), 'record');
 };
 
+const requestArtifactReferenceKey = (requestId: string, sha256: string) => {
+  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
+};
+
+const parseJsonBlob = async (store: Awaited<ReturnType<typeof getArtifactIndexBlobStore>>, key: string) => {
+  const text = await store.get(key);
+  if (!text) return undefined;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+};
+
+const loadArtifactFromPointer = async (
+  store: Awaited<ReturnType<typeof getArtifactIndexBlobStore>>,
+  pointer: unknown
+) => {
+  const value = getRecordValue(pointer);
+  const pointerRequestId = toNonEmptyString(value?.requestId);
+  const sha256 = toNonEmptyString(value?.sha256);
+
+  if (!pointerRequestId || !sha256) return undefined;
+
+  return parseJsonBlob(store, requestArtifactReferenceKey(pointerRequestId, sha256));
+};
+
+const loadArtifactsFromPrefix = async (
+  store: Awaited<ReturnType<typeof getArtifactIndexBlobStore>>,
+  prefix: string
+) => {
+  const result = await store.list({ prefix });
+  const blobs = getBlobListItems(result);
+
+  return Promise.all(blobs.map((blob) => parseJsonBlob(store, blob.key)));
+};
+
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
-  if (typeof requestId !== 'string' || requestId.trim().length === 0) {
+  const normalizedRequestId = typeof requestId === 'string' ? requestId.trim() : '';
+  if (!normalizedRequestId) {
     return toolError('requestId is required.');
   }
 
   const store = await getArtifactIndexBlobStore(event);
-  const prefix = `request-artifacts/${encodeURIComponent(requestId)}/`;
-  const result = await store.list({ prefix });
-  const blobs = getBlobListItems(result);
-  const artifacts = await Promise.all(
-    blobs.map(async (blob) => {
-      const text = await store.get(blob.key);
-
-      if (!text) return undefined;
-
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        return undefined;
-      }
-    })
-  );
+  const pointerPrefix = `by-request/${encodeURIComponent(normalizedRequestId)}/`;
+  const pointerResult = await store.list({ prefix: pointerPrefix });
+  const pointerBlobs = getBlobListItems(pointerResult);
+  const artifacts = pointerBlobs.length
+    ? await Promise.all(
+        pointerBlobs.map(async (blob) => loadArtifactFromPointer(store, await parseJsonBlob(store, blob.key)))
+      )
+    : await loadArtifactsFromPrefix(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`);
 
   return toolResult({ artifacts: artifacts.filter((artifact) => artifact !== undefined) });
 };

@@ -622,9 +622,30 @@ test('save-artifact saves safe ArtifactReference display fields and rejects unsa
   });
 
   assert.equal(validResponse.statusCode, 201);
-  assert.equal((validResponse.json.artifact as { originalFilename: string }).originalFilename, 'hero safe.png');
-  assert.equal((validResponse.json.artifact as { label: string }).label, 'Hero Safe Upload');
-  assert.deepEqual((validResponse.json.artifact as { tags: string[] }).tags, ['hero', 'safe']);
+  const artifact = validResponse.json.artifact as {
+    originalFilename: string;
+    label: string;
+    tags: string[];
+    sha256: string;
+  };
+  assert.equal(artifact.originalFilename, 'hero safe.png');
+  assert.equal(artifact.label, 'Hero Safe Upload');
+  assert.deepEqual(artifact.tags, ['hero', 'safe']);
+
+  const indexStore = await getArtifactIndexBlobStore({});
+  const expectedPointer = { requestId, sha256: artifact.sha256, artifactKind: 'image' };
+  assert.deepEqual(
+    JSON.parse((await indexStore.get(`by-kind/image/${artifact.sha256}.json`)) || '{}'),
+    expectedPointer
+  );
+  assert.deepEqual(
+    JSON.parse(
+      (await indexStore.get(`by-request/${encodeURIComponent(requestId)}/image/${artifact.sha256}.json`)) || '{}'
+    ),
+    expectedPointer
+  );
+  assert.deepEqual(JSON.parse((await indexStore.get(`by-tag/hero/${artifact.sha256}.json`)) || '{}'), expectedPointer);
+  assert.deepEqual(JSON.parse((await indexStore.get(`by-tag/safe/${artifact.sha256}.json`)) || '{}'), expectedPointer);
 
   const blobKeyResponse = await postArtifact({
     ...makeBaseInput(requestId),
