@@ -55,6 +55,25 @@ const getContentTypeFromExtension = (blobKey: string) => {
   return contentTypeByExtension[extension] || '';
 };
 
+type ContentTypeSource = 'artifact-index' | 'query-string' | 'extension' | 'missing';
+
+type ResolvedArtifactContentType = {
+  contentType: string;
+  source: ContentTypeSource;
+};
+
+const createArtifactDebugFields = (
+  blobKey: string,
+  contentTypeSource: ContentTypeSource = 'missing',
+  extra: Record<string, unknown> = {}
+) => ({
+  blobKey,
+  store: 'artifacts',
+  lookup: 'bytes',
+  contentTypeSource,
+  ...extra,
+});
+
 const getShaFromBlobKey = (blobKey: string) => {
   const [, , filename = ''] = blobKey.split('/');
   const match = filename.match(/^[a-f0-9]{64}/i);
@@ -106,20 +125,26 @@ const findArtifactReferenceByBlobKey = async (store: ArtifactIndexBlobStore, blo
   return undefined;
 };
 
-const resolveArtifactContentType = async (event: LambdaEvent, blobKey: string) => {
+const resolveArtifactContentType = async (
+  event: LambdaEvent,
+  blobKey: string
+): Promise<ResolvedArtifactContentType> => {
   try {
     const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
     const reference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
     const indexedContentType = getConcreteImageContentType(reference?.contentType);
-    if (indexedContentType) return indexedContentType;
+    if (indexedContentType) return { contentType: indexedContentType, source: 'artifact-index' };
   } catch (error) {
     console.warn('Artifact index lookup failed while resolving image content type.', { blobKey, error });
   }
 
   const queryContentType = getConcreteImageContentType(event.queryStringParameters?.contentType);
-  if (queryContentType) return queryContentType;
+  if (queryContentType) return { contentType: queryContentType, source: 'query-string' };
 
-  return getContentTypeFromExtension(blobKey);
+  const extensionContentType = getContentTypeFromExtension(blobKey);
+  if (extensionContentType) return { contentType: extensionContentType, source: 'extension' };
+
+  return { contentType: '', source: 'missing' };
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -140,21 +165,38 @@ export const handler = async (event: LambdaEvent) => {
 
   const blobKey = toText(event.queryStringParameters?.blobKey);
   if (!allowedImageBlobKeyPattern.test(blobKey)) {
-    return jsonResponse(400, { error: 'A valid image artifact blobKey is required.' });
+    return jsonResponse(400, {
+      error: 'A valid image artifact blobKey is required.',
+      ...createArtifactDebugFields(blobKey),
+    });
   }
 
+  let contentTypeSource: ContentTypeSource = 'missing';
+
   try {
-    const contentType = await resolveArtifactContentType(event, blobKey);
+    const resolvedContentType = await resolveArtifactContentType(event, blobKey);
+    const { contentType } = resolvedContentType;
+    contentTypeSource = resolvedContentType.source;
     if (!contentType) {
-      return jsonResponse(400, { error: 'A concrete image content type is required for this artifact.' });
+      return jsonResponse(400, {
+        error: 'A concrete image content type is required for this artifact.',
+        ...createArtifactDebugFields(blobKey, contentTypeSource),
+      });
     }
 
     const store = (await getArtifactBlobStore(event)) as BinaryReadableArtifactBlobStore;
     const bytes = await store.get(blobKey, { type: 'buffer' });
 
-    if (!bytes) return jsonResponse(404, { error: 'Image artifact was not found.' });
+    if (!bytes)
+      return jsonResponse(404, {
+        error: 'Image artifact was not found.',
+        ...createArtifactDebugFields(blobKey, contentTypeSource),
+      });
     if (typeof bytes === 'string')
-      return jsonResponse(500, { error: 'Image artifact returned text instead of bytes.' });
+      return jsonResponse(500, {
+        error: 'Image artifact returned text instead of bytes.',
+        ...createArtifactDebugFields(blobKey, contentTypeSource, { actualValueType: 'string' }),
+      });
 
     const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
 
@@ -170,6 +212,9 @@ export const handler = async (event: LambdaEvent) => {
   } catch (error) {
     console.error('Failed to read saved image artifact.', error);
 
-    return jsonResponse(500, { error: 'Saved image artifact could not be read.' });
+    return jsonResponse(500, {
+      error: 'Saved image artifact could not be read.',
+      ...createArtifactDebugFields(blobKey, contentTypeSource),
+    });
   }
 };

@@ -3722,9 +3722,49 @@ const metadata = {
         });
       };
 
-      const formatArtifactReselectionMessage = (references) => {
-        const names = references.map((reference) => shortenFilename(getArtifactImageName(reference), 24));
-        return `Image artifact${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}. Re-select or re-upload ${
+      const getArtifactFailureReference = (failure) => failure?.reference || failure;
+
+      const getAdminBlobImageFailureLabel = (status) => {
+        if (status === 400) return '400 bad request';
+        if (status === 401) return '401 auth failure';
+        if (status === 403) return '403 auth/authorization failure';
+        if (status === 404) return '404 artifact bytes missing';
+        if (status >= 500) return `${status} server/config failure`;
+        return `${status} HTTP failure`;
+      };
+
+      const formatAdminBlobImageFailureDetails = (payload) => {
+        const details = [
+          payload?.blobKey ? `blobKey=${payload.blobKey}` : '',
+          payload?.store ? `store=${payload.store}` : '',
+          payload?.lookup ? `lookup=${payload.lookup}` : '',
+          payload?.contentTypeSource ? `contentTypeSource=${payload.contentTypeSource}` : '',
+        ].filter(Boolean);
+
+        return details.length ? ` (${details.join(', ')})` : '';
+      };
+
+      const readAdminBlobImageFailure = async (response, reference) => {
+        const payload = await response
+          .clone()
+          .json()
+          .catch(() => ({}));
+        const name = shortenFilename(getArtifactImageName(reference), 24);
+        const label = getAdminBlobImageFailureLabel(response.status);
+        const serverMessage = payload?.error ? `: ${payload.error}` : '';
+        const debugDetails = formatAdminBlobImageFailureDetails(payload);
+
+        return `${name} — admin-get-blob-image returned ${label}${serverMessage}${debugDetails}`;
+      };
+
+      const formatArtifactReselectionMessage = (failures) => {
+        const names = failures.map((failure) =>
+          shortenFilename(getArtifactImageName(getArtifactFailureReference(failure)), 24)
+        );
+        const details = failures.map((failure) => failure?.failureMessage).filter(Boolean);
+        const detailMessage = details.length ? ` Details: ${details.join('; ')}.` : '';
+
+        return `Image artifact${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}.${detailMessage} Re-select or re-upload ${
           names.length === 1 ? 'this image' : 'these images'
         } before publishing.`;
       };
@@ -3740,19 +3780,31 @@ const metadata = {
           artifactReferences.map(async (reference) => {
             try {
               const response = await fetchArtifactPreviewResponse(reference, clerkToken);
-              if (!response.ok) throw new Error(`Image artifact could not be read (${response.status}).`);
+              if (!response.ok) {
+                return {
+                  reference,
+                  readable: false,
+                  failureMessage: await readAdminBlobImageFailure(response, reference),
+                };
+              }
               await response.blob();
               return { reference, readable: true };
             } catch (error) {
               console.warn(`${logContext} image artifact could not be read.`, error);
-              return { reference, readable: false };
+              return {
+                reference,
+                readable: false,
+                failureMessage: `${shortenFilename(getArtifactImageName(reference), 24)} — ${
+                  error instanceof Error ? error.message : 'admin-get-blob-image request failed'
+                }`,
+              };
             }
           })
         );
 
         return {
           readableReferences: results.filter((result) => result.readable).map((result) => result.reference),
-          failedReferences: results.filter((result) => !result.readable).map((result) => result.reference),
+          failedReferences: results.filter((result) => !result.readable),
         };
       };
 
