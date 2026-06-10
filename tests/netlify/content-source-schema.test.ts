@@ -310,6 +310,18 @@ test('create_request returns HTTP 400 when content_source discriminators are inv
   assert.ok(body.issues.some((issue: { path: string[] }) => issue.path.join('.') === 'schema_version'));
 });
 
+test('publication_status stays open while documenting first-party states separately from workflow_status', () => {
+  const futureStatusContentSource = {
+    ...validContentSourceV1,
+    publication: {
+      ...validContentSourceV1.publication,
+      publication_status: 'external_future_state',
+    },
+  };
+
+  assert.equal(validateContentSourceV1(futureStatusContentSource), true);
+});
+
 test('create_request returns HTTP 400 for invalid nested publication payloads', async () => {
   const response = await createWorkflow({
     ...validContentSourceV1,

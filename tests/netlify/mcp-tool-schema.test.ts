@@ -63,6 +63,11 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
   ]) {
     assert.ok(inputProperties[section], `Expected ${section} in content_source.v1 MCP schema.`);
   }
+
+  const publication = inputProperties.publication as Record<string, unknown>;
+  const publicationStatus = property(publication, 'publication_status') as { description?: string };
+  assert.match(String(publicationStatus.description), /Known first-party values are draft and ready/);
+  assert.match(String(publicationStatus.description), /published\/live\/scheduled are not currently publication_status values/);
 });
 
 test('content_source.v1 MCP schema describes high-value agent fields and controlled extensions', async () => {

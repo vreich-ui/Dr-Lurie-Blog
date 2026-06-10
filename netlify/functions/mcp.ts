@@ -39,6 +39,8 @@ const PROTOCOL_VERSION = '2025-06-18';
 const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'] as const;
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
+const PUBLICATION_STATUS_DESCRIPTION =
+  'Article payload status separate from workflow_status. Known first-party values are draft and ready; published/live/scheduled are not currently publication_status values. Use workflow_status: published after mark_published for the committed live article state.';
 
 const jsonHeaders = {
   'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id',
@@ -481,7 +483,7 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
     publication: objectSchema({
       schema_version: constStringSchema('publication.v1'),
-      publication_status: stringSchema('Publication status separate from workflow_status.'),
+      publication_status: stringSchema(PUBLICATION_STATUS_DESCRIPTION),
       publish_payload: publishPayloadJsonSchema,
     }),
     workflow: objectSchema({

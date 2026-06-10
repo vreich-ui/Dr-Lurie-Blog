@@ -160,6 +160,7 @@ Important agent-facing field descriptions:
 - `content.title`: working or final article title agents should use for the content source.
 - `editorial.draft_markdown`: Markdown draft body agents can pass between drafting, revision, and publishing steps.
 - `publication.publish_payload`: publication payload used by the publishing step; include `slug`, `title`, and article body fields when ready to publish.
+- `publication.publication_status`: article payload status, not the persisted workflow lifecycle. Known first-party values are `draft` (saved admin draft) and `ready` (payload is ready for publishing). The local contract does not currently define `published`, `live`, or `scheduled`; successful publication is tracked on the workflow record as `workflow_status: "published"` after `mark_published`.
 - `workflow.workflow_id`: workflow identifier agents should preserve across handoffs and backend workflow records.
 - `versioning.record_version`: content-source record version agents should increment or preserve for revision tracking.
 
@@ -194,7 +195,7 @@ Minimum sample backend request body:
 }
 ```
 
-Publication-ready sample fragment:
+Publication-ready sample fragment (use `ready`, not `published`/`live`/`scheduled`, for the article payload handoff):
 
 ```json
 {

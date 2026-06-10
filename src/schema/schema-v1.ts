@@ -4,6 +4,16 @@ import { z } from 'zod';
 export type AllowedAgentName = 'reader_insight' | 'research' | 'angle' | 'draft' | 'final_article';
 export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'published';
 
+export const KNOWN_PUBLICATION_STATUSES = {
+  draft: 'Saved admin draft; not publication-ready yet.',
+  ready: 'Final article payload is ready for the publishing step.',
+} as const;
+
+export type KnownPublicationStatus = keyof typeof KNOWN_PUBLICATION_STATUSES;
+
+export const publicationStatusDescription =
+  'Article payload status separate from workflow_status. Known first-party values are draft and ready; published/live/scheduled are not currently publication_status values. Use workflow_status: published after mark_published for the committed live article state.';
+
 export type AgentOutputEnvelope = {
   version: number; // agent output version (repo contract)
   updated_at: string; // ISO
@@ -258,7 +268,7 @@ export type ContentSourceV1 = {
 
   publication?: {
     schema_version?: 'publication.v1';
-    publication_status?: string; // keep separate from workflow_status
+    publication_status?: string; // open string; see publicationStatusDescription for first-party semantics
     publish_payload?: PublishPayload; // repo naming precedence
   };
 
@@ -608,7 +618,7 @@ export const contentSourceV1Schema = z
     publication: z
       .object({
         schema_version: z.literal('publication.v1').optional(),
-        publication_status: z.string().optional(),
+        publication_status: z.string().describe(publicationStatusDescription).optional(),
         publish_payload: publishPayloadSchema.optional(),
       })
       .strict()
