@@ -244,9 +244,11 @@ const replaceAllLiteral = (value: string, search: string, replacement: string) =
   search ? value.split(search).join(replacement) : value;
 
 const getArtifactReplacementValues = (reference: ArtifactReference) =>
-  [reference.blobKey, toStringValue((reference as { url?: unknown }).url)].filter((value): value is string =>
-    Boolean(value)
-  );
+  [
+    reference.blobKey,
+    (reference as PublishArtifactReference)[originalArtifactBlobKey],
+    toStringValue((reference as { url?: unknown }).url),
+  ].filter((value): value is string => Boolean(value));
 
 const getPublishedMediaDisplayPath = (mediaEntries: MediaEntry[], requestedPath: string | undefined) => {
   if (!requestedPath) return undefined;
@@ -274,6 +276,10 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
     );
   }, markdown);
 
+const originalArtifactBlobKey = Symbol('originalArtifactBlobKey');
+
+type PublishArtifactReference = ArtifactReference & { [originalArtifactBlobKey]?: string };
+
 const normalizeArtifactReferenceInputBlobKeys = (value: unknown) => {
   if (!Array.isArray(value)) return value;
 
@@ -282,7 +288,14 @@ const normalizeArtifactReferenceInputBlobKeys = (value: unknown) => {
     const record = reference as Record<string, unknown>;
     if (typeof record.blobKey !== 'string') return reference;
 
-    return { ...record, blobKey: normalizeArtifactBlobKey(record.blobKey) };
+    const normalizedBlobKey = normalizeArtifactBlobKey(record.blobKey);
+    const normalizedReference = { ...record, blobKey: normalizedBlobKey };
+
+    if (normalizedBlobKey !== record.blobKey) {
+      Object.defineProperty(normalizedReference, originalArtifactBlobKey, { value: record.blobKey });
+    }
+
+    return normalizedReference;
   });
 };
 
@@ -303,7 +316,11 @@ const readArtifactBytes = async (
   reference: ArtifactReference,
   filename: string
 ) => {
-  const reconciliation = await reconcileArtifactReference(reference, artifactStore, indexStore, { logger: console });
+  const originalBlobKey = (reference as PublishArtifactReference)[originalArtifactBlobKey];
+  const reconciliationReference = originalBlobKey ? { ...reference, blobKey: originalBlobKey } : reference;
+  const reconciliation = await reconcileArtifactReference(reconciliationReference, artifactStore, indexStore, {
+    logger: console,
+  });
 
   if (reconciliation.status === 'found') return reconciliation.bytes;
 
