@@ -280,7 +280,18 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   const body = await listTools();
   const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
 
-  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+  for (const name of [
+    'save_artifact',
+    'save_artifact_chunk',
+    'list_artifacts_for_request',
+    'list_artifacts_by_kind',
+    'list_artifacts_by_request',
+    'search_artifacts',
+    'soft_delete_artifact',
+    'restore_artifact',
+    'migrate_artifact_indexes',
+    'reconcile_artifact_indexes',
+  ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
   }
 
@@ -288,6 +299,19 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
   assert.ok(property(saveArtifact.inputSchema, 'payload'));
   assert.ok(property(saveArtifact.inputSchema, 'metadata'));
+  assert.equal(property(saveArtifact.inputSchema, 'label').maxLength, 120);
+  assert.equal(property(saveArtifact.inputSchema, 'tags').maxItems, 20);
+  assert.equal((property(saveArtifact.inputSchema, 'tags').items as { maxLength: number }).maxLength, 40);
+  assert.deepEqual((property(saveArtifact.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
+    'image',
+    'pdf',
+    'video',
+    'doc',
+    'audio',
+    'data',
+    'attachment',
+    'other',
+  ]);
   assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSizeBytes'), {
     type: 'integer',
     minimum: 0,
@@ -317,6 +341,18 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'chunkIndex',
     'totalChunks',
     'payload',
+  ]);
+  assert.equal(property(saveChunk.inputSchema, 'label').maxLength, 120);
+  assert.equal(property(saveChunk.inputSchema, 'tags').maxItems, 20);
+  assert.deepEqual((property(saveChunk.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
+    'image',
+    'pdf',
+    'video',
+    'doc',
+    'audio',
+    'data',
+    'attachment',
+    'other',
   ]);
   assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
   assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
@@ -353,7 +389,65 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     /does not read or write artifact bytes/i
   );
 
-  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+  const listByKind = tools.get('list_artifacts_by_kind')!;
+  assert.deepEqual(listByKind.inputSchema.required, ['artifactKind']);
+  assert.ok(property(listByKind.inputSchema, 'limit'));
+  assert.ok(property(listByKind.inputSchema, 'cursor'));
+  assert.ok(property(listByKind.inputSchema, 'includeDeleted'));
+  assert.match(String((listByKind as { description?: string }).description), /Admin-only/);
+
+  const listByRequest = tools.get('list_artifacts_by_request')!;
+  assert.deepEqual(listByRequest.inputSchema.required, ['requestId']);
+  assert.ok(property(listByRequest.inputSchema, 'artifactKind'));
+  assert.ok(property(listByRequest.inputSchema, 'includeDeleted'));
+
+  const searchArtifacts = tools.get('search_artifacts')!;
+  assert.ok(property(searchArtifacts.inputSchema, 'tag'));
+  assert.ok(property(searchArtifacts.inputSchema, 'createdAfter'));
+  assert.ok(property(searchArtifacts.inputSchema, 'createdBefore'));
+  assert.match(String((searchArtifacts as { description?: string }).description), /prefix indexes/);
+  assert.ok(property(searchArtifacts.inputSchema, 'includeDeleted'));
+
+  const softDeleteArtifact = tools.get('soft_delete_artifact')!;
+  assert.deepEqual(softDeleteArtifact.inputSchema.required, ['requestId', 'sha256']);
+  assert.ok(property(softDeleteArtifact.inputSchema, 'deletedBy'));
+  assert.match(String((softDeleteArtifact as { description?: string }).description), /soft delete/i);
+
+  const restoreArtifact = tools.get('restore_artifact')!;
+  assert.deepEqual(restoreArtifact.inputSchema.required, ['requestId', 'sha256']);
+  assert.match(String((restoreArtifact as { description?: string }).description), /restore/i);
+
+  const migrateArtifacts = tools.get('migrate_artifact_indexes')!;
+  assert.ok(property(migrateArtifacts.inputSchema, 'cursor'));
+  assert.ok(property(migrateArtifacts.inputSchema, 'limit'));
+  assert.ok(property(migrateArtifacts.inputSchema, 'dryRun'));
+  assert.match(String((migrateArtifacts as { description?: string }).description), /one-time artifact-index migration/);
+
+  const reconcileArtifacts = tools.get('reconcile_artifact_indexes')!;
+  assert.ok(property(reconcileArtifacts.inputSchema, 'requestId'));
+  assert.ok(property(reconcileArtifacts.inputSchema, 'artifactKind'));
+  assert.ok(property(reconcileArtifacts.inputSchema, 'limit'));
+  assert.match(
+    String((reconcileArtifacts as { description?: string }).description),
+    /Admin-only artifact-index correction job/
+  );
+  assert.match(
+    String((reconcileArtifacts as { description?: string }).description),
+    /corrects stale artifact-index blobKey values/
+  );
+
+  for (const name of [
+    'save_artifact',
+    'save_artifact_chunk',
+    'list_artifacts_for_request',
+    'list_artifacts_by_kind',
+    'list_artifacts_by_request',
+    'search_artifacts',
+    'soft_delete_artifact',
+    'restore_artifact',
+    'migrate_artifact_indexes',
+    'reconcile_artifact_indexes',
+  ]) {
     const serialized = JSON.stringify(tools.get(name));
 
     assert.equal(serialized.includes('NETLIFY_PUBLISH_SECRET'), false);

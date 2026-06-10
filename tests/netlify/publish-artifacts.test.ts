@@ -272,6 +272,102 @@ test('publish-article rewrites saved artifact blob keys before committing markdo
   }
 });
 
+test('publish-article normalizes stale artifact blobKeys and corrects the artifact index', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'feature/reconcile-artifact-paths';
+
+  const requestId = `artifact-reconcile-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const artifactBytes = Buffer.from('artifact reconcile bytes');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'reconcile.png',
+    encoding: 'base64',
+    payload: artifactBytes.toString('base64'),
+    metadata: { filename: 'Reconciled Hero.PNG' },
+  });
+  const artifact = upload.artifact as Record<string, string | number>;
+  const staleBlobKey = `artifacts/${artifact.blobKey}`;
+  const { getArtifactIndexBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const indexStore = await getArtifactIndexBlobStore({});
+  await indexStore.setJSON(`request-artifacts/${encodeURIComponent(requestId)}/${artifact.sha256}.json`, {
+    ...upload.artifact,
+    blobKey: staleBlobKey,
+  });
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/artifact-reconcile-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/feature%2Freconcile-artifact-paths')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/feature%2Freconcile-artifact-paths') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'artifact-reconcile-test',
+        title: 'Artifact Reconcile Test',
+        markdown: `![Hero](${staleBlobKey})`,
+        featuredImage: staleBlobKey,
+        artifactReferences: [{ ...upload.artifact, blobKey: staleBlobKey }],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.match(blobWrites[0]?.content, /~\/assets\/images\/uploads\/artifact-reconcile-test\/reconciled-hero.png/);
+    assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
+    const correctedIndex = JSON.parse(
+      (await indexStore.get(`request-artifacts/${encodeURIComponent(requestId)}/${artifact.sha256}.json`)) || '{}'
+    ) as { blobKey?: string };
+    assert.equal(correctedIndex.blobKey, artifact.blobKey);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article reports stale saved image references instead of a generic 500', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;

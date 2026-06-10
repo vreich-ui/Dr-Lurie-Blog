@@ -81,24 +81,24 @@ test('admin publish JSON import filters unreadable artifact references before se
   assert.ok(awaitApplyIndex > warningIndex, 'JSON load should await asynchronous artifact validation.');
 });
 
-test('admin publish image picker lists all saved blob images instead of scoping to a workflow request', async () => {
+test('admin publish image picker uses MCP artifact browse filters and current request defaults', async () => {
   const source = await readPublishPage();
   const loadIndex = indexAfter(source, 'const loadBlobImageChoices = async () =>', 0);
-  const tokenIndex = indexAfter(source, 'const token = await getClerkSessionToken();', loadIndex);
-  const fetchIndex = indexAfter(
-    source,
-    "const response = await fetch('/.netlify/functions/admin-list-blob-images', {",
-    tokenIndex
-  );
-  const renderIndex = indexAfter(source, 'renderBlobImageChoices(availableBlobImageArtifacts);', fetchIndex);
+  const mcpIndex = indexAfter(source, "loadAllArtifactBrowsePages('list_artifacts_by_request'", 0);
+  const fallbackIndex = indexAfter(source, "loadAllArtifactBrowsePages('list_artifacts_by_kind'", 0);
+  const searchIndex = indexAfter(source, "loadAllArtifactBrowsePages('search_artifacts'", 0);
+  const currentRequestIndex = indexAfter(source, 'value="current" selected>Current draft/request', 0);
+  const imageKindIndex = indexAfter(source, 'value="image" selected>Image', 0);
+  const sortIndex = indexAfter(source, 'sortArtifactsByCreatedDesc', 0);
+  const renderIndex = indexAfter(source, 'renderBlobImageChoices(availableBlobImageArtifacts);', loadIndex);
 
-  assert.equal(
-    source.includes('admin-list-blob-images?requestId='),
-    false,
-    'Image picker should not limit the saved image list to the checked-out workflow request.'
-  );
-  assert.ok(fetchIndex > tokenIndex, 'Image picker should fetch the global saved image artifact list.');
-  assert.ok(renderIndex > fetchIndex, 'Image picker should render the global saved image artifact list response.');
+  assert.ok(mcpIndex > 0, 'Image picker should use the MCP request-scoped artifact browsing tool.');
+  assert.ok(fallbackIndex > 0, 'Image picker should use the MCP kind browsing tool.');
+  assert.ok(searchIndex > 0, 'Image picker should use the MCP tag search tool for search assistance.');
+  assert.ok(currentRequestIndex > 0, 'Request filter should default to the current draft/request.');
+  assert.ok(imageKindIndex > 0, 'Artifact kind filter should default to image.');
+  assert.ok(sortIndex > 0, 'Image picker should sort artifacts by createdAtISO descending.');
+  assert.ok(renderIndex > loadIndex, 'Image picker should render the filtered artifact list response.');
 });
 
 test('admin publish payload omits stale existing featured paths for selected publishable images', async () => {
