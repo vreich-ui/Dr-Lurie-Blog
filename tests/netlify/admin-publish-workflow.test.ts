@@ -80,3 +80,22 @@ test('admin publish JSON import filters unreadable artifact references before se
   assert.ok(warningIndex > selectedIndex, 'Unreadable imported artifact references should produce a user warning.');
   assert.ok(awaitApplyIndex > warningIndex, 'JSON load should await asynchronous artifact validation.');
 });
+
+test('admin publish image picker scopes blob image list to checked-out workflow request when available', async () => {
+  const source = await readPublishPage();
+  const loadIndex = indexAfter(source, 'const loadBlobImageChoices = async () =>', 0);
+  const tokenIndex = indexAfter(source, 'const token = await getClerkSessionToken();', loadIndex);
+  const requestIdIndex = indexAfter(source, 'const { requestId } = getCheckedOutWorkflowDraft();', tokenIndex);
+  const scopedUrlIndex = indexAfter(
+    source,
+    '? `/.netlify/functions/admin-list-blob-images?requestId=${encodeURIComponent(requestId)}`',
+    requestIdIndex
+  );
+  const fallbackUrlIndex = indexAfter(source, ": '/.netlify/functions/admin-list-blob-images';", scopedUrlIndex);
+  const fetchIndex = indexAfter(source, 'const response = await fetch(blobImageListUrl, {', fallbackUrlIndex);
+
+  assert.ok(requestIdIndex > tokenIndex, 'Image picker should read the checked-out workflow request id.');
+  assert.ok(scopedUrlIndex > requestIdIndex, 'Image picker should pass requestId when one is available.');
+  assert.ok(fallbackUrlIndex > scopedUrlIndex, 'Global image listing should remain only as the no-request fallback.');
+  assert.ok(fetchIndex > fallbackUrlIndex, 'Image picker should fetch the computed scoped-or-fallback URL.');
+});

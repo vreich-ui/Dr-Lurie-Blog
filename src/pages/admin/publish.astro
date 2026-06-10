@@ -4977,7 +4977,11 @@ const metadata = {
 
         try {
           const token = await getClerkSessionToken();
-          const response = await fetch('/.netlify/functions/admin-list-blob-images', {
+          const { requestId } = getCheckedOutWorkflowDraft();
+          const blobImageListUrl = requestId
+            ? `/.netlify/functions/admin-list-blob-images?requestId=${encodeURIComponent(requestId)}`
+            : '/.netlify/functions/admin-list-blob-images';
+          const response = await fetch(blobImageListUrl, {
             method: 'GET',
             headers: {
               Authorization: `Bearer ${token}`,
