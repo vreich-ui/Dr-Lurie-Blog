@@ -75,7 +75,7 @@ metadata:
 title: "Retinol Recovery Rules: When to Pause, Restart, or Scale Back"
 publishDate: 2026-06-10T09:46:00.000Z
 excerpt: "Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset."
-image: "~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back/1702301bdb91f2dcb328ca183d6a52b99c63dbb8f76407ff4e4a6b1223707d97.jpg"
+image: "~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy/req_retinol-recovery-rules-20260608-001-b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg"
 category: "Ingredients "
 tags:
   - "retinol"
@@ -224,7 +224,7 @@ metadata:
 title: "Retinol Recovery Rules: When to Pause, Restart, or Scale Back"
 publishDate: 2026-06-09T08:58:00.000Z
 excerpt: "Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset."
-image: "~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back/~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy/req_retinol-recovery-rules-20260608-001-b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg"
+image: "~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back/~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back/b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg"
 tags:
   - "retinol"
   - "retinoids"
@@ -292,7 +292,7 @@ The easiest way to make retinol harder to tolerate is to combine it with too man
 
 This is especially important for people with eczema, rosacea, very sensitive skin, a history of contact dermatitis, or a recently damaged skin barrier. In those situations, the better move may be a slower schedule or medical advice before restarting.
 
-![Unbranded retinol bottle, moisturizer, sunscreen, and a simple dot calendar arranged on a neutral bathroom surface.](image/req_retinol-recovery-rules-20260608-001/1702301bdb91f2dcb328ca183d6a52b99c63dbb8f76407ff4e4a6b1223707d97.jpg)
+![Unbranded retinol bottle, moisturizer, sunscreen, and a simple dot calendar arranged on a neutral bathroom surface.](~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy/req_retinol-recovery-rules-20260608-001-b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg)
 
 ## A Gentler Restart Plan
 
