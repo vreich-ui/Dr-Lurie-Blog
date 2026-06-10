@@ -280,7 +280,14 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   const body = await listTools();
   const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
 
-  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+  for (const name of [
+    'save_artifact',
+    'save_artifact_chunk',
+    'list_artifacts_for_request',
+    'list_artifacts_by_kind',
+    'list_artifacts_by_request',
+    'search_artifacts',
+  ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
   }
 
@@ -378,7 +385,30 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     /does not read or write artifact bytes/i
   );
 
-  for (const name of ['save_artifact', 'save_artifact_chunk', 'list_artifacts_for_request']) {
+  const listByKind = tools.get('list_artifacts_by_kind')!;
+  assert.deepEqual(listByKind.inputSchema.required, ['artifactKind']);
+  assert.ok(property(listByKind.inputSchema, 'limit'));
+  assert.ok(property(listByKind.inputSchema, 'cursor'));
+  assert.match(String((listByKind as { description?: string }).description), /Admin-only/);
+
+  const listByRequest = tools.get('list_artifacts_by_request')!;
+  assert.deepEqual(listByRequest.inputSchema.required, ['requestId']);
+  assert.ok(property(listByRequest.inputSchema, 'artifactKind'));
+
+  const searchArtifacts = tools.get('search_artifacts')!;
+  assert.ok(property(searchArtifacts.inputSchema, 'tag'));
+  assert.ok(property(searchArtifacts.inputSchema, 'createdAfter'));
+  assert.ok(property(searchArtifacts.inputSchema, 'createdBefore'));
+  assert.match(String((searchArtifacts as { description?: string }).description), /prefix indexes/);
+
+  for (const name of [
+    'save_artifact',
+    'save_artifact_chunk',
+    'list_artifacts_for_request',
+    'list_artifacts_by_kind',
+    'list_artifacts_by_request',
+    'search_artifacts',
+  ]) {
     const serialized = JSON.stringify(tools.get(name));
 
     assert.equal(serialized.includes('NETLIFY_PUBLISH_SECRET'), false);

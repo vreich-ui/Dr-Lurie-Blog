@@ -65,6 +65,34 @@ test('MCP handler returns a server error when request handling fails after parsi
   }
 });
 
+test('admin artifact browsing MCP tools require admin authentication', async () => {
+  const previousClerkSecret = process.env.CLERK_SECRET_KEY;
+  delete process.env.CLERK_SECRET_KEY;
+
+  try {
+    const response = await handler({
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'list_artifacts_by_kind', arguments: { artifactKind: 'image' } },
+      }),
+    });
+    const body = JSON.parse(response.body) as {
+      result: { isError: boolean; structuredContent: { error: string } };
+    };
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(body.result.isError, true);
+    assert.match(body.result.structuredContent.error, /Clerk session token|required/i);
+  } finally {
+    if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY;
+    else process.env.CLERK_SECRET_KEY = previousClerkSecret;
+  }
+});
+
 test('MCP tools/call preserves structured tool errors from save-json-blob JSON responses', async () => {
   const previousPublishSecret = process.env.NETLIFY_PUBLISH_SECRET;
   const previousFallbackSecret = process.env.PUBLISH_SECRET;
