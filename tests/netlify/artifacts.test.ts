@@ -7,6 +7,7 @@ import {
   createArtifactReference,
   getArtifactReferenceIssue,
   isArtifactReference,
+  type ArtifactReference,
   type ReadableArtifactBlobStore,
 } from '../../netlify/lib/artifacts.js';
 import { sha256Hex } from '../../netlify/lib/crypto.js';
@@ -170,6 +171,28 @@ test('reconcileImageArtifactReference reads a valid reference with valid blob by
   assert.equal(result.status, 'found');
   assert.equal(result.blobKey, reference.blobKey);
   assert.equal(result.status === 'found' ? result.bytes.toString() : '', 'image bytes');
+});
+
+test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact-index JSON', async () => {
+  const reference = makeImageReference('normalized-stale-reference');
+  const staleReference = { ...reference, blobKey: `artifacts/${reference.blobKey}` } as ArtifactReference;
+  const { store } = createFakeArtifactStore({ [reference.blobKey]: Buffer.from('normalized bytes') });
+  const { values, store: indexStore } = createFakeIndexStore();
+  const loggedCorrections: unknown[] = [];
+  const { reconcileArtifactReference } = await import('../../netlify/lib/artifacts.js');
+
+  const result = await reconcileArtifactReference(staleReference, store, indexStore, {
+    logger: { warn: (...args: unknown[]) => loggedCorrections.push(args) },
+  });
+
+  assert.equal(result.status, 'found');
+  assert.equal(result.blobKey, reference.blobKey);
+  assert.equal(result.status === 'found' ? result.correctedBlobKey : '', reference.blobKey);
+  assert.deepEqual(values.get(`request-artifacts/normalized-stale-reference/${reference.sha256}.json`), {
+    ...reference,
+    blobKey: reference.blobKey,
+  });
+  assert.equal(loggedCorrections.length, 1);
 });
 
 test('reconcileImageArtifactReference reads from stores that only support arrayBuffer binary reads', async () => {

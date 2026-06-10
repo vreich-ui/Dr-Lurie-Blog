@@ -2,7 +2,8 @@ import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import {
-  reconcileImageArtifactReference,
+  normalizeArtifactBlobKey,
+  reconcileArtifactReference,
   requireArtifactReferenceArray,
   type ArtifactReference,
 } from '../lib/artifacts.js';
@@ -273,9 +274,21 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
     );
   }, markdown);
 
+const normalizeArtifactReferenceInputBlobKeys = (value: unknown) => {
+  if (!Array.isArray(value)) return value;
+
+  return value.map((reference) => {
+    if (!reference || typeof reference !== 'object' || Array.isArray(reference)) return reference;
+    const record = reference as Record<string, unknown>;
+    if (typeof record.blobKey !== 'string') return reference;
+
+    return { ...record, blobKey: normalizeArtifactBlobKey(record.blobKey) };
+  });
+};
+
 const normalizeArtifactReferences = (value: unknown): ArtifactReference[] => {
   try {
-    return requireArtifactReferenceArray(value);
+    return requireArtifactReferenceArray(normalizeArtifactReferenceInputBlobKeys(value));
   } catch (error) {
     throw new PublishError(400, error instanceof Error ? error.message : 'Invalid artifactReferences.');
   }
@@ -290,7 +303,7 @@ const readArtifactBytes = async (
   reference: ArtifactReference,
   filename: string
 ) => {
-  const reconciliation = await reconcileImageArtifactReference(reference, artifactStore, indexStore);
+  const reconciliation = await reconcileArtifactReference(reference, artifactStore, indexStore, { logger: console });
 
   if (reconciliation.status === 'found') return reconciliation.bytes;
 

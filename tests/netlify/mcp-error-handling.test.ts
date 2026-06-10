@@ -65,7 +65,7 @@ test('MCP handler returns a server error when request handling fails after parsi
   }
 });
 
-test('admin artifact browsing MCP tools require admin authentication', async () => {
+test('admin artifact browsing and reconciliation MCP tools require admin authentication', async () => {
   const previousClerkSecret = process.env.CLERK_SECRET_KEY;
   delete process.env.CLERK_SECRET_KEY;
 
@@ -77,7 +77,7 @@ test('admin artifact browsing MCP tools require admin authentication', async () 
         jsonrpc: '2.0',
         id: 1,
         method: 'tools/call',
-        params: { name: 'list_artifacts_by_kind', arguments: { artifactKind: 'image' } },
+        params: { name: 'reconcile_artifact_indexes', arguments: { artifactKind: 'image' } },
       }),
     });
     const body = JSON.parse(response.body) as {

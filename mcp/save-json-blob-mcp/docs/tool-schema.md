@@ -70,6 +70,7 @@ Registered core tool names:
 - `list_artifacts_by_kind` (admin-only)
 - `list_artifacts_by_request` (admin-only)
 - `search_artifacts` (admin-only)
+- `reconcile_artifact_indexes` (admin-only)
 - `ping`
 
 ## Artifact tools
@@ -136,8 +137,9 @@ These tools require Clerk admin authentication and browse compact artifact-index
 - `list_artifacts_by_kind({ artifactKind, limit?, cursor? })` lists `by-kind/{artifactKind}/` pointers.
 - `list_artifacts_by_request({ requestId, artifactKind?, limit?, cursor? })` lists `by-request/{requestId}/` pointers, optionally scoped by kind.
 - `search_artifacts({ tag?, createdAfter?, createdBefore?, limit?, cursor? })` lists `by-tag/{tag}/` when a tag is provided, otherwise by-kind pointer prefixes, and applies optional `createdAtISO` bounds after resolving references.
+- `reconcile_artifact_indexes({ requestId?, artifactKind?, limit? })` scans `request-artifacts/` JSON references, normalizes stale `blobKey` values, verifies backing artifact bytes, and corrects artifact-index JSON when one matching blob is found.
 
-Results include `artifacts`, `limit`, `cursor`, and `nextCursor`.
+Browse results include `artifacts`, `limit`, `cursor`, and `nextCursor`. Reconciliation results include compact scan/correction counts plus per-reference diagnostics.
 
 ### `save_json_blob_create_request`
 

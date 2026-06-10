@@ -4,9 +4,17 @@ import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { getBlobListItems } from '../lib/blob-list.js';
-import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { artifactKindValues, artifactReferenceLimits, safePathSegment } from '../lib/artifacts.js';
+import {
+  artifactKindValues,
+  artifactReferenceLimits,
+  isArtifactReference,
+  normalizeArtifactBlobKey,
+  reconcileArtifactReference,
+  safePathSegment,
+  type ArtifactReference,
+} from '../lib/artifacts.js';
 
 type LambdaEvent = {
   blobs?: string;
@@ -317,6 +325,12 @@ const artifactListLimitJsonSchema = {
 const artifactListCursorJsonSchema = stringSchema(
   'Optional opaque pagination cursor returned by a previous list call.'
 );
+const artifactReconcileLimitJsonSchema = {
+  type: 'integer',
+  minimum: 1,
+  maximum: ARTIFACT_LIST_MAX_LIMIT,
+  description: `Optional maximum number of artifact-index JSON references to reconcile; defaults to ${ARTIFACT_LIST_DEFAULT_LIMIT}, max ${ARTIFACT_LIST_MAX_LIMIT}.`,
+};
 const artifactSearchTagJsonSchema = {
   type: 'string',
   minLength: 1,
@@ -903,6 +917,16 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     }),
   },
   {
+    name: 'reconcile_artifact_indexes',
+    description:
+      'Admin-only artifact-index correction job. Reads request-artifacts JSON references, normalizes blobKeys, checks artifact bytes, corrects stale artifact-index blobKey values when a single matching blob is found, and returns compact correction diagnostics.',
+    inputSchema: objectSchema({
+      requestId: stringSchema('Optional workflow request id to reconcile; omit to scan request-artifacts by prefix.'),
+      artifactKind: artifactKindJsonSchema('Optional artifact kind to reconcile after reading request-artifacts JSON.'),
+      limit: artifactReconcileLimitJsonSchema,
+    }),
+  },
+  {
     name: 'ping',
     description: 'Diagnostic tool that confirms the MCP server is reachable.',
     inputSchema: objectSchema({}),
@@ -1274,6 +1298,7 @@ const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown
 };
 
 type ArtifactIndexStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>>;
+type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
 
 type ArtifactBrowseOptions = {
   createdAfter?: Date;
@@ -1322,6 +1347,83 @@ const loadArtifactsFromPrefix = async (store: ArtifactIndexStore, prefix: string
   const keys = await listPointerKeys(store, [prefix]);
 
   return Promise.all(keys.map((key) => parseJsonBlob(store, key)));
+};
+
+const loadArtifactIndexKeysFromPrefix = async (store: ArtifactIndexStore, prefix: string, limit: number) => {
+  const keys = await listPointerKeys(store, [prefix]);
+
+  return keys.slice(0, limit);
+};
+
+const normalizeArtifactReconcileLimit = (limit: unknown) => {
+  if (limit === undefined || limit === null) return { ok: true as const, value: ARTIFACT_LIST_DEFAULT_LIMIT };
+  if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > ARTIFACT_LIST_MAX_LIMIT) {
+    return { ok: false as const, error: `limit must be an integer from 1 to ${ARTIFACT_LIST_MAX_LIMIT}.` };
+  }
+
+  return { ok: true as const, value: limit as number };
+};
+
+const normalizeIndexedArtifactReference = (value: unknown) => {
+  const record = getRecordValue(value);
+  const originalBlobKey = toNonEmptyString(record?.blobKey);
+  if (!record || !originalBlobKey) return undefined;
+
+  const normalized = { ...record, blobKey: normalizeArtifactBlobKey(originalBlobKey) };
+  if (!isArtifactReference(normalized)) return undefined;
+
+  return { originalBlobKey, reference: { ...normalized, blobKey: originalBlobKey } as ArtifactReference };
+};
+
+const getArtifactKindFromBlobKey = (blobKey: string) => normalizeArtifactBlobKey(blobKey).split('/')[0] || '';
+
+const summarizeArtifactReconciliation = (
+  indexKey: string,
+  reference: ArtifactReference,
+  result: Awaited<ReturnType<typeof reconcileArtifactReference>>
+) => ({
+  indexKey,
+  sha256: reference.sha256,
+  previousBlobKey: reference.blobKey,
+  status: result.status,
+  blobKey: result.blobKey,
+  ...(result.status === 'found' && result.correctedBlobKey ? { correctedBlobKey: result.correctedBlobKey } : {}),
+  ...(result.status === 'missing'
+    ? { exactFilenameExists: result.exactFilenameExists, nearbyCount: result.nearbyKeys.length }
+    : {}),
+  ...(result.status === 'ambiguous' ? { matchingKeys: result.matchingKeys } : {}),
+});
+
+type ArtifactReconciliationSummary = ReturnType<typeof summarizeArtifactReconciliation>;
+
+const reconcileArtifactIndexKeys = async (
+  artifactStore: ArtifactBlobStore,
+  indexStore: ArtifactIndexStore,
+  keys: string[],
+  artifactKind?: string
+) => {
+  const results: ArtifactReconciliationSummary[] = [];
+  let skipped = 0;
+
+  for (const indexKey of keys) {
+    const normalized = normalizeIndexedArtifactReference(await parseJsonBlob(indexStore, indexKey));
+    if (!normalized) {
+      skipped += 1;
+      continue;
+    }
+
+    if (artifactKind && getArtifactKindFromBlobKey(normalized.reference.blobKey) !== artifactKind) {
+      skipped += 1;
+      continue;
+    }
+
+    const result = await reconcileArtifactReference(normalized.reference, artifactStore, indexStore, {
+      logger: console,
+    });
+    results.push(summarizeArtifactReconciliation(indexKey, normalized.reference, result));
+  }
+
+  return { results, skipped };
 };
 
 const normalizeArtifactBrowseLimit = (limit: unknown) => {
@@ -1507,6 +1609,44 @@ const searchArtifacts = async (event: LambdaEvent, input: Record<string, unknown
   return listArtifactsFromPointerPrefixes(event, prefixes, options);
 };
 
+const reconcileArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const artifactKind = normalizeArtifactKindInput(input.artifactKind, false);
+  if (!artifactKind.ok) return toolError(artifactKind.error);
+
+  const limit = normalizeArtifactReconcileLimit(input.limit);
+  if (!limit.ok) return toolError(limit.error);
+
+  const requestId = toNonEmptyString(input.requestId);
+  const prefix = requestId ? `request-artifacts/${encodeURIComponent(requestId)}/` : 'request-artifacts/';
+  const indexStore = await getArtifactIndexBlobStore(event);
+  const artifactStore = await getArtifactBlobStore(event);
+  const keys = await loadArtifactIndexKeysFromPrefix(indexStore, prefix, limit.value);
+  const { results, skipped } = await reconcileArtifactIndexKeys(
+    artifactStore,
+    indexStore,
+    keys,
+    artifactKind.artifactKind
+  );
+  const corrected = results.filter((result) => 'correctedBlobKey' in result).length;
+  const found = results.filter((result) => result.status === 'found').length;
+  const missing = results.filter((result) => result.status === 'missing').length;
+  const ambiguous = results.filter((result) => result.status === 'ambiguous').length;
+
+  return toolResult({
+    scanned: keys.length,
+    reconciled: results.length,
+    corrected,
+    found,
+    missing,
+    ambiguous,
+    skipped,
+    results,
+  });
+};
+
 const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
   const input = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
 
@@ -1628,6 +1768,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return listArtifactsByRequest(event, input);
     case 'search_artifacts':
       return searchArtifacts(event, input);
+    case 'reconcile_artifact_indexes':
+      return reconcileArtifactIndexes(event, input);
     case 'save_json_blob_patch_agent_output':
       return callNormalizedAction(
         event,

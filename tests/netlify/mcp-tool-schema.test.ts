@@ -287,6 +287,7 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
     'search_artifacts',
+    'reconcile_artifact_indexes',
   ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
   }
@@ -401,6 +402,19 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.ok(property(searchArtifacts.inputSchema, 'createdBefore'));
   assert.match(String((searchArtifacts as { description?: string }).description), /prefix indexes/);
 
+  const reconcileArtifacts = tools.get('reconcile_artifact_indexes')!;
+  assert.ok(property(reconcileArtifacts.inputSchema, 'requestId'));
+  assert.ok(property(reconcileArtifacts.inputSchema, 'artifactKind'));
+  assert.ok(property(reconcileArtifacts.inputSchema, 'limit'));
+  assert.match(
+    String((reconcileArtifacts as { description?: string }).description),
+    /Admin-only artifact-index correction job/
+  );
+  assert.match(
+    String((reconcileArtifacts as { description?: string }).description),
+    /corrects stale artifact-index blobKey values/
+  );
+
   for (const name of [
     'save_artifact',
     'save_artifact_chunk',
@@ -408,6 +422,7 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
     'search_artifacts',
+    'reconcile_artifact_indexes',
   ]) {
     const serialized = JSON.stringify(tools.get(name));
 

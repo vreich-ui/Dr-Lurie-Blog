@@ -51,14 +51,20 @@ export type WritableArtifactIndexStore = {
   setJSON?: (key: string, value: unknown, options?: { metadata?: Record<string, string> }) => Promise<unknown>;
 };
 
-export type ImageArtifactReconciliationResult =
+export type ArtifactReconciliationLogger = {
+  warn?: (message?: unknown, ...optionalParams: unknown[]) => void;
+};
+
+export type ArtifactReconciliationResult =
   | { status: 'found'; blobKey: string; bytes: Buffer; correctedBlobKey?: string; nearbyKeys: string[] }
   | { status: 'missing'; blobKey: string; nearbyKeys: string[]; exactFilenameExists: boolean }
   | { status: 'ambiguous'; blobKey: string; matchingKeys: string[]; nearbyKeys: string[] };
 
+export type ImageArtifactReconciliationResult = ArtifactReconciliationResult;
+
 const imageExtensionFallbacks = new Set(['jpg', 'jpeg', 'png', 'webp']);
 
-const normalizeArtifactBlobKey = (blobKey: string) =>
+export const normalizeArtifactBlobKey = (blobKey: string) =>
   blobKey
     .trim()
     .replace(/^\/+/, '')
@@ -93,7 +99,7 @@ const tryReadArtifactBytes = async (store: ReadableArtifactBlobStore, key: strin
 
 const uniqueValues = <T>(values: T[]) => [...new Set(values)];
 
-const listImageArtifactKeysForPrefixes = async (store: ReadableArtifactBlobStore, prefixes: string[]) => {
+const listArtifactKeysForPrefixes = async (store: ReadableArtifactBlobStore, prefixes: string[]) => {
   if (typeof store.list !== 'function') return [];
 
   const keys: string[] = [];
@@ -115,18 +121,24 @@ const getNearbyImageArtifactKeys = async (store: ReadableArtifactBlobStore, norm
   const prefix = getBlobKeyPrefix(normalizedBlobKey);
   if (!prefix) return [];
 
-  return listImageArtifactKeysForPrefixes(store, [prefix, `artifacts/${prefix}`, `/${prefix}`]);
+  return listArtifactKeysForPrefixes(store, [prefix, `artifacts/${prefix}`, `/${prefix}`]);
 };
 
-const getGlobalImageArtifactKeys = async (store: ReadableArtifactBlobStore) => {
-  return listImageArtifactKeysForPrefixes(store, ['image/', 'artifacts/image/', '/image/']);
+const getGlobalArtifactKeys = async (store: ReadableArtifactBlobStore, normalizedBlobKey: string) => {
+  const [artifactKind] = normalizedBlobKey.split('/');
+  const kinds = artifactKindSet.has(artifactKind as ArtifactKind) ? [artifactKind] : artifactKindValues;
+
+  return listArtifactKeysForPrefixes(
+    store,
+    kinds.flatMap((kind) => [`${kind}/`, `artifacts/${kind}/`, `/${kind}/`])
+  );
 };
 
 const getExtension = (filename: string) => filename.split('.').pop()?.toLowerCase() || '';
 
 const stripExtension = (filename: string) => filename.replace(/\.[^.]+$/, '');
 
-const getImageArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: string) => {
+const getArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: string) => {
   const expectedFilename = basename(normalizedBlobKey);
   const expectedStem = stripExtension(expectedFilename);
 
@@ -142,10 +154,13 @@ const getImageArtifactKeyMatches = (nearbyKeys: string[], normalizedBlobKey: str
   });
 };
 
+const getRequestIdFromArtifactBlobKey = (blobKey: string) => normalizeArtifactBlobKey(blobKey).split('/')[1] || '';
+
 const maybeUpdateArtifactIndexReference = async (
   indexStore: WritableArtifactIndexStore | undefined,
   reference: ArtifactReference,
-  correctedBlobKey: string
+  correctedBlobKey: string,
+  logger?: ArtifactReconciliationLogger
 ) => {
   const indexBlobKey = normalizeArtifactBlobKey(correctedBlobKey);
   if (
@@ -153,23 +168,36 @@ const maybeUpdateArtifactIndexReference = async (
     indexBlobKey === reference.blobKey ||
     !isValidArtifactBlobKey(indexBlobKey, reference.sha256)
   ) {
-    return;
+    return false;
   }
 
-  const [, requestId = ''] = indexBlobKey.split('/');
-  if (!requestId) return;
+  const correctedRequestId = getRequestIdFromArtifactBlobKey(indexBlobKey);
+  if (!correctedRequestId) return false;
 
-  await indexStore.setJSON(
-    requestArtifactIndexKey(requestId, reference.sha256),
-    { ...reference, blobKey: indexBlobKey },
-    {
-      metadata: {
-        requestId,
-        sha256: reference.sha256,
-        contentType: reference.contentType,
-      },
-    }
+  const previousRequestId = getRequestIdFromArtifactBlobKey(reference.blobKey);
+  const requestIds = uniqueValues([previousRequestId, correctedRequestId].filter(Boolean));
+  const correctedReference = { ...reference, blobKey: indexBlobKey };
+
+  await Promise.all(
+    requestIds.map((requestId) =>
+      indexStore.setJSON?.(requestArtifactIndexKey(requestId, reference.sha256), correctedReference, {
+        metadata: {
+          requestId,
+          sha256: reference.sha256,
+          contentType: reference.contentType,
+        },
+      })
+    )
   );
+
+  logger?.warn?.('Corrected artifact-index blobKey drift.', {
+    previousBlobKey: reference.blobKey,
+    correctedBlobKey: indexBlobKey,
+    sha256: reference.sha256,
+    requestIds,
+  });
+
+  return true;
 };
 
 export const getImageArtifactReadDiagnostics = async (
@@ -190,16 +218,17 @@ export const getImageArtifactReadDiagnostics = async (
   };
 };
 
-export const reconcileImageArtifactReference = async (
+export const reconcileArtifactReference = async (
   reference: ArtifactReference,
   artifactStore: ReadableArtifactBlobStore,
-  indexStore?: WritableArtifactIndexStore
-): Promise<ImageArtifactReconciliationResult> => {
+  indexStore?: WritableArtifactIndexStore,
+  options: { logger?: ArtifactReconciliationLogger } = {}
+): Promise<ArtifactReconciliationResult> => {
   const normalizedBlobKey = normalizeArtifactBlobKey(reference.blobKey);
   const directBytes = await tryReadArtifactBytes(artifactStore, normalizedBlobKey);
 
   if (directBytes) {
-    await maybeUpdateArtifactIndexReference(indexStore, reference, normalizedBlobKey);
+    await maybeUpdateArtifactIndexReference(indexStore, reference, normalizedBlobKey, options.logger);
 
     return {
       status: 'found',
@@ -211,12 +240,12 @@ export const reconcileImageArtifactReference = async (
   }
 
   const nearbyKeys = await getNearbyImageArtifactKeys(artifactStore, normalizedBlobKey);
-  let matches = getImageArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
+  let matches = getArtifactKeyMatches(nearbyKeys, normalizedBlobKey);
   let searchedKeys = nearbyKeys;
 
   if (!matches.length) {
-    const globalKeys = await getGlobalImageArtifactKeys(artifactStore);
-    matches = getImageArtifactKeyMatches(globalKeys, normalizedBlobKey);
+    const globalKeys = await getGlobalArtifactKeys(artifactStore, normalizedBlobKey);
+    matches = getArtifactKeyMatches(globalKeys, normalizedBlobKey);
     searchedKeys = uniqueValues([...nearbyKeys, ...globalKeys]).sort();
   }
 
@@ -225,7 +254,7 @@ export const reconcileImageArtifactReference = async (
     const correctedBytes = await tryReadArtifactBytes(artifactStore, correctedBlobKey);
 
     if (correctedBytes) {
-      await maybeUpdateArtifactIndexReference(indexStore, reference, correctedBlobKey);
+      await maybeUpdateArtifactIndexReference(indexStore, reference, correctedBlobKey, options.logger);
 
       return {
         status: 'found',
@@ -249,6 +278,15 @@ export const reconcileImageArtifactReference = async (
     nearbyKeys: searchedKeys,
     exactFilenameExists: searchedKeys.some((key) => basename(key) === exactFilename),
   };
+};
+
+export const reconcileImageArtifactReference = (
+  reference: ArtifactReference,
+  artifactStore: ReadableArtifactBlobStore,
+  indexStore?: WritableArtifactIndexStore,
+  options: { logger?: ArtifactReconciliationLogger } = {}
+): Promise<ImageArtifactReconciliationResult> => {
+  return reconcileArtifactReference(reference, artifactStore, indexStore, options);
 };
 
 export type ArtifactUploadInput = {
