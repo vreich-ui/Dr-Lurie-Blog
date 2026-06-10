@@ -51,7 +51,7 @@ const contentSourceInput = (requestId: string, body = 'Initial publish smoke bod
   },
 });
 
-const callTool = async (name: string, args: Record<string, unknown>) => {
+const callToolRaw = async (name: string, args: Record<string, unknown>) => {
   const response = await mcpHandler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -69,15 +69,21 @@ const callTool = async (name: string, args: Record<string, unknown>) => {
     result: { isError?: boolean; structuredContent?: Record<string, unknown>; content?: Array<{ text: string }> };
   };
 
-  assert.equal(body.result.isError, undefined, body.result.content?.[0]?.text ?? `${name} failed`);
-  assert.ok(body.result.structuredContent, `${name} should return structuredContent`);
+  return body.result;
+};
 
-  return body.result.structuredContent;
+const callTool = async (name: string, args: Record<string, unknown>) => {
+  const result = await callToolRaw(name, args);
+
+  assert.equal(result.isError, undefined, result.content?.[0]?.text ?? `${name} failed`);
+  assert.ok(result.structuredContent, `${name} should return structuredContent`);
+
+  return result.structuredContent;
 };
 
 const parseJsonBody = <T>(response: { body: string }) => JSON.parse(response.body) as T;
 
-const installGitHubPublishMock = () => {
+const installGitHubPublishMock = (slug = 'admin-publish-e2e-smoke', commitSha = 'published-smoke-commit') => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ method: string; url: string }> = [];
   const blobWrites: Array<{ content: string; encoding: string }> = [];
@@ -87,7 +93,7 @@ const installGitHubPublishMock = () => {
     const method = init?.method ?? 'GET';
     calls.push({ method, url });
 
-    if (url.includes('/contents/src/data/post/admin-publish-e2e-smoke.md')) {
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) {
       return new Response('not found', { status: 404 });
     }
 
@@ -109,7 +115,7 @@ const installGitHubPublishMock = () => {
     }
 
     if (url.endsWith('/git/commits') && method === 'POST') {
-      return Response.json({ sha: 'published-smoke-commit' });
+      return Response.json({ sha: commitSha });
     }
 
     if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
@@ -303,4 +309,120 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
   } finally {
     github.restore();
   }
+});
+
+test('scheduled publish tool publishes due scheduled records and returns not-due reasons for future records', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.SCHEDULED_PUBLISH_TOKEN = 'scheduled-publish-test-token';
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-scheduled-smoke-token';
+  process.env.GITHUB_REPOSITORY = 'vreich-ui/dr-lurie-blog-test';
+  process.env.GITHUB_BRANCH = 'main';
+
+  await rm(localBlobRoot, { recursive: true, force: true });
+
+  const requestId = `req_scheduled_publish_smoke_${Date.now()}`;
+  const scheduledSlug = `scheduled-publish-smoke-${Date.now()}`;
+  const scheduledInput = contentSourceInput(requestId, 'Scheduled publish smoke body.') as ReturnType<
+    typeof contentSourceInput
+  > & {
+    publication: ReturnType<typeof contentSourceInput>['publication'] & { scheduled_for?: string };
+  };
+  scheduledInput.publication.publication_status = 'scheduled';
+  scheduledInput.publication.scheduled_for = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  scheduledInput.publication.publish_payload.slug = scheduledSlug;
+  scheduledInput.publication.publish_payload.title = 'Scheduled Publish Smoke';
+  scheduledInput.publication.publish_payload.markdown =
+    '---\npublishDate: 2026-06-10T00:00:00.000Z\ntitle: "Scheduled Publish Smoke"\nauthor: "Dr. Lurié"\n---\n\nScheduled publish smoke body.\n';
+  scheduledInput.publication.publish_payload.content = 'Scheduled publish smoke body.';
+  scheduledInput.content.title = 'Scheduled Publish Smoke';
+
+  const createResult = await callTool('save_json_blob_create_request', {
+    request_id: requestId,
+    input: scheduledInput,
+    current_agent: 'final_article',
+    next_agent: null,
+    validation_mode: 'admin_publish_draft',
+  });
+  const createdRecord = createResult.record as WorkflowRecord;
+
+  const checkoutResult = await callTool('save_json_blob_checkout_request', {
+    request_id: requestId,
+    owner_id: 'scheduled-agent',
+    owner_label: 'Scheduled agent',
+  });
+  const checkedOutRecord = checkoutResult.record as WorkflowRecord;
+  const lockToken = checkedOutRecord.lock?.token;
+  assert.ok(lockToken);
+
+  const finalOutputResult = await callTool('final_article_update_output', {
+    request_id: requestId,
+    expected_agent_version: 0,
+    lock_token: lockToken,
+    output: scheduledInput.publication.publish_payload,
+  });
+  const finalOutputRecord = finalOutputResult.record as WorkflowRecord;
+
+  const completeResult = await callTool('final_article_mark_complete', {
+    request_id: requestId,
+    expected_record_version: finalOutputRecord.version,
+    lock_token: lockToken,
+  });
+  const completeRecord = completeResult.record as WorkflowRecord;
+  assert.equal(completeRecord.workflow_status, 'completed');
+
+  const futureResult = await callToolRaw('save_json_blob_publish_scheduled', {
+    request_id: requestId,
+    expected_record_version: completeRecord.version,
+    lock_token: lockToken,
+    scheduled_publish_token: 'scheduled-publish-test-token',
+    agent_id: 'agent-scheduled-smoke',
+    agent_owner: 'QA',
+  });
+  assert.equal(futureResult.isError, true);
+  assert.equal(futureResult.structuredContent?.error_code, 'scheduled_publish_not_due');
+
+  const store = await getWorkflowBlobStore({ blobs: undefined });
+  const storedText = await store.get(`workflows/by-id/${requestId}.json`);
+  assert.ok(storedText);
+  const storedRecord = JSON.parse(storedText) as WorkflowRecord;
+  storedRecord.input.publication!.scheduled_for = new Date(Date.now() - 1000).toISOString();
+  await store.setJSON(`workflows/by-id/${requestId}.json`, storedRecord);
+
+  const github = installGitHubPublishMock(scheduledSlug, 'scheduled-published-commit');
+  try {
+    const scheduledResult = await callTool('save_json_blob_publish_scheduled', {
+      request_id: requestId,
+      expected_record_version: completeRecord.version,
+      lock_token: lockToken,
+      scheduled_publish_token: 'scheduled-publish-test-token',
+      agent_id: 'agent-scheduled-smoke',
+      agent_owner: 'QA',
+      agent_label: 'Scheduled Smoke Agent',
+    });
+    const publishedRecord = scheduledResult.record as WorkflowRecord;
+    assert.equal(publishedRecord.workflow_status, 'published');
+    assert.equal(
+      (scheduledResult.publish_result as { commit?: string } | undefined)?.commit,
+      'scheduled-published-commit'
+    );
+    assert.ok(github.blobWrites.some((write) => write.content.includes('Scheduled publish smoke body.')));
+    assert.deepEqual(publishedRecord.history.at(-1)?.details?.commit_metadata, {
+      commit: 'scheduled-published-commit',
+      articlePath: `src/data/post/${scheduledSlug}.md`,
+      deployStatus: 'queued',
+      message: `Article publish queued for src/data/post/${scheduledSlug}.md.`,
+      scheduled_for: storedRecord.input.publication!.scheduled_for,
+      scheduled_publish: true,
+      agent_id: 'agent-scheduled-smoke',
+      agent_owner: 'QA',
+      agent_label: 'Scheduled Smoke Agent',
+    });
+  } finally {
+    github.restore();
+  }
+
+  assert.equal(createdRecord.request_id, requestId);
 });

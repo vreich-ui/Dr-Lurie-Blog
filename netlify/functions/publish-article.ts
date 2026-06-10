@@ -342,7 +342,7 @@ const verifyPublisher = async (event: LambdaEvent) => {
   const publishKey = getHeader(event.headers, 'x-publish-key').trim();
 
   if (publishKey) {
-    const publishSecret = process.env.PUBLISH_SECRET;
+    const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
     if (!publishSecret) {
       return jsonResponse(401, {
