@@ -6,8 +6,51 @@ import sharp from 'sharp';
 
 import { handler as publishHandler } from '../../netlify/functions/publish-article.js';
 import { handler as saveArtifactHandler } from '../../netlify/functions/save-artifact.js';
+import { setNetlifyBlobsModuleForTesting } from '../../netlify/lib/blob-store.js';
 
 const publishSecret = 'publish-artifact-test-secret';
+
+const toArrayBuffer = (bytes: Uint8Array) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+
+const bufferFromStoreValue = (value: string | Buffer | Uint8Array | ArrayBuffer) => {
+  if (typeof value === 'string') return Buffer.from(value);
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+
+  return Buffer.from(value);
+};
+
+const createArrayBufferOnlyStore = () => {
+  const values = new Map<string, Uint8Array>();
+
+  return {
+    async set(key: string, value: string | Buffer | Uint8Array | ArrayBuffer) {
+      values.set(key, bufferFromStoreValue(value));
+    },
+    async setJSON(key: string, value: unknown) {
+      values.set(key, Buffer.from(JSON.stringify(value, null, 2)));
+    },
+    async get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) {
+      if (options?.type === 'buffer') throw new Error('Netlify-like test store does not support buffer reads.');
+
+      const value = values.get(key);
+      if (!value) return null;
+      if (options?.type === 'arrayBuffer') return toArrayBuffer(value);
+
+      return Buffer.from(value).toString('utf8');
+    },
+    async del(key: string) {
+      values.delete(key);
+    },
+    async list(options?: { prefix?: string }) {
+      const prefix = options?.prefix ?? '';
+
+      return {
+        blobs: [...values.keys()].filter((key) => key.startsWith(prefix)).map((key) => ({ key, etag: '' })),
+        directories: [],
+      };
+    },
+  };
+};
 
 const postArtifact = async (body: Record<string, unknown>) => {
   const response = await saveArtifactHandler({
@@ -22,15 +65,34 @@ const postArtifact = async (body: Record<string, unknown>) => {
 };
 
 test('publish-article resolves artifactReferences into base64 media blobs', async () => {
+  const previousNetlify = process.env.NETLIFY;
+  const previousSiteId = process.env.NETLIFY_SITE_ID;
+
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
-  process.env.NETLIFY = 'false';
-  process.env.NETLIFY_SITE_ID = '';
+  process.env.NETLIFY = 'true';
+  process.env.NETLIFY_SITE_ID = 'publish-artifacts-test-site';
   process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
+  const stores = {
+    artifacts: createArrayBufferOnlyStore(),
+    'artifact-index': createArrayBufferOnlyStore(),
+  };
+
+  setNetlifyBlobsModuleForTesting({
+    connectLambda() {},
+    getStore(input) {
+      const name = typeof input === 'string' ? input : input.name;
+      const store = stores[name as keyof typeof stores];
+
+      assert.ok(store, `Unexpected blob store: ${name}`);
+
+      return store as never;
+    },
+  });
   const requestId = `artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const explicitBytes = Buffer.from('explicit filename bytes');
   const derivedBytes = await sharp({
@@ -148,6 +210,11 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
     );
   } finally {
     globalThis.fetch = originalFetch;
+    setNetlifyBlobsModuleForTesting(undefined);
+    if (previousNetlify === undefined) delete process.env.NETLIFY;
+    else process.env.NETLIFY = previousNetlify;
+    if (previousSiteId === undefined) delete process.env.NETLIFY_SITE_ID;
+    else process.env.NETLIFY_SITE_ID = previousSiteId;
   }
 });
 

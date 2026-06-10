@@ -14,6 +14,12 @@ export type AdminAuthState = {
   error?: string;
 };
 
+let adminAuthStateForTesting: AdminAuthState | undefined;
+
+export const setAdminAuthStateForTesting = (state?: AdminAuthState) => {
+  adminAuthStateForTesting = state;
+};
+
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 const toStringValue = (value: unknown) => {
@@ -83,6 +89,8 @@ const getEmailFromClerkUser = async (userId: string, secretKey: string) => {
 };
 
 export const getAdminStateFromEvent = async (event: LambdaEventWithHeaders): Promise<AdminAuthState> => {
+  if (adminAuthStateForTesting) return adminAuthStateForTesting;
+
   const token = getBearerToken(getHeader(event.headers, 'authorization'));
 
   if (!token) {

@@ -64,7 +64,7 @@ type PublishMediaEntryInput = {
 
 type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
 type BinaryReadableArtifactBlobStore = Omit<ArtifactBlobStore, 'get'> & {
-  get: (key: string, options: { type: 'buffer' }) => Promise<Buffer | ArrayBuffer | string | null>;
+  get: (key: string, options: { type: 'arrayBuffer' }) => Promise<Buffer | ArrayBuffer | string | null>;
 };
 
 type PublishInput = {
@@ -245,7 +245,7 @@ const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string, file
   let bytes: Buffer | ArrayBuffer | string | null;
 
   try {
-    bytes = await binaryStore.get(blobKey, { type: 'buffer' });
+    bytes = await binaryStore.get(blobKey, { type: 'arrayBuffer' });
   } catch (error) {
     console.error('Artifact blob store read failed during publish.', { blobKey, filename, error });
     throw new PublishError(404, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
@@ -255,8 +255,8 @@ const readArtifactBytes = async (store: ArtifactBlobStore, blobKey: string, file
     console.warn('Artifact blob was missing during publish.', { blobKey, filename });
     throw new PublishError(404, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);
   }
-  if (Buffer.isBuffer(bytes)) return bytes;
   if (bytes instanceof ArrayBuffer) return Buffer.from(bytes);
+  if (Buffer.isBuffer(bytes)) return bytes;
   if (typeof bytes === 'string') {
     console.error('Artifact blob store returned text for binary artifact bytes during publish.', { blobKey, filename });
     throw new PublishError(500, `Image artifact could not be read: ${filename}. Re-select or re-upload the image.`);

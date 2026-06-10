@@ -25,7 +25,7 @@ type LambdaEvent = {
 };
 
 type BinaryReadableArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>> & {
-  get(key: string, options: { type: 'buffer' }): Promise<Buffer | ArrayBuffer | string | null>;
+  get(key: string, options: { type: 'arrayBuffer' }): Promise<Buffer | ArrayBuffer | string | null>;
 };
 
 type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>> & {
@@ -191,7 +191,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const store = (await getArtifactBlobStore(event)) as BinaryReadableArtifactBlobStore;
-    const bytes = await store.get(blobKey, { type: 'buffer' });
+    const bytes = await store.get(blobKey, { type: 'arrayBuffer' });
 
     if (!bytes)
       return jsonResponse(404, {
