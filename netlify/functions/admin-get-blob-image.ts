@@ -1,7 +1,11 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { isArtifactReference } from '../lib/artifacts.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import {
+  getArtifactBlobStore,
+  getArtifactIndexBlobStore,
+  getCoreBlobStoreSourceDiagnostics,
+} from '../lib/blob-store.js';
 
 const allowedImageBlobKeyPattern = /^image\/[a-z0-9._-]+\/[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i;
 const contentTypeByExtension: Record<string, string> = {
@@ -63,6 +67,7 @@ type ResolvedArtifactContentType = {
 };
 
 const createArtifactDebugFields = (
+  event: LambdaEvent,
   blobKey: string,
   contentTypeSource: ContentTypeSource = 'missing',
   extra: Record<string, unknown> = {}
@@ -71,6 +76,7 @@ const createArtifactDebugFields = (
   store: 'artifacts',
   lookup: 'bytes',
   contentTypeSource,
+  blobStoreDiagnostics: getCoreBlobStoreSourceDiagnostics(event),
   ...extra,
 });
 
@@ -167,7 +173,7 @@ export const handler = async (event: LambdaEvent) => {
   if (!allowedImageBlobKeyPattern.test(blobKey)) {
     return jsonResponse(400, {
       error: 'A valid image artifact blobKey is required.',
-      ...createArtifactDebugFields(blobKey),
+      ...createArtifactDebugFields(event, blobKey),
     });
   }
 
@@ -180,7 +186,7 @@ export const handler = async (event: LambdaEvent) => {
     if (!contentType) {
       return jsonResponse(400, {
         error: 'A concrete image content type is required for this artifact.',
-        ...createArtifactDebugFields(blobKey, contentTypeSource),
+        ...createArtifactDebugFields(event, blobKey, contentTypeSource),
       });
     }
 
@@ -190,12 +196,12 @@ export const handler = async (event: LambdaEvent) => {
     if (!bytes)
       return jsonResponse(404, {
         error: 'Image artifact was not found.',
-        ...createArtifactDebugFields(blobKey, contentTypeSource),
+        ...createArtifactDebugFields(event, blobKey, contentTypeSource),
       });
     if (typeof bytes === 'string')
       return jsonResponse(500, {
         error: 'Image artifact returned text instead of bytes.',
-        ...createArtifactDebugFields(blobKey, contentTypeSource, { actualValueType: 'string' }),
+        ...createArtifactDebugFields(event, blobKey, contentTypeSource, { actualValueType: 'string' }),
       });
 
     const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
@@ -214,7 +220,7 @@ export const handler = async (event: LambdaEvent) => {
 
     return jsonResponse(500, {
       error: 'Saved image artifact could not be read.',
-      ...createArtifactDebugFields(blobKey, contentTypeSource),
+      ...createArtifactDebugFields(event, blobKey, contentTypeSource),
     });
   }
 };

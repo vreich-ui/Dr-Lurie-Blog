@@ -3733,12 +3733,28 @@ const metadata = {
         return `${status} HTTP failure`;
       };
 
+      const formatBlobStoreDiagnosticSummary = (label, diagnostic) => {
+        if (!diagnostic) return '';
+
+        const site = diagnostic.siteId?.present
+          ? `${diagnostic.siteId.envVar || 'site'}=${diagnostic.siteId.redacted}`
+          : 'siteId=missing';
+
+        return `${label}Source=${diagnostic.source}, ${label}ExplicitApi=${Boolean(
+          diagnostic.explicitApiConfigUsed
+        )}, ${label}LambdaContext=${Boolean(diagnostic.lambdaBlobContextUsed)}, ${label}Site=${site}`;
+      };
+
       const formatAdminBlobImageFailureDetails = (payload) => {
+        const storeDiagnostics = payload?.blobStoreDiagnostics || {};
         const details = [
           payload?.blobKey ? `blobKey=${payload.blobKey}` : '',
           payload?.store ? `store=${payload.store}` : '',
           payload?.lookup ? `lookup=${payload.lookup}` : '',
           payload?.contentTypeSource ? `contentTypeSource=${payload.contentTypeSource}` : '',
+          formatBlobStoreDiagnosticSummary('workflows', storeDiagnostics.workflows),
+          formatBlobStoreDiagnosticSummary('artifactIndex', storeDiagnostics.artifactIndex),
+          formatBlobStoreDiagnosticSummary('artifacts', storeDiagnostics.artifacts),
         ].filter(Boolean);
 
         return details.length ? ` (${details.join(', ')})` : '';

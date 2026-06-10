@@ -4,6 +4,8 @@ import test from 'node:test';
 import {
   getArtifactBlobStore,
   getArtifactIndexBlobStore,
+  getBlobStoreSourceDiagnostics,
+  getCoreBlobStoreSourceDiagnostics,
   getWorkflowBlobStore,
   setNetlifyBlobsModuleForTesting,
 } from '../../netlify/lib/blob-store.js';
@@ -178,5 +180,50 @@ test('getWorkflowBlobStore falls back to the local file-backed store when Netlif
     await store.setJSON(key, { ok: true });
 
     assert.deepEqual(JSON.parse((await store.get(key)) ?? 'null'), { ok: true });
+  });
+});
+
+test('blob store source diagnostics redact site IDs and expose no tokens', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    process.env.NETLIFY_SITE_ID = 'site-diagnostics-1234';
+    process.env.NETLIFY_BLOBS_TOKEN = 'super-secret-token';
+
+    const diagnostics = getBlobStoreSourceDiagnostics('workflows', { blobs: { context: true } });
+
+    assert.deepEqual(diagnostics, {
+      storeName: 'workflows',
+      source: 'explicit-api-config',
+      explicitApiConfigUsed: true,
+      lambdaBlobContextUsed: false,
+      siteId: {
+        envVar: 'NETLIFY_SITE_ID',
+        present: true,
+        redacted: '…1234',
+      },
+    });
+    assert.equal(JSON.stringify(diagnostics).includes('super-secret-token'), false);
+    assert.equal(JSON.stringify(diagnostics).includes('site-diagnostics-1234'), false);
+  });
+});
+
+test('core blob store diagnostics identify Lambda context for all admin stores', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    process.env.SITE_ID = 'fallback-site-5678';
+    const diagnostics = getCoreBlobStoreSourceDiagnostics({ blobs: { context: true } });
+
+    assert.deepEqual(Object.keys(diagnostics), ['workflows', 'artifactIndex', 'artifacts']);
+    assert.equal(diagnostics.workflows.storeName, 'workflows');
+    assert.equal(diagnostics.artifactIndex.storeName, 'artifact-index');
+    assert.equal(diagnostics.artifacts.storeName, 'artifacts');
+    assert.equal(diagnostics.workflows.source, 'lambda-context');
+    assert.equal(diagnostics.artifactIndex.source, 'lambda-context');
+    assert.equal(diagnostics.artifacts.source, 'lambda-context');
+    assert.equal(diagnostics.workflows.explicitApiConfigUsed, false);
+    assert.equal(diagnostics.workflows.lambdaBlobContextUsed, true);
+    assert.deepEqual(diagnostics.workflows.siteId, {
+      envVar: 'SITE_ID',
+      present: true,
+      redacted: '…5678',
+    });
   });
 });
