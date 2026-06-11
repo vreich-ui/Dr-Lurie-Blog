@@ -160,6 +160,26 @@ Required fields:
 Optional fields:
 
 - `request_id: string` - generated as `req_<uuid>` by the MCP server when omitted.
+- `current_agent: reader_insight|research|angle|draft|final_article` - optional initial current agent; defaults to `input.workflow.current_agent` or no current stage.
+- `next_agent: reader_insight|research|angle|draft|final_article|null` - optional initial next agent; defaults to `input.workflow.next_agent` or `reader_insight`.
+
+Admin-publish validation fields:
+
+- `validation_mode: "admin_publish_draft"` - required for MCP-created admin-publish article drafts. This mode asks the backend to reject skeletal drafts before workflow creation.
+
+Runtime requirements for `validation_mode: "admin_publish_draft"`:
+
+- `publication.publish_payload.slug` (the current validator remains backwards-compatible and can compute a slug from `content.title` when this is omitted).
+- `publication.publish_payload.title` (the current validator remains backwards-compatible and can use `content.title` when this is omitted).
+- `publication.publish_payload.author`.
+- Non-empty article body markdown/content in one of the supported body locations below.
+
+Documented body precedence, exactly as implemented by the admin import helper:
+
+1. `publication.publish_payload.markdown`
+2. `publication.publish_payload.content`
+3. `editorial.draft_markdown`
+4. Markdown blocks in `content.blocks` where `block_type === "markdown"`
 
 The production Netlify `/mcp` `inputSchema` exposes a structured `content_source.v1` object for `input`, not a generic payload. The top-level schema allows these sections only:
 
@@ -176,6 +196,7 @@ The production Netlify `/mcp` `inputSchema` exposes a structured `content_source
 - `commercial`
 - `approvals`
 - `publication`
+- `emotional_strategy`
 - `workflow`
 - `revision_control`
 - `versioning`
@@ -184,7 +205,7 @@ Important agent-facing field descriptions:
 
 - `content.title`: working or final article title agents should use for the content source.
 - `editorial.draft_markdown`: Markdown draft body agents can pass between drafting, revision, and publishing steps.
-- `publication.publish_payload`: publication payload used by the publishing step; include `slug`, `title`, and article body fields when ready to publish.
+- `publication.publish_payload`: publication payload used by the publishing step. Schema-required fields are `slug` and `title`; optional supported fields include `markdown`, `content`, `description`, `publishDate`, `author`, `tags`, `images`, `mediaEntries`, `artifactReferences`, `overwrite`, `draft`, `articlePath`, `category`, `excerpt`, `seoDescription`, `featuredImage`, `existingFeaturedImagePath`, `videoLink`, `ctaLink`, `ctaText`, `commitMessage`, and `metadata`.
 - `publication.publication_status`: article payload status, not the persisted workflow lifecycle. Known first-party values are `draft` (saved admin draft), `ready` (payload is ready for manual publishing), and `scheduled` (payload has `publication.scheduled_for` and requires a server-authorized scheduled publish call when due). The local contract does not define `published` or `live` as publication statuses; successful publication is tracked on the workflow record as `workflow_status: "published"` after `mark_published`.
 - `workflow.workflow_id`: workflow identifier agents should preserve across handoffs and backend workflow records.
 - `versioning.record_version`: content-source record version agents should increment or preserve for revision tracking.
@@ -197,6 +218,7 @@ Minimum sample backend request body:
 {
   "action": "create_request",
   "request_id": "req_123",
+  "validation_mode": "admin_publish_draft",
   "input": {
     "record_type": "content_source",
     "schema_version": "content_source.v1",
@@ -207,6 +229,15 @@ Minimum sample backend request body:
     "editorial": {
       "schema_version": "editorial.v1",
       "draft_markdown": "# Skin barrier basics\n\nDraft body..."
+    },
+    "publication": {
+      "schema_version": "publication.v1",
+      "publication_status": "draft",
+      "publish_payload": {
+        "slug": "skin-barrier-basics",
+        "title": "Skin Barrier Basics",
+        "author": "Dr. Lurié"
+      }
     },
     "workflow": {
       "schema_version": "content_workflow.v1",
@@ -231,7 +262,8 @@ Publication-ready sample fragment (use `ready` for manual publishing handoff; us
       "slug": "skin-barrier-basics",
       "title": "Skin Barrier Basics",
       "markdown": "# Skin Barrier Basics\n\nArticle body...",
-      "description": "A practical explanation of the skin barrier."
+      "description": "A practical explanation of the skin barrier.",
+      "author": "Dr. Lurié"
     }
   }
 }
