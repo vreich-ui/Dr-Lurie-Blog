@@ -116,6 +116,137 @@ test('getWorkflowBlobStore connects Lambda context and uses Lambda-compatible lo
   });
 });
 
+test('getWorkflowBlobStore treats enabled NETLIFY env values as production Netlify runtime', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const getStoreInputs: unknown[] = [];
+    const connectedEvents: unknown[] = [];
+
+    process.env.NETLIFY = 'yes';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda(event: unknown) {
+        connectedEvents.push(event);
+      },
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    const result = await getWorkflowBlobStore({});
+
+    assert.equal(result, store);
+    assert.deepEqual(connectedEvents, []);
+    assert.deepEqual(getStoreInputs, ['workflows']);
+  });
+});
+
+test('blob store diagnostics parse NETLIFY env values explicitly', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    for (const value of ['true', '1', 'yes']) {
+      process.env.NETLIFY = value;
+      assert.equal(getBlobStoreSourceDiagnostics('workflows', {}).source, 'netlify-name-lookup');
+    }
+
+    for (const value of ['', 'false', '0', 'no']) {
+      process.env.NETLIFY = value;
+      assert.equal(getBlobStoreSourceDiagnostics('workflows', {}).source, 'local-file-backed');
+    }
+
+    delete process.env.NETLIFY;
+    assert.equal(getBlobStoreSourceDiagnostics('workflows', {}).source, 'local-file-backed');
+  });
+});
+
+test('getWorkflowBlobStore supports NETLIFY_AUTH_TOKEN with NETLIFY_SITE_ID explicit API config', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const getStoreInputs: unknown[] = [];
+
+    process.env.NETLIFY_SITE_ID = 'site-auth-token';
+    process.env.NETLIFY_AUTH_TOKEN = 'auth-token-abc';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda() {},
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    const result = await getWorkflowBlobStore({});
+
+    assert.equal(result, store);
+    assert.deepEqual(getStoreInputs, [
+      { consistency: 'strong', name: 'workflows', siteID: 'site-auth-token', token: 'auth-token-abc' },
+    ]);
+  });
+});
+
+test('getWorkflowBlobStore treats NETLIFY=false as local runtime without site ID or blob context', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    process.env.NETLIFY = 'false';
+
+    const store = await getWorkflowBlobStore({});
+    const key = `blob-store-netlify-false-${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+
+    await store.setJSON(key, { ok: true });
+
+    assert.deepEqual(JSON.parse((await store.get(key)) ?? 'null'), { ok: true });
+  });
+});
+
+test('getWorkflowBlobStore treats NETLIFY=false with NETLIFY_SITE_ID as Netlify runtime', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const getStoreInputs: unknown[] = [];
+
+    process.env.NETLIFY = 'false';
+    process.env.NETLIFY_SITE_ID = 'site-from-env';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda() {},
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    const result = await getWorkflowBlobStore({});
+
+    assert.equal(result, store);
+    assert.deepEqual(getStoreInputs, ['workflows']);
+  });
+});
+
+test('getWorkflowBlobStore treats NETLIFY=false with blob context as Netlify runtime', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const event = { blobs: { context: true } };
+    const getStoreInputs: unknown[] = [];
+    const connectedEvents: unknown[] = [];
+
+    process.env.NETLIFY = 'false';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda(lambdaEvent: unknown) {
+        connectedEvents.push(lambdaEvent);
+      },
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    const result = await getWorkflowBlobStore(event);
+
+    assert.equal(result, store);
+    assert.deepEqual(connectedEvents, [event]);
+    assert.deepEqual(getStoreInputs, ['workflows']);
+  });
+});
+
 test('artifact stores use explicit strong API config when site ID and token are configured', async () => {
   await withCleanWorkflowBlobEnv(async () => {
     const store = createFakeStore();
