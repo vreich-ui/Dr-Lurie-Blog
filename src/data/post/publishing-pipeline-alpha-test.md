@@ -1,5 +1,5 @@
 ---
-publishDate: 2026-06-11
+publishDate: 2026-06-11T11:42:00.000Z
 title: "Publishing Pipeline Alpha Test: From Draft to Release"
 excerpt: "A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness."
 category: "Editorial"
