@@ -25,6 +25,17 @@ Production `/mcp` also registers artifact tools (`save_artifact`, `save_artifact
 
 For full tool schemas, versioning rules, helper tool names, and sample calls, see [`docs/tool-schema.md`](docs/tool-schema.md).
 
+## Admin-publish draft contract
+
+For MCP-created admin-publish article drafts, call `save_json_blob_create_request` with `validation_mode: "admin_publish_draft"`. The backend then validates the `content_source.v1` input before writing a workflow record. Agents should provide:
+
+- `publication.publish_payload.slug` (the current validator can still compute a slug from `content.title` for backwards compatibility).
+- `publication.publish_payload.title` (the current validator can still use `content.title` for backwards compatibility).
+- `publication.publish_payload.author`.
+- Body markdown/content in the implemented precedence order: `publication.publish_payload.markdown`, then `publication.publish_payload.content`, then `editorial.draft_markdown`, then markdown blocks in `content.blocks` where `block_type === "markdown"`.
+
+Keep workflow/routing fields such as `current_agent`, `next_agent`, and `workflow.workflow_id` optional unless the backend validator starts requiring them.
+
 ## Environment and secret handling
 
 Both variables are required at runtime:
