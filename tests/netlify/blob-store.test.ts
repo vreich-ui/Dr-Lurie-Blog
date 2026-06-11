@@ -123,6 +123,7 @@ test('getWorkflowBlobStore treats enabled NETLIFY env values as production Netli
     const connectedEvents: unknown[] = [];
 
     process.env.NETLIFY = 'yes';
+    process.env.NETLIFY = '1';
 
     setNetlifyBlobsModuleForTesting({
       connectLambda(event: unknown) {
