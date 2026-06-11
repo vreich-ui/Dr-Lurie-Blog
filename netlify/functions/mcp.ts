@@ -3,8 +3,8 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
-import { getBlobListItems } from '../lib/blob-list.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import {
   artifactKindValues,
@@ -54,13 +54,15 @@ const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
 const ARTIFACT_LIST_MAX_LIMIT = 100;
+const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
+const WIPE_BLOB_SAMPLE_LIMIT = 20;
 const PUBLICATION_STATUS_DESCRIPTION =
   'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
 
 const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 
 const jsonHeaders = {
-  'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id',
+  'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-publish-key',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Expose-Headers': 'mcp-session-id',
@@ -354,6 +356,19 @@ const artifactMigrationDryRunJsonSchema = {
   type: 'boolean',
   description: 'When true, report migration actions without writing artifact-index records or pointers.',
 };
+
+const wipeBlobDryRunJsonSchema = {
+  type: 'boolean',
+  default: true,
+  description: 'When true or omitted, only count and sample matching blob keys without deleting them.',
+};
+const wipeBlobConfirmJsonSchema = stringSchema(
+  `Required only for live deletion; must equal ${WIPE_BLOB_CONFIRMATION}.`
+);
+const wipeBlobPrefixesJsonSchema = arraySchema(
+  { type: 'string', enum: ['workflows/', 'artifact-index/', ...artifactKindValues.map((kind) => `${kind}/`)] },
+  'Optional logical prefixes to wipe. Defaults to all app-managed prefixes.'
+);
 const artifactIncludeDeletedJsonSchema = {
   type: 'boolean',
   description: 'When true, include soft-deleted artifact references. Defaults to false.',
@@ -987,6 +1002,16 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       cursor: artifactListCursorJsonSchema,
       limit: artifactReconcileLimitJsonSchema,
       dryRun: artifactMigrationDryRunJsonSchema,
+    }),
+  },
+  {
+    name: 'wipe_blob_stores',
+    description:
+      'Admin-only MCP maintenance tool protected by server publish-key headers. Dry-runs by default; live mode deletes only allowlisted app-managed blob prefixes across workflow, artifact-index, and artifact blob stores.',
+    inputSchema: objectSchema({
+      dryRun: wipeBlobDryRunJsonSchema,
+      confirm: wipeBlobConfirmJsonSchema,
+      prefixes: wipeBlobPrefixesJsonSchema,
     }),
   },
   {
@@ -1904,6 +1929,151 @@ const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string
   };
 };
 
+type WipeBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
+
+type WipeBlobTarget = {
+  logicalPrefix: string;
+  listPrefix: string;
+  store: WipeBlobStore;
+};
+
+const WIPE_BLOB_ALLOWED_PREFIXES = [
+  'workflows/',
+  'artifact-index/',
+  ...artifactKindValues.map((kind) => `${kind}/`),
+] as const;
+const WIPE_BLOB_ALLOWED_PREFIX_SET = new Set<string>(WIPE_BLOB_ALLOWED_PREFIXES);
+const WIPE_BLOB_ARTIFACT_PREFIX_SET = new Set<string>(artifactKindValues.map((kind) => `${kind}/`));
+
+const isArtifactWipeBlobPrefix = (prefix: string) => WIPE_BLOB_ARTIFACT_PREFIX_SET.has(prefix);
+
+const normalizeWipeBlobPrefixes = (value: unknown) => {
+  if (value === undefined || value === null) {
+    return { prefixes: [...WIPE_BLOB_ALLOWED_PREFIXES], skipped: [] as string[] };
+  }
+
+  if (!Array.isArray(value)) {
+    return { prefixes: [] as string[], skipped: ['prefixes must be an array of strings.'] };
+  }
+
+  const prefixes: string[] = [];
+  const skipped: string[] = [];
+  for (const item of value) {
+    const prefix = typeof item === 'string' ? item.trim() : '';
+    if (!prefix || !WIPE_BLOB_ALLOWED_PREFIX_SET.has(prefix)) {
+      skipped.push(String(item));
+      continue;
+    }
+
+    if (!prefixes.includes(prefix)) prefixes.push(prefix);
+  }
+
+  return { prefixes, skipped };
+};
+
+const getWipeBlobTargets = async (event: LambdaEvent, prefixes: string[]): Promise<WipeBlobTarget[]> => {
+  const workflowsStorePromise = prefixes.includes('workflows/') ? getWorkflowBlobStore(event) : undefined;
+  const artifactIndexStorePromise = prefixes.includes('artifact-index/') ? getArtifactIndexBlobStore(event) : undefined;
+  const artifactStorePromise = prefixes.some(isArtifactWipeBlobPrefix) ? getArtifactBlobStore(event) : undefined;
+
+  const workflowsStore = await workflowsStorePromise;
+  const artifactIndexStore = await artifactIndexStorePromise;
+  const artifactStore = await artifactStorePromise;
+
+  return prefixes.flatMap((prefix) => {
+    if (prefix === 'workflows/' && workflowsStore) {
+      return [{ logicalPrefix: prefix, listPrefix: prefix, store: workflowsStore }];
+    }
+
+    if (prefix === 'artifact-index/' && artifactIndexStore) {
+      return [{ logicalPrefix: prefix, listPrefix: '', store: artifactIndexStore }];
+    }
+
+    if (artifactStore && isArtifactWipeBlobPrefix(prefix)) {
+      return [{ logicalPrefix: prefix, listPrefix: prefix, store: artifactStore }];
+    }
+
+    return [];
+  });
+};
+
+const listWipeBlobTargetKeys = async (target: WipeBlobTarget) => {
+  const blobs = await collectBlobListItems(await target.store.list({ prefix: target.listPrefix }));
+
+  return [...new Set(blobs.map((blob) => blob.key))].sort();
+};
+
+const toLogicalWipeBlobKey = (target: WipeBlobTarget, key: string) => {
+  if (target.logicalPrefix === 'artifact-index/') return `${target.logicalPrefix}${key}`;
+
+  return key;
+};
+
+const isWipeBlobKeyAllowed = (target: WipeBlobTarget, key: string) => {
+  if (!WIPE_BLOB_ALLOWED_PREFIX_SET.has(target.logicalPrefix)) return false;
+  if (target.logicalPrefix === 'artifact-index/') return true;
+
+  return key.startsWith(target.logicalPrefix);
+};
+
+const wipeBlobStores = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  if (!hasValidNetlifyPublishSecret(event)) {
+    return toolError('Unauthorized: a valid server publish key is required.');
+  }
+
+  const dryRun = input.dryRun !== false;
+  if (!dryRun && input.confirm !== WIPE_BLOB_CONFIRMATION) {
+    return toolError(`Live deletion requires confirm to equal ${WIPE_BLOB_CONFIRMATION}.`, {
+      dryRun,
+      deleted: 0,
+      scanned: 0,
+      skipped: 0,
+      prefixes: [],
+      sampleDeletedKeys: [],
+    });
+  }
+
+  const normalizedPrefixes = normalizeWipeBlobPrefixes(input.prefixes);
+  const targets = await getWipeBlobTargets(event, normalizedPrefixes.prefixes);
+  let scanned = 0;
+  let deleted = 0;
+  let skipped = normalizedPrefixes.skipped.length;
+  const sampleKeys: string[] = [];
+  const sampleDeletedKeys: string[] = [];
+
+  for (const target of targets) {
+    const keys = await listWipeBlobTargetKeys(target);
+
+    for (const key of keys) {
+      if (!isWipeBlobKeyAllowed(target, key)) {
+        skipped += 1;
+        continue;
+      }
+
+      scanned += 1;
+      const logicalKey = toLogicalWipeBlobKey(target, key);
+      if (sampleKeys.length < WIPE_BLOB_SAMPLE_LIMIT) sampleKeys.push(logicalKey);
+
+      if (!dryRun) {
+        await target.store.del(key);
+        deleted += 1;
+        if (sampleDeletedKeys.length < WIPE_BLOB_SAMPLE_LIMIT) sampleDeletedKeys.push(logicalKey);
+      }
+    }
+  }
+
+  return toolResult({
+    dryRun,
+    deleted,
+    scanned,
+    skipped,
+    prefixes: normalizedPrefixes.prefixes,
+    sampleKeys,
+    sampleDeletedKeys,
+    skippedPrefixes: normalizedPrefixes.skipped,
+  });
+};
+
 const migrateArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const unauthorized = await requireArtifactMigrationAccess(event);
   if (unauthorized) return unauthorized;
@@ -2168,6 +2338,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return restoreArtifact(event, input);
     case 'migrate_artifact_indexes':
       return migrateArtifactIndexes(event, input);
+    case 'wipe_blob_stores':
+      return wipeBlobStores(event, input);
     case 'reconcile_artifact_indexes':
       return reconcileArtifactIndexes(event, input);
     case 'save_json_blob_patch_agent_output':
