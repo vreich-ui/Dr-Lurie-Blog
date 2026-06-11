@@ -89,6 +89,23 @@ const safeSecretsMatch = (provided: string, expected: string) => {
   return timingSafeEqual(providedBuffer, expectedBuffer);
 };
 
+const getBearerToken = (authorization: string | undefined) => {
+  const match = authorization?.match(/^Bearer\s+(.+)$/i);
+
+  return match?.[1]?.trim() || undefined;
+};
+
+const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
+  const expected = toNonEmptyString(process.env.NETLIFY_PUBLISH_SECRET);
+  if (!expected) return false;
+
+  const provided =
+    toNonEmptyString(getHeader(event.headers, 'x-publish-key')) ??
+    getBearerToken(getHeader(event.headers, 'authorization'));
+
+  return Boolean(provided && safeSecretsMatch(provided, expected));
+};
+
 const verifyScheduledPublishToken = (token: unknown) => {
   const provided = toNonEmptyString(token);
   const expected = process.env.SCHEDULED_PUBLISH_TOKEN;
@@ -1601,6 +1618,12 @@ const requireAdminToolAccess = async (event: LambdaEvent) => {
   return 'isError' in adminState ? adminState : undefined;
 };
 
+const requireArtifactMigrationAccess = async (event: LambdaEvent) => {
+  if (hasValidNetlifyPublishSecret(event)) return undefined;
+
+  return requireAdminToolAccess(event);
+};
+
 const normalizeArtifactKindInput = (value: unknown, required: boolean) => {
   const artifactKind = toNonEmptyString(value);
   if (!artifactKind)
@@ -1768,12 +1791,16 @@ const getMigrationArtifactKind = (record: Record<string, unknown>, blobKey: stri
   return inferArtifactKindFromContentType(record.contentType);
 };
 
+const migrationControlCharacters = `${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}`;
+const unsafeMigrationFilenamePattern = new RegExp(`[${migrationControlCharacters}<>\\\\/]+`, 'gu');
+const unsafeMigrationLabelPattern = new RegExp(`[${migrationControlCharacters}<>]+`, 'gu');
+
 const normalizeMigrationFilename = (value: string) => {
   const filename = value.split(/[\\/]/).pop() || value;
   const normalized = filename
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/[\u0000-\u001f\u007f<>\\/]+/gu, '-')
+    .replace(unsafeMigrationFilenamePattern, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, artifactReferenceLimits.originalFilename);
 
@@ -1784,7 +1811,7 @@ const normalizeMigrationLabel = (value: string) => {
   const normalized = value
     .trim()
     .replace(/\s+/g, ' ')
-    .replace(/[\u0000-\u001f\u007f<>]+/gu, ' ')
+    .replace(unsafeMigrationLabelPattern, ' ')
     .slice(0, artifactReferenceLimits.label)
     .trim();
 
@@ -1878,7 +1905,7 @@ const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string
 };
 
 const migrateArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const unauthorized = await requireAdminToolAccess(event);
+  const unauthorized = await requireArtifactMigrationAccess(event);
   if (unauthorized) return unauthorized;
 
   const limit = normalizeArtifactReconcileLimit(input.limit);
