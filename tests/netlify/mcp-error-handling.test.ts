@@ -93,6 +93,90 @@ test('admin artifact browsing and reconciliation MCP tools require admin authent
   }
 });
 
+test('migrate_artifact_indexes accepts the server publish key without Clerk authentication', async () => {
+  const previousClerkSecret = process.env.CLERK_SECRET_KEY;
+  const previousPublishSecret = process.env.NETLIFY_PUBLISH_SECRET;
+  const previousNetlify = process.env.NETLIFY;
+  const publishSecret = 'mcp-migration-publish-secret';
+  const sha256 = 'a'.repeat(64);
+  const requestId = 'secret-migrate-request';
+  const artifactKey = `request-artifacts/${requestId}/${sha256}.json`;
+  const blobs = new Map<string, string>([
+    [
+      artifactKey,
+      JSON.stringify({
+        blobKey: `image/${requestId}/${sha256}.png`,
+        sizeBytes: 4,
+        sha256,
+        contentType: 'image/png',
+        createdAtISO: '2026-01-01T00:00:00.000Z',
+      }),
+    ],
+  ]);
+
+  delete process.env.CLERK_SECRET_KEY;
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'true';
+  setNetlifyBlobsModuleForTesting({
+    connectLambda() {},
+    getStore() {
+      return {
+        async set(key: string, value: string | Buffer | Uint8Array) {
+          blobs.set(key, Buffer.isBuffer(value) ? value.toString('utf8') : String(value));
+        },
+        async setJSON(key: string, value: unknown) {
+          blobs.set(key, JSON.stringify(value));
+        },
+        async get(key: string) {
+          return blobs.get(key) ?? null;
+        },
+        async del(key: string) {
+          blobs.delete(key);
+        },
+        async list(options?: { prefix?: string }) {
+          const prefix = options?.prefix ?? '';
+          return {
+            blobs: [...blobs.keys()].filter((key) => key.startsWith(prefix)).map((key) => ({ key, etag: key })),
+            directories: [],
+          };
+        },
+      };
+    },
+  });
+
+  try {
+    const response = await handler({
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json', 'x-publish-key': publishSecret },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'migrate_artifact_indexes', arguments: { limit: 1, dryRun: true } },
+      }),
+    });
+    const body = JSON.parse(response.body) as {
+      result: { isError?: boolean; structuredContent?: { migrated?: number; results?: Array<{ status: string }> } };
+    };
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(body.result.isError, undefined);
+    assert.equal(body.result.structuredContent?.migrated, 1);
+    assert.equal(body.result.structuredContent?.results?.[0]?.status, 'dry_run');
+  } finally {
+    setNetlifyBlobsModuleForTesting(undefined);
+
+    if (previousClerkSecret === undefined) delete process.env.CLERK_SECRET_KEY;
+    else process.env.CLERK_SECRET_KEY = previousClerkSecret;
+
+    if (previousPublishSecret === undefined) delete process.env.NETLIFY_PUBLISH_SECRET;
+    else process.env.NETLIFY_PUBLISH_SECRET = previousPublishSecret;
+
+    if (previousNetlify === undefined) delete process.env.NETLIFY;
+    else process.env.NETLIFY = previousNetlify;
+  }
+});
+
 test('MCP tools/call preserves structured tool errors from save-json-blob JSON responses', async () => {
   const previousPublishSecret = process.env.NETLIFY_PUBLISH_SECRET;
   const previousFallbackSecret = process.env.PUBLISH_SECRET;

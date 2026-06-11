@@ -353,9 +353,14 @@ export const getArtifactExtension = (filename: string | undefined): string => {
 
 const normalizeArtifactSafeString = (value: string) => value.trim().replace(/\s+/g, ' ');
 
-const hasUnsafeArtifactTextCharacters = (value: string) => /[\u0000-\u001f\u007f<>]/u.test(value);
+const artifactControlCharacters = `${String.fromCharCode(0)}-${String.fromCharCode(31)}${String.fromCharCode(127)}`;
+const unsafeArtifactTextPattern = new RegExp(`[${artifactControlCharacters}<>]`, 'u');
+const unsafeArtifactFilenamePattern = new RegExp(`[${artifactControlCharacters}<>/\\\\]`, 'u');
+const unsafeArtifactFilenameGlobalPattern = new RegExp(`[${artifactControlCharacters}<>/\\\\]+`, 'gu');
 
-const hasUnsafeArtifactFilenameCharacters = (value: string) => /[\u0000-\u001f\u007f<>/\\]/u.test(value);
+const hasUnsafeArtifactTextCharacters = (value: string) => unsafeArtifactTextPattern.test(value);
+
+const hasUnsafeArtifactFilenameCharacters = (value: string) => unsafeArtifactFilenamePattern.test(value);
 
 const getSafeArtifactStringIssue = (
   value: unknown,
@@ -386,7 +391,7 @@ export const isSafeArtifactFilename = (value: string, maxLength = artifactRefere
 
 const toSafeArtifactFilename = (filename: string | undefined, fallback: string) => {
   const candidate = filename ? basename(filename) : fallback;
-  const normalized = normalizeArtifactSafeString(candidate).replace(/[\u0000-\u001f\u007f<>/\\]+/gu, '-');
+  const normalized = normalizeArtifactSafeString(candidate).replace(unsafeArtifactFilenameGlobalPattern, '-');
   const truncated = normalized.slice(0, artifactReferenceLimits.originalFilename).replace(/^-+|-+$/g, '');
 
   return truncated || fallback.slice(0, artifactReferenceLimits.originalFilename);
