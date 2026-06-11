@@ -73,6 +73,7 @@ Registered core tool names:
 - `soft_delete_artifact` (admin-only)
 - `restore_artifact` (admin-only)
 - `migrate_artifact_indexes` (admin-only)
+- `wipe_blob_stores` (admin-only maintenance)
 - `reconcile_artifact_indexes` (admin-only)
 - `ping`
 
@@ -143,6 +144,7 @@ These tools require Clerk admin authentication and browse compact artifact-index
 - `soft_delete_artifact({ requestId, sha256, deletedBy? })` marks the request artifact index JSON with `deletedAtISO` and `deletedBy` while leaving artifact bytes in place.
 - `restore_artifact({ requestId, sha256 })` clears `deletedAtISO` and `deletedBy` on a soft-deleted request artifact index JSON.
 - `migrate_artifact_indexes({ cursor?, limit?, dryRun? })` scans `request-artifacts/{requestId}/{sha256}.json`, fills missing `artifactKind`, `originalFilename`, and `label`, writes `by-kind` and `by-request` pointers, and returns checkpoint cursors for idempotent batches.
+- `wipe_blob_stores({ dryRun?, confirm?, prefixes? })` requires the server publish key via `x-publish-key` or `Authorization: Bearer`; dry-runs by default and live deletion requires `confirm: "WIPE_BLOBS"`. It wipes only allowlisted logical prefixes: `workflows/`, `artifact-index/`, and artifact byte prefixes (`image/`, `pdf/`, `video/`, `doc/`, `audio/`, `data/`, `attachment/`, `other/`).
 - `reconcile_artifact_indexes({ requestId?, artifactKind?, limit? })` scans `request-artifacts/` JSON references, normalizes stale `blobKey` values, verifies backing artifact bytes, and corrects artifact-index JSON when one matching blob is found.
 
 Browse results include `artifacts`, `limit`, `cursor`, and `nextCursor`. Reconciliation results include compact scan/correction counts plus per-reference diagnostics.

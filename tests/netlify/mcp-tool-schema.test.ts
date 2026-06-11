@@ -290,6 +290,7 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'soft_delete_artifact',
     'restore_artifact',
     'migrate_artifact_indexes',
+    'wipe_blob_stores',
     'reconcile_artifact_indexes',
   ]) {
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
@@ -423,6 +424,12 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.ok(property(migrateArtifacts.inputSchema, 'dryRun'));
   assert.match(String((migrateArtifacts as { description?: string }).description), /one-time artifact-index migration/);
 
+  const wipeBlobStores = tools.get('wipe_blob_stores')!;
+  assert.ok(property(wipeBlobStores.inputSchema, 'dryRun'));
+  assert.ok(property(wipeBlobStores.inputSchema, 'confirm'));
+  assert.ok(property(wipeBlobStores.inputSchema, 'prefixes'));
+  assert.match(String((wipeBlobStores as { description?: string }).description), /maintenance tool/);
+
   const reconcileArtifacts = tools.get('reconcile_artifact_indexes')!;
   assert.ok(property(reconcileArtifacts.inputSchema, 'requestId'));
   assert.ok(property(reconcileArtifacts.inputSchema, 'artifactKind'));
@@ -446,6 +453,7 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     'soft_delete_artifact',
     'restore_artifact',
     'migrate_artifact_indexes',
+    'wipe_blob_stores',
     'reconcile_artifact_indexes',
   ]) {
     const serialized = JSON.stringify(tools.get(name));
