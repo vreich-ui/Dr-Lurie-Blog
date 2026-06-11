@@ -4,7 +4,19 @@ import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { getBlobListItems } from '../lib/blob-list.js';
-import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import {
+  artifactKindValues,
+  artifactReferenceLimits,
+  isArtifactReference,
+  isDeletedArtifactReference,
+  isSafeArtifactText,
+  normalizeArtifactBlobKey,
+  reconcileArtifactReference,
+  safePathSegment,
+  type ArtifactReference,
+} from '../lib/artifacts.js';
 
 type LambdaEvent = {
   blobs?: string;
@@ -40,6 +52,8 @@ const PROTOCOL_VERSION = '2025-06-18';
 const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'] as const;
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
+const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
+const ARTIFACT_LIST_MAX_LIMIT = 100;
 const PUBLICATION_STATUS_DESCRIPTION =
   'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
 
@@ -268,7 +282,7 @@ const adminPublishValidationModeSchema = {
 
 const artifactKindJsonSchema = (description?: string) => ({
   type: 'string',
-  enum: ['image', 'audio', 'video', 'binary', 'markdown'],
+  enum: [...artifactKindValues],
   ...(description ? { description } : {}),
 });
 const artifactEncodingJsonSchema = (description?: string) => ({
@@ -277,6 +291,24 @@ const artifactEncodingJsonSchema = (description?: string) => ({
   ...(description ? { description } : {}),
 });
 const artifactMetadataJsonSchema = metadataBagSchema('Optional artifact metadata saved in the artifact reference.');
+const artifactLabelJsonSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: artifactReferenceLimits.label,
+  pattern: '^[^\\u0000-\\u001f\\u007f<>]+$',
+  description: 'Optional safe human-readable artifact label saved in the ArtifactReference.',
+};
+const artifactTagsJsonSchema = {
+  type: 'array',
+  maxItems: artifactReferenceLimits.tags,
+  items: {
+    type: 'string',
+    minLength: 1,
+    maxLength: artifactReferenceLimits.tag,
+    pattern: '^[^\\u0000-\\u001f\\u007f<>]+$',
+  },
+  description: 'Optional safe ArtifactReference tags for filtering or display.',
+};
 const expectedSizeBytesJsonSchema = intSchema(
   'Optional expected complete artifact byte size for upload integrity checks.'
 );
@@ -285,6 +317,49 @@ const expectedSha256JsonSchema = {
   pattern: '^[a-fA-F0-9]{64}$',
   description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
 };
+
+const artifactListLimitJsonSchema = {
+  type: 'integer',
+  minimum: 1,
+  maximum: ARTIFACT_LIST_MAX_LIMIT,
+  description: `Optional result limit; defaults to ${ARTIFACT_LIST_DEFAULT_LIMIT}, max ${ARTIFACT_LIST_MAX_LIMIT}.`,
+};
+const artifactListCursorJsonSchema = stringSchema(
+  'Optional opaque pagination cursor returned by a previous list call.'
+);
+const artifactReconcileLimitJsonSchema = {
+  type: 'integer',
+  minimum: 1,
+  maximum: ARTIFACT_LIST_MAX_LIMIT,
+  description: `Optional maximum number of artifact-index JSON references to reconcile; defaults to ${ARTIFACT_LIST_DEFAULT_LIMIT}, max ${ARTIFACT_LIST_MAX_LIMIT}.`,
+};
+const artifactMigrationDryRunJsonSchema = {
+  type: 'boolean',
+  description: 'When true, report migration actions without writing artifact-index records or pointers.',
+};
+const artifactIncludeDeletedJsonSchema = {
+  type: 'boolean',
+  description: 'When true, include soft-deleted artifact references. Defaults to false.',
+};
+const artifactDeletedByJsonSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: artifactReferenceLimits.label,
+  pattern: '^[^\u0000-\u001f\u007f<>]+$',
+  description: 'Optional safe actor label recorded as deletedBy; defaults to the authenticated admin email or user id.',
+};
+
+const artifactSearchTagJsonSchema = {
+  type: 'string',
+  minLength: 1,
+  maxLength: artifactReferenceLimits.tag,
+  description: 'Optional tag to search via artifact-index/by-tag pointers.',
+};
+const isoDateStringSchema = (description: string) => ({
+  type: 'string',
+  format: 'date-time',
+  description,
+});
 
 const publishPayloadJsonSchema = objectSchema(
   {
@@ -757,19 +832,24 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_artifact',
     description:
-      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, audio, video, binary, or markdown bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
+      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
         artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
         contentType: stringSchema('MIME type for the artifact bytes.'),
-        filename: stringSchema('Optional original filename used only for the blob extension.'),
+        filename: {
+          ...stringSchema('Optional original filename used for blob extension and ArtifactReference originalFilename.'),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
         encoding: artifactEncodingJsonSchema('Payload encoding; defaults to base64.'),
         expectedSizeBytes: expectedSizeBytesJsonSchema,
         expectedSha256: expectedSha256JsonSchema,
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
         payload: stringSchema('Artifact bytes as base64 unless encoding is binary.'),
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
       },
       ['requestId', 'artifactKind', 'contentType', 'payload']
@@ -787,13 +867,20 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         clientUploadId: stringSchema('Stable UUID shared by every chunk in this upload.'),
         chunkIndex: intSchema('Zero-based chunk index.'),
         totalChunks: { type: 'integer', minimum: 1, description: 'Total number of chunks in this upload.' },
-        filename: stringSchema('Optional original filename used only for the final blob extension.'),
+        filename: {
+          ...stringSchema(
+            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
+          ),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
         encoding: artifactEncodingJsonSchema('Chunk payload encoding; defaults to base64.'),
         expectedSizeBytes: expectedSizeBytesJsonSchema,
         expectedSha256: expectedSha256JsonSchema,
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
         payload: stringSchema('Chunk bytes as base64 unless encoding is binary.'),
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
       },
       ['requestId', 'artifactKind', 'contentType', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload']
@@ -807,6 +894,93 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       { requestId: stringSchema('Workflow request id whose artifact references should be listed.') },
       ['requestId']
     ),
+  },
+  {
+    name: 'list_artifacts_by_kind',
+    description:
+      'Admin-only artifact browser. Lists artifacts via artifact-index/by-kind/{artifactKind}/ pointers and resolves them to ArtifactReference objects. Does not read artifact bytes.',
+    inputSchema: objectSchema(
+      {
+        artifactKind: artifactKindJsonSchema('Artifact kind pointer prefix to browse.'),
+        limit: artifactListLimitJsonSchema,
+        cursor: artifactListCursorJsonSchema,
+        includeDeleted: artifactIncludeDeletedJsonSchema,
+      },
+      ['artifactKind']
+    ),
+  },
+  {
+    name: 'list_artifacts_by_request',
+    description:
+      'Admin-only artifact browser. Lists artifacts via artifact-index/by-request/{requestId}/ pointers, optionally scoped by artifactKind, and resolves them to ArtifactReference objects. Does not read artifact bytes.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id to browse artifacts for.'),
+        artifactKind: artifactKindJsonSchema('Optional artifact kind pointer prefix within the request.'),
+        limit: artifactListLimitJsonSchema,
+        cursor: artifactListCursorJsonSchema,
+        includeDeleted: artifactIncludeDeletedJsonSchema,
+      },
+      ['requestId']
+    ),
+  },
+  {
+    name: 'search_artifacts',
+    description:
+      'Admin-only artifact search using prefix indexes, not full text search. With tag, lists artifact-index/by-tag/{tag}/ pointers; without tag, lists by-kind pointer prefixes. Optional createdAfter/createdBefore filters are applied after resolving ArtifactReference objects. Does not read artifact bytes.',
+    inputSchema: objectSchema({
+      tag: artifactSearchTagJsonSchema,
+      createdAfter: isoDateStringSchema('Optional inclusive lower createdAtISO bound.'),
+      createdBefore: isoDateStringSchema('Optional inclusive upper createdAtISO bound.'),
+      limit: artifactListLimitJsonSchema,
+      cursor: artifactListCursorJsonSchema,
+      includeDeleted: artifactIncludeDeletedJsonSchema,
+    }),
+  },
+  {
+    name: 'soft_delete_artifact',
+    description:
+      'Admin-only soft delete for an ArtifactReference. Marks request-artifacts/{requestId}/{sha256}.json with deletedAtISO/deletedBy and leaves binary artifact bytes in place.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns the artifact reference.'),
+        sha256: expectedSha256JsonSchema,
+        deletedBy: artifactDeletedByJsonSchema,
+      },
+      ['requestId', 'sha256']
+    ),
+  },
+  {
+    name: 'restore_artifact',
+    description:
+      'Admin-only restore for a soft-deleted ArtifactReference. Clears deletedAtISO/deletedBy on request-artifacts/{requestId}/{sha256}.json and keeps existing blob bytes untouched.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns the artifact reference.'),
+        sha256: expectedSha256JsonSchema,
+      },
+      ['requestId', 'sha256']
+    ),
+  },
+  {
+    name: 'migrate_artifact_indexes',
+    description:
+      'Admin-only one-time artifact-index migration. Scans request-artifacts/{requestId}/{sha256}.json, fills missing artifactKind/originalFilename/label fields, writes by-kind and by-request pointers, and returns cursor checkpoints for large idempotent batches.',
+    inputSchema: objectSchema({
+      cursor: artifactListCursorJsonSchema,
+      limit: artifactReconcileLimitJsonSchema,
+      dryRun: artifactMigrationDryRunJsonSchema,
+    }),
+  },
+  {
+    name: 'reconcile_artifact_indexes',
+    description:
+      'Admin-only artifact-index correction job. Reads request-artifacts JSON references, normalizes blobKeys, checks artifact bytes, corrects stale artifact-index blobKey values when a single matching blob is found, and returns compact correction diagnostics.',
+    inputSchema: objectSchema({
+      requestId: stringSchema('Optional workflow request id to reconcile; omit to scan request-artifacts by prefix.'),
+      artifactKind: artifactKindJsonSchema('Optional artifact kind to reconcile after reading request-artifacts JSON.'),
+      limit: artifactReconcileLimitJsonSchema,
+    }),
   },
   {
     name: 'ping',
@@ -896,6 +1070,22 @@ const getHeader = (headers: LambdaEvent['headers'], name: string) => {
   const entry = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
 
   return entry?.[1];
+};
+
+const getAuthorizationBearerToken = (event: LambdaEvent) => {
+  const authorization = getHeader(event.headers, 'authorization') ?? '';
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+
+  return match?.[1]?.trim();
+};
+
+const isAuthorizedWithPublishSecret = (event: LambdaEvent) => {
+  const provided = getAuthorizationBearerToken(event);
+  const expectedSecrets = [process.env.PUBLISH_SECRET, process.env.NETLIFY_PUBLISH_SECRET].filter(
+    (secret): secret is string => Boolean(secret)
+  );
+
+  return Boolean(provided && expectedSecrets.some((expected) => safeSecretsMatch(provided, expected)));
 };
 
 const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) => ({
@@ -1179,30 +1369,669 @@ const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown
   return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, agentName), 'record');
 };
 
+type ArtifactIndexStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>>;
+type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
+
+type ArtifactBrowseOptions = {
+  createdAfter?: Date;
+  createdBefore?: Date;
+  cursor: number;
+  includeDeleted: boolean;
+  limit: number;
+};
+
+const requestArtifactReferenceKey = (requestId: string, sha256: string) => {
+  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
+};
+
+const parseJsonBlob = async (store: ArtifactIndexStore, key: string) => {
+  const text = await store.get(key);
+  if (!text) return undefined;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+};
+
+const loadArtifactFromPointer = async (store: ArtifactIndexStore, pointer: unknown) => {
+  const value = getRecordValue(pointer);
+  const pointerRequestId = toNonEmptyString(value?.requestId);
+  const sha256 = toNonEmptyString(value?.sha256);
+
+  if (!pointerRequestId || !sha256) return undefined;
+
+  return parseJsonBlob(store, requestArtifactReferenceKey(pointerRequestId, sha256));
+};
+
+const listPointerKeys = async (store: ArtifactIndexStore, prefixes: string[]) => {
+  const keys: string[] = [];
+
+  for (const prefix of prefixes) {
+    const result = await store.list({ prefix });
+    keys.push(...getBlobListItems(result).map((blob) => blob.key));
+  }
+
+  return [...new Set(keys)].filter((key) => key.endsWith('.json')).sort();
+};
+
+const loadArtifactsFromPrefix = async (store: ArtifactIndexStore, prefix: string) => {
+  const keys = await listPointerKeys(store, [prefix]);
+
+  return Promise.all(keys.map((key) => parseJsonBlob(store, key)));
+};
+
+const loadArtifactIndexKeysFromPrefix = async (store: ArtifactIndexStore, prefix: string, limit: number) => {
+  const keys = await listPointerKeys(store, [prefix]);
+
+  return keys.slice(0, limit);
+};
+
+const normalizeArtifactReconcileLimit = (limit: unknown) => {
+  if (limit === undefined || limit === null) return { ok: true as const, value: ARTIFACT_LIST_DEFAULT_LIMIT };
+  if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > ARTIFACT_LIST_MAX_LIMIT) {
+    return { ok: false as const, error: `limit must be an integer from 1 to ${ARTIFACT_LIST_MAX_LIMIT}.` };
+  }
+
+  return { ok: true as const, value: limit as number };
+};
+
+const normalizeIndexedArtifactReference = (value: unknown) => {
+  const record = getRecordValue(value);
+  const originalBlobKey = toNonEmptyString(record?.blobKey);
+  if (!record || !originalBlobKey) return undefined;
+
+  const normalized = { ...record, blobKey: normalizeArtifactBlobKey(originalBlobKey) };
+  if (!isArtifactReference(normalized)) return undefined;
+
+  return { originalBlobKey, reference: { ...normalized, blobKey: originalBlobKey } as ArtifactReference };
+};
+
+const getArtifactKindFromBlobKey = (blobKey: string) => normalizeArtifactBlobKey(blobKey).split('/')[0] || '';
+
+const summarizeArtifactReconciliation = (
+  indexKey: string,
+  reference: ArtifactReference,
+  result: Awaited<ReturnType<typeof reconcileArtifactReference>>
+) => ({
+  indexKey,
+  sha256: reference.sha256,
+  previousBlobKey: reference.blobKey,
+  status: result.status,
+  blobKey: result.blobKey,
+  ...(result.status === 'found' && result.correctedBlobKey ? { correctedBlobKey: result.correctedBlobKey } : {}),
+  ...(result.status === 'missing'
+    ? { exactFilenameExists: result.exactFilenameExists, nearbyCount: result.nearbyKeys.length }
+    : {}),
+  ...(result.status === 'ambiguous' ? { matchingKeys: result.matchingKeys } : {}),
+});
+
+type ArtifactReconciliationSummary = ReturnType<typeof summarizeArtifactReconciliation>;
+
+const reconcileArtifactIndexKeys = async (
+  artifactStore: ArtifactBlobStore,
+  indexStore: ArtifactIndexStore,
+  keys: string[],
+  artifactKind?: string
+) => {
+  const results: ArtifactReconciliationSummary[] = [];
+  let skipped = 0;
+
+  for (const indexKey of keys) {
+    const normalized = normalizeIndexedArtifactReference(await parseJsonBlob(indexStore, indexKey));
+    if (!normalized) {
+      skipped += 1;
+      continue;
+    }
+
+    if (artifactKind && getArtifactKindFromBlobKey(normalized.reference.blobKey) !== artifactKind) {
+      skipped += 1;
+      continue;
+    }
+
+    const result = await reconcileArtifactReference(normalized.reference, artifactStore, indexStore, {
+      logger: console,
+    });
+    results.push(summarizeArtifactReconciliation(indexKey, normalized.reference, result));
+  }
+
+  return { results, skipped };
+};
+
+const normalizeArtifactBrowseLimit = (limit: unknown) => {
+  if (limit === undefined || limit === null) return { ok: true as const, value: ARTIFACT_LIST_DEFAULT_LIMIT };
+  if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > ARTIFACT_LIST_MAX_LIMIT) {
+    return { ok: false as const, error: `limit must be an integer from 1 to ${ARTIFACT_LIST_MAX_LIMIT}.` };
+  }
+
+  return { ok: true as const, value: limit as number };
+};
+
+const normalizeArtifactBrowseCursor = (cursor: unknown) => {
+  if (cursor === undefined || cursor === null || cursor === '') return { ok: true as const, value: 0 };
+  if (typeof cursor !== 'string' || !/^\d+$/.test(cursor)) {
+    return { ok: false as const, error: 'cursor must be a cursor string returned by a previous artifact list call.' };
+  }
+
+  return { ok: true as const, value: Number(cursor) };
+};
+
+const normalizeArtifactBrowseOptions = (
+  input: Record<string, unknown>
+): ArtifactBrowseOptions | ReturnType<typeof toolError> => {
+  const limit = normalizeArtifactBrowseLimit(input.limit);
+  if (!limit.ok) return toolError(limit.error);
+
+  const cursor = normalizeArtifactBrowseCursor(input.cursor);
+  if (!cursor.ok) return toolError(cursor.error);
+
+  const createdAfter = input.createdAfter === undefined ? undefined : new Date(String(input.createdAfter));
+  if (createdAfter && Number.isNaN(createdAfter.getTime()))
+    return toolError('createdAfter must be a valid ISO date string.');
+
+  const createdBefore = input.createdBefore === undefined ? undefined : new Date(String(input.createdBefore));
+  if (createdBefore && Number.isNaN(createdBefore.getTime())) {
+    return toolError('createdBefore must be a valid ISO date string.');
+  }
+
+  return {
+    limit: limit.value,
+    cursor: cursor.value,
+    includeDeleted: input.includeDeleted === true,
+    createdAfter,
+    createdBefore,
+  };
+};
+
+const isArtifactBrowseOptions = (
+  value: ArtifactBrowseOptions | ReturnType<typeof toolError>
+): value is ArtifactBrowseOptions => !('isError' in value);
+
+const paginateArtifacts = (artifacts: unknown[], limit: number, cursor: number) => {
+  const page = artifacts.slice(cursor, cursor + limit);
+  const nextOffset = cursor + page.length;
+
+  return {
+    artifacts: page,
+    limit,
+    cursor: String(cursor),
+    nextCursor: nextOffset < artifacts.length ? String(nextOffset) : null,
+  };
+};
+
+const getArtifactCreatedAtMs = (artifact: unknown) => {
+  const value = getRecordValue(artifact);
+  const createdAtISO = toNonEmptyString(value?.createdAtISO);
+
+  return createdAtISO ? Date.parse(createdAtISO) : Number.NaN;
+};
+
+const filterArtifactsForBrowse = (artifacts: unknown[], options: ArtifactBrowseOptions) => {
+  const visibleArtifacts = options.includeDeleted
+    ? artifacts
+    : artifacts.filter((artifact) => !isDeletedArtifactReference(artifact));
+
+  if (!options.createdAfter && !options.createdBefore) return visibleArtifacts;
+
+  const afterMs = options.createdAfter?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const beforeMs = options.createdBefore?.getTime() ?? Number.POSITIVE_INFINITY;
+
+  return visibleArtifacts.filter((artifact) => {
+    const createdAtMs = getArtifactCreatedAtMs(artifact);
+
+    return Number.isFinite(createdAtMs) && createdAtMs >= afterMs && createdAtMs <= beforeMs;
+  });
+};
+
+const listArtifactsFromPointerPrefixes = async (
+  event: LambdaEvent,
+  prefixes: string[],
+  options: ArtifactBrowseOptions
+) => {
+  const store = await getArtifactIndexBlobStore(event);
+  const pointerKeys = await listPointerKeys(store, prefixes);
+  const artifacts = await Promise.all(
+    pointerKeys.map(async (key) => loadArtifactFromPointer(store, await parseJsonBlob(store, key)))
+  );
+  const filteredArtifacts = filterArtifactsForBrowse(
+    artifacts.filter((artifact) => artifact !== undefined),
+    options
+  );
+
+  return toolResult(paginateArtifacts(filteredArtifacts, options.limit, options.cursor));
+};
+
+const getAdminToolState = async (event: LambdaEvent) => {
+  if (isAuthorizedWithPublishSecret(event)) {
+    return { authenticated: true, isAdmin: true, userId: 'publish-secret' };
+  }
+
+  const adminState = await getAdminStateFromEvent(event);
+
+  if (!adminState.authenticated) return toolError(adminState.error || 'A valid admin session token is required.');
+  if (!adminState.isAdmin) return toolError('This user is not authorized to browse artifacts.');
+
+  return adminState;
+};
+
+const requireAdminToolAccess = async (event: LambdaEvent) => {
+  const adminState = await getAdminToolState(event);
+
+  return 'isError' in adminState ? adminState : undefined;
+};
+
+const normalizeArtifactKindInput = (value: unknown, required: boolean) => {
+  const artifactKind = toNonEmptyString(value);
+  if (!artifactKind)
+    return required ? { ok: false as const, error: 'artifactKind is required.' } : { ok: true as const };
+  if (!artifactKindValues.includes(artifactKind as (typeof artifactKindValues)[number])) {
+    return { ok: false as const, error: `artifactKind must be one of: ${artifactKindValues.join(', ')}.` };
+  }
+
+  return { ok: true as const, artifactKind };
+};
+
+const normalizeArtifactSha256Input = (value: unknown) => {
+  const sha256 = toNonEmptyString(value)?.toLowerCase();
+  if (!sha256) return { ok: false as const, error: 'sha256 is required.' };
+  if (!/^[a-f0-9]{64}$/.test(sha256)) return { ok: false as const, error: 'sha256 must be a 64-character hex digest.' };
+
+  return { ok: true as const, sha256 };
+};
+
+const loadArtifactReferenceForAdminMutation = async (store: ArtifactIndexStore, requestId: string, sha256: string) => {
+  const artifact = await parseJsonBlob(store, requestArtifactReferenceKey(requestId, sha256));
+
+  if (!artifact) return { ok: false as const, error: 'Artifact reference was not found.' };
+  if (!isArtifactReference(artifact)) return { ok: false as const, error: 'Artifact reference JSON is invalid.' };
+
+  return { ok: true as const, artifact };
+};
+
+const writeArtifactReferenceForAdminMutation = async (
+  store: ArtifactIndexStore,
+  requestId: string,
+  artifact: ArtifactReference
+) => {
+  await store.setJSON(requestArtifactReferenceKey(requestId, artifact.sha256), artifact, {
+    metadata: {
+      requestId,
+      sha256: artifact.sha256,
+      contentType: artifact.contentType,
+      ...(artifact.deletedAtISO ? { deletedAtISO: artifact.deletedAtISO } : {}),
+    },
+  });
+};
+
+const normalizeDeletedByInput = (value: unknown, fallback: string) => {
+  const deletedBy = toNonEmptyString(value) ?? fallback;
+
+  if (!isSafeArtifactText(deletedBy, artifactReferenceLimits.label)) {
+    return {
+      ok: false as const,
+      error: `deletedBy must be a safe string up to ${artifactReferenceLimits.label} characters.`,
+    };
+  }
+
+  return { ok: true as const, deletedBy };
+};
+
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
-  if (typeof requestId !== 'string' || requestId.trim().length === 0) {
+  const normalizedRequestId = typeof requestId === 'string' ? requestId.trim() : '';
+  if (!normalizedRequestId) {
     return toolError('requestId is required.');
   }
 
   const store = await getArtifactIndexBlobStore(event);
-  const prefix = `request-artifacts/${encodeURIComponent(requestId)}/`;
-  const result = await store.list({ prefix });
-  const blobs = getBlobListItems(result);
-  const artifacts = await Promise.all(
-    blobs.map(async (blob) => {
-      const text = await store.get(blob.key);
+  const pointerPrefix = `by-request/${encodeURIComponent(normalizedRequestId)}/`;
+  const pointerResult = await store.list({ prefix: pointerPrefix });
+  const pointerBlobs = getBlobListItems(pointerResult);
+  const artifacts = pointerBlobs.length
+    ? await Promise.all(
+        pointerBlobs.map(async (blob) => loadArtifactFromPointer(store, await parseJsonBlob(store, blob.key)))
+      )
+    : await loadArtifactsFromPrefix(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`);
 
-      if (!text) return undefined;
+  return toolResult({
+    artifacts: artifacts.filter((artifact) => artifact !== undefined && !isDeletedArtifactReference(artifact)),
+  });
+};
 
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        return undefined;
-      }
-    })
+const listArtifactsByKind = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const artifactKind = normalizeArtifactKindInput(input.artifactKind, true);
+  if (!artifactKind.ok) return toolError(artifactKind.error);
+
+  const options = normalizeArtifactBrowseOptions(input);
+  if (!isArtifactBrowseOptions(options)) return options;
+
+  return listArtifactsFromPointerPrefixes(event, [`by-kind/${artifactKind.artifactKind}/`], options);
+};
+
+const listArtifactsByRequest = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return toolError('requestId is required.');
+
+  const artifactKind = normalizeArtifactKindInput(input.artifactKind, false);
+  if (!artifactKind.ok) return toolError(artifactKind.error);
+
+  const options = normalizeArtifactBrowseOptions(input);
+  if (!isArtifactBrowseOptions(options)) return options;
+
+  const prefix = artifactKind.artifactKind
+    ? `by-request/${encodeURIComponent(requestId)}/${artifactKind.artifactKind}/`
+    : `by-request/${encodeURIComponent(requestId)}/`;
+
+  return listArtifactsFromPointerPrefixes(event, [prefix], options);
+};
+
+const searchArtifacts = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const options = normalizeArtifactBrowseOptions(input);
+  if (!isArtifactBrowseOptions(options)) return options;
+
+  const tag = toNonEmptyString(input.tag);
+  const normalizedTag = tag ? safePathSegment(tag) : undefined;
+  if (tag && !normalizedTag) return toolError('tag must contain at least one safe path character.');
+
+  const prefixes = normalizedTag
+    ? [`by-tag/${normalizedTag}/`]
+    : artifactKindValues.map((artifactKind) => `by-kind/${artifactKind}/`);
+
+  return listArtifactsFromPointerPrefixes(event, prefixes, options);
+};
+
+const requestArtifactKeyPattern = /^request-artifacts\/([^/]+)\/([a-f0-9]{64})\.json$/i;
+
+const parseRequestArtifactIndexKey = (key: string) => {
+  const match = key.match(requestArtifactKeyPattern);
+  if (!match) return undefined;
+
+  return { requestId: decodeURIComponent(match[1]), sha256: match[2].toLowerCase() };
+};
+
+const inferArtifactKindFromContentType = (contentType: unknown) => {
+  const normalized = toNonEmptyString(contentType)?.toLowerCase().split(';', 1)[0] ?? '';
+  if (normalized.startsWith('image/')) return 'image';
+  if (normalized.startsWith('video/')) return 'video';
+  if (normalized.startsWith('audio/')) return 'audio';
+  if (normalized === 'application/pdf') return 'pdf';
+  if (
+    normalized.startsWith('text/') ||
+    normalized.includes('document') ||
+    normalized === 'application/msword' ||
+    normalized === 'application/rtf'
+  ) {
+    return 'doc';
+  }
+  if (normalized.includes('json') || normalized.includes('csv') || normalized.includes('xml')) return 'data';
+
+  return 'other';
+};
+
+const getMigrationArtifactKind = (record: Record<string, unknown>, blobKey: string): string => {
+  const explicitKind = toNonEmptyString(record.artifactKind);
+  if (explicitKind && artifactKindValues.includes(explicitKind as (typeof artifactKindValues)[number]))
+    return explicitKind;
+
+  const [blobKeyKind] = normalizeArtifactBlobKey(blobKey).split('/');
+  if (artifactKindValues.includes(blobKeyKind as (typeof artifactKindValues)[number])) return blobKeyKind;
+
+  return inferArtifactKindFromContentType(record.contentType);
+};
+
+const normalizeMigrationFilename = (value: string) => {
+  const filename = value.split(/[\\/]/).pop() || value;
+  const normalized = filename
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f<>\\/]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, artifactReferenceLimits.originalFilename);
+
+  return normalized || 'artifact';
+};
+
+const normalizeMigrationLabel = (value: string) => {
+  const normalized = value
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[\u0000-\u001f\u007f<>]+/gu, ' ')
+    .slice(0, artifactReferenceLimits.label)
+    .trim();
+
+  return normalized || 'Artifact';
+};
+
+const getMigrationFilename = (record: Record<string, unknown>, blobKey: string, sha256: string) => {
+  const metadata = getRecordValue(record.metadata);
+  const metadataFilename = toNonEmptyString(metadata?.filename) ?? toNonEmptyString(metadata?.name);
+  const existingFilename = toNonEmptyString(record.originalFilename);
+  const blobFilename = normalizeArtifactBlobKey(blobKey).split('/').pop();
+
+  return normalizeMigrationFilename(existingFilename ?? metadataFilename ?? blobFilename ?? sha256);
+};
+
+const getMigrationTags = (value: unknown) => {
+  if (!Array.isArray(value)) return undefined;
+
+  const tags = value.filter((tag): tag is string => typeof tag === 'string' && Boolean(tag.trim()));
+
+  return tags.length ? tags : undefined;
+};
+
+const buildArtifactPointer = (requestId: string, artifact: ArtifactReference) => ({
+  requestId,
+  sha256: artifact.sha256,
+  artifactKind: artifact.artifactKind ?? getArtifactKindFromBlobKey(artifact.blobKey),
+});
+
+const writeMigratedArtifactPointers = async (
+  store: ArtifactIndexStore,
+  requestId: string,
+  artifact: ArtifactReference
+) => {
+  const pointer = buildArtifactPointer(requestId, artifact);
+  const pointerMetadata = { requestId, sha256: artifact.sha256, artifactKind: pointer.artifactKind };
+
+  await Promise.all([
+    store.setJSON(`by-kind/${pointer.artifactKind}/${artifact.sha256}.json`, pointer, { metadata: pointerMetadata }),
+    store.setJSON(
+      `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${artifact.sha256}.json`,
+      pointer,
+      { metadata: pointerMetadata }
+    ),
+  ]);
+};
+
+const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string, input: { dryRun: boolean }) => {
+  const parsedKey = parseRequestArtifactIndexKey(key);
+  if (!parsedKey) return { indexKey: key, status: 'skipped' as const, reason: 'unexpected request artifact key shape' };
+
+  const raw = await parseJsonBlob(store, key);
+  const record = getRecordValue(raw);
+  const blobKey = toNonEmptyString(record?.blobKey);
+  if (!record || !blobKey) return { indexKey: key, status: 'skipped' as const, reason: 'invalid artifact JSON' };
+
+  const normalizedBlobKey = normalizeArtifactBlobKey(blobKey);
+  const artifactKind = getMigrationArtifactKind(record, normalizedBlobKey);
+  const originalFilename = getMigrationFilename(record, normalizedBlobKey, parsedKey.sha256);
+  const label = normalizeMigrationLabel(toNonEmptyString(record.label) ?? originalFilename);
+  const tags = getMigrationTags(record.tags);
+  const migratedRecord = {
+    ...record,
+    blobKey: normalizedBlobKey,
+    sha256: parsedKey.sha256,
+    artifactKind,
+    originalFilename,
+    label,
+    ...(tags ? { tags } : {}),
+  };
+
+  if (!isArtifactReference(migratedRecord)) {
+    return { indexKey: key, status: 'skipped' as const, reason: 'artifact JSON is still invalid after migration' };
+  }
+
+  const referenceChanged = JSON.stringify(record) !== JSON.stringify(migratedRecord);
+  if (!input.dryRun) {
+    if (referenceChanged) await writeArtifactReferenceForAdminMutation(store, parsedKey.requestId, migratedRecord);
+    await writeMigratedArtifactPointers(store, parsedKey.requestId, migratedRecord);
+  }
+
+  return {
+    indexKey: key,
+    requestId: parsedKey.requestId,
+    sha256: parsedKey.sha256,
+    artifactKind,
+    status: input.dryRun ? ('dry_run' as const) : ('migrated' as const),
+    referenceUpdated: referenceChanged,
+    pointersWritten: input.dryRun ? 0 : 2,
+  };
+};
+
+const migrateArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const limit = normalizeArtifactReconcileLimit(input.limit);
+  if (!limit.ok) return toolError(limit.error);
+
+  const cursor = normalizeArtifactBrowseCursor(input.cursor);
+  if (!cursor.ok) return toolError(cursor.error);
+
+  const dryRun = input.dryRun === true;
+  const store = await getArtifactIndexBlobStore(event);
+  const keys = await listPointerKeys(store, ['request-artifacts/']);
+  const pageKeys = keys.slice(cursor.value, cursor.value + limit.value);
+  const results: Array<Awaited<ReturnType<typeof migrateArtifactIndexRecord>>> = [];
+
+  for (const key of pageKeys) {
+    results.push(await migrateArtifactIndexRecord(store, key, { dryRun }));
+  }
+
+  const nextOffset = cursor.value + pageKeys.length;
+  const nextCursor = nextOffset < keys.length ? String(nextOffset) : null;
+  const checkpoint = {
+    cursor: String(cursor.value),
+    nextCursor,
+    lastKey: pageKeys.at(-1) ?? null,
+    processed: results.length,
+    totalKeys: keys.length,
+  };
+  const migrated = results.filter((result) => result.status === 'migrated' || result.status === 'dry_run').length;
+  const skipped = results.filter((result) => result.status === 'skipped').length;
+  const referenceUpdates = results.filter((result) => 'referenceUpdated' in result && result.referenceUpdated).length;
+  const pointerWrites = results.reduce(
+    (count, result) => count + ('pointersWritten' in result ? (result.pointersWritten ?? 0) : 0),
+    0
   );
 
-  return toolResult({ artifacts: artifacts.filter((artifact) => artifact !== undefined) });
+  console.info('Artifact index migration checkpoint.', { dryRun, migrated, skipped, referenceUpdates, ...checkpoint });
+
+  return toolResult({
+    dryRun,
+    scanned: pageKeys.length,
+    migrated,
+    skipped,
+    referenceUpdates,
+    pointerWrites,
+    checkpoint,
+    results,
+  });
+};
+
+const softDeleteArtifact = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const adminState = await getAdminToolState(event);
+  if ('isError' in adminState) return adminState;
+
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return toolError('requestId is required.');
+
+  const sha256 = normalizeArtifactSha256Input(input.sha256);
+  if (!sha256.ok) return toolError(sha256.error);
+
+  const store = await getArtifactIndexBlobStore(event);
+  const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
+  if (!loaded.ok) return toolError(loaded.error);
+
+  const deletedBy = normalizeDeletedByInput(input.deletedBy, adminState.email ?? adminState.userId ?? 'admin');
+  if (!deletedBy.ok) return toolError(deletedBy.error);
+
+  const deletedArtifact: ArtifactReference = {
+    ...loaded.artifact,
+    deletedAtISO: loaded.artifact.deletedAtISO ?? new Date().toISOString(),
+    deletedBy: loaded.artifact.deletedBy ?? deletedBy.deletedBy,
+  };
+
+  await writeArtifactReferenceForAdminMutation(store, requestId, deletedArtifact);
+
+  return toolResult({ artifact: deletedArtifact, deleted: true });
+};
+
+const restoreArtifact = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return toolError('requestId is required.');
+
+  const sha256 = normalizeArtifactSha256Input(input.sha256);
+  if (!sha256.ok) return toolError(sha256.error);
+
+  const store = await getArtifactIndexBlobStore(event);
+  const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
+  if (!loaded.ok) return toolError(loaded.error);
+
+  const { deletedAtISO, deletedBy, ...restoredArtifact } = loaded.artifact;
+  await writeArtifactReferenceForAdminMutation(store, requestId, restoredArtifact);
+
+  return toolResult({ artifact: restoredArtifact, restored: Boolean(deletedAtISO || deletedBy) });
+};
+
+const reconcileArtifactIndexes = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
+  const artifactKind = normalizeArtifactKindInput(input.artifactKind, false);
+  if (!artifactKind.ok) return toolError(artifactKind.error);
+
+  const limit = normalizeArtifactReconcileLimit(input.limit);
+  if (!limit.ok) return toolError(limit.error);
+
+  const requestId = toNonEmptyString(input.requestId);
+  const prefix = requestId ? `request-artifacts/${encodeURIComponent(requestId)}/` : 'request-artifacts/';
+  const indexStore = await getArtifactIndexBlobStore(event);
+  const artifactStore = await getArtifactBlobStore(event);
+  const keys = await loadArtifactIndexKeysFromPrefix(indexStore, prefix, limit.value);
+  const { results, skipped } = await reconcileArtifactIndexKeys(
+    artifactStore,
+    indexStore,
+    keys,
+    artifactKind.artifactKind
+  );
+  const corrected = results.filter((result) => 'correctedBlobKey' in result).length;
+  const found = results.filter((result) => result.status === 'found').length;
+  const missing = results.filter((result) => result.status === 'missing').length;
+  const ambiguous = results.filter((result) => result.status === 'ambiguous').length;
+
+  return toolResult({
+    scanned: keys.length,
+    reconciled: results.length,
+    corrected,
+    found,
+    missing,
+    ambiguous,
+    skipped,
+    results,
+  });
 };
 
 const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
@@ -1295,6 +2124,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         localSizeBytes: input.localSizeBytes,
         localSha256: input.localSha256,
         payload: input.payload,
+        label: input.label,
+        tags: input.tags,
         metadata: input.metadata,
       });
     case 'save_artifact_chunk':
@@ -1312,10 +2143,26 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         localSizeBytes: input.localSizeBytes,
         localSha256: input.localSha256,
         payload: input.payload,
+        label: input.label,
+        tags: input.tags,
         metadata: input.metadata,
       });
     case 'list_artifacts_for_request':
       return listArtifactsForRequest(event, input.requestId);
+    case 'list_artifacts_by_kind':
+      return listArtifactsByKind(event, input);
+    case 'list_artifacts_by_request':
+      return listArtifactsByRequest(event, input);
+    case 'search_artifacts':
+      return searchArtifacts(event, input);
+    case 'soft_delete_artifact':
+      return softDeleteArtifact(event, input);
+    case 'restore_artifact':
+      return restoreArtifact(event, input);
+    case 'migrate_artifact_indexes':
+      return migrateArtifactIndexes(event, input);
+    case 'reconcile_artifact_indexes':
+      return reconcileArtifactIndexes(event, input);
     case 'save_json_blob_patch_agent_output':
       return callNormalizedAction(
         event,

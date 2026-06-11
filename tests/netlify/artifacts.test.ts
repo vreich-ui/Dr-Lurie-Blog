@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   ArtifactKind,
+  artifactKindValues,
   createArtifactBlobKey,
   createArtifactReference,
   getArtifactReferenceIssue,
   isArtifactReference,
+  type ArtifactReference,
   type ReadableArtifactBlobStore,
 } from '../../netlify/lib/artifacts.js';
 import { sha256Hex } from '../../netlify/lib/crypto.js';
@@ -22,6 +24,8 @@ test('artifact helpers produce stable blob keys and references', () => {
       artifactKind: ArtifactKind.Image,
       contentType: 'image/png',
       filename: 'Hero Preview.PNG',
+      label: 'Hero image',
+      tags: ['hero', 'homepage'],
       metadata: { source: 'test' },
     },
     bytes,
@@ -32,18 +36,46 @@ test('artifact helpers produce stable blob keys and references', () => {
   assert.equal(reference.sizeBytes, bytes.byteLength);
   assert.equal(reference.contentType, 'image/png');
   assert.equal(reference.createdAtISO, '2026-06-05T00:00:00.000Z');
+  assert.equal(reference.artifactKind, ArtifactKind.Image);
+  assert.equal(reference.originalFilename, 'Hero Preview.PNG');
+  assert.equal(reference.label, 'Hero image');
+  assert.deepEqual(reference.tags, ['hero', 'homepage']);
   assert.deepEqual(reference.metadata, { source: 'test' });
 });
 
 test('artifact blob keys fall back safely when request IDs are not path-safe', () => {
+  const digest = 'a'.repeat(64);
+
   assert.equal(
     createArtifactBlobKey({
-      artifactKind: ArtifactKind.Markdown,
+      artifactKind: ArtifactKind.Doc,
       requestId: '///',
-      sha256: 'abc123',
+      sha256: digest,
       filename: 'notes.md',
     }),
-    'markdown/request/abc123.md'
+    `doc/request/${digest}.md`
+  );
+});
+
+test('artifact blob keys enforce the server artifactKind whitelist and sha256 format', () => {
+  assert.deepEqual(artifactKindValues, ['image', 'pdf', 'video', 'doc', 'audio', 'data', 'attachment', 'other']);
+  assert.throws(
+    () =>
+      createArtifactBlobKey({
+        artifactKind: 'markdown' as ArtifactKind,
+        requestId: 'request',
+        sha256: 'a'.repeat(64),
+      }),
+    /artifactKind must be one of/
+  );
+  assert.throws(
+    () =>
+      createArtifactBlobKey({
+        artifactKind: ArtifactKind.Image,
+        requestId: 'request',
+        sha256: 'abc123',
+      }),
+    /sha256 must be a 64-character hex digest/
   );
 });
 
@@ -69,6 +101,36 @@ test('ArtifactReference validation rejects invented media handles and incomplete
     getArtifactReferenceIssue({ blobKey: reference.blobKey, sha256: reference.sha256 }) ?? '',
     /sizeBytes must be a non-negative number/
   );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, blobKey: reference.blobKey.replace(/^image\//, 'markdown/') }) ?? '',
+    /blobKey must match the server ArtifactReference path format/
+  );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, artifactKind: 'markdown' }) ?? '',
+    /artifactKind must be one of/
+  );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, originalFilename: '../unsafe.png' }) ?? '',
+    /originalFilename must be a filename/
+  );
+  assert.match(getArtifactReferenceIssue({ ...reference, label: '<script>' }) ?? '', /label must not contain/);
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, tags: ['x'.repeat(41)] }) ?? '',
+    /tags\[0\] must be at most 40/
+  );
+  assert.equal(
+    getArtifactReferenceIssue({
+      ...reference,
+      deletedAtISO: '2026-06-10T00:00:00.000Z',
+      deletedBy: 'admin@example.com',
+    }),
+    undefined
+  );
+  assert.match(
+    getArtifactReferenceIssue({ ...reference, deletedAtISO: 'not-a-date' }) ?? '',
+    /deletedAtISO must be a valid ISO date string/
+  );
+  assert.match(getArtifactReferenceIssue({ ...reference, deletedBy: '<admin>' }) ?? '', /deletedBy must not contain/);
 });
 
 type FakeArtifactStoreValue = Buffer | string;
@@ -127,6 +189,28 @@ test('reconcileImageArtifactReference reads a valid reference with valid blob by
   assert.equal(result.status, 'found');
   assert.equal(result.blobKey, reference.blobKey);
   assert.equal(result.status === 'found' ? result.bytes.toString() : '', 'image bytes');
+});
+
+test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact-index JSON', async () => {
+  const reference = makeImageReference('normalized-stale-reference');
+  const staleReference = { ...reference, blobKey: `artifacts/${reference.blobKey}` } as ArtifactReference;
+  const { store } = createFakeArtifactStore({ [reference.blobKey]: Buffer.from('normalized bytes') });
+  const { values, store: indexStore } = createFakeIndexStore();
+  const loggedCorrections: unknown[] = [];
+  const { reconcileArtifactReference } = await import('../../netlify/lib/artifacts.js');
+
+  const result = await reconcileArtifactReference(staleReference, store, indexStore, {
+    logger: { warn: (...args: unknown[]) => loggedCorrections.push(args) },
+  });
+
+  assert.equal(result.status, 'found');
+  assert.equal(result.blobKey, reference.blobKey);
+  assert.equal(result.status === 'found' ? result.correctedBlobKey : '', reference.blobKey);
+  assert.deepEqual(values.get(`request-artifacts/normalized-stale-reference/${reference.sha256}.json`), {
+    ...reference,
+    blobKey: reference.blobKey,
+  });
+  assert.equal(loggedCorrections.length, 1);
 });
 
 test('reconcileImageArtifactReference reads from stores that only support arrayBuffer binary reads', async () => {

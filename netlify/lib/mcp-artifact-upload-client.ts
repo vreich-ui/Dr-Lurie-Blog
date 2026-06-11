@@ -193,6 +193,8 @@ const uploadImageWithIntegrity = async ({
       expectedSizeBytes: sizeBytes,
       expectedSha256: sha256,
       payload: chunk.toString('base64'),
+      label: filename,
+      tags: ['publisher-agent', 'image'],
       metadata: { source: 'publisher_agent', filename },
     });
   };

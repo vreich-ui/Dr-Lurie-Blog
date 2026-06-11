@@ -57,6 +57,8 @@ test('MCP image artifact upload integrity verification passes when local and ser
   assert.equal(calls[0].args.totalChunks, 1);
   assert.equal(calls[0].args.expectedSizeBytes, bytes.byteLength);
   assert.equal(calls[0].args.expectedSha256, createHash('sha256').update(bytes).digest('hex'));
+  assert.equal(calls[0].args.label, 'integrity.jpg');
+  assert.deepEqual(calls[0].args.tags, ['publisher-agent', 'image']);
 });
 
 test('MCP image artifact upload integrity verification fails on mismatched returned SHA', async () => {

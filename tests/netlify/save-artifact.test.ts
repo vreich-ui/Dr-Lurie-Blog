@@ -604,6 +604,84 @@ test('save-artifact rejects JPEG bytes that have markers but cannot be decoded b
   assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
 
+test('save-artifact saves safe ArtifactReference display fields and rejects unsafe upload fields', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `schema-reject-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const bytes = Buffer.from('schema checked bytes');
+  const validResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    filename: 'hero safe.png',
+    label: 'Hero Safe Upload',
+    tags: ['hero', 'safe'],
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(validResponse.statusCode, 201);
+  const artifact = validResponse.json.artifact as {
+    originalFilename: string;
+    label: string;
+    tags: string[];
+    sha256: string;
+  };
+  assert.equal(artifact.originalFilename, 'hero safe.png');
+  assert.equal(artifact.label, 'Hero Safe Upload');
+  assert.deepEqual(artifact.tags, ['hero', 'safe']);
+
+  const indexStore = await getArtifactIndexBlobStore({});
+  const expectedPointer = { requestId, sha256: artifact.sha256, artifactKind: 'image' };
+  assert.deepEqual(
+    JSON.parse((await indexStore.get(`by-kind/image/${artifact.sha256}.json`)) || '{}'),
+    expectedPointer
+  );
+  assert.deepEqual(
+    JSON.parse(
+      (await indexStore.get(`by-request/${encodeURIComponent(requestId)}/image/${artifact.sha256}.json`)) || '{}'
+    ),
+    expectedPointer
+  );
+  assert.deepEqual(JSON.parse((await indexStore.get(`by-tag/hero/${artifact.sha256}.json`)) || '{}'), expectedPointer);
+  assert.deepEqual(JSON.parse((await indexStore.get(`by-tag/safe/${artifact.sha256}.json`)) || '{}'), expectedPointer);
+
+  const blobKeyResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    blobKey: `image/${requestId}/${'a'.repeat(64)}.png`,
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(blobKeyResponse.statusCode, 400);
+  assert.equal(blobKeyResponse.json.error, 'Invalid artifact upload input');
+  assert.match(JSON.stringify(blobKeyResponse.json.issues), /Unrecognized key/);
+
+  const artifactKindResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    artifactKind: 'markdown',
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(artifactKindResponse.statusCode, 400);
+  assert.equal(artifactKindResponse.json.error, 'Invalid artifact upload input');
+  assert.match(JSON.stringify(artifactKindResponse.json.issues), /artifactKind/);
+
+  const unsafeFieldResponse = await postArtifact({
+    ...makeBaseInput(requestId),
+    label: '<unsafe>',
+    tags: ['x'.repeat(41)],
+    encoding: 'base64',
+    payload: bytes.toString('base64'),
+  });
+
+  assert.equal(unsafeFieldResponse.statusCode, 400);
+  assert.equal(unsafeFieldResponse.json.error, 'Invalid artifact upload input');
+  assert.match(JSON.stringify(unsafeFieldResponse.json.issues), /label|tags/);
+});
+
 test('save-artifact rejects a single-shot upload when expected size does not match decoded bytes', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;

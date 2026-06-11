@@ -13,8 +13,13 @@ import { z } from 'zod';
 
 import {
   ArtifactKind,
+  artifactReferenceLimits,
+  artifactKindValues,
   createArtifactReference,
   isArtifactReference,
+  isSafeArtifactFilename,
+  isSafeArtifactText,
+  safePathSegment,
   type ArtifactReference,
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
@@ -53,6 +58,8 @@ type ChunkManifest = {
   artifactKind: ArtifactKind;
   contentType: string;
   filename?: string;
+  label?: string;
+  tags?: string[];
   expectedSizeBytes?: number;
   expectedSha256?: string;
   receivedChunkIndexes: number[];
@@ -70,12 +77,39 @@ const jsonHeaders = {
   'Cache-Control': 'no-store',
 };
 
+const safeArtifactFilenameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(artifactReferenceLimits.originalFilename)
+  .refine((value) => isSafeArtifactFilename(value), {
+    message: 'filename must not contain control characters, angle brackets, or path separators.',
+  });
+
+const safeArtifactLabelSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(artifactReferenceLimits.label)
+  .refine((value) => isSafeArtifactText(value, artifactReferenceLimits.label), {
+    message: 'label must not contain control characters or angle brackets.',
+  });
+
+const safeArtifactTagSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(artifactReferenceLimits.tag)
+  .refine((value) => isSafeArtifactText(value, artifactReferenceLimits.tag), {
+    message: 'tags must not contain control characters or angle brackets.',
+  });
+
 const uploadSchema = z
   .object({
     requestId: z.string().min(1),
-    artifactKind: z.enum(ArtifactKind),
+    artifactKind: z.enum(artifactKindValues),
     contentType: z.string().min(1),
-    filename: z.string().min(1).optional(),
+    filename: safeArtifactFilenameSchema.optional(),
     clientUploadId: z.uuid().optional(),
     chunkIndex: z.number().int().nonnegative().optional(),
     totalChunks: z.number().int().positive().max(10_000).optional(),
@@ -91,6 +125,8 @@ const uploadSchema = z
       .regex(/^[a-f0-9]{64}$/i)
       .optional(),
     payload: z.string(),
+    label: safeArtifactLabelSchema.optional(),
+    tags: z.array(safeArtifactTagSchema).max(artifactReferenceLimits.tags).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .strict()
@@ -265,6 +301,36 @@ const requestArtifactIndexKey = (requestId: string, sha256: string) => {
   return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
 };
 
+const getArtifactKindFromReference = (reference: ArtifactReference): ArtifactKind => {
+  const [artifactKind] = reference.blobKey.split('/');
+
+  return artifactKind as ArtifactKind;
+};
+
+const artifactPointerValue = (requestId: string, reference: ArtifactReference) => ({
+  requestId,
+  sha256: reference.sha256,
+  artifactKind: getArtifactKindFromReference(reference),
+});
+
+const artifactKindPointerKey = (reference: ArtifactReference) => {
+  const pointer = artifactPointerValue('', reference);
+
+  return `by-kind/${pointer.artifactKind}/${reference.sha256}.json`;
+};
+
+const artifactRequestPointerKey = (requestId: string, reference: ArtifactReference) => {
+  const pointer = artifactPointerValue(requestId, reference);
+
+  return `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${reference.sha256}.json`;
+};
+
+const artifactTagPointerKeys = (reference: ArtifactReference) => {
+  const tags = reference.tags ?? [];
+
+  return [...new Set(tags.map(safePathSegment).filter(Boolean))].map((tag) => `by-tag/${tag}/${reference.sha256}.json`);
+};
+
 const getArrayBuffer = async (store: BlobStore, key: string) => {
   const binaryStore = store as BinaryReadableBlobStore;
   const value = await binaryStore.get(key, { type: 'arrayBuffer' });
@@ -334,6 +400,12 @@ const validateChunkUploadManifest = async (
     parsed.filename !== undefined && parsed.filename !== input.filename
       ? `filename expected ${parsed.filename} received ${input.filename ?? ''}`
       : undefined,
+    parsed.label !== undefined && parsed.label !== input.label
+      ? `label expected ${parsed.label} received ${input.label ?? ''}`
+      : undefined,
+    parsed.tags !== undefined && (input.tags === undefined || parsed.tags.join('\0') !== input.tags.join('\0'))
+      ? `tags expected ${parsed.tags.join(',')} received ${input.tags?.join(',') ?? ''}`
+      : undefined,
     parsed.expectedSizeBytes !== undefined &&
     expectedSizeBytes !== undefined &&
     parsed.expectedSizeBytes !== expectedSizeBytes
@@ -382,6 +454,8 @@ const writeChunkManifest = async (
     artifactKind: input.artifactKind,
     contentType: input.contentType,
     ...(input.filename ? { filename: input.filename } : {}),
+    ...(input.label ? { label: input.label } : {}),
+    ...(input.tags?.length ? { tags: input.tags } : {}),
     ...(expectedSizeBytes !== undefined ? { expectedSizeBytes } : {}),
     ...(expectedSha256 ? { expectedSha256 } : {}),
     receivedChunkIndexes: [...receivedChunkIndexes].sort((a, b) => a - b),
@@ -471,7 +545,7 @@ export const saveUploadedChunk = async (
       clientUploadId,
       chunkIndex,
       totalChunks,
-      artifactKind: ArtifactKind.Binary,
+      artifactKind: ArtifactKind.Data,
       contentType: 'application/octet-stream',
       payload: '',
     },
@@ -492,6 +566,8 @@ const mergeChunkManifestIntegrity = async (
 
   return {
     ...input,
+    label: input.label ?? manifest.label,
+    tags: input.tags ?? manifest.tags,
     expectedSizeBytes: input.expectedSizeBytes ?? input.localSizeBytes ?? manifest.expectedSizeBytes,
     expectedSha256: input.expectedSha256 ?? input.localSha256 ?? manifest.expectedSha256,
   };
@@ -592,6 +668,22 @@ const getExistingReference = async (store: BlobStore, requestId: string, sha256:
   }
 };
 
+const saveReferencePointers = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
+  const pointer = artifactPointerValue(requestId, reference);
+  const pointerMetadata = {
+    requestId,
+    sha256: reference.sha256,
+    artifactKind: pointer.artifactKind,
+  };
+  const pointerWrites = [
+    store.setJSON(artifactKindPointerKey(reference), pointer, { metadata: pointerMetadata }),
+    store.setJSON(artifactRequestPointerKey(requestId, reference), pointer, { metadata: pointerMetadata }),
+    ...artifactTagPointerKeys(reference).map((key) => store.setJSON(key, pointer, { metadata: pointerMetadata })),
+  ];
+
+  await Promise.all(pointerWrites);
+};
+
 const saveReference = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
   await store.setJSON(requestArtifactIndexKey(requestId, reference.sha256), reference, {
     metadata: {
@@ -600,6 +692,30 @@ const saveReference = async (store: BlobStore, requestId: string, reference: Art
       contentType: reference.contentType,
     },
   });
+  await saveReferencePointers(store, requestId, reference);
+};
+
+const mergeArtifactReferenceDisplayFields = (
+  existingReference: ArtifactReference,
+  newReference: ArtifactReference
+) => ({
+  ...existingReference,
+  originalFilename: existingReference.originalFilename ?? newReference.originalFilename,
+  label: existingReference.label ?? newReference.label,
+  tags: existingReference.tags ?? newReference.tags,
+});
+
+const shouldSaveArtifactReference = (
+  existingReference: ArtifactReference | undefined,
+  responseReference: ArtifactReference
+) => {
+  if (!existingReference || existingReference.blobKey !== responseReference.blobKey) return true;
+
+  return (
+    existingReference.originalFilename !== responseReference.originalFilename ||
+    existingReference.label !== responseReference.label ||
+    existingReference.tags?.join('\0') !== responseReference.tags?.join('\0')
+  );
 };
 
 const finalizeUpload = async (
@@ -622,10 +738,15 @@ const finalizeUpload = async (
   const existingReference = deduped
     ? await getExistingReference(indexStore, input.requestId, reference.sha256)
     : undefined;
-  const responseReference = existingReference?.blobKey === reference.blobKey ? existingReference : reference;
+  const responseReference =
+    existingReference?.blobKey === reference.blobKey
+      ? mergeArtifactReferenceDisplayFields(existingReference, reference)
+      : reference;
 
-  if (!existingReference || existingReference.blobKey !== reference.blobKey) {
+  if (shouldSaveArtifactReference(existingReference, responseReference)) {
     await saveReference(indexStore, input.requestId, responseReference);
+  } else {
+    await saveReferencePointers(indexStore, input.requestId, responseReference);
   }
 
   return jsonResponse(deduped ? 200 : 201, {
