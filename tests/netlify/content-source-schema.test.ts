@@ -259,6 +259,51 @@ test('create_request honors explicit initial routing fields over workflow defaul
   assert.equal(body.record.next_agent, null);
 });
 
+test('create_request accepts a minimal admin-publish draft with publish payload markdown', async () => {
+  const store = createMemoryStore();
+  const markdown = '# Minimal Admin Draft\n\nBody text supplied through publish payload markdown.';
+  const input = adminPublishDraftInputWithBody({
+    publication: {
+      publish_payload: {
+        markdown,
+      },
+    },
+  });
+
+  const response = await createRequest(store, {
+    action: 'create_request',
+    request_id: 'req_admin_publish_minimal_markdown',
+    input,
+    validation_mode: 'admin_publish_draft',
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(body.ok, true);
+  assert.equal(body.record.input.publication.publish_payload.markdown, markdown);
+});
+
+test('create_request rejects admin-publish drafts missing only body text', async () => {
+  const store = createMemoryStore();
+  const input = adminPublishDraftInputWithBody({});
+
+  const response = await createRequest(store, {
+    action: 'create_request',
+    request_id: 'req_admin_publish_missing_body',
+    input,
+    validation_mode: 'admin_publish_draft',
+  });
+  const body = parseResponseBody(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error_code, 'invalid_admin_publish_draft');
+  assert.deepEqual(body.issues.map((issue: { path: string[] }) => issue.path.join('.')), [
+    'publication.publish_payload.content',
+  ]);
+  assert.equal(await store.get('workflows/by-id/req_admin_publish_missing_body.json'), null);
+});
+
 test('create_request rejects skeletal admin-publish drafts before writing workflow records', async () => {
   const store = createMemoryStore();
   const requestId = 'req_admin_publish_validation_test';

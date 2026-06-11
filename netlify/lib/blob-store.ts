@@ -41,8 +41,14 @@ const hasNetlifyBlobContext = (event: unknown) => {
   return Boolean(event && typeof event === 'object' && 'blobs' in event && (event as NetlifyLambdaEvent).blobs);
 };
 
+const isNetlifyEnvEnabled = (value: string | undefined) => {
+  if (!value) return false;
+
+  return ['true', '1', 'yes'].includes(value.trim().toLowerCase());
+};
+
 const isNetlifyRuntime = (event: unknown) =>
-  process.env.NETLIFY === 'true' || Boolean(process.env.NETLIFY_SITE_ID) || hasNetlifyBlobContext(event);
+  isNetlifyEnvEnabled(process.env.NETLIFY) || Boolean(process.env.NETLIFY_SITE_ID) || hasNetlifyBlobContext(event);
 
 type BlobStoreSource = 'explicit-api-config' | 'lambda-context' | 'netlify-name-lookup' | 'local-file-backed';
 
@@ -117,6 +123,8 @@ const getApiStoreConfig = (name: string, consistency?: 'eventual' | 'strong') =>
 
 const loadNetlifyBlobs = async (event: unknown) => {
   if (!isNetlifyRuntime(event)) return undefined;
+
+  // @netlify/blobs must be installed in production; production fallback to local filesystem is disabled.
 
   if (netlifyBlobsModuleForTesting) return netlifyBlobsModuleForTesting;
 

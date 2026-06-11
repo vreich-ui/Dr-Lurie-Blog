@@ -242,14 +242,22 @@ export const createServer = () => {
   server.registerTool(
     'save_json_blob_create_request',
     {
-      description: 'Create a save-json-blob workflow request and return its record.',
+      description:
+        'Create a save-json-blob workflow request and return its record. MCP-created admin-publish article drafts should pass validation_mode: "admin_publish_draft" so the backend rejects skeletal drafts before workflow creation.',
       inputSchema: {
         input: z.any(),
         request_id: z.string().min(1).optional(),
+        validation_mode: z
+          .enum(['admin_publish_draft'])
+          .optional()
+          .describe('Required validation mode for MCP-created admin-publish article drafts.'),
       },
     },
-    async ({ input, request_id }) =>
-      callAction({ action: 'create_request', input, request_id: request_id ?? createRequestId() }, 'record')
+    async ({ input, request_id, validation_mode }) =>
+      callAction(
+        { action: 'create_request', input, request_id: request_id ?? createRequestId(), validation_mode },
+        'record'
+      )
   );
 
   server.registerTool(
