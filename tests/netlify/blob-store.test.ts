@@ -116,6 +116,57 @@ test('getWorkflowBlobStore connects Lambda context and uses Lambda-compatible lo
   });
 });
 
+test('getWorkflowBlobStore treats truthy NETLIFY env as production Netlify runtime', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const getStoreInputs: unknown[] = [];
+    const connectedEvents: unknown[] = [];
+
+    process.env.NETLIFY = '1';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda(event: unknown) {
+        connectedEvents.push(event);
+      },
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    const result = await getWorkflowBlobStore({});
+
+    assert.equal(result, store);
+    assert.deepEqual(connectedEvents, []);
+    assert.deepEqual(getStoreInputs, ['workflows']);
+  });
+});
+
+test('getWorkflowBlobStore supports NETLIFY_AUTH_TOKEN with NETLIFY_SITE_ID explicit API config', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const getStoreInputs: unknown[] = [];
+
+    process.env.NETLIFY_SITE_ID = 'site-auth-token';
+    process.env.NETLIFY_AUTH_TOKEN = 'auth-token-abc';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda() {},
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    const result = await getWorkflowBlobStore({});
+
+    assert.equal(result, store);
+    assert.deepEqual(getStoreInputs, [
+      { consistency: 'strong', name: 'workflows', siteID: 'site-auth-token', token: 'auth-token-abc' },
+    ]);
+  });
+});
+
 test('artifact stores use explicit strong API config when site ID and token are configured', async () => {
   await withCleanWorkflowBlobEnv(async () => {
     const store = createFakeStore();
