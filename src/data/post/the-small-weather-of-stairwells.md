@@ -1,5 +1,5 @@
 ---
-publishDate: 2026-06-12T16:08:19Z
+publishDate: 2026-06-12T17:10:25Z
 title: "The Small Weather of Stairwells"
 excerpt: "A short, strange essay about the in-between places that quietly teach us how buildings breathe."
 category: "Essay"
@@ -14,6 +14,8 @@ metadata:
 ---
 # The Small Weather of Stairwells
 
+![Quiet stairwell after rain with soft light on the landing.](src/assets/images/uploads/the-small-weather-of-stairwells/stairwell-hero-tiny.jpg)
+
 Some places are not designed to be destinations. They are designed to be crossed, climbed, pushed through, escaped from, or forgotten. A stairwell is one of those places. It asks almost nothing from us except motion. Keep going up. Keep going down. Hold the rail. Let the door shut behind you.
 
 And yet, if you pause there, a stairwell begins to behave like a tiny weather system.
@@ -23,6 +25,8 @@ The air changes first. In a lobby, air usually has a public texture: conditioned
 This is why stairwells can feel unexpectedly alive. A door opens four floors below and a soft pressure travels upward. Someone comes in from rain and the smell arrives before the footsteps do. Warm air gathers near the top landing. Cold air waits at the bottom like an opinion. The building is not speaking exactly, but it is giving itself away.
 
 Sound behaves differently there too. Stairwells make private noises public and public noises abstract. A cough becomes architectural. Keys become weather. Footsteps turn into a question: coming toward me, away from me, above me, below me? The echo removes identity but keeps intention. You can hear haste. You can hear hesitation. You can hear the particular pause of someone deciding whether to take one more flight or give in to the elevator.
+
+![A stairwell landing detail with handrail, light, and scuffed surfaces.](src/assets/images/uploads/the-small-weather-of-stairwells/stairwell-inline-micro.png)
 
 Light has its own habits. In older buildings, a stairwell window may catch one strict rectangle of afternoon and place it on the wall like a temporary painting. In newer ones, the light may be practical, white, evenly distributed, a little suspicious of mystery. Either way, stairwell light tends to reveal surfaces we normally ignore: chipped paint on the corner where furniture scraped past, the gray crescent of many hands around a door handle, a dusty landing where nobody intended beauty and beauty quietly occurred anyway.
 
