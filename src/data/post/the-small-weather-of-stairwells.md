@@ -28,9 +28,8 @@ author: "Dr. Lurie"
 metadata:
   description: "A short, strange essay about stairwells, buildings, and the quiet weather inside overlooked in-between spaces."
 ---
-# The Small Weather of Stairwells
 
-![Quiet stairwell after rain with soft light on the landing.](src/assets/images/uploads/the-small-weather-of-stairwells/stairwell-hero-tiny.jpg)
+![Quiet stairwell after rain with soft light on the landing.](src/assets/images/uploads/the-small-weather-of-stairwells/stairwell-inline-micro.png)
 
 Some places are not designed to be destinations. They are designed to be crossed, climbed, pushed through, escaped from, or forgotten. A stairwell is one of those places. It asks almost nothing from us except motion. Keep going up. Keep going down. Hold the rail. Let the door shut behind you.
 
