@@ -8,6 +8,7 @@ import {
   type ArtifactReference,
 } from '../lib/artifacts.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -75,6 +76,7 @@ type PublishInput = {
   author?: unknown;
   category?: unknown;
   content?: unknown;
+  description?: unknown;
   ctaLink?: unknown;
   ctaText?: unknown;
   draft?: unknown;
@@ -85,10 +87,14 @@ type PublishInput = {
   images?: unknown;
   mediaEntries?: unknown;
   artifactReferences?: unknown;
+  metadata?: unknown;
   requestId?: unknown;
+  request_id?: unknown;
+  lock_token?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
   publishDate?: unknown;
+  publishedDate?: unknown;
   seoDescription?: unknown;
   slug?: unknown;
   tags?: unknown;
@@ -356,7 +362,49 @@ const normalizeExistingFeaturedImagePath = (value: unknown) => {
   return normalizedPath.replace(`${uploadRoot}/`, '~/assets/images/uploads/');
 };
 
-const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
+const hasFrontmatter = (markdown: string) => /^---(?:\s|$)/.test(markdown.trimStart());
+
+const getPublishPayloadIssue = (
+  input: PublishInput,
+  slug: string,
+  title: string,
+  publishDate: string,
+  tags: string[]
+) => {
+  const result = publishPayloadSchema.safeParse({
+    slug,
+    title,
+    markdown: toStringValue(input.markdown),
+    content: toStringValue(input.content),
+    description: toStringValue(input.description),
+    publishDate,
+    author: toStringValue(input.author),
+    tags,
+    images: Array.isArray(input.images) ? input.images : undefined,
+    mediaEntries: Array.isArray(input.mediaEntries) ? input.mediaEntries : undefined,
+    artifactReferences: Array.isArray(input.artifactReferences) ? input.artifactReferences : undefined,
+    overwrite: toBooleanValue(input.overwrite),
+    draft: toBooleanValue(input.draft),
+    articlePath: toStringValue(input.articlePath),
+    category: toStringValue(input.category),
+    excerpt: toStringValue(input.excerpt),
+    seoDescription: toStringValue(input.seoDescription),
+    featuredImage: toStringValue(input.featuredImage),
+    existingFeaturedImagePath: toStringValue(input.existingFeaturedImagePath),
+    videoLink: toStringValue(input.videoLink),
+    ctaLink: toStringValue(input.ctaLink),
+    ctaText: toStringValue(input.ctaText),
+    commitMessage: toStringValue(input.commitMessage),
+    metadata:
+      input.metadata && typeof input.metadata === 'object' && !Array.isArray(input.metadata)
+        ? input.metadata
+        : undefined,
+  });
+
+  if (result.success) return undefined;
+
+  return result.error.issues.map((issue) => `${issue.path.join('.') || 'publishPayload'}: ${issue.message}`).join('; ');
+};
 
 const parseTags = (value: unknown) => {
   if (Array.isArray(value)) {
@@ -671,6 +719,10 @@ export const handler = async (event: LambdaEvent) => {
     return jsonResponse(400, { error: 'Missing request body.' });
   }
 
+  if (Object.hasOwn(input, 'publishedDate')) {
+    return jsonResponse(400, { error: 'publishedDate is not supported. Use publishDate in PublishPayload.' });
+  }
+
   const rawSlug = toStringValue(input.slug);
   const slug = rawSlug ? slugify(rawSlug) : undefined;
   const markdownInput = toStringValue(input.markdown);
@@ -691,8 +743,22 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  if (!isAgentPayload && Number.isNaN(Date.parse(publishDate))) {
+  if (Number.isNaN(Date.parse(publishDate))) {
     return jsonResponse(400, { error: 'publishDate must be a valid date string.' });
+  }
+
+  if ((markdownInput && hasFrontmatter(markdownInput)) || (content && hasFrontmatter(content))) {
+    return jsonResponse(400, { error: 'Submit body-only markdown. Frontmatter is generated server-side.' });
+  }
+
+  if (!title) {
+    return jsonResponse(400, { error: 'Missing required field: title' });
+  }
+
+  const tags = parseTags(input.tags);
+  const publishPayloadIssue = slug ? getPublishPayloadIssue(input, slug, title, publishDate, tags) : undefined;
+  if (publishPayloadIssue) {
+    return jsonResponse(400, { error: `Invalid PublishPayload: ${publishPayloadIssue}` });
   }
 
   const rawArticlePath = toStringValue(input.articlePath) ?? `${repoContentRoot}/${slug}.md`;
@@ -749,39 +815,21 @@ export const handler = async (event: LambdaEvent) => {
       ? undefined
       : normalizeExistingFeaturedImagePath(existingFeaturedImageInput ?? featuredImage);
     const imagePath = uploadedImagePath ?? existingFeaturedImage;
-    const rawMarkdown = markdownInput
-      ? hasFrontmatter(markdownInput)
-        ? markdownInput
-        : buildFrontmatter({
-            author: toStringValue(input.author),
-            category: toStringValue(input.category),
-            content: markdownInput,
-            ctaLink: toStringValue(input.ctaLink),
-            ctaText: toStringValue(input.ctaText),
-            draft: toBooleanValue(input.draft),
-            excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
-            imagePath,
-            publishDate,
-            seoDescription: toStringValue(input.seoDescription),
-            tags: parseTags(input.tags),
-            title: title ?? slug,
-            videoLink: toStringValue(input.videoLink),
-          })
-      : buildFrontmatter({
-          author: toStringValue(input.author),
-          category: toStringValue(input.category),
-          content: content ?? '',
-          ctaLink: toStringValue(input.ctaLink),
-          ctaText: toStringValue(input.ctaText),
-          draft: toBooleanValue(input.draft),
-          excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
-          imagePath,
-          publishDate,
-          seoDescription: toStringValue(input.seoDescription),
-          tags: parseTags(input.tags),
-          title: title ?? slug,
-          videoLink: toStringValue(input.videoLink),
-        });
+    const rawMarkdown = buildFrontmatter({
+      author: toStringValue(input.author),
+      category: toStringValue(input.category),
+      content: markdownInput ?? content ?? '',
+      ctaLink: toStringValue(input.ctaLink),
+      ctaText: toStringValue(input.ctaText),
+      draft: toBooleanValue(input.draft),
+      excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
+      imagePath,
+      publishDate,
+      seoDescription: toStringValue(input.seoDescription),
+      tags,
+      title,
+      videoLink: toStringValue(input.videoLink),
+    });
     const markdown = replacePublishedArtifactReferences(rawMarkdown, mediaEntries);
 
     const ref = await githubRequest<GitHubRef>(`/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);

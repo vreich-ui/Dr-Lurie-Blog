@@ -1,19 +1,31 @@
 // schema-v1.ts
 import { z } from 'zod';
 
-export type AllowedAgentName = 'reader_insight' | 'research' | 'angle' | 'draft' | 'final_article';
-export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'published';
+import {
+  allowedAgentNames,
+  knownPublicationStatuses,
+  publicationStatusDescription,
+  workflowStatuses,
+  type AllowedAgentName,
+  type KnownPublicationStatus,
+  type WorkflowStatus,
+} from './workflow-contract.js';
+
+export {
+  allowedAgentNames,
+  knownPublicationStatuses,
+  publicationStatusDescription,
+  workflowStatuses,
+  type AllowedAgentName,
+  type KnownPublicationStatus,
+  type WorkflowStatus,
+} from './workflow-contract.js';
 
 export const KNOWN_PUBLICATION_STATUSES = {
   draft: 'Saved admin draft; not publication-ready yet.',
   ready: 'Final article payload is ready for the publishing step.',
   scheduled: 'Final article payload is scheduled for server-gated publishing at publication.scheduled_for.',
-} as const;
-
-export type KnownPublicationStatus = keyof typeof KNOWN_PUBLICATION_STATUSES;
-
-export const publicationStatusDescription =
-  'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
+} as const satisfies Record<KnownPublicationStatus, string>;
 
 export type AgentOutputEnvelope = {
   version: number; // agent output version (repo contract)
@@ -319,10 +331,11 @@ export type WorkflowRecord = {
 
 // ---------- Zod Schemas ----------
 const metadataBagSchema = z.record(z.string(), z.unknown());
-const allowedAgentNameSchema = z.enum(['reader_insight', 'research', 'angle', 'draft', 'final_article']);
-const workflowStatusSchema = z.enum(['pending', 'in_progress', 'completed', 'failed', 'published']);
+const allowedAgentNameSchema = z.enum(allowedAgentNames);
+const workflowStatusSchema = z.enum(workflowStatuses);
+export const knownPublicationStatusSchema = z.enum(knownPublicationStatuses);
 
-const publishPayloadSchema = z
+export const publishPayloadSchema = z
   .object({
     slug: z.string(),
     title: z.string(),

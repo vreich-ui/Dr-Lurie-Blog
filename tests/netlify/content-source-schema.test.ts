@@ -5,6 +5,7 @@ import { createRequest } from '../../netlify/functions/save-json-blob.js';
 import { normalizeContentSourceImportToFormData } from '../../src/lib/contentSourceImportFormData.js';
 import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import { validateContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { knownPublicationStatuses } from '../../src/schema/workflow-contract.js';
 
 const validContentSourceV1 = {
   record_type: 'content_source',
@@ -298,9 +299,10 @@ test('create_request rejects admin-publish drafts missing only body text', async
   assert.equal(response.statusCode, 400);
   assert.equal(body.ok, false);
   assert.equal(body.error_code, 'invalid_admin_publish_draft');
-  assert.deepEqual(body.issues.map((issue: { path: string[] }) => issue.path.join('.')), [
-    'publication.publish_payload.content',
-  ]);
+  assert.deepEqual(
+    body.issues.map((issue: { path: string[] }) => issue.path.join('.')),
+    ['publication.publish_payload.content']
+  );
   assert.equal(await store.get('workflows/by-id/req_admin_publish_missing_body.json'), null);
 });
 
@@ -368,7 +370,20 @@ test('content_source.v1 accepts scheduled publication metadata', () => {
   assert.equal(validateContentSourceV1(scheduledContentSource), true);
 });
 
-test('publication_status stays open while documenting first-party states separately from workflow_status', () => {
+test('publication_status recognizes centralized first-party states while staying open for future values', () => {
+  for (const publicationStatus of knownPublicationStatuses) {
+    assert.equal(
+      validateContentSourceV1({
+        ...validContentSourceV1,
+        publication: {
+          ...validContentSourceV1.publication,
+          publication_status: publicationStatus,
+        },
+      }),
+      true
+    );
+  }
+
   const futureStatusContentSource = {
     ...validContentSourceV1,
     publication: {

@@ -4,6 +4,9 @@ export type PublishArticlePayload = {
   markdown?: string;
   content?: string;
   publishDate?: string;
+  requestId?: string;
+  request_id?: string;
+  lock_token?: string;
   draft?: boolean;
   author?: string;
   category?: string;
@@ -11,6 +14,8 @@ export type PublishArticlePayload = {
   excerpt?: string;
   overwrite?: boolean;
   images?: unknown[];
+  mediaEntries?: unknown[];
+  artifactReferences?: unknown[];
   featuredImage?: string;
   videoLink?: string;
   ctaLink?: string;
@@ -25,51 +30,19 @@ export type PublishArticleResult = {
   body: unknown;
 };
 
-const escapeYaml = (value: string) => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 const toText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 const normalizeTags = (tags: PublishArticlePayload['tags']) => {
   if (Array.isArray(tags)) return tags.map((tag) => toText(tag)).filter(Boolean);
-  if (typeof tags === 'string')
+  if (typeof tags === 'string') {
     return tags
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean);
+  }
+
   return [];
 };
-
-const buildMarkdownFromPayload = (
-  payload: PublishArticlePayload,
-  publishDate: string,
-  bodyContent: string = toText(payload.content)
-) => {
-  const title = toText(payload.title) || toText(payload.slug);
-  const content = bodyContent;
-  const tags = normalizeTags(payload.tags);
-  const frontmatter = [
-    '---',
-    `title: "${escapeYaml(title)}"`,
-    `publishDate: ${publishDate}`,
-    ...(payload.draft ? ['draft: true'] : []),
-    ...(toText(payload.excerpt) ? [`excerpt: "${escapeYaml(toText(payload.excerpt))}"`] : []),
-    ...(toText(payload.featuredImage) ? [`image: "${escapeYaml(toText(payload.featuredImage))}"`] : []),
-    ...(toText(payload.videoLink) ? [`video: "${escapeYaml(toText(payload.videoLink))}"`] : []),
-    ...(toText(payload.ctaLink) ? [`ctaLink: "${escapeYaml(toText(payload.ctaLink))}"`] : []),
-    ...(toText(payload.ctaText) ? [`ctaText: "${escapeYaml(toText(payload.ctaText))}"`] : []),
-    ...(toText(payload.category) ? [`category: "${escapeYaml(toText(payload.category))}"`] : []),
-    ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
-    ...(toText(payload.author) ? [`author: "${escapeYaml(toText(payload.author))}"`] : []),
-    ...(toText(payload.seoDescription)
-      ? ['metadata:', `  description: "${escapeYaml(toText(payload.seoDescription))}"`]
-      : []),
-    '---',
-    '',
-  ];
-
-  return `${frontmatter.join('\n')}${content}\n`;
-};
-
-const hasFrontmatter = (markdown: string) => markdown.trimStart().startsWith('---');
 
 type ClerkWindow = Window & {
   Clerk?: {
@@ -92,12 +65,7 @@ export const publishArticleFromPayload = async (payload: PublishArticlePayload):
   }
 
   const publishDate = toText(payload.publishDate) || new Date().toISOString();
-  const markdownInput = toText(payload.markdown);
-  const markdown = markdownInput
-    ? hasFrontmatter(markdownInput)
-      ? markdownInput
-      : buildMarkdownFromPayload(payload, publishDate, markdownInput)
-    : buildMarkdownFromPayload(payload, publishDate);
+  const markdown = toText(payload.markdown);
 
   const requestBody = {
     ...payload,
