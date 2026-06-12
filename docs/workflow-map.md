@@ -10,6 +10,10 @@
 6. The server-side publishing path resolves `artifactReferences` to base64 media entries and commits them through the existing GitHub media flow. Agents must not request, store, or forward Netlify/GitHub credentials.
 7. After the trusted publish process returns commit/deploy metadata, call `save_json_blob_mark_published`, then check in the workflow lock.
 
+## Workflow contract source
+
+The canonical workflow contract lives in `src/schema/workflow-contract.ts`. Use its exported `allowedAgentNames`, `workflowStatuses`, `knownPublicationStatuses`, and `publicationStatusDescription` when updating schema validation, Netlify functions, MCP tool schemas, or docs so agent names, workflow lifecycle states, and first-party publication-status semantics stay aligned. The standalone Node MCP package keeps a local runtime mirror that is tested against this TypeScript contract.
+
 ## Immutability rules
 
 - `ArtifactReference` is immutable: `blobKey`, `sha256`, `sizeBytes`, `contentType`, and `createdAtISO` describe one uploaded byte sequence.

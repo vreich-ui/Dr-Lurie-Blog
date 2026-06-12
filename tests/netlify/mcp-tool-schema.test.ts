@@ -3,6 +3,11 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
+import {
+  allowedAgentNames,
+  publicationStatusDescription,
+  workflowStatuses,
+} from '../../src/schema/workflow-contract.js';
 
 const listTools = async () => {
   const response = await handler({
@@ -66,8 +71,7 @@ test('save_json_blob_create_request exposes structured content_source.v1 input s
 
   const publication = inputProperties.publication as Record<string, unknown>;
   const publicationStatus = property(publication, 'publication_status') as { description?: string };
-  assert.match(String(publicationStatus.description), /Known first-party values are draft, ready, and scheduled/);
-  assert.match(String(publicationStatus.description), /published\/live are not publication_status values/);
+  assert.equal(publicationStatus.description, publicationStatusDescription);
   assert.ok(property(publication, 'scheduled_for'));
 });
 
@@ -152,13 +156,7 @@ test('content_source.v1 MCP schema uses concrete workflow and agent-priority sec
   const assetItems = property(media, 'image_asset_register').items as Record<string, unknown>;
   const revisionItems = property(revisionControl, 'revision_requests').items as Record<string, unknown>;
 
-  assert.deepEqual((property(workflow, 'current_agent') as { enum: string[] }).enum, [
-    'reader_insight',
-    'research',
-    'angle',
-    'draft',
-    'final_article',
-  ]);
+  assert.deepEqual((property(workflow, 'current_agent') as { enum: string[] }).enum, [...allowedAgentNames]);
   assert.ok(property(claimItems, 'claim_text'));
   assert.ok(property(requirementItems, 'description'));
   assert.ok(property(offerItems, 'name'));
@@ -228,6 +226,15 @@ test('stage mark-complete helpers expose transition fields and document common r
     assert.deepEqual(tool.inputSchema.required, ['request_id', 'expected_record_version', 'lock_token']);
     assert.match(String((tool as { description?: string }).description), new RegExp(transitionText));
   }
+
+  const genericCompleteTool = tools.get('save_json_blob_mark_agent_complete');
+  assert.ok(genericCompleteTool);
+  assert.deepEqual((property(genericCompleteTool.inputSchema, 'agent_name') as { enum: string[] }).enum, [
+    ...allowedAgentNames,
+  ]);
+  assert.deepEqual((property(genericCompleteTool.inputSchema, 'workflow_status') as { enum: string[] }).enum, [
+    ...workflowStatuses,
+  ]);
 
   const finalTool = tools.get('final_article_mark_complete');
   assert.ok(finalTool);

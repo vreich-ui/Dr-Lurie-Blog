@@ -5,12 +5,12 @@ import { z } from 'zod';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import type { BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { workflowStatuses, type WorkflowStatus } from '../../src/schema/workflow-contract.js';
 import {
   parseContentSourceV1,
   type ContentSourceV1,
   type PublishPayload,
   type WorkflowRecord,
-  type WorkflowStatus,
 } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
@@ -23,7 +23,9 @@ const missingLockTokenMessage = 'lock_token is required to update a checked-out 
 const lockExpiredMessage = 'The workflow lock has expired. Check out the draft again and retry.';
 const lockMismatchMessage = 'The provided lock_token does not match the active workflow lock.';
 const notFoundMessage = 'Workflow record was not found.';
-const draftWorkflowStatuses = new Set<WorkflowStatus>(['pending', 'in_progress']);
+const draftWorkflowStatuses = new Set<WorkflowStatus>(
+  workflowStatuses.filter((status) => status === 'pending' || status === 'in_progress')
+);
 
 type LambdaEvent = {
   blobs?: string;

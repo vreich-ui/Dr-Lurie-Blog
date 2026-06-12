@@ -7,6 +7,11 @@ import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import {
+  allowedAgentNames,
+  publicationStatusDescription,
+  workflowStatuses,
+} from '../../src/schema/workflow-contract.js';
+import {
   artifactKindValues,
   artifactReferenceLimits,
   isArtifactReference,
@@ -49,16 +54,13 @@ type ToolDefinition = {
 const SERVER_NAME = 'Dr_Lurie_MCP_Server';
 const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
 const PROTOCOL_VERSION = '2025-06-18';
-const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'] as const;
+const ALLOWED_AGENTS = allowedAgentNames;
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
 const ARTIFACT_LIST_MAX_LIMIT = 100;
 const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
 const WIPE_BLOB_SAMPLE_LIMIT = 20;
-const PUBLICATION_STATUS_DESCRIPTION =
-  'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
-
 const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 
 const jsonHeaders = {
@@ -289,6 +291,11 @@ const agentNameJsonSchema = (description?: string) => ({
 });
 const nullableAgentNameJsonSchema = (description?: string) => ({
   anyOf: [{ type: 'string', enum: ALLOWED_AGENTS }, { type: 'null' }],
+  ...(description ? { description } : {}),
+});
+const workflowStatusJsonSchema = (description?: string) => ({
+  type: 'string',
+  enum: workflowStatuses,
   ...(description ? { description } : {}),
 });
 
@@ -651,7 +658,7 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
     publication: objectSchema({
       schema_version: constStringSchema('publication.v1'),
-      publication_status: stringSchema(PUBLICATION_STATUS_DESCRIPTION),
+      publication_status: stringSchema(publicationStatusDescription),
       scheduled_for: stringSchema(
         'ISO timestamp for scheduled publication. Due scheduled-publish calls may publish when this timestamp is now, in the past, or within the short server due window.'
       ),
@@ -742,8 +749,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     name: 'save_json_blob_list_pending_requests',
     description: 'List pending save-json-blob workflow request summaries, optionally filtered by stage and status.',
     inputSchema: objectSchema({
-      stage: stringSchema(),
-      status: stringSchema(),
+      stage: agentNameJsonSchema(),
+      status: workflowStatusJsonSchema(),
       limit: { type: 'integer', minimum: 1, maximum: 1000 },
     }),
   },
@@ -753,7 +760,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
-        agent_name: stringSchema(),
+        agent_name: agentNameJsonSchema(),
         expected_agent_version: intSchema(),
         lock_token: lockTokenSchema,
         output: { description: 'Agent output payload.' },
@@ -767,12 +774,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
-        agent_name: stringSchema(),
+        agent_name: agentNameJsonSchema(),
         expected_record_version: intSchema(),
         lock_token: lockTokenSchema,
-        current_stage: nullableStringSchema(),
-        next_agent: nullableStringSchema(),
-        workflow_status: stringSchema(),
+        current_stage: nullableAgentNameJsonSchema(),
+        next_agent: nullableAgentNameJsonSchema(),
+        workflow_status: workflowStatusJsonSchema(),
         needs_review: { type: 'boolean' },
         last_error: nullableStringSchema(),
       },
@@ -1049,14 +1056,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       inputSchema: objectSchema(
         {
           request_id: stringSchema(),
-          agent_name: stringSchema(
+          agent_name: agentNameJsonSchema(
             'Optional for compatibility with save_json_blob_mark_agent_complete; stage helpers always use their hardcoded agent.'
           ),
           expected_record_version: intSchema(),
           lock_token: lockTokenSchema,
-          current_stage: nullableStringSchema(),
-          next_agent: nullableStringSchema(),
-          workflow_status: stringSchema(),
+          current_stage: nullableAgentNameJsonSchema(),
+          next_agent: nullableAgentNameJsonSchema(),
+          workflow_status: workflowStatusJsonSchema(),
           needs_review: { type: 'boolean' },
           last_error: nullableStringSchema(),
         },
