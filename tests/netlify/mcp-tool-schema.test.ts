@@ -336,6 +336,15 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     /store only the returned ArtifactReference/i
   );
   assert.match(String((saveArtifact as { description?: string }).description), /never invent blobKey/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /preferred\/default artifact path/i);
+  assert.match(
+    String((saveArtifact as { description?: string }).description),
+    /50-150 KB JPEG\/PNG images should be uploaded in one call/i
+  );
+  assert.match(
+    String(property(saveArtifact.inputSchema, 'payload').description),
+    /do not chunk merely because an image is around 50 KB/i
+  );
   assert.match(String((saveArtifact as { description?: string }).description), /Writes final artifact bytes/i);
   assert.match(String((saveArtifact as { description?: string }).description), /ArtifactReference index/i);
   assert.match(String((saveArtifact as { description?: string }).description), /dedup is success/i);
@@ -365,6 +374,14 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
   assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
   assert.ok(property(saveChunk.inputSchema, 'totalChunks'));
+  assert.match(
+    String(property(saveChunk.inputSchema, 'totalChunks').description),
+    /For normal 50-150 KB images, use save_artifact/i
+  );
+  assert.match(
+    String(property(saveChunk.inputSchema, 'payload').description),
+    /target about 256000 raw bytes per chunk/i
+  );
   assert.deepEqual(property(saveChunk.inputSchema, 'expectedSizeBytes'), {
     type: 'integer',
     minimum: 0,
@@ -375,7 +392,15 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     pattern: '^[a-fA-F0-9]{64}$',
     description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
   });
-  assert.match(String((saveChunk as { description?: string }).description), /immediately for large created artifacts/i);
+  assert.match(
+    String((saveChunk as { description?: string }).description),
+    /fallback for artifacts too large for one MCP tool call/i
+  );
+  assert.match(
+    String((saveChunk as { description?: string }).description),
+    /Do not use this for ordinary 50-150 KB generated web images/i
+  );
+  assert.match(String((saveChunk as { description?: string }).description), /largest safe chunks/i);
   assert.match(
     String((saveChunk as { description?: string }).description),
     /store only the final returned ArtifactReference/i

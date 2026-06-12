@@ -26,7 +26,8 @@ The mark-published step records publication state only. It must not accept, requ
 
 ## Artifact handling rules
 
-- When agents generate images, binaries, or other artifacts, call `save_artifact` immediately; use `save_artifact_chunk` when the payload is too large for one tool call.
+- When agents generate images, binaries, or other artifacts, call `save_artifact` immediately. Use the single-shot `save_artifact` path for ordinary web images and artifacts up to roughly 750,000 raw bytes; a 50-150 KB JPEG/PNG should not be split into chunks. Use `save_artifact_chunk` only when a single tool call is rejected by client/tool payload limits or when the artifact is genuinely larger than that guidance threshold.
+- If chunking is necessary, use the largest safe chunks the client accepts (target about 256,000 raw bytes per chunk) instead of many tiny chunks.
 - Store the returned `ArtifactReference` in MCP workflow state or the relevant agent output. Persist the whole reference, not just a URL or filename.
 - Never construct deterministic artifact keys in the model. The artifact tool is authoritative for `blobKey`, checksum, size, content type, and creation timestamp.
 - Treat `ArtifactReference` as immutable. Regeneration means a new upload and a new reference.
