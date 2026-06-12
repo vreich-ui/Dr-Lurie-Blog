@@ -24,6 +24,12 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import {
+  allowedAgentNames,
+  workflowStatuses,
+  type AllowedAgentName,
+  type WorkflowStatus,
+} from '../../src/schema/workflow-contract.js';
 import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
@@ -31,19 +37,9 @@ const jsonHeaders = {
   'Cache-Control': 'no-store',
 };
 
-export type AllowedAgentName = 'reader_insight' | 'research' | 'angle' | 'draft' | 'final_article';
+export const allowedAgents = new Set<AllowedAgentName>(allowedAgentNames);
 
-export const allowedAgents = new Set<AllowedAgentName>([
-  'reader_insight',
-  'research',
-  'angle',
-  'draft',
-  'final_article',
-]);
-
-export type WorkflowStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'published';
-
-const allowedStatuses = new Set<WorkflowStatus>(['pending', 'in_progress', 'completed', 'failed', 'published']);
+const allowedStatuses = new Set<WorkflowStatus>(workflowStatuses);
 
 export type WorkflowRecord = {
   request_id: string;

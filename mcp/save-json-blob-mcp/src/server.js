@@ -9,7 +9,14 @@ const FUNCTION_PATH = '/.netlify/functions/save-json-blob';
 const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
 const REQUIRED_ENV = ['NETLIFY_PUBLISH_SECRET', 'SAVE_JSON_BLOB_BASE_URL'];
 
-const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
+// Standalone Node execution cannot import the TypeScript contract reliably.
+// Keep this runtime mirror in sync with src/schema/workflow-contract.ts;
+// mcp/save-json-blob-mcp/test/workflow-contract-mirror.test.js asserts parity.
+export const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
+export const WORKFLOW_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'published'];
+export const KNOWN_PUBLICATION_STATUSES = ['draft', 'ready', 'scheduled'];
+export const PUBLICATION_STATUS_DESCRIPTION =
+  'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
 const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 
