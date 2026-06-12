@@ -62,6 +62,8 @@ const ARTIFACT_LIST_MAX_LIMIT = 100;
 const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
 const WIPE_BLOB_SAMPLE_LIMIT = 20;
 const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
+const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
+const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
 
 const jsonHeaders = {
   'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-publish-key',
@@ -870,8 +872,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     : []),
   {
     name: 'save_artifact',
-    description:
-      'Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.',
+    description: `Single-shot byte upload and preferred/default artifact path. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Prefer this tool for normal web images and artifacts up to ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} raw bytes; 50-150 KB JPEG/PNG images should be uploaded in one call, not chunked. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -886,7 +887,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         expectedSha256: expectedSha256JsonSchema,
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
-        payload: stringSchema('Artifact bytes as base64 unless encoding is binary.'),
+        payload: stringSchema(
+          `Artifact bytes as base64 unless encoding is binary. Preferred for normal web images up to ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} raw bytes; do not chunk merely because an image is around 50 KB.`
+        ),
         label: artifactLabelJsonSchema,
         tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
@@ -896,8 +899,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_artifact_chunk',
-    description:
-      'Chunked byte upload. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Agents must call this immediately for large created artifacts and store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.',
+    description: `Chunked byte upload fallback for artifacts too large for one MCP tool call. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Do not use this for ordinary 50-150 KB generated web images; call save_artifact once instead. Use chunks only after a single-shot upload is rejected by client/tool payload limits or when the raw artifact is larger than ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} bytes. When chunking is necessary, use the largest safe chunks the client accepts, targeting about ${CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES} raw bytes per chunk rather than many tiny chunks. Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -905,7 +907,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         contentType: stringSchema('MIME type for the complete artifact bytes.'),
         clientUploadId: stringSchema('Stable UUID shared by every chunk in this upload.'),
         chunkIndex: intSchema('Zero-based chunk index.'),
-        totalChunks: { type: 'integer', minimum: 1, description: 'Total number of chunks in this upload.' },
+        totalChunks: {
+          type: 'integer',
+          minimum: 1,
+          description:
+            'Total number of chunks in this upload. For normal 50-150 KB images, use save_artifact instead of splitting into chunks.',
+        },
         filename: {
           ...stringSchema(
             'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
@@ -917,7 +924,9 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         expectedSha256: expectedSha256JsonSchema,
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
-        payload: stringSchema('Chunk bytes as base64 unless encoding is binary.'),
+        payload: stringSchema(
+          `Chunk bytes as base64 unless encoding is binary. Only use when the complete artifact is too large for save_artifact; target about ${CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES} raw bytes per chunk when possible.`
+        ),
         label: artifactLabelJsonSchema,
         tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
