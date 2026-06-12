@@ -700,6 +700,10 @@ const metadata = {
           setStatus('Markdown must be at least 5 words to publish.', false);
           return;
         }
+        if (Object.hasOwn(publishPayloadObject || {}, 'publishedDate')) {
+          setStatus('publishedDate is not supported. Use publishDate in PublishPayload.', false);
+          return;
+        }
         if (invalidImageCount > 0) {
           setStatus(
             'Publish blocked: one or more images are invalid base64 entries or contain unsupported paths.',
@@ -723,6 +727,15 @@ const metadata = {
           excerpt: getPayloadText(payload, 'excerpt') || undefined,
           overwrite: Boolean(publishPayloadObject?.overwrite),
           images,
+          ...(Array.isArray(publishPayloadObject?.mediaEntries)
+            ? { mediaEntries: publishPayloadObject.mediaEntries }
+            : {}),
+          ...(Array.isArray(publishPayloadObject?.artifactReferences)
+            ? { artifactReferences: publishPayloadObject.artifactReferences }
+            : {}),
+          requestId: getPayloadText(payload, 'requestId') || getPayloadText(payload, 'request_id') || undefined,
+          request_id: getPayloadText(payload, 'request_id') || getPayloadText(payload, 'requestId') || undefined,
+          lock_token: getPayloadText(payload, 'lock_token') || undefined,
           featuredImage: getPayloadText(payload, 'featuredImage') || undefined,
           videoLink: getPayloadText(payload, 'videoLink') || undefined,
           ctaLink: getPayloadText(payload, 'ctaLink') || undefined,

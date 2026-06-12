@@ -335,7 +335,7 @@ const allowedAgentNameSchema = z.enum(allowedAgentNames);
 const workflowStatusSchema = z.enum(workflowStatuses);
 export const knownPublicationStatusSchema = z.enum(knownPublicationStatuses);
 
-const publishPayloadSchema = z
+export const publishPayloadSchema = z
   .object({
     slug: z.string(),
     title: z.string(),

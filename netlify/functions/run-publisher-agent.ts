@@ -30,6 +30,7 @@ type PublisherRequest = {
   request_id?: unknown;
   markdown?: unknown;
   overwrite?: unknown;
+  publishedDate?: unknown;
   publishSecret?: unknown;
   slug?: unknown;
   title?: unknown;
@@ -494,6 +495,10 @@ export const handler = async (event: LambdaEvent) => {
         articleIdea: toStringValue(body.articleIdea) ?? '',
         message: 'Workflow start action acknowledged.',
       });
+    }
+
+    if (Object.hasOwn(body, 'publishedDate')) {
+      throw new RunnerError(400, 'publishedDate is not supported. Use publishDate in PublishPayload.');
     }
 
     input = normalizeRequest(body);
