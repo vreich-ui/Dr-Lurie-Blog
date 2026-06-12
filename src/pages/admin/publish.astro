@@ -2487,8 +2487,6 @@ const metadata = {
           .replaceAll('"', '&quot;')
           .replaceAll("'", '&#039;');
 
-      const escapeYaml = (value) => String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-
       const formatDateTimeLocal = (date) => {
         const offset = date.getTimezoneOffset();
         const localDate = new Date(date.getTime() - offset * 60000);
@@ -3366,34 +3364,10 @@ const metadata = {
 
       const buildMarkdown = () => {
         const slug = getCurrentSlug();
-        const featuredPath = getFeaturedImagePath();
-        const tags = parseTags(fields.tags.value);
-        const sources = parseSources(fields.sources.value);
-        const publishDate = getPublishDate().toISOString();
-        const frontmatter = [
-          '---',
-          `title: "${escapeYaml(fields.title.value || 'Untitled article')}"`,
-          `publishDate: ${publishDate}`,
-          ...(fields.draft.checked ? ['draft: true'] : []),
-          ...(fields.excerpt.value ? [`excerpt: "${escapeYaml(fields.excerpt.value)}"`] : []),
-          ...(featuredPath ? [`image: "${escapeYaml(featuredPath)}"`] : []),
-          ...(fields.videoLink.value ? [`video: "${escapeYaml(fields.videoLink.value)}"`] : []),
-          ...(fields.ctaLink.value ? [`ctaLink: "${escapeYaml(fields.ctaLink.value)}"`] : []),
-          ...(fields.ctaText.value ? [`ctaText: "${escapeYaml(fields.ctaText.value)}"`] : []),
-          ...(fields.category.value ? [`category: "${escapeYaml(fields.category.value)}"`] : []),
-          ...(tags.length ? ['tags:', ...tags.map((tag) => `  - "${escapeYaml(tag)}"`)] : []),
-          ...(fields.author.value ? [`author: "${escapeYaml(fields.author.value)}"`] : []),
-          ...(sources.length ? ['sources:', ...sources.map((source) => `  - "${escapeYaml(source)}"`)] : []),
-          ...(fields.seoDescription.value
-            ? ['metadata:', `  description: "${escapeYaml(fields.seoDescription.value)}"`]
-            : []),
-          '---',
-          '',
-        ];
 
         return {
           slug,
-          markdown: `${frontmatter.join('\n')}${fields.content.value.trim()}\n`,
+          markdown: `${fields.content.value.trim()}\n`,
         };
       };
 
