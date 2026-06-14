@@ -1,5 +1,5 @@
 ---
-publishDate: 2026-06-14T08:47:03.000Z
+publishDate: 2026-06-14T11:28:55.000Z
 title: "The Blue Dot on the Floor"
 excerpt: "A small reflection from a phone screen becomes a quiet way back into memory."
 image: "~/assets/images/uploads/the-blue-dot-on-the-floor/scrolling-mood.webp"
