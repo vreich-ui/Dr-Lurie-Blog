@@ -5,6 +5,7 @@ import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
+import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
@@ -890,6 +891,22 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
     }),
   },
+  {
+    name: 'verify_article_images',
+    description:
+      'Verify that a published article page contains expected image URLs and that each expected image is fetchable as an image. Server-only publish credentials are never accepted as inputs or returned.',
+    inputSchema: objectSchema(
+      {
+        url: stringSchema('Published article URL to fetch and inspect for <img> sources.'),
+        expectedImages: {
+          type: 'array',
+          items: stringSchema('Expected image URL or page-relative image path.'),
+          description: 'Expected image URLs or page-relative image paths that must appear in the article HTML.',
+        },
+      },
+      ['url', 'expectedImages']
+    ),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -1407,6 +1424,41 @@ const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unkn
         ? body.error
         : `HTTP ${deployStatusResponse.statusCode}: deploy status lookup failed`,
       { statusCode: deployStatusResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
+};
+
+const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Article image verification is not configured on the server.', {
+      error_code: 'verify_article_images_not_configured',
+    });
+  }
+
+  const verifyResponse = await verifyArticleImagesHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: input.url,
+      expectedImages: input.expectedImages,
+    }),
+  });
+  const body = parseJsonResponseBody(verifyResponse.body);
+
+  if (verifyResponse.statusCode < 200 || verifyResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${verifyResponse.statusCode}: article image verification failed`,
+      { statusCode: verifyResponse.statusCode, ...body }
     );
   }
 
@@ -2511,6 +2563,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callScheduledPublish(event, input);
     case 'deploy_status':
       return callDeployStatus(event, input);
+    case 'verify_article_images':
+      return callVerifyArticleImages(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
