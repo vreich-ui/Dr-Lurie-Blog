@@ -9,6 +9,21 @@ import { handler as saveArtifactHandler } from '../../netlify/functions/save-art
 
 const publishSecret = 'publish-artifact-test-secret';
 
+const createImageBytes = (format: 'jpeg' | 'png' | 'webp') => {
+  const image = sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: 80, g: 100, b: 120 },
+    },
+  });
+
+  if (format === 'jpeg') return image.jpeg().toBuffer();
+  if (format === 'webp') return image.webp().toBuffer();
+  return image.png().toBuffer();
+};
+
 const postArtifact = async (body: Record<string, unknown>) => {
   const response = await saveArtifactHandler({
     httpMethod: 'POST',
@@ -32,17 +47,9 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
 
   const originalFetch = globalThis.fetch;
   const requestId = `artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const explicitBytes = Buffer.from('explicit filename bytes');
-  const derivedBytes = await sharp({
-    create: {
-      width: 2,
-      height: 2,
-      channels: 3,
-      background: { r: 80, g: 100, b: 120 },
-    },
-  })
-    .jpeg()
-    .toBuffer();
+  const directBytes = await createImageBytes('png');
+  const explicitBytes = await createImageBytes('png');
+  const derivedBytes = await createImageBytes('jpeg');
   const explicitUpload = await postArtifact({
     requestId,
     artifactKind: 'image',
@@ -115,7 +122,7 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
         mediaEntries: [
           {
             name: 'Direct Media.PNG',
-            content: Buffer.from('direct media bytes').toString('base64'),
+            content: directBytes.toString('base64'),
             encoding: 'base64',
           },
         ],
@@ -135,7 +142,7 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
     assert.deepEqual(body.imagePaths, [directPath, explicitPath, derivedPath]);
     assert.deepEqual(treePaths, ['src/data/post/artifact-publish-test.md', directPath, explicitPath, derivedPath]);
     assert.equal(blobWrites[1]?.encoding, 'base64');
-    assert.equal(blobWrites[1]?.content, Buffer.from('direct media bytes').toString('base64'));
+    assert.equal(blobWrites[1]?.content, directBytes.toString('base64'));
     assert.equal(blobWrites[2]?.encoding, 'base64');
     assert.equal(blobWrites[2]?.content, explicitBytes.toString('base64'));
     assert.equal(blobWrites[3]?.encoding, 'base64');
@@ -194,7 +201,7 @@ test('publish-article rewrites saved artifact blob keys before committing markdo
   process.env.GITHUB_BRANCH = 'feature/rewrite-artifact-paths';
 
   const requestId = `artifact-rewrite-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const artifactBytes = Buffer.from('artifact rewrite bytes');
+  const artifactBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
     artifactKind: 'image',
@@ -253,7 +260,8 @@ test('publish-article rewrites saved artifact blob keys before committing markdo
       body: JSON.stringify({
         slug: 'artifact-rewrite-test',
         title: 'Artifact Rewrite Test',
-        markdown: `---\ntitle: "Artifact Rewrite Test"\nimage: "${artifact.blobKey}"\n---\n\n![Hero](${artifact.blobKey})\n`,
+        markdown: `![Hero](${artifact.blobKey})\n`,
+        publishDate: '2026-06-14T00:00:00.000Z',
         featuredImage: artifact.blobKey,
         artifactReferences: [upload.artifact],
         overwrite: false,
@@ -264,7 +272,7 @@ test('publish-article rewrites saved artifact blob keys before committing markdo
     assert.equal(blobWrites[0]?.encoding, 'utf-8');
     assert.equal(
       blobWrites[0]?.content,
-      '---\ntitle: "Artifact Rewrite Test"\nimage: "~/assets/images/uploads/artifact-rewrite-test/hero-selected.png"\n---\n\n![Hero](~/assets/images/uploads/artifact-rewrite-test/hero-selected.png)'
+      '---\npublishDate: 2026-06-14T00:00:00.000Z\ntitle: "Artifact Rewrite Test"\nimage: "~/assets/images/uploads/artifact-rewrite-test/hero-selected.png"\n---\n![Hero](~/assets/images/uploads/artifact-rewrite-test/hero-selected.png)\n'
     );
     assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
   } finally {
@@ -282,7 +290,7 @@ test('publish-article normalizes stale artifact blobKeys and corrects the artifa
   process.env.GITHUB_BRANCH = 'feature/reconcile-artifact-paths';
 
   const requestId = `artifact-reconcile-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const artifactBytes = Buffer.from('artifact reconcile bytes');
+  const artifactBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
     artifactKind: 'image',
@@ -384,7 +392,7 @@ test('publish-article reports stale saved image references instead of a generic 
     contentType: 'image/png',
     filename: 'stale.png',
     encoding: 'base64',
-    payload: Buffer.from('stale image bytes').toString('base64'),
+    payload: (await createImageBytes('png')).toString('base64'),
   });
   const artifact = upload.artifact as { blobKey: string };
   const { getArtifactBlobStore } = await import('../../netlify/lib/blob-store.js');
@@ -439,7 +447,7 @@ test('publish-article ignores a stale existingFeaturedImagePath when the feature
   process.env.GITHUB_BRANCH = 'feature/image-artifacts';
 
   const requestId = `artifact-featured-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const artifactBytes = Buffer.from('featured artifact bytes');
+  const artifactBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
     artifactKind: 'image',
@@ -519,6 +527,257 @@ test('publish-article ignores a stale existingFeaturedImagePath when the feature
       /image: "~\/assets\/images\/uploads\/artifact-featured-image-test\/featured-artifact\.png"/
     );
     assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects corrupt artifact bytes before GitHub writes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `corrupt-artifact-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const corruptBytes = Buffer.from('not an image');
+  const corruptSha256 = createHash('sha256').update(corruptBytes).digest('hex');
+  const artifact = {
+    blobKey: `image/${requestId}/${corruptSha256}.png`,
+    sizeBytes: corruptBytes.byteLength,
+    sha256: corruptSha256,
+    contentType: 'image/png',
+    createdAtISO: new Date().toISOString(),
+    artifactKind: 'image',
+    originalFilename: 'corrupt.png',
+    label: 'corrupt.png',
+  };
+  const { getArtifactBlobStore, getArtifactIndexBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+  await artifactStore.set(artifact.blobKey, corruptBytes, {
+    metadata: {
+      contentType: artifact.contentType,
+      sha256: artifact.sha256,
+      sizeBytes: String(artifact.sizeBytes),
+      createdAtISO: artifact.createdAtISO,
+    },
+  });
+  await indexStore.setJSON(`request-artifacts/${encodeURIComponent(requestId)}/${artifact.sha256}.json`, artifact, {
+    metadata: {
+      requestId,
+      sha256: artifact.sha256,
+      contentType: artifact.contentType,
+    },
+  });
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    requestedUrls.push(`${init?.method ?? 'GET'} ${url}`);
+
+    if (url.includes('/contents/src/data/post/corrupt-artifact-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    return new Response(`unexpected ${init?.method ?? 'GET'} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'corrupt-artifact-test',
+        title: 'Corrupt Artifact Test',
+        markdown: '# Corrupt artifact test',
+        artifactReferences: [artifact],
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(
+      JSON.parse(response.body).error,
+      /Invalid image artifact: .*corrupt\.png could not be decoded as a valid PNG/
+    );
+    assert.deepEqual(
+      requestedUrls.filter((url) => /\/git\/(blobs|trees|commits|refs)/.test(url)),
+      []
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects corrupt admin files before GitHub writes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    requestedUrls.push(`${init?.method ?? 'GET'} ${url}`);
+
+    if (url.includes('/contents/src/data/post/corrupt-admin-file-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    return new Response(`unexpected ${init?.method ?? 'GET'} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'corrupt-admin-file-test',
+        title: 'Corrupt Admin File Test',
+        markdown: '# Corrupt admin file test',
+        files: [{ name: 'hero.png', type: 'image/png', base64: Buffer.from('not an image').toString('base64') }],
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(
+      JSON.parse(response.body).error,
+      /Invalid image artifact: hero\.png could not be decoded as a valid PNG/
+    );
+    assert.deepEqual(
+      requestedUrls.filter((url) => /\/git\/(blobs|trees|commits|refs)/.test(url)),
+      []
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects content-type and extension mismatches before GitHub writes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+  const webpBytes = await createImageBytes('webp');
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    requestedUrls.push(`${init?.method ?? 'GET'} ${url}`);
+
+    if (url.includes('/contents/src/data/post/mismatch-image-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    return new Response(`unexpected ${init?.method ?? 'GET'} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'mismatch-image-test',
+        title: 'Mismatch Image Test',
+        markdown: '# Mismatch image test',
+        files: [{ name: 'hero.png', type: 'image/png', base64: webpBytes.toString('base64') }],
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(
+      JSON.parse(response.body).error,
+      /Invalid image artifact: hero\.png could not be decoded as a valid PNG/
+    );
+    assert.deepEqual(
+      requestedUrls.filter((url) => /\/git\/(blobs|trees|commits|refs)/.test(url)),
+      []
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article accepts valid PNG, WebP, and JPEG media entries', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const pngBytes = await createImageBytes('png');
+  const webpBytes = await createImageBytes('webp');
+  const jpegBytes = await createImageBytes('jpeg');
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/valid-image-formats-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'valid-image-formats-test',
+        title: 'Valid Image Formats Test',
+        markdown: '# Valid image formats test',
+        files: [
+          { name: 'hero.png', type: 'image/png', base64: pngBytes.toString('base64') },
+          { name: 'inline.webp', type: 'image/webp', base64: webpBytes.toString('base64') },
+          { name: 'card.jpg', type: 'image/jpeg', base64: jpegBytes.toString('base64') },
+        ],
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.equal(blobWrites.length, 4);
+    assert.equal(blobWrites[1]?.content, pngBytes.toString('base64'));
+    assert.equal(blobWrites[2]?.content, webpBytes.toString('base64'));
+    assert.equal(blobWrites[3]?.content, jpegBytes.toString('base64'));
   } finally {
     globalThis.fetch = originalFetch;
   }
