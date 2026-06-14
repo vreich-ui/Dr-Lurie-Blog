@@ -559,3 +559,21 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     assert.equal(serialized.includes('credential'), false);
   }
 });
+
+test('verify_article_images appears in tools/list with expected input schema', async () => {
+  const body = await listTools();
+  const tool = body.result.tools.find((item) => item.name === 'verify_article_images');
+
+  assert.ok(tool, 'Expected verify_article_images to be registered.');
+  assert.deepEqual(tool.inputSchema.required, ['url', 'expectedImages']);
+
+  const url = property(tool.inputSchema, 'url');
+  const expectedImages = property(tool.inputSchema, 'expectedImages');
+
+  assert.equal(url.type, 'string');
+  assert.equal(expectedImages.type, 'array');
+  assert.equal((expectedImages.items as Record<string, unknown>).type, 'string');
+  assert.equal(JSON.stringify(tool).includes('NETLIFY_PUBLISH_SECRET'), false);
+  assert.equal(JSON.stringify(tool).includes('PUBLISH_SECRET'), false);
+});
+
