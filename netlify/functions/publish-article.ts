@@ -9,6 +9,13 @@ import {
 } from '../lib/artifacts.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
+import {
+  getDeployReceiptByCommit,
+  isNetlifyDeployLookupConfigured,
+  pollDeployReceipt,
+  type DeployReceipt,
+  type DeployStatus,
+} from '../lib/netlify-deploys.js';
 import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
 
 type LambdaEvent = {
@@ -101,7 +108,10 @@ type PublishInput = {
   tags?: unknown;
   title?: unknown;
   commitMessage?: unknown;
+  deployPollIntervalSeconds?: unknown;
+  deployWaitTimeoutSeconds?: unknown;
   videoLink?: unknown;
+  waitForDeploy?: unknown;
 };
 
 const jsonHeaders = {
@@ -112,6 +122,63 @@ const jsonHeaders = {
 const repoContentRoot = 'src/data/post';
 const uploadRoot = 'src/assets/images/uploads';
 const githubApiRoot = 'https://api.github.com';
+
+const DEFAULT_DEPLOY_WAIT_TIMEOUT_SECONDS = 120;
+const DEFAULT_DEPLOY_POLL_INTERVAL_SECONDS = 5;
+const MAX_DEPLOY_WAIT_TIMEOUT_SECONDS = 120;
+const MIN_DEPLOY_POLL_INTERVAL_SECONDS = 1;
+const MAX_DEPLOY_POLL_INTERVAL_SECONDS = 30;
+
+const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const parseBoundedNumber = (value: unknown, defaultValue: number, min: number, max: number) => {
+  if (value === undefined || value === null || value === '') return defaultValue;
+
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : Number.NaN;
+  if (!Number.isFinite(parsed)) return defaultValue;
+
+  return clampNumber(parsed, min, max);
+};
+
+type PublishDeployReceipt = Partial<Omit<DeployReceipt, 'commit' | 'deployStatus'>> & {
+  commit: string;
+  deployStatus: DeployStatus;
+};
+
+const getPublishDeployReceipt = async (input: PublishInput, commit: string): Promise<PublishDeployReceipt> => {
+  const fallbackReceipt: PublishDeployReceipt = {
+    commit,
+    deployStatus: 'queued',
+  };
+
+  if (!isNetlifyDeployLookupConfigured()) return fallbackReceipt;
+
+  try {
+    if (!toBooleanValue(input.waitForDeploy)) {
+      const receipt = await getDeployReceiptByCommit(commit);
+      return receipt ? { ...fallbackReceipt, ...receipt } : fallbackReceipt;
+    }
+
+    const timeoutSeconds = parseBoundedNumber(
+      input.deployWaitTimeoutSeconds,
+      DEFAULT_DEPLOY_WAIT_TIMEOUT_SECONDS,
+      0,
+      MAX_DEPLOY_WAIT_TIMEOUT_SECONDS
+    );
+    const intervalSeconds = parseBoundedNumber(
+      input.deployPollIntervalSeconds,
+      DEFAULT_DEPLOY_POLL_INTERVAL_SECONDS,
+      MIN_DEPLOY_POLL_INTERVAL_SECONDS,
+      MAX_DEPLOY_POLL_INTERVAL_SECONDS
+    );
+    const receipt = await pollDeployReceipt({ commit, timeoutSeconds, intervalSeconds });
+
+    return { ...fallbackReceipt, ...receipt };
+  } catch (error) {
+    console.warn('Netlify deploy receipt lookup failed after publish.', { commit, error });
+    return fallbackReceipt;
+  }
+};
 
 class PublishError extends Error {
   statusCode: number;
@@ -1089,6 +1156,7 @@ export const handler = async (event: LambdaEvent) => {
       body: JSON.stringify({ force: false, sha: newCommit.sha }),
     });
 
+    const deployReceipt = await getPublishDeployReceipt(input, newCommit.sha);
     const imagePaths = publishImagePaths;
     const message = `Article publish queued for ${articlePath}.`;
 
@@ -1096,9 +1164,15 @@ export const handler = async (event: LambdaEvent) => {
       success: true,
       articlePath,
       imagePaths,
-      deployStatus: 'queued',
+      deployId: deployReceipt.deployId,
+      deployUrl: deployReceipt.deployUrl,
+      productionUrl: deployReceipt.productionUrl,
+      commit: deployReceipt.commit,
+      deployStatus: deployReceipt.deployStatus,
+      startedAt: deployReceipt.startedAt,
+      finishedAt: deployReceipt.finishedAt,
+      errorMessage: deployReceipt.errorMessage,
       message,
-      commit: newCommit.sha,
       media: imagePaths,
       ok: true,
       path: articlePath,
