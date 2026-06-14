@@ -1,5 +1,5 @@
 ---
-publishDate: 2026-06-14T08:40:34.000Z
+publishDate: 2026-06-14T08:47:03.000Z
 title: "The Blue Dot on the Floor"
 excerpt: "A small reflection from a phone screen becomes a quiet way back into memory."
 image: "~/assets/images/uploads/the-blue-dot-on-the-floor/scrolling-mood.webp"
@@ -33,7 +33,7 @@ The phone keeps offering more. The floor offers one thing and lets it be enough.
 
 And because memory is strange, that small blue reflection opens into other small lights: the green clock on a microwave, the amber bead on a cassette player, the red tip of an old power strip under a desk. Household stars. Quiet evidence that the night was holding itself together while no one was looking.
 
-![Warm evening light on ordinary objects, suggesting a gentle nostalgic memory.](/assets/nostalgia-mood-CO_FhMp3.webp)
+<figure class="article-inline-image"><img src="/assets/nostalgia-mood-CO_FhMp3.webp" alt="Warm evening light on ordinary objects, suggesting a gentle nostalgic memory." loading="lazy" /></figure>
 
 The scrolling does not become noble. It was still mostly wasted time. But the mood changes. The thumb slows down. The feed looks flatter, less demanding. The room grows back around the screen. The chair has weight. The window has a dark square of sky in it. Somewhere in the apartment, something settles with a soft wooden tick.
 
