@@ -1490,10 +1490,16 @@ const callScheduledPublish = async (event: LambdaEvent, input: Record<string, un
   }
 
   const commitMetadata = {
-    commit: publishResult.body.commit,
+    ...publishResult.body,
+    commit: publishResult.body.commit ?? null,
+    deployStatus: publishResult.body.deployStatus ?? null,
+    deployId: publishResult.body.deployId ?? null,
+    deployUrl: publishResult.body.deployUrl ?? null,
+    productionUrl: publishResult.body.productionUrl ?? null,
+    startedAt: publishResult.body.startedAt ?? null,
+    finishedAt: publishResult.body.finishedAt ?? null,
+    errorMessage: publishResult.body.errorMessage ?? null,
     articlePath: publishResult.body.articlePath ?? publishResult.body.path,
-    deployStatus: publishResult.body.deployStatus,
-    message: publishResult.body.message,
     scheduled_for: scheduledFor,
     scheduled_publish: true,
     agent_id: agentId,
