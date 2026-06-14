@@ -3788,6 +3788,7 @@ const metadata = {
         if (status === 401) return '401 auth failure';
         if (status === 403) return '403 auth/authorization failure';
         if (status === 404) return '404 artifact bytes missing';
+        if (status === 422) return '422 invalid image bytes';
         if (status >= 500) return `${status} server/config failure`;
         return `${status} HTTP failure`;
       };
@@ -3814,6 +3815,7 @@ const metadata = {
           payload?.store ? `store=${payload.store}` : '',
           payload?.lookup ? `lookup=${payload.lookup}` : '',
           payload?.contentTypeSource ? `contentTypeSource=${payload.contentTypeSource}` : '',
+          payload?.validationReason ? `validationReason=${payload.validationReason}` : '',
           readDiagnostics.parentPrefix ? `parentPrefix=${readDiagnostics.parentPrefix}` : '',
           readDiagnostics.exactFilename ? `exactFilename=${readDiagnostics.exactFilename}` : '',
           typeof readDiagnostics.exactFilenameExists === 'boolean'

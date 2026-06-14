@@ -8,6 +8,7 @@ import {
   type ArtifactReference,
 } from '../lib/artifacts.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
 
 type LambdaEvent = {
@@ -125,9 +126,12 @@ class PublishError extends Error {
 type MediaEntry = {
   artifactReference?: ArtifactReference;
   content: string;
+  contentType?: string;
   displayPath: string;
   encoding: 'base64' | 'utf-8';
+  filename?: string;
   path: string;
+  rawBytes: Buffer;
 };
 
 const toStringValue = (value: unknown) => {
@@ -580,6 +584,28 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
+const decodeMediaEntryBytes = (content: string, encoding: 'base64' | 'utf-8', path: string) => {
+  try {
+    return Buffer.from(content, encoding === 'base64' ? 'base64' : 'utf8');
+  } catch {
+    throw new PublishError(
+      422,
+      `Invalid image artifact: ${path} could not be decoded. Re-upload or replace this image.`
+    );
+  }
+};
+
+const validateMediaEntries = async (mediaEntries: MediaEntry[]) => {
+  for (const entry of mediaEntries) {
+    await validatePublishImageBytes({
+      bytes: entry.rawBytes,
+      contentType: entry.contentType,
+      filename: entry.filename,
+      path: entry.path,
+    });
+  }
+};
+
 const getMediaEntries = async (
   event: LambdaEvent,
   input: PublishInput,
@@ -606,9 +632,12 @@ const getMediaEntries = async (
 
     return {
       content: file.base64,
+      contentType: file.type,
       displayPath: `~/assets/images/uploads/${slug}/${filename}`,
       encoding: 'base64' as const,
+      filename,
       path: `${uploadRoot}/${slug}/${filename}`,
+      rawBytes: decodeMediaEntryBytes(file.base64, 'base64', `${uploadRoot}/${slug}/${filename}`),
     };
   });
 
@@ -631,9 +660,16 @@ const getMediaEntries = async (
 
     return {
       content,
+      contentType: toStringValue(image.type),
       displayPath: path.replace(`${uploadRoot}/`, '~/assets/images/uploads/'),
       encoding: toStringValue(image.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+      filename: sanitizeFilename(filename ?? path),
       path,
+      rawBytes: decodeMediaEntryBytes(
+        content,
+        toStringValue(image.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+        path
+      ),
     };
   });
 
@@ -659,9 +695,16 @@ const getMediaEntries = async (
 
     return {
       content,
+      contentType: toStringValue(entry.type),
       displayPath: path.replace(`${uploadRoot}/`, '~/assets/images/uploads/'),
       encoding: toStringValue(entry.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+      filename: sanitizeFilename(filename ?? path),
       path,
+      rawBytes: decodeMediaEntryBytes(
+        content,
+        toStringValue(entry.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+        path
+      ),
     };
   });
 
@@ -684,9 +727,12 @@ const getMediaEntries = async (
       return {
         artifactReference: reference,
         content: bytes.toString('base64'),
+        contentType: reference.contentType,
         displayPath: `~/assets/images/uploads/${slug}/${filename}`,
         encoding: 'base64' as const,
+        filename,
         path: `${uploadRoot}/${slug}/${filename}`,
+        rawBytes: bytes,
       };
     })
   );
@@ -805,6 +851,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences);
+    await validateMediaEntries(mediaEntries);
     publishImagePaths = mediaEntries.map((entry) => entry.path);
     const featuredImage = toStringValue(input.featuredImage);
     const existingFeaturedImageInput = toStringValue(input.existingFeaturedImagePath);
@@ -908,6 +955,10 @@ export const handler = async (event: LambdaEvent) => {
 
     if (error instanceof PublishError) {
       return jsonResponse(error.statusCode, { error: error.message });
+    }
+
+    if (error instanceof ImageValidationError) {
+      return jsonResponse(422, { error: error.message, path: error.path });
     }
 
     return jsonResponse(500, {
