@@ -317,6 +317,15 @@ test('deploy_status exposes deploy receipt lookup inputs and structured content'
   assert.equal(result.structuredContent.commit, 'schema-test-commit');
 });
 
+test('verify_article_images appears in tools/list with expected inputs', async () => {
+  const body = await listTools();
+  const tool = body.result.tools.find((item) => item.name === 'verify_article_images');
+
+  assert.ok(tool, 'Expected verify_article_images to be registered.');
+  assert.ok(property(tool.inputSchema, 'articleUrl'));
+  assert.ok(property(tool.inputSchema, 'expectedImageUrls'));
+});
+
 test('artifact MCP tools are registered with precise byte-vs-metadata descriptions', async () => {
   const body = await listTools();
   const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));

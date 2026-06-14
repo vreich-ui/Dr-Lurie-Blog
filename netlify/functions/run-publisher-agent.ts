@@ -322,7 +322,7 @@ const createMcpToolCaller = (endpoint: string) => async (name: string, args: Rec
   return result.structuredContent ?? {};
 };
 
-type DeployReceiptLike = Partial<DeployReceipt> & {
+type DeployReceiptLike = Omit<Partial<DeployReceipt>, 'deployStatus'> & {
   commit?: string;
   deployStatus?: DeployStatus | string;
 };
@@ -688,19 +688,29 @@ export const handler = async (event: LambdaEvent) => {
       input = { ...input, images: [], artifactReferences: [...input.artifactReferences, ...uploadedReferences] };
     }
 
-    const agent = createPublisherAgent({
-      endpoint: env.endpoint,
-      defaultInput: input,
-      publishSecret: env.publishSecret,
-      onPublishResult: (result) => {
-        publishResult = result;
-      },
-    });
-    const agentResult = await run(
-      agent,
-      `Publish the approved article using this payload JSON exactly:\n${JSON.stringify(input)}\nArticle path: ${articlePath}.`,
-      { maxTurns: 3 }
-    );
+    let agentResult: unknown;
+    const testResult = process.env.RUN_PUBLISHER_AGENT_TEST_RESULT;
+
+    if (testResult && process.env.NODE_ENV === 'test') {
+      publishResult = JSON.parse(testResult) as PublishToolResult;
+      agentResult = { finalOutput: JSON.stringify({ deployReceipt: createDeployReceipt(publishResult) }) };
+    } else {
+      const agent = createPublisherAgent({
+        endpoint: env.endpoint,
+        defaultInput: input,
+        publishSecret: env.publishSecret,
+        onPublishResult: (result) => {
+          publishResult = result;
+        },
+      });
+      agentResult = await run(
+        agent,
+        `Publish the approved article using this payload JSON exactly:
+${JSON.stringify(input)}
+Article path: ${articlePath}.`,
+        { maxTurns: 3 }
+      );
+    }
     const metadata = getAgentMetadata(agentResult);
 
     if (!publishResult) {
