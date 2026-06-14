@@ -894,16 +894,17 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'verify_article_images',
     description:
-      'Read-only verification that a deployed article page references expected image URLs and that each image URL returns an image response.',
+      'Verify that a published article page contains expected image URLs and that each expected image is fetchable as an image. Server-only publish credentials are never accepted as inputs or returned.',
     inputSchema: objectSchema(
       {
-        articleUrl: stringSchema('Absolute deployed article URL to inspect.'),
-        expectedImageUrls: arraySchema(
-          stringSchema('Absolute expected image URL that should appear on the article page.'),
-          'Expected image URLs that must be present and fetchable as image/* responses.'
-        ),
+        url: stringSchema('Published article URL to fetch and inspect for <img> sources.'),
+        expectedImages: {
+          type: 'array',
+          items: stringSchema('Expected image URL or page-relative image path.'),
+          description: 'Expected image URLs or page-relative image paths that must appear in the article HTML.',
+        },
       },
-      ['articleUrl', 'expectedImageUrls']
+      ['url', 'expectedImages']
     ),
   },
   ...(ADMIN_TOOLS_ENABLED
@@ -1437,6 +1438,40 @@ const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unkn
 
 const callVerifyArticleImages = async (event: LambdaEvent, payload: Record<string, unknown>) =>
   callSecureFunctionWithPublishKey(event, payload, 'verify_article_images', verifyArticleImagesHandler);
+const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Article image verification is not configured on the server.', {
+      error_code: 'verify_article_images_not_configured',
+    });
+  }
+
+  const verifyResponse = await verifyArticleImagesHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: input.url,
+      expectedImages: input.expectedImages,
+    }),
+  });
+  const body = parseJsonResponseBody(verifyResponse.body);
+
+  if (verifyResponse.statusCode < 200 || verifyResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${verifyResponse.statusCode}: article image verification failed`,
+      { statusCode: verifyResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
+};
 
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const tokenResult = verifyScheduledPublishToken(input.scheduled_publish_token);
