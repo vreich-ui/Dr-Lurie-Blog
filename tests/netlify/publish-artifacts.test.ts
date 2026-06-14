@@ -707,6 +707,310 @@ test('publish-article rejects content-type and extension mismatches before GitHu
   }
 });
 
+test('publish-article uses a saved artifact for a path-only image repoPath update', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `artifact-target-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const artifactBytes = await createImageBytes('webp');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/webp',
+    filename: 'nostalgia-mood.webp',
+    encoding: 'base64',
+    payload: artifactBytes.toString('base64'),
+  });
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/the-blue-dot-on-the-floor.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'the-blue-dot-on-the-floor',
+        title: 'The Blue Dot on the Floor',
+        markdown: '# The blue dot on the floor',
+        featuredImage: 'src/assets/images/uploads/the-blue-dot-on-the-floor/nostalgia-mood.webp',
+        images: [{ repoPath: 'src/assets/images/uploads/the-blue-dot-on-the-floor/nostalgia-mood.webp' }],
+        artifactReferences: [upload.artifact],
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.deepEqual(treePaths, [
+      'src/data/post/the-blue-dot-on-the-floor.md',
+      'src/assets/images/uploads/the-blue-dot-on-the-floor/nostalgia-mood.webp',
+    ]);
+    assert.match(
+      blobWrites[0]?.content ?? '',
+      /image: "~\/assets\/images\/uploads\/the-blue-dot-on-the-floor\/nostalgia-mood\.webp"/
+    );
+    assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article validates existing repo image references without rewriting the image', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const existingBytes = await createImageBytes('png');
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/repo-reference-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/contents/src/assets/images/uploads/shared/existing-hero.png')) {
+      return Response.json({
+        type: 'file',
+        encoding: 'base64',
+        content: existingBytes.toString('base64'),
+      });
+    }
+
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'repo-reference-test',
+        title: 'Repo Reference Test',
+        markdown: '# Repo reference test',
+        existingFeaturedImagePath: 'src/assets/images/uploads/shared/existing-hero.png',
+        images: [{ repoPath: 'src/assets/images/uploads/shared/existing-hero.png' }],
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.deepEqual(treePaths, ['src/data/post/repo-reference-test.md']);
+    assert.equal(blobWrites.length, 1);
+    assert.match(blobWrites[0]?.content ?? '', /image: "~\/assets\/images\/uploads\/shared\/existing-hero\.png"/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects corrupt existing repo image references before GitHub writes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    requestedUrls.push(`${method} ${url}`);
+
+    if (url.includes('/contents/src/data/post/corrupt-repo-reference-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/contents/src/assets/images/uploads/shared/corrupt-hero.png')) {
+      return Response.json({
+        type: 'file',
+        encoding: 'base64',
+        content: Buffer.from('not an image').toString('base64'),
+      });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'corrupt-repo-reference-test',
+        title: 'Corrupt Repo Reference Test',
+        markdown: '# Corrupt repo reference test',
+        existingFeaturedImagePath: 'src/assets/images/uploads/shared/corrupt-hero.png',
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(
+      JSON.parse(response.body).error,
+      /Invalid image artifact: corrupt-hero\.png could not be decoded as a valid PNG/
+    );
+    assert.deepEqual(
+      requestedUrls.filter((url) => /\/git\/(blobs|trees|commits|refs)/.test(url)),
+      []
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article validates external image references without requiring upload bytes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const externalBytes = await createImageBytes('webp');
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url === 'https://cdn.example.com/images/existing-hero.webp') {
+      return new Response(new Uint8Array(externalBytes), { headers: { 'content-type': 'image/webp' } });
+    }
+
+    if (url.includes('/contents/src/data/post/external-reference-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'external-reference-test',
+        title: 'External Reference Test',
+        markdown: '# External reference test',
+        featuredImage: 'https://cdn.example.com/images/existing-hero.webp',
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.deepEqual(treePaths, ['src/data/post/external-reference-test.md']);
+    assert.equal(blobWrites.length, 1);
+    assert.match(blobWrites[0]?.content ?? '', /image: "https:\/\/cdn\.example\.com\/images\/existing-hero\.webp"/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article accepts valid PNG, WebP, and JPEG media entries', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
