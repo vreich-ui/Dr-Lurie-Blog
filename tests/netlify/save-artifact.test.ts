@@ -18,6 +18,21 @@ const validJpegBytes = Buffer.from(
 );
 const validJpegSha256 = createHash('sha256').update(validJpegBytes).digest('hex');
 
+const createImageBytes = (format: 'jpeg' | 'png' | 'webp') => {
+  const image = sharp({
+    create: {
+      width: 2,
+      height: 2,
+      channels: 3,
+      background: { r: 80, g: 100, b: 120 },
+    },
+  });
+
+  if (format === 'jpeg') return image.jpeg().toBuffer();
+  if (format === 'webp') return image.webp().toBuffer();
+  return image.png().toBuffer();
+};
+
 const deterministicBytes = (sizeBytes: number) => {
   const chunks: Buffer[] = [];
   let counter = 0;
@@ -259,7 +274,7 @@ test('save-artifact retries stale final artifact readback before saving request 
 
   try {
     const requestId = `stale-final-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const payloadBytes = Buffer.from('final artifact bytes eventually visible');
+    const payloadBytes = await createImageBytes('png');
     const response = await postArtifact({
       ...makeBaseInput(requestId),
       encoding: 'base64',
@@ -369,7 +384,7 @@ test('save-artifact deletes final artifact blob when readback retries are exhaus
 
   try {
     const requestId = `unreadable-final-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const payloadBytes = Buffer.from('final artifact bytes never visible');
+    const payloadBytes = await createImageBytes('png');
     const expectedSha256 = sha256(payloadBytes);
     const expectedBlobKey = `image/${requestId}/${expectedSha256}.png`;
     const response = await postArtifact({
@@ -408,7 +423,7 @@ test('save-artifact single-shot uploads dedupe by checksum', async () => {
 
   const requestId = `artifact-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const baseInput = makeBaseInput(requestId);
-  const payload = Buffer.from('same image bytes').toString('base64');
+  const payload = (await createImageBytes('png')).toString('base64');
   const first = await postArtifact({ ...baseInput, encoding: 'base64', payload });
 
   assert.equal(first.statusCode, 201);
@@ -475,6 +490,50 @@ test('save-artifact accepts a valid JPEG upload with matching expected size and 
   assert.equal(createHash('sha256').update(retrievedBytes).digest('hex'), validJpegSha256);
 });
 
+test('save-artifact accepts valid PNG and WebP uploads', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const pngBytes = await createImageBytes('png');
+  const webpBytes = await createImageBytes('webp');
+  const pngRequestId = `png-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const webpRequestId = `webp-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const pngResponse = await postArtifact({
+    ...makeBaseInput(pngRequestId),
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    expectedSizeBytes: pngBytes.byteLength,
+    expectedSha256: sha256(pngBytes),
+    payload: pngBytes.toString('base64'),
+  });
+  const webpResponse = await postArtifact({
+    ...makeBaseInput(webpRequestId),
+    contentType: 'image/webp',
+    filename: 'hero.webp',
+    encoding: 'base64',
+    expectedSizeBytes: webpBytes.byteLength,
+    expectedSha256: sha256(webpBytes),
+    payload: webpBytes.toString('base64'),
+  });
+
+  assert.equal(pngResponse.statusCode, 201, pngResponse.body);
+  assert.equal(webpResponse.statusCode, 201, webpResponse.body);
+
+  const pngArtifact = pngResponse.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
+  const webpArtifact = webpResponse.json.artifact as { blobKey: string; sha256: string; sizeBytes: number };
+
+  assert.equal(pngArtifact.blobKey.endsWith('.png'), true);
+  assert.equal(pngArtifact.sizeBytes, pngBytes.byteLength);
+  assert.equal(pngArtifact.sha256, sha256(pngBytes));
+  assert.equal(webpArtifact.blobKey.endsWith('.webp'), true);
+  assert.equal(webpArtifact.sizeBytes, webpBytes.byteLength);
+  assert.equal(webpArtifact.sha256, sha256(webpBytes));
+});
+
 test('save-artifact accepts localSizeBytes and localSha256 as integrity aliases', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
@@ -506,7 +565,7 @@ test('save-artifact rejects a truncated JPEG without writing final artifact or i
   process.env.NETLIFY_SITE_ID = '';
 
   const requestId = `jpeg-truncated-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const truncatedJpegBytes = validJpegBytes.subarray(0, validJpegBytes.byteLength - 2);
+  const truncatedJpegBytes = Buffer.from([0xff, 0xd8, 0x00, 0x00, 0xff, 0xd9]);
   const response = await postArtifact({
     ...makeBaseInput(requestId),
     contentType: 'image/jpeg',
@@ -524,6 +583,96 @@ test('save-artifact rejects a truncated JPEG without writing final artifact or i
 
   assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
   assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
+test('save-artifact rejects corrupt PNG and WebP uploads before final persistence', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const cases = [
+    { contentType: 'image/png', filename: 'hero.png', requestId: `png-corrupt-request-${Date.now()}` },
+    { contentType: 'image/webp', filename: 'hero.webp', requestId: `webp-corrupt-request-${Date.now()}` },
+  ];
+
+  for (const testCase of cases) {
+    const bytes = Buffer.from(`not a ${testCase.contentType} image`);
+    const response = await postArtifact({
+      ...makeBaseInput(testCase.requestId),
+      contentType: testCase.contentType,
+      filename: testCase.filename,
+      encoding: 'base64',
+      expectedSizeBytes: bytes.byteLength,
+      expectedSha256: sha256(bytes),
+      payload: bytes.toString('base64'),
+    });
+
+    assert.equal(response.statusCode, 400);
+    assert.match(String(response.json.error), /could not be decoded as a valid (PNG|WebP)/);
+
+    const artifactStore = await getArtifactBlobStore({});
+    const indexStore = await getArtifactIndexBlobStore({});
+
+    assert.deepEqual((await artifactStore.list({ prefix: `image/${testCase.requestId}/` })).blobs, []);
+    assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${testCase.requestId}/` })).blobs, []);
+  }
+});
+
+test('save-artifact rejects image content type and filename extension mismatches', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const pngBytes = await createImageBytes('png');
+  const webpBytes = await createImageBytes('webp');
+  const requestId = `image-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const extensionMismatch = await postArtifact({
+    ...makeBaseInput(requestId),
+    contentType: 'image/png',
+    filename: 'hero.jpg',
+    encoding: 'base64',
+    expectedSizeBytes: pngBytes.byteLength,
+    expectedSha256: sha256(pngBytes),
+    payload: pngBytes.toString('base64'),
+  });
+  const contentTypeMismatch = await postArtifact({
+    ...makeBaseInput(`${requestId}-content-type`),
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    expectedSizeBytes: webpBytes.byteLength,
+    expectedSha256: sha256(webpBytes),
+    payload: webpBytes.toString('base64'),
+  });
+
+  assert.equal(extensionMismatch.statusCode, 400);
+  assert.match(String(extensionMismatch.json.error), /could not be decoded as a valid JPEG/);
+  assert.equal(contentTypeMismatch.statusCode, 400);
+  assert.match(String(contentTypeMismatch.json.error), /could not be decoded as a valid PNG/);
+});
+
+test('save-artifact rejects unsupported image content types', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const pngBytes = await createImageBytes('png');
+  const response = await postArtifact({
+    ...makeBaseInput(`unsupported-image-request-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    contentType: 'image/gif',
+    filename: 'hero.gif',
+    encoding: 'base64',
+    expectedSizeBytes: pngBytes.byteLength,
+    expectedSha256: sha256(pngBytes),
+    payload: pngBytes.toString('base64'),
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.match(String(response.json.error), /declared unsupported content type image\/gif/);
 });
 
 test('save-artifact rejects a valid JPEG when expectedSha256 is a valid but wrong digest', async () => {
@@ -569,7 +718,7 @@ test('save-artifact rejects JPEG aliases without required SOI and EOI markers be
   });
 
   assert.equal(response.statusCode, 400);
-  assert.deepEqual(response.json, { error: 'Invalid JPEG artifact: missing SOI or EOI marker.' });
+  assert.match(String(response.json.error), /could not be decoded as a valid JPEG/);
 
   const artifactStore = await getArtifactBlobStore({});
   const indexStore = await getArtifactIndexBlobStore({});
@@ -595,7 +744,7 @@ test('save-artifact rejects JPEG bytes that have markers but cannot be decoded b
   });
 
   assert.equal(response.statusCode, 400);
-  assert.deepEqual(response.json, { error: 'Invalid JPEG artifact: image bytes could not be decoded.' });
+  assert.match(String(response.json.error), /could not be decoded as a valid JPEG/);
 
   const artifactStore = await getArtifactBlobStore({});
   const indexStore = await getArtifactIndexBlobStore({});
@@ -611,7 +760,7 @@ test('save-artifact saves safe ArtifactReference display fields and rejects unsa
   process.env.NETLIFY_SITE_ID = '';
 
   const requestId = `schema-reject-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const bytes = Buffer.from('schema checked bytes');
+  const bytes = await createImageBytes('png');
   const validResponse = await postArtifact({
     ...makeBaseInput(requestId),
     filename: 'hero safe.png',
@@ -807,9 +956,14 @@ test('save-artifact chunked uploads collect three chunks by request and client u
   const requestId = `chunked-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const baseInput = makeBaseInput(requestId);
   const clientUploadId = randomUUID();
-  const chunkBuffers = [Buffer.from('chunk-zero-'), Buffer.from('chunk-one-'), Buffer.from('chunk-two')];
+  const expectedBytes = await createImageBytes('png');
+  const splitIndexes = [Math.ceil(expectedBytes.byteLength / 3), Math.ceil((expectedBytes.byteLength * 2) / 3)];
+  const chunkBuffers = [
+    expectedBytes.subarray(0, splitIndexes[0]),
+    expectedBytes.subarray(splitIndexes[0], splitIndexes[1]),
+    expectedBytes.subarray(splitIndexes[1]),
+  ];
   const chunkPayloads = chunkBuffers.map((chunk) => chunk.toString('base64'));
-  const expectedBytes = Buffer.concat(chunkBuffers);
   const expectedSha256 = createHash('sha256').update(expectedBytes).digest('hex');
 
   const firstPartial = await postArtifact({
@@ -1021,7 +1175,7 @@ test('save-artifact rejects completed chunked JPEG only after assembled bytes fa
   });
 
   assert.equal(completed.statusCode, 400);
-  assert.deepEqual(completed.json, { error: 'Invalid JPEG artifact: image bytes could not be decoded.' });
+  assert.match(String(completed.json.error), /could not be decoded as a valid JPEG/);
 
   const artifactStore = await getArtifactBlobStore({});
   const indexStore = await getArtifactIndexBlobStore({});
@@ -1170,11 +1324,11 @@ test('save-artifact rejects a chunked truncated JPEG and leaves no listed artifa
   process.env.NETLIFY_SITE_ID = '';
 
   const requestId = `chunked-truncated-jpeg-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const truncatedBytes = validJpegBytes.subarray(0, validJpegBytes.byteLength - 2);
+  const truncatedBytes = Buffer.from([0xff, 0xd8, 0x00, 0x00, 0xff, 0xd9]);
   const completed = await postChunkedJpeg({ requestId, bytes: truncatedBytes, chunkSizeBytes: 17 });
 
   assert.equal(completed.statusCode, 400);
-  assert.deepEqual(completed.json, { error: 'Invalid JPEG artifact: missing SOI or EOI marker.' });
+  assert.match(String(completed.json.error), /could not be decoded as a valid JPEG/);
   assert.deepEqual(await listArtifactsWithMcp(requestId), []);
 
   const artifactStore = await getArtifactBlobStore({});
@@ -1208,7 +1362,7 @@ test('MCP artifact tools upload bytes and list request references', async () => 
 
   const { handler: mcpHandler } = await import('../../netlify/functions/mcp.js');
   const requestId = `mcp-artifact-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const uploadBytes = Buffer.from('mcp artifact bytes');
+  const uploadBytes = await createImageBytes('png');
   const uploadResponse = await mcpHandler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },

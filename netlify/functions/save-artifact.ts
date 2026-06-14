@@ -8,7 +8,6 @@
  */
 import { timingSafeEqual } from 'node:crypto';
 
-import sharp from 'sharp';
 import { z } from 'zod';
 
 import {
@@ -26,6 +25,7 @@ import {
 import { getHeader } from '../lib/admin-auth.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { sha256Hex } from '../lib/crypto.js';
+import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 
 // artifactStore holds binary blobs (final artifacts and temporary chunks); indexStore holds JSON references and indexes.
 
@@ -248,30 +248,22 @@ const validateArtifactIntegrity = (input: UploadRequest, bytes: Buffer) => {
   return undefined;
 };
 
-const isJpegContentType = (contentType: string) => {
-  const normalized = contentType.split(';', 1)[0].trim().toLowerCase();
-
-  return normalized === 'image/jpeg' || normalized === 'image/jpg';
-};
-
 const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
-  if (!isJpegContentType(input.contentType)) return undefined;
-
-  const hasJpegMarkers =
-    bytes.length >= 4 &&
-    bytes[0] === 0xff &&
-    bytes[1] === 0xd8 &&
-    bytes[bytes.length - 2] === 0xff &&
-    bytes[bytes.length - 1] === 0xd9;
-
-  if (!hasJpegMarkers) {
-    return jsonResponse(400, { error: 'Invalid JPEG artifact: missing SOI or EOI marker.' });
-  }
+  if (input.artifactKind !== ArtifactKind.Image) return undefined;
 
   try {
-    await sharp(bytes).metadata();
-  } catch {
-    return jsonResponse(400, { error: 'Invalid JPEG artifact: image bytes could not be decoded.' });
+    await validatePublishImageBytes({
+      bytes,
+      contentType: input.contentType,
+      filename: input.filename,
+      path: input.filename ?? 'artifact',
+    });
+  } catch (error) {
+    if (error instanceof ImageValidationError) {
+      return jsonResponse(400, { error: error.message });
+    }
+
+    throw error;
   }
 
   return undefined;
