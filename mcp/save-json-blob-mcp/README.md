@@ -21,7 +21,7 @@ Core registered tool names:
 - `save_json_blob_mark_agent_complete`
 - `ping`
 
-Production `/mcp` also registers artifact tools (`save_artifact`, `save_artifact_chunk`, and `list_artifacts_for_request`); see the schema document for the compact agent-facing descriptions.
+Production `/mcp` also registers artifact tools (`save_artifact`, `save_artifact_chunk`, `save_artifact_create_upload_session`, `save_artifact_finalize_upload_session`, and `list_artifacts_for_request`); see the schema document for the compact agent-facing descriptions. Upload sessions are the recommended path for larger binary artifacts because bytes move through the binary HTTP endpoint instead of MCP JSON payloads.
 
 For full tool schemas, versioning rules, helper tool names, and sample calls, see [`docs/tool-schema.md`](docs/tool-schema.md).
 

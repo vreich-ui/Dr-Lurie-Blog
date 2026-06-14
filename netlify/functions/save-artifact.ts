@@ -710,7 +710,7 @@ const shouldSaveArtifactReference = (
   );
 };
 
-const finalizeUpload = async (
+export const finalizeUpload = async (
   event: LambdaEvent,
   input: UploadRequest,
   finalBytes: Buffer,

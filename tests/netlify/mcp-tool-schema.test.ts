@@ -290,6 +290,8 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   for (const name of [
     'save_artifact',
     'save_artifact_chunk',
+    'save_artifact_create_upload_session',
+    'save_artifact_finalize_upload_session',
     'list_artifacts_for_request',
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
@@ -392,6 +394,31 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     pattern: '^[a-fA-F0-9]{64}$',
     description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
   });
+
+  const createSession = tools.get('save_artifact_create_upload_session')!;
+  assert.deepEqual(createSession.inputSchema.required, [
+    'requestId',
+    'artifactKind',
+    'contentType',
+    'expectedSizeBytes',
+    'expectedSha256',
+  ]);
+  assert.equal(property(createSession.inputSchema, 'expectedSizeBytes').maximum, 50 * 1024 * 1024);
+  assert.match(String((createSession as { description?: string }).description), /chunkSizeBytes=5242880/);
+  assert.match(String((createSession as { description?: string }).description), /larger binary assets/i);
+  assert.ok(property(createSession.inputSchema, 'metadata'));
+
+  const finalizeSession = tools.get('save_artifact_finalize_upload_session')!;
+  assert.deepEqual(finalizeSession.inputSchema.required, [
+    'sessionId',
+    'requestId',
+    'artifactKind',
+    'contentType',
+    'expectedSizeBytes',
+    'expectedSha256',
+  ]);
+  assert.match(String((finalizeSession as { description?: string }).description), /Idempotent retries/i);
+  assert.ok(property(finalizeSession.inputSchema, 'sessionId'));
   assert.match(
     String((saveChunk as { description?: string }).description),
     /fallback for artifacts too large for one MCP tool call/i
@@ -478,6 +505,8 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   for (const name of [
     'save_artifact',
     'save_artifact_chunk',
+    'save_artifact_create_upload_session',
+    'save_artifact_finalize_upload_session',
     'list_artifacts_for_request',
     'list_artifacts_by_kind',
     'list_artifacts_by_request',

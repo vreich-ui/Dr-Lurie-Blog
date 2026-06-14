@@ -13,11 +13,21 @@ export type UploadableImage = {
 };
 
 type McpToolCall = (name: string, args: Record<string, unknown>) => Promise<Record<string, unknown>>;
+type BinaryChunkUpload = (input: {
+  bytes: Buffer;
+  chunkIndex: number;
+  totalChunks: number;
+  uploadToken: string;
+  uploadUrlBase: string;
+  sessionId: string;
+  filename: string;
+}) => Promise<Record<string, unknown>>;
 
 type UploadImagesWithIntegrityInput = {
   images: UploadableImage[];
   requestId: string;
   mcpToolCall: McpToolCall;
+  binaryChunkUpload?: BinaryChunkUpload;
   onWorkflowError?: (message: string) => void;
   chunkSizeBytes?: number;
 };
@@ -31,6 +41,8 @@ type PreparedImageUpload = {
 };
 
 const DEFAULT_IMAGE_CHUNK_SIZE_BYTES = 6 * 1024;
+const SINGLE_SHOT_UPLOAD_MAX_BYTES = 30 * 1024;
+const UPLOAD_SESSION_MAX_BYTES = 50 * 1024 * 1024;
 const FINAL_CHUNK_RETRY_ATTEMPTS = 3;
 
 export class ArtifactIntegrityError extends Error {
@@ -162,7 +174,41 @@ const verifyReturnedArtifact = ({
   }
 };
 
-const uploadImageWithIntegrity = async ({
+const defaultBinaryChunkUpload: BinaryChunkUpload = async ({
+  bytes,
+  chunkIndex,
+  totalChunks,
+  uploadToken,
+  uploadUrlBase,
+  sessionId,
+}) => {
+  if (typeof fetch !== 'function') {
+    throw new ArtifactIntegrityError('Artifact upload failed integrity verification: fetch is unavailable.');
+  }
+
+  const response = await fetch(uploadUrlBase, {
+    method: 'PUT',
+    headers: {
+      'content-type': 'application/octet-stream',
+      'x-upload-token': uploadToken,
+      'x-session-id': sessionId,
+      'x-chunk-index': String(chunkIndex),
+      'x-total-chunks': String(totalChunks),
+    },
+    body: new Uint8Array(bytes),
+  });
+  const body = (await response.json()) as Record<string, unknown>;
+
+  if (!response.ok) {
+    throw new ArtifactIntegrityError(
+      `Artifact upload failed integrity verification: ${typeof body.error === 'string' ? body.error : response.statusText}.`
+    );
+  }
+
+  return body;
+};
+
+const uploadImageWithLegacyChunks = async ({
   image,
   requestId,
   mcpToolCall,
@@ -224,10 +270,126 @@ const uploadImageWithIntegrity = async ({
   return completedArtifact;
 };
 
+const uploadImageSingleShot = async ({
+  image,
+  requestId,
+  mcpToolCall,
+}: {
+  image: PreparedImageUpload;
+  requestId: string;
+  mcpToolCall: McpToolCall;
+}) => {
+  const { bytes, contentType, filename, sha256, sizeBytes } = image;
+  const result = await mcpToolCall('save_artifact', {
+    requestId,
+    artifactKind: 'image',
+    contentType,
+    filename,
+    encoding: 'base64',
+    expectedSizeBytes: sizeBytes,
+    expectedSha256: sha256,
+    payload: bytes.toString('base64'),
+    label: filename,
+    tags: ['publisher-agent', 'image'],
+    metadata: { source: 'publisher_agent', filename },
+  });
+  const artifact = assertArtifactReference(result.artifact);
+
+  verifyReturnedArtifact({ artifact, contentType, sha256, sizeBytes });
+
+  return artifact;
+};
+
+const uploadImageWithSession = async ({
+  image,
+  requestId,
+  mcpToolCall,
+  binaryChunkUpload,
+}: {
+  image: PreparedImageUpload;
+  requestId: string;
+  mcpToolCall: McpToolCall;
+  binaryChunkUpload: BinaryChunkUpload;
+}) => {
+  const { bytes, contentType, filename, sha256, sizeBytes } = image;
+  const session = await mcpToolCall('save_artifact_create_upload_session', {
+    requestId,
+    artifactKind: 'image',
+    contentType,
+    filename,
+    expectedSizeBytes: sizeBytes,
+    expectedSha256: sha256,
+    label: filename,
+    tags: ['publisher-agent', 'image'],
+    metadata: { source: 'publisher_agent', filename },
+  });
+  const sessionId = typeof session.sessionId === 'string' ? session.sessionId : undefined;
+  const uploadUrlBase = typeof session.uploadUrlBase === 'string' ? session.uploadUrlBase : undefined;
+  const uploadToken = typeof session.uploadToken === 'string' ? session.uploadToken : undefined;
+  const chunkSizeBytes = typeof session.chunkSizeBytes === 'number' ? session.chunkSizeBytes : undefined;
+
+  if (!sessionId || !uploadUrlBase || !uploadToken || !chunkSizeBytes) {
+    throw new ArtifactIntegrityError('Artifact upload failed integrity verification: incomplete upload session.');
+  }
+
+  const totalChunks = Math.max(1, Math.ceil(sizeBytes / chunkSizeBytes));
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+    const chunk = bytes.subarray(chunkIndex * chunkSizeBytes, Math.min(sizeBytes, (chunkIndex + 1) * chunkSizeBytes));
+    await binaryChunkUpload({ bytes: chunk, chunkIndex, totalChunks, uploadToken, uploadUrlBase, sessionId, filename });
+  }
+
+  const finalizeResult = await mcpToolCall('save_artifact_finalize_upload_session', {
+    sessionId,
+    requestId,
+    artifactKind: 'image',
+    contentType,
+    filename,
+    expectedSizeBytes: sizeBytes,
+    expectedSha256: sha256,
+    label: filename,
+    tags: ['publisher-agent', 'image'],
+    metadata: { source: 'publisher_agent', filename },
+  });
+  const artifact = assertArtifactReference(finalizeResult.artifact);
+
+  verifyReturnedArtifact({ artifact, contentType, sha256, sizeBytes });
+
+  return artifact;
+};
+
+const uploadImageWithIntegrity = async ({
+  image,
+  requestId,
+  mcpToolCall,
+  binaryChunkUpload,
+  chunkSizeBytes,
+}: {
+  image: PreparedImageUpload;
+  requestId: string;
+  mcpToolCall: McpToolCall;
+  binaryChunkUpload: BinaryChunkUpload;
+  chunkSizeBytes: number;
+}) => {
+  if (image.sizeBytes <= SINGLE_SHOT_UPLOAD_MAX_BYTES) {
+    return uploadImageSingleShot({ image, requestId, mcpToolCall });
+  }
+
+  if (image.sizeBytes <= UPLOAD_SESSION_MAX_BYTES) {
+    try {
+      return await uploadImageWithSession({ image, requestId, mcpToolCall, binaryChunkUpload });
+    } catch {
+      return uploadImageWithLegacyChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
+    }
+  }
+
+  return uploadImageWithLegacyChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
+};
+
 export const uploadImagesWithIntegrity = async ({
   images,
   requestId,
   mcpToolCall,
+  binaryChunkUpload = defaultBinaryChunkUpload,
   onWorkflowError,
   chunkSizeBytes = DEFAULT_IMAGE_CHUNK_SIZE_BYTES,
 }: UploadImagesWithIntegrityInput) => {
@@ -238,7 +400,13 @@ export const uploadImagesWithIntegrity = async ({
 
     for (let index = 0; index < preparedImages.length; index += 1) {
       verifiedArtifacts.push(
-        await uploadImageWithIntegrity({ image: preparedImages[index], requestId, mcpToolCall, chunkSizeBytes })
+        await uploadImageWithIntegrity({
+          image: preparedImages[index],
+          requestId,
+          mcpToolCall,
+          binaryChunkUpload,
+          chunkSizeBytes,
+        })
       );
     }
   } catch (error) {
