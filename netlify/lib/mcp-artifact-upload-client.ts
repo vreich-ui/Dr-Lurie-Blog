@@ -41,7 +41,8 @@ type PreparedImageUpload = {
 };
 
 const DEFAULT_IMAGE_CHUNK_SIZE_BYTES = 6 * 1024;
-const SINGLE_SHOT_UPLOAD_MAX_BYTES = 30 * 1024;
+// Temporarily keep single-shot uploads tiny while MCP base64 payload limits are characterized.
+const SINGLE_SHOT_UPLOAD_MAX_BYTES = 3 * 1024;
 const UPLOAD_SESSION_MAX_BYTES = 50 * 1024 * 1024;
 const FINAL_CHUNK_RETRY_ATTEMPTS = 3;
 
@@ -172,6 +173,29 @@ const verifyReturnedArtifact = ({
   if (mismatches.length) {
     throw new ArtifactIntegrityError(`Artifact upload failed integrity verification: ${mismatches.join('; ')}.`);
   }
+};
+
+const logUploadPathSelection = ({
+  filename,
+  requestId,
+  sizeBytes,
+  uploadPath,
+}: {
+  filename: string;
+  requestId: string;
+  sizeBytes: number;
+  uploadPath: 'single-shot' | 'upload-session' | 'legacy-chunks';
+}) => {
+  console.log(
+    JSON.stringify({
+      event: 'artifact_upload_path_selected',
+      requestId,
+      filename,
+      sizeBytes,
+      uploadPath,
+      singleShotMaxBytes: SINGLE_SHOT_UPLOAD_MAX_BYTES,
+    })
+  );
 };
 
 const defaultBinaryChunkUpload: BinaryChunkUpload = async ({
@@ -371,10 +395,22 @@ const uploadImageWithIntegrity = async ({
   chunkSizeBytes: number;
 }) => {
   if (image.sizeBytes <= SINGLE_SHOT_UPLOAD_MAX_BYTES) {
+    logUploadPathSelection({
+      filename: image.filename,
+      requestId,
+      sizeBytes: image.sizeBytes,
+      uploadPath: 'single-shot',
+    });
     return uploadImageSingleShot({ image, requestId, mcpToolCall });
   }
 
   if (image.sizeBytes <= UPLOAD_SESSION_MAX_BYTES) {
+    logUploadPathSelection({
+      filename: image.filename,
+      requestId,
+      sizeBytes: image.sizeBytes,
+      uploadPath: 'upload-session',
+    });
     try {
       return await uploadImageWithSession({ image, requestId, mcpToolCall, binaryChunkUpload });
     } catch {
@@ -382,6 +418,12 @@ const uploadImageWithIntegrity = async ({
     }
   }
 
+  logUploadPathSelection({
+    filename: image.filename,
+    requestId,
+    sizeBytes: image.sizeBytes,
+    uploadPath: 'legacy-chunks',
+  });
   return uploadImageWithLegacyChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
 };
 

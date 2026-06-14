@@ -4,6 +4,7 @@ import { handler as saveArtifactHandler } from './save-artifact.js';
 import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
+import { handler as deployStatusHandler } from './deploy-status.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
@@ -31,12 +32,25 @@ import {
   type ArtifactReference,
 } from '../lib/artifacts.js';
 
+type StructuredLogPayload = {
+  event: string;
+  rpcMethod?: string | null;
+  slug?: string | null;
+  [key: string]: unknown;
+};
+
+type StructuredLogger = (payload: StructuredLogPayload) => void;
+
 type LambdaEvent = {
   blobs?: string;
   body?: string | null;
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   isBase64Encoded?: boolean;
+  log?: StructuredLogger;
+  rpcMethod?: string | null;
+  requestId?: string;
+  slug?: string | null;
 };
 
 type JsonRpcRequest = {
@@ -868,6 +882,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ['request_id', 'lock_token', 'scheduled_publish_token', 'agent_id', 'agent_owner']
     ),
   },
+  {
+    name: 'deploy_status',
+    description: 'Read-only Netlify deploy receipt lookup by commit or deploy id.',
+    inputSchema: objectSchema({
+      commit: stringSchema('Commit SHA to look up in saved Netlify deploy receipts.'),
+      deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
+    }),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -1192,6 +1214,52 @@ const getHeader = (headers: LambdaEvent['headers'], name: string) => {
   return entry?.[1];
 };
 
+const getRequestId = (event: LambdaEvent) =>
+  toNonEmptyString(getHeader(event.headers, 'x-nf-request-id')) ?? randomUUID();
+
+const getSlugFromValue = (value: unknown): string | null => {
+  const record = getRecordValue(value);
+  if (!record) return null;
+
+  return (
+    toNonEmptyString(record.slug) ??
+    toNonEmptyString(record.articleSlug) ??
+    toNonEmptyString(record.article_slug) ??
+    getSlugFromValue(record.publication) ??
+    getSlugFromValue(record.publish_payload) ??
+    getSlugFromValue(record.publishPayload) ??
+    getSlugFromValue(record.content)
+  );
+};
+
+const getRpcSlug = (request: JsonRpcRequest) =>
+  getSlugFromValue(request.params?.arguments) ?? getSlugFromValue(request.params);
+
+const createStructuredLogger = (requestId: string): StructuredLogger => {
+  return ({ event: logEvent, rpcMethod = null, slug = null, ...details }) => {
+    console.log(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        requestId,
+        rpcMethod,
+        slug,
+        event: logEvent,
+        ...details,
+      })
+    );
+  };
+};
+
+const withStructuredLogger = (event: LambdaEvent): LambdaEvent => {
+  const requestId = event.requestId ?? getRequestId(event);
+
+  return {
+    ...event,
+    requestId,
+    log: event.log ?? createStructuredLogger(requestId),
+  };
+};
+
 const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) => ({
   ...(event.headers ?? {}),
   ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
@@ -1247,6 +1315,10 @@ const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, un
     httpMethod: 'POST',
     headers: createSaveJsonBlobHeaders(event, publishSecret),
     body: JSON.stringify(payload),
+    log: event.log,
+    requestId: event.requestId,
+    rpcMethod: event.rpcMethod,
+    slug: event.slug,
   });
 
   const bodyText = saveResponse.body ?? '';
@@ -1295,6 +1367,10 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
       'content-type': 'application/json',
     },
     body: JSON.stringify(payload),
+    log: event.log,
+    requestId: event.requestId,
+    rpcMethod: event.rpcMethod,
+    slug: event.slug,
   });
   const body = parseJsonResponseBody(publishResponse.body);
 
@@ -1303,6 +1379,38 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
   }
 
   return { ok: true as const, statusCode: publishResponse.statusCode, body };
+};
+
+const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Deploy status lookup is not configured on the server.', {
+      error_code: 'deploy_status_not_configured',
+    });
+  }
+
+  const deployStatusResponse = await deployStatusHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = parseJsonResponseBody(deployStatusResponse.body);
+
+  if (deployStatusResponse.statusCode < 200 || deployStatusResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${deployStatusResponse.statusCode}: deploy status lookup failed`,
+      { statusCode: deployStatusResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
 };
 
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
@@ -2401,6 +2509,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       );
     case 'save_json_blob_publish_scheduled':
       return callScheduledPublish(event, input);
+    case 'deploy_status':
+      return callDeployStatus(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
@@ -2507,6 +2617,11 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
 };
 
 const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Promise<JsonRpcResponse | undefined> => {
+  const rpcMethod = typeof request.method === 'string' ? request.method : null;
+  const slug = getRpcSlug(request);
+
+  event.log?.({ event: 'rpc_request_received', rpcMethod, slug });
+
   if (request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
     return rpcError(request.id, -32600, 'Invalid Request');
   }
@@ -2514,10 +2629,12 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
   const isNotification = !Object.hasOwn(request, 'id');
 
   if (request.method === 'notifications/initialized') {
+    event.log?.({ event: 'rpc_notification_ignored', rpcMethod, slug });
     return undefined;
   }
 
   if (isNotification) {
+    event.log?.({ event: 'rpc_notification_ignored', rpcMethod, slug });
     return undefined;
   }
 
@@ -2531,13 +2648,20 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
     case 'tools/list':
       return rpcResponse(request.id, { tools: TOOL_DEFINITIONS });
     case 'tools/call':
-      return rpcResponse(request.id, await callTool(event, request.params?.name, request.params?.arguments));
+      event.log?.({ event: 'rpc_tool_call_started', rpcMethod, slug, toolName: request.params?.name });
+      return rpcResponse(
+        request.id,
+        await callTool({ ...event, rpcMethod, slug }, request.params?.name, request.params?.arguments)
+      );
     default:
+      event.log?.({ event: 'rpc_method_not_found', rpcMethod, slug });
       return rpcError(request.id, -32601, `Method not found: ${request.method}`);
   }
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (rawEvent: LambdaEvent) => {
+  const event = withStructuredLogger(rawEvent);
+  event.log?.({ event: 'mcp_request_received', rpcMethod: null, slug: null, httpMethod: event.httpMethod });
   if (event.httpMethod === 'OPTIONS') {
     return emptyResponse(204);
   }
@@ -2570,6 +2694,12 @@ export const handler = async (event: LambdaEvent) => {
 
     return response(200, Array.isArray(body) ? results : results[0]);
   } catch (error) {
+    event.log?.({
+      event: 'mcp_request_failed',
+      rpcMethod: null,
+      slug: null,
+      error: error instanceof Error ? error.message : String(error),
+    });
     console.error('Failed to handle MCP JSON-RPC request.', error);
 
     return response(500, rpcError(null, -32000, 'Internal server error'));

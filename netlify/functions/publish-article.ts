@@ -9,6 +9,13 @@ import {
 } from '../lib/artifacts.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
+import {
+  getDeployReceiptByCommit,
+  isNetlifyDeployLookupConfigured,
+  pollDeployReceipt,
+  type DeployReceipt,
+  type DeployStatus,
+} from '../lib/netlify-deploys.js';
 import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
 
 type LambdaEvent = {
@@ -16,6 +23,10 @@ type LambdaEvent = {
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   isBase64Encoded?: boolean;
+  log?: (payload: { event: string; rpcMethod?: string | null; slug?: string | null; [key: string]: unknown }) => void;
+  requestId?: string;
+  rpcMethod?: string | null;
+  slug?: string | null;
 };
 
 type GitHubRef = {
@@ -101,7 +112,10 @@ type PublishInput = {
   tags?: unknown;
   title?: unknown;
   commitMessage?: unknown;
+  deployPollIntervalSeconds?: unknown;
+  deployWaitTimeoutSeconds?: unknown;
   videoLink?: unknown;
+  waitForDeploy?: unknown;
 };
 
 const jsonHeaders = {
@@ -112,6 +126,63 @@ const jsonHeaders = {
 const repoContentRoot = 'src/data/post';
 const uploadRoot = 'src/assets/images/uploads';
 const githubApiRoot = 'https://api.github.com';
+
+const DEFAULT_DEPLOY_WAIT_TIMEOUT_SECONDS = 120;
+const DEFAULT_DEPLOY_POLL_INTERVAL_SECONDS = 5;
+const MAX_DEPLOY_WAIT_TIMEOUT_SECONDS = 120;
+const MIN_DEPLOY_POLL_INTERVAL_SECONDS = 1;
+const MAX_DEPLOY_POLL_INTERVAL_SECONDS = 30;
+
+const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const parseBoundedNumber = (value: unknown, defaultValue: number, min: number, max: number) => {
+  if (value === undefined || value === null || value === '') return defaultValue;
+
+  const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : Number.NaN;
+  if (!Number.isFinite(parsed)) return defaultValue;
+
+  return clampNumber(parsed, min, max);
+};
+
+type PublishDeployReceipt = Partial<Omit<DeployReceipt, 'commit' | 'deployStatus'>> & {
+  commit: string;
+  deployStatus: DeployStatus;
+};
+
+const getPublishDeployReceipt = async (input: PublishInput, commit: string): Promise<PublishDeployReceipt> => {
+  const fallbackReceipt: PublishDeployReceipt = {
+    commit,
+    deployStatus: 'queued',
+  };
+
+  if (!isNetlifyDeployLookupConfigured()) return fallbackReceipt;
+
+  try {
+    if (!toBooleanValue(input.waitForDeploy)) {
+      const receipt = await getDeployReceiptByCommit(commit);
+      return receipt ? { ...fallbackReceipt, ...receipt } : fallbackReceipt;
+    }
+
+    const timeoutSeconds = parseBoundedNumber(
+      input.deployWaitTimeoutSeconds,
+      DEFAULT_DEPLOY_WAIT_TIMEOUT_SECONDS,
+      0,
+      MAX_DEPLOY_WAIT_TIMEOUT_SECONDS
+    );
+    const intervalSeconds = parseBoundedNumber(
+      input.deployPollIntervalSeconds,
+      DEFAULT_DEPLOY_POLL_INTERVAL_SECONDS,
+      MIN_DEPLOY_POLL_INTERVAL_SECONDS,
+      MAX_DEPLOY_POLL_INTERVAL_SECONDS
+    );
+    const receipt = await pollDeployReceipt({ commit, timeoutSeconds, intervalSeconds });
+
+    return { ...fallbackReceipt, ...receipt };
+  } catch (error) {
+    console.warn('Netlify deploy receipt lookup failed after publish.', { commit, error });
+    return fallbackReceipt;
+  }
+};
 
 class PublishError extends Error {
   statusCode: number;
@@ -206,6 +277,37 @@ const isValidUploadedImagePath = (path: string) => {
 const isValidImagePath = (path: string, slug: string) => {
   const prefix = `${uploadRoot}/${slug}/`;
   return isValidUploadedImagePath(path) && path.startsWith(prefix) && path.length > prefix.length;
+};
+
+const toSafeLogPath = (value: string | undefined) =>
+  value
+    ?.split('')
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join('')
+    .slice(0, 240);
+
+const getPublishRequestId = (event: LambdaEvent, input: PublishInput) =>
+  event.requestId ?? toStringValue(input.requestId) ?? toStringValue(input.request_id) ?? null;
+
+const logPublishMedia = (
+  event: LambdaEvent,
+  input: PublishInput,
+  logEvent: string,
+  slug: string,
+  articlePath: string,
+  details: Record<string, unknown> = {}
+) => {
+  event.log?.({
+    event: logEvent,
+    requestId: getPublishRequestId(event, input),
+    rpcMethod: event.rpcMethod ?? null,
+    slug,
+    articlePath,
+    ...details,
+  });
 };
 
 const isHttpImageReference = (value: string) => {
@@ -727,6 +829,7 @@ const getMediaEntries = async (
   event: LambdaEvent,
   input: PublishInput,
   slug: string,
+  articlePath: string,
   artifactReferences: ArtifactReference[],
   githubContext: PublishGitHubContext
 ): Promise<MediaEntry[]> => {
@@ -762,6 +865,26 @@ const getMediaEntries = async (
   const fallbackRequestId = toStringValue(input.requestId) ?? slug;
   const artifactTargetPaths = new Map<ArtifactReference, string>();
   const images = Array.isArray(input.images) ? (input.images as AgentImageInput[]) : [];
+  const agentImageSummaries = images.map((image) => {
+    const repoPath = toStringValue(image.repoPath);
+    const filename = toStringValue(image.name);
+    const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
+    const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
+
+    return {
+      imagePath: toSafeLogPath(repoPath ?? filename),
+      repoPath: toSafeLogPath(path),
+      hasContent: Boolean(toStringValue(image.base64) ?? toStringValue(image.content)),
+    };
+  });
+
+  logPublishMedia(event, input, 'publish_media_entries_started', slug, articlePath, {
+    imagePaths: agentImageSummaries.map((image) => image.imagePath ?? null),
+    repoPaths: agentImageSummaries.map((image) => image.repoPath ?? null),
+    images: agentImageSummaries,
+    mediaEntryInputCount: Array.isArray(input.mediaEntries) ? input.mediaEntries.length : 0,
+    artifactReferenceCount: artifactReferences.length,
+  });
   const agentEntries: MediaEntry[] = [];
 
   for (const image of images) {
@@ -774,7 +897,11 @@ const getMediaEntries = async (
     if (!content) {
       const referenceValue = repoPath ?? filename;
       if (!referenceValue) {
-        throw new PublishError(400, 'Image content or a valid image reference is required.');
+        logPublishMedia(event, input, 'publish_media_image_missing_content', slug, articlePath, {
+          imagePath: null,
+          repoPath: toSafeLogPath(path),
+        });
+        throw new PublishError(400, 'Image content or a valid image reference is required for an image entry.');
       }
 
       const existingPath = normalizeUploadReferencePath(referenceValue);
@@ -796,7 +923,14 @@ const getMediaEntries = async (
     }
 
     if (!path || !isValidImagePath(path, slug)) {
-      throw new PublishError(403, `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`);
+      const safeRepoPath = toSafeLogPath(path ?? repoPath ?? filename);
+      logPublishMedia(event, input, 'publish_media_invalid_image_repo_path', slug, articlePath, {
+        repoPath: safeRepoPath,
+      });
+      throw new PublishError(
+        403,
+        `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
+      );
     }
 
     agentEntries.push({
@@ -822,16 +956,24 @@ const getMediaEntries = async (
     const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
 
     if (!path || !isValidImagePath(path, slug)) {
+      const safeRepoPath = toSafeLogPath(path ?? repoPath ?? filename);
+      logPublishMedia(event, input, 'publish_media_invalid_media_entry_repo_path', slug, articlePath, {
+        repoPath: safeRepoPath,
+      });
       throw new PublishError(
         403,
-        `mediaEntries repoPath/path values must be under ${uploadRoot}/${slug}/ and include a filename.`
+        `mediaEntries repoPath/path values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
       );
     }
 
     const content = toStringValue(entry.base64) ?? toStringValue(entry.content);
 
     if (!content) {
-      throw new PublishError(400, `Media entry content is required for ${path}.`);
+      const safeRepoPath = toSafeLogPath(path);
+      logPublishMedia(event, input, 'publish_media_entry_missing_content', slug, articlePath, {
+        repoPath: safeRepoPath,
+      });
+      throw new PublishError(400, `Media entry content is required for ${safeRepoPath}.`);
     }
 
     return {
@@ -862,9 +1004,13 @@ const getMediaEntries = async (
       const path = artifactTargetPaths.get(reference) ?? normalizedTargetPath;
 
       if (explicitTargetPath && (!path || !isValidImagePath(path, slug))) {
+        const safeRepoPath = toSafeLogPath(path ?? explicitTargetPath);
+        logPublishMedia(event, input, 'publish_media_invalid_artifact_repo_path', slug, articlePath, {
+          repoPath: safeRepoPath,
+        });
         throw new PublishError(
           403,
-          `Artifact repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`
+          `Artifact repoPath values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
         );
       }
 
@@ -890,7 +1036,15 @@ const getMediaEntries = async (
     })
   );
 
-  return [...adminEntries, ...agentEntries, ...directMediaEntries, ...artifactEntries];
+  const mediaEntries = [...adminEntries, ...agentEntries, ...directMediaEntries, ...artifactEntries];
+  logPublishMedia(event, input, 'publish_media_entries_resolved', slug, articlePath, {
+    imagePaths: agentImageSummaries.map((image) => image.imagePath ?? null),
+    repoPaths: mediaEntries.map((entry) => toSafeLogPath(entry.path) ?? null),
+    images: agentImageSummaries,
+    totalMediaEntries: mediaEntries.length,
+  });
+
+  return mediaEntries;
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -1004,7 +1158,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const githubContext = { branch, repo, token };
-    const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences, githubContext);
+    const mediaEntries = await getMediaEntries(event, input, slug, articlePath, artifactReferences, githubContext);
     const featuredImage = toStringValue(input.featuredImage);
     const existingFeaturedImageInput = toStringValue(input.existingFeaturedImagePath);
     const uploadedImagePath =
@@ -1089,6 +1243,7 @@ export const handler = async (event: LambdaEvent) => {
       body: JSON.stringify({ force: false, sha: newCommit.sha }),
     });
 
+    const deployReceipt = await getPublishDeployReceipt(input, newCommit.sha);
     const imagePaths = publishImagePaths;
     const message = `Article publish queued for ${articlePath}.`;
 
@@ -1096,9 +1251,15 @@ export const handler = async (event: LambdaEvent) => {
       success: true,
       articlePath,
       imagePaths,
-      deployStatus: 'queued',
+      deployId: deployReceipt.deployId,
+      deployUrl: deployReceipt.deployUrl,
+      productionUrl: deployReceipt.productionUrl,
+      commit: deployReceipt.commit,
+      deployStatus: deployReceipt.deployStatus,
+      startedAt: deployReceipt.startedAt,
+      finishedAt: deployReceipt.finishedAt,
+      errorMessage: deployReceipt.errorMessage,
       message,
-      commit: newCommit.sha,
       media: imagePaths,
       ok: true,
       path: articlePath,

@@ -283,6 +283,40 @@ test('save_json_blob_mark_published exposes only workflow-state inputs', async (
   assert.equal(serializedSchema.includes('PUBLISH_SECRET'), false);
 });
 
+test('deploy_status exposes deploy receipt lookup inputs and structured content', async () => {
+  process.env.PUBLISH_SECRET = 'mcp-deploy-status-schema-secret';
+  process.env.NETLIFY_PUBLISH_SECRET = 'mcp-deploy-status-schema-secret';
+
+  const body = await listTools();
+  const tool = body.result.tools.find((item) => item.name === 'deploy_status');
+
+  assert.ok(tool, 'Expected deploy_status to be registered.');
+  assert.ok(property(tool.inputSchema, 'commit'));
+  assert.ok(property(tool.inputSchema, 'deployId'));
+  assert.equal(JSON.stringify(tool).includes('PUBLISH_SECRET'), false);
+  assert.equal(JSON.stringify(tool).includes('NETLIFY_PUBLISH_SECRET'), false);
+
+  const response = await handler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'deploy_status', arguments: { commit: 'schema-test-commit' } },
+    }),
+  });
+  const result = JSON.parse(response.body).result as {
+    isError?: boolean;
+    structuredContent?: Record<string, unknown>;
+  };
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(result.isError, undefined);
+  assert.ok(result.structuredContent, 'deploy_status should return structuredContent.');
+  assert.equal(result.structuredContent.commit, 'schema-test-commit');
+});
+
 test('artifact MCP tools are registered with precise byte-vs-metadata descriptions', async () => {
   const body = await listTools();
   const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
