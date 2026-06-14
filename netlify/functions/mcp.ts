@@ -5,6 +5,7 @@ import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
+import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
@@ -890,6 +891,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
     }),
   },
+  {
+    name: 'verify_article_images',
+    description:
+      'Read-only verification that a deployed article page references expected image URLs and that each image URL returns an image response.',
+    inputSchema: objectSchema(
+      {
+        articleUrl: stringSchema('Absolute deployed article URL to inspect.'),
+        expectedImageUrls: arraySchema(
+          stringSchema('Absolute expected image URL that should appear on the article page.'),
+          'Expected image URLs that must be present and fetchable as image/* responses.'
+        ),
+      },
+      ['articleUrl', 'expectedImageUrls']
+    ),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -1381,16 +1397,21 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
   return { ok: true as const, statusCode: publishResponse.statusCode, body };
 };
 
-const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+const callSecureFunctionWithPublishKey = async (
+  event: LambdaEvent,
+  payload: Record<string, unknown>,
+  functionName: string,
+  targetHandler: (event: LambdaEvent) => Promise<{ statusCode: number; body: string }>
+) => {
   const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
   if (!publishSecret) {
-    return toolError('Deploy status lookup is not configured on the server.', {
-      error_code: 'deploy_status_not_configured',
+    return toolError('Server-side publish key is not configured.', {
+      error_code: `${functionName}_not_configured`,
     });
   }
 
-  const deployStatusResponse = await deployStatusHandler({
+  const functionResponse = await targetHandler({
     httpMethod: 'POST',
     headers: {
       ...(event.headers ?? {}),
@@ -1399,19 +1420,23 @@ const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unkn
     },
     body: JSON.stringify(payload),
   });
-  const body = parseJsonResponseBody(deployStatusResponse.body);
+  const body = parseJsonResponseBody(functionResponse.body);
 
-  if (deployStatusResponse.statusCode < 200 || deployStatusResponse.statusCode >= 300) {
+  if (functionResponse.statusCode < 200 || functionResponse.statusCode >= 300) {
     return toolError(
-      typeof body.error === 'string'
-        ? body.error
-        : `HTTP ${deployStatusResponse.statusCode}: deploy status lookup failed`,
-      { statusCode: deployStatusResponse.statusCode, ...body }
+      typeof body.error === 'string' ? body.error : `HTTP ${functionResponse.statusCode}: ${functionName} failed`,
+      { statusCode: functionResponse.statusCode, ...body }
     );
   }
 
   return toolResult(body);
 };
+
+const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unknown>) =>
+  callSecureFunctionWithPublishKey(event, payload, 'deploy_status', deployStatusHandler);
+
+const callVerifyArticleImages = async (event: LambdaEvent, payload: Record<string, unknown>) =>
+  callSecureFunctionWithPublishKey(event, payload, 'verify_article_images', verifyArticleImagesHandler);
 
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const tokenResult = verifyScheduledPublishToken(input.scheduled_publish_token);
@@ -1490,16 +1515,16 @@ const callScheduledPublish = async (event: LambdaEvent, input: Record<string, un
   }
 
   const commitMetadata = {
-    ...publishResult.body,
     commit: publishResult.body.commit ?? null,
-    deployStatus: publishResult.body.deployStatus ?? null,
-    deployId: publishResult.body.deployId ?? null,
-    deployUrl: publishResult.body.deployUrl ?? null,
-    productionUrl: publishResult.body.productionUrl ?? null,
-    startedAt: publishResult.body.startedAt ?? null,
-    finishedAt: publishResult.body.finishedAt ?? null,
-    errorMessage: publishResult.body.errorMessage ?? null,
     articlePath: publishResult.body.articlePath ?? publishResult.body.path,
+    deployStatus: publishResult.body.deployStatus ?? null,
+    message: publishResult.body.message,
+    ...(publishResult.body.deployId ? { deployId: publishResult.body.deployId } : {}),
+    ...(publishResult.body.deployUrl ? { deployUrl: publishResult.body.deployUrl } : {}),
+    ...(publishResult.body.productionUrl ? { productionUrl: publishResult.body.productionUrl } : {}),
+    ...(publishResult.body.startedAt ? { startedAt: publishResult.body.startedAt } : {}),
+    ...(publishResult.body.finishedAt ? { finishedAt: publishResult.body.finishedAt } : {}),
+    ...(publishResult.body.errorMessage ? { errorMessage: publishResult.body.errorMessage } : {}),
     scheduled_for: scheduledFor,
     scheduled_publish: true,
     agent_id: agentId,
@@ -2517,6 +2542,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callScheduledPublish(event, input);
     case 'deploy_status':
       return callDeployStatus(event, input);
+    case 'verify_article_images':
+      return callVerifyArticleImages(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
