@@ -1,6 +1,7 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/mcp-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
+import { pollDeployReceipt, type DeployReceipt, type DeployStatus } from '../lib/netlify-deploys.js';
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
 
@@ -48,8 +49,14 @@ type NormalizedPublisherRequest = {
 
 type PublishEndpointResult = {
   articlePath?: unknown;
+  deployId?: unknown;
+  deployUrl?: unknown;
+  productionUrl?: unknown;
   commit?: unknown;
   deployStatus?: unknown;
+  startedAt?: unknown;
+  finishedAt?: unknown;
+  errorMessage?: unknown;
   imagePaths?: unknown;
   media?: unknown;
   message?: unknown;
@@ -95,6 +102,9 @@ const publishToolInputSchema = z
     images: z.array(publishImageSchema).optional(),
     artifactReferences: z.array(z.unknown()).optional(),
     overwrite: z.boolean().optional(),
+    waitForDeploy: z.boolean().optional(),
+    deployWaitTimeoutSeconds: z.number().min(0).optional(),
+    deployPollIntervalSeconds: z.number().min(1).optional(),
   })
   .superRefine((value, ctx) => {
     if (!value.markdown && !value.content) {
@@ -312,6 +322,137 @@ const createMcpToolCaller = (endpoint: string) => async (name: string, args: Rec
   return result.structuredContent ?? {};
 };
 
+type DeployReceiptLike = Partial<DeployReceipt> & {
+  commit?: string;
+  deployStatus?: DeployStatus | string;
+};
+
+type ImageVerificationResult = {
+  verified: boolean;
+  articleUrl: string;
+  expectedImageUrls: string[];
+  statusCode?: number;
+  error?: string;
+  [key: string]: unknown;
+};
+
+const terminalDeployStatuses = new Set(['ready', 'failed', 'canceled', 'timed_out']);
+
+const createDeployReceipt = (result: PublishEndpointResult): DeployReceiptLike => ({
+  deployId: toStringValue(result.deployId),
+  deployUrl: toStringValue(result.deployUrl),
+  productionUrl: toStringValue(result.productionUrl),
+  commit: toStringValue(result.commit),
+  deployStatus: toStringValue(result.deployStatus),
+  startedAt: toStringValue(result.startedAt),
+  finishedAt: toStringValue(result.finishedAt),
+  errorMessage: toStringValue(result.errorMessage),
+});
+
+const normalizeDeployReceipt = async (result: PublishToolResult): Promise<DeployReceiptLike> => {
+  const receipt = createDeployReceipt(result);
+  const commit = receipt.commit || toStringValue(result.commit) || '';
+  const deployId = receipt.deployId || toStringValue(result.deployId) || '';
+  const deployStatus = receipt.deployStatus || '';
+  const shouldPoll = Boolean(commit || deployId) && !terminalDeployStatuses.has(deployStatus);
+
+  if (!shouldPoll && terminalDeployStatuses.has(deployStatus)) return receipt;
+  if (!commit && !deployId) return receipt;
+
+  try {
+    const polledReceipt = await pollDeployReceipt({ commit, deployId });
+    return { ...receipt, ...polledReceipt };
+  } catch (error) {
+    console.warn('Publisher deploy polling failed.', { commit, deployId, error });
+    return {
+      ...receipt,
+      commit,
+      deployId,
+      deployStatus: receipt.deployStatus || 'queued',
+      errorMessage: receipt.errorMessage || (error instanceof Error ? error.message : 'Deploy polling failed.'),
+    };
+  }
+};
+
+const asUrl = (baseUrl: string, path: string) => {
+  try {
+    return new URL(path, baseUrl).toString();
+  } catch {
+    return '';
+  }
+};
+
+const normalizeMediaPath = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return toStringValue(value);
+  if (!value || typeof value !== 'object') return undefined;
+
+  const record = value as Record<string, unknown>;
+  return (
+    toStringValue(record.url) ??
+    toStringValue(record.src) ??
+    toStringValue(record.path) ??
+    toStringValue(record.imagePath) ??
+    toStringValue(record.repoPath)
+  );
+};
+
+const collectMediaPaths = (...values: unknown[]) =>
+  Array.from(
+    new Set(
+      values
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .map(normalizeMediaPath)
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
+const deriveArticleUrl = (productionUrl: string, result: PublishToolResult) => {
+  const returnedUrl =
+    toStringValue(result.articleUrl) ?? toStringValue(result.url) ?? toStringValue(result.permalink) ?? '';
+  if (returnedUrl) return asUrl(productionUrl, returnedUrl);
+
+  const slug = result.payload.slug;
+  return asUrl(productionUrl, `/${slug}/`);
+};
+
+const verifyArticleImages = async ({
+  endpoint,
+  expectedImageUrls,
+  articleUrl,
+  publishSecret,
+}: {
+  endpoint: string;
+  expectedImageUrls: string[];
+  articleUrl: string;
+  publishSecret: string;
+}): Promise<ImageVerificationResult | undefined> => {
+  if (!articleUrl || !expectedImageUrls.length) {
+    return undefined;
+  }
+
+  const verifyEndpoint = new URL('/.netlify/functions/verify-article-images', endpoint).toString();
+  const response = await fetch(verifyEndpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-publish-key': publishSecret,
+    },
+    body: JSON.stringify({ articleUrl, expectedImageUrls }),
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+
+  return {
+    ...body,
+    verified: body.verified === true || body.success === true || body.ok === true,
+    articleUrl,
+    expectedImageUrls,
+    statusCode: response.status,
+    ...(response.ok
+      ? {}
+      : { error: toStringValue(body.error) ?? `Image verification failed with HTTP ${response.status}.` }),
+  };
+};
+
 const createPublishTool = ({
   endpoint,
   defaultInput,
@@ -358,6 +499,9 @@ const createPublishTool = ({
         artifactReferences,
         commitMessage: `Publish article: ${title}`,
         overwrite: parsed.overwrite ?? defaultInput.overwrite,
+        waitForDeploy: parsed.waitForDeploy,
+        deployWaitTimeoutSeconds: parsed.deployWaitTimeoutSeconds,
+        deployPollIntervalSeconds: parsed.deployPollIntervalSeconds,
       };
 
       console.info('Publisher agent posting approved article.', {
@@ -425,6 +569,8 @@ export const createPublisherAgent = ({
       'Do not invent or store deterministic blob keys, URLs, repo paths, or inline base64 media; artifact references must already come from server-side artifact tools.',
       'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
+      'Your final output must report commit SHA, deploy id, deploy URL, production URL, deploy status, and image verification result when available.',
+      'Do not call publish_approved_article more than once; deploy polling and image verification are handled by deterministic server code after your tool call.',
     ].join('\n'),
     tools: [createPublishTool({ endpoint, defaultInput, publishSecret, onPublishResult })],
   });
@@ -561,7 +707,32 @@ export const handler = async (event: LambdaEvent) => {
       throw new RunnerError(500, 'Publisher agent completed without returning publish endpoint results.');
     }
 
+    const deployReceipt = await normalizeDeployReceipt(publishResult);
     const imagePaths = toStringArray(publishResult.imagePaths ?? publishResult.media);
+    const expectedImageUrls =
+      deployReceipt.productionUrl && deployReceipt.deployStatus === 'ready'
+        ? collectMediaPaths(
+            publishResult.imagePaths,
+            publishResult.media,
+            (publishResult as Record<string, unknown>).mediaEntries,
+            (publishResult as Record<string, unknown>).artifactReferences
+          )
+            .map((path) => asUrl(deployReceipt.productionUrl || '', path))
+            .filter((url) => Boolean(url))
+        : [];
+    const articleUrl =
+      deployReceipt.productionUrl && deployReceipt.deployStatus === 'ready'
+        ? deriveArticleUrl(deployReceipt.productionUrl, publishResult)
+        : '';
+    const imageVerification =
+      deployReceipt.deployStatus === 'ready'
+        ? await verifyArticleImages({
+            endpoint: env.endpoint,
+            expectedImageUrls,
+            articleUrl,
+            publishSecret: env.publishSecret,
+          })
+        : undefined;
     const success = publishResult.success === true || publishResult.ok === true;
     const statusCode = success ? 200 : Number(publishResult.statusCode) || 502;
 
@@ -570,12 +741,21 @@ export const handler = async (event: LambdaEvent) => {
       success,
       articlePath: toStringValue(publishResult.articlePath) ?? articlePath,
       imagePaths,
-      deployStatus: toStringValue(publishResult.deployStatus) ?? 'unknown',
+      deployId: deployReceipt.deployId,
+      deployUrl: deployReceipt.deployUrl,
+      productionUrl: deployReceipt.productionUrl,
+      deployStatus: deployReceipt.deployStatus || 'unknown',
+      startedAt: deployReceipt.startedAt,
+      finishedAt: deployReceipt.finishedAt,
+      errorMessage: deployReceipt.errorMessage,
       message:
         toStringValue(publishResult.error) ??
         toStringValue(publishResult.message) ??
         (success ? `Article publish queued for ${articlePath}.` : 'Publish endpoint failed.'),
-      commit: toStringValue(publishResult.commit),
+      commit: deployReceipt.commit,
+      deployReceipt,
+      imageVerification,
+      verified: imageVerification?.verified === true,
       agent: {
         ...metadata,
         normalizedSlug: input.slug,
