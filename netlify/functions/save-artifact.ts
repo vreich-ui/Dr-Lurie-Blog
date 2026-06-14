@@ -35,6 +35,10 @@ type LambdaEvent = {
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   isBase64Encoded?: boolean;
+  log?: (payload: { event: string; rpcMethod?: string | null; slug?: string | null; [key: string]: unknown }) => void;
+  requestId?: string;
+  rpcMethod?: string | null;
+  slug?: string | null;
 };
 
 type UploadRequest = ArtifactUploadInput & {
@@ -223,17 +227,49 @@ const decodePayload = (input: Pick<UploadRequest, 'encoding' | 'payload'>) => {
   return Buffer.from(input.payload, 'base64');
 };
 
+const getTruncatedSha256 = (sha256: string | undefined) => sha256?.slice(0, 8);
+
 const getExpectedSizeBytes = (input: UploadRequest) => input.expectedSizeBytes ?? input.localSizeBytes;
 
 const getExpectedSha256 = (input: UploadRequest) => input.expectedSha256 ?? input.localSha256;
 
-const validateArtifactIntegrity = (input: UploadRequest, bytes: Buffer) => {
+const logArtifactUpload = (
+  event: LambdaEvent,
+  input: UploadRequest,
+  logEvent: string,
+  details: Record<string, unknown> = {}
+) => {
+  const payload = typeof input.payload === 'string' ? input.payload : undefined;
+
+  event.log?.({
+    event: logEvent,
+    requestId: event.requestId ?? input.requestId,
+    rpcMethod: event.rpcMethod ?? null,
+    slug: event.slug ?? null,
+    uploadId: null,
+    encoding: input.encoding ?? 'base64',
+    payloadChars: payload?.length ?? null,
+    payloadUtf8Bytes: payload === undefined ? null : Buffer.byteLength(payload, 'utf8'),
+    decodedBytes: null,
+    expectedSizeBytes: getExpectedSizeBytes(input) ?? null,
+    expectedSha256: getTruncatedSha256(getExpectedSha256(input)) ?? null,
+    ...details,
+  });
+};
+
+const validateArtifactIntegrity = (event: LambdaEvent, input: UploadRequest, bytes: Buffer, uploadId?: string) => {
   const sizeBytes = bytes.byteLength;
   const sha256 = sha256Hex(bytes);
   const expectedSizeBytes = getExpectedSizeBytes(input);
   const expectedSha256 = getExpectedSha256(input);
 
   if (expectedSizeBytes !== undefined && expectedSizeBytes !== sizeBytes) {
+    logArtifactUpload(event, input, 'artifact_upload_size_mismatch', {
+      uploadId: uploadId ?? null,
+      decodedBytes: bytes.length,
+      receivedSizeBytes: sizeBytes,
+    });
+
     return jsonResponse(400, {
       error: `Artifact size mismatch: expected ${expectedSizeBytes} bytes, received ${sizeBytes} bytes.`,
     });
@@ -269,8 +305,8 @@ const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
   return undefined;
 };
 
-const validateFinalArtifact = async (input: UploadRequest, bytes: Buffer) => {
-  const integrityError = validateArtifactIntegrity(input, bytes);
+const validateFinalArtifact = async (event: LambdaEvent, input: UploadRequest, bytes: Buffer, uploadId?: string) => {
+  const integrityError = validateArtifactIntegrity(event, input, bytes, uploadId);
 
   if (integrityError) return integrityError;
 
@@ -716,13 +752,18 @@ export const finalizeUpload = async (
   finalBytes: Buffer,
   chunkStatus?: ChunkStatus
 ) => {
-  const validationError = await validateFinalArtifact(input, finalBytes);
+  const reference = createArtifactReference({ input, bytes: finalBytes });
+  logArtifactUpload(event, input, 'artifact_upload_finalize_started', {
+    uploadId: reference.blobKey,
+    decodedBytes: finalBytes.length,
+  });
+
+  const validationError = await validateFinalArtifact(event, input, finalBytes, reference.blobKey);
 
   if (validationError) return validationError;
 
   const artifactStore = await getArtifactBlobStore(event);
   const indexStore = await getArtifactIndexBlobStore(event);
-  const reference = createArtifactReference({ input, bytes: finalBytes });
   const { deduped, integrityError } = await saveFinalArtifact(artifactStore, reference, finalBytes);
 
   if (integrityError) return integrityError;
@@ -740,6 +781,11 @@ export const finalizeUpload = async (
   } else {
     await saveReferencePointers(indexStore, input.requestId, responseReference);
   }
+
+  logArtifactUpload(event, input, 'artifact_upload_finalize_completed', {
+    uploadId: responseReference.blobKey,
+    decodedBytes: finalBytes.length,
+  });
 
   return jsonResponse(deduped ? 200 : 201, {
     ok: true,
@@ -774,9 +820,16 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const input = parsedInput.data;
+  logArtifactUpload(event, input, 'artifact_upload_decode_started');
   const bytes = decodePayload(input);
 
   if (input.chunkIndex === undefined || input.totalChunks === undefined || !input.clientUploadId) {
+    const reference = createArtifactReference({ input, bytes });
+    logArtifactUpload(event, input, 'artifact_upload_decode_completed', {
+      uploadId: reference.blobKey,
+      decodedBytes: bytes.length,
+    });
+
     return finalizeUpload(event, input, bytes);
   }
 

@@ -23,6 +23,10 @@ type LambdaEvent = {
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
   isBase64Encoded?: boolean;
+  log?: (payload: { event: string; rpcMethod?: string | null; slug?: string | null; [key: string]: unknown }) => void;
+  requestId?: string;
+  rpcMethod?: string | null;
+  slug?: string | null;
 };
 
 type GitHubRef = {
@@ -273,6 +277,37 @@ const isValidUploadedImagePath = (path: string) => {
 const isValidImagePath = (path: string, slug: string) => {
   const prefix = `${uploadRoot}/${slug}/`;
   return isValidUploadedImagePath(path) && path.startsWith(prefix) && path.length > prefix.length;
+};
+
+const toSafeLogPath = (value: string | undefined) =>
+  value
+    ?.split('')
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join('')
+    .slice(0, 240);
+
+const getPublishRequestId = (event: LambdaEvent, input: PublishInput) =>
+  event.requestId ?? toStringValue(input.requestId) ?? toStringValue(input.request_id) ?? null;
+
+const logPublishMedia = (
+  event: LambdaEvent,
+  input: PublishInput,
+  logEvent: string,
+  slug: string,
+  articlePath: string,
+  details: Record<string, unknown> = {}
+) => {
+  event.log?.({
+    event: logEvent,
+    requestId: getPublishRequestId(event, input),
+    rpcMethod: event.rpcMethod ?? null,
+    slug,
+    articlePath,
+    ...details,
+  });
 };
 
 const isHttpImageReference = (value: string) => {
@@ -794,6 +829,7 @@ const getMediaEntries = async (
   event: LambdaEvent,
   input: PublishInput,
   slug: string,
+  articlePath: string,
   artifactReferences: ArtifactReference[],
   githubContext: PublishGitHubContext
 ): Promise<MediaEntry[]> => {
@@ -829,6 +865,26 @@ const getMediaEntries = async (
   const fallbackRequestId = toStringValue(input.requestId) ?? slug;
   const artifactTargetPaths = new Map<ArtifactReference, string>();
   const images = Array.isArray(input.images) ? (input.images as AgentImageInput[]) : [];
+  const agentImageSummaries = images.map((image) => {
+    const repoPath = toStringValue(image.repoPath);
+    const filename = toStringValue(image.name);
+    const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
+    const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
+
+    return {
+      imagePath: toSafeLogPath(repoPath ?? filename),
+      repoPath: toSafeLogPath(path),
+      hasContent: Boolean(toStringValue(image.base64) ?? toStringValue(image.content)),
+    };
+  });
+
+  logPublishMedia(event, input, 'publish_media_entries_started', slug, articlePath, {
+    imagePaths: agentImageSummaries.map((image) => image.imagePath ?? null),
+    repoPaths: agentImageSummaries.map((image) => image.repoPath ?? null),
+    images: agentImageSummaries,
+    mediaEntryInputCount: Array.isArray(input.mediaEntries) ? input.mediaEntries.length : 0,
+    artifactReferenceCount: artifactReferences.length,
+  });
   const agentEntries: MediaEntry[] = [];
 
   for (const image of images) {
@@ -841,7 +897,11 @@ const getMediaEntries = async (
     if (!content) {
       const referenceValue = repoPath ?? filename;
       if (!referenceValue) {
-        throw new PublishError(400, 'Image content or a valid image reference is required.');
+        logPublishMedia(event, input, 'publish_media_image_missing_content', slug, articlePath, {
+          imagePath: null,
+          repoPath: toSafeLogPath(path),
+        });
+        throw new PublishError(400, 'Image content or a valid image reference is required for an image entry.');
       }
 
       const existingPath = normalizeUploadReferencePath(referenceValue);
@@ -863,7 +923,14 @@ const getMediaEntries = async (
     }
 
     if (!path || !isValidImagePath(path, slug)) {
-      throw new PublishError(403, `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`);
+      const safeRepoPath = toSafeLogPath(path ?? repoPath ?? filename);
+      logPublishMedia(event, input, 'publish_media_invalid_image_repo_path', slug, articlePath, {
+        repoPath: safeRepoPath,
+      });
+      throw new PublishError(
+        403,
+        `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
+      );
     }
 
     agentEntries.push({
@@ -889,16 +956,24 @@ const getMediaEntries = async (
     const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
 
     if (!path || !isValidImagePath(path, slug)) {
+      const safeRepoPath = toSafeLogPath(path ?? repoPath ?? filename);
+      logPublishMedia(event, input, 'publish_media_invalid_media_entry_repo_path', slug, articlePath, {
+        repoPath: safeRepoPath,
+      });
       throw new PublishError(
         403,
-        `mediaEntries repoPath/path values must be under ${uploadRoot}/${slug}/ and include a filename.`
+        `mediaEntries repoPath/path values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
       );
     }
 
     const content = toStringValue(entry.base64) ?? toStringValue(entry.content);
 
     if (!content) {
-      throw new PublishError(400, `Media entry content is required for ${path}.`);
+      const safeRepoPath = toSafeLogPath(path);
+      logPublishMedia(event, input, 'publish_media_entry_missing_content', slug, articlePath, {
+        repoPath: safeRepoPath,
+      });
+      throw new PublishError(400, `Media entry content is required for ${safeRepoPath}.`);
     }
 
     return {
@@ -929,9 +1004,13 @@ const getMediaEntries = async (
       const path = artifactTargetPaths.get(reference) ?? normalizedTargetPath;
 
       if (explicitTargetPath && (!path || !isValidImagePath(path, slug))) {
+        const safeRepoPath = toSafeLogPath(path ?? explicitTargetPath);
+        logPublishMedia(event, input, 'publish_media_invalid_artifact_repo_path', slug, articlePath, {
+          repoPath: safeRepoPath,
+        });
         throw new PublishError(
           403,
-          `Artifact repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`
+          `Artifact repoPath values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
         );
       }
 
@@ -957,7 +1036,15 @@ const getMediaEntries = async (
     })
   );
 
-  return [...adminEntries, ...agentEntries, ...directMediaEntries, ...artifactEntries];
+  const mediaEntries = [...adminEntries, ...agentEntries, ...directMediaEntries, ...artifactEntries];
+  logPublishMedia(event, input, 'publish_media_entries_resolved', slug, articlePath, {
+    imagePaths: agentImageSummaries.map((image) => image.imagePath ?? null),
+    repoPaths: mediaEntries.map((entry) => toSafeLogPath(entry.path) ?? null),
+    images: agentImageSummaries,
+    totalMediaEntries: mediaEntries.length,
+  });
+
+  return mediaEntries;
 };
 
 export const handler = async (event: LambdaEvent) => {
@@ -1071,7 +1158,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const githubContext = { branch, repo, token };
-    const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences, githubContext);
+    const mediaEntries = await getMediaEntries(event, input, slug, articlePath, artifactReferences, githubContext);
     const featuredImage = toStringValue(input.featuredImage);
     const existingFeaturedImageInput = toStringValue(input.existingFeaturedImagePath);
     const uploadedImagePath =

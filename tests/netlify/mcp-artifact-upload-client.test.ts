@@ -245,8 +245,8 @@ test('MCP image artifact chunk indexes are monotonic and deterministic with 4 KB
   assert.deepEqual(indexes, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 });
 
-test('MCP image artifact upload uses binary upload sessions above 30 KB', async () => {
-  const bytes = Buffer.alloc(31 * 1024, 3);
+test('MCP image artifact upload uses binary upload sessions above 3 KB', async () => {
+  const bytes = Buffer.alloc(4 * 1024, 3);
   const calls: { name: string; args: Record<string, unknown> }[] = [];
   const uploadedChunks: Buffer[] = [];
 
@@ -280,7 +280,7 @@ test('MCP image artifact upload uses binary upload sessions above 30 KB', async 
     calls.map((call) => call.name),
     ['save_artifact_create_upload_session', 'save_artifact_finalize_upload_session']
   );
-  assert.equal(uploadedChunks.length, 2);
+  assert.equal(uploadedChunks.length, 1);
   assert.equal(Buffer.concat(uploadedChunks).equals(bytes), true);
 });
 
