@@ -4,6 +4,7 @@ import { handler as saveArtifactHandler } from './save-artifact.js';
 import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
+import { handler as deployStatusHandler } from './deploy-status.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
@@ -868,6 +869,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ['request_id', 'lock_token', 'scheduled_publish_token', 'agent_id', 'agent_owner']
     ),
   },
+  {
+    name: 'deploy_status',
+    description: 'Read-only Netlify deploy receipt lookup by commit or deploy id.',
+    inputSchema: objectSchema({
+      commit: stringSchema('Commit SHA to look up in saved Netlify deploy receipts.'),
+      deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
+    }),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -1303,6 +1312,36 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
   }
 
   return { ok: true as const, statusCode: publishResponse.statusCode, body };
+};
+
+const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Deploy status lookup is not configured on the server.', {
+      error_code: 'deploy_status_not_configured',
+    });
+  }
+
+  const deployStatusResponse = await deployStatusHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = parseJsonResponseBody(deployStatusResponse.body);
+
+  if (deployStatusResponse.statusCode < 200 || deployStatusResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string' ? body.error : `HTTP ${deployStatusResponse.statusCode}: deploy status lookup failed`,
+      { statusCode: deployStatusResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
 };
 
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
@@ -2401,6 +2440,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       );
     case 'save_json_blob_publish_scheduled':
       return callScheduledPublish(event, input);
+    case 'deploy_status':
+      return callDeployStatus(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
