@@ -11,6 +11,7 @@ import {
   getArtifactIndexBlobStore,
   getCoreBlobStoreSourceDiagnostics,
 } from '../lib/blob-store.js';
+import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 
 const allowedImageBlobKeyPattern = /^image\/[a-z0-9._-]+\/[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i;
 const contentTypeByExtension: Record<string, string> = {
@@ -160,30 +161,7 @@ const resolveArtifactContentType = async (
   return { contentType: '', source: 'missing' };
 };
 
-export const handler = async (event: LambdaEvent) => {
-  if (event.httpMethod !== 'GET') {
-    return jsonResponse(405, { error: 'Method not allowed' });
-  }
-
-  const adminState = await getAdminStateFromEvent(event);
-  if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
-    });
-  }
-
-  if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to read saved image artifacts.' });
-  }
-
-  const blobKey = toText(event.queryStringParameters?.blobKey);
-  if (!allowedImageBlobKeyPattern.test(blobKey)) {
-    return jsonResponse(400, {
-      error: 'A valid image artifact blobKey is required.',
-      ...createArtifactDebugFields(event, blobKey),
-    });
-  }
-
+export const readAdminBlobImage = async (event: LambdaEvent, blobKey: string) => {
   let contentTypeSource: ContentTypeSource = 'missing';
 
   try {
@@ -242,6 +220,7 @@ export const handler = async (event: LambdaEvent) => {
       return jsonResponse(409, {
         ...createArtifactDebugFields(event, blobKey, contentTypeSource),
         error: 'Saved image artifact bytes are ambiguous.',
+        reason: 'ambiguous-artifact-bytes',
         blobKey,
         store: 'artifacts',
         ...(shouldIncludeArtifactReadDiagnostics()
@@ -251,6 +230,29 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const buffer = reconciliation.bytes;
+    const filename = blobKey.split('/').pop() || blobKey;
+
+    try {
+      await validatePublishImageBytes({
+        bytes: buffer,
+        contentType,
+        filename,
+        path: blobKey,
+      });
+    } catch (error) {
+      if (error instanceof ImageValidationError) {
+        return jsonResponse(422, {
+          ...createArtifactDebugFields(event, blobKey, contentTypeSource),
+          error: error.message,
+          reason: error.code,
+          validationReason: error.reason,
+          blobKey,
+          store: 'artifacts',
+        });
+      }
+
+      throw error;
+    }
 
     return {
       statusCode: 200,
@@ -269,4 +271,31 @@ export const handler = async (event: LambdaEvent) => {
       ...createArtifactDebugFields(event, blobKey, contentTypeSource),
     });
   }
+};
+
+export const handler = async (event: LambdaEvent) => {
+  if (event.httpMethod !== 'GET') {
+    return jsonResponse(405, { error: 'Method not allowed' });
+  }
+
+  const adminState = await getAdminStateFromEvent(event);
+  if (!adminState.authenticated) {
+    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
+      error: adminState.error || 'A valid Clerk session token is required.',
+    });
+  }
+
+  if (!adminState.isAdmin) {
+    return jsonResponse(403, { error: 'This Clerk user is not authorized to read saved image artifacts.' });
+  }
+
+  const blobKey = toText(event.queryStringParameters?.blobKey);
+  if (!allowedImageBlobKeyPattern.test(blobKey)) {
+    return jsonResponse(400, {
+      error: 'A valid image artifact blobKey is required.',
+      ...createArtifactDebugFields(event, blobKey),
+    });
+  }
+
+  return readAdminBlobImage(event, blobKey);
 };

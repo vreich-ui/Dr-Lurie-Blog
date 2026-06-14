@@ -8,6 +8,7 @@ import {
   type ArtifactReference,
 } from '../lib/artifacts.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
 
 type LambdaEvent = {
@@ -125,9 +126,19 @@ class PublishError extends Error {
 type MediaEntry = {
   artifactReference?: ArtifactReference;
   content: string;
+  contentType?: string;
   displayPath: string;
   encoding: 'base64' | 'utf-8';
+  filename?: string;
   path: string;
+  persist?: boolean;
+  rawBytes: Buffer;
+};
+
+type PublishGitHubContext = {
+  branch: string;
+  repo: string;
+  token: string;
 };
 
 const toStringValue = (value: unknown) => {
@@ -197,6 +208,15 @@ const isValidImagePath = (path: string, slug: string) => {
   return isValidUploadedImagePath(path) && path.startsWith(prefix) && path.length > prefix.length;
 };
 
+const isHttpImageReference = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+};
+
 const extensionForContentType = (contentType: string) => {
   const normalized = contentType.toLowerCase().split(';')[0]?.trim();
   const extensionMap: Record<string, string> = {
@@ -245,6 +265,25 @@ const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: st
 
   return derivedFilename;
 };
+
+const getArtifactTargetPath = (reference: ArtifactReference) =>
+  toStringValue((reference as { repoPath?: unknown }).repoPath) ?? toStringValue(reference.metadata?.repoPath);
+
+const normalizeUploadReferencePath = (value: string) => {
+  const repoPath = value.startsWith('~/assets/images/uploads/')
+    ? value.replace('~/assets/images/uploads/', `${uploadRoot}/`)
+    : value.startsWith('/src/assets/images/uploads/')
+      ? value.slice(1)
+      : value.startsWith(`${uploadRoot}/`)
+        ? value
+        : undefined;
+
+  const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
+  return normalizedPath && isValidUploadedImagePath(normalizedPath) ? normalizedPath : undefined;
+};
+
+const getDisplayPath = (path: string) =>
+  path.startsWith(`${uploadRoot}/`) ? path.replace(`${uploadRoot}/`, '~/assets/images/uploads/') : path;
 
 const replaceAllLiteral = (value: string, search: string, replacement: string) =>
   search ? value.split(search).join(replacement) : value;
@@ -340,26 +379,6 @@ const readArtifactBytes = async (
   });
 
   throw new PublishError(422, staleImageReferencesMessage);
-};
-
-const normalizeExistingFeaturedImagePath = (value: unknown) => {
-  const rawPath = toStringValue(value);
-  if (!rawPath) return undefined;
-  const repoPath = rawPath.startsWith('~/assets/images/uploads/')
-    ? rawPath.replace('~/assets/images/uploads/', `${uploadRoot}/`)
-    : rawPath.startsWith('/src/assets/images/uploads/')
-      ? rawPath.slice(1)
-      : rawPath.startsWith(`${uploadRoot}/`)
-        ? rawPath
-        : undefined;
-
-  const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
-
-  if (!normalizedPath || !isValidUploadedImagePath(normalizedPath)) {
-    throw new PublishError(403, `existingFeaturedImagePath must be under ${uploadRoot}/ and include a filename.`);
-  }
-
-  return normalizedPath.replace(`${uploadRoot}/`, '~/assets/images/uploads/');
 };
 
 const hasFrontmatter = (markdown: string) => /^---(?:\s|$)/.test(markdown.trimStart());
@@ -574,17 +593,142 @@ const githubExists = async (repo: string, branch: string, path: string, token: s
   );
 };
 
+const readGitHubContentBytes = async ({ repo, branch, token }: PublishGitHubContext, path: string) => {
+  const response = await fetch(
+    `${githubApiRoot}/repos/${repo}/contents/${encodeURIComponent(path).replaceAll('%2F', '/')}?ref=${encodeURIComponent(branch)}`,
+    {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        Authorization: `Bearer ${token}`,
+        'User-Agent': 'dr-lurie-netlify-publisher',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    }
+  );
+
+  if (response.status === 404) {
+    throw new PublishError(422, `Image reference does not exist: ${path}. Re-select or re-upload this image.`);
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new PublishError(
+      response.status === 401 || response.status === 403 ? 403 : 500,
+      `GitHub API ${response.status} while reading image reference ${path}: ${body}`
+    );
+  }
+
+  const body = (await response.json()) as { content?: unknown; encoding?: unknown; type?: unknown };
+  const content = toStringValue(body.content);
+  const encoding = toStringValue(body.encoding);
+
+  if (body.type && body.type !== 'file') {
+    throw new PublishError(422, `Image reference is not a file: ${path}. Re-select or re-upload this image.`);
+  }
+
+  if (!content || encoding !== 'base64') {
+    throw new PublishError(422, `Image reference could not be read: ${path}. Re-select or re-upload this image.`);
+  }
+
+  return Buffer.from(content.replace(/\s/g, ''), 'base64');
+};
+
+const readExternalImageBytes = async (url: string) => {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'image/jpeg,image/png,image/webp',
+      'User-Agent': 'dr-lurie-netlify-publisher',
+    },
+  });
+
+  if (!response.ok) {
+    throw new PublishError(
+      422,
+      `External image reference could not be read: ${url}. Re-select or re-upload this image.`
+    );
+  }
+
+  return {
+    bytes: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get('content-type') ?? undefined,
+  };
+};
+
+const resolveExistingImageReference = async (
+  value: string,
+  githubContext: PublishGitHubContext,
+  fallbackContentType?: string
+): Promise<MediaEntry> => {
+  if (isHttpImageReference(value)) {
+    const { bytes, contentType } = await readExternalImageBytes(value);
+    const filename = sanitizeFilename(new URL(value).pathname) ?? value;
+
+    return {
+      content: '',
+      contentType: fallbackContentType ?? contentType,
+      displayPath: value,
+      encoding: 'base64',
+      filename,
+      path: value,
+      persist: false,
+      rawBytes: bytes,
+    };
+  }
+
+  const path = normalizeUploadReferencePath(value);
+
+  if (!path) {
+    throw new PublishError(403, `Image references must be under ${uploadRoot}/ or be an HTTP(S) image URL.`);
+  }
+
+  const bytes = await readGitHubContentBytes(githubContext, path);
+
+  return {
+    content: '',
+    contentType: fallbackContentType,
+    displayPath: getDisplayPath(path),
+    encoding: 'base64',
+    filename: sanitizeFilename(path),
+    path,
+    persist: false,
+    rawBytes: bytes,
+  };
+};
+
 const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   statusCode,
   headers: jsonHeaders,
   body: JSON.stringify(body),
 });
 
+const decodeMediaEntryBytes = (content: string, encoding: 'base64' | 'utf-8', path: string) => {
+  try {
+    return Buffer.from(content, encoding === 'base64' ? 'base64' : 'utf8');
+  } catch {
+    throw new PublishError(
+      422,
+      `Invalid image artifact: ${path} could not be decoded. Re-upload or replace this image.`
+    );
+  }
+};
+
+const validateMediaEntries = async (mediaEntries: MediaEntry[]) => {
+  for (const entry of mediaEntries) {
+    await validatePublishImageBytes({
+      bytes: entry.rawBytes,
+      contentType: entry.contentType,
+      filename: entry.filename,
+      path: entry.path,
+    });
+  }
+};
+
 const getMediaEntries = async (
   event: LambdaEvent,
   input: PublishInput,
   slug: string,
-  artifactReferences: ArtifactReference[]
+  artifactReferences: ArtifactReference[],
+  githubContext: PublishGitHubContext
 ): Promise<MediaEntry[]> => {
   const files = Array.isArray(input.files) ? (input.files as PublishFile[]) : [];
   const uploadedFiles = files
@@ -606,36 +750,69 @@ const getMediaEntries = async (
 
     return {
       content: file.base64,
+      contentType: file.type,
       displayPath: `~/assets/images/uploads/${slug}/${filename}`,
       encoding: 'base64' as const,
+      filename,
       path: `${uploadRoot}/${slug}/${filename}`,
+      rawBytes: decodeMediaEntryBytes(file.base64, 'base64', `${uploadRoot}/${slug}/${filename}`),
     };
   });
 
+  const fallbackRequestId = toStringValue(input.requestId) ?? slug;
+  const artifactTargetPaths = new Map<ArtifactReference, string>();
   const images = Array.isArray(input.images) ? (input.images as AgentImageInput[]) : [];
-  const agentEntries = images.map((image) => {
+  const agentEntries: MediaEntry[] = [];
+
+  for (const image of images) {
     const repoPath = toStringValue(image.repoPath);
     const filename = toStringValue(image.name);
     const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
     const path = normalizedPath ?? (filename ? `${uploadRoot}/${slug}/${sanitizeFilename(filename) ?? ''}` : undefined);
+    const content = toStringValue(image.base64) ?? toStringValue(image.content);
+
+    if (!content) {
+      const referenceValue = repoPath ?? filename;
+      if (!referenceValue) {
+        throw new PublishError(400, 'Image content or a valid image reference is required.');
+      }
+
+      const existingPath = normalizeUploadReferencePath(referenceValue);
+      const matchingArtifact = existingPath
+        ? artifactReferences.find(
+            (reference) =>
+              !artifactTargetPaths.has(reference) &&
+              sanitizeFilename(existingPath) === getArtifactFilename(reference, fallbackRequestId)
+          )
+        : undefined;
+
+      if (existingPath && matchingArtifact && isValidImagePath(existingPath, slug)) {
+        artifactTargetPaths.set(matchingArtifact, existingPath);
+        continue;
+      }
+
+      agentEntries.push(await resolveExistingImageReference(referenceValue, githubContext, toStringValue(image.type)));
+      continue;
+    }
 
     if (!path || !isValidImagePath(path, slug)) {
       throw new PublishError(403, `Image repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`);
     }
 
-    const content = toStringValue(image.base64) ?? toStringValue(image.content);
-
-    if (!content) {
-      throw new PublishError(400, `Image content is required for ${path}.`);
-    }
-
-    return {
+    agentEntries.push({
       content,
-      displayPath: path.replace(`${uploadRoot}/`, '~/assets/images/uploads/'),
+      contentType: toStringValue(image.type),
+      displayPath: getDisplayPath(path),
       encoding: toStringValue(image.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+      filename: sanitizeFilename(filename ?? path),
       path,
-    };
-  });
+      rawBytes: decodeMediaEntryBytes(
+        content,
+        toStringValue(image.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+        path
+      ),
+    });
+  }
 
   const mediaEntryInputs = Array.isArray(input.mediaEntries) ? (input.mediaEntries as PublishMediaEntryInput[]) : [];
   const directMediaEntries = mediaEntryInputs.map((entry) => {
@@ -659,22 +836,41 @@ const getMediaEntries = async (
 
     return {
       content,
-      displayPath: path.replace(`${uploadRoot}/`, '~/assets/images/uploads/'),
+      contentType: toStringValue(entry.type),
+      displayPath: getDisplayPath(path),
       encoding: toStringValue(entry.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+      filename: sanitizeFilename(filename ?? path),
       path,
+      rawBytes: decodeMediaEntryBytes(
+        content,
+        toStringValue(entry.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
+        path
+      ),
     };
   });
 
   const artifactStore = artifactReferences.length ? await getArtifactBlobStore(event) : undefined;
   const indexStore = artifactReferences.length ? await getArtifactIndexBlobStore(event) : undefined;
-  const fallbackRequestId = toStringValue(input.requestId) ?? slug;
   const artifactEntries = await Promise.all(
     artifactReferences.map(async (reference) => {
       if (!artifactStore) {
         throw new PublishError(500, 'Artifact blob store is not available.');
       }
 
-      const filename = getArtifactFilename(reference, fallbackRequestId);
+      const explicitTargetPath = getArtifactTargetPath(reference);
+      const normalizedTargetPath = explicitTargetPath ? normalizeUploadReferencePath(explicitTargetPath) : undefined;
+      const path = artifactTargetPaths.get(reference) ?? normalizedTargetPath;
+
+      if (explicitTargetPath && (!path || !isValidImagePath(path, slug))) {
+        throw new PublishError(
+          403,
+          `Artifact repoPath values must be under ${uploadRoot}/${slug}/ and include a filename.`
+        );
+      }
+
+      const filename = path
+        ? (sanitizeFilename(path) ?? getArtifactFilename(reference, fallbackRequestId))
+        : getArtifactFilename(reference, fallbackRequestId);
       if (!indexStore) {
         throw new PublishError(500, 'Artifact index blob store is not available.');
       }
@@ -684,9 +880,12 @@ const getMediaEntries = async (
       return {
         artifactReference: reference,
         content: bytes.toString('base64'),
-        displayPath: `~/assets/images/uploads/${slug}/${filename}`,
+        contentType: reference.contentType,
+        displayPath: path ? getDisplayPath(path) : `~/assets/images/uploads/${slug}/${filename}`,
         encoding: 'base64' as const,
-        path: `${uploadRoot}/${slug}/${filename}`,
+        filename,
+        path: path ?? `${uploadRoot}/${slug}/${filename}`,
+        rawBytes: bytes,
       };
     })
   );
@@ -804,8 +1003,8 @@ export const handler = async (event: LambdaEvent) => {
       });
     }
 
-    const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences);
-    publishImagePaths = mediaEntries.map((entry) => entry.path);
+    const githubContext = { branch, repo, token };
+    const mediaEntries = await getMediaEntries(event, input, slug, artifactReferences, githubContext);
     const featuredImage = toStringValue(input.featuredImage);
     const existingFeaturedImageInput = toStringValue(input.existingFeaturedImagePath);
     const uploadedImagePath =
@@ -813,8 +1012,13 @@ export const handler = async (event: LambdaEvent) => {
       getPublishedMediaDisplayPath(mediaEntries, existingFeaturedImageInput);
     const existingFeaturedImage = uploadedImagePath
       ? undefined
-      : normalizeExistingFeaturedImagePath(existingFeaturedImageInput ?? featuredImage);
-    const imagePath = uploadedImagePath ?? existingFeaturedImage;
+      : existingFeaturedImageInput || featuredImage
+        ? await resolveExistingImageReference(existingFeaturedImageInput ?? featuredImage ?? '', githubContext)
+        : undefined;
+    const entriesToValidate = existingFeaturedImage ? [...mediaEntries, existingFeaturedImage] : mediaEntries;
+    await validateMediaEntries(entriesToValidate);
+    publishImagePaths = entriesToValidate.map((entry) => entry.path);
+    const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
     const rawMarkdown = buildFrontmatter({
       author: toStringValue(input.author),
       category: toStringValue(input.category),
@@ -838,8 +1042,9 @@ export const handler = async (event: LambdaEvent) => {
       method: 'POST',
       body: JSON.stringify({ content: markdown, encoding: 'utf-8' }),
     });
+    const persistedMediaEntries = mediaEntries.filter((entry) => entry.persist !== false);
     const mediaBlobs = await Promise.all(
-      mediaEntries.map(async (entry) => ({
+      persistedMediaEntries.map(async (entry) => ({
         ...entry,
         blob: await githubRequest<GitHubBlob>(`/repos/${repo}/git/blobs`, token, {
           method: 'POST',
@@ -908,6 +1113,10 @@ export const handler = async (event: LambdaEvent) => {
 
     if (error instanceof PublishError) {
       return jsonResponse(error.statusCode, { error: error.message });
+    }
+
+    if (error instanceof ImageValidationError) {
+      return jsonResponse(422, { error: error.message, path: error.path });
     }
 
     return jsonResponse(500, {

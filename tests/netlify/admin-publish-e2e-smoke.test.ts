@@ -328,14 +328,20 @@ test('scheduled publish tool publishes due scheduled records and returns not-due
   const scheduledInput = contentSourceInput(requestId, 'Scheduled publish smoke body.') as ReturnType<
     typeof contentSourceInput
   > & {
-    publication: ReturnType<typeof contentSourceInput>['publication'] & { scheduled_for?: string };
+    publication: ReturnType<typeof contentSourceInput>['publication'] & {
+      publish_payload: ReturnType<typeof contentSourceInput>['publication']['publish_payload'] & {
+        publishDate?: string;
+      };
+      scheduled_for?: string;
+    };
   };
   scheduledInput.publication.publication_status = 'scheduled';
   scheduledInput.publication.scheduled_for = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   scheduledInput.publication.publish_payload.slug = scheduledSlug;
   scheduledInput.publication.publish_payload.title = 'Scheduled Publish Smoke';
-  scheduledInput.publication.publish_payload.markdown =
-    '---\npublishDate: 2026-06-10T00:00:00.000Z\ntitle: "Scheduled Publish Smoke"\nauthor: "Dr. Lurié"\n---\n\nScheduled publish smoke body.\n';
+  scheduledInput.publication.publish_payload.markdown = 'Scheduled publish smoke body.\n';
+  scheduledInput.publication.publish_payload.publishDate = '2026-06-10T00:00:00.000Z';
+  scheduledInput.publication.publish_payload.author = 'Dr. Lurié';
   scheduledInput.publication.publish_payload.content = 'Scheduled publish smoke body.';
   scheduledInput.content.title = 'Scheduled Publish Smoke';
 
