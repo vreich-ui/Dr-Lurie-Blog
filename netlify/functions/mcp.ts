@@ -1,10 +1,18 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
+import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import {
+  createUploadSession,
+  getFinalizeUploadSessionPayload,
+  markUploadSessionFinalized,
+  UPLOAD_SESSION_CHUNK_SIZE_BYTES,
+  UPLOAD_SESSION_MAX_BYTES,
+} from '../lib/artifact-upload-sessions.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import {
   allowedAgentNames,
@@ -935,6 +943,60 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'save_artifact_create_upload_session',
+    description: `Create a short-lived artifact upload session for larger binary assets without sending bytes through MCP. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrlBase, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, and maxBytes=${UPLOAD_SESSION_MAX_BYTES}. Use for artifacts larger than about 30 KB and up to ${UPLOAD_SESSION_MAX_BYTES} bytes. Upload chunks with HTTP PUT application/octet-stream to uploadUrlBase using x-upload-token, x-session-id, x-chunk-index, and x-total-chunks headers, then call save_artifact_finalize_upload_session.`,
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns this artifact.'),
+        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+        contentType: stringSchema('MIME type for the artifact bytes.'),
+        filename: {
+          ...stringSchema(
+            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
+          ),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
+        expectedSizeBytes: {
+          ...expectedSizeBytesJsonSchema,
+          maximum: UPLOAD_SESSION_MAX_BYTES,
+        },
+        expectedSha256: expectedSha256JsonSchema,
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+    ),
+  },
+  {
+    name: 'save_artifact_finalize_upload_session',
+    description:
+      'Finalize a binary artifact upload session after all raw chunks have been uploaded. Verifies all chunks are present, verifies total size and sha256, writes final artifact bytes and indexes, and returns the immutable ArtifactReference. Idempotent retries return the same ArtifactReference after a session has finalized.',
+    inputSchema: objectSchema(
+      {
+        sessionId: stringSchema('Upload session id returned by save_artifact_create_upload_session.'),
+        requestId: stringSchema('Workflow request id that owns this artifact.'),
+        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+        contentType: stringSchema('MIME type for the artifact bytes.'),
+        filename: {
+          ...stringSchema(
+            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
+          ),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
+        expectedSizeBytes: {
+          ...expectedSizeBytesJsonSchema,
+          maximum: UPLOAD_SESSION_MAX_BYTES,
+        },
+        expectedSha256: expectedSha256JsonSchema,
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['sessionId', 'requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+    ),
+  },
+  {
     name: 'list_artifacts_for_request',
     description:
       'List ArtifactReference metadata for a requestId. Required: requestId. Reads the request artifact index only; it does not read or write artifact bytes. Returns artifacts array.',
@@ -1354,6 +1416,43 @@ const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, un
   if ('isError' in result) return result;
 
   return toolResult(result);
+};
+
+const callCreateArtifactUploadSession = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  try {
+    return toolResult(await createUploadSession(event, input));
+  } catch (error) {
+    return toolError(error instanceof Error ? error.message : String(error));
+  }
+};
+
+const callFinalizeArtifactUploadSession = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  try {
+    const finalization = await getFinalizeUploadSessionPayload(event, input);
+
+    if (!finalization.ok) return toolError(finalization.error, { statusCode: finalization.statusCode });
+    if (finalization.alreadyFinalized) {
+      return toolResult({ ok: true, complete: true, deduped: true, artifact: finalization.artifact });
+    }
+    if (!finalization.uploadInput || !finalization.bytes) {
+      return toolError('Upload session finalization did not produce artifact bytes.');
+    }
+
+    const response = await finalizeUpload(event, finalization.uploadInput, finalization.bytes);
+    const body = JSON.parse(response.body) as Record<string, unknown>;
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return toolError(typeof body.error === 'string' ? body.error : `HTTP ${response.statusCode}`, body);
+    }
+
+    if (body.artifact && typeof body.artifact === 'object') {
+      await markUploadSessionFinalized(event, finalization.manifest, body.artifact as ArtifactReference);
+    }
+
+    return toolResult(body);
+  } catch (error) {
+    return toolError(error instanceof Error ? error.message : String(error));
+  }
 };
 
 const callAction = async (event: LambdaEvent, payload: Record<string, unknown>, resultKey: string) => {
@@ -2340,6 +2439,10 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         tags: input.tags,
         metadata: input.metadata,
       });
+    case 'save_artifact_create_upload_session':
+      return callCreateArtifactUploadSession(event, input);
+    case 'save_artifact_finalize_upload_session':
+      return callFinalizeArtifactUploadSession(event, input);
     case 'list_artifacts_for_request':
       return listArtifactsForRequest(event, input.requestId);
     case 'list_artifacts_by_kind':

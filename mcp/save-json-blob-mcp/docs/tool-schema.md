@@ -66,6 +66,8 @@ Registered core tool names:
 - `save_json_blob_force_unlock` (admin-only, registered only when `MCP_ENABLE_ADMIN_TOOLS=true`)
 - `save_artifact`
 - `save_artifact_chunk`
+- `save_artifact_create_upload_session`
+- `save_artifact_finalize_upload_session`
 - `list_artifacts_for_request`
 - `list_artifacts_by_kind` (admin-only)
 - `list_artifacts_by_request` (admin-only)
@@ -123,6 +125,28 @@ Required fields:
 Optional fields: `filename`, `label`, `tags`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata` match `save_artifact`.
 
 Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is safe; checksum dedup returns success and does not rewrite final bytes.
+
+### `save_artifact_create_upload_session`
+
+Creates a short-lived upload session for larger binary artifacts without placing artifact bytes in MCP JSON payloads. Use this path for artifacts larger than about 30 KB and up to 50 MB, especially PDFs and other binary assets.
+
+Required fields:
+
+- `requestId: string` - workflow request id that owns the artifact.
+- `artifactKind: "image" | "pdf" | "video" | "doc" | "audio" | "data" | "attachment" | "other"` - storage routing kind.
+- `contentType: string` - MIME type for the artifact bytes.
+- `expectedSizeBytes: integer` - expected complete artifact byte size, max 50 MiB.
+- `expectedSha256: string` - expected complete artifact SHA-256 hex digest.
+
+Optional fields: `filename`, `label`, `tags`, and `metadata` match `save_artifact`.
+
+Success returns `sessionId`, `uploadUrlBase`, `uploadToken`, `chunkSizeBytes` (default 5 MiB), and `maxBytes` (50 MiB). Upload raw binary chunks with HTTP `PUT` to `uploadUrlBase`, `Content-Type: application/octet-stream`, and headers `x-upload-token`, `x-session-id`, `x-chunk-index`, `x-total-chunks`, and optional `x-filename`. The upload token is short-lived and must not be logged or stored in article content.
+
+### `save_artifact_finalize_upload_session`
+
+Finalizes a binary upload session after all chunks have been uploaded. The server verifies that all chunks are present, validates total size and SHA-256, assembles the final artifact, writes the normal artifact bytes and artifact-index records, and returns the same immutable `ArtifactReference` shape as `save_artifact`. Finalization is idempotent: retrying after success returns the same artifact reference.
+
+Required fields: `sessionId`, `requestId`, `artifactKind`, `contentType`, `expectedSizeBytes`, and `expectedSha256`. Optional fields: `filename`, `label`, `tags`, and `metadata` should match the create-session call.
 
 ### `list_artifacts_for_request`
 
