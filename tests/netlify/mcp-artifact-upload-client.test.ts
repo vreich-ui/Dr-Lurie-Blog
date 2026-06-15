@@ -233,7 +233,7 @@ test('MCP image artifact chunk indexes are monotonic and deterministic with 4 KB
     requestId: 'req-integrity-test',
     chunkSizeBytes: 4096,
     mcpToolCall: async (name, args) => {
-      if (name === 'save_artifact_create_upload_session') throw new Error('session unavailable');
+      if (name === 'create_upload_session') throw new Error('session unavailable');
       indexes.push(args.chunkIndex);
 
       return args.chunkIndex === 8
@@ -256,10 +256,10 @@ test('MCP image artifact upload uses binary upload sessions above 3 KB', async (
     mcpToolCall: async (name, args) => {
       calls.push({ name, args });
 
-      if (name === 'save_artifact_create_upload_session') {
+      if (name === 'create_upload_session') {
         return {
           sessionId: 'session-1',
-          uploadUrlBase: '/.netlify/functions/save-artifact-upload-chunk',
+          uploadUrl: '/.netlify/functions/upload-session-chunk',
           uploadToken: 'token-1',
           chunkSizeBytes: 16 * 1024,
           maxBytes: 50 * 1024 * 1024,
@@ -278,7 +278,7 @@ test('MCP image artifact upload uses binary upload sessions above 3 KB', async (
   assert.equal(artifacts.length, 1);
   assert.deepEqual(
     calls.map((call) => call.name),
-    ['save_artifact_create_upload_session', 'save_artifact_finalize_upload_session']
+    ['create_upload_session', 'finalize_upload_session']
   );
   assert.equal(uploadedChunks.length, 1);
   assert.equal(Buffer.concat(uploadedChunks).equals(bytes), true);
@@ -295,7 +295,7 @@ test('MCP image artifact upload falls back to legacy chunks when upload sessions
     mcpToolCall: async (name, args) => {
       calls.push({ name, args });
 
-      if (name === 'save_artifact_create_upload_session') {
+      if (name === 'create_upload_session') {
         throw new Error('session unavailable');
       }
 
@@ -308,7 +308,7 @@ test('MCP image artifact upload falls back to legacy chunks when upload sessions
   assert.equal(artifacts.length, 1);
   assert.deepEqual(
     calls.map((call) => call.name),
-    ['save_artifact_create_upload_session', 'save_artifact_chunk', 'save_artifact_chunk']
+    ['create_upload_session', 'save_artifact_chunk', 'save_artifact_chunk']
   );
 });
 
@@ -322,7 +322,7 @@ test('MCP image artifact upload retries the final chunk when completion is delay
     requestId: 'req-integrity-test',
     chunkSizeBytes: 4096,
     mcpToolCall: async (name, args) => {
-      if (name === 'save_artifact_create_upload_session') throw new Error('session unavailable');
+      if (name === 'create_upload_session') throw new Error('session unavailable');
       indexes.push(args.chunkIndex);
 
       if (args.chunkIndex === 8) {

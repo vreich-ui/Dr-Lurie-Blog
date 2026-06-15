@@ -18,7 +18,7 @@ type BinaryChunkUpload = (input: {
   chunkIndex: number;
   totalChunks: number;
   uploadToken: string;
-  uploadUrlBase: string;
+  uploadUrl: string;
   sessionId: string;
   filename: string;
 }) => Promise<Record<string, unknown>>;
@@ -194,6 +194,30 @@ const logUploadPathSelection = ({
       sizeBytes,
       uploadPath,
       singleShotMaxBytes: SINGLE_SHOT_UPLOAD_MAX_BYTES,
+      uploadSessionMaxBytes: UPLOAD_SESSION_MAX_BYTES,
+    })
+  );
+};
+
+const logUploadSessionFallback = ({
+  filename,
+  requestId,
+  sizeBytes,
+  error,
+}: {
+  filename: string;
+  requestId: string;
+  sizeBytes: number;
+  error: unknown;
+}) => {
+  console.warn(
+    JSON.stringify({
+      event: 'artifact_upload_session_fallback',
+      requestId,
+      filename,
+      sizeBytes,
+      fallbackUploadPath: 'legacy-chunks',
+      reason: error instanceof Error ? error.message : String(error),
     })
   );
 };
@@ -203,14 +227,14 @@ const defaultBinaryChunkUpload: BinaryChunkUpload = async ({
   chunkIndex,
   totalChunks,
   uploadToken,
-  uploadUrlBase,
+  uploadUrl,
   sessionId,
 }) => {
   if (typeof fetch !== 'function') {
     throw new ArtifactIntegrityError('Artifact upload failed integrity verification: fetch is unavailable.');
   }
 
-  const response = await fetch(uploadUrlBase, {
+  const response = await fetch(uploadUrl, {
     method: 'PUT',
     headers: {
       'content-type': 'application/octet-stream',
@@ -218,6 +242,7 @@ const defaultBinaryChunkUpload: BinaryChunkUpload = async ({
       'x-session-id': sessionId,
       'x-chunk-index': String(chunkIndex),
       'x-total-chunks': String(totalChunks),
+      'x-chunk-sha256': sha256Hex(bytes),
     },
     body: new Uint8Array(bytes),
   });
@@ -336,7 +361,7 @@ const uploadImageWithSession = async ({
   binaryChunkUpload: BinaryChunkUpload;
 }) => {
   const { bytes, contentType, filename, sha256, sizeBytes } = image;
-  const session = await mcpToolCall('save_artifact_create_upload_session', {
+  const session = await mcpToolCall('create_upload_session', {
     requestId,
     artifactKind: 'image',
     contentType,
@@ -348,21 +373,26 @@ const uploadImageWithSession = async ({
     metadata: { source: 'publisher_agent', filename },
   });
   const sessionId = typeof session.sessionId === 'string' ? session.sessionId : undefined;
-  const uploadUrlBase = typeof session.uploadUrlBase === 'string' ? session.uploadUrlBase : undefined;
+  const uploadUrl =
+    typeof session.uploadUrl === 'string'
+      ? session.uploadUrl
+      : typeof session.uploadUrlBase === 'string'
+        ? session.uploadUrlBase
+        : undefined;
   const uploadToken = typeof session.uploadToken === 'string' ? session.uploadToken : undefined;
   const chunkSizeBytes = typeof session.chunkSizeBytes === 'number' ? session.chunkSizeBytes : undefined;
 
-  if (!sessionId || !uploadUrlBase || !uploadToken || !chunkSizeBytes) {
+  if (!sessionId || !uploadUrl || !uploadToken || !chunkSizeBytes) {
     throw new ArtifactIntegrityError('Artifact upload failed integrity verification: incomplete upload session.');
   }
 
   const totalChunks = Math.max(1, Math.ceil(sizeBytes / chunkSizeBytes));
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
     const chunk = bytes.subarray(chunkIndex * chunkSizeBytes, Math.min(sizeBytes, (chunkIndex + 1) * chunkSizeBytes));
-    await binaryChunkUpload({ bytes: chunk, chunkIndex, totalChunks, uploadToken, uploadUrlBase, sessionId, filename });
+    await binaryChunkUpload({ bytes: chunk, chunkIndex, totalChunks, uploadToken, uploadUrl, sessionId, filename });
   }
 
-  const finalizeResult = await mcpToolCall('save_artifact_finalize_upload_session', {
+  const finalizeResult = await mcpToolCall('finalize_upload_session', {
     sessionId,
     requestId,
     artifactKind: 'image',
@@ -413,7 +443,14 @@ const uploadImageWithIntegrity = async ({
     });
     try {
       return await uploadImageWithSession({ image, requestId, mcpToolCall, binaryChunkUpload });
-    } catch {
+    } catch (error) {
+      logUploadSessionFallback({ filename: image.filename, requestId, sizeBytes: image.sizeBytes, error });
+      logUploadPathSelection({
+        filename: image.filename,
+        requestId,
+        sizeBytes: image.sizeBytes,
+        uploadPath: 'legacy-chunks',
+      });
       return uploadImageWithLegacyChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
     }
   }

@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
@@ -12,8 +12,9 @@ import {
   type ArtifactReference,
   type ArtifactUploadInput,
 } from './artifacts.js';
-import { getArtifactBlobStore } from './blob-store.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from './blob-store.js';
 import { sha256Hex } from './crypto.js';
+import { signUploadSessionToken, validateUploadSessionToken } from './upload-session-tokens.js';
 
 export const UPLOAD_SESSION_CHUNK_SIZE_BYTES = 5 * 1024 * 1024;
 export const UPLOAD_SESSION_MAX_BYTES = 50 * 1024 * 1024;
@@ -30,15 +31,28 @@ export type ArtifactUploadSessionManifest = {
   label?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
-  tokenSha256: string;
+  uploadDirectory?: string;
+  tokenSha256?: string;
+  totalChunks: number;
   chunkSizeBytes: number;
   maxBytes: number;
   expiresAtISO: string;
   createdAtISO: string;
   updatedAtISO: string;
-  totalChunks?: number;
-  receivedChunkIndexes: number[];
-  chunkDigests: Record<string, { sizeBytes: number; sha256: string }>;
+  uploadedChunkIndexes: number[];
+  perChunk: Record<
+    string,
+    {
+      sizeBytes: number;
+      sha256: string;
+      updatedAt: string;
+      label?: string;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+    }
+  >;
+  receivedChunkIndexes?: number[];
+  chunkDigests?: Record<string, { sizeBytes: number; sha256: string }>;
   finalizedArtifact?: ArtifactReference;
   finalizedAtISO?: string;
 };
@@ -53,6 +67,7 @@ export type CreateUploadSessionInput = {
   label?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  uploadDirectory?: string;
 };
 
 export type FinalizeUploadSessionInput = CreateUploadSessionInput & {
@@ -86,6 +101,42 @@ const safeArtifactTagSchema = z
     message: 'tags must not contain control characters or angle brackets.',
   });
 
+const uploadDirectorySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(240)
+  .refine(
+    (value) => {
+      if (value.includes('\0') || value.includes('..') || value.includes('\\')) return false;
+      const normalized = value.replace(/^\/+/, '').replace(/\/+$/, '');
+      return normalized.startsWith('src/assets/images/uploads/');
+    },
+    {
+      message: 'uploadDirectory must be under src/assets/images/uploads/ and must not contain .. or backslashes.',
+    }
+  );
+
+const normalizeUploadDirectory = (value: string | undefined) =>
+  value ? value.trim().replace(/^\/+/, '').replace(/\/+$/, '') : undefined;
+
+const appendUploadDirectoryMetadata = (input: CreateUploadSessionInput): CreateUploadSessionInput => {
+  const uploadDirectory = normalizeUploadDirectory(input.uploadDirectory);
+  if (!uploadDirectory) return input;
+
+  const filename = input.filename ? safePathSegment(input.filename) : undefined;
+  const repoPath = filename ? `${uploadDirectory}/${filename}` : uploadDirectory;
+  return {
+    ...input,
+    uploadDirectory,
+    metadata: {
+      ...(input.metadata ?? {}),
+      uploadDirectory,
+      repoPath,
+    },
+  };
+};
+
 const createUploadSessionSchema = z
   .object({
     requestId: z.string().min(1),
@@ -97,6 +148,7 @@ const createUploadSessionSchema = z
     label: safeArtifactLabelSchema.optional(),
     tags: z.array(safeArtifactTagSchema).max(artifactReferenceLimits.tags).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    uploadDirectory: uploadDirectorySchema.optional(),
   })
   .strict();
 
@@ -105,15 +157,19 @@ const finalizeUploadSessionSchema = createUploadSessionSchema.extend({
 });
 
 export const parseCreateUploadSessionInput = (input: unknown): CreateUploadSessionInput =>
-  createUploadSessionSchema.parse(input) as CreateUploadSessionInput;
+  appendUploadDirectoryMetadata(createUploadSessionSchema.parse(input) as CreateUploadSessionInput);
 
 export const parseFinalizeUploadSessionInput = (input: unknown): FinalizeUploadSessionInput =>
-  finalizeUploadSessionSchema.parse(input) as FinalizeUploadSessionInput;
+  appendUploadDirectoryMetadata(
+    finalizeUploadSessionSchema.parse(input) as FinalizeUploadSessionInput
+  ) as FinalizeUploadSessionInput;
 
 export const uploadSessionManifestKey = (sessionId: string) => `artifact-upload-sessions/${sessionId}/manifest.json`;
-export const uploadSessionChunkPrefix = (sessionId: string) => `artifact-upload-sessions/${sessionId}/chunks/`;
+export const uploadSessionChunkPrefix = (sessionId: string) => `upload-session/${sessionId}/`;
 export const uploadSessionChunkKey = (sessionId: string, chunkIndex: number) =>
-  `${uploadSessionChunkPrefix(sessionId)}${chunkIndex}`;
+  `${uploadSessionChunkPrefix(sessionId)}chunk-${chunkIndex}`;
+const legacyUploadSessionChunkKey = (sessionId: string, chunkIndex: number) =>
+  `artifact-upload-sessions/${sessionId}/chunks/${chunkIndex}`;
 
 const toArrayBufferBuffer = (value: Buffer | ArrayBuffer | string | null) => {
   if (value === null) return null;
@@ -122,13 +178,22 @@ const toArrayBufferBuffer = (value: Buffer | ArrayBuffer | string | null) => {
   return Buffer.from(value);
 };
 
-export const getUploadSessionBaseUrl = () => '/.netlify/functions/save-artifact-upload-chunk';
+export const getUploadSessionBaseUrl = () => '/.netlify/functions/upload-session-chunk';
 
 export const createUploadSession = async (event: unknown, rawInput: unknown) => {
   const input = parseCreateUploadSessionInput(rawInput);
   const sessionId = randomUUID();
-  const uploadToken = randomBytes(24).toString('base64url');
   const nowISO = new Date().toISOString();
+  const expiresAtISO = new Date(Date.now() + UPLOAD_SESSION_TTL_MS).toISOString();
+  const totalChunks = Math.max(1, Math.ceil(input.expectedSizeBytes / UPLOAD_SESSION_CHUNK_SIZE_BYTES));
+  const uploadToken = signUploadSessionToken({
+    sessionId,
+    requestId: input.requestId,
+    expectedSizeBytes: input.expectedSizeBytes,
+    expiresAt: Date.parse(expiresAtISO),
+    totalChunks,
+    chunkSizeBytes: UPLOAD_SESSION_CHUNK_SIZE_BYTES,
+  });
   const manifest: ArtifactUploadSessionManifest = {
     sessionId,
     requestId: input.requestId,
@@ -140,49 +205,116 @@ export const createUploadSession = async (event: unknown, rawInput: unknown) => 
     ...(input.label ? { label: input.label } : {}),
     ...(input.tags?.length ? { tags: input.tags } : {}),
     ...(input.metadata ? { metadata: input.metadata } : {}),
-    tokenSha256: sha256Hex(Buffer.from(uploadToken)),
+    ...(input.uploadDirectory ? { uploadDirectory: input.uploadDirectory } : {}),
+    totalChunks,
     chunkSizeBytes: UPLOAD_SESSION_CHUNK_SIZE_BYTES,
     maxBytes: UPLOAD_SESSION_MAX_BYTES,
-    expiresAtISO: new Date(Date.now() + UPLOAD_SESSION_TTL_MS).toISOString(),
+    expiresAtISO,
     createdAtISO: nowISO,
     updatedAtISO: nowISO,
+    uploadedChunkIndexes: [],
+    perChunk: {},
     receivedChunkIndexes: [],
     chunkDigests: {},
   };
 
-  const store = await getArtifactBlobStore(event);
-  await store.setJSON(uploadSessionManifestKey(sessionId), manifest, {
+  await setSessionManifest(event, manifest, {
     metadata: {
       sessionId,
       requestId: input.requestId,
       artifactKind: input.artifactKind,
       expectedSizeBytes: String(input.expectedSizeBytes),
       expectedSha256: input.expectedSha256.toLowerCase(),
+      ...(input.uploadDirectory ? { uploadDirectory: input.uploadDirectory } : {}),
     },
   });
 
+  const uploadUrl = getUploadSessionBaseUrl();
+
   return {
     sessionId,
-    uploadUrlBase: getUploadSessionBaseUrl(),
+    uploadUrl,
+    uploadUrlBase: uploadUrl,
     uploadToken,
     chunkSizeBytes: UPLOAD_SESSION_CHUNK_SIZE_BYTES,
     maxBytes: UPLOAD_SESSION_MAX_BYTES,
+    totalChunks,
   };
 };
 
-export const readUploadSessionManifest = async (event: unknown, sessionId: string) => {
-  const store = await getArtifactBlobStore(event);
-  const text = await store.get(uploadSessionManifestKey(sessionId));
-  if (!text) return undefined;
-  const parsed = JSON.parse(text) as unknown;
-  return parsed as ArtifactUploadSessionManifest;
+const normalizeSessionManifest = (manifest: ArtifactUploadSessionManifest): ArtifactUploadSessionManifest => {
+  const uploadedChunkIndexes = manifest.uploadedChunkIndexes ?? manifest.receivedChunkIndexes ?? [];
+  const legacyChunkDigests = manifest.chunkDigests ?? {};
+  const perChunk =
+    manifest.perChunk ??
+    Object.fromEntries(
+      Object.entries(legacyChunkDigests).map(([index, digest]) => [
+        index,
+        {
+          ...digest,
+          updatedAt: manifest.updatedAtISO,
+          ...(manifest.label ? { label: manifest.label } : {}),
+          ...(manifest.tags?.length ? { tags: manifest.tags } : {}),
+          ...(manifest.metadata ? { metadata: manifest.metadata } : {}),
+        },
+      ])
+    );
+
+  return {
+    ...manifest,
+    totalChunks: manifest.totalChunks ?? Math.max(1, Math.ceil(manifest.expectedSizeBytes / manifest.chunkSizeBytes)),
+    uploadedChunkIndexes,
+    perChunk,
+    receivedChunkIndexes: uploadedChunkIndexes,
+    chunkDigests: Object.fromEntries(
+      Object.entries(perChunk).map(([index, digest]) => [index, { sizeBytes: digest.sizeBytes, sha256: digest.sha256 }])
+    ),
+  };
 };
 
-const secureEqual = (left: string, right: string) => {
-  const leftBuffer = Buffer.from(left);
-  const rightBuffer = Buffer.from(right);
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
+export const getSessionManifest = async (event: unknown, sessionId: string) => {
+  const key = uploadSessionManifestKey(sessionId);
+  const indexStore = await getArtifactIndexBlobStore(event);
+  const text = await indexStore.get(key);
+  if (text) return normalizeSessionManifest(JSON.parse(text) as ArtifactUploadSessionManifest);
+
+  const artifactStore = await getArtifactBlobStore(event);
+  const legacyText = await artifactStore.get(key);
+  if (!legacyText) return undefined;
+  return normalizeSessionManifest(JSON.parse(legacyText) as ArtifactUploadSessionManifest);
+};
+
+export const readUploadSessionManifest = getSessionManifest;
+
+export const setSessionManifest = async (
+  event: unknown,
+  manifest: ArtifactUploadSessionManifest,
+  options?: { metadata?: Record<string, string> }
+) => {
+  const store = await getArtifactIndexBlobStore(event);
+  await store.setJSON(uploadSessionManifestKey(manifest.sessionId), normalizeSessionManifest(manifest), options);
+};
+
+export const appendChunkIndex = (manifest: ArtifactUploadSessionManifest, index: number) => {
+  const uploadedChunkIndexes = new Set(manifest.uploadedChunkIndexes ?? manifest.receivedChunkIndexes ?? []);
+  uploadedChunkIndexes.add(index);
+  return [...uploadedChunkIndexes].sort((a, b) => a - b);
+};
+
+const getExpectedTotalChunks = (
+  manifest: Pick<ArtifactUploadSessionManifest, 'expectedSizeBytes' | 'chunkSizeBytes'>
+) => Math.max(1, Math.ceil(manifest.expectedSizeBytes / manifest.chunkSizeBytes));
+
+const getMissingChunkIndexes = (manifest: ArtifactUploadSessionManifest) => {
+  const totalChunks = manifest.totalChunks ?? getExpectedTotalChunks(manifest);
+  const uploaded = new Set(manifest.uploadedChunkIndexes ?? manifest.receivedChunkIndexes ?? []);
+  const missing: number[] = [];
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
+    if (!uploaded.has(chunkIndex)) missing.push(chunkIndex);
+  }
+
+  return missing;
 };
 
 const validateManifestActive = (manifest: ArtifactUploadSessionManifest) => {
@@ -201,6 +333,7 @@ export const storeUploadSessionChunk = async ({
   chunkIndex,
   totalChunks,
   bytes,
+  chunkSha256,
 }: {
   event: unknown;
   sessionId: string;
@@ -208,6 +341,7 @@ export const storeUploadSessionChunk = async ({
   chunkIndex: number;
   totalChunks: number;
   bytes: Buffer;
+  chunkSha256?: string;
 }) => {
   const store = await getArtifactBlobStore(event);
   const manifest = await readUploadSessionManifest(event, sessionId);
@@ -216,9 +350,18 @@ export const storeUploadSessionChunk = async ({
   const active = validateManifestActive(manifest);
   if (!active.ok) return { statusCode: active.statusCode, body: { error: active.error } };
 
-  const tokenSha256 = sha256Hex(Buffer.from(uploadToken));
-  if (!secureEqual(tokenSha256, manifest.tokenSha256)) {
-    return { statusCode: 401, body: { error: 'Invalid upload token.' } };
+  const tokenValidation = validateUploadSessionToken({
+    token: uploadToken,
+    expected: {
+      sessionId: manifest.sessionId,
+      requestId: manifest.requestId,
+      expectedSizeBytes: manifest.expectedSizeBytes,
+      totalChunks: manifest.totalChunks,
+      chunkSizeBytes: manifest.chunkSizeBytes,
+    },
+  });
+  if (!tokenValidation.ok) {
+    return { statusCode: tokenValidation.statusCode, body: { error: tokenValidation.error } };
   }
 
   if (!Number.isInteger(chunkIndex) || chunkIndex < 0 || !Number.isInteger(totalChunks) || totalChunks < 1) {
@@ -229,19 +372,22 @@ export const storeUploadSessionChunk = async ({
   if (bytes.byteLength > manifest.chunkSizeBytes) {
     return { statusCode: 413, body: { error: `Chunk exceeds maximum size of ${manifest.chunkSizeBytes} bytes.` } };
   }
-  const expectedTotalChunks = Math.max(1, Math.ceil(manifest.expectedSizeBytes / manifest.chunkSizeBytes));
+  const expectedTotalChunks = getExpectedTotalChunks(manifest);
   if (totalChunks !== expectedTotalChunks) {
     return {
       statusCode: 400,
       body: { error: `totalChunks must be ${expectedTotalChunks} for this upload session.` },
     };
   }
-  if (manifest.totalChunks !== undefined && manifest.totalChunks !== totalChunks) {
+  if (manifest.totalChunks !== totalChunks) {
     return { statusCode: 400, body: { error: 'totalChunks does not match the existing upload session manifest.' } };
   }
 
   const incomingDigest = { sizeBytes: bytes.byteLength, sha256: sha256Hex(bytes) };
-  const existingDigest = manifest.chunkDigests[String(chunkIndex)];
+  if (chunkSha256 && chunkSha256.toLowerCase() !== incomingDigest.sha256) {
+    return { statusCode: 400, body: { error: 'x-chunk-sha256 does not match the uploaded chunk bytes.' } };
+  }
+  const existingDigest = manifest.perChunk[String(chunkIndex)] ?? manifest.chunkDigests?.[String(chunkIndex)];
   if (
     existingDigest &&
     (existingDigest.sizeBytes !== incomingDigest.sizeBytes ||
@@ -252,31 +398,42 @@ export const storeUploadSessionChunk = async ({
 
   if (!existingDigest) await store.set(uploadSessionChunkKey(sessionId, chunkIndex), bytes);
 
-  const receivedChunkIndexes = new Set(manifest.receivedChunkIndexes);
-  receivedChunkIndexes.add(chunkIndex);
+  const uploadedChunkIndexes = appendChunkIndex(manifest, chunkIndex);
   const updatedManifest: ArtifactUploadSessionManifest = {
     ...manifest,
     totalChunks,
-    receivedChunkIndexes: [...receivedChunkIndexes].sort((a, b) => a - b),
-    chunkDigests: { ...manifest.chunkDigests, [String(chunkIndex)]: incomingDigest },
+    uploadedChunkIndexes,
+    receivedChunkIndexes: uploadedChunkIndexes,
+    perChunk: {
+      ...manifest.perChunk,
+      [String(chunkIndex)]: {
+        ...incomingDigest,
+        updatedAt: new Date().toISOString(),
+        ...(manifest.label ? { label: manifest.label } : {}),
+        ...(manifest.tags?.length ? { tags: manifest.tags } : {}),
+        ...(manifest.metadata ? { metadata: manifest.metadata } : {}),
+      },
+    },
+    chunkDigests: { ...(manifest.chunkDigests ?? {}), [String(chunkIndex)]: incomingDigest },
     updatedAtISO: new Date().toISOString(),
   };
-  await store.setJSON(uploadSessionManifestKey(sessionId), updatedManifest, {
+  await setSessionManifest(event, updatedManifest, {
     metadata: {
       sessionId,
       requestId: manifest.requestId,
       artifactKind: manifest.artifactKind,
       totalChunks: String(totalChunks),
-      receivedChunks: String(updatedManifest.receivedChunkIndexes.length),
+      receivedChunks: String(updatedManifest.uploadedChunkIndexes.length),
     },
   });
 
   return {
-    statusCode: existingDigest ? 200 : 202,
+    statusCode: 200,
     body: {
       ok: true,
-      complete: updatedManifest.receivedChunkIndexes.length === totalChunks,
-      receivedChunks: updatedManifest.receivedChunkIndexes.length,
+      receivedBytes: bytes.byteLength,
+      complete: updatedManifest.uploadedChunkIndexes.length === totalChunks,
+      receivedChunks: updatedManifest.uploadedChunkIndexes.length,
       totalChunks,
     },
   };
@@ -284,12 +441,17 @@ export const storeUploadSessionChunk = async ({
 
 const getChunkBytes = async (event: unknown, sessionId: string, chunkIndex: number) => {
   const store = await getArtifactBlobStore(event);
+  const typedStore = store as typeof store & {
+    get: (key: string, options: { type: 'arrayBuffer' }) => Promise<ArrayBuffer | Buffer | null>;
+  };
+  const chunk = toArrayBufferBuffer(
+    await typedStore.get(uploadSessionChunkKey(sessionId, chunkIndex), { type: 'arrayBuffer' })
+  );
+
+  if (chunk) return chunk;
+
   return toArrayBufferBuffer(
-    await (
-      store as typeof store & {
-        get: (key: string, options: { type: 'arrayBuffer' }) => Promise<ArrayBuffer | Buffer | null>;
-      }
-    ).get(uploadSessionChunkKey(sessionId, chunkIndex), { type: 'arrayBuffer' })
+    await typedStore.get(legacyUploadSessionChunkKey(sessionId, chunkIndex), { type: 'arrayBuffer' })
   );
 };
 
@@ -308,29 +470,46 @@ const assertFinalizeInputMatchesManifest = (
     input.expectedSha256.toLowerCase() !== manifest.expectedSha256.toLowerCase()
       ? 'expectedSha256 does not match upload session.'
       : undefined,
+    (input.uploadDirectory ?? '') !== (manifest.uploadDirectory ?? '')
+      ? 'uploadDirectory does not match upload session.'
+      : undefined,
   ].filter(Boolean);
 
   return mismatches[0];
 };
 
 export const assembleUploadSessionBytes = async (event: unknown, manifest: ArtifactUploadSessionManifest) => {
-  const totalChunks =
-    manifest.totalChunks ?? Math.max(1, Math.ceil(manifest.expectedSizeBytes / manifest.chunkSizeBytes));
+  const totalChunks = manifest.totalChunks ?? getExpectedTotalChunks(manifest);
   const chunks: Buffer[] = [];
+  let totalSizeBytes = 0;
 
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex += 1) {
     const chunk = await getChunkBytes(event, manifest.sessionId, chunkIndex);
     if (!chunk) return { ok: false as const, error: `Upload session is missing chunk ${chunkIndex}.` };
 
-    const digest = manifest.chunkDigests[String(chunkIndex)];
+    const digest = manifest.perChunk[String(chunkIndex)] ?? manifest.chunkDigests?.[String(chunkIndex)];
     const actualDigest = { sizeBytes: chunk.byteLength, sha256: sha256Hex(chunk) };
     if (!digest || digest.sizeBytes !== actualDigest.sizeBytes || digest.sha256 !== actualDigest.sha256) {
       return { ok: false as const, error: `Upload session chunk ${chunkIndex} failed integrity verification.` };
     }
+    totalSizeBytes += chunk.byteLength;
     chunks.push(chunk);
   }
 
-  return { ok: true as const, bytes: Buffer.concat(chunks) };
+  if (totalSizeBytes !== manifest.expectedSizeBytes) {
+    return {
+      ok: false as const,
+      error: `Upload session reconstructed size ${totalSizeBytes} does not match expectedSizeBytes ${manifest.expectedSizeBytes}.`,
+    };
+  }
+
+  const bytes = Buffer.concat(chunks, totalSizeBytes);
+  const actualSha256 = sha256Hex(bytes);
+  if (actualSha256 !== manifest.expectedSha256.toLowerCase()) {
+    return { ok: false as const, error: 'Upload session reconstructed sha256 does not match expectedSha256.' };
+  }
+
+  return { ok: true as const, bytes };
 };
 
 export const getFinalizeUploadSessionPayload = async (event: unknown, rawInput: unknown) => {
@@ -348,9 +527,14 @@ export const getFinalizeUploadSessionPayload = async (event: unknown, rawInput: 
   const mismatch = assertFinalizeInputMatchesManifest(input, manifest);
   if (mismatch) return { ok: false as const, statusCode: 400, error: mismatch };
 
-  const totalChunks = Math.max(1, Math.ceil(manifest.expectedSizeBytes / manifest.chunkSizeBytes));
-  if (manifest.receivedChunkIndexes.length !== totalChunks) {
-    return { ok: false as const, statusCode: 409, error: 'Upload session is incomplete.' };
+  const totalChunks = manifest.totalChunks ?? getExpectedTotalChunks(manifest);
+  const missingChunkIndexes = getMissingChunkIndexes(manifest);
+  if (missingChunkIndexes.length > 0 || manifest.uploadedChunkIndexes.length !== totalChunks) {
+    return {
+      ok: false as const,
+      statusCode: 409,
+      error: `Upload session is incomplete; missing chunk indexes: ${missingChunkIndexes.join(', ') || 'unknown'}.`,
+    };
   }
 
   const assembled = await assembleUploadSessionBytes(event, manifest);
@@ -381,14 +565,13 @@ export const markUploadSessionFinalized = async (
   manifest: ArtifactUploadSessionManifest,
   artifact: ArtifactReference
 ) => {
-  const store = await getArtifactBlobStore(event);
   const updatedManifest: ArtifactUploadSessionManifest = {
     ...manifest,
     finalizedArtifact: artifact,
     finalizedAtISO: new Date().toISOString(),
     updatedAtISO: new Date().toISOString(),
   };
-  await store.setJSON(uploadSessionManifestKey(manifest.sessionId), updatedManifest, {
+  await setSessionManifest(event, updatedManifest, {
     metadata: {
       sessionId: manifest.sessionId,
       requestId: manifest.requestId,
@@ -396,6 +579,18 @@ export const markUploadSessionFinalized = async (
       finalized: 'true',
     },
   });
+};
+
+export const cleanupUploadSessionChunks = async (event: unknown, manifest: ArtifactUploadSessionManifest) => {
+  const store = await getArtifactBlobStore(event);
+  const totalChunks = manifest.totalChunks ?? getExpectedTotalChunks(manifest);
+
+  await Promise.allSettled(
+    Array.from({ length: totalChunks }, async (_, chunkIndex) => {
+      await store.del?.(uploadSessionChunkKey(manifest.sessionId, chunkIndex));
+      await store.del?.(legacyUploadSessionChunkKey(manifest.sessionId, chunkIndex));
+    })
+  );
 };
 
 export const getUploadSessionSafeRequestSegment = (requestId: string) => safePathSegment(requestId) || 'request';
