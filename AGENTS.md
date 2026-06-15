@@ -29,6 +29,7 @@
 ## Agent artifact workflow rules
 
 - When an agent generates artifacts (images, audio, video, binary files, or markdown files), it must upload them immediately and store the returned `ArtifactReference`/`blobKey` in MCP request state or the relevant agent output. Use `save_artifact` for small artifacts, use `save_artifact_create_upload_session` plus the binary chunk endpoint plus `save_artifact_finalize_upload_session` for larger artifacts, and use `save_artifact_chunk` only as a legacy compatibility fallback.
+- For binary upload sessions, the `uploadUrl` returned by the server is an absolute URL. Agents must use this URL directly for HTTP PUT requests. If a binary PUT upload fails with a 403 error (potentially due to proxy issues), agents should call the `diagnostic_upload` tool with the session details to identify whether the failure occurs at the proxy or the Netlify endpoint.
 - Agents must never attempt to generate deterministic artifact blob keys themselves. Let the artifact tool return `blobKey`, `sha256`, size, content type, and timestamp.
 - Treat every `ArtifactReference` as immutable. If an artifact must be regenerated, upload it again and use the newly returned reference.
 - If an artifact upload tool call or binary chunk upload fails or times out, retry the exact same upload/chunk call and rely on idempotent chunk handling/checksum deduplication instead of inventing a new handle.
