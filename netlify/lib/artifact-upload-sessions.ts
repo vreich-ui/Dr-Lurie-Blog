@@ -178,19 +178,19 @@ const toArrayBufferBuffer = (value: Buffer | ArrayBuffer | string | null) => {
   return Buffer.from(value);
 };
 
-export const getUploadSessionBaseUrl = (event?: any) => {
+export const getUploadSessionBaseUrl = (event?: unknown) => {
   const relativeUrl = '/.netlify/functions/upload-session-chunk';
 
   if (!event || !event.headers) return relativeUrl;
 
-  const host = event.headers.host || event.headers.Host;
+  const host = (event as Record<string, unknown>).headers.host || (event as Record<string, unknown>).headers.Host;
   if (!host) return relativeUrl;
 
-  const proto = event.headers['x-forwarded-proto'] || 'https';
+  const proto = (event as Record<string, unknown>).headers['x-forwarded-proto'] || 'https';
   return `${proto}://${host}${relativeUrl}`;
 };
 
-export const createUploadSession = async (event: any, rawInput: unknown) => {
+export const createUploadSession = async (event: unknown, rawInput: unknown) => {
   const proxyInfo = {
     HTTPS_PROXY: Boolean(process.env.HTTPS_PROXY || process.env.https_proxy),
     HTTP_PROXY: Boolean(process.env.HTTP_PROXY || process.env.http_proxy),
@@ -200,7 +200,7 @@ export const createUploadSession = async (event: any, rawInput: unknown) => {
   console.log('Artifact upload session diagnostics:', {
     proxyInfo,
     hasEvent: Boolean(event),
-    hasHeaders: Boolean(event?.headers),
+    hasHeaders: Boolean((event as Record<string, unknown>)?.headers),
   });
 
   const input = parseCreateUploadSessionInput(rawInput);
@@ -259,7 +259,7 @@ export const createUploadSession = async (event: any, rawInput: unknown) => {
       protocol: urlObj.protocol,
       host: urlObj.host,
     });
-  } catch (e) {
+  } catch {
     console.warn('Failed to parse uploadUrl for logging:', uploadUrl);
   }
 

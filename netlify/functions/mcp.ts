@@ -8,6 +8,7 @@ import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import { sha256Hex } from '../lib/crypto.js';
 import {
   cleanupUploadSessionChunks,
   createUploadSession,
@@ -1170,12 +1171,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'diagnostic_upload',
-    description: 'Run a diagnostic HTTP PUT to check the upload endpoint for 403 errors and proxy issues.',
+    description: 'Run a diagnostic HTTP PUT or POST to check the upload endpoint for 403 errors and proxy issues.',
     inputSchema: objectSchema(
       {
         uploadUrl: stringSchema('The absolute upload URL to test.'),
         uploadToken: stringSchema('The upload token to use in the x-upload-token header.'),
         sessionId: stringSchema('The session id to use in the x-session-id header.'),
+        method: { type: 'string', enum: ['PUT', 'POST'], description: 'HTTP method to test; defaults to PUT.' },
+        payload: { type: 'string', description: 'Optional base64-encoded payload to upload.' },
       },
       ['uploadUrl', 'uploadToken', 'sessionId']
     ),
@@ -2531,26 +2534,34 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
     case 'diagnostic_upload':
       try {
+        const method = String(input.method || 'PUT').toUpperCase();
+        const payloadBase64 = toNonEmptyString(input.payload);
+        const body = payloadBase64 ? Buffer.from(payloadBase64, 'base64') : Buffer.from('test');
+        const chunkSha256 = payloadBase64 ? sha256Hex(body) : undefined;
+
         const fetchResponse = await fetch(String(input.uploadUrl), {
-          method: 'PUT',
+          method,
           headers: {
             'Content-Type': 'application/octet-stream',
             'x-upload-token': String(input.uploadToken),
             'x-session-id': String(input.sessionId),
             'x-chunk-index': '0',
             'x-total-chunks': '1',
+            ...(chunkSha256 ? { 'x-chunk-sha256': chunkSha256 } : {}),
           },
-          body: Buffer.from('test'),
+          body,
         });
 
         const headers = Object.fromEntries(fetchResponse.headers.entries());
-        const body = await fetchResponse.text();
+        const responseBody = await fetchResponse.text();
 
         return toolResult({
           status: fetchResponse.status,
           statusText: fetchResponse.statusText,
           headers,
-          body,
+          body: responseBody,
+          method,
+          payloadSizeBytes: body.byteLength,
         });
       } catch (error: any) {
         return toolError(`Diagnostic upload failed: ${error.message}`);
