@@ -1168,6 +1168,18 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: 'Diagnostic tool that confirms the MCP server is reachable.',
     inputSchema: objectSchema({}),
   },
+  {
+    name: 'diagnostic_upload',
+    description: 'Run a diagnostic HTTP PUT to check the upload endpoint for 403 errors and proxy issues.',
+    inputSchema: objectSchema(
+      {
+        uploadUrl: stringSchema('The absolute upload URL to test.'),
+        uploadToken: stringSchema('The upload token to use in the x-upload-token header.'),
+        sessionId: stringSchema('The session id to use in the x-session-id header.'),
+      },
+      ['uploadUrl', 'uploadToken', 'sessionId']
+    ),
+  },
   ...ALLOWED_AGENTS.flatMap<ToolDefinition>((agentName) => [
     {
       name: `${agentName}_update_output`,
@@ -2517,6 +2529,32 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
   switch (name) {
     case 'ping':
       return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
+    case 'diagnostic_upload':
+      try {
+        const fetchResponse = await fetch(String(input.uploadUrl), {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'x-upload-token': String(input.uploadToken),
+            'x-session-id': String(input.sessionId),
+            'x-chunk-index': '0',
+            'x-total-chunks': '1',
+          },
+          body: Buffer.from('test'),
+        });
+
+        const headers = Object.fromEntries(fetchResponse.headers.entries());
+        const body = await fetchResponse.text();
+
+        return toolResult({
+          status: fetchResponse.status,
+          statusText: fetchResponse.statusText,
+          headers,
+          body,
+        });
+      } catch (error: any) {
+        return toolError(`Diagnostic upload failed: ${error.message}`);
+      }
     case 'save_json_blob_create_request':
       return callAction(
         event,
