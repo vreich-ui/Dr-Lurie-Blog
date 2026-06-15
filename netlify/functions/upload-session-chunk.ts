@@ -80,6 +80,15 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const bytes = decodeRawBody(event);
+
+  console.log('Upload session chunk received:', {
+    sessionId,
+    chunkIndex,
+    receivedBytes: bytes.byteLength,
+    isBase64Encoded: event.isBase64Encoded,
+    contentType: getHeader(event.headers, 'content-type'),
+  });
+
   const result = await storeUploadSessionChunk({
     event,
     sessionId,

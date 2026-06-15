@@ -1,0 +1,26 @@
+{
+  "sessionId": "5cb4da3f-2431-4aa0-b626-85fe4b227e7f",
+  "requestId": "upload-session-1781535467666-4f714kee6j9",
+  "artifactKind": "data",
+  "contentType": "application/octet-stream",
+  "filename": "artifact.bin",
+  "expectedSizeBytes": 5242890,
+  "expectedSha256": "55f7cd4d4268749af5f1be2c15f65f02473e6bb75e90c88cf8a54e170fa0b429",
+  "label": "artifact.bin",
+  "tags": [
+    "test"
+  ],
+  "metadata": {
+    "source": "test"
+  },
+  "totalChunks": 2,
+  "chunkSizeBytes": 5242880,
+  "maxBytes": 52428800,
+  "expiresAtISO": "2026-06-15T16:57:47.684Z",
+  "createdAtISO": "2026-06-15T14:57:47.684Z",
+  "updatedAtISO": "2026-06-15T14:57:47.684Z",
+  "uploadedChunkIndexes": [],
+  "perChunk": {},
+  "receivedChunkIndexes": [],
+  "chunkDigests": {}
+}
