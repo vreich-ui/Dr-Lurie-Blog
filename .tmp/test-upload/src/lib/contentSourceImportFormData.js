@@ -1,0 +1,140 @@
+import { getContentSourceMarkdown } from './contentSourceBody.js';
+const isPlainObject = (value) => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+const hasOwn = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+const getPathValue = (object, path) => {
+    let current = object;
+    for (const key of path) {
+        if (!isPlainObject(current) || !hasOwn(current, key))
+            return { exists: false, value: undefined };
+        current = current[key];
+    }
+    return { exists: true, value: current };
+};
+const getFirstImportPathValue = (object, paths) => {
+    for (const path of paths) {
+        const result = getPathValue(object, path);
+        if (result.exists)
+            return result;
+    }
+    return { exists: false, value: undefined };
+};
+const normalizeTextImportField = (contentSource, paths) => {
+    const result = getFirstImportPathValue(contentSource, paths);
+    return {
+        exists: result.exists,
+        value: result.exists && result.value != null ? result.value : '',
+    };
+};
+const slugify = (value) => String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+const isSimpleImportObject = (value) => Boolean(value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.values(value).every((item) => item == null || ['string', 'number', 'boolean'].includes(typeof item)));
+const formatImportedSource = (source) => {
+    if (typeof source === 'string')
+        return source.trim();
+    if (!isSimpleImportObject(source))
+        return '';
+    return Object.entries(source)
+        .map(([key, value]) => {
+        if (value == null || String(value).trim() === '')
+            return '';
+        return `${key}: ${String(value).trim()}`;
+    })
+        .filter(Boolean)
+        .join('; ');
+};
+const formatImportedList = (value) => value.map(formatImportedSource).filter(Boolean).join('\n');
+export const normalizeContentSourceImportToFormData = (contentSource, currentSchemaVersion) => {
+    const title = normalizeTextImportField(contentSource, [
+        ['publication', 'publish_payload', 'title'],
+        ['content', 'title'],
+    ]);
+    const slug = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'slug']]);
+    const computedSlug = slugify(slug.value || title.value);
+    const author = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'author']]);
+    const excerpt = normalizeTextImportField(contentSource, [
+        ['publication', 'publish_payload', 'excerpt'],
+        ['publication', 'publish_payload', 'description'],
+        ['content', 'deck'],
+    ]);
+    const seoDescription = normalizeTextImportField(contentSource, [
+        ['publication', 'publish_payload', 'seoDescription'],
+        ['seo', 'meta_description'],
+        ['publication', 'publish_payload', 'description'],
+    ]);
+    const markdown = getContentSourceMarkdown(contentSource);
+    const content = {
+        exists: Boolean(markdown),
+        value: markdown,
+    };
+    const importedTags = getFirstImportPathValue(contentSource, [
+        ['publication', 'publish_payload', 'tags'],
+        ['taxonomy', 'tags'],
+    ]);
+    const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
+    const featuredImage = normalizeTextImportField(contentSource, [
+        ['publication', 'publish_payload', 'featuredImage'],
+        ['publication', 'publish_payload', 'image'],
+    ]);
+    const existingFeaturedImagePath = normalizeTextImportField(contentSource, [
+        ['publication', 'publish_payload', 'existingFeaturedImagePath'],
+        ['publication', 'publish_payload', 'featuredImage'],
+        ['publication', 'publish_payload', 'image'],
+    ]);
+    const uploadedImageNames = getFirstImportPathValue(contentSource, [
+        ['publication', 'publish_payload', 'metadata', 'uploaded_image_names'],
+        ['publication', 'publish_payload', 'imageNames'],
+    ]);
+    const artifactReferences = getFirstImportPathValue(contentSource, [
+        ['publication', 'publish_payload', 'artifactReferences'],
+        ['publication', 'publish_payload', 'metadata', 'artifactReferences'],
+    ]);
+    const mediaEntries = getPathValue(contentSource, ['publication', 'publish_payload', 'mediaEntries']);
+    return {
+        schemaVersion: contentSource.schema_version,
+        currentSchemaVersion,
+        title,
+        slug: {
+            exists: slug.exists || Boolean(computedSlug),
+            value: computedSlug,
+        },
+        author,
+        excerpt,
+        seoDescription,
+        content,
+        tags: {
+            exists: importedTags.exists,
+            value: Array.isArray(importedTags.value)
+                ? importedTags.value
+                    .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+                    .filter(Boolean)
+                    .join(', ')
+                : '',
+        },
+        sources: {
+            exists: importedSources.exists,
+            value: Array.isArray(importedSources.value) ? formatImportedList(importedSources.value) : '',
+        },
+        featuredImage,
+        existingFeaturedImagePath,
+        imageNames: {
+            exists: uploadedImageNames.exists,
+            value: Array.isArray(uploadedImageNames.value)
+                ? uploadedImageNames.value.map((name) => (typeof name === 'string' ? name.trim() : '')).filter(Boolean)
+                : [],
+        },
+        artifactReferences: {
+            exists: artifactReferences.exists,
+            value: Array.isArray(artifactReferences.value) ? artifactReferences.value : [],
+        },
+        mediaEntries: {
+            exists: mediaEntries.exists,
+            value: Array.isArray(mediaEntries.value) ? mediaEntries.value : [],
+        },
+    };
+};
