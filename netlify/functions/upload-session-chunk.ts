@@ -43,7 +43,17 @@ const parseSha256Header = (headers: Record<string, string | undefined> | undefin
 
 const decodeRawBody = (event: LambdaEvent) => {
   if (!event.body) return Buffer.alloc(0);
-  if (event.isBase64Encoded) return Buffer.from(event.body, 'base64');
+
+  if (event.isBase64Encoded) {
+    try {
+      return Buffer.from(event.body, 'base64');
+    } catch (e) {
+      console.warn('Failed to decode base64 body:', e);
+    }
+  }
+
+  // Netlify often passes binary as base64-encoded string even if isBase64Encoded is false in some environments,
+  // or it might be raw binary. Buffer.from(body, 'binary') handles "latin1" encoding.
   return Buffer.from(event.body, 'binary');
 };
 
@@ -68,6 +78,15 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   const bytes = decodeRawBody(event);
+
+  console.log('Upload session chunk received:', {
+    sessionId,
+    chunkIndex,
+    receivedBytes: bytes.byteLength,
+    isBase64Encoded: event.isBase64Encoded,
+    contentType: getHeader(event.headers, 'content-type'),
+  });
+
   const result = await storeUploadSessionChunk({
     event,
     sessionId,
