@@ -178,9 +178,31 @@ const toArrayBufferBuffer = (value: Buffer | ArrayBuffer | string | null) => {
   return Buffer.from(value);
 };
 
-export const getUploadSessionBaseUrl = () => '/.netlify/functions/upload-session-chunk';
+export const getUploadSessionBaseUrl = (event?: any) => {
+  const relativeUrl = '/.netlify/functions/upload-session-chunk';
 
-export const createUploadSession = async (event: unknown, rawInput: unknown) => {
+  if (!event || !event.headers) return relativeUrl;
+
+  const host = event.headers.host || event.headers.Host;
+  if (!host) return relativeUrl;
+
+  const proto = event.headers['x-forwarded-proto'] || 'https';
+  return `${proto}://${host}${relativeUrl}`;
+};
+
+export const createUploadSession = async (event: any, rawInput: unknown) => {
+  const proxyInfo = {
+    HTTPS_PROXY: Boolean(process.env.HTTPS_PROXY || process.env.https_proxy),
+    HTTP_PROXY: Boolean(process.env.HTTP_PROXY || process.env.http_proxy),
+    ALL_PROXY: Boolean(process.env.ALL_PROXY || process.env.all_proxy),
+  };
+
+  console.log('Artifact upload session diagnostics:', {
+    proxyInfo,
+    hasEvent: Boolean(event),
+    hasHeaders: Boolean(event?.headers),
+  });
+
   const input = parseCreateUploadSessionInput(rawInput);
   const sessionId = randomUUID();
   const nowISO = new Date().toISOString();
@@ -229,7 +251,17 @@ export const createUploadSession = async (event: unknown, rawInput: unknown) => 
     },
   });
 
-  const uploadUrl = getUploadSessionBaseUrl();
+  const uploadUrl = getUploadSessionBaseUrl(event);
+
+  try {
+    const urlObj = new URL(uploadUrl, 'https://example.com');
+    console.log('Artifact uploadUrl host:', {
+      protocol: urlObj.protocol,
+      host: urlObj.host,
+    });
+  } catch (e) {
+    console.warn('Failed to parse uploadUrl for logging:', uploadUrl);
+  }
 
   return {
     sessionId,

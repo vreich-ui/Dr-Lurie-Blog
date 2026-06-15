@@ -120,6 +120,7 @@ const uploadChunk = async ({
   totalChunks,
   bytes,
   chunkSha256,
+  method = 'PUT',
 }: {
   sessionId: string;
   uploadToken: string;
@@ -127,9 +128,10 @@ const uploadChunk = async ({
   totalChunks: number;
   bytes: Buffer;
   chunkSha256?: string;
+  method?: 'PUT' | 'POST';
 }) => {
   const response = await uploadChunkHandler({
-    httpMethod: 'PUT',
+    httpMethod: method,
     headers: {
       'content-type': 'application/octet-stream',
       'x-session-id': sessionId,
@@ -281,4 +283,25 @@ test('upload session rejects missing chunks, wrong indexes, tampered chunks, and
     expectedSha256: 'a'.repeat(64),
   });
   assert.match(tooLarge.error as string, /Too big|max|expectedSizeBytes/i);
+});
+
+test('upload session supports HTTP POST as an alternative to PUT', async () => {
+  await resetLocalBlobs();
+  const bytes = deterministicBytes(1024);
+  const session = await createSession({ bytes });
+
+  const response = await uploadChunk({
+    sessionId: session.sessionId,
+    uploadToken: session.uploadToken,
+    chunkIndex: 0,
+    totalChunks: 1,
+    bytes,
+    method: 'POST',
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json.ok, true);
+
+  const finalized = await finalizeSession(session);
+  assert.equal(finalized.complete, true);
 });

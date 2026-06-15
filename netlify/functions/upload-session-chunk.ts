@@ -9,7 +9,7 @@ import { getHeader } from '../lib/admin-auth.js';
 const jsonHeaders = {
   'Access-Control-Allow-Headers':
     'authorization, content-type, x-upload-token, x-session-id, x-chunk-index, x-total-chunks, x-chunk-sha256',
-  'Access-Control-Allow-Methods': 'PUT, OPTIONS',
+  'Access-Control-Allow-Methods': 'PUT, POST, OPTIONS',
   'Access-Control-Allow-Origin': '*',
   'Cache-Control': 'no-store',
   'Content-Type': 'application/json',
@@ -43,13 +43,25 @@ const parseSha256Header = (headers: Record<string, string | undefined> | undefin
 
 const decodeRawBody = (event: LambdaEvent) => {
   if (!event.body) return Buffer.alloc(0);
-  if (event.isBase64Encoded) return Buffer.from(event.body, 'base64');
+
+  if (event.isBase64Encoded) {
+    try {
+      return Buffer.from(event.body, 'base64');
+    } catch (e) {
+      console.warn('Failed to decode base64 body:', e);
+    }
+  }
+
+  // Netlify often passes binary as base64-encoded string even if isBase64Encoded is false in some environments,
+  // or it might be raw binary. Buffer.from(body, 'binary') handles "latin1" encoding.
   return Buffer.from(event.body, 'binary');
 };
 
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: jsonHeaders, body: '' };
-  if (event.httpMethod !== 'PUT') return jsonResponse(405, { error: 'Method not allowed' });
+  if (event.httpMethod !== 'PUT' && event.httpMethod !== 'POST') {
+    return jsonResponse(405, { error: 'Method not allowed' });
+  }
 
   const sessionId = getHeader(event.headers, 'x-session-id');
   const uploadToken = getHeader(event.headers, 'x-upload-token');
