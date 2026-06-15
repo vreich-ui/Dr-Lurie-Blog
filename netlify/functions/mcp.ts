@@ -5,9 +5,11 @@ import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
+import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
+  cleanupUploadSessionChunks,
   createUploadSession,
   getFinalizeUploadSessionPayload,
   markUploadSessionFinalized,
@@ -367,6 +369,59 @@ const expectedSha256JsonSchema = {
   pattern: '^[a-fA-F0-9]{64}$',
   description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
 };
+
+const uploadDirectoryJsonSchema = stringSchema(
+  'Optional repository upload directory used to derive metadata.repoPath, e.g. src/assets/images/uploads/<slug>/.'
+);
+const uploadSessionCreateInputSchema = () =>
+  objectSchema(
+    {
+      requestId: stringSchema('Workflow request id that owns this artifact.'),
+      artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+      contentType: stringSchema('MIME type for the artifact bytes.'),
+      filename: {
+        ...stringSchema(
+          'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
+        ),
+        maxLength: artifactReferenceLimits.originalFilename,
+      },
+      expectedSizeBytes: {
+        ...expectedSizeBytesJsonSchema,
+        maximum: UPLOAD_SESSION_MAX_BYTES,
+      },
+      expectedSha256: expectedSha256JsonSchema,
+      label: artifactLabelJsonSchema,
+      tags: artifactTagsJsonSchema,
+      metadata: artifactMetadataJsonSchema,
+      uploadDirectory: uploadDirectoryJsonSchema,
+    },
+    ['requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+  );
+const uploadSessionFinalizeInputSchema = () =>
+  objectSchema(
+    {
+      sessionId: stringSchema('Upload session id returned by create_upload_session.'),
+      requestId: stringSchema('Workflow request id that owns this artifact.'),
+      artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+      contentType: stringSchema('MIME type for the artifact bytes.'),
+      filename: {
+        ...stringSchema(
+          'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
+        ),
+        maxLength: artifactReferenceLimits.originalFilename,
+      },
+      expectedSizeBytes: {
+        ...expectedSizeBytesJsonSchema,
+        maximum: UPLOAD_SESSION_MAX_BYTES,
+      },
+      expectedSha256: expectedSha256JsonSchema,
+      label: artifactLabelJsonSchema,
+      tags: artifactTagsJsonSchema,
+      metadata: artifactMetadataJsonSchema,
+      uploadDirectory: uploadDirectoryJsonSchema,
+    },
+    ['sessionId', 'requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+  );
 
 const artifactListLimitJsonSchema = {
   type: 'integer',
@@ -890,6 +945,22 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
     }),
   },
+  {
+    name: 'verify_article_images',
+    description:
+      'Verify that a published article page contains expected image URLs and that each expected image is fetchable as an image. Server-only publish credentials are never accepted as inputs or returned.',
+    inputSchema: objectSchema(
+      {
+        url: stringSchema('Published article URL to fetch and inspect for <img> sources.'),
+        expectedImages: {
+          type: 'array',
+          items: stringSchema('Expected image URL or page-relative image path.'),
+          description: 'Expected image URLs or page-relative image paths that must appear in the article HTML.',
+        },
+      },
+      ['url', 'expectedImages']
+    ),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -966,57 +1037,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_artifact_create_upload_session',
-    description: `Create a short-lived artifact upload session for larger binary assets without sending bytes through MCP. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrlBase, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, and maxBytes=${UPLOAD_SESSION_MAX_BYTES}. Use for artifacts larger than about 30 KB and up to ${UPLOAD_SESSION_MAX_BYTES} bytes. Upload chunks with HTTP PUT application/octet-stream to uploadUrlBase using x-upload-token, x-session-id, x-chunk-index, and x-total-chunks headers, then call save_artifact_finalize_upload_session.`,
-    inputSchema: objectSchema(
-      {
-        requestId: stringSchema('Workflow request id that owns this artifact.'),
-        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
-        contentType: stringSchema('MIME type for the artifact bytes.'),
-        filename: {
-          ...stringSchema(
-            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
-          ),
-          maxLength: artifactReferenceLimits.originalFilename,
-        },
-        expectedSizeBytes: {
-          ...expectedSizeBytesJsonSchema,
-          maximum: UPLOAD_SESSION_MAX_BYTES,
-        },
-        expectedSha256: expectedSha256JsonSchema,
-        label: artifactLabelJsonSchema,
-        tags: artifactTagsJsonSchema,
-        metadata: artifactMetadataJsonSchema,
-      },
-      ['requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
-    ),
+    description: `Create a short-lived artifact upload session for larger binary assets without sending bytes through MCP. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Use for artifacts larger than about 30 KB and up to ${UPLOAD_SESSION_MAX_BYTES} bytes. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
+    inputSchema: uploadSessionCreateInputSchema(),
+  },
+  {
+    name: 'create_upload_session',
+    description: `Create a short-lived artifact upload session. Alias of save_artifact_create_upload_session with output fields sessionId, uploadUrl, uploadToken, chunkSizeBytes, maxBytes, and totalChunks. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call finalize_upload_session.`,
+    inputSchema: uploadSessionCreateInputSchema(),
   },
   {
     name: 'save_artifact_finalize_upload_session',
     description:
       'Finalize a binary artifact upload session after all raw chunks have been uploaded. Verifies all chunks are present, verifies total size and sha256, writes final artifact bytes and indexes, and returns the immutable ArtifactReference. Idempotent retries return the same ArtifactReference after a session has finalized.',
-    inputSchema: objectSchema(
-      {
-        sessionId: stringSchema('Upload session id returned by save_artifact_create_upload_session.'),
-        requestId: stringSchema('Workflow request id that owns this artifact.'),
-        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
-        contentType: stringSchema('MIME type for the artifact bytes.'),
-        filename: {
-          ...stringSchema(
-            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
-          ),
-          maxLength: artifactReferenceLimits.originalFilename,
-        },
-        expectedSizeBytes: {
-          ...expectedSizeBytesJsonSchema,
-          maximum: UPLOAD_SESSION_MAX_BYTES,
-        },
-        expectedSha256: expectedSha256JsonSchema,
-        label: artifactLabelJsonSchema,
-        tags: artifactTagsJsonSchema,
-        metadata: artifactMetadataJsonSchema,
-      },
-      ['sessionId', 'requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
-    ),
+    inputSchema: uploadSessionFinalizeInputSchema(),
+  },
+  {
+    name: 'finalize_upload_session',
+    description:
+      'Finalize a binary artifact upload session. Alias of save_artifact_finalize_upload_session. Required: sessionId, requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Returns the immutable ArtifactReference.',
+    inputSchema: uploadSessionFinalizeInputSchema(),
   },
   {
     name: 'list_artifacts_for_request',
@@ -1413,6 +1452,41 @@ const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unkn
   return toolResult(body);
 };
 
+const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Article image verification is not configured on the server.', {
+      error_code: 'verify_article_images_not_configured',
+    });
+  }
+
+  const verifyResponse = await verifyArticleImagesHandler({
+    httpMethod: 'POST',
+    headers: {
+      ...(event.headers ?? {}),
+      'x-publish-key': publishSecret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      url: input.url,
+      expectedImages: input.expectedImages,
+    }),
+  });
+  const body = parseJsonResponseBody(verifyResponse.body);
+
+  if (verifyResponse.statusCode < 200 || verifyResponse.statusCode >= 300) {
+    return toolError(
+      typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${verifyResponse.statusCode}: article image verification failed`,
+      { statusCode: verifyResponse.statusCode, ...body }
+    );
+  }
+
+  return toolResult(body);
+};
+
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const tokenResult = verifyScheduledPublishToken(input.scheduled_publish_token);
   if (!tokenResult.ok) return toolError(tokenResult.error, tokenResult);
@@ -1555,6 +1629,9 @@ const callFinalizeArtifactUploadSession = async (event: LambdaEvent, input: Reco
 
     if (body.artifact && typeof body.artifact === 'object') {
       await markUploadSessionFinalized(event, finalization.manifest, body.artifact as ArtifactReference);
+      cleanupUploadSessionChunks(event, finalization.manifest).catch((cleanupError: unknown) => {
+        console.warn('Upload session cleanup failed after finalize.', cleanupError);
+      });
     }
 
     return toolResult(body);
@@ -2511,6 +2588,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callScheduledPublish(event, input);
     case 'deploy_status':
       return callDeployStatus(event, input);
+    case 'verify_article_images':
+      return callVerifyArticleImages(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
@@ -2550,8 +2629,10 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         metadata: input.metadata,
       });
     case 'save_artifact_create_upload_session':
+    case 'create_upload_session':
       return callCreateArtifactUploadSession(event, input);
     case 'save_artifact_finalize_upload_session':
+    case 'finalize_upload_session':
       return callFinalizeArtifactUploadSession(event, input);
     case 'list_artifacts_for_request':
       return listArtifactsForRequest(event, input.requestId);

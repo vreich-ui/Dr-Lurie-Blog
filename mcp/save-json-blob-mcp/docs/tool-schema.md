@@ -68,6 +68,8 @@ Registered core tool names:
 - `save_artifact_chunk`
 - `save_artifact_create_upload_session`
 - `save_artifact_finalize_upload_session`
+- `create_upload_session`
+- `finalize_upload_session`
 - `list_artifacts_for_request`
 - `list_artifacts_by_kind` (admin-only)
 - `list_artifacts_by_request` (admin-only)
@@ -126,7 +128,7 @@ Optional fields: `filename`, `label`, `tags`, `encoding`, `expectedSizeBytes`, `
 
 Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is safe; checksum dedup returns success and does not rewrite final bytes.
 
-### `save_artifact_create_upload_session`
+### `create_upload_session`
 
 Creates a short-lived upload session for larger binary artifacts without placing artifact bytes in MCP JSON payloads. Use this path for artifacts larger than about 30 KB and up to 50 MB, especially PDFs and other binary assets.
 
@@ -138,15 +140,67 @@ Required fields:
 - `expectedSizeBytes: integer` - expected complete artifact byte size, max 50 MiB.
 - `expectedSha256: string` - expected complete artifact SHA-256 hex digest.
 
-Optional fields: `filename`, `label`, `tags`, and `metadata` match `save_artifact`.
+Optional fields use the same metadata shape as `save_artifact`:
 
-Success returns `sessionId`, `uploadUrlBase`, `uploadToken`, `chunkSizeBytes` (default 5 MiB), and `maxBytes` (50 MiB). Upload raw binary chunks with HTTP `PUT` to `uploadUrlBase`, `Content-Type: application/octet-stream`, and headers `x-upload-token`, `x-session-id`, `x-chunk-index`, `x-total-chunks`, and optional `x-filename`. The upload token is short-lived and must not be logged or stored in article content.
+- `filename: string` - original filename used for the final artifact extension and `ArtifactReference.originalFilename`.
+- `label: string` - safe human-readable label.
+- `tags: string[]` - safe filter/display tags.
+- `metadata: object` - arbitrary JSON metadata saved on the `ArtifactReference`.
+- `uploadDirectory: string` - optional repository upload directory used to derive `metadata.uploadDirectory` and `metadata.repoPath`, for example `src/assets/images/uploads/<slug>/`. When `filename` is present, `repoPath` points to `<uploadDirectory>/<filename>`.
 
-### `save_artifact_finalize_upload_session`
+Success returns:
 
-Finalizes a binary upload session after all chunks have been uploaded. The server verifies that all chunks are present, validates total size and SHA-256, assembles the final artifact, writes the normal artifact bytes and artifact-index records, and returns the same immutable `ArtifactReference` shape as `save_artifact`. Finalization is idempotent: retrying after success returns the same artifact reference.
+- `sessionId: string`
+- `uploadUrl: string` - Netlify Function URL for binary chunk uploads.
+- `uploadToken: string` - short-lived HMAC-SHA256 signed token scoped to `sessionId`, `requestId`, `expectedSizeBytes`, expiry, `totalChunks`, and `chunkSizeBytes`, using the server publish/auth secret (`NETLIFY_PUBLISH_SECRET` or `PUBLISH_SECRET`). Do not log it or store it in article content.
+- `chunkSizeBytes: integer` - defaults to `5 * 1024 * 1024`.
+- `maxBytes: integer` - defaults to `50 * 1024 * 1024`.
+- `totalChunks: integer` - `ceil(expectedSizeBytes / chunkSizeBytes)`.
 
-Required fields: `sessionId`, `requestId`, `artifactKind`, `contentType`, `expectedSizeBytes`, and `expectedSha256`. Optional fields: `filename`, `label`, `tags`, and `metadata` should match the create-session call.
+`save_artifact_create_upload_session` remains registered as a backwards-compatible alias with the same input schema and response. New clients should prefer `create_upload_session`.
+
+### Upload session HTTP `PUT` endpoint
+
+Upload each raw chunk to the returned `uploadUrl` (`/.netlify/functions/upload-session-chunk`) before finalizing. The endpoint accepts one chunk per HTTP `PUT` request.
+
+Required request format:
+
+- Method: `PUT`
+- Body: raw binary bytes for exactly one chunk.
+- `Content-Type: application/octet-stream`
+- `x-upload-token: <uploadToken>`
+- `x-session-id: <sessionId>`
+- `x-chunk-index: <zero-based chunk index>`
+- `x-total-chunks: <totalChunks>`
+
+Optional header:
+
+- `x-chunk-sha256: <sha256>` - optional SHA-256 hex digest for this chunk; the endpoint rejects the upload if it does not match the raw bytes.
+
+Chunk expectations:
+
+- Use chunk indexes `0` through `totalChunks - 1`.
+- Non-final chunks should be no larger than `chunkSizeBytes`; the final chunk may be smaller.
+- Re-sending the exact same chunk is safe and should be used for retry after timeout or transient failure.
+- `x-total-chunks` must equal `ceil(expectedSizeBytes / chunkSizeBytes)` for the session.
+- The server validates the signed upload token on every chunk, rejects expired or mismatched tokens, stores each chunk under `upload-session/{sessionId}/chunk-{chunkIndex}`, updates the manifest, returns `ok: true` with `receivedBytes`, and validates the uploaded bytes during `finalize_upload_session` by checking every chunk, the assembled byte count, and the final SHA-256 digest.
+
+### `finalize_upload_session`
+
+Finalizes a binary upload session after all chunks have been uploaded. The server verifies that every chunk index from `0` through `totalChunks - 1` is present, reconstructs bytes in order from `upload-session/{sessionId}/chunk-{i}`, validates total size and SHA-256 against `expectedSizeBytes` and `expectedSha256`, writes the normal artifact bytes and artifact-index records through the same completion path as `save_artifact`, best-effort cleans up chunk blobs, and returns the same immutable `ArtifactReference` shape as `save_artifact`. Finalization is idempotent: retrying after success returns the same artifact reference.
+
+Required fields:
+
+- `sessionId: string`
+- `requestId: string`
+- `expectedSizeBytes: integer`
+- `expectedSha256: string`
+- `artifactKind: "image" | "pdf" | "video" | "doc" | "audio" | "data" | "attachment" | "other"`
+- `contentType: string`
+
+Optional fields: `filename`, `label`, `tags`, `metadata`, and `uploadDirectory` should match the create-session call.
+
+Success returns the `ArtifactReference` fields returned by `save_artifact` (`blobKey`, `sizeBytes`, `sha256`, `contentType`, `createdAtISO`, `artifactKind`, `originalFilename`, `label`, optional `tags`, optional `metadata`, and any deletion markers). `save_artifact_finalize_upload_session` remains registered as a backwards-compatible alias with the same input schema and response. New clients should prefer `finalize_upload_session`.
 
 ### `list_artifacts_for_request`
 
