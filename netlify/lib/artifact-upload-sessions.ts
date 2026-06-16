@@ -181,12 +181,15 @@ const toArrayBufferBuffer = (value: Buffer | ArrayBuffer | string | null) => {
 export const getUploadSessionBaseUrl = (event?: unknown) => {
   const relativeUrl = '/.netlify/functions/upload-session-chunk';
 
-  if (!event || !event.headers) return relativeUrl;
+  if (!event || typeof event !== 'object' || !('headers' in event)) return relativeUrl;
 
-  const host = (event as Record<string, unknown>).headers.host || (event as Record<string, unknown>).headers.Host;
+  const headers = (event as { headers?: Record<string, string | undefined> }).headers;
+  if (!headers) return relativeUrl;
+
+  const host = headers.host || headers.Host;
   if (!host) return relativeUrl;
 
-  const proto = (event as Record<string, unknown>).headers['x-forwarded-proto'] || 'https';
+  const proto = headers['x-forwarded-proto'] || 'https';
   return `${proto}://${host}${relativeUrl}`;
 };
 
