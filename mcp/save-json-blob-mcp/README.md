@@ -78,7 +78,9 @@ The HTTP transport is stateless Streamable HTTP. Each MCP POST request receives 
 
 Optional remote access token:
 
-- Set `MCP_HTTP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on the MCP endpoint.
+- Set `MCP_HTTP_AUTH_TOKEN` to require an auth token on the MCP endpoint.
+- Preferred request header: `x-mcp-auth-token: <token>`.
+- Legacy/compatible request header: `Authorization: Bearer <token>`.
 - Do not use `NETLIFY_PUBLISH_SECRET` as this token. `NETLIFY_PUBLISH_SECRET` must remain only in the server runtime environment and is used solely when the MCP tool calls the Netlify function.
 
 ## Verify tool registration with MCP Inspector

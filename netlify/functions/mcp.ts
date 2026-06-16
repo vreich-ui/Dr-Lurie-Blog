@@ -91,7 +91,8 @@ const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
 const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
 
 const jsonHeaders = {
-  'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-publish-key',
+  'Access-Control-Allow-Headers':
+    'authorization, content-type, mcp-protocol-version, mcp-session-id, x-mcp-auth-token, x-publish-key',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Expose-Headers': 'mcp-session-id',
@@ -1252,14 +1253,29 @@ const parseBody = (event: LambdaEvent) => {
   return JSON.parse(rawBody) as JsonRpcRequest | JsonRpcRequest[];
 };
 
-const isAuthorized = (event: LambdaEvent) => {
-  const token = process.env.MCP_HTTP_AUTH_TOKEN;
-  if (!token) return true;
+type AuthResult =
+  | { ok: true }
+  | { ok: false; reason: 'missing_token' | 'missing_authorization' | 'invalid_authorization' };
 
-  const authorization = event.headers?.authorization ?? event.headers?.Authorization;
+const getAuthResult = (event: LambdaEvent): AuthResult => {
+  const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
+  if (!token) {
+    return process.env.MCP_HTTP_AUTH_TOKEN === undefined ? { ok: true } : { ok: false, reason: 'missing_token' };
+  }
 
-  return authorization === `Bearer ${token}`;
+  const dedicatedToken = toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'));
+  const authorization = toNonEmptyString(getHeader(event.headers, 'authorization'));
+  const bearerToken = getBearerToken(authorization);
+  const providedTokens = [dedicatedToken, bearerToken].filter((provided): provided is string => Boolean(provided));
+
+  if (providedTokens.length === 0) return { ok: false, reason: 'missing_authorization' };
+
+  return providedTokens.some((provided) => safeSecretsMatch(provided, token))
+    ? { ok: true }
+    : { ok: false, reason: 'invalid_authorization' };
 };
+
+const getAuthDiagnosticReason = (reason: Exclude<AuthResult, { ok: true }>['reason']) => `mcp_auth_${reason}`;
 
 const getHeader = (headers: LambdaEvent['headers'], name: string) => {
   const normalizedName = name.toLowerCase();
@@ -2800,8 +2816,20 @@ export const handler = async (rawEvent: LambdaEvent) => {
     return response(405, rpcError(null, -32000, 'Method not allowed.'), { ...jsonHeaders, Allow: 'POST' });
   }
 
-  if (!isAuthorized(event)) {
-    return response(401, rpcError(null, -32001, 'Unauthorized'));
+  const authResult = getAuthResult(event);
+  if (!authResult.ok) {
+    const diagnosticReason = getAuthDiagnosticReason(authResult.reason);
+    event.log?.({
+      event: 'mcp_auth_rejected',
+      rpcMethod: null,
+      slug: null,
+      hasMcpHttpAuthToken: Boolean(toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN)),
+      hasMcpAuthTokenHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'))),
+      hasAuthorizationHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'authorization'))),
+      reason: diagnosticReason,
+    });
+
+    return response(401, rpcError(null, -32001, 'Unauthorized', { reason: diagnosticReason }));
   }
 
   let body: JsonRpcRequest | JsonRpcRequest[];
