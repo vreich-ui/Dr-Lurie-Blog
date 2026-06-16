@@ -284,6 +284,51 @@ test('MCP image artifact upload uses binary upload sessions above 3 KB', async (
   assert.equal(Buffer.concat(uploadedChunks).equals(bytes), true);
 });
 
+test('MCP image artifact upload retries POST when PUT fails with a proxy tunnel error', async () => {
+  const bytes = Buffer.alloc(4 * 1024, 5);
+  const methods: string[] = [];
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (_url, init) => {
+    const method = init?.method ?? 'GET';
+    methods.push(method);
+
+    if (method === 'PUT') {
+      throw new Error('CONNECT tunnel failed, response 403');
+    }
+
+    return {
+      ok: true,
+      json: async () => ({ ok: true }),
+    } as Response;
+  }) as typeof fetch;
+
+  try {
+    const artifacts = await uploadImagesWithIntegrity({
+      images: [createImage(bytes)],
+      requestId: 'req-integrity-test',
+      mcpToolCall: async (name) => {
+        if (name === 'create_upload_session') {
+          return {
+            sessionId: 'session-1',
+            uploadUrl: '/.netlify/functions/upload-session-chunk',
+            uploadToken: 'token-1',
+            chunkSizeBytes: 16 * 1024,
+            maxBytes: 50 * 1024 * 1024,
+          };
+        }
+
+        return { ok: true, complete: true, artifact: createArtifact({ bytes }) };
+      },
+    });
+
+    assert.equal(artifacts.length, 1);
+    assert.deepEqual(methods, ['PUT', 'POST']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('MCP image artifact upload falls back to legacy chunks when upload sessions fail', async () => {
   const bytes = Buffer.alloc(31 * 1024, 4);
   const calls: { name: string; args: Record<string, unknown> }[] = [];
