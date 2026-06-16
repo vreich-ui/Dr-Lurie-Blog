@@ -40,9 +40,8 @@ type PreparedImageUpload = {
   sizeBytes: number;
 };
 
-const DEFAULT_IMAGE_CHUNK_SIZE_BYTES = 6 * 1024;
-// Temporarily keep single-shot uploads tiny while MCP base64 payload limits are characterized.
-const SINGLE_SHOT_UPLOAD_MAX_BYTES = 3 * 1024;
+const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
+const SINGLE_SHOT_UPLOAD_MAX_BYTES = 750_000;
 const UPLOAD_SESSION_MAX_BYTES = 50 * 1024 * 1024;
 const FINAL_CHUNK_RETRY_ATTEMPTS = 3;
 
@@ -479,7 +478,7 @@ export const uploadImagesWithIntegrity = async ({
   mcpToolCall,
   binaryChunkUpload = defaultBinaryChunkUpload,
   onWorkflowError,
-  chunkSizeBytes = DEFAULT_IMAGE_CHUNK_SIZE_BYTES,
+  chunkSizeBytes = CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES,
 }: UploadImagesWithIntegrityInput) => {
   const verifiedArtifacts: ArtifactReference[] = [];
 
