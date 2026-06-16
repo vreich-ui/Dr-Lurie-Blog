@@ -135,10 +135,11 @@ const postChunkedJpeg = async ({
   return response;
 };
 
-test('save-artifact chunk status stays monotonic when an immediate chunk read is stale', async () => {
+test('save-artifact chunk status uses the manifest without direct visibility reads after each chunk', async () => {
   type FakeStoreValue = Buffer | string;
   const values = new Map<string, FakeStoreValue>();
   const hiddenImmediateChunkReads = new Set<string>();
+  let directChunkArrayBufferReads = 0;
   const fakeStore = {
     async set(key: string, value: string | Buffer | Uint8Array | ArrayBuffer) {
       values.set(
@@ -151,6 +152,10 @@ test('save-artifact chunk status stays monotonic when an immediate chunk read is
       values.set(key, JSON.stringify(value));
     },
     async get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) {
+      if (key.startsWith(`artifact-chunks/`) && !key.endsWith('/manifest.json') && options?.type === 'arrayBuffer') {
+        directChunkArrayBufferReads += 1;
+      }
+
       if (hiddenImmediateChunkReads.has(key) && options?.type === 'arrayBuffer') {
         hiddenImmediateChunkReads.delete(key);
         return null;
@@ -198,6 +203,7 @@ test('save-artifact chunk status stays monotonic when an immediate chunk read is
     statuses.map((status) => status.receivedChunks),
     [1, 2, 3]
   );
+  assert.equal(directChunkArrayBufferReads, 0);
 });
 
 test('save-artifact retries stale final artifact readback before saving request index', async () => {
@@ -943,6 +949,61 @@ test('save-artifact rejects chunked upload attempts that change totalChunks for 
     `${chunkPrefix}0`,
     `${chunkPrefix}manifest.json`,
   ]);
+  assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
+  assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
+});
+
+test('save-artifact rejects duplicate chunk uploads with different bytes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `chunked-digest-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const clientUploadId = randomUUID();
+  const firstChunk = Buffer.from('first duplicate chunk');
+
+  const firstPartial = await postArtifact({
+    ...makeBaseInput(requestId),
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    payload: firstChunk.toString('base64'),
+  });
+
+  assert.equal(firstPartial.statusCode, 202);
+  assert.deepEqual(firstPartial.json, { ok: true, complete: false, receivedChunks: 1, totalChunks: 2 });
+
+  const sameChunkRetry = await postArtifact({
+    ...makeBaseInput(requestId),
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    payload: firstChunk.toString('base64'),
+  });
+
+  assert.equal(sameChunkRetry.statusCode, 202);
+  assert.deepEqual(sameChunkRetry.json, { ok: true, complete: false, receivedChunks: 1, totalChunks: 2 });
+
+  const differentChunkRetry = await postArtifact({
+    ...makeBaseInput(requestId),
+    clientUploadId,
+    chunkIndex: 0,
+    totalChunks: 2,
+    encoding: 'base64',
+    payload: Buffer.from('different duplicate chunk').toString('base64'),
+  });
+
+  assert.equal(differentChunkRetry.statusCode, 400);
+  assert.deepEqual(differentChunkRetry.json, {
+    error: `Chunk upload digest mismatch for clientUploadId ${clientUploadId} chunkIndex 0.`,
+  });
+
+  const artifactStore = await getArtifactBlobStore({});
+  const indexStore = await getArtifactIndexBlobStore({});
+
   assert.deepEqual((await artifactStore.list({ prefix: `image/${requestId}/` })).blobs, []);
   assert.deepEqual((await indexStore.list({ prefix: `request-artifacts/${requestId}/` })).blobs, []);
 });
