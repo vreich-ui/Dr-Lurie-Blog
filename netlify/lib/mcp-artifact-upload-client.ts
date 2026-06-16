@@ -234,27 +234,36 @@ const defaultBinaryChunkUpload: BinaryChunkUpload = async ({
     throw new ArtifactIntegrityError('Artifact upload failed integrity verification: fetch is unavailable.');
   }
 
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      'content-type': 'application/octet-stream',
-      'x-upload-token': uploadToken,
-      'x-session-id': sessionId,
-      'x-chunk-index': String(chunkIndex),
-      'x-total-chunks': String(totalChunks),
-      'x-chunk-sha256': sha256Hex(bytes),
-    },
-    body: new Uint8Array(bytes),
-  });
-  const body = (await response.json()) as Record<string, unknown>;
+  const uploadWithMethod = async (method: 'PUT' | 'POST') => {
+    const response = await fetch(uploadUrl, {
+      method,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'x-upload-token': uploadToken,
+        'x-session-id': sessionId,
+        'x-chunk-index': String(chunkIndex),
+        'x-total-chunks': String(totalChunks),
+        'x-chunk-sha256': sha256Hex(bytes),
+      },
+      body: new Uint8Array(bytes),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
 
-  if (!response.ok) {
-    throw new ArtifactIntegrityError(
-      `Artifact upload failed integrity verification: ${typeof body.error === 'string' ? body.error : response.statusText}.`
-    );
+    if (!response.ok) {
+      throw new ArtifactIntegrityError(
+        `Artifact upload failed integrity verification: ${typeof body.error === 'string' ? body.error : response.statusText}.`
+      );
+    }
+
+    return body;
+  };
+
+  try {
+    return await uploadWithMethod('PUT');
+  } catch (error) {
+    if (error instanceof ArtifactIntegrityError) throw error;
+    return uploadWithMethod('POST');
   }
-
-  return body;
 };
 
 const uploadImageWithLegacyChunks = async ({
