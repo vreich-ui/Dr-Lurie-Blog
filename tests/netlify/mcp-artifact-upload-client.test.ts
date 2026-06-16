@@ -41,7 +41,6 @@ test('MCP image artifact upload integrity verification passes when local and ser
   const artifacts = await uploadImagesWithIntegrity({
     images: [createImage(bytes)],
     requestId: 'req-integrity-test',
-    chunkSizeBytes: 4096,
     mcpToolCall: async (name, args) => {
       calls.push({ name, args });
 
@@ -224,29 +223,29 @@ test('verified image blobKeys are not partially attached when image 2 of N fails
   assert.deepEqual(finalArticle.artifactReferences, []);
 });
 
-test('MCP image artifact chunk indexes are monotonic and deterministic with 4 KB chunks', async () => {
-  const bytes = Buffer.alloc(33 * 1024, 1);
+test('MCP image artifact chunk indexes are monotonic and deterministic with target-sized chunks', async () => {
+  const bytes = Buffer.alloc(800_000, 1);
   const indexes: unknown[] = [];
 
   await uploadImagesWithIntegrity({
     images: [createImage(bytes)],
     requestId: 'req-integrity-test',
-    chunkSizeBytes: 4096,
+    chunkSizeBytes: 256_000,
     mcpToolCall: async (name, args) => {
       if (name === 'create_upload_session') throw new Error('session unavailable');
       indexes.push(args.chunkIndex);
 
-      return args.chunkIndex === 8
+      return args.chunkIndex === 3
         ? { ok: true, complete: true, artifact: createArtifact({ bytes }) }
-        : { ok: true, complete: false, receivedChunks: Number(args.chunkIndex) + 1, totalChunks: 9 };
+        : { ok: true, complete: false, receivedChunks: Number(args.chunkIndex) + 1, totalChunks: 4 };
     },
   });
 
-  assert.deepEqual(indexes, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(indexes, [0, 1, 2, 3]);
 });
 
-test('MCP image artifact upload uses binary upload sessions above 3 KB', async () => {
-  const bytes = Buffer.alloc(4 * 1024, 3);
+test('MCP image artifact upload uses binary upload sessions above the single-shot guidance threshold', async () => {
+  const bytes = Buffer.alloc(800_000, 3);
   const calls: { name: string; args: Record<string, unknown> }[] = [];
   const uploadedChunks: Buffer[] = [];
 
@@ -261,7 +260,7 @@ test('MCP image artifact upload uses binary upload sessions above 3 KB', async (
           sessionId: 'session-1',
           uploadUrl: '/.netlify/functions/upload-session-chunk',
           uploadToken: 'token-1',
-          chunkSizeBytes: 16 * 1024,
+          chunkSizeBytes: 256_000,
           maxBytes: 50 * 1024 * 1024,
         };
       }
@@ -280,12 +279,12 @@ test('MCP image artifact upload uses binary upload sessions above 3 KB', async (
     calls.map((call) => call.name),
     ['create_upload_session', 'finalize_upload_session']
   );
-  assert.equal(uploadedChunks.length, 1);
+  assert.equal(uploadedChunks.length, 4);
   assert.equal(Buffer.concat(uploadedChunks).equals(bytes), true);
 });
 
 test('MCP image artifact upload retries POST when PUT fails with a proxy tunnel error', async () => {
-  const bytes = Buffer.alloc(4 * 1024, 5);
+  const bytes = Buffer.alloc(800_000, 5);
   const methods: string[] = [];
   const originalFetch = globalThis.fetch;
 
@@ -313,7 +312,7 @@ test('MCP image artifact upload retries POST when PUT fails with a proxy tunnel 
             sessionId: 'session-1',
             uploadUrl: '/.netlify/functions/upload-session-chunk',
             uploadToken: 'token-1',
-            chunkSizeBytes: 16 * 1024,
+            chunkSizeBytes: 1_000_000,
             maxBytes: 50 * 1024 * 1024,
           };
         }
@@ -330,13 +329,13 @@ test('MCP image artifact upload retries POST when PUT fails with a proxy tunnel 
 });
 
 test('MCP image artifact upload falls back to legacy chunks when upload sessions fail', async () => {
-  const bytes = Buffer.alloc(31 * 1024, 4);
+  const bytes = Buffer.alloc(800_000, 4);
   const calls: { name: string; args: Record<string, unknown> }[] = [];
 
   const artifacts = await uploadImagesWithIntegrity({
     images: [createImage(bytes)],
     requestId: 'req-integrity-test',
-    chunkSizeBytes: 16 * 1024,
+    chunkSizeBytes: 256_000,
     mcpToolCall: async (name, args) => {
       calls.push({ name, args });
 
@@ -344,33 +343,39 @@ test('MCP image artifact upload falls back to legacy chunks when upload sessions
         throw new Error('session unavailable');
       }
 
-      return args.chunkIndex === 1
+      return args.chunkIndex === 3
         ? { ok: true, complete: true, artifact: createArtifact({ bytes }) }
-        : { ok: true, complete: false, receivedChunks: 1, totalChunks: 2 };
+        : { ok: true, complete: false, receivedChunks: Number(args.chunkIndex) + 1, totalChunks: 4 };
     },
   });
 
   assert.equal(artifacts.length, 1);
   assert.deepEqual(
     calls.map((call) => call.name),
-    ['create_upload_session', 'save_artifact_chunk', 'save_artifact_chunk']
+    [
+      'create_upload_session',
+      'save_artifact_chunk',
+      'save_artifact_chunk',
+      'save_artifact_chunk',
+      'save_artifact_chunk',
+    ]
   );
 });
 
 test('MCP image artifact upload retries the final chunk when completion is delayed', async () => {
-  const bytes = Buffer.alloc(33 * 1024, 2);
+  const bytes = Buffer.alloc(800_000, 2);
   const indexes: unknown[] = [];
   let finalChunkCalls = 0;
 
   const artifacts = await uploadImagesWithIntegrity({
     images: [createImage(bytes)],
     requestId: 'req-integrity-test',
-    chunkSizeBytes: 4096,
+    chunkSizeBytes: 256_000,
     mcpToolCall: async (name, args) => {
       if (name === 'create_upload_session') throw new Error('session unavailable');
       indexes.push(args.chunkIndex);
 
-      if (args.chunkIndex === 8) {
+      if (args.chunkIndex === 3) {
         finalChunkCalls += 1;
       }
 
@@ -379,12 +384,12 @@ test('MCP image artifact upload retries the final chunk when completion is delay
         : {
             ok: true,
             complete: false,
-            receivedChunks: Math.min(Number(args.chunkIndex) + 1, 9),
-            totalChunks: 9,
+            receivedChunks: Math.min(Number(args.chunkIndex) + 1, 4),
+            totalChunks: 4,
           };
     },
   });
 
   assert.equal(artifacts.length, 1);
-  assert.deepEqual(indexes, [0, 1, 2, 3, 4, 5, 6, 7, 8, 8]);
+  assert.deepEqual(indexes, [0, 1, 2, 3, 3]);
 });
