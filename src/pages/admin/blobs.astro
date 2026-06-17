@@ -1,0 +1,1011 @@
+---
+import AdminNav from '~/components/admin/AdminNav.astro';
+import Layout from '~/layouts/PageLayout.astro';
+
+const pageTitle = 'Blob Store Manager';
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  <section
+    class="blobs-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14"
+    data-admin-shell
+    data-clerk-publishable-key={clerkPublishableKey}
+    hidden
+  >
+    <header class="blobs-header">
+      <div>
+        <p class="blobs-kicker">Admin workspace</p>
+        <h1>{pageTitle}</h1>
+        <p class="blobs-intro">
+          Search, inspect, edit, duplicate, rename, and delete objects across every Netlify Blobs store for this site.
+        </p>
+      </div>
+    </header>
+
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
+    <AdminNav />
+
+    <section class="blobs-shell" data-auth-gated hidden>
+      <div class="blobs-toolbar">
+        <label class="field">
+          <span class="field-label">Store</span>
+          <select id="store-select" class="control" aria-label="Blob store"></select>
+        </label>
+        <label class="field field-grow">
+          <span class="field-label">Search keys</span>
+          <input
+            id="search-input"
+            class="control"
+            type="search"
+            placeholder="Filter by key substring…"
+            autocomplete="off"
+          />
+        </label>
+        <div class="toolbar-actions">
+          <button id="refresh-blobs" class="btn-secondary" type="button">Refresh</button>
+          <button id="new-blob" class="btn-primary" type="button">New blob</button>
+        </div>
+      </div>
+
+      <p class="list-status" id="list-status" aria-live="polite" role="status"></p>
+
+      <div class="blobs-table-wrap" data-blobs-table-wrap hidden>
+        <table class="blobs-table">
+          <thead>
+            <tr>
+              <th scope="col">Key</th>
+              <th scope="col" class="col-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="blobs-table-body"></tbody>
+        </table>
+      </div>
+
+      <p class="blobs-empty" id="blobs-empty" hidden>No blobs match the current store and search.</p>
+
+      <div class="danger-zone">
+        <div>
+          <p class="danger-title">Destructive actions</p>
+          <p class="danger-note">
+            Wiping deletes objects permanently and cannot be undone. The "wipe all" action removes every object in every
+            store for this site.
+          </p>
+        </div>
+        <div class="danger-actions">
+          <button id="wipe-store" class="btn-danger" type="button">Wipe this store</button>
+          <button id="wipe-all" class="btn-danger btn-danger-strong" type="button">Wipe ALL stores</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Editor / viewer drawer -->
+    <div class="drawer" id="editor-drawer" data-auth-gated hidden>
+      <div class="drawer-backdrop" data-drawer-close></div>
+      <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+        <div class="drawer-head">
+          <h2 id="drawer-title">Blob</h2>
+          <button class="drawer-close" type="button" data-drawer-close aria-label="Close">✕</button>
+        </div>
+        <div class="drawer-body">
+          <label class="field">
+            <span class="field-label">Key</span>
+            <input id="editor-key" class="control" type="text" autocomplete="off" />
+          </label>
+          <label class="field">
+            <span class="field-label">Content type (optional metadata)</span>
+            <input
+              id="editor-content-type"
+              class="control"
+              type="text"
+              placeholder="e.g. text/plain"
+              autocomplete="off"
+            />
+          </label>
+          <p class="editor-meta" id="editor-meta"></p>
+          <div id="editor-text-wrap">
+            <label class="field">
+              <span class="field-label">Content</span>
+              <textarea id="editor-content" class="control control-area" rows="14" spellcheck="false"></textarea>
+            </label>
+          </div>
+          <div id="editor-binary-wrap" hidden>
+            <p class="editor-binary-note">
+              This object is binary or too large to edit inline. You can still rename, duplicate, or delete it, or
+              download a preview copy.
+            </p>
+            <a id="editor-download" class="btn-secondary" download>Download preview</a>
+          </div>
+          <p class="editor-status" id="editor-status" aria-live="polite" role="status"></p>
+        </div>
+        <div class="drawer-foot">
+          <button id="editor-save" class="btn-primary" type="button">Save</button>
+          <button class="btn-secondary" type="button" data-drawer-close>Cancel</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .blobs-page {
+    color: var(--aw-color-text-default);
+  }
+
+  .blobs-header {
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgb(229 231 235);
+  }
+
+  :global(.dark) .blobs-header {
+    border-color: rgb(30 41 59);
+  }
+
+  .blobs-kicker,
+  .field-label,
+  .danger-title {
+    color: var(--aw-color-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .blobs-kicker {
+    margin: 0 0 0.5rem;
+  }
+
+  .blobs-header h1 {
+    margin: 0;
+    font-family: var(--aw-font-heading, inherit);
+    font-weight: 800;
+    line-height: 1.05;
+    font-size: clamp(2.1rem, 6vw, 3.25rem);
+  }
+
+  .blobs-intro {
+    max-width: 46rem;
+    margin: 0.9rem 0 0;
+    color: var(--aw-color-text-muted);
+    font-size: 1.05rem;
+  }
+
+  .auth-status,
+  .list-status {
+    margin: 0 0 1.25rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .list-status.is-error,
+  .editor-status.is-error {
+    color: rgb(190 18 60);
+  }
+
+  .blobs-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+    margin-bottom: 1.25rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .field-grow {
+    flex: 1 1 18rem;
+  }
+
+  .control {
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.85rem;
+    padding: 0.6rem 0.8rem;
+    background: rgb(255 255 255 / 0.92);
+    color: var(--aw-color-text-default);
+    font-size: 0.95rem;
+    min-width: 12rem;
+  }
+
+  .control-area {
+    width: 100%;
+    min-width: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    resize: vertical;
+  }
+
+  :global(.dark) .control {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42 / 0.7);
+  }
+
+  .toolbar-actions {
+    display: flex;
+    gap: 0.6rem;
+    margin-left: auto;
+  }
+
+  .blobs-table-wrap {
+    overflow-x: auto;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.1rem;
+    background: rgb(255 255 255 / 0.86);
+  }
+
+  :global(.dark) .blobs-table-wrap {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.7);
+  }
+
+  .blobs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+
+  .blobs-table th,
+  .blobs-table td {
+    padding: 0.7rem 0.9rem;
+    text-align: left;
+    border-bottom: 1px solid rgb(229 231 235);
+    vertical-align: middle;
+  }
+
+  :global(.dark) .blobs-table th,
+  :global(.dark) .blobs-table td {
+    border-color: rgb(30 41 59);
+  }
+
+  .blobs-table th {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--aw-color-text-muted);
+  }
+
+  .blobs-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .blob-key {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    word-break: break-all;
+  }
+
+  .col-actions {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  .row-actions {
+    display: flex;
+    gap: 0.4rem;
+    white-space: nowrap;
+  }
+
+  .row-btn {
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.6rem;
+    padding: 0.32rem 0.6rem;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      border-color 160ms ease,
+      color 160ms ease,
+      background-color 160ms ease;
+  }
+
+  .row-btn:hover {
+    border-color: rgb(94 140 138 / 50%);
+    color: var(--aw-color-text-heading);
+    background: rgb(94 140 138 / 10%);
+  }
+
+  .row-btn.is-danger:hover {
+    border-color: rgb(190 18 60 / 55%);
+    color: rgb(190 18 60);
+    background: rgb(190 18 60 / 8%);
+  }
+
+  :global(.dark) .row-btn {
+    border-color: rgb(51 65 85);
+  }
+
+  .blobs-empty {
+    margin: 1.25rem 0;
+    color: var(--aw-color-text-muted);
+    font-weight: 700;
+  }
+
+  .danger-zone {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding: 1.25rem;
+    border: 1px solid rgb(190 18 60 / 35%);
+    border-radius: 1.1rem;
+    background: rgb(190 18 60 / 5%);
+  }
+
+  .danger-title {
+    margin: 0 0 0.35rem;
+    color: rgb(190 18 60);
+  }
+
+  .danger-note {
+    margin: 0;
+    max-width: 38rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .danger-actions {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  .btn-danger {
+    border: 1px solid rgb(190 18 60 / 55%);
+    border-radius: 0.85rem;
+    padding: 0.55rem 1rem;
+    background: rgb(255 255 255 / 0.9);
+    color: rgb(190 18 60);
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .btn-danger:hover {
+    background: rgb(190 18 60 / 10%);
+  }
+
+  .btn-danger-strong {
+    background: rgb(190 18 60);
+    color: #fff;
+  }
+
+  .btn-danger-strong:hover {
+    background: rgb(159 18 57);
+  }
+
+  :global(.dark) .btn-danger {
+    background: rgb(15 23 42 / 0.6);
+  }
+
+  /* Drawer */
+  .drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .drawer[hidden] {
+    display: none;
+  }
+
+  .drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(15 23 42 / 0.55);
+  }
+
+  .drawer-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: min(620px, 100%);
+    height: 100%;
+    background: var(--aw-color-bg-page, #fff);
+    box-shadow: -20px 0 60px rgb(15 23 42 / 0.25);
+  }
+
+  :global(.dark) .drawer-panel {
+    background: rgb(15 23 42);
+  }
+
+  .drawer-head,
+  .drawer-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+
+  .drawer-head {
+    justify-content: space-between;
+    border-bottom: 1px solid rgb(229 231 235);
+  }
+
+  .drawer-foot {
+    border-top: 1px solid rgb(229 231 235);
+  }
+
+  :global(.dark) .drawer-head,
+  :global(.dark) .drawer-foot {
+    border-color: rgb(30 41 59);
+  }
+
+  .drawer-head h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+  }
+
+  .drawer-close {
+    border: none;
+    background: transparent;
+    font-size: 1.1rem;
+    cursor: pointer;
+    color: var(--aw-color-text-muted);
+  }
+
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .editor-meta,
+  .editor-binary-note {
+    margin: 0;
+    color: var(--aw-color-text-muted);
+    font-size: 0.85rem;
+  }
+
+  .editor-status {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+  }
+
+  @media (max-width: 767px) {
+    .toolbar-actions {
+      margin-left: 0;
+      width: 100%;
+    }
+
+    .danger-zone {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .danger-actions {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  import { loadClerk } from '~/utils/clerkLoader';
+
+  (() => {
+    const initializeBlobManagerPage = () => {
+      const pageRoot = document.querySelector('.blobs-page');
+      if (!pageRoot || pageRoot.dataset.blobManagerInitialized === 'true') return;
+      pageRoot.dataset.blobManagerInitialized = 'true';
+
+      const adminPage = pageRoot;
+      const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
+      const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+      const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+      const authStatus = document.querySelector('[data-auth-status]');
+
+      const storeSelect = document.querySelector('#store-select');
+      const searchInput = document.querySelector('#search-input');
+      const refreshButton = document.querySelector('#refresh-blobs');
+      const newBlobButton = document.querySelector('#new-blob');
+      const listStatus = document.querySelector('#list-status');
+      const tableWrap = document.querySelector('[data-blobs-table-wrap]');
+      const tableBody = document.querySelector('#blobs-table-body');
+      const emptyState = document.querySelector('#blobs-empty');
+      const wipeStoreButton = document.querySelector('#wipe-store');
+      const wipeAllButton = document.querySelector('#wipe-all');
+
+      const drawer = document.querySelector('#editor-drawer');
+      const drawerTitle = document.querySelector('#drawer-title');
+      const editorKey = document.querySelector('#editor-key');
+      const editorContentType = document.querySelector('#editor-content-type');
+      const editorMeta = document.querySelector('#editor-meta');
+      const editorTextWrap = document.querySelector('#editor-text-wrap');
+      const editorContent = document.querySelector('#editor-content');
+      const editorBinaryWrap = document.querySelector('#editor-binary-wrap');
+      const editorDownload = document.querySelector('#editor-download');
+      const editorStatus = document.querySelector('#editor-status');
+      const editorSave = document.querySelector('#editor-save');
+
+      let clerkLoadPromise;
+      let activeToken = '';
+      let searchTimer;
+      // Editor mode: 'create' for a brand-new blob, or 'edit' for an existing key.
+      let editorMode = 'create';
+      let editorEncoding = 'text';
+      let managerStarted = false;
+
+      const setGatedContentVisible = (visible) => {
+        gatedContent.forEach((element) => {
+          if (element === drawer) return; // drawer visibility is controlled separately
+          element.hidden = !visible;
+        });
+      };
+
+      const getClerk = async () => {
+        if (!clerkPublishableKey) {
+          throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+        }
+
+        clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
+
+        return clerkLoadPromise;
+      };
+
+      const setAdminShellVisible = (visible) => {
+        if (adminPage) adminPage.hidden = !visible;
+      };
+
+      const redirectToHome = () => {
+        window.location.replace('/');
+      };
+
+      const authStatusMessages = {
+        checking: 'Checking admin access…',
+        'signed-out': 'Sign in to view admin tools.',
+        forbidden: 'Access denied (not an admin).',
+        error: 'Admin auth failed. Please refresh or contact support.',
+        'signed-in': '',
+      };
+
+      const setAuthStatus = (message) => {
+        if (authStatus) authStatus.textContent = message;
+      };
+
+      const setListStatus = (message, isError = false) => {
+        if (!listStatus) return;
+        listStatus.textContent = message;
+        listStatus.classList.toggle('is-error', isError);
+      };
+
+      const setEditorStatus = (message, isError = false) => {
+        if (!editorStatus) return;
+        editorStatus.textContent = message;
+        editorStatus.classList.toggle('is-error', isError);
+      };
+
+      const setAuthState = (state) => {
+        const isSignedIn = state === 'signed-in';
+        setAuthStatus(authStatusMessages[state] || '');
+        setAdminShellVisible(isSignedIn);
+        setGatedContentVisible(isSignedIn);
+
+        if (!isSignedIn && state !== 'checking') redirectToHome();
+      };
+
+      const escapeHtml = (value) =>
+        String(value || '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+
+      const formatBytes = (bytes) => {
+        if (!Number.isFinite(bytes)) return '';
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+      };
+
+      const getAdminStateForClerk = async (clerk) => {
+        if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+
+        const token = await clerk.session.getToken();
+        if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+
+        activeToken = token;
+
+        const response = await fetch('/.netlify/functions/admin-auth-state', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+      };
+
+      // All blob operations route through this single endpoint with the action in the body.
+      const callApi = async (action, payload = {}) => {
+        if (!activeToken) throw new Error('Missing admin session token.');
+
+        const response = await fetch('/.netlify/functions/admin-blob-manager', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${activeToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, ...payload }),
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.ok === false) {
+          throw new Error(result.error || `Request failed (${response.status}).`);
+        }
+
+        return result;
+      };
+
+      const getActiveStore = () => storeSelect?.value || '';
+
+      const renderBlobs = (keys) => {
+        const hasKeys = keys.length > 0;
+        if (tableWrap) tableWrap.hidden = !hasKeys;
+        if (emptyState) emptyState.hidden = hasKeys;
+        if (!tableBody) return;
+
+        tableBody.innerHTML = keys
+          .map((key) => {
+            const safeKey = escapeHtml(key);
+            const attrKey = encodeURIComponent(key);
+            return `
+              <tr data-key="${attrKey}">
+                <td class="blob-key">${safeKey}</td>
+                <td class="col-actions">
+                  <div class="row-actions">
+                    <button class="row-btn" type="button" data-action="view">View</button>
+                    <button class="row-btn" type="button" data-action="duplicate">Duplicate</button>
+                    <button class="row-btn" type="button" data-action="rename">Rename</button>
+                    <button class="row-btn is-danger" type="button" data-action="delete">Delete</button>
+                  </div>
+                </td>
+              </tr>`;
+          })
+          .join('');
+      };
+
+      const loadStores = async () => {
+        const result = await callApi('list-stores');
+        const stores = Array.isArray(result.stores) ? result.stores : [];
+
+        if (storeSelect) {
+          const previous = storeSelect.value;
+          storeSelect.innerHTML = stores
+            .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+            .join('');
+          if (stores.includes(previous)) storeSelect.value = previous;
+        }
+
+        return stores;
+      };
+
+      const loadBlobs = async () => {
+        const store = getActiveStore();
+        if (!store) {
+          setListStatus('No blob stores exist for this site yet.');
+          renderBlobs([]);
+          return;
+        }
+
+        setListStatus('Loading objects…');
+        if (refreshButton) refreshButton.disabled = true;
+
+        try {
+          const result = await callApi('list-blobs', { store, search: searchInput?.value?.trim() || '' });
+          const keys = Array.isArray(result.keys) ? result.keys : [];
+          renderBlobs(keys);
+          const truncatedNote = result.truncated ? ' (showing first 10,000)' : '';
+          setListStatus(`${result.count} object${result.count === 1 ? '' : 's'} in “${store}”${truncatedNote}.`);
+        } catch (error) {
+          setListStatus(error.message || 'Objects could not be loaded.', true);
+          renderBlobs([]);
+        } finally {
+          if (refreshButton) refreshButton.disabled = false;
+        }
+      };
+
+      const closeDrawer = () => {
+        if (drawer) drawer.hidden = true;
+      };
+
+      const openEditorForCreate = () => {
+        editorMode = 'create';
+        editorEncoding = 'text';
+        if (drawerTitle) drawerTitle.textContent = 'New blob';
+        if (editorKey) {
+          editorKey.value = '';
+          editorKey.readOnly = false;
+        }
+        if (editorContentType) editorContentType.value = '';
+        if (editorContent) editorContent.value = '';
+        if (editorMeta) editorMeta.textContent = `Creating in store “${getActiveStore()}”.`;
+        if (editorTextWrap) editorTextWrap.hidden = false;
+        if (editorBinaryWrap) editorBinaryWrap.hidden = true;
+        setEditorStatus('');
+        if (drawer) drawer.hidden = false;
+        editorKey?.focus();
+      };
+
+      const openEditorForKey = async (key) => {
+        const store = getActiveStore();
+        editorMode = 'edit';
+        if (drawerTitle) drawerTitle.textContent = 'Edit blob';
+        if (editorKey) {
+          editorKey.value = key;
+          editorKey.readOnly = true;
+        }
+        if (editorContentType) editorContentType.value = '';
+        if (editorContent) editorContent.value = '';
+        if (editorMeta) editorMeta.textContent = 'Loading…';
+        if (editorTextWrap) editorTextWrap.hidden = true;
+        if (editorBinaryWrap) editorBinaryWrap.hidden = true;
+        setEditorStatus('');
+        if (drawer) drawer.hidden = false;
+
+        try {
+          const result = await callApi('get-blob', { store, key });
+          editorEncoding = result.encoding || 'text';
+          const meta = result.metadata && typeof result.metadata === 'object' ? result.metadata : {};
+          const declaredType = meta.contentType || meta['content-type'] || result.contentType || '';
+          if (editorContentType) editorContentType.value = declaredType;
+          if (editorMeta) editorMeta.textContent = `${formatBytes(result.size)} • ${declaredType || 'unknown type'}`;
+
+          if (result.encoding === 'text' && !result.truncated) {
+            if (editorTextWrap) editorTextWrap.hidden = false;
+            if (editorBinaryWrap) editorBinaryWrap.hidden = true;
+            if (editorContent) editorContent.value = result.content || '';
+          } else {
+            // Binary or oversized: offer a download preview instead of inline editing.
+            if (editorTextWrap) editorTextWrap.hidden = true;
+            if (editorBinaryWrap) editorBinaryWrap.hidden = false;
+            if (editorDownload) {
+              if (result.encoding === 'base64' && result.content) {
+                editorDownload.href = `data:${declaredType || 'application/octet-stream'};base64,${result.content}`;
+                editorDownload.hidden = false;
+                editorDownload.setAttribute('download', key.split('/').pop() || 'blob');
+              } else {
+                editorDownload.hidden = true;
+              }
+            }
+          }
+        } catch (error) {
+          setEditorStatus(error.message || 'Blob could not be loaded.', true);
+        }
+      };
+
+      const saveBlob = async () => {
+        const store = getActiveStore();
+        const key = editorKey?.value?.trim();
+        if (!key) {
+          setEditorStatus('A key is required.', true);
+          return;
+        }
+
+        if (editorMode === 'edit' && editorEncoding !== 'text') {
+          setEditorStatus('Binary blobs cannot be edited inline.', true);
+          return;
+        }
+
+        editorSave.disabled = true;
+        setEditorStatus('Saving…');
+
+        try {
+          await callApi('set-blob', {
+            store,
+            key,
+            encoding: 'text',
+            content: editorContent?.value ?? '',
+            contentType: editorContentType?.value?.trim() || '',
+          });
+          setEditorStatus('Saved.');
+          closeDrawer();
+          await loadBlobs();
+        } catch (error) {
+          setEditorStatus(error.message || 'Blob could not be saved.', true);
+        } finally {
+          editorSave.disabled = false;
+        }
+      };
+
+      const duplicateBlob = async (key) => {
+        const store = getActiveStore();
+        const suggestion = `${key}-copy`;
+        const targetKey = window.prompt(`Duplicate “${key}” to a new key:`, suggestion);
+        if (!targetKey || targetKey.trim() === key) return;
+
+        setListStatus('Duplicating…');
+        try {
+          await callApi('duplicate-blob', { store, key, targetKey: targetKey.trim() });
+          await loadBlobs();
+        } catch (error) {
+          setListStatus(error.message || 'Blob could not be duplicated.', true);
+        }
+      };
+
+      const renameBlob = async (key) => {
+        const store = getActiveStore();
+        const targetKey = window.prompt(`Rename “${key}” to:`, key);
+        if (!targetKey || targetKey.trim() === key) return;
+
+        setListStatus('Renaming…');
+        try {
+          await callApi('rename-blob', { store, key, targetKey: targetKey.trim() });
+          await loadBlobs();
+        } catch (error) {
+          setListStatus(error.message || 'Blob could not be renamed.', true);
+        }
+      };
+
+      const deleteBlob = async (key) => {
+        const store = getActiveStore();
+        if (!window.confirm(`Delete “${key}” from “${store}”? This cannot be undone.`)) return;
+
+        setListStatus('Deleting…');
+        try {
+          await callApi('delete-blob', { store, key });
+          await loadBlobs();
+        } catch (error) {
+          setListStatus(error.message || 'Blob could not be deleted.', true);
+        }
+      };
+
+      const wipeStore = async () => {
+        const store = getActiveStore();
+        if (!store) return;
+        if (!window.confirm(`Delete EVERY object in “${store}”? This cannot be undone.`)) return;
+
+        setListStatus('Wiping store…');
+        wipeStoreButton.disabled = true;
+        try {
+          const result = await callApi('wipe-store', { store });
+          await loadBlobs();
+          setListStatus(`Wiped ${result.deleted} object${result.deleted === 1 ? '' : 's'} from “${store}”.`);
+        } catch (error) {
+          setListStatus(error.message || 'Store could not be wiped.', true);
+        } finally {
+          wipeStoreButton.disabled = false;
+        }
+      };
+
+      const wipeAll = async () => {
+        if (!window.confirm('Delete EVERY object in EVERY store for this site? This cannot be undone.')) return;
+        const phrase = window.prompt('Type WIPE ALL to confirm deleting every object in every store:');
+        if (phrase !== 'WIPE ALL') {
+          setListStatus('Wipe-all cancelled (confirmation phrase did not match).');
+          return;
+        }
+
+        setListStatus('Wiping all stores…');
+        wipeAllButton.disabled = true;
+        try {
+          const result = await callApi('wipe-all', { confirm: 'WIPE ALL' });
+          await loadBlobs();
+          setListStatus(
+            `Wiped ${result.totalDeleted} object${result.totalDeleted === 1 ? '' : 's'} across ${result.stores?.length ?? 0} store(s).`
+          );
+        } catch (error) {
+          setListStatus(error.message || 'Stores could not be wiped.', true);
+        } finally {
+          wipeAllButton.disabled = false;
+        }
+      };
+
+      const onTableClick = (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const row = button.closest('tr[data-key]');
+        if (!row) return;
+        const key = decodeURIComponent(row.dataset.key);
+        const action = button.dataset.action;
+
+        if (action === 'view') openEditorForKey(key);
+        else if (action === 'duplicate') duplicateBlob(key);
+        else if (action === 'rename') renameBlob(key);
+        else if (action === 'delete') deleteBlob(key);
+      };
+
+      const bindEvents = () => {
+        storeSelect?.addEventListener('change', () => loadBlobs());
+        refreshButton?.addEventListener('click', () => loadBlobs());
+        newBlobButton?.addEventListener('click', () => openEditorForCreate());
+        searchInput?.addEventListener('input', () => {
+          window.clearTimeout(searchTimer);
+          searchTimer = window.setTimeout(() => loadBlobs(), 250);
+        });
+        tableBody?.addEventListener('click', onTableClick);
+        wipeStoreButton?.addEventListener('click', () => wipeStore());
+        wipeAllButton?.addEventListener('click', () => wipeAll());
+        editorSave?.addEventListener('click', () => saveBlob());
+        drawer?.querySelectorAll('[data-drawer-close]')?.forEach((el) => el.addEventListener('click', closeDrawer));
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && drawer && !drawer.hidden) closeDrawer();
+        });
+      };
+
+      const startManager = async () => {
+        try {
+          await loadStores();
+          await loadBlobs();
+        } catch (error) {
+          setListStatus(error.message || 'Blob stores could not be loaded.', true);
+        }
+      };
+
+      const renderAuthState = async (clerk) => {
+        const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+
+        if (signedIn) {
+          const adminState = await getAdminStateForClerk(clerk);
+
+          if (adminState.isAdmin) {
+            setAuthState('signed-in');
+            if (!managerStarted) {
+              managerStarted = true;
+              await startManager();
+            }
+            return;
+          }
+
+          setAuthState('forbidden');
+          return;
+        }
+
+        setAuthState('signed-out');
+      };
+
+      const initializeClerkAuth = async () => {
+        setAuthState('checking');
+
+        try {
+          const clerk = await getClerk();
+          await renderAuthState(clerk);
+
+          if (typeof clerk.addListener === 'function') {
+            clerk.addListener(() => {
+              renderAuthState(clerk).catch((error) => {
+                console.error('Clerk authentication refresh failed.', error);
+              });
+            });
+          }
+        } catch (error) {
+          console.error('Clerk authentication initialization failed.', error);
+          setAuthState('error');
+        }
+      };
+
+      bindEvents();
+      initializeClerkAuth();
+    };
+
+    if (!window.__drLurieBlobManagerPageLoadListener) {
+      window.__drLurieBlobManagerPageLoadListener = true;
+      document.addEventListener('astro:page-load', initializeBlobManagerPage);
+    }
+
+    initializeBlobManagerPage();
+  })();
+</script>
