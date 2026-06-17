@@ -1038,6 +1038,29 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'probe_artifact_chunk_size',
+    description: 'Dev/admin-only diagnostic tool to test candidate raw chunk sizes for save_artifact_chunk. Detects transport truncation by comparing decoded payload to expectedChunkRawBytes.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id.'),
+        clientUploadId: stringSchema('Stable UUID for the chunked upload session.'),
+        chunkIndex: intSchema('Zero-based chunk index.'),
+        totalChunks: intSchema('Total chunks.'),
+        payload: stringSchema('Chunk bytes as base64.'),
+        expectedChunkRawBytes: intSchema('Expected raw byte length of THIS chunk after base64 decoding.'),
+        artifactKind: artifactKindJsonSchema(),
+        contentType: stringSchema(),
+        filename: { ...stringSchema(), optional: true },
+        expectedSizeBytes: expectedSizeBytesJsonSchema,
+        expectedSha256: expectedSha256JsonSchema,
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['requestId', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload', 'expectedChunkRawBytes', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+    ),
+  },
+  {
     name: 'save_artifact_create_upload_session',
     description: `Create a short-lived artifact upload session for larger binary assets without sending bytes through MCP. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Use for artifacts larger than about 30 KB and up to ${UPLOAD_SESSION_MAX_BYTES} bytes. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
     inputSchema: uploadSessionCreateInputSchema(),
@@ -2674,6 +2697,68 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         tags: input.tags,
         metadata: input.metadata,
       });
+    case 'probe_artifact_chunk_size': {
+      const payloadBase64 = toNonEmptyString(input.payload) || '';
+      const expectedChunkRawBytes = Number(input.expectedChunkRawBytes);
+      let decoded: Buffer;
+      try {
+        decoded = Buffer.from(payloadBase64, 'base64');
+      } catch (error: any) {
+        return toolError('base64_decode_failure', { error: error.message });
+      }
+
+      if (decoded.length < expectedChunkRawBytes) {
+        return toolError('transport_truncation', {
+          reason: 'received_less_than_expected',
+          expected: expectedChunkRawBytes,
+          received: decoded.length,
+          payloadChars: payloadBase64.length,
+        });
+      }
+
+      const result = await invokeSaveArtifact(event, {
+        requestId: input.requestId,
+        artifactKind: input.artifactKind,
+        contentType: input.contentType,
+        filename: input.filename,
+        clientUploadId: input.clientUploadId,
+        chunkIndex: input.chunkIndex,
+        totalChunks: input.totalChunks,
+        encoding: 'base64',
+        expectedSizeBytes: input.expectedSizeBytes,
+        expectedSha256: input.expectedSha256,
+        payload: input.payload,
+        label: input.label,
+        tags: input.tags,
+        metadata: input.metadata,
+      });
+
+      if ('isError' in result) {
+        const structuredContent = result.structuredContent as Record<string, unknown>;
+        const message = String(structuredContent?.error || result.content?.[0]?.text || 'unknown_error');
+        let failureType = 'unknown_error';
+
+        if (message.includes('Artifact size mismatch')) failureType = 'expected_size_mismatch';
+        else if (message.includes('Artifact sha256 mismatch')) failureType = 'expected_sha_mismatch';
+        else if (message.includes('Invalid artifact upload input')) failureType = 'schema_validation_failure';
+        else if (message.includes('Chunk upload digest mismatch')) failureType = 'chunk_digest_mismatch';
+
+        return toolError(message, {
+          failureType,
+          ...structuredContent,
+          probe: { transportOk: true, receivedChunkRawBytes: decoded.length },
+        });
+      }
+
+      return toolResult({
+        ...result,
+        probe: {
+          status: 'success',
+          transportOk: true,
+          receivedChunkRawBytes: decoded.length,
+        },
+      });
+    }
     case 'save_artifact_chunk':
       return callArtifactUpload(event, {
         requestId: input.requestId,

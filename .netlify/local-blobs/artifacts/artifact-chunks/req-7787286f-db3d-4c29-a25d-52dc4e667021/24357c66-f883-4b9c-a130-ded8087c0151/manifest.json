@@ -1,0 +1,20 @@
+{
+  "requestId": "req-7787286f-db3d-4c29-a25d-52dc4e667021",
+  "clientUploadId": "24357c66-f883-4b9c-a130-ded8087c0151",
+  "totalChunks": 1,
+  "artifactKind": "data",
+  "contentType": "application/octet-stream",
+  "label": "probe-pass-test",
+  "expectedSizeBytes": 19,
+  "expectedSha256": "bf6b93a3ebf02fd453401ce064e13e689a1e4f734cfc259b411dbb455b29b6f5",
+  "receivedChunkIndexes": [
+    0
+  ],
+  "chunkDigests": {
+    "0": {
+      "sizeBytes": 19,
+      "sha256": "bf6b93a3ebf02fd453401ce064e13e689a1e4f734cfc259b411dbb455b29b6f5"
+    }
+  },
+  "updatedAtISO": "2026-06-17T11:21:14.142Z"
+}
