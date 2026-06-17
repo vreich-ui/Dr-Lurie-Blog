@@ -87,7 +87,7 @@ Artifact tools are registered by the production Netlify `/mcp` entry point. They
 
 ### `save_artifact`
 
-Single-shot byte upload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes, then store only the returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes the final artifact blob and a request artifact index entry.
+Single-shot byte upload. Agents must store only returned `ArtifactReference` objects; never invent deterministic `blobKey` values, URLs, or repo paths. While available for compatibility or non-agent use, `save_artifact_chunk` is now the primary method for agent-driven uploads. Writes the final artifact blob and a request artifact index entry.
 
 Required fields:
 
@@ -108,11 +108,11 @@ Optional fields:
 - `localSha256: string` - accepted legacy alias for `expectedSha256`.
 - `metadata: object` - saved in the returned `ArtifactReference`.
 
-Success returns the same shape as the upload function: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist for the checksum, `deduped: true` is a successful response and bytes are not rewritten. Finalization also writes compact artifact-index pointers under `by-kind/{artifactKind}/{sha256}.json`, `by-request/{requestId}/{artifactKind}/{sha256}.json`, and `by-tag/{tag}/{sha256}.json` when tags are present.
+Success returns: `ok`, `complete: true`, `deduped`, and `artifact`. If bytes already exist, `deduped: true` is returned and bytes are not rewritten. Writes artifact-index pointers.
 
 ### `save_artifact_chunk`
 
-Chunked byte upload. Agents must call this immediately for large created artifacts, then store only the final returned `ArtifactReference`; never invent deterministic `blobKey` values, URLs, or repo paths. Writes one chunk blob to the upload session. When all chunks exist, the server assembles the final artifact blob and writes the request artifact index.
+Chunked byte upload. **This is the primary and only default upload path for all publisher-agent artifacts.** Agents must call this immediately for created artifacts, splitting the payload into raw chunks (default 48 KiB). Store only the final returned `ArtifactReference`.
 
 Required fields:
 
@@ -122,15 +122,15 @@ Required fields:
 - `clientUploadId: string` - stable UUID shared by every chunk in this upload.
 - `chunkIndex: integer` - zero-based chunk index.
 - `totalChunks: integer` - total chunks in the upload.
-- `payload: string` - chunk bytes, base64 by default.
+- `payload: string` - chunk bytes as base64.
 
-Optional fields: `filename`, `label`, `tags`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata` match `save_artifact`.
+Optional fields: `filename`, `label`, `tags`, `encoding`, `expectedSizeBytes`, `expectedSha256`, `localSizeBytes`, `localSha256`, and `metadata`.
 
-Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is safe; checksum dedup returns success and does not rewrite final bytes.
+Success returns `complete: false` until all chunks are present. The final chunk returns `complete: true`, `deduped`, and `artifact`. Re-sending chunks or re-finalizing is idempotent; checksum dedup returns success and does not rewrite final bytes.
 
 ### `create_upload_session`
 
-Creates a short-lived upload session for larger binary artifacts without placing artifact bytes in MCP JSON payloads. Use this path for artifacts larger than about 30 KB and up to 50 MB, especially PDFs and other binary assets.
+Creates a short-lived upload session for larger binary artifacts. **This is optional and separate from the default publisher-agent path.** Use for non-agent or app-facing paths where binary chunking is preferred over base64 tool calls.
 
 Required fields:
 

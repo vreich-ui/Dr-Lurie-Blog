@@ -88,7 +88,7 @@ const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
 const WIPE_BLOB_SAMPLE_LIMIT = 20;
 const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
-const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
+const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 48 * 1024;
 
 const jsonHeaders = {
   'Access-Control-Allow-Headers':
@@ -500,7 +500,7 @@ const publishPayloadJsonSchema = objectSchema(
     ),
     artifactReferences: arraySchema(
       {},
-      'ArtifactReference objects returned by save_artifact or save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
+      'ArtifactReference objects returned by save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
     ),
     overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
     draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
@@ -975,7 +975,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     : []),
   {
     name: 'save_artifact',
-    description: `Single-shot byte upload and preferred/default artifact path. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Prefer this tool for normal web images and artifacts up to ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} raw bytes; 50-150 KB JPEG/PNG images should be uploaded in one call, not chunked. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
+    description: `Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. While available for compatibility or non-agent use, save_artifact_chunk is now the primary method for agent-driven uploads. Writes final artifact bytes and an index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1002,7 +1002,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_artifact_chunk',
-    description: `Chunked byte upload fallback for artifacts too large for one MCP tool call. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Do not use this for ordinary 50-150 KB generated web images; call save_artifact once instead. Use chunks only after a single-shot upload is rejected by client/tool payload limits or when the raw artifact is larger than ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} bytes. When chunking is necessary, use the largest safe chunks the client accepts, targeting about ${CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES} raw bytes per chunk rather than many tiny chunks. Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.`,
+    description: `Chunked byte upload. This is the primary and only default upload path for all publisher-agent artifacts. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Agents must call this immediately for created artifacts, splitting the payload into raw chunks (default 48 KiB). Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete:false until finalization; dedup is idempotent success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1038,13 +1038,36 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'probe_artifact_chunk_size',
+    description: 'Dev/admin-only diagnostic tool to test candidate raw chunk sizes for save_artifact_chunk. Detects transport truncation by comparing decoded payload to expectedChunkRawBytes.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id.'),
+        clientUploadId: stringSchema('Stable UUID for the chunked upload session.'),
+        chunkIndex: intSchema('Zero-based chunk index.'),
+        totalChunks: intSchema('Total chunks.'),
+        payload: stringSchema('Chunk bytes as base64.'),
+        expectedChunkRawBytes: intSchema('Expected raw byte length of THIS chunk after base64 decoding.'),
+        artifactKind: artifactKindJsonSchema(),
+        contentType: stringSchema(),
+        filename: { ...stringSchema(), optional: true },
+        expectedSizeBytes: expectedSizeBytesJsonSchema,
+        expectedSha256: expectedSha256JsonSchema,
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['requestId', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload', 'expectedChunkRawBytes', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+    ),
+  },
+  {
     name: 'save_artifact_create_upload_session',
-    description: `Create a short-lived artifact upload session for larger binary assets without sending bytes through MCP. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Use for artifacts larger than about 30 KB and up to ${UPLOAD_SESSION_MAX_BYTES} bytes. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
+    description: `Create a short-lived artifact upload session. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
     inputSchema: uploadSessionCreateInputSchema(),
   },
   {
     name: 'create_upload_session',
-    description: `Create a short-lived artifact upload session. Alias of save_artifact_create_upload_session with output fields sessionId, uploadUrl, uploadToken, chunkSizeBytes, maxBytes, and totalChunks. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call finalize_upload_session.`,
+    description: `Create a short-lived artifact upload session. Alias of save_artifact_create_upload_session. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call finalize_upload_session.`,
     inputSchema: uploadSessionCreateInputSchema(),
   },
   {
@@ -2674,6 +2697,68 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         tags: input.tags,
         metadata: input.metadata,
       });
+    case 'probe_artifact_chunk_size': {
+      const payloadBase64 = toNonEmptyString(input.payload) || '';
+      const expectedChunkRawBytes = Number(input.expectedChunkRawBytes);
+      let decoded: Buffer;
+      try {
+        decoded = Buffer.from(payloadBase64, 'base64');
+      } catch (error: any) {
+        return toolError('base64_decode_failure', { error: error.message });
+      }
+
+      if (decoded.length < expectedChunkRawBytes) {
+        return toolError('transport_truncation', {
+          reason: 'received_less_than_expected',
+          expected: expectedChunkRawBytes,
+          received: decoded.length,
+          payloadChars: payloadBase64.length,
+        });
+      }
+
+      const result = await invokeSaveArtifact(event, {
+        requestId: input.requestId,
+        artifactKind: input.artifactKind,
+        contentType: input.contentType,
+        filename: input.filename,
+        clientUploadId: input.clientUploadId,
+        chunkIndex: input.chunkIndex,
+        totalChunks: input.totalChunks,
+        encoding: 'base64',
+        expectedSizeBytes: input.expectedSizeBytes,
+        expectedSha256: input.expectedSha256,
+        payload: input.payload,
+        label: input.label,
+        tags: input.tags,
+        metadata: input.metadata,
+      });
+
+      if ('isError' in result) {
+        const structuredContent = result.structuredContent as Record<string, unknown>;
+        const message = String(structuredContent?.error || result.content?.[0]?.text || 'unknown_error');
+        let failureType = 'unknown_error';
+
+        if (message.includes('Artifact size mismatch')) failureType = 'expected_size_mismatch';
+        else if (message.includes('Artifact sha256 mismatch')) failureType = 'expected_sha_mismatch';
+        else if (message.includes('Invalid artifact upload input')) failureType = 'schema_validation_failure';
+        else if (message.includes('Chunk upload digest mismatch')) failureType = 'chunk_digest_mismatch';
+
+        return toolError(message, {
+          failureType,
+          ...structuredContent,
+          probe: { transportOk: true, receivedChunkRawBytes: decoded.length },
+        });
+      }
+
+      return toolResult({
+        ...result,
+        probe: {
+          status: 'success',
+          transportOk: true,
+          receivedChunkRawBytes: decoded.length,
+        },
+      });
+    }
     case 'save_artifact_chunk':
       return callArtifactUpload(event, {
         requestId: input.requestId,

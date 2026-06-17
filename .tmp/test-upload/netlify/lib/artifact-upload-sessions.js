@@ -95,12 +95,15 @@ const toArrayBufferBuffer = (value) => {
 };
 export const getUploadSessionBaseUrl = (event) => {
     const relativeUrl = '/.netlify/functions/upload-session-chunk';
-    if (!event || !event.headers)
+    if (!event || typeof event !== 'object' || !('headers' in event))
         return relativeUrl;
-    const host = event.headers.host || event.headers.Host;
+    const headers = event.headers;
+    if (!headers)
+        return relativeUrl;
+    const host = headers.host || headers.Host;
     if (!host)
         return relativeUrl;
-    const proto = event.headers['x-forwarded-proto'] || 'https';
+    const proto = headers['x-forwarded-proto'] || 'https';
     return `${proto}://${host}${relativeUrl}`;
 };
 export const createUploadSession = async (event, rawInput) => {
@@ -168,7 +171,7 @@ export const createUploadSession = async (event, rawInput) => {
             host: urlObj.host,
         });
     }
-    catch (e) {
+    catch {
         console.warn('Failed to parse uploadUrl for logging:', uploadUrl);
     }
     return {

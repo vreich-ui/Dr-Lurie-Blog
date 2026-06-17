@@ -3,7 +3,7 @@
 ## Artifact-aware publishing path
 
 1. Agents create or fetch the MCP workflow request and keep MCP state authoritative.
-2. When an agent generates an image, PDF, video, document, audio, data, attachment, or other artifact, it immediately uploads bytes with the smallest reliable path: `save_artifact` for small artifacts, `save_artifact_create_upload_session` plus the binary chunk endpoint plus `save_artifact_finalize_upload_session` for larger artifacts, and legacy `save_artifact_chunk` only as a compatibility fallback.
+2. When an agent generates an image, PDF, video, document, audio, data, attachment, or other artifact, it immediately uploads bytes using `save_artifact_chunk` (using 48 KiB chunks) as the only default path. `save_artifact` and upload sessions remain available for non-default or app-facing paths but are not recommended for publisher-agent activity.
 3. The returned `ArtifactReference` is the deterministic handle. Store the whole reference in the workflow record or stage output; never derive `blobKey` in the model.
 4. If upload fails or the tool call times out, retry the same payload, raw upload-session chunk, or legacy chunk. Upload-session chunks are idempotent when the re-uploaded chunk bytes match; finalization and checksum deduplication return the existing reference without duplicating final bytes.
 5. Before final publication, re-fetch the workflow/request state and build `publication.publish_payload` from the latest article body plus current `artifactReferences` and any existing base64 `mediaEntries`.
