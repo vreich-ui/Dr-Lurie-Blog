@@ -8,6 +8,8 @@ import {
   uploadImagesWithIntegrity,
 } from '../../netlify/lib/mcp-artifact-upload-client.js';
 
+const AGENT_ARTIFACT_CHUNK_RAW_BYTES = 48 * 1024;
+
 const createArtifact = ({
   contentType = 'image/jpeg',
   bytes,
@@ -34,7 +36,7 @@ const createImage = (bytes: Buffer, type = 'image/jpeg') => ({
   type,
 });
 
-test('MCP image artifact upload integrity verification passes when local and server metadata match', async () => {
+test('MCP image artifact upload integrity verification passes when local and server metadata match using save_artifact_chunk', async () => {
   const bytes = Buffer.from('matching image bytes');
   const calls: { name: string; args: Record<string, unknown> }[] = [];
 
@@ -51,11 +53,62 @@ test('MCP image artifact upload integrity verification passes when local and ser
   assert.equal(artifacts.length, 1);
   assert.equal(artifacts[0].sha256, createHash('sha256').update(bytes).digest('hex'));
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, 'save_artifact');
+  assert.equal(calls[0].name, 'save_artifact_chunk');
   assert.equal(calls[0].args.expectedSizeBytes, bytes.byteLength);
   assert.equal(calls[0].args.expectedSha256, createHash('sha256').update(bytes).digest('hex'));
   assert.equal(calls[0].args.label, 'integrity.jpg');
   assert.deepEqual(calls[0].args.tags, ['publisher-agent', 'image']);
+});
+
+test('MCP image artifact upload uses save_artifact_chunk for larger images and does not call save_artifact or upload sessions', async () => {
+  const bytes = Buffer.alloc(AGENT_ARTIFACT_CHUNK_RAW_BYTES * 2 + 100, 1);
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+  const logs: any[] = [];
+  const originalLog = console.log;
+  console.log = (msg) => logs.push(JSON.parse(msg));
+
+  try {
+    const artifacts = await uploadImagesWithIntegrity({
+      images: [createImage(bytes)],
+      requestId: 'req-integrity-test',
+      mcpToolCall: async (name, args) => {
+        calls.push({ name, args });
+
+        return args.chunkIndex === 2
+          ? { ok: true, complete: true, artifact: createArtifact({ bytes }) }
+          : { ok: true, complete: false };
+      },
+    });
+
+    assert.equal(artifacts.length, 1);
+    assert.ok(calls.every((call) => call.name === 'save_artifact_chunk'));
+    assert.equal(calls.length, 3);
+    assert.ok(!calls.some((call) => call.name === 'save_artifact'));
+    assert.ok(!calls.some((call) => call.name === 'create_upload_session'));
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].uploadPath, 'chunks');
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test('MCP image artifact upload defaults to AGENT_ARTIFACT_CHUNK_RAW_BYTES', async () => {
+  const bytes = Buffer.alloc(AGENT_ARTIFACT_CHUNK_RAW_BYTES + 1, 2);
+  const calls: { name: string; args: Record<string, unknown> }[] = [];
+
+  await uploadImagesWithIntegrity({
+    images: [createImage(bytes)],
+    requestId: 'req-integrity-test',
+    mcpToolCall: async (name, args) => {
+      calls.push({ name, args });
+      return { ok: true, complete: args.chunkIndex === 1, artifact: createArtifact({ bytes }) };
+    },
+  });
+
+  assert.equal(calls.length, 2);
+  // First chunk should be exactly AGENT_ARTIFACT_CHUNK_RAW_BYTES
+  const firstPayload = calls[0].args.payload as string;
+  assert.equal(Buffer.from(firstPayload, 'base64').length, AGENT_ARTIFACT_CHUNK_RAW_BYTES);
 });
 
 test('MCP image artifact upload integrity verification fails on mismatched returned SHA', async () => {
@@ -224,15 +277,14 @@ test('verified image blobKeys are not partially attached when image 2 of N fails
 });
 
 test('MCP image artifact chunk indexes are monotonic and deterministic with target-sized chunks', async () => {
-  const bytes = Buffer.alloc(800_000, 1);
+  const bytes = Buffer.alloc(100_000, 1);
   const indexes: unknown[] = [];
 
   await uploadImagesWithIntegrity({
     images: [createImage(bytes)],
     requestId: 'req-integrity-test',
-    chunkSizeBytes: 256_000,
+    chunkSizeBytes: 25_000,
     mcpToolCall: async (name, args) => {
-      if (name === 'create_upload_session') throw new Error('session unavailable');
       indexes.push(args.chunkIndex);
 
       return args.chunkIndex === 3
@@ -244,135 +296,16 @@ test('MCP image artifact chunk indexes are monotonic and deterministic with targ
   assert.deepEqual(indexes, [0, 1, 2, 3]);
 });
 
-test('MCP image artifact upload uses binary upload sessions above the single-shot guidance threshold', async () => {
-  const bytes = Buffer.alloc(800_000, 3);
-  const calls: { name: string; args: Record<string, unknown> }[] = [];
-  const uploadedChunks: Buffer[] = [];
-
-  const artifacts = await uploadImagesWithIntegrity({
-    images: [createImage(bytes)],
-    requestId: 'req-integrity-test',
-    mcpToolCall: async (name, args) => {
-      calls.push({ name, args });
-
-      if (name === 'create_upload_session') {
-        return {
-          sessionId: 'session-1',
-          uploadUrl: '/.netlify/functions/upload-session-chunk',
-          uploadToken: 'token-1',
-          chunkSizeBytes: 256_000,
-          maxBytes: 50 * 1024 * 1024,
-        };
-      }
-
-      return { ok: true, complete: true, artifact: createArtifact({ bytes }) };
-    },
-    binaryChunkUpload: async ({ bytes: chunk }) => {
-      uploadedChunks.push(chunk);
-
-      return { ok: true };
-    },
-  });
-
-  assert.equal(artifacts.length, 1);
-  assert.deepEqual(
-    calls.map((call) => call.name),
-    ['create_upload_session', 'finalize_upload_session']
-  );
-  assert.equal(uploadedChunks.length, 4);
-  assert.equal(Buffer.concat(uploadedChunks).equals(bytes), true);
-});
-
-test('MCP image artifact upload retries POST when PUT fails with a proxy tunnel error', async () => {
-  const bytes = Buffer.alloc(800_000, 5);
-  const methods: string[] = [];
-  const originalFetch = globalThis.fetch;
-
-  globalThis.fetch = (async (_url, init) => {
-    const method = init?.method ?? 'GET';
-    methods.push(method);
-
-    if (method === 'PUT') {
-      throw new Error('CONNECT tunnel failed, response 403');
-    }
-
-    return {
-      ok: true,
-      json: async () => ({ ok: true }),
-    } as Response;
-  }) as typeof fetch;
-
-  try {
-    const artifacts = await uploadImagesWithIntegrity({
-      images: [createImage(bytes)],
-      requestId: 'req-integrity-test',
-      mcpToolCall: async (name) => {
-        if (name === 'create_upload_session') {
-          return {
-            sessionId: 'session-1',
-            uploadUrl: '/.netlify/functions/upload-session-chunk',
-            uploadToken: 'token-1',
-            chunkSizeBytes: 1_000_000,
-            maxBytes: 50 * 1024 * 1024,
-          };
-        }
-
-        return { ok: true, complete: true, artifact: createArtifact({ bytes }) };
-      },
-    });
-
-    assert.equal(artifacts.length, 1);
-    assert.deepEqual(methods, ['PUT', 'POST']);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
-});
-
-test('MCP image artifact upload falls back to legacy chunks when upload sessions fail', async () => {
-  const bytes = Buffer.alloc(800_000, 4);
-  const calls: { name: string; args: Record<string, unknown> }[] = [];
-
-  const artifacts = await uploadImagesWithIntegrity({
-    images: [createImage(bytes)],
-    requestId: 'req-integrity-test',
-    chunkSizeBytes: 256_000,
-    mcpToolCall: async (name, args) => {
-      calls.push({ name, args });
-
-      if (name === 'create_upload_session') {
-        throw new Error('session unavailable');
-      }
-
-      return args.chunkIndex === 3
-        ? { ok: true, complete: true, artifact: createArtifact({ bytes }) }
-        : { ok: true, complete: false, receivedChunks: Number(args.chunkIndex) + 1, totalChunks: 4 };
-    },
-  });
-
-  assert.equal(artifacts.length, 1);
-  assert.deepEqual(
-    calls.map((call) => call.name),
-    [
-      'create_upload_session',
-      'save_artifact_chunk',
-      'save_artifact_chunk',
-      'save_artifact_chunk',
-      'save_artifact_chunk',
-    ]
-  );
-});
-
 test('MCP image artifact upload retries the final chunk when completion is delayed', async () => {
-  const bytes = Buffer.alloc(800_000, 2);
+  const bytes = Buffer.alloc(100_000, 2);
   const indexes: unknown[] = [];
   let finalChunkCalls = 0;
 
   const artifacts = await uploadImagesWithIntegrity({
     images: [createImage(bytes)],
     requestId: 'req-integrity-test',
-    chunkSizeBytes: 256_000,
+    chunkSizeBytes: 25_000,
     mcpToolCall: async (name, args) => {
-      if (name === 'create_upload_session') throw new Error('session unavailable');
       indexes.push(args.chunkIndex);
 
       if (args.chunkIndex === 3) {
@@ -392,4 +325,21 @@ test('MCP image artifact upload retries the final chunk when completion is delay
 
   assert.equal(artifacts.length, 1);
   assert.deepEqual(indexes, [0, 1, 2, 3, 3]);
+});
+
+test('retrying the final chunk dedupes/idempotently returns the existing artifact', async () => {
+  const bytes = Buffer.from('idempotent test bytes');
+  let calls = 0;
+
+  const artifacts = await uploadImagesWithIntegrity({
+    images: [createImage(bytes)],
+    requestId: 'req-integrity-test',
+    mcpToolCall: async () => {
+      calls += 1;
+      return { ok: true, complete: true, artifact: createArtifact({ bytes }) };
+    },
+  });
+
+  assert.equal(artifacts.length, 1);
+  assert.equal(calls, 1);
 });

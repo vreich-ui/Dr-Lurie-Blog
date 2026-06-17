@@ -7,6 +7,7 @@ import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import { sha256Hex } from '../lib/crypto.js';
 import { cleanupUploadSessionChunks, createUploadSession, getFinalizeUploadSessionPayload, markUploadSessionFinalized, UPLOAD_SESSION_CHUNK_SIZE_BYTES, UPLOAD_SESSION_MAX_BYTES, } from '../lib/artifact-upload-sessions.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { allowedAgentNames, publicationStatusDescription, workflowStatuses, } from '../../src/schema/workflow-contract.js';
@@ -25,7 +26,7 @@ const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
 const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
 const jsonHeaders = {
-    'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-publish-key',
+    'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-mcp-auth-token, x-publish-key',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Expose-Headers': 'mcp-session-id',
@@ -866,11 +867,13 @@ const TOOL_DEFINITIONS = [
     },
     {
         name: 'diagnostic_upload',
-        description: 'Run a diagnostic HTTP PUT to check the upload endpoint for 403 errors and proxy issues.',
+        description: 'Run a diagnostic HTTP PUT or POST to check the upload endpoint for 403 errors and proxy issues.',
         inputSchema: objectSchema({
             uploadUrl: stringSchema('The absolute upload URL to test.'),
             uploadToken: stringSchema('The upload token to use in the x-upload-token header.'),
             sessionId: stringSchema('The session id to use in the x-session-id header.'),
+            method: { type: 'string', enum: ['PUT', 'POST'], description: 'HTTP method to test; defaults to PUT.' },
+            payload: { type: 'string', description: 'Optional base64-encoded payload to upload.' },
         }, ['uploadUrl', 'uploadToken', 'sessionId']),
     },
     ...ALLOWED_AGENTS.flatMap((agentName) => [
@@ -927,13 +930,22 @@ const parseBody = (event) => {
     const rawBody = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
     return JSON.parse(rawBody);
 };
-const isAuthorized = (event) => {
-    const token = process.env.MCP_HTTP_AUTH_TOKEN;
-    if (!token)
-        return true;
-    const authorization = event.headers?.authorization ?? event.headers?.Authorization;
-    return authorization === `Bearer ${token}`;
+const getAuthResult = (event) => {
+    const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
+    if (!token) {
+        return process.env.MCP_HTTP_AUTH_TOKEN === undefined ? { ok: true } : { ok: false, reason: 'missing_token' };
+    }
+    const dedicatedToken = toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'));
+    const authorization = toNonEmptyString(getHeader(event.headers, 'authorization'));
+    const bearerToken = getBearerToken(authorization);
+    const providedTokens = [dedicatedToken, bearerToken].filter((provided) => Boolean(provided));
+    if (providedTokens.length === 0)
+        return { ok: false, reason: 'missing_authorization' };
+    return providedTokens.some((provided) => safeSecretsMatch(provided, token))
+        ? { ok: true }
+        : { ok: false, reason: 'invalid_authorization' };
 };
+const getAuthDiagnosticReason = (reason) => `mcp_auth_${reason}`;
 const getHeader = (headers, name) => {
     const normalizedName = name.toLowerCase();
     const entry = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
@@ -1953,24 +1965,31 @@ const callTool = async (event, name, args) => {
             return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
         case 'diagnostic_upload':
             try {
+                const method = String(input.method || 'PUT').toUpperCase();
+                const payloadBase64 = toNonEmptyString(input.payload);
+                const body = payloadBase64 ? Buffer.from(payloadBase64, 'base64') : Buffer.from('test');
+                const chunkSha256 = payloadBase64 ? sha256Hex(body) : undefined;
                 const fetchResponse = await fetch(String(input.uploadUrl), {
-                    method: 'PUT',
+                    method,
                     headers: {
                         'Content-Type': 'application/octet-stream',
                         'x-upload-token': String(input.uploadToken),
                         'x-session-id': String(input.sessionId),
                         'x-chunk-index': '0',
                         'x-total-chunks': '1',
+                        ...(chunkSha256 ? { 'x-chunk-sha256': chunkSha256 } : {}),
                     },
-                    body: Buffer.from('test'),
+                    body,
                 });
                 const headers = Object.fromEntries(fetchResponse.headers.entries());
-                const body = await fetchResponse.text();
+                const responseBody = await fetchResponse.text();
                 return toolResult({
                     status: fetchResponse.status,
                     statusText: fetchResponse.statusText,
                     headers,
-                    body,
+                    body: responseBody,
+                    method,
+                    payloadSizeBytes: body.byteLength,
                 });
             }
             catch (error) {
@@ -2163,8 +2182,19 @@ export const handler = async (rawEvent) => {
     if (event.httpMethod !== 'POST') {
         return response(405, rpcError(null, -32000, 'Method not allowed.'), { ...jsonHeaders, Allow: 'POST' });
     }
-    if (!isAuthorized(event)) {
-        return response(401, rpcError(null, -32001, 'Unauthorized'));
+    const authResult = getAuthResult(event);
+    if (!authResult.ok) {
+        const diagnosticReason = getAuthDiagnosticReason(authResult.reason);
+        event.log?.({
+            event: 'mcp_auth_rejected',
+            rpcMethod: null,
+            slug: null,
+            hasMcpHttpAuthToken: Boolean(toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN)),
+            hasMcpAuthTokenHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'))),
+            hasAuthorizationHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'authorization'))),
+            reason: diagnosticReason,
+        });
+        return response(401, rpcError(null, -32001, 'Unauthorized', { reason: diagnosticReason }));
     }
     let body;
     try {

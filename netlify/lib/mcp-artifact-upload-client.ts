@@ -41,6 +41,7 @@ type PreparedImageUpload = {
 };
 
 const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
+const AGENT_ARTIFACT_CHUNK_RAW_BYTES = 48 * 1024;
 const SINGLE_SHOT_UPLOAD_MAX_BYTES = 750_000;
 const UPLOAD_SESSION_MAX_BYTES = 50 * 1024 * 1024;
 const FINAL_CHUNK_RETRY_ATTEMPTS = 3;
@@ -183,7 +184,7 @@ const logUploadPathSelection = ({
   filename: string;
   requestId: string;
   sizeBytes: number;
-  uploadPath: 'single-shot' | 'upload-session' | 'legacy-chunks';
+  uploadPath: 'single-shot' | 'upload-session' | 'chunks';
 }) => {
   console.log(
     JSON.stringify({
@@ -265,7 +266,7 @@ const defaultBinaryChunkUpload: BinaryChunkUpload = async ({
   }
 };
 
-const uploadImageWithLegacyChunks = async ({
+const uploadImageWithChunks = async ({
   image,
   requestId,
   mcpToolCall,
@@ -423,53 +424,20 @@ const uploadImageWithIntegrity = async ({
   image,
   requestId,
   mcpToolCall,
-  binaryChunkUpload,
   chunkSizeBytes,
 }: {
   image: PreparedImageUpload;
   requestId: string;
   mcpToolCall: McpToolCall;
-  binaryChunkUpload: BinaryChunkUpload;
   chunkSizeBytes: number;
 }) => {
-  if (image.sizeBytes <= SINGLE_SHOT_UPLOAD_MAX_BYTES) {
-    logUploadPathSelection({
-      filename: image.filename,
-      requestId,
-      sizeBytes: image.sizeBytes,
-      uploadPath: 'single-shot',
-    });
-    return uploadImageSingleShot({ image, requestId, mcpToolCall });
-  }
-
-  if (image.sizeBytes <= UPLOAD_SESSION_MAX_BYTES) {
-    logUploadPathSelection({
-      filename: image.filename,
-      requestId,
-      sizeBytes: image.sizeBytes,
-      uploadPath: 'upload-session',
-    });
-    try {
-      return await uploadImageWithSession({ image, requestId, mcpToolCall, binaryChunkUpload });
-    } catch (error) {
-      logUploadSessionFallback({ filename: image.filename, requestId, sizeBytes: image.sizeBytes, error });
-      logUploadPathSelection({
-        filename: image.filename,
-        requestId,
-        sizeBytes: image.sizeBytes,
-        uploadPath: 'legacy-chunks',
-      });
-      return uploadImageWithLegacyChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
-    }
-  }
-
   logUploadPathSelection({
     filename: image.filename,
     requestId,
     sizeBytes: image.sizeBytes,
-    uploadPath: 'legacy-chunks',
+    uploadPath: 'chunks',
   });
-  return uploadImageWithLegacyChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
+  return uploadImageWithChunks({ image, requestId, mcpToolCall, chunkSizeBytes });
 };
 
 export const uploadImagesWithIntegrity = async ({
@@ -478,7 +446,7 @@ export const uploadImagesWithIntegrity = async ({
   mcpToolCall,
   binaryChunkUpload = defaultBinaryChunkUpload,
   onWorkflowError,
-  chunkSizeBytes = CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES,
+  chunkSizeBytes = AGENT_ARTIFACT_CHUNK_RAW_BYTES,
 }: UploadImagesWithIntegrityInput) => {
   const verifiedArtifacts: ArtifactReference[] = [];
 
@@ -491,7 +459,6 @@ export const uploadImagesWithIntegrity = async ({
           image: preparedImages[index],
           requestId,
           mcpToolCall,
-          binaryChunkUpload,
           chunkSizeBytes,
         })
       );

@@ -28,8 +28,8 @@
 
 ## Agent artifact workflow rules
 
-- When an agent generates artifacts (images, audio, video, binary files, or markdown files), it must upload them immediately and store the returned `ArtifactReference`/`blobKey` in MCP request state or the relevant agent output. Use `save_artifact` for small artifacts, use `save_artifact_create_upload_session` plus the binary chunk endpoint plus `save_artifact_finalize_upload_session` for larger artifacts, and use `save_artifact_chunk` only as a legacy compatibility fallback.
-- For binary upload sessions, the `uploadUrl` returned by the server is an absolute URL. Agents should use `HTTP PUT` by default for binary chunk uploads. If `PUT` is blocked (e.g., by a proxy returning 403), agents **must try HTTP POST** to the same `uploadUrl` before falling back to other methods.
+- When an agent generates artifacts (images, audio, video, binary files, or markdown files), it must upload them immediately and store the returned `ArtifactReference`/`blobKey` in MCP request state or the relevant agent output. For reliability in agent-driven workflows, use `save_artifact_chunk` as the default and primary upload method. `save_artifact` and upload sessions are available for compatibility and app-facing use but are not part of the default agent path.
+- For binary upload sessions (when used outside the default agent path), the `uploadUrl` returned by the server is an absolute URL. Agents should use `HTTP PUT` by default for binary chunk uploads. If `PUT` is blocked (e.g., by a proxy returning 403), agents **must try HTTP POST** to the same `uploadUrl` before falling back to other methods.
 - If a binary upload fails, use the `diagnostic_upload` tool with the session details and an optional `payload` to identify whether the failure occurs at the proxy or the Netlify endpoint.
 - Agents must never attempt to generate deterministic artifact blob keys themselves. Let the artifact tool return `blobKey`, `sha256`, size, content type, and timestamp.
 - Treat every `ArtifactReference` as immutable. If an artifact must be regenerated, upload it again and use the newly returned reference.
