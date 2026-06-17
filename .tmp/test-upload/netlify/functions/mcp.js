@@ -7,6 +7,7 @@ import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import { sha256Hex } from '../lib/crypto.js';
 import { cleanupUploadSessionChunks, createUploadSession, getFinalizeUploadSessionPayload, markUploadSessionFinalized, UPLOAD_SESSION_CHUNK_SIZE_BYTES, UPLOAD_SESSION_MAX_BYTES, } from '../lib/artifact-upload-sessions.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { allowedAgentNames, publicationStatusDescription, workflowStatuses, } from '../../src/schema/workflow-contract.js';
@@ -23,9 +24,9 @@ const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
 const WIPE_BLOB_SAMPLE_LIMIT = 20;
 const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
-const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 256_000;
+const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 48 * 1024;
 const jsonHeaders = {
-    'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-publish-key',
+    'Access-Control-Allow-Headers': 'authorization, content-type, mcp-protocol-version, mcp-session-id, x-mcp-auth-token, x-publish-key',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Expose-Headers': 'mcp-session-id',
@@ -346,7 +347,7 @@ const publishPayloadJsonSchema = objectSchema({
     tags: stringArraySchema('Article tags.'),
     images: arraySchema({}, 'Image metadata or asset references.'),
     mediaEntries: arraySchema({}, 'Permissive media entry payloads accepted by the runtime publisher; use for existing base64 media entries when needed.'),
-    artifactReferences: arraySchema({}, 'ArtifactReference objects returned by save_artifact or save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'),
+    artifactReferences: arraySchema({}, 'ArtifactReference objects returned by save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'),
     overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
     draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
     articlePath: stringSchema('Optional normalized repository path, usually src/data/post/{slug}.md.'),
@@ -708,7 +709,7 @@ const TOOL_DEFINITIONS = [
         : []),
     {
         name: 'save_artifact',
-        description: `Single-shot byte upload and preferred/default artifact path. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating image, pdf, video, doc, audio, data, attachment, or other bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Prefer this tool for normal web images and artifacts up to ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} raw bytes; 50-150 KB JPEG/PNG images should be uploaded in one call, not chunked. Writes final artifact bytes to the artifact blob store and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
+        description: `Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. While available for compatibility or non-agent use, save_artifact_chunk is now the primary method for agent-driven uploads. Writes final artifact bytes and an index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
         inputSchema: objectSchema({
             requestId: stringSchema('Workflow request id that owns this artifact.'),
             artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
@@ -730,7 +731,7 @@ const TOOL_DEFINITIONS = [
     },
     {
         name: 'save_artifact_chunk',
-        description: `Chunked byte upload fallback for artifacts too large for one MCP tool call. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Do not use this for ordinary 50-150 KB generated web images; call save_artifact once instead. Use chunks only after a single-shot upload is rejected by client/tool payload limits or when the raw artifact is larger than ${SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES} bytes. When chunking is necessary, use the largest safe chunks the client accepts, targeting about ${CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES} raw bytes per chunk rather than many tiny chunks. Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.`,
+        description: `Chunked byte upload. This is the primary and only default upload path for all publisher-agent artifacts. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Agents must call this immediately for created artifacts, splitting the payload into raw chunks (default 48 KiB). Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete:false until finalization; dedup is idempotent success and skips rewriting bytes.`,
         inputSchema: objectSchema({
             requestId: stringSchema('Workflow request id that owns this artifact.'),
             artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
@@ -758,13 +759,33 @@ const TOOL_DEFINITIONS = [
         }, ['requestId', 'artifactKind', 'contentType', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload']),
     },
     {
+        name: 'probe_artifact_chunk_size',
+        description: 'Dev/admin-only diagnostic tool to test candidate raw chunk sizes for save_artifact_chunk. Detects transport truncation by comparing decoded payload to expectedChunkRawBytes.',
+        inputSchema: objectSchema({
+            requestId: stringSchema('Workflow request id.'),
+            clientUploadId: stringSchema('Stable UUID for the chunked upload session.'),
+            chunkIndex: intSchema('Zero-based chunk index.'),
+            totalChunks: intSchema('Total chunks.'),
+            payload: stringSchema('Chunk bytes as base64.'),
+            expectedChunkRawBytes: intSchema('Expected raw byte length of THIS chunk after base64 decoding.'),
+            artifactKind: artifactKindJsonSchema(),
+            contentType: stringSchema(),
+            filename: { ...stringSchema(), optional: true },
+            expectedSizeBytes: expectedSizeBytesJsonSchema,
+            expectedSha256: expectedSha256JsonSchema,
+            label: artifactLabelJsonSchema,
+            tags: artifactTagsJsonSchema,
+            metadata: artifactMetadataJsonSchema,
+        }, ['requestId', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload', 'expectedChunkRawBytes', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']),
+    },
+    {
         name: 'save_artifact_create_upload_session',
-        description: `Create a short-lived artifact upload session for larger binary assets without sending bytes through MCP. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Use for artifacts larger than about 30 KB and up to ${UPLOAD_SESSION_MAX_BYTES} bytes. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
+        description: `Create a short-lived artifact upload session. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
         inputSchema: uploadSessionCreateInputSchema(),
     },
     {
         name: 'create_upload_session',
-        description: `Create a short-lived artifact upload session. Alias of save_artifact_create_upload_session with output fields sessionId, uploadUrl, uploadToken, chunkSizeBytes, maxBytes, and totalChunks. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call finalize_upload_session.`,
+        description: `Create a short-lived artifact upload session. Alias of save_artifact_create_upload_session. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call finalize_upload_session.`,
         inputSchema: uploadSessionCreateInputSchema(),
     },
     {
@@ -866,11 +887,13 @@ const TOOL_DEFINITIONS = [
     },
     {
         name: 'diagnostic_upload',
-        description: 'Run a diagnostic HTTP PUT to check the upload endpoint for 403 errors and proxy issues.',
+        description: 'Run a diagnostic HTTP PUT or POST to check the upload endpoint for 403 errors and proxy issues.',
         inputSchema: objectSchema({
             uploadUrl: stringSchema('The absolute upload URL to test.'),
             uploadToken: stringSchema('The upload token to use in the x-upload-token header.'),
             sessionId: stringSchema('The session id to use in the x-session-id header.'),
+            method: { type: 'string', enum: ['PUT', 'POST'], description: 'HTTP method to test; defaults to PUT.' },
+            payload: { type: 'string', description: 'Optional base64-encoded payload to upload.' },
         }, ['uploadUrl', 'uploadToken', 'sessionId']),
     },
     ...ALLOWED_AGENTS.flatMap((agentName) => [
@@ -927,13 +950,22 @@ const parseBody = (event) => {
     const rawBody = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
     return JSON.parse(rawBody);
 };
-const isAuthorized = (event) => {
-    const token = process.env.MCP_HTTP_AUTH_TOKEN;
-    if (!token)
-        return true;
-    const authorization = event.headers?.authorization ?? event.headers?.Authorization;
-    return authorization === `Bearer ${token}`;
+const getAuthResult = (event) => {
+    const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
+    if (!token) {
+        return process.env.MCP_HTTP_AUTH_TOKEN === undefined ? { ok: true } : { ok: false, reason: 'missing_token' };
+    }
+    const dedicatedToken = toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'));
+    const authorization = toNonEmptyString(getHeader(event.headers, 'authorization'));
+    const bearerToken = getBearerToken(authorization);
+    const providedTokens = [dedicatedToken, bearerToken].filter((provided) => Boolean(provided));
+    if (providedTokens.length === 0)
+        return { ok: false, reason: 'missing_authorization' };
+    return providedTokens.some((provided) => safeSecretsMatch(provided, token))
+        ? { ok: true }
+        : { ok: false, reason: 'invalid_authorization' };
 };
+const getAuthDiagnosticReason = (reason) => `mcp_auth_${reason}`;
 const getHeader = (headers, name) => {
     const normalizedName = name.toLowerCase();
     const entry = Object.entries(headers ?? {}).find(([key]) => key.toLowerCase() === normalizedName);
@@ -1953,24 +1985,31 @@ const callTool = async (event, name, args) => {
             return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
         case 'diagnostic_upload':
             try {
+                const method = String(input.method || 'PUT').toUpperCase();
+                const payloadBase64 = toNonEmptyString(input.payload);
+                const body = payloadBase64 ? Buffer.from(payloadBase64, 'base64') : Buffer.from('test');
+                const chunkSha256 = payloadBase64 ? sha256Hex(body) : undefined;
                 const fetchResponse = await fetch(String(input.uploadUrl), {
-                    method: 'PUT',
+                    method,
                     headers: {
                         'Content-Type': 'application/octet-stream',
                         'x-upload-token': String(input.uploadToken),
                         'x-session-id': String(input.sessionId),
                         'x-chunk-index': '0',
                         'x-total-chunks': '1',
+                        ...(chunkSha256 ? { 'x-chunk-sha256': chunkSha256 } : {}),
                     },
-                    body: Buffer.from('test'),
+                    body,
                 });
                 const headers = Object.fromEntries(fetchResponse.headers.entries());
-                const body = await fetchResponse.text();
+                const responseBody = await fetchResponse.text();
                 return toolResult({
                     status: fetchResponse.status,
                     statusText: fetchResponse.statusText,
                     headers,
-                    body,
+                    body: responseBody,
+                    method,
+                    payloadSizeBytes: body.byteLength,
                 });
             }
             catch (error) {
@@ -2045,6 +2084,67 @@ const callTool = async (event, name, args) => {
                 tags: input.tags,
                 metadata: input.metadata,
             });
+        case 'probe_artifact_chunk_size': {
+            const payloadBase64 = toNonEmptyString(input.payload) || '';
+            const expectedChunkRawBytes = Number(input.expectedChunkRawBytes);
+            let decoded;
+            try {
+                decoded = Buffer.from(payloadBase64, 'base64');
+            }
+            catch (error) {
+                return toolError('base64_decode_failure', { error: error.message });
+            }
+            if (decoded.length < expectedChunkRawBytes) {
+                return toolError('transport_truncation', {
+                    reason: 'received_less_than_expected',
+                    expected: expectedChunkRawBytes,
+                    received: decoded.length,
+                    payloadChars: payloadBase64.length,
+                });
+            }
+            const result = await invokeSaveArtifact(event, {
+                requestId: input.requestId,
+                artifactKind: input.artifactKind,
+                contentType: input.contentType,
+                filename: input.filename,
+                clientUploadId: input.clientUploadId,
+                chunkIndex: input.chunkIndex,
+                totalChunks: input.totalChunks,
+                encoding: 'base64',
+                expectedSizeBytes: input.expectedSizeBytes,
+                expectedSha256: input.expectedSha256,
+                payload: input.payload,
+                label: input.label,
+                tags: input.tags,
+                metadata: input.metadata,
+            });
+            if ('isError' in result) {
+                const structuredContent = result.structuredContent;
+                const message = String(structuredContent?.error || result.content?.[0]?.text || 'unknown_error');
+                let failureType = 'unknown_error';
+                if (message.includes('Artifact size mismatch'))
+                    failureType = 'expected_size_mismatch';
+                else if (message.includes('Artifact sha256 mismatch'))
+                    failureType = 'expected_sha_mismatch';
+                else if (message.includes('Invalid artifact upload input'))
+                    failureType = 'schema_validation_failure';
+                else if (message.includes('Chunk upload digest mismatch'))
+                    failureType = 'chunk_digest_mismatch';
+                return toolError(message, {
+                    failureType,
+                    ...structuredContent,
+                    probe: { transportOk: true, receivedChunkRawBytes: decoded.length },
+                });
+            }
+            return toolResult({
+                ...result,
+                probe: {
+                    status: 'success',
+                    transportOk: true,
+                    receivedChunkRawBytes: decoded.length,
+                },
+            });
+        }
         case 'save_artifact_chunk':
             return callArtifactUpload(event, {
                 requestId: input.requestId,
@@ -2163,8 +2263,19 @@ export const handler = async (rawEvent) => {
     if (event.httpMethod !== 'POST') {
         return response(405, rpcError(null, -32000, 'Method not allowed.'), { ...jsonHeaders, Allow: 'POST' });
     }
-    if (!isAuthorized(event)) {
-        return response(401, rpcError(null, -32001, 'Unauthorized'));
+    const authResult = getAuthResult(event);
+    if (!authResult.ok) {
+        const diagnosticReason = getAuthDiagnosticReason(authResult.reason);
+        event.log?.({
+            event: 'mcp_auth_rejected',
+            rpcMethod: null,
+            slug: null,
+            hasMcpHttpAuthToken: Boolean(toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN)),
+            hasMcpAuthTokenHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'))),
+            hasAuthorizationHeader: Boolean(toNonEmptyString(getHeader(event.headers, 'authorization'))),
+            reason: diagnosticReason,
+        });
+        return response(401, rpcError(null, -32001, 'Unauthorized', { reason: diagnosticReason }));
     }
     let body;
     try {

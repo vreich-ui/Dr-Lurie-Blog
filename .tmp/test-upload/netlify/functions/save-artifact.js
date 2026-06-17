@@ -246,8 +246,6 @@ const getArrayBuffer = async (store, key) => {
     const value = await binaryStore.get(key, { type: 'arrayBuffer' });
     return value ? Buffer.from(value) : null;
 };
-const chunkStatusCache = new Map();
-const chunkStatusCacheKey = (requestId, clientUploadId) => `${requestId}:${clientUploadId}`;
 const toValidChunkIndexSet = (indexes, totalChunks) => {
     if (!Array.isArray(indexes))
         return new Set();
@@ -266,10 +264,6 @@ const readChunkManifestRecord = async (store, requestId, clientUploadId) => {
     catch {
         return undefined;
     }
-};
-const readChunkManifest = async (store, requestId, clientUploadId, totalChunks) => {
-    const parsed = await readChunkManifestRecord(store, requestId, clientUploadId);
-    return toValidChunkIndexSet(parsed?.receivedChunkIndexes, totalChunks);
 };
 const validateChunkUploadManifest = async (store, input, bytes) => {
     const parsed = await readChunkManifestRecord(store, input.requestId, input.clientUploadId);
@@ -324,8 +318,7 @@ const validateChunkUploadManifest = async (store, input, bytes) => {
     }
     return undefined;
 };
-const writeChunkManifest = async (store, input, receivedChunkIndexes, bytes) => {
-    const existingManifest = await readChunkManifestRecord(store, input.requestId, input.clientUploadId);
+const writeChunkManifest = async (store, input, receivedChunkIndexes, bytes, existingManifest) => {
     const expectedSizeBytes = getExpectedSizeBytes(input);
     const expectedSha256 = getExpectedSha256(input)?.toLowerCase();
     const manifest = {
@@ -355,27 +348,11 @@ const writeChunkManifest = async (store, input, receivedChunkIndexes, bytes) => 
         },
     });
 };
-const getVisibleChunkIndexes = async (store, requestId, clientUploadId, totalChunks) => {
-    const receivedChunkIndexes = new Set();
-    // Intentionally avoid prefix listing because list visibility can lag behind recent writes in Netlify Blob runtime.
-    for (let index = 0; index < totalChunks; index += 1) {
-        const chunk = await getArrayBuffer(store, chunkKey(requestId, clientUploadId, index));
-        if (chunk)
-            receivedChunkIndexes.add(index);
-    }
-    return receivedChunkIndexes;
-};
-const toChunkStatus = (requestId, clientUploadId, totalChunks, receivedChunkIndexes) => {
-    const cacheKey = chunkStatusCacheKey(requestId, clientUploadId);
-    const previousReceivedChunks = chunkStatusCache.get(cacheKey) ?? 0;
-    const receivedChunks = Math.min(totalChunks, Math.max(previousReceivedChunks, receivedChunkIndexes.size));
-    chunkStatusCache.set(cacheKey, receivedChunks);
-    return {
-        complete: receivedChunks === totalChunks,
-        receivedChunks,
-        totalChunks,
-    };
-};
+const toChunkStatus = (totalChunks, receivedChunkIndexes) => ({
+    complete: receivedChunkIndexes.size === totalChunks,
+    receivedChunks: receivedChunkIndexes.size,
+    totalChunks,
+});
 export const saveUploadedChunk = async (store, requestId, clientUploadId, chunkIndex, totalChunks, bytes, uploadInput) => {
     await store.set(chunkKey(requestId, clientUploadId, chunkIndex), bytes, {
         metadata: {
@@ -385,11 +362,9 @@ export const saveUploadedChunk = async (store, requestId, clientUploadId, chunkI
             totalChunks: String(totalChunks),
         },
     });
-    const [manifestChunkIndexes, visibleChunkIndexes] = await Promise.all([
-        readChunkManifest(store, requestId, clientUploadId, totalChunks),
-        getVisibleChunkIndexes(store, requestId, clientUploadId, totalChunks),
-    ]);
-    const receivedChunkIndexes = new Set([...manifestChunkIndexes, ...visibleChunkIndexes, chunkIndex]);
+    const existingManifest = await readChunkManifestRecord(store, requestId, clientUploadId);
+    const receivedChunkIndexes = toValidChunkIndexSet(existingManifest?.receivedChunkIndexes, totalChunks);
+    receivedChunkIndexes.add(chunkIndex);
     await writeChunkManifest(store, uploadInput ?? {
         requestId,
         clientUploadId,
@@ -398,8 +373,8 @@ export const saveUploadedChunk = async (store, requestId, clientUploadId, chunkI
         artifactKind: ArtifactKind.Data,
         contentType: 'application/octet-stream',
         payload: '',
-    }, receivedChunkIndexes, bytes);
-    return toChunkStatus(requestId, clientUploadId, totalChunks, receivedChunkIndexes);
+    }, receivedChunkIndexes, bytes, existingManifest);
+    return toChunkStatus(totalChunks, receivedChunkIndexes);
 };
 const mergeChunkManifestIntegrity = async (store, input) => {
     const manifest = await readChunkManifestRecord(store, input.requestId, input.clientUploadId);

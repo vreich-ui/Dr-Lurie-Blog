@@ -421,7 +421,7 @@ export const createPublisherAgent = ({
       'You run server-side publishing for already-approved Dr. Lurié article data.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',
       'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences when present.',
-      'If image, pdf, video, doc, audio, data, attachment, or other artifact bytes are created upstream, they must be uploaded immediately with save_artifact or save_artifact_chunk and stored only as the returned ArtifactReference objects.',
+      'If image, pdf, video, doc, audio, data, attachment, or other artifact bytes are created upstream, they must be uploaded immediately with save_artifact_chunk (using 48 KiB chunks) and stored only as the returned ArtifactReference objects.',
       'Do not invent or store deterministic blob keys, URLs, repo paths, or inline base64 media; artifact references must already come from server-side artifact tools.',
       'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
