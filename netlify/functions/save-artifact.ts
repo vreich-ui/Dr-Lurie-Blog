@@ -31,7 +31,7 @@ import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-sto
 import { sha256Hex } from '../lib/crypto.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 
-// artifactStore holds binary blobs (final artifacts and temporary chunks); indexStore holds JSON references and indexes.
+// artifactStore holds binary blobs (final artifacts and obsolete temporary chunks); indexStore holds JSON references and indexes.
 
 type LambdaEvent = {
   blobs?: string;

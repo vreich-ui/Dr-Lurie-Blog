@@ -347,7 +347,7 @@ test('artifact MCP tools register direct upload and omit legacy binary transport
     'save_artifact_finalize_upload_session',
     'diagnostic_upload',
   ]) {
-    assert.equal(tools.has(name), false, `Expected ${name} to be removed from tools/list.`);
+    assert.equal(tools.has(name), false, `Expected obsolete ${name} to be removed from tools/list.`);
   }
 
   const saveArtifact = tools.get('save_artifact')!;
