@@ -22,3 +22,6 @@ pnpm-debug.log*
 pnpm-lock.yaml
 
 .astro
+# local test/build/blob artifacts
+.tmp/
+.netlify/

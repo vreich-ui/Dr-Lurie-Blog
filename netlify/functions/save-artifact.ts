@@ -3,7 +3,7 @@
  * Required method: POST
  * Required header: x-publish-key
  * Stores:
- * - artifacts: final binary artifact bytes and temporary upload chunks
+ * - artifacts: final binary artifact bytes
  * - artifact-index: JSON request artifact reference indexes
  */
 import { timingSafeEqual } from 'node:crypto';
@@ -42,33 +42,10 @@ type LambdaEvent = {
 };
 
 type UploadRequest = ArtifactUploadInput & {
-  clientUploadId?: string;
   expectedSizeBytes?: number;
   expectedSha256?: string;
   localSizeBytes?: number;
   localSha256?: string;
-};
-
-type ChunkStatus = {
-  complete: boolean;
-  receivedChunks: number;
-  totalChunks: number;
-};
-
-type ChunkManifest = {
-  requestId: string;
-  clientUploadId: string;
-  totalChunks: number;
-  artifactKind: ArtifactKind;
-  contentType: string;
-  filename?: string;
-  label?: string;
-  tags?: string[];
-  expectedSizeBytes?: number;
-  expectedSha256?: string;
-  receivedChunkIndexes: number[];
-  chunkDigests: Record<string, { sizeBytes: number; sha256: string }>;
-  updatedAtISO: string;
 };
 
 type BlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
@@ -114,9 +91,6 @@ const uploadSchema = z
     artifactKind: z.enum(artifactKindValues),
     contentType: z.string().min(1),
     filename: safeArtifactFilenameSchema.optional(),
-    clientUploadId: z.uuid().optional(),
-    chunkIndex: z.number().int().nonnegative().optional(),
-    totalChunks: z.number().int().positive().max(10_000).optional(),
     encoding: z.enum(['base64', 'binary']).optional(),
     expectedSizeBytes: z.number().int().nonnegative().optional(),
     expectedSha256: z
@@ -135,25 +109,6 @@ const uploadSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    const hasChunkIndex = value.chunkIndex !== undefined;
-    const hasTotalChunks = value.totalChunks !== undefined;
-
-    if (hasChunkIndex !== hasTotalChunks) {
-      context.addIssue({
-        code: 'custom',
-        path: hasChunkIndex ? ['totalChunks'] : ['chunkIndex'],
-        message: 'chunkIndex and totalChunks must be supplied together.',
-      });
-    }
-
-    if (hasChunkIndex && !value.clientUploadId) {
-      context.addIssue({
-        code: 'custom',
-        path: ['clientUploadId'],
-        message: 'clientUploadId is required for chunked uploads.',
-      });
-    }
-
     if (
       value.expectedSizeBytes !== undefined &&
       value.localSizeBytes !== undefined &&
@@ -175,14 +130,6 @@ const uploadSchema = z
         code: 'custom',
         path: ['localSha256'],
         message: 'localSha256 must match expectedSha256 when both are supplied.',
-      });
-    }
-
-    if (value.chunkIndex !== undefined && value.totalChunks !== undefined && value.chunkIndex >= value.totalChunks) {
-      context.addIssue({
-        code: 'custom',
-        path: ['chunkIndex'],
-        message: 'chunkIndex must be less than totalChunks.',
       });
     }
   });
@@ -313,18 +260,6 @@ const validateFinalArtifact = async (event: LambdaEvent, input: UploadRequest, b
   return validateImageArtifact(input, bytes);
 };
 
-const chunkUploadPrefix = (requestId: string, clientUploadId: string) => {
-  return `artifact-chunks/${requestId}/${clientUploadId}/`;
-};
-
-const chunkKey = (requestId: string, clientUploadId: string, chunkIndex: number) => {
-  return `${chunkUploadPrefix(requestId, clientUploadId)}${chunkIndex}`;
-};
-
-const chunkManifestKey = (requestId: string, clientUploadId: string) => {
-  return `${chunkUploadPrefix(requestId, clientUploadId)}manifest.json`;
-};
-
 const requestArtifactIndexKey = (requestId: string, sha256: string) => {
   return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
 };
@@ -364,213 +299,6 @@ const getArrayBuffer = async (store: BlobStore, key: string) => {
   const value = await binaryStore.get(key, { type: 'arrayBuffer' });
 
   return value ? Buffer.from(value) : null;
-};
-
-const toValidChunkIndexSet = (indexes: unknown, totalChunks: number) => {
-  if (!Array.isArray(indexes)) return new Set<number>();
-
-  return new Set(
-    indexes.filter((index): index is number => Number.isInteger(index) && index >= 0 && index < totalChunks)
-  );
-};
-
-const readChunkManifestRecord = async (store: BlobStore, requestId: string, clientUploadId: string) => {
-  const manifest = await store.get(chunkManifestKey(requestId, clientUploadId));
-
-  if (!manifest) return undefined;
-
-  try {
-    const parsed = JSON.parse(manifest) as unknown;
-
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Partial<ChunkManifest>)
-      : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const validateChunkUploadManifest = async (
-  store: BlobStore,
-  input: Required<Pick<UploadRequest, 'requestId' | 'clientUploadId' | 'chunkIndex' | 'totalChunks'>> & UploadRequest,
-  bytes: Buffer
-) => {
-  const parsed = await readChunkManifestRecord(store, input.requestId, input.clientUploadId);
-
-  if (!parsed) return undefined;
-
-  if (parsed.totalChunks !== undefined && parsed.totalChunks !== input.totalChunks) {
-    return jsonResponse(400, {
-      error: `Chunk upload totalChunks mismatch for clientUploadId ${input.clientUploadId}: expected existing total ${parsed.totalChunks}, received ${input.totalChunks}.`,
-    });
-  }
-
-  const expectedSizeBytes = getExpectedSizeBytes(input);
-  const expectedSha256 = getExpectedSha256(input)?.toLowerCase();
-  const manifestExpectedSha256 = parsed.expectedSha256?.toLowerCase();
-  const mismatches = [
-    parsed.artifactKind !== undefined && parsed.artifactKind !== input.artifactKind
-      ? `artifactKind expected ${parsed.artifactKind} received ${input.artifactKind}`
-      : undefined,
-    parsed.contentType !== undefined && parsed.contentType !== input.contentType
-      ? `contentType expected ${parsed.contentType} received ${input.contentType}`
-      : undefined,
-    parsed.filename !== undefined && parsed.filename !== input.filename
-      ? `filename expected ${parsed.filename} received ${input.filename ?? ''}`
-      : undefined,
-    parsed.label !== undefined && parsed.label !== input.label
-      ? `label expected ${parsed.label} received ${input.label ?? ''}`
-      : undefined,
-    parsed.tags !== undefined && (input.tags === undefined || parsed.tags.join('\0') !== input.tags.join('\0'))
-      ? `tags expected ${parsed.tags.join(',')} received ${input.tags?.join(',') ?? ''}`
-      : undefined,
-    parsed.expectedSizeBytes !== undefined &&
-    expectedSizeBytes !== undefined &&
-    parsed.expectedSizeBytes !== expectedSizeBytes
-      ? `expectedSizeBytes expected ${parsed.expectedSizeBytes} received ${expectedSizeBytes}`
-      : undefined,
-    manifestExpectedSha256 !== undefined && expectedSha256 !== undefined && manifestExpectedSha256 !== expectedSha256
-      ? `expectedSha256 expected ${manifestExpectedSha256} received ${expectedSha256}`
-      : undefined,
-  ].filter(Boolean);
-
-  if (mismatches.length) {
-    return jsonResponse(400, {
-      error: `Chunk upload metadata mismatch for clientUploadId ${input.clientUploadId}: ${mismatches.join('; ')}.`,
-    });
-  }
-
-  const existingChunkDigest = parsed.chunkDigests?.[String(input.chunkIndex)];
-  const incomingChunkDigest = { sizeBytes: bytes.byteLength, sha256: sha256Hex(bytes) };
-
-  if (
-    existingChunkDigest &&
-    (existingChunkDigest.sizeBytes !== incomingChunkDigest.sizeBytes ||
-      existingChunkDigest.sha256.toLowerCase() !== incomingChunkDigest.sha256)
-  ) {
-    return jsonResponse(400, {
-      error: `Chunk upload digest mismatch for clientUploadId ${input.clientUploadId} chunkIndex ${input.chunkIndex}.`,
-    });
-  }
-
-  return undefined;
-};
-
-const writeChunkManifest = async (
-  store: BlobStore,
-  input: Required<Pick<UploadRequest, 'requestId' | 'clientUploadId' | 'chunkIndex' | 'totalChunks'>> & UploadRequest,
-  receivedChunkIndexes: Set<number>,
-  bytes: Buffer,
-  existingManifest?: Partial<ChunkManifest>
-) => {
-  const expectedSizeBytes = getExpectedSizeBytes(input);
-  const expectedSha256 = getExpectedSha256(input)?.toLowerCase();
-  const manifest: ChunkManifest = {
-    requestId: input.requestId,
-    clientUploadId: input.clientUploadId,
-    totalChunks: input.totalChunks,
-    artifactKind: input.artifactKind,
-    contentType: input.contentType,
-    ...(input.filename ? { filename: input.filename } : {}),
-    ...(input.label ? { label: input.label } : {}),
-    ...(input.tags?.length ? { tags: input.tags } : {}),
-    ...(expectedSizeBytes !== undefined ? { expectedSizeBytes } : {}),
-    ...(expectedSha256 ? { expectedSha256 } : {}),
-    receivedChunkIndexes: [...receivedChunkIndexes].sort((a, b) => a - b),
-    chunkDigests: {
-      ...(existingManifest?.chunkDigests ?? {}),
-      [String(input.chunkIndex)]: { sizeBytes: bytes.byteLength, sha256: sha256Hex(bytes) },
-    },
-    updatedAtISO: new Date().toISOString(),
-  };
-
-  await store.setJSON(chunkManifestKey(input.requestId, input.clientUploadId), manifest, {
-    metadata: {
-      requestId: input.requestId,
-      clientUploadId: input.clientUploadId,
-      totalChunks: String(input.totalChunks),
-      receivedChunks: String(manifest.receivedChunkIndexes.length),
-    },
-  });
-};
-
-const toChunkStatus = (totalChunks: number, receivedChunkIndexes: Set<number>): ChunkStatus => ({
-  complete: receivedChunkIndexes.size === totalChunks,
-  receivedChunks: receivedChunkIndexes.size,
-  totalChunks,
-});
-
-export const saveUploadedChunk = async (
-  store: BlobStore,
-  requestId: string,
-  clientUploadId: string,
-  chunkIndex: number,
-  totalChunks: number,
-  bytes: Buffer,
-  uploadInput?: Required<Pick<UploadRequest, 'requestId' | 'clientUploadId' | 'chunkIndex' | 'totalChunks'>> &
-    UploadRequest
-): Promise<ChunkStatus> => {
-  await store.set(chunkKey(requestId, clientUploadId, chunkIndex), bytes, {
-    metadata: {
-      requestId,
-      clientUploadId,
-      chunkIndex: String(chunkIndex),
-      totalChunks: String(totalChunks),
-    },
-  });
-
-  const existingManifest = await readChunkManifestRecord(store, requestId, clientUploadId);
-  const receivedChunkIndexes = toValidChunkIndexSet(existingManifest?.receivedChunkIndexes, totalChunks);
-  receivedChunkIndexes.add(chunkIndex);
-
-  await writeChunkManifest(
-    store,
-    uploadInput ?? {
-      requestId,
-      clientUploadId,
-      chunkIndex,
-      totalChunks,
-      artifactKind: ArtifactKind.Data,
-      contentType: 'application/octet-stream',
-      payload: '',
-    },
-    receivedChunkIndexes,
-    bytes,
-    existingManifest
-  );
-
-  return toChunkStatus(totalChunks, receivedChunkIndexes);
-};
-
-const mergeChunkManifestIntegrity = async (
-  store: BlobStore,
-  input: Required<Pick<UploadRequest, 'requestId' | 'clientUploadId' | 'chunkIndex' | 'totalChunks'>> & UploadRequest
-): Promise<UploadRequest> => {
-  const manifest = await readChunkManifestRecord(store, input.requestId, input.clientUploadId);
-
-  if (!manifest) return input;
-
-  return {
-    ...input,
-    label: input.label ?? manifest.label,
-    tags: input.tags ?? manifest.tags,
-    expectedSizeBytes: input.expectedSizeBytes ?? input.localSizeBytes ?? manifest.expectedSizeBytes,
-    expectedSha256: input.expectedSha256 ?? input.localSha256 ?? manifest.expectedSha256,
-  };
-};
-
-const assembleChunks = async (store: BlobStore, requestId: string, clientUploadId: string, totalChunks: number) => {
-  const chunks: Buffer[] = [];
-
-  for (let index = 0; index < totalChunks; index += 1) {
-    const chunk = await getArrayBuffer(store, chunkKey(requestId, clientUploadId, index));
-
-    if (!chunk) return null;
-
-    chunks.push(chunk);
-  }
-
-  return Buffer.concat(chunks);
 };
 
 const waitForStoredBytesRetry = (attemptIndex: number) => {
@@ -704,12 +432,7 @@ const shouldSaveArtifactReference = (
   );
 };
 
-export const finalizeUpload = async (
-  event: LambdaEvent,
-  input: UploadRequest,
-  finalBytes: Buffer,
-  chunkStatus?: ChunkStatus
-) => {
+export const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, finalBytes: Buffer) => {
   const reference = createArtifactReference({ input, bytes: finalBytes });
   logArtifactUpload(event, input, 'artifact_upload_finalize_started', {
     uploadId: reference.blobKey,
@@ -750,7 +473,6 @@ export const finalizeUpload = async (
     complete: true,
     deduped,
     artifact: responseReference,
-    ...(chunkStatus ? { receivedChunks: chunkStatus.receivedChunks, totalChunks: chunkStatus.totalChunks } : {}),
   });
 };
 
@@ -781,63 +503,11 @@ export const handler = async (event: LambdaEvent) => {
   logArtifactUpload(event, input, 'artifact_upload_decode_started');
   const bytes = decodePayload(input);
 
-  if (input.chunkIndex === undefined || input.totalChunks === undefined || !input.clientUploadId) {
-    const reference = createArtifactReference({ input, bytes });
-    logArtifactUpload(event, input, 'artifact_upload_decode_completed', {
-      uploadId: reference.blobKey,
-      decodedBytes: bytes.length,
-    });
+  const reference = createArtifactReference({ input, bytes });
+  logArtifactUpload(event, input, 'artifact_upload_decode_completed', {
+    uploadId: reference.blobKey,
+    decodedBytes: bytes.length,
+  });
 
-    return finalizeUpload(event, input, bytes);
-  }
-
-  const chunkInput = {
-    ...input,
-    clientUploadId: input.clientUploadId,
-    chunkIndex: input.chunkIndex,
-    totalChunks: input.totalChunks,
-  } as Required<Pick<UploadRequest, 'requestId' | 'clientUploadId' | 'chunkIndex' | 'totalChunks'>> & UploadRequest;
-  const artifactStore = await getArtifactBlobStore(event);
-  const chunkManifestValidationError = await validateChunkUploadManifest(artifactStore, chunkInput, bytes);
-
-  if (chunkManifestValidationError) return chunkManifestValidationError;
-
-  const status = await saveUploadedChunk(
-    artifactStore,
-    chunkInput.requestId,
-    chunkInput.clientUploadId,
-    chunkInput.chunkIndex,
-    chunkInput.totalChunks,
-    bytes,
-    chunkInput
-  );
-
-  if (!status.complete) {
-    return jsonResponse(202, {
-      ok: true,
-      complete: false,
-      receivedChunks: status.receivedChunks,
-      totalChunks: status.totalChunks,
-    });
-  }
-
-  const assembledBytes = await assembleChunks(
-    artifactStore,
-    chunkInput.requestId,
-    chunkInput.clientUploadId,
-    chunkInput.totalChunks
-  );
-
-  if (!assembledBytes) {
-    return jsonResponse(202, {
-      ok: true,
-      complete: false,
-      receivedChunks: status.receivedChunks,
-      totalChunks: status.totalChunks,
-    });
-  }
-
-  const finalInput = await mergeChunkManifestIntegrity(artifactStore, chunkInput);
-
-  return finalizeUpload(event, finalInput, assembledBytes, status);
+  return finalizeUpload(event, input, bytes);
 };

@@ -1,5 +1,5 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
-import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/mcp-artifact-upload-client.js';
+import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/publisher-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
@@ -276,42 +276,6 @@ const getActionName = (input: PublisherRequest) => toStringValue(input.action) ?
 const toStringArray = (value: unknown) =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 
-const createMcpEndpoint = (publishEndpoint: string) => {
-  const configured = toStringValue(process.env.NETLIFY_MCP_ENDPOINT);
-  if (configured) return configured;
-
-  return new URL('/mcp', publishEndpoint).toString();
-};
-
-const createMcpToolCaller = (endpoint: string) => async (name: string, args: Record<string, unknown>) => {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: `publisher-agent-${name}-${Date.now()}`,
-      method: 'tools/call',
-      params: { name, arguments: args },
-    }),
-  });
-  const rpc = (await response.json().catch(() => ({}))) as {
-    error?: { message?: string };
-    result?: { isError?: boolean; structuredContent?: Record<string, unknown>; content?: { text?: string }[] };
-  };
-  const result = rpc.result ?? {};
-
-  if (!response.ok || rpc.error || result.isError) {
-    const message =
-      rpc.error?.message ||
-      String(
-        result.structuredContent?.error || result.content?.[0]?.text || `${name} failed with status ${response.status}.`
-      );
-    throw new Error(message);
-  }
-
-  return result.structuredContent ?? {};
-};
-
 const createPublishTool = ({
   endpoint,
   defaultInput,
@@ -421,7 +385,7 @@ export const createPublisherAgent = ({
       'You run server-side publishing for already-approved Dr. Lurié article data.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',
       'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences when present.',
-      'If image, pdf, video, doc, audio, data, attachment, or other artifact bytes are created upstream, they must be uploaded immediately with save_artifact_chunk (using 48 KiB chunks) and stored only as the returned ArtifactReference objects.',
+      'If image, pdf, video, doc, audio, data, attachment, or other artifact bytes are created upstream, they must be uploaded immediately with create_artifact_upload_intent plus direct HTTP upload and stored only as the returned ArtifactReference objects.',
       'Do not invent or store deterministic blob keys, URLs, repo paths, or inline base64 media; artifact references must already come from server-side artifact tools.',
       'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',
       'Call publish_approved_article exactly once, then return a concise JSON-style status summary.',
@@ -534,7 +498,7 @@ export const handler = async (event: LambdaEvent) => {
       const uploadedReferences = await uploadImagesWithIntegrity({
         images: input.images,
         requestId: input.requestId,
-        mcpToolCall: createMcpToolCaller(createMcpEndpoint(env.endpoint)),
+        event,
         onWorkflowError: (message) => {
           console.error('Publisher artifact workflow error.', { articlePath, message, slug: input.slug });
         },
