@@ -8,6 +8,11 @@ import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
 import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import {
+  createArtifactUploadToken,
+  defaultArtifactUploadTokenTtlMs,
+  getDirectArtifactUploadMaxBytes,
+} from '../lib/artifact-upload.js';
 import { sha256Hex } from '../lib/crypto.js';
 import {
   cleanupUploadSessionChunks,
@@ -28,6 +33,7 @@ import {
   artifactReferenceLimits,
   isArtifactReference,
   isDeletedArtifactReference,
+  isSafeArtifactFilename,
   isSafeArtifactText,
   normalizeArtifactBlobKey,
   reconcileArtifactReference,
@@ -88,7 +94,6 @@ const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
 const WIPE_BLOB_SAMPLE_LIMIT = 20;
 const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
-const CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES = 48 * 1024;
 
 const jsonHeaders = {
   'Access-Control-Allow-Headers':
@@ -375,6 +380,24 @@ const expectedSha256JsonSchema = {
 const uploadDirectoryJsonSchema = stringSchema(
   'Optional repository upload directory used to derive metadata.repoPath, e.g. src/assets/images/uploads/<slug>/.'
 );
+const artifactUploadIntentInputSchema = () =>
+  objectSchema(
+    {
+      requestId: stringSchema('Workflow request id that owns this artifact.'),
+      artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+      contentType: stringSchema('Real MIME type of the artifact bytes, e.g. image/png or application/pdf.'),
+      filename: {
+        ...stringSchema('Optional original filename used for blob extension and ArtifactReference originalFilename.'),
+        maxLength: artifactReferenceLimits.originalFilename,
+      },
+      expectedSizeBytes: expectedSizeBytesJsonSchema,
+      expectedSha256: expectedSha256JsonSchema,
+      label: artifactLabelJsonSchema,
+      tags: artifactTagsJsonSchema,
+    },
+    ['requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+  );
+
 const uploadSessionCreateInputSchema = () =>
   objectSchema(
     {
@@ -974,8 +997,14 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ]
     : []),
   {
+    name: 'create_artifact_upload_intent',
+    description:
+      'Create a short-lived scoped direct artifact upload intent. New clients should call this tool first, then upload raw bytes with HTTP POST application/octet-stream to /api/artifacts/upload using the returned requiredHeaders. Keeps binary bytes out of MCP arguments and returns no server secrets other than the scoped upload token.',
+    inputSchema: artifactUploadIntentInputSchema(),
+  },
+  {
     name: 'save_artifact',
-    description: `Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. While available for compatibility or non-agent use, save_artifact_chunk is now the primary method for agent-driven uploads. Writes final artifact bytes and an index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
+    description: `Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. This remains the preferred/default artifact path for legacy MCP clients; 50-150 KB JPEG/PNG images should be uploaded in one call. New clients should prefer create_artifact_upload_intent plus raw HTTP upload. Writes final artifact bytes and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1002,7 +1031,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_artifact_chunk',
-    description: `Chunked byte upload. This is the primary and only default upload path for all publisher-agent artifacts. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Agents must call this immediately for created artifacts, splitting the payload into raw chunks (default 48 KiB). Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete:false until finalization; dedup is idempotent success and skips rewriting bytes.`,
+    description: `Chunked byte upload. Legacy fallback for artifacts too large for one MCP tool call. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Do not use this for ordinary 50-150 KB generated web images. Agents must call this immediately for created artifacts, splitting the payload into the largest safe chunks. Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1028,7 +1057,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         localSizeBytes: expectedSizeBytesJsonSchema,
         localSha256: expectedSha256JsonSchema,
         payload: stringSchema(
-          `Chunk bytes as base64 unless encoding is binary. Only use when the complete artifact is too large for save_artifact; target about ${CHUNKED_ARTIFACT_TARGET_CHUNK_BYTES} raw bytes per chunk when possible.`
+          `Chunk bytes as base64 unless encoding is binary. Only use when the complete artifact is too large for save_artifact; target about 256000 raw bytes per chunk when possible. Current publisher-agent guidance may use smaller chunks when required by transport reliability.`
         ),
         label: artifactLabelJsonSchema,
         tags: artifactTagsJsonSchema,
@@ -1039,7 +1068,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'probe_artifact_chunk_size',
-    description: 'Dev/admin-only diagnostic tool to test candidate raw chunk sizes for save_artifact_chunk. Detects transport truncation by comparing decoded payload to expectedChunkRawBytes.',
+    description:
+      'Dev/admin-only diagnostic tool to test candidate raw chunk sizes for save_artifact_chunk. Detects transport truncation by comparing decoded payload to expectedChunkRawBytes.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id.'),
@@ -1057,12 +1087,23 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         tags: artifactTagsJsonSchema,
         metadata: artifactMetadataJsonSchema,
       },
-      ['requestId', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload', 'expectedChunkRawBytes', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
+      [
+        'requestId',
+        'clientUploadId',
+        'chunkIndex',
+        'totalChunks',
+        'payload',
+        'expectedChunkRawBytes',
+        'artifactKind',
+        'contentType',
+        'expectedSizeBytes',
+        'expectedSha256',
+      ]
     ),
   },
   {
     name: 'save_artifact_create_upload_session',
-    description: `Create a short-lived artifact upload session. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
+    description: `Create a short-lived artifact upload session for larger binary assets. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
     inputSchema: uploadSessionCreateInputSchema(),
   },
   {
@@ -1644,6 +1685,140 @@ const callScheduledPublish = async (event: LambdaEvent, input: Record<string, un
     publish_result: publishResult.body,
     commit_metadata: commitMetadata,
   });
+};
+
+const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
+  const requestId = toNonEmptyString(input.requestId);
+  if (!requestId) return { ok: false as const, error: 'requestId is required.' };
+
+  const artifactKind = normalizeArtifactKindInput(input.artifactKind, true);
+  if (!artifactKind.ok) return artifactKind;
+  const normalizedArtifactKind = artifactKind.artifactKind as (typeof artifactKindValues)[number];
+
+  const contentType = toNonEmptyString(input.contentType);
+  if (!contentType) return { ok: false as const, error: 'contentType is required.' };
+
+  const expectedSizeBytes = Number(input.expectedSizeBytes);
+  const maxBytes = getDirectArtifactUploadMaxBytes();
+  if (!Number.isInteger(expectedSizeBytes) || expectedSizeBytes < 0) {
+    return { ok: false as const, error: 'expectedSizeBytes must be a non-negative integer.' };
+  }
+  if (expectedSizeBytes > maxBytes) {
+    return { ok: false as const, error: `expectedSizeBytes must be less than or equal to ${maxBytes}.`, maxBytes };
+  }
+
+  const expectedSha256 = toNonEmptyString(input.expectedSha256)?.toLowerCase();
+  if (!expectedSha256 || !/^[a-f0-9]{64}$/.test(expectedSha256)) {
+    return { ok: false as const, error: 'expectedSha256 must be a 64-character hex digest.' };
+  }
+
+  const filename = toNonEmptyString(input.filename);
+  if (filename && !isSafeArtifactFilename(filename)) {
+    return {
+      ok: false as const,
+      error: 'filename must not contain control characters, angle brackets, or path separators.',
+    };
+  }
+
+  const label = toNonEmptyString(input.label);
+  if (label && !isSafeArtifactText(label, artifactReferenceLimits.label)) {
+    return { ok: false as const, error: 'label must not contain control characters or angle brackets.' };
+  }
+
+  let tags: string[] | undefined;
+  if (input.tags !== undefined) {
+    if (!Array.isArray(input.tags)) return { ok: false as const, error: 'tags must be an array.' };
+    if (input.tags.length > artifactReferenceLimits.tags) {
+      return { ok: false as const, error: `tags must contain at most ${artifactReferenceLimits.tags} values.` };
+    }
+    tags = [];
+    for (const tag of input.tags) {
+      const normalizedTag = toNonEmptyString(tag);
+      if (!normalizedTag || !isSafeArtifactText(normalizedTag, artifactReferenceLimits.tag)) {
+        return { ok: false as const, error: 'tags must not contain control characters or angle brackets.' };
+      }
+      tags.push(normalizedTag);
+    }
+  }
+
+  return {
+    ok: true as const,
+    value: {
+      requestId,
+      artifactKind: normalizedArtifactKind,
+      contentType,
+      expectedSizeBytes,
+      expectedSha256,
+      ...(filename ? { filename } : {}),
+      ...(label ? { label } : {}),
+      ...(tags?.length ? { tags } : {}),
+    },
+    maxBytes,
+  };
+};
+
+const getArtifactUploadBaseUrl = (event: LambdaEvent) => {
+  const forwardedProto = toNonEmptyString(getHeader(event.headers, 'x-forwarded-proto'))?.split(',')[0]?.trim();
+  const proto = forwardedProto || 'https';
+  const forwardedHost = toNonEmptyString(getHeader(event.headers, 'x-forwarded-host'))?.split(',')[0]?.trim();
+  const host = forwardedHost || toNonEmptyString(getHeader(event.headers, 'host'));
+
+  if (!host || /[\s/]/.test(host)) return '/api/artifacts/upload';
+  return `${proto}://${host}/api/artifacts/upload`;
+};
+
+const createRequiredArtifactUploadHeaders = (input: {
+  requestId: string;
+  artifactKind: string;
+  contentType: string;
+  expectedSizeBytes: number;
+  expectedSha256: string;
+  uploadToken: string;
+  filename?: string;
+  tags?: string[];
+}) => ({
+  Authorization: `Bearer ${input.uploadToken}`,
+  'Content-Type': 'application/octet-stream',
+  'X-Artifact-Request-Id': input.requestId,
+  'X-Artifact-Kind': input.artifactKind,
+  'X-Artifact-Content-Type': input.contentType,
+  'X-Artifact-Size': String(input.expectedSizeBytes),
+  'X-Artifact-Sha256': input.expectedSha256,
+  ...(input.filename ? { 'X-Artifact-Filename': input.filename } : {}),
+  ...(input.tags?.length ? { 'X-Artifact-Tags': input.tags.join(',') } : {}),
+});
+
+const callCreateArtifactUploadIntent = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const normalized = normalizeArtifactUploadIntentInput(input);
+  if (!normalized.ok)
+    return toolError(normalized.error, 'maxBytes' in normalized ? { maxBytes: normalized.maxBytes } : {});
+
+  const expiresAt = Date.now() + defaultArtifactUploadTokenTtlMs;
+
+  try {
+    const uploadToken = createArtifactUploadToken({
+      requestId: normalized.value.requestId,
+      artifactKind: normalized.value.artifactKind,
+      contentType: normalized.value.contentType,
+      filename: normalized.value.filename,
+      label: normalized.value.label,
+      tags: normalized.value.tags,
+      expectedSizeBytes: normalized.value.expectedSizeBytes,
+      expectedSha256: normalized.value.expectedSha256,
+      expiresAt,
+    });
+
+    return toolResult({
+      ok: true,
+      uploadUrl: getArtifactUploadBaseUrl(event),
+      uploadToken,
+      expiresAtISO: new Date(expiresAt).toISOString(),
+      maxBytes: normalized.maxBytes,
+      requiredHeaders: createRequiredArtifactUploadHeaders({ ...normalized.value, uploadToken }),
+    });
+  } catch (error) {
+    return toolError(error instanceof Error ? error.message : String(error), { maxBytes: normalized.maxBytes });
+  }
 };
 
 const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, unknown>) => {
@@ -2602,8 +2777,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           method,
           payloadSizeBytes: body.byteLength,
         });
-      } catch (error: any) {
-        return toolError(`Diagnostic upload failed: ${error.message}`);
+      } catch (error: unknown) {
+        return toolError(`Diagnostic upload failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     case 'save_json_blob_create_request':
       return callAction(
@@ -2681,6 +2856,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
+    case 'create_artifact_upload_intent':
+      return callCreateArtifactUploadIntent(event, input);
     case 'save_artifact':
       return callArtifactUpload(event, {
         requestId: input.requestId,
@@ -2703,8 +2880,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       let decoded: Buffer;
       try {
         decoded = Buffer.from(payloadBase64, 'base64');
-      } catch (error: any) {
-        return toolError('base64_decode_failure', { error: error.message });
+      } catch (error: unknown) {
+        return toolError('base64_decode_failure', { error: error instanceof Error ? error.message : String(error) });
       }
 
       if (decoded.length < expectedChunkRawBytes) {
