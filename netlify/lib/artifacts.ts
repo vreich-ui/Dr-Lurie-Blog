@@ -1,4 +1,5 @@
 import { basename, extname } from 'node:path';
+import { requestArtifactReferenceKey } from './artifact-index.js';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import { sha256Hex } from './crypto.js';
 
@@ -78,10 +79,6 @@ const getBlobKeyPrefix = (blobKey: string) => {
   if (parts.length < 3) return '';
 
   return `${parts[0]}/${parts[1]}/`;
-};
-
-const requestArtifactIndexKey = (requestId: string, sha256: string) => {
-  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
 };
 
 const toBufferOrNull = (value: Buffer | ArrayBuffer | string | null) => {
@@ -183,7 +180,7 @@ const maybeUpdateArtifactIndexReference = async (
 
   await Promise.all(
     requestIds.map((requestId) =>
-      indexStore.setJSON?.(requestArtifactIndexKey(requestId, reference.sha256), correctedReference, {
+      indexStore.setJSON?.(requestArtifactReferenceKey(requestId, reference.sha256), correctedReference, {
         metadata: {
           requestId,
           sha256: reference.sha256,

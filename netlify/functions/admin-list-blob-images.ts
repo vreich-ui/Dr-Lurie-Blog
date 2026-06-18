@@ -1,6 +1,14 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { isArtifactReference, isDeletedArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
-import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
+import {
+  isArtifactReference,
+  isDeletedArtifactReference,
+  type ArtifactReference,
+} from '../lib/artifacts.js';
+import {
+  listArtifactIndexKeys,
+  resolveArtifactPointer,
+  type ArtifactIndexStore,
+} from '../lib/artifact-index.js';
 import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 const jsonHeaders = {
@@ -15,13 +23,6 @@ type LambdaEvent = {
   queryStringParameters?: Record<string, string | undefined> | null;
 };
 
-type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>> & {
-  list?: (options?: {
-    prefix?: string;
-    directories?: boolean;
-    paginate?: boolean;
-  }) => Promise<BlobListResult> | AsyncIterable<BlobListResult>;
-};
 
 const requestArtifactPrefix = 'request-artifacts/';
 const imageArtifactKind = 'image';
@@ -48,18 +49,7 @@ const requestArtifactReferenceKey = (requestId: string, sha256: string) => {
   return `${requestArtifactPrefix}${encodeURIComponent(requestId)}/${sha256}.json`;
 };
 
-const listBlobKeys = async (store: ArtifactIndexBlobStore, prefix: string) => {
-  if (typeof store.list !== 'function') {
-    throw new Error('Artifact index blob store does not support listing artifact references.');
-  }
-
-  const result = await store.list({ prefix, directories: false, paginate: true });
-  const blobs = await collectBlobListItems(result);
-
-  return blobs.map((blob) => blob.key).filter((key) => key.endsWith('.json'));
-};
-
-const parseJsonBlob = async (store: ArtifactIndexBlobStore, key: string) => {
+const parseJsonBlob = async (store: ArtifactIndexStore, key: string) => {
   const raw = await store.get(key);
   if (!raw) return undefined;
 
@@ -70,36 +60,22 @@ const parseJsonBlob = async (store: ArtifactIndexBlobStore, key: string) => {
   }
 };
 
-const loadArtifactReference = async (store: ArtifactIndexBlobStore, key: string) => {
-  const parsed = await parseJsonBlob(store, key);
-
-  return isArtifactReference(parsed) ? parsed : undefined;
-};
-
-const toNonEmptyString = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
-
-const loadArtifactReferenceFromPointer = async (store: ArtifactIndexBlobStore, key: string) => {
-  const pointer = await parseJsonBlob(store, key);
-  const pointerValue = pointer && typeof pointer === 'object' ? (pointer as Record<string, unknown>) : undefined;
-  const requestId = toNonEmptyString(pointerValue?.requestId);
-  const sha256 = toNonEmptyString(pointerValue?.sha256);
-
-  if (!requestId || !sha256) return undefined;
-
-  return loadArtifactReference(store, requestArtifactReferenceKey(requestId, sha256));
-};
-
 const isImageArtifactReference = (reference: ArtifactReference) => {
   return reference.contentType.toLowerCase().startsWith('image/') || reference.blobKey.startsWith('image/');
 };
 
-const listImageArtifacts = async (indexStore: ArtifactIndexBlobStore, requestId: string | undefined) => {
-  const pointerKeys = await listBlobKeys(indexStore, getImageArtifactPointerPrefix(requestId));
+const listImageArtifacts = async (indexStore: ArtifactIndexStore, requestId: string | undefined) => {
+  const pointerKeys = await listArtifactIndexKeys(indexStore, getImageArtifactPointerPrefix(requestId));
   const candidates = pointerKeys.length
-    ? await Promise.all(pointerKeys.map((key) => loadArtifactReferenceFromPointer(indexStore, key)))
+    ? await Promise.all(
+        pointerKeys.map(async (key) => resolveArtifactPointer(indexStore, await parseJsonBlob(indexStore, key)))
+      )
     : await Promise.all(
-        (await listBlobKeys(indexStore, getRequestArtifactPrefix(requestId))).map((key) =>
-          loadArtifactReference(indexStore, key)
+        (await listArtifactIndexKeys(indexStore, getRequestArtifactPrefix(requestId))).map(
+          async (key) => {
+            const parsed = await parseJsonBlob(indexStore, key);
+            return isArtifactReference(parsed) ? parsed : undefined;
+          }
         )
       );
 
@@ -125,7 +101,7 @@ export const handler = async (event: LambdaEvent) => {
   }
 
   try {
-    const indexStore = await getArtifactIndexBlobStore(event);
+    const indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
     const images = await listImageArtifacts(indexStore, event.queryStringParameters?.requestId);
 
     return jsonResponse(200, { images, skipped: 0 });
