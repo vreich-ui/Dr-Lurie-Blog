@@ -577,3 +577,89 @@ test('verify_article_images appears in tools/list with expected input schema', a
   assert.equal(JSON.stringify(tool).includes('PUBLISH_SECRET'), false);
 });
 
+test('create_artifact_upload_intent exposes direct upload token and required headers', async () => {
+  const previousSecret = process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
+  const previousMaxBytes = process.env.ARTIFACT_UPLOAD_MAX_BYTES;
+  process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = 'mcp-direct-upload-secret';
+  process.env.ARTIFACT_UPLOAD_MAX_BYTES = '4096';
+
+  try {
+    const body = await listTools();
+    const tool = body.result.tools.find((item) => item.name === 'create_artifact_upload_intent');
+
+    assert.ok(tool, 'Expected create_artifact_upload_intent to be registered.');
+    assert.deepEqual(tool.inputSchema.required, [
+      'requestId',
+      'artifactKind',
+      'contentType',
+      'expectedSizeBytes',
+      'expectedSha256',
+    ]);
+    assert.ok(property(tool.inputSchema, 'filename'));
+    assert.ok(property(tool.inputSchema, 'label'));
+    assert.ok(property(tool.inputSchema, 'tags'));
+    assert.equal(property(tool.inputSchema, 'metadata'), undefined);
+    assert.equal('maximum' in property(tool.inputSchema, 'expectedSizeBytes'), false);
+    assert.match(
+      String((tool as { description?: string }).description),
+      /raw bytes with HTTP POST application\/octet-stream/i
+    );
+
+    const expectedSha256 = 'a'.repeat(64);
+    const response = await handler({
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json', host: 'preview--site.netlify.app', 'x-forwarded-proto': 'https' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'create_artifact_upload_intent',
+          arguments: {
+            requestId: 'intent-request',
+            artifactKind: 'image',
+            contentType: 'image/png',
+            expectedSizeBytes: 123,
+            expectedSha256,
+            filename: 'hero.png',
+            label: 'Hero',
+            tags: ['hero', 'agent'],
+          },
+        },
+      }),
+    });
+    const result = JSON.parse(response.body).result as {
+      isError?: boolean;
+      structuredContent: {
+        uploadUrl: string;
+        uploadToken: string;
+        expiresAtISO: string;
+        maxBytes: number;
+        requiredHeaders: Record<string, string>;
+      };
+    };
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(result.isError, undefined);
+    assert.equal(result.structuredContent.uploadUrl, 'https://preview--site.netlify.app/api/artifacts/upload');
+    assert.equal(result.structuredContent.maxBytes, 4096);
+    assert.match(result.structuredContent.expiresAtISO, /^\d{4}-\d{2}-\d{2}T/);
+    assert.equal(
+      result.structuredContent.requiredHeaders.Authorization,
+      `Bearer ${result.structuredContent.uploadToken}`
+    );
+    assert.equal(result.structuredContent.requiredHeaders['Content-Type'], 'application/octet-stream');
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Request-Id'], 'intent-request');
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Kind'], 'image');
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Content-Type'], 'image/png');
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Size'], '123');
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Sha256'], expectedSha256);
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Filename'], 'hero.png');
+    assert.equal(result.structuredContent.requiredHeaders['X-Artifact-Tags'], 'hero,agent');
+  } finally {
+    if (previousSecret === undefined) delete process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
+    else process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = previousSecret;
+    if (previousMaxBytes === undefined) delete process.env.ARTIFACT_UPLOAD_MAX_BYTES;
+    else process.env.ARTIFACT_UPLOAD_MAX_BYTES = previousMaxBytes;
+  }
+});
