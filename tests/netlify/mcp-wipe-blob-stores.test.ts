@@ -83,7 +83,7 @@ const withMockBlobStores = async (fn: (stores: Record<string, TestStore>) => Pro
       values: new Map([
         ['image/request-1/image.png', 'image'],
         ['pdf/request-1/file.pdf', 'pdf'],
-        ['artifact-chunks/request/upload/0', 'chunk'],
+        ['legacy-temp/request/upload/0', 'chunk'],
       ]),
       deleted: [] as string[],
     },
@@ -180,7 +180,7 @@ test('wipe_blob_stores live delete is constrained to allowlisted prefixes', asyn
     const body = await callWipeBlobStores({
       dryRun: false,
       confirm: 'WIPE_BLOBS',
-      prefixes: ['image/', '../', 'artifact-chunks/', 'workflows/../../'],
+      prefixes: ['image/', '../', 'legacy-temp/', 'workflows/../../'],
     });
 
     assert.equal(body.result.isError, undefined);
@@ -191,7 +191,7 @@ test('wipe_blob_stores live delete is constrained to allowlisted prefixes', asyn
     assert.deepEqual(body.result.structuredContent.sampleDeletedKeys, ['image/request-1/image.png']);
     assert.deepEqual(stores.artifacts.deleted, ['image/request-1/image.png']);
     assert.ok(stores.artifacts.values.has('pdf/request-1/file.pdf'));
-    assert.ok(stores.artifacts.values.has('artifact-chunks/request/upload/0'));
+    assert.ok(stores.artifacts.values.has('legacy-temp/request/upload/0'));
     assert.ok(stores.workflows.values.has('workflows/by-id/request-1.json'));
   });
 });
