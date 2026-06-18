@@ -26,9 +26,9 @@ The mark-published step records publication state only. It must not accept, requ
 
 ## Artifact handling rules
 
-- When agents generate images, binaries, or other artifacts, call an artifact upload tool immediately. For publisher-agent activity, use `save_artifact_chunk` as the only default upload path. The client should split payloads into chunks of 48 KiB raw bytes (unless a larger size is proven reliable).
+- When agents generate images, binaries, or other artifacts, call an artifact upload tool immediately. For publisher-agent activity, use `create_artifact_upload_intent` plus raw HTTP `POST /api/artifacts/upload` as the default upload path.
 - Store the returned `ArtifactReference` in MCP workflow state or the relevant agent output. Persist the whole reference, not just a URL or filename.
-- Upload sessions and `save_artifact` remain available but are separate from the primary agent-driven path. Use `save_artifact_chunk` for reliability.
+- `save_artifact` remains available only for legacy small-artifact MCP compatibility; legacy chunk/session tools are intentionally removed. Artifact listing/admin tools read the retained ArtifactReference indexes.
 - Never construct deterministic artifact keys in the model. The artifact tool is authoritative for `blobKey`, checksum, size, content type, and creation timestamp.
 - Treat `ArtifactReference` as immutable. Regeneration means a new upload and a new reference.
 - On upload or network failure, retry the same payload/chunk and rely on checksum deduplication; do not create alternate handles manually.

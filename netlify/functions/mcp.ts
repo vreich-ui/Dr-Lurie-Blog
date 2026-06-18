@@ -1,7 +1,6 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
-import { finalizeUpload } from './save-artifact.js';
 import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
@@ -13,15 +12,6 @@ import {
   defaultArtifactUploadTokenTtlMs,
   getDirectArtifactUploadMaxBytes,
 } from '../lib/artifact-upload.js';
-import { sha256Hex } from '../lib/crypto.js';
-import {
-  cleanupUploadSessionChunks,
-  createUploadSession,
-  getFinalizeUploadSessionPayload,
-  markUploadSessionFinalized,
-  UPLOAD_SESSION_CHUNK_SIZE_BYTES,
-  UPLOAD_SESSION_MAX_BYTES,
-} from '../lib/artifact-upload-sessions.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import {
   allowedAgentNames,
@@ -377,9 +367,6 @@ const expectedSha256JsonSchema = {
   description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
 };
 
-const uploadDirectoryJsonSchema = stringSchema(
-  'Optional repository upload directory used to derive metadata.repoPath, e.g. src/assets/images/uploads/<slug>/.'
-);
 const artifactUploadIntentInputSchema = () =>
   objectSchema(
     {
@@ -396,56 +383,6 @@ const artifactUploadIntentInputSchema = () =>
       tags: artifactTagsJsonSchema,
     },
     ['requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
-  );
-
-const uploadSessionCreateInputSchema = () =>
-  objectSchema(
-    {
-      requestId: stringSchema('Workflow request id that owns this artifact.'),
-      artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
-      contentType: stringSchema('MIME type for the artifact bytes.'),
-      filename: {
-        ...stringSchema(
-          'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
-        ),
-        maxLength: artifactReferenceLimits.originalFilename,
-      },
-      expectedSizeBytes: {
-        ...expectedSizeBytesJsonSchema,
-        maximum: UPLOAD_SESSION_MAX_BYTES,
-      },
-      expectedSha256: expectedSha256JsonSchema,
-      label: artifactLabelJsonSchema,
-      tags: artifactTagsJsonSchema,
-      metadata: artifactMetadataJsonSchema,
-      uploadDirectory: uploadDirectoryJsonSchema,
-    },
-    ['requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
-  );
-const uploadSessionFinalizeInputSchema = () =>
-  objectSchema(
-    {
-      sessionId: stringSchema('Upload session id returned by create_upload_session.'),
-      requestId: stringSchema('Workflow request id that owns this artifact.'),
-      artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
-      contentType: stringSchema('MIME type for the artifact bytes.'),
-      filename: {
-        ...stringSchema(
-          'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
-        ),
-        maxLength: artifactReferenceLimits.originalFilename,
-      },
-      expectedSizeBytes: {
-        ...expectedSizeBytesJsonSchema,
-        maximum: UPLOAD_SESSION_MAX_BYTES,
-      },
-      expectedSha256: expectedSha256JsonSchema,
-      label: artifactLabelJsonSchema,
-      tags: artifactTagsJsonSchema,
-      metadata: artifactMetadataJsonSchema,
-      uploadDirectory: uploadDirectoryJsonSchema,
-    },
-    ['sessionId', 'requestId', 'artifactKind', 'contentType', 'expectedSizeBytes', 'expectedSha256']
   );
 
 const artifactListLimitJsonSchema = {
@@ -523,7 +460,7 @@ const publishPayloadJsonSchema = objectSchema(
     ),
     artifactReferences: arraySchema(
       {},
-      'ArtifactReference objects returned by save_artifact_chunk. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
+      'ArtifactReference objects returned by create_artifact_upload_intent plus direct upload or legacy save_artifact. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
     ),
     overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
     draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
@@ -1004,7 +941,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_artifact',
-    description: `Single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Agents must call this immediately after creating bytes and store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. This remains the preferred/default artifact path for legacy MCP clients; 50-150 KB JPEG/PNG images should be uploaded in one call. New clients should prefer create_artifact_upload_intent plus raw HTTP upload. Writes final artifact bytes and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
+    description: `Legacy small-artifact single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Generated binary files/images should use create_artifact_upload_intent plus raw HTTP POST /api/artifacts/upload. Writes final artifact bytes and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1028,100 +965,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       ['requestId', 'artifactKind', 'contentType', 'payload']
     ),
-  },
-  {
-    name: 'save_artifact_chunk',
-    description: `Chunked byte upload. Legacy fallback for artifacts too large for one MCP tool call. Required: requestId, artifactKind, contentType, clientUploadId, chunkIndex, totalChunks, payload. Do not use this for ordinary 50-150 KB generated web images. Agents must call this immediately for created artifacts, splitting the payload into the largest safe chunks. Store only the final returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Writes one chunk blob; when all chunks exist, assembles final artifact bytes and writes the request index. Returns complete=false until finalization; dedup is success and skips rewriting bytes.`,
-    inputSchema: objectSchema(
-      {
-        requestId: stringSchema('Workflow request id that owns this artifact.'),
-        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
-        contentType: stringSchema('MIME type for the complete artifact bytes.'),
-        clientUploadId: stringSchema('Stable UUID shared by every chunk in this upload.'),
-        chunkIndex: intSchema('Zero-based chunk index.'),
-        totalChunks: {
-          type: 'integer',
-          minimum: 1,
-          description:
-            'Total number of chunks in this upload. For normal 50-150 KB images, use save_artifact instead of splitting into chunks.',
-        },
-        filename: {
-          ...stringSchema(
-            'Optional original filename used for final blob extension and ArtifactReference originalFilename.'
-          ),
-          maxLength: artifactReferenceLimits.originalFilename,
-        },
-        encoding: artifactEncodingJsonSchema('Chunk payload encoding; defaults to base64.'),
-        expectedSizeBytes: expectedSizeBytesJsonSchema,
-        expectedSha256: expectedSha256JsonSchema,
-        localSizeBytes: expectedSizeBytesJsonSchema,
-        localSha256: expectedSha256JsonSchema,
-        payload: stringSchema(
-          `Chunk bytes as base64 unless encoding is binary. Only use when the complete artifact is too large for save_artifact; target about 256000 raw bytes per chunk when possible. Current publisher-agent guidance may use smaller chunks when required by transport reliability.`
-        ),
-        label: artifactLabelJsonSchema,
-        tags: artifactTagsJsonSchema,
-        metadata: artifactMetadataJsonSchema,
-      },
-      ['requestId', 'artifactKind', 'contentType', 'clientUploadId', 'chunkIndex', 'totalChunks', 'payload']
-    ),
-  },
-  {
-    name: 'probe_artifact_chunk_size',
-    description:
-      'Dev/admin-only diagnostic tool to test candidate raw chunk sizes for save_artifact_chunk. Detects transport truncation by comparing decoded payload to expectedChunkRawBytes.',
-    inputSchema: objectSchema(
-      {
-        requestId: stringSchema('Workflow request id.'),
-        clientUploadId: stringSchema('Stable UUID for the chunked upload session.'),
-        chunkIndex: intSchema('Zero-based chunk index.'),
-        totalChunks: intSchema('Total chunks.'),
-        payload: stringSchema('Chunk bytes as base64.'),
-        expectedChunkRawBytes: intSchema('Expected raw byte length of THIS chunk after base64 decoding.'),
-        artifactKind: artifactKindJsonSchema(),
-        contentType: stringSchema(),
-        filename: { ...stringSchema(), optional: true },
-        expectedSizeBytes: expectedSizeBytesJsonSchema,
-        expectedSha256: expectedSha256JsonSchema,
-        label: artifactLabelJsonSchema,
-        tags: artifactTagsJsonSchema,
-        metadata: artifactMetadataJsonSchema,
-      },
-      [
-        'requestId',
-        'clientUploadId',
-        'chunkIndex',
-        'totalChunks',
-        'payload',
-        'expectedChunkRawBytes',
-        'artifactKind',
-        'contentType',
-        'expectedSizeBytes',
-        'expectedSha256',
-      ]
-    ),
-  },
-  {
-    name: 'save_artifact_create_upload_session',
-    description: `Create a short-lived artifact upload session for larger binary assets. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Returns sessionId, uploadUrl, uploadToken, chunkSizeBytes=${UPLOAD_SESSION_CHUNK_SIZE_BYTES}, maxBytes=${UPLOAD_SESSION_MAX_BYTES}, and totalChunks. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call save_artifact_finalize_upload_session.`,
-    inputSchema: uploadSessionCreateInputSchema(),
-  },
-  {
-    name: 'create_upload_session',
-    description: `Create a short-lived artifact upload session. Alias of save_artifact_create_upload_session. This is optional and separate from the default publisher-agent path. Required: requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Upload chunks with HTTP PUT application/octet-stream to uploadUrl using x-upload-token, x-session-id, x-chunk-index, x-total-chunks, and optional x-chunk-sha256 headers, then call finalize_upload_session.`,
-    inputSchema: uploadSessionCreateInputSchema(),
-  },
-  {
-    name: 'save_artifact_finalize_upload_session',
-    description:
-      'Finalize a binary artifact upload session after all raw chunks have been uploaded. Verifies all chunks are present, verifies total size and sha256, writes final artifact bytes and indexes, and returns the immutable ArtifactReference. Idempotent retries return the same ArtifactReference after a session has finalized.',
-    inputSchema: uploadSessionFinalizeInputSchema(),
-  },
-  {
-    name: 'finalize_upload_session',
-    description:
-      'Finalize a binary artifact upload session. Alias of save_artifact_finalize_upload_session. Required: sessionId, requestId, artifactKind, contentType, expectedSizeBytes, expectedSha256. Optional: filename, label, tags, metadata, uploadDirectory. Returns the immutable ArtifactReference.',
-    inputSchema: uploadSessionFinalizeInputSchema(),
   },
   {
     name: 'list_artifacts_for_request',
@@ -1233,20 +1076,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     name: 'ping',
     description: 'Diagnostic tool that confirms the MCP server is reachable.',
     inputSchema: objectSchema({}),
-  },
-  {
-    name: 'diagnostic_upload',
-    description: 'Run a diagnostic HTTP PUT or POST to check the upload endpoint for 403 errors and proxy issues.',
-    inputSchema: objectSchema(
-      {
-        uploadUrl: stringSchema('The absolute upload URL to test.'),
-        uploadToken: stringSchema('The upload token to use in the x-upload-token header.'),
-        sessionId: stringSchema('The session id to use in the x-session-id header.'),
-        method: { type: 'string', enum: ['PUT', 'POST'], description: 'HTTP method to test; defaults to PUT.' },
-        payload: { type: 'string', description: 'Optional base64-encoded payload to upload.' },
-      },
-      ['uploadUrl', 'uploadToken', 'sessionId']
-    ),
   },
   ...ALLOWED_AGENTS.flatMap<ToolDefinition>((agentName) => [
     {
@@ -1827,46 +1656,6 @@ const callArtifactUpload = async (event: LambdaEvent, payload: Record<string, un
   if ('isError' in result) return result;
 
   return toolResult(result);
-};
-
-const callCreateArtifactUploadSession = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  try {
-    return toolResult(await createUploadSession(event, input));
-  } catch (error) {
-    return toolError(error instanceof Error ? error.message : String(error));
-  }
-};
-
-const callFinalizeArtifactUploadSession = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  try {
-    const finalization = await getFinalizeUploadSessionPayload(event, input);
-
-    if (!finalization.ok) return toolError(finalization.error, { statusCode: finalization.statusCode });
-    if (finalization.alreadyFinalized) {
-      return toolResult({ ok: true, complete: true, deduped: true, artifact: finalization.artifact });
-    }
-    if (!finalization.uploadInput || !finalization.bytes) {
-      return toolError('Upload session finalization did not produce artifact bytes.');
-    }
-
-    const response = await finalizeUpload(event, finalization.uploadInput, finalization.bytes);
-    const body = JSON.parse(response.body) as Record<string, unknown>;
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      return toolError(typeof body.error === 'string' ? body.error : `HTTP ${response.statusCode}`, body);
-    }
-
-    if (body.artifact && typeof body.artifact === 'object') {
-      await markUploadSessionFinalized(event, finalization.manifest, body.artifact as ArtifactReference);
-      cleanupUploadSessionChunks(event, finalization.manifest).catch((cleanupError: unknown) => {
-        console.warn('Upload session cleanup failed after finalize.', cleanupError);
-      });
-    }
-
-    return toolResult(body);
-  } catch (error) {
-    return toolError(error instanceof Error ? error.message : String(error));
-  }
 };
 
 const callAction = async (event: LambdaEvent, payload: Record<string, unknown>, resultKey: string) => {
@@ -2746,40 +2535,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
   switch (name) {
     case 'ping':
       return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
-    case 'diagnostic_upload':
-      try {
-        const method = String(input.method || 'PUT').toUpperCase();
-        const payloadBase64 = toNonEmptyString(input.payload);
-        const body = payloadBase64 ? Buffer.from(payloadBase64, 'base64') : Buffer.from('test');
-        const chunkSha256 = payloadBase64 ? sha256Hex(body) : undefined;
-
-        const fetchResponse = await fetch(String(input.uploadUrl), {
-          method,
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'x-upload-token': String(input.uploadToken),
-            'x-session-id': String(input.sessionId),
-            'x-chunk-index': '0',
-            'x-total-chunks': '1',
-            ...(chunkSha256 ? { 'x-chunk-sha256': chunkSha256 } : {}),
-          },
-          body,
-        });
-
-        const headers = Object.fromEntries(fetchResponse.headers.entries());
-        const responseBody = await fetchResponse.text();
-
-        return toolResult({
-          status: fetchResponse.status,
-          statusText: fetchResponse.statusText,
-          headers,
-          body: responseBody,
-          method,
-          payloadSizeBytes: body.byteLength,
-        });
-      } catch (error: unknown) {
-        return toolError(`Diagnostic upload failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
     case 'save_json_blob_create_request':
       return callAction(
         event,
@@ -2874,93 +2629,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         tags: input.tags,
         metadata: input.metadata,
       });
-    case 'probe_artifact_chunk_size': {
-      const payloadBase64 = toNonEmptyString(input.payload) || '';
-      const expectedChunkRawBytes = Number(input.expectedChunkRawBytes);
-      let decoded: Buffer;
-      try {
-        decoded = Buffer.from(payloadBase64, 'base64');
-      } catch (error: unknown) {
-        return toolError('base64_decode_failure', { error: error instanceof Error ? error.message : String(error) });
-      }
-
-      if (decoded.length < expectedChunkRawBytes) {
-        return toolError('transport_truncation', {
-          reason: 'received_less_than_expected',
-          expected: expectedChunkRawBytes,
-          received: decoded.length,
-          payloadChars: payloadBase64.length,
-        });
-      }
-
-      const result = await invokeSaveArtifact(event, {
-        requestId: input.requestId,
-        artifactKind: input.artifactKind,
-        contentType: input.contentType,
-        filename: input.filename,
-        clientUploadId: input.clientUploadId,
-        chunkIndex: input.chunkIndex,
-        totalChunks: input.totalChunks,
-        encoding: 'base64',
-        expectedSizeBytes: input.expectedSizeBytes,
-        expectedSha256: input.expectedSha256,
-        payload: input.payload,
-        label: input.label,
-        tags: input.tags,
-        metadata: input.metadata,
-      });
-
-      if ('isError' in result) {
-        const structuredContent = result.structuredContent as Record<string, unknown>;
-        const message = String(structuredContent?.error || result.content?.[0]?.text || 'unknown_error');
-        let failureType = 'unknown_error';
-
-        if (message.includes('Artifact size mismatch')) failureType = 'expected_size_mismatch';
-        else if (message.includes('Artifact sha256 mismatch')) failureType = 'expected_sha_mismatch';
-        else if (message.includes('Invalid artifact upload input')) failureType = 'schema_validation_failure';
-        else if (message.includes('Chunk upload digest mismatch')) failureType = 'chunk_digest_mismatch';
-
-        return toolError(message, {
-          failureType,
-          ...structuredContent,
-          probe: { transportOk: true, receivedChunkRawBytes: decoded.length },
-        });
-      }
-
-      return toolResult({
-        ...result,
-        probe: {
-          status: 'success',
-          transportOk: true,
-          receivedChunkRawBytes: decoded.length,
-        },
-      });
-    }
-    case 'save_artifact_chunk':
-      return callArtifactUpload(event, {
-        requestId: input.requestId,
-        artifactKind: input.artifactKind,
-        contentType: input.contentType,
-        filename: input.filename,
-        clientUploadId: input.clientUploadId,
-        chunkIndex: input.chunkIndex,
-        totalChunks: input.totalChunks,
-        encoding: input.encoding,
-        expectedSizeBytes: input.expectedSizeBytes,
-        expectedSha256: input.expectedSha256,
-        localSizeBytes: input.localSizeBytes,
-        localSha256: input.localSha256,
-        payload: input.payload,
-        label: input.label,
-        tags: input.tags,
-        metadata: input.metadata,
-      });
-    case 'save_artifact_create_upload_session':
-    case 'create_upload_session':
-      return callCreateArtifactUploadSession(event, input);
-    case 'save_artifact_finalize_upload_session':
-    case 'finalize_upload_session':
-      return callFinalizeArtifactUploadSession(event, input);
     case 'list_artifacts_for_request':
       return listArtifactsForRequest(event, input.requestId);
     case 'list_artifacts_by_kind':

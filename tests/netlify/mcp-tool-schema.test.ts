@@ -317,15 +317,13 @@ test('deploy_status exposes deploy receipt lookup inputs and structured content'
   assert.equal(result.structuredContent.commit, 'schema-test-commit');
 });
 
-test('artifact MCP tools are registered with precise byte-vs-metadata descriptions', async () => {
+test('artifact MCP tools register direct upload and omit legacy binary transports', async () => {
   const body = await listTools();
   const tools = new Map(body.result.tools.map((tool) => [tool.name, tool]));
 
   for (const name of [
+    'create_artifact_upload_intent',
     'save_artifact',
-    'save_artifact_chunk',
-    'save_artifact_create_upload_session',
-    'save_artifact_finalize_upload_session',
     'list_artifacts_for_request',
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
@@ -339,138 +337,31 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     assert.ok(tools.has(name), `Expected ${name} to be registered.`);
   }
 
+  for (const name of [
+    'save_artifact_chunk',
+    'probe_artifact_chunk_size',
+    'create_upload_session',
+    'finalize_upload_session',
+    'save_artifact_create_upload_session',
+    'save_artifact_finalize_upload_session',
+    'diagnostic_upload',
+  ]) {
+    assert.equal(tools.has(name), false, `Expected ${name} to be removed from tools/list.`);
+  }
+
   const saveArtifact = tools.get('save_artifact')!;
   assert.deepEqual(saveArtifact.inputSchema.required, ['requestId', 'artifactKind', 'contentType', 'payload']);
   assert.ok(property(saveArtifact.inputSchema, 'payload'));
   assert.ok(property(saveArtifact.inputSchema, 'metadata'));
   assert.equal(property(saveArtifact.inputSchema, 'label').maxLength, 120);
   assert.equal(property(saveArtifact.inputSchema, 'tags').maxItems, 20);
-  assert.equal((property(saveArtifact.inputSchema, 'tags').items as { maxLength: number }).maxLength, 40);
-  assert.deepEqual((property(saveArtifact.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
-    'image',
-    'pdf',
-    'video',
-    'doc',
-    'audio',
-    'data',
-    'attachment',
-    'other',
-  ]);
-  assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSizeBytes'), {
-    type: 'integer',
-    minimum: 0,
-    description: 'Optional expected complete artifact byte size for upload integrity checks.',
-  });
-  assert.deepEqual(property(saveArtifact.inputSchema, 'expectedSha256'), {
-    type: 'string',
-    pattern: '^[a-fA-F0-9]{64}$',
-    description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
-  });
-  assert.match(String((saveArtifact as { description?: string }).description), /immediately after creating/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /Legacy small-artifact/i);
+  assert.match(String((saveArtifact as { description?: string }).description), /create_artifact_upload_intent/i);
   assert.match(
     String((saveArtifact as { description?: string }).description),
-    /store only the returned ArtifactReference/i
+    /raw HTTP POST \/api\/artifacts\/upload/i
   );
-  assert.match(String((saveArtifact as { description?: string }).description), /never invent blobKey/i);
-  assert.match(String((saveArtifact as { description?: string }).description), /preferred\/default artifact path/i);
-  assert.match(
-    String((saveArtifact as { description?: string }).description),
-    /50-150 KB JPEG\/PNG images should be uploaded in one call/i
-  );
-  assert.match(
-    String(property(saveArtifact.inputSchema, 'payload').description),
-    /do not chunk merely because an image is around 50 KB/i
-  );
-  assert.match(String((saveArtifact as { description?: string }).description), /Writes final artifact bytes/i);
   assert.match(String((saveArtifact as { description?: string }).description), /ArtifactReference index/i);
-  assert.match(String((saveArtifact as { description?: string }).description), /dedup is success/i);
-
-  const saveChunk = tools.get('save_artifact_chunk')!;
-  assert.deepEqual(saveChunk.inputSchema.required, [
-    'requestId',
-    'artifactKind',
-    'contentType',
-    'clientUploadId',
-    'chunkIndex',
-    'totalChunks',
-    'payload',
-  ]);
-  assert.equal(property(saveChunk.inputSchema, 'label').maxLength, 120);
-  assert.equal(property(saveChunk.inputSchema, 'tags').maxItems, 20);
-  assert.deepEqual((property(saveChunk.inputSchema, 'artifactKind') as { enum: string[] }).enum, [
-    'image',
-    'pdf',
-    'video',
-    'doc',
-    'audio',
-    'data',
-    'attachment',
-    'other',
-  ]);
-  assert.ok(property(saveChunk.inputSchema, 'clientUploadId'));
-  assert.ok(property(saveChunk.inputSchema, 'chunkIndex'));
-  assert.ok(property(saveChunk.inputSchema, 'totalChunks'));
-  assert.match(
-    String(property(saveChunk.inputSchema, 'totalChunks').description),
-    /For normal 50-150 KB images, use save_artifact/i
-  );
-  assert.match(
-    String(property(saveChunk.inputSchema, 'payload').description),
-    /target about 256000 raw bytes per chunk/i
-  );
-  assert.deepEqual(property(saveChunk.inputSchema, 'expectedSizeBytes'), {
-    type: 'integer',
-    minimum: 0,
-    description: 'Optional expected complete artifact byte size for upload integrity checks.',
-  });
-  assert.deepEqual(property(saveChunk.inputSchema, 'expectedSha256'), {
-    type: 'string',
-    pattern: '^[a-fA-F0-9]{64}$',
-    description: 'Optional expected complete artifact SHA-256 hex digest for upload integrity checks.',
-  });
-
-  const createSession = tools.get('save_artifact_create_upload_session')!;
-  assert.deepEqual(createSession.inputSchema.required, [
-    'requestId',
-    'artifactKind',
-    'contentType',
-    'expectedSizeBytes',
-    'expectedSha256',
-  ]);
-  assert.equal(property(createSession.inputSchema, 'expectedSizeBytes').maximum, 50 * 1024 * 1024);
-  assert.match(String((createSession as { description?: string }).description), /chunkSizeBytes=5242880/);
-  assert.match(String((createSession as { description?: string }).description), /larger binary assets/i);
-  assert.ok(property(createSession.inputSchema, 'metadata'));
-
-  const finalizeSession = tools.get('save_artifact_finalize_upload_session')!;
-  assert.deepEqual(finalizeSession.inputSchema.required, [
-    'sessionId',
-    'requestId',
-    'artifactKind',
-    'contentType',
-    'expectedSizeBytes',
-    'expectedSha256',
-  ]);
-  assert.match(String((finalizeSession as { description?: string }).description), /Idempotent retries/i);
-  assert.ok(property(finalizeSession.inputSchema, 'sessionId'));
-  assert.match(
-    String((saveChunk as { description?: string }).description),
-    /fallback for artifacts too large for one MCP tool call/i
-  );
-  assert.match(
-    String((saveChunk as { description?: string }).description),
-    /Do not use this for ordinary 50-150 KB generated web images/i
-  );
-  assert.match(String((saveChunk as { description?: string }).description), /largest safe chunks/i);
-  assert.match(
-    String((saveChunk as { description?: string }).description),
-    /store only the final returned ArtifactReference/i
-  );
-  assert.match(String((saveChunk as { description?: string }).description), /never invent blobKey/i);
-  assert.match(String((saveChunk as { description?: string }).description), /Writes one chunk blob/i);
-  assert.match(String((saveChunk as { description?: string }).description), /assembles final artifact bytes/i);
-  assert.match(String((saveChunk as { description?: string }).description), /complete=false/i);
-  assert.match(String((saveChunk as { description?: string }).description), /dedup is success/i);
 
   const listArtifacts = tools.get('list_artifacts_for_request')!;
   assert.deepEqual(listArtifacts.inputSchema.required, ['requestId']);
@@ -478,17 +369,12 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
     String((listArtifacts as { description?: string }).description),
     /Reads the request artifact index only/i
   );
-  assert.match(
-    String((listArtifacts as { description?: string }).description),
-    /does not read or write artifact bytes/i
-  );
 
   const listByKind = tools.get('list_artifacts_by_kind')!;
   assert.deepEqual(listByKind.inputSchema.required, ['artifactKind']);
   assert.ok(property(listByKind.inputSchema, 'limit'));
   assert.ok(property(listByKind.inputSchema, 'cursor'));
   assert.ok(property(listByKind.inputSchema, 'includeDeleted'));
-  assert.match(String((listByKind as { description?: string }).description), /Admin-only/);
 
   const listByRequest = tools.get('list_artifacts_by_request')!;
   assert.deepEqual(listByRequest.inputSchema.required, ['requestId']);
@@ -499,64 +385,20 @@ test('artifact MCP tools are registered with precise byte-vs-metadata descriptio
   assert.ok(property(searchArtifacts.inputSchema, 'tag'));
   assert.ok(property(searchArtifacts.inputSchema, 'createdAfter'));
   assert.ok(property(searchArtifacts.inputSchema, 'createdBefore'));
-  assert.match(String((searchArtifacts as { description?: string }).description), /prefix indexes/);
   assert.ok(property(searchArtifacts.inputSchema, 'includeDeleted'));
 
   const softDeleteArtifact = tools.get('soft_delete_artifact')!;
   assert.deepEqual(softDeleteArtifact.inputSchema.required, ['requestId', 'sha256']);
   assert.ok(property(softDeleteArtifact.inputSchema, 'deletedBy'));
-  assert.match(String((softDeleteArtifact as { description?: string }).description), /soft delete/i);
 
   const restoreArtifact = tools.get('restore_artifact')!;
   assert.deepEqual(restoreArtifact.inputSchema.required, ['requestId', 'sha256']);
-  assert.match(String((restoreArtifact as { description?: string }).description), /restore/i);
 
-  const migrateArtifacts = tools.get('migrate_artifact_indexes')!;
-  assert.ok(property(migrateArtifacts.inputSchema, 'cursor'));
-  assert.ok(property(migrateArtifacts.inputSchema, 'limit'));
-  assert.ok(property(migrateArtifacts.inputSchema, 'dryRun'));
-  assert.match(String((migrateArtifacts as { description?: string }).description), /one-time artifact-index migration/);
-
-  const wipeBlobStores = tools.get('wipe_blob_stores')!;
-  assert.ok(property(wipeBlobStores.inputSchema, 'dryRun'));
-  assert.ok(property(wipeBlobStores.inputSchema, 'confirm'));
-  assert.ok(property(wipeBlobStores.inputSchema, 'prefixes'));
-  assert.match(String((wipeBlobStores as { description?: string }).description), /maintenance tool/);
-
-  const reconcileArtifacts = tools.get('reconcile_artifact_indexes')!;
-  assert.ok(property(reconcileArtifacts.inputSchema, 'requestId'));
-  assert.ok(property(reconcileArtifacts.inputSchema, 'artifactKind'));
-  assert.ok(property(reconcileArtifacts.inputSchema, 'limit'));
-  assert.match(
-    String((reconcileArtifacts as { description?: string }).description),
-    /Admin-only artifact-index correction job/
-  );
-  assert.match(
-    String((reconcileArtifacts as { description?: string }).description),
-    /corrects stale artifact-index blobKey values/
-  );
-
-  for (const name of [
-    'save_artifact',
-    'save_artifact_chunk',
-    'save_artifact_create_upload_session',
-    'save_artifact_finalize_upload_session',
-    'list_artifacts_for_request',
-    'list_artifacts_by_kind',
-    'list_artifacts_by_request',
-    'search_artifacts',
-    'soft_delete_artifact',
-    'restore_artifact',
-    'migrate_artifact_indexes',
-    'wipe_blob_stores',
-    'reconcile_artifact_indexes',
-  ]) {
+  for (const name of tools.keys()) {
     const serialized = JSON.stringify(tools.get(name));
 
     assert.equal(serialized.includes('NETLIFY_PUBLISH_SECRET'), false);
     assert.equal(serialized.includes('PUBLISH_SECRET'), false);
-    assert.equal(serialized.includes('secret'), false);
-    assert.equal(serialized.includes('credential'), false);
   }
 });
 

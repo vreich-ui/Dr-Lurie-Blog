@@ -28,12 +28,10 @@
 
 ## Agent artifact workflow rules
 
-- When an agent generates artifacts (images, audio, video, binary files, or markdown files), it must upload them immediately and store the returned `ArtifactReference`/`blobKey` in MCP request state or the relevant agent output. For reliability in agent-driven workflows, use `save_artifact_chunk` as the only default upload method. Split the payload into chunks of 48 KiB raw bytes (unless a larger size is proven reliable). `save_artifact` and upload sessions remain available for app-facing or non-default use but are not part of the standard publisher-agent path.
-- If a binary upload session is used (outside the default agent path), the `uploadUrl` returned by the server is an absolute URL. Use `HTTP PUT` by default for binary chunk uploads. If `PUT` is blocked (e.g., by a proxy returning 403), agents **must try HTTP POST** to the same `uploadUrl` before falling back to other methods.
-- If a binary upload fails, use the `diagnostic_upload` tool with the session details and an optional `payload` to identify whether the failure occurs at the proxy or the Netlify endpoint.
+- When an agent generates artifacts (images, audio, video, binary files, or markdown files), it must upload them immediately and store the returned `ArtifactReference`/`blobKey` in MCP request state or the relevant agent output. For generated binary files and images, use `create_artifact_upload_intent` plus raw HTTP `POST /api/artifacts/upload` as the default upload path. `save_artifact` remains available only for legacy small-artifact MCP compatibility.
 - Agents must never attempt to generate deterministic artifact blob keys themselves. Let the artifact tool return `blobKey`, `sha256`, size, content type, and timestamp.
 - Treat every `ArtifactReference` as immutable. If an artifact must be regenerated, upload it again and use the newly returned reference.
-- If an artifact upload tool call or binary chunk upload fails or times out, retry the exact same upload/chunk call and rely on idempotent chunk handling/checksum deduplication instead of inventing a new handle.
+- If an artifact upload tool call or direct HTTP upload fails or times out, retry the same upload flow when safe and rely on server-side idempotency/checksum deduplication instead of inventing a new handle.
 - Before publishing, re-fetch the workflow/request state and use the current `artifactReferences` returned from MCP. Publishing payloads may include `mediaEntries` (existing base64) and/or `artifactReferences`; do not publish until artifact references are present and resolvable by the server-side publishing path.
 - Do not ask users for, display, or pass Netlify/GitHub publishing credentials. Artifact upload, artifact resolution, and publication use server-side environment variables only.
 
