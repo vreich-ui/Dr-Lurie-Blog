@@ -6,16 +6,23 @@ import { saveArtifactBytes } from '../../netlify/lib/artifact-upload.js';
 import { handler as saveArtifactLegacyHandler } from '../../netlify/functions/save-artifact.js';
 import {
   getArtifactBlobStore,
-  getArtifactIndexBlobStore,
   setNetlifyBlobsModuleForTesting,
 } from '../../netlify/lib/blob-store.js';
-import { ArtifactKind } from '../../netlify/lib/artifacts.js';
+import { ArtifactKind, type ArtifactReference } from '../../netlify/lib/artifacts.js';
 
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 
 type FakeStoreValue = Buffer | string;
 
-const createFakeStore = (values = new Map<string, FakeStoreValue>()) => ({
+interface FakeStore {
+  set(key: string, value: string | Buffer | Uint8Array, options?: { onlyIfNew?: boolean }): Promise<{ modified: boolean }>;
+  setJSON(key: string, value: unknown): Promise<{ modified: boolean }>;
+  get(key: string, options?: { type?: 'arrayBuffer' }): Promise<ArrayBuffer | string | null>;
+  del(key: string): Promise<void>;
+  list(options?: { prefix?: string }): Promise<{ blobs: { key: string; etag: string }[]; directories: string[] }>;
+}
+
+const createFakeStore = (values = new Map<string, FakeStoreValue>()): { values: Map<string, FakeStoreValue>; store: FakeStore } => ({
   values,
   store: {
     async set(key: string, value: string | Buffer | Uint8Array, options?: { onlyIfNew?: boolean }) {
@@ -73,10 +80,10 @@ const withBlobStores = async (
     getStore(input) {
       const storeName = typeof input === 'string' ? input : input.name;
       if (storeName === 'artifacts') {
-        return artifactStore as any;
+        return artifactStore as unknown as ReturnType<typeof getArtifactBlobStore> extends Promise<infer T> ? T : never;
       }
       if (storeName === 'artifact-index') {
-        return indexStore as any;
+        return indexStore as unknown as ReturnType<typeof getArtifactBlobStore> extends Promise<infer T> ? T : never;
       }
       throw new Error(`Unexpected blob store: ${storeName}`);
     },
@@ -97,7 +104,7 @@ const withBlobStores = async (
   }
 };
 
-const callMcp = async (method: string, args: Record<string, any>) => {
+const callMcp = async (method: string, args: Record<string, unknown>) => {
   const response = await mcpHandler({
     httpMethod: 'POST',
     headers: {
@@ -156,49 +163,64 @@ test('Artifact listing and metadata retrieval', async () => {
     });
 
     // 3. Test list_artifacts_for_request
-    const list1 = await callMcp('list_artifacts_for_request', { requestId: requestId1 });
+    const list1 = (await callMcp('list_artifacts_for_request', { requestId: requestId1 })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(list1.structuredContent.artifacts.length, 1);
     assert.equal(list1.structuredContent.artifacts[0].sha256, sha1);
 
-    const list2 = await callMcp('list_artifacts_for_request', { requestId: requestId2 });
+    const list2 = (await callMcp('list_artifacts_for_request', { requestId: requestId2 })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(list2.structuredContent.artifacts.length, 1);
     assert.equal(list2.structuredContent.artifacts[0].sha256, sha2);
 
     // 4. Test list_artifacts_by_kind
-    const listKind = await callMcp('list_artifacts_by_kind', { artifactKind: 'pdf' });
+    const listKind = (await callMcp('list_artifacts_by_kind', { artifactKind: 'pdf' })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(listKind.structuredContent.artifacts.length, 2);
-    const shas = listKind.structuredContent.artifacts.map((a: any) => a.sha256);
+    const shas = listKind.structuredContent.artifacts.map((a) => a.sha256);
     assert.ok(shas.includes(sha1));
     assert.ok(shas.includes(sha2));
 
     // 5. Test list_artifacts_by_request
-    const listByReq1 = await callMcp('list_artifacts_by_request', { requestId: requestId1 });
+    const listByReq1 = (await callMcp('list_artifacts_by_request', { requestId: requestId1 })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(listByReq1.structuredContent.artifacts.length, 1);
     assert.equal(listByReq1.structuredContent.artifacts[0].sha256, sha1);
 
     // 6. Test search_artifacts by tag
-    const searchTag = await callMcp('search_artifacts', { tag: 'test-tag' });
+    const searchTag = (await callMcp('search_artifacts', { tag: 'test-tag' })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(searchTag.structuredContent.artifacts.length, 1);
     assert.equal(searchTag.structuredContent.artifacts[0].sha256, sha1);
 
     // 7. Test get_artifact_metadata (the new tool)
-    const artifactStore = (await getArtifactBlobStore({})) as any;
+    const artifactStore = (await getArtifactBlobStore({})) as unknown as FakeStore;
     const originalGet = artifactStore.get;
     let bytesRead = false;
-    artifactStore.get = async (...args: any[]) => {
+    artifactStore.get = async (key: string, options?: { type?: 'arrayBuffer' }) => {
       bytesRead = true;
-      return originalGet.apply(artifactStore, args);
+      return originalGet.call(artifactStore, key, options);
     };
 
     try {
-      const meta = await callMcp('get_artifact_metadata', { requestId: requestId1, sha256: sha1 });
+      const meta = (await callMcp('get_artifact_metadata', { requestId: requestId1, sha256: sha1 })) as {
+        structuredContent: ArtifactReference;
+      };
       assert.equal(meta.structuredContent.sha256, sha1);
       assert.equal(meta.structuredContent.label, 'Direct PDF');
       assert.ok(meta.structuredContent.blobKey);
       assert.equal(bytesRead, false, 'get_artifact_metadata should not read artifact bytes');
 
       // Test metadata not found
-      const metaNotFound = await callMcp('get_artifact_metadata', { requestId: requestId1, sha256: '0'.repeat(64) });
+      const metaNotFound = (await callMcp('get_artifact_metadata', {
+        requestId: requestId1,
+        sha256: '0'.repeat(64),
+      })) as { isError?: boolean; structuredContent: { error: string } };
       assert.equal(metaNotFound.isError, true);
       assert.match(metaNotFound.structuredContent.error, /not found/i);
     } finally {
@@ -209,19 +231,28 @@ test('Artifact listing and metadata retrieval', async () => {
     await callMcp('soft_delete_artifact', { requestId: requestId1, sha256: sha1 });
 
     // Should be hidden by default
-    const listAfterDelete = await callMcp('list_artifacts_for_request', { requestId: requestId1 });
+    const listAfterDelete = (await callMcp('list_artifacts_for_request', { requestId: requestId1 })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(listAfterDelete.structuredContent.artifacts.length, 0);
 
-    const listByKindAfterDelete = await callMcp('list_artifacts_by_kind', { artifactKind: 'pdf' });
+    const listByKindAfterDelete = (await callMcp('list_artifacts_by_kind', { artifactKind: 'pdf' })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(listByKindAfterDelete.structuredContent.artifacts.length, 1); // Only legacy one left
 
     // Should be visible with includeDeleted
-    const listWithDeleted = await callMcp('list_artifacts_by_kind', { artifactKind: 'pdf', includeDeleted: true });
+    const listWithDeleted = (await callMcp('list_artifacts_by_kind', {
+      artifactKind: 'pdf',
+      includeDeleted: true,
+    })) as { structuredContent: { artifacts: ArtifactReference[] } };
     assert.equal(listWithDeleted.structuredContent.artifacts.length, 2);
 
     // Restore and check
     await callMcp('restore_artifact', { requestId: requestId1, sha256: sha1 });
-    const listAfterRestore = await callMcp('list_artifacts_for_request', { requestId: requestId1 });
+    const listAfterRestore = (await callMcp('list_artifacts_for_request', { requestId: requestId1 })) as {
+      structuredContent: { artifacts: ArtifactReference[] };
+    };
     assert.equal(listAfterRestore.structuredContent.artifacts.length, 1);
   });
 });

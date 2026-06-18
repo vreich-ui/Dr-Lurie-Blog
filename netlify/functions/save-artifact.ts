@@ -15,7 +15,6 @@ import {
   artifactReferenceLimits,
   artifactKindValues,
   createArtifactReference,
-  isArtifactReference,
   isSafeArtifactFilename,
   isSafeArtifactText,
   type ArtifactReference,

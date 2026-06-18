@@ -5,7 +5,7 @@ import { handler as saveJsonBlobHandler } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
-import { collectBlobListItems, getBlobListItems } from '../lib/blob-list.js';
+import { collectBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
   createArtifactUploadToken,
