@@ -294,7 +294,9 @@ export type ArtifactUploadInput = {
   artifactKind: ArtifactKind;
   contentType: string;
   filename?: string;
+  /** @deprecated - obsolete legacy chunk transport field */
   chunkIndex?: number;
+  /** @deprecated - obsolete legacy chunk transport field */
   totalChunks?: number;
   encoding?: 'base64' | 'binary';
   payload: string;

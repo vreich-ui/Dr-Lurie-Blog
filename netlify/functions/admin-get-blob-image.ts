@@ -1,7 +1,6 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import {
   getImageArtifactReadDiagnostics,
-  isArtifactReference,
   reconcileImageArtifactReference,
   type ArtifactReference,
 } from '../lib/artifacts.js';
@@ -93,19 +92,6 @@ const getRequestIdFromBlobKey = (blobKey: string) => {
   const [, requestId = ''] = blobKey.split('/');
 
   return requestId.trim();
-};
-
-const loadArtifactReference = async (store: ArtifactIndexStore, key: string) => {
-  const raw = await store.get(key);
-  if (!raw) return undefined;
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-
-    return isArtifactReference(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
 };
 
 const findArtifactReferenceByBlobKey = async (store: ArtifactIndexStore, blobKey: string) => {

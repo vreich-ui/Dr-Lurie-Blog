@@ -45,10 +45,6 @@ const getImageArtifactPointerPrefix = (requestId: string | undefined) => {
   return trimmed ? `by-request/${encodeURIComponent(trimmed)}/${imageArtifactKind}/` : `by-kind/${imageArtifactKind}/`;
 };
 
-const requestArtifactReferenceKey = (requestId: string, sha256: string) => {
-  return `${requestArtifactPrefix}${encodeURIComponent(requestId)}/${sha256}.json`;
-};
-
 const parseJsonBlob = async (store: ArtifactIndexStore, key: string) => {
   const raw = await store.get(key);
   if (!raw) return undefined;
