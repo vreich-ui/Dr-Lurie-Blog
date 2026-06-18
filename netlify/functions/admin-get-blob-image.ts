@@ -5,7 +5,12 @@ import {
   reconcileImageArtifactReference,
   type ArtifactReference,
 } from '../lib/artifacts.js';
-import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
+import {
+  listArtifactIndexKeys,
+  readArtifactReference,
+  resolveArtifactPointer,
+  type ArtifactIndexStore,
+} from '../lib/artifact-index.js';
 import {
   getArtifactBlobStore,
   getArtifactIndexBlobStore,
@@ -30,13 +35,6 @@ type LambdaEvent = {
   queryStringParameters?: Record<string, string | undefined> | null;
 };
 
-type ArtifactIndexBlobStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>> & {
-  list?: (options?: {
-    prefix?: string;
-    directories?: boolean;
-    paginate?: boolean;
-  }) => Promise<BlobListResult> | AsyncIterable<BlobListResult>;
-};
 
 const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   statusCode,
@@ -97,7 +95,7 @@ const getRequestIdFromBlobKey = (blobKey: string) => {
   return requestId.trim();
 };
 
-const loadArtifactReference = async (store: ArtifactIndexBlobStore, key: string) => {
+const loadArtifactReference = async (store: ArtifactIndexStore, key: string) => {
   const raw = await store.get(key);
   if (!raw) return undefined;
 
@@ -110,25 +108,22 @@ const loadArtifactReference = async (store: ArtifactIndexBlobStore, key: string)
   }
 };
 
-const findArtifactReferenceByBlobKey = async (store: ArtifactIndexBlobStore, blobKey: string) => {
+const findArtifactReferenceByBlobKey = async (store: ArtifactIndexStore, blobKey: string) => {
   const requestId = getRequestIdFromBlobKey(blobKey);
   const sha = getShaFromBlobKey(blobKey);
-  const directIndexKey = requestId && sha ? `request-artifacts/${encodeURIComponent(requestId)}/${sha}.json` : '';
 
-  if (directIndexKey) {
-    const directReference = await loadArtifactReference(store, directIndexKey);
+  if (requestId && sha) {
+    const directReference = await readArtifactReference(store, requestId, sha);
     if (directReference?.blobKey === blobKey) return directReference;
   }
 
-  if (typeof store.list !== 'function') return undefined;
+  const keys = await listArtifactIndexKeys(store, 'request-artifacts/');
 
-  const result = await store.list({ prefix: 'request-artifacts/', directories: false, paginate: true });
-  const blobs = await collectBlobListItems(result);
-
-  for (const blob of blobs) {
-    if (!blob.key.endsWith('.json') || blob.key === directIndexKey) continue;
-
-    const reference = await loadArtifactReference(store, blob.key);
+  for (const key of keys) {
+    const reference = await resolveArtifactPointer(store, {
+      requestId: key.split('/')[1] ? decodeURIComponent(key.split('/')[1]) : '',
+      sha256: key.split('/').pop()?.replace('.json', '') ?? '',
+    });
     if (reference?.blobKey === blobKey) return reference;
   }
 
@@ -143,7 +138,7 @@ const resolveArtifactContentType = async (
   try {
     let indexedContentType = getConcreteImageContentType(reference?.contentType);
     if (!indexedContentType) {
-      const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
+      const indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
       reference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
       indexedContentType = getConcreteImageContentType(reference?.contentType);
     }
@@ -165,7 +160,7 @@ export const readAdminBlobImage = async (event: LambdaEvent, blobKey: string) =>
   let contentTypeSource: ContentTypeSource = 'missing';
 
   try {
-    const indexStore = (await getArtifactIndexBlobStore(event)) as ArtifactIndexBlobStore;
+    const indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
     const indexedReference = await findArtifactReferenceByBlobKey(indexStore, blobKey);
     const resolvedContentType = await resolveArtifactContentType(event, blobKey, indexedReference);
     const { contentType } = resolvedContentType;
