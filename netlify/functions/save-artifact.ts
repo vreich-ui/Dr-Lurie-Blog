@@ -18,10 +18,14 @@ import {
   isArtifactReference,
   isSafeArtifactFilename,
   isSafeArtifactText,
-  safePathSegment,
   type ArtifactReference,
   type ArtifactUploadInput,
 } from '../lib/artifacts.js';
+import {
+  readArtifactReference,
+  writeArtifactReferenceIndexes,
+  type ArtifactIndexStore,
+} from '../lib/artifact-index.js';
 import { getHeader } from '../lib/admin-auth.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { sha256Hex } from '../lib/crypto.js';
@@ -260,39 +264,6 @@ const validateFinalArtifact = async (event: LambdaEvent, input: UploadRequest, b
   return validateImageArtifact(input, bytes);
 };
 
-const requestArtifactIndexKey = (requestId: string, sha256: string) => {
-  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
-};
-
-const getArtifactKindFromReference = (reference: ArtifactReference): ArtifactKind => {
-  const [artifactKind] = reference.blobKey.split('/');
-
-  return artifactKind as ArtifactKind;
-};
-
-const artifactPointerValue = (requestId: string, reference: ArtifactReference) => ({
-  requestId,
-  sha256: reference.sha256,
-  artifactKind: getArtifactKindFromReference(reference),
-});
-
-const artifactKindPointerKey = (reference: ArtifactReference) => {
-  const pointer = artifactPointerValue('', reference);
-
-  return `by-kind/${pointer.artifactKind}/${reference.sha256}.json`;
-};
-
-const artifactRequestPointerKey = (requestId: string, reference: ArtifactReference) => {
-  const pointer = artifactPointerValue(requestId, reference);
-
-  return `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${reference.sha256}.json`;
-};
-
-const artifactTagPointerKeys = (reference: ArtifactReference) => {
-  const tags = reference.tags ?? [];
-
-  return [...new Set(tags.map(safePathSegment).filter(Boolean))].map((tag) => `by-tag/${tag}/${reference.sha256}.json`);
-};
 
 const getArrayBuffer = async (store: BlobStore, key: string) => {
   const binaryStore = store as BinaryReadableBlobStore;
@@ -368,46 +339,6 @@ const saveFinalArtifact = async (store: BlobStore, reference: ArtifactReference,
   return { deduped: false, integrityError };
 };
 
-const getExistingReference = async (store: BlobStore, requestId: string, sha256: string) => {
-  const existing = await store.get(requestArtifactIndexKey(requestId, sha256));
-
-  if (!existing) return undefined;
-
-  try {
-    const parsed = JSON.parse(existing) as unknown;
-
-    return isArtifactReference(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const saveReferencePointers = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
-  const pointer = artifactPointerValue(requestId, reference);
-  const pointerMetadata = {
-    requestId,
-    sha256: reference.sha256,
-    artifactKind: pointer.artifactKind,
-  };
-  const pointerWrites = [
-    store.setJSON(artifactKindPointerKey(reference), pointer, { metadata: pointerMetadata }),
-    store.setJSON(artifactRequestPointerKey(requestId, reference), pointer, { metadata: pointerMetadata }),
-    ...artifactTagPointerKeys(reference).map((key) => store.setJSON(key, pointer, { metadata: pointerMetadata })),
-  ];
-
-  await Promise.all(pointerWrites);
-};
-
-const saveReference = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
-  await store.setJSON(requestArtifactIndexKey(requestId, reference.sha256), reference, {
-    metadata: {
-      requestId,
-      sha256: reference.sha256,
-      contentType: reference.contentType,
-    },
-  });
-  await saveReferencePointers(store, requestId, reference);
-};
 
 const mergeArtifactReferenceDisplayFields = (
   existingReference: ArtifactReference,
@@ -444,13 +375,13 @@ export const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, f
   if (validationError) return validationError;
 
   const artifactStore = await getArtifactBlobStore(event);
-  const indexStore = await getArtifactIndexBlobStore(event);
+  const indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const { deduped, integrityError } = await saveFinalArtifact(artifactStore, reference, finalBytes);
 
   if (integrityError) return integrityError;
 
   const existingReference = deduped
-    ? await getExistingReference(indexStore, input.requestId, reference.sha256)
+    ? await readArtifactReference(indexStore, input.requestId, reference.sha256)
     : undefined;
   const responseReference =
     existingReference?.blobKey === reference.blobKey
@@ -458,9 +389,9 @@ export const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, f
       : reference;
 
   if (shouldSaveArtifactReference(existingReference, responseReference)) {
-    await saveReference(indexStore, input.requestId, responseReference);
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, responseReference);
   } else {
-    await saveReferencePointers(indexStore, input.requestId, responseReference);
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, responseReference);
   }
 
   logArtifactUpload(event, input, 'artifact_upload_finalize_completed', {

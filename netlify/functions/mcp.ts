@@ -30,6 +30,14 @@ import {
   safePathSegment,
   type ArtifactReference,
 } from '../lib/artifacts.js';
+import {
+  listArtifactIndexKeys,
+  readArtifactReference,
+  requestArtifactReferenceKey,
+  resolveArtifactPointer,
+  writeArtifactReferenceIndexes,
+  type ArtifactIndexStore,
+} from '../lib/artifact-index.js';
 
 type StructuredLogPayload = {
   event: string;
@@ -976,6 +984,18 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'get_artifact_metadata',
+    description:
+      'Get full ArtifactReference metadata for a requestId and sha256. Does not read artifact bytes.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns the artifact.'),
+        sha256: expectedSha256JsonSchema,
+      },
+      ['requestId', 'sha256']
+    ),
+  },
+  {
     name: 'list_artifacts_by_kind',
     description:
       'Admin-only artifact browser. Lists artifacts via artifact-index/by-kind/{artifactKind}/ pointers and resolves them to ArtifactReference objects. Does not read artifact bytes.',
@@ -1713,7 +1733,6 @@ const callMarkAgentComplete = (event: LambdaEvent, input: Record<string, unknown
   return callNormalizedAction(event, () => createMarkAgentCompletePayload(input, agentName), 'record');
 };
 
-type ArtifactIndexStore = Awaited<ReturnType<typeof getArtifactIndexBlobStore>>;
 type ArtifactBlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
 
 type ArtifactBrowseOptions = {
@@ -1722,10 +1741,6 @@ type ArtifactBrowseOptions = {
   cursor: number;
   includeDeleted: boolean;
   limit: number;
-};
-
-const requestArtifactReferenceKey = (requestId: string, sha256: string) => {
-  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
 };
 
 const parseJsonBlob = async (store: ArtifactIndexStore, key: string) => {
@@ -1739,35 +1754,8 @@ const parseJsonBlob = async (store: ArtifactIndexStore, key: string) => {
   }
 };
 
-const loadArtifactFromPointer = async (store: ArtifactIndexStore, pointer: unknown) => {
-  const value = getRecordValue(pointer);
-  const pointerRequestId = toNonEmptyString(value?.requestId);
-  const sha256 = toNonEmptyString(value?.sha256);
-
-  if (!pointerRequestId || !sha256) return undefined;
-
-  return parseJsonBlob(store, requestArtifactReferenceKey(pointerRequestId, sha256));
-};
-
-const listPointerKeys = async (store: ArtifactIndexStore, prefixes: string[]) => {
-  const keys: string[] = [];
-
-  for (const prefix of prefixes) {
-    const result = await store.list({ prefix });
-    keys.push(...getBlobListItems(result).map((blob) => blob.key));
-  }
-
-  return [...new Set(keys)].filter((key) => key.endsWith('.json')).sort();
-};
-
-const loadArtifactsFromPrefix = async (store: ArtifactIndexStore, prefix: string) => {
-  const keys = await listPointerKeys(store, [prefix]);
-
-  return Promise.all(keys.map((key) => parseJsonBlob(store, key)));
-};
-
 const loadArtifactIndexKeysFromPrefix = async (store: ArtifactIndexStore, prefix: string, limit: number) => {
-  const keys = await listPointerKeys(store, [prefix]);
+  const keys = await listArtifactIndexKeys(store, prefix);
 
   return keys.slice(0, limit);
 };
@@ -1933,10 +1921,16 @@ const listArtifactsFromPointerPrefixes = async (
   prefixes: string[],
   options: ArtifactBrowseOptions
 ) => {
-  const store = await getArtifactIndexBlobStore(event);
-  const pointerKeys = await listPointerKeys(store, prefixes);
+  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const pointerKeys: string[] = [];
+
+  for (const prefix of prefixes) {
+    pointerKeys.push(...(await listArtifactIndexKeys(store, prefix)));
+  }
+
+  const uniquePointerKeys = [...new Set(pointerKeys)].sort();
   const artifacts = await Promise.all(
-    pointerKeys.map(async (key) => loadArtifactFromPointer(store, await parseJsonBlob(store, key)))
+    uniquePointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key)))
   );
   const filteredArtifacts = filterArtifactsForBrowse(
     artifacts.filter((artifact) => artifact !== undefined),
@@ -1956,6 +1950,8 @@ const getAdminToolState = async (event: LambdaEvent) => {
 };
 
 const requireAdminToolAccess = async (event: LambdaEvent) => {
+  if (hasValidNetlifyPublishSecret(event)) return undefined;
+
   const adminState = await getAdminToolState(event);
 
   return 'isError' in adminState ? adminState : undefined;
@@ -2029,19 +2025,40 @@ const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) =
     return toolError('requestId is required.');
   }
 
-  const store = await getArtifactIndexBlobStore(event);
+  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const pointerPrefix = `by-request/${encodeURIComponent(normalizedRequestId)}/`;
-  const pointerResult = await store.list({ prefix: pointerPrefix });
-  const pointerBlobs = getBlobListItems(pointerResult);
-  const artifacts = pointerBlobs.length
+  const pointerKeys = await listArtifactIndexKeys(store, pointerPrefix);
+
+  const artifacts = pointerKeys.length
     ? await Promise.all(
-        pointerBlobs.map(async (blob) => loadArtifactFromPointer(store, await parseJsonBlob(store, blob.key)))
+        pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key)))
       )
-    : await loadArtifactsFromPrefix(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`);
+    : await Promise.all(
+        (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`)).map(
+          (key) => parseJsonBlob(store, key)
+        )
+      );
 
   return toolResult({
     artifacts: artifacts.filter((artifact) => artifact !== undefined && !isDeletedArtifactReference(artifact)),
   });
+};
+
+const getArtifactMetadata = async (event: LambdaEvent, requestId: unknown, sha256: unknown) => {
+  const normalizedRequestId = typeof requestId === 'string' ? requestId.trim() : '';
+  if (!normalizedRequestId) {
+    return toolError('requestId is required.');
+  }
+
+  const normalizedSha256 = normalizeArtifactSha256Input(sha256);
+  if (!normalizedSha256.ok) return toolError(normalizedSha256.error);
+
+  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const artifact = await readArtifactReference(store, normalizedRequestId, normalizedSha256.sha256);
+
+  if (!artifact) return toolError('Artifact reference was not found.');
+
+  return toolResult(artifact);
 };
 
 const listArtifactsByKind = async (event: LambdaEvent, input: Record<string, unknown>) => {
@@ -2178,29 +2195,6 @@ const getMigrationTags = (value: unknown) => {
   return tags.length ? tags : undefined;
 };
 
-const buildArtifactPointer = (requestId: string, artifact: ArtifactReference) => ({
-  requestId,
-  sha256: artifact.sha256,
-  artifactKind: artifact.artifactKind ?? getArtifactKindFromBlobKey(artifact.blobKey),
-});
-
-const writeMigratedArtifactPointers = async (
-  store: ArtifactIndexStore,
-  requestId: string,
-  artifact: ArtifactReference
-) => {
-  const pointer = buildArtifactPointer(requestId, artifact);
-  const pointerMetadata = { requestId, sha256: artifact.sha256, artifactKind: pointer.artifactKind };
-
-  await Promise.all([
-    store.setJSON(`by-kind/${pointer.artifactKind}/${artifact.sha256}.json`, pointer, { metadata: pointerMetadata }),
-    store.setJSON(
-      `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${artifact.sha256}.json`,
-      pointer,
-      { metadata: pointerMetadata }
-    ),
-  ]);
-};
 
 const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string, input: { dryRun: boolean }) => {
   const parsedKey = parseRequestArtifactIndexKey(key);
@@ -2232,8 +2226,11 @@ const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string
 
   const referenceChanged = JSON.stringify(record) !== JSON.stringify(migratedRecord);
   if (!input.dryRun) {
-    if (referenceChanged) await writeArtifactReferenceForAdminMutation(store, parsedKey.requestId, migratedRecord);
-    await writeMigratedArtifactPointers(store, parsedKey.requestId, migratedRecord);
+    if (referenceChanged) {
+      await writeArtifactReferenceForAdminMutation(store, parsedKey.requestId, migratedRecord);
+    } else {
+      await writeArtifactReferenceIndexes(store, parsedKey.requestId, migratedRecord);
+    }
   }
 
   return {
@@ -2403,8 +2400,8 @@ const migrateArtifactIndexes = async (event: LambdaEvent, input: Record<string, 
   if (!cursor.ok) return toolError(cursor.error);
 
   const dryRun = input.dryRun === true;
-  const store = await getArtifactIndexBlobStore(event);
-  const keys = await listPointerKeys(store, ['request-artifacts/']);
+  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const keys = await listArtifactIndexKeys(store, 'request-artifacts/');
   const pageKeys = keys.slice(cursor.value, cursor.value + limit.value);
   const results: Array<Awaited<ReturnType<typeof migrateArtifactIndexRecord>>> = [];
 
@@ -2444,8 +2441,10 @@ const migrateArtifactIndexes = async (event: LambdaEvent, input: Record<string, 
 };
 
 const softDeleteArtifact = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const unauthorized = await requireAdminToolAccess(event);
+  if (unauthorized) return unauthorized;
+
   const adminState = await getAdminToolState(event);
-  if ('isError' in adminState) return adminState;
 
   const requestId = toNonEmptyString(input.requestId);
   if (!requestId) return toolError('requestId is required.');
@@ -2453,11 +2452,13 @@ const softDeleteArtifact = async (event: LambdaEvent, input: Record<string, unkn
   const sha256 = normalizeArtifactSha256Input(input.sha256);
   if (!sha256.ok) return toolError(sha256.error);
 
-  const store = await getArtifactIndexBlobStore(event);
+  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
   if (!loaded.ok) return toolError(loaded.error);
 
-  const deletedBy = normalizeDeletedByInput(input.deletedBy, adminState.email ?? adminState.userId ?? 'admin');
+  const adminEmail = !('isError' in adminState) ? adminState.email : undefined;
+  const adminUserId = !('isError' in adminState) ? adminState.userId : undefined;
+  const deletedBy = normalizeDeletedByInput(input.deletedBy, adminEmail ?? adminUserId ?? 'admin');
   if (!deletedBy.ok) return toolError(deletedBy.error);
 
   const deletedArtifact: ArtifactReference = {
@@ -2481,7 +2482,7 @@ const restoreArtifact = async (event: LambdaEvent, input: Record<string, unknown
   const sha256 = normalizeArtifactSha256Input(input.sha256);
   if (!sha256.ok) return toolError(sha256.error);
 
-  const store = await getArtifactIndexBlobStore(event);
+  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
   if (!loaded.ok) return toolError(loaded.error);
 
@@ -2631,6 +2632,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       });
     case 'list_artifacts_for_request':
       return listArtifactsForRequest(event, input.requestId);
+    case 'get_artifact_metadata':
+      return getArtifactMetadata(event, input.requestId, input.sha256);
     case 'list_artifacts_by_kind':
       return listArtifactsByKind(event, input);
     case 'list_artifacts_by_request':

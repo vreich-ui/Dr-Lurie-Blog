@@ -4,13 +4,16 @@ import {
   artifactKindSet,
   artifactReferenceLimits,
   createArtifactReference,
-  isArtifactReference,
   isSafeArtifactFilename,
   isSafeArtifactText,
-  safePathSegment,
   type ArtifactKind,
   type ArtifactReference,
 } from './artifacts.js';
+import {
+  readArtifactReference,
+  writeArtifactReferenceIndexes,
+  type ArtifactIndexStore,
+} from './artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from './blob-store.js';
 import { sha256Hex } from './crypto.js';
 import { ImageValidationError, validatePublishImageBytes } from './image-validation.js';
@@ -236,33 +239,6 @@ export const verifyArtifactUploadToken = ({
   return { ok: true, claims };
 };
 
-const requestArtifactIndexKey = (requestId: string, sha256: string) => {
-  return `request-artifacts/${encodeURIComponent(requestId)}/${sha256}.json`;
-};
-
-const artifactPointerValue = (requestId: string, reference: ArtifactReference) => ({
-  requestId,
-  sha256: reference.sha256,
-  artifactKind: reference.artifactKind ?? (reference.blobKey.split('/')[0] as ArtifactKind),
-});
-
-const artifactKindPointerKey = (reference: ArtifactReference) => {
-  const pointer = artifactPointerValue('', reference);
-  return `by-kind/${pointer.artifactKind}/${reference.sha256}.json`;
-};
-
-const artifactRequestPointerKey = (requestId: string, reference: ArtifactReference) => {
-  const pointer = artifactPointerValue(requestId, reference);
-  return `by-request/${encodeURIComponent(requestId)}/${pointer.artifactKind}/${reference.sha256}.json`;
-};
-
-const artifactTagPointerKeys = (reference: ArtifactReference) => {
-  const tags = reference.tags ?? [];
-  return Array.from(new Set(tags.map(safePathSegment).filter(Boolean))).map(
-    (tag) => `by-tag/${tag}/${reference.sha256}.json`
-  );
-};
-
 const toBuffer = (bytes: Buffer | Uint8Array) => (Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
 
 const toBufferOrNull = (value: ArrayBuffer | Buffer | string | null) => {
@@ -275,44 +251,6 @@ const toBufferOrNull = (value: ArrayBuffer | Buffer | string | null) => {
 const getArrayBuffer = async (store: BlobStore, key: string) => {
   const binaryStore = store as BinaryReadableBlobStore;
   return toBufferOrNull(await binaryStore.get(key, { type: 'arrayBuffer' }));
-};
-
-const readArtifactReference = async (store: BlobStore, requestId: string, sha256: string) => {
-  const existing = await store.get(requestArtifactIndexKey(requestId, sha256));
-  if (!existing) return undefined;
-
-  try {
-    const parsed = JSON.parse(existing) as unknown;
-    return isArtifactReference(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const writeReferencePointers = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
-  const pointer = artifactPointerValue(requestId, reference);
-  const pointerMetadata = {
-    requestId,
-    sha256: reference.sha256,
-    artifactKind: pointer.artifactKind,
-  };
-
-  await Promise.all([
-    store.setJSON(artifactKindPointerKey(reference), pointer, { metadata: pointerMetadata }),
-    store.setJSON(artifactRequestPointerKey(requestId, reference), pointer, { metadata: pointerMetadata }),
-    ...artifactTagPointerKeys(reference).map((key) => store.setJSON(key, pointer, { metadata: pointerMetadata })),
-  ]);
-};
-
-const writeArtifactReference = async (store: BlobStore, requestId: string, reference: ArtifactReference) => {
-  await store.setJSON(requestArtifactIndexKey(requestId, reference.sha256), reference, {
-    metadata: {
-      requestId,
-      sha256: reference.sha256,
-      contentType: reference.contentType,
-    },
-  });
-  await writeReferencePointers(store, requestId, reference);
 };
 
 const validateBytesAgainstIntent = (
@@ -402,7 +340,7 @@ export const saveArtifactBytes = async (input: SaveArtifactBytesInput): Promise<
   });
 
   const artifactStore = await getArtifactBlobStore(input.event);
-  const indexStore = await getArtifactIndexBlobStore(input.event);
+  const indexStore = (await getArtifactIndexBlobStore(input.event)) as unknown as ArtifactIndexStore;
   const existingReference = await readArtifactReference(indexStore, input.requestId, reference.sha256);
 
   if (existingReference) {
@@ -422,7 +360,7 @@ export const saveArtifactBytes = async (input: SaveArtifactBytesInput): Promise<
       };
     }
 
-    await writeReferencePointers(indexStore, input.requestId, existingReference);
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, existingReference);
     return { ok: true, artifact: existingReference, deduped: true };
   }
 
@@ -432,7 +370,7 @@ export const saveArtifactBytes = async (input: SaveArtifactBytesInput): Promise<
       return { ok: false, statusCode: 409, error: 'Artifact blob already exists with different bytes.' };
     }
 
-    await writeArtifactReference(indexStore, input.requestId, reference);
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, reference);
     return { ok: true, artifact: reference, deduped: true };
   }
 
@@ -453,6 +391,6 @@ export const saveArtifactBytes = async (input: SaveArtifactBytesInput): Promise<
     return { ok: false, statusCode: 500, error: 'Artifact blob write failed integrity verification.' };
   }
 
-  await writeArtifactReference(indexStore, input.requestId, reference);
+  await writeArtifactReferenceIndexes(indexStore, input.requestId, reference);
   return { ok: true, artifact: reference, deduped: false };
 };
