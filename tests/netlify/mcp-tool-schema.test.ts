@@ -325,6 +325,7 @@ test('artifact MCP tools register direct upload and omit legacy binary transport
     'create_artifact_upload_intent',
     'save_artifact',
     'list_artifacts_for_request',
+    'get_artifact_metadata',
     'list_artifacts_by_kind',
     'list_artifacts_by_request',
     'search_artifacts',
