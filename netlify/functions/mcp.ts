@@ -28,6 +28,7 @@ import {
   normalizeArtifactBlobKey,
   reconcileArtifactReference,
   safePathSegment,
+  type ArtifactKind,
   type ArtifactReference,
 } from '../lib/artifacts.js';
 import {
@@ -38,6 +39,7 @@ import {
   writeArtifactReferenceIndexes,
   type ArtifactIndexStore,
 } from '../lib/artifact-index.js';
+import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
 
 type StructuredLogPayload = {
   event: string;
@@ -946,6 +948,29 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     description:
       'Create a short-lived scoped direct artifact upload intent. New clients should call this tool first, then upload raw bytes with HTTP POST application/octet-stream to /api/artifacts/upload using the returned requiredHeaders. Keeps binary bytes out of MCP arguments and returns no server secrets other than the scoped upload token.',
     inputSchema: artifactUploadIntentInputSchema(),
+  },
+  {
+    name: 'create_artifact_from_url',
+    description:
+      'Fallback tool to ingest an artifact from a public HTTPS URL. Use this when the MCP client cannot perform a direct HTTP POST of binary bytes. The server fetches the URL and saves it as a request artifact.',
+    inputSchema: objectSchema(
+      {
+        requestId: stringSchema('Workflow request id that owns this artifact.'),
+        artifactKind: artifactKindJsonSchema('Artifact kind for storage routing.'),
+        contentType: stringSchema('MIME type of the artifact bytes.'),
+        sourceUrl: stringSchema('Public HTTPS URL of the artifact to fetch.'),
+        expectedSizeBytes: expectedSizeBytesJsonSchema,
+        expectedSha256: expectedSha256JsonSchema,
+        filename: {
+          ...stringSchema('Optional original filename used for blob extension and ArtifactReference originalFilename.'),
+          maxLength: artifactReferenceLimits.originalFilename,
+        },
+        label: artifactLabelJsonSchema,
+        tags: artifactTagsJsonSchema,
+        metadata: artifactMetadataJsonSchema,
+      },
+      ['requestId', 'artifactKind', 'contentType', 'sourceUrl', 'expectedSizeBytes', 'expectedSha256']
+    ),
   },
   {
     name: 'save_artifact',
@@ -2614,6 +2639,75 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
+    case 'create_artifact_from_url': {
+      const requestId = toNonEmptyString(input.requestId);
+      if (!requestId) return toolError('requestId is required.');
+
+      const artifactKind = toNonEmptyString(input.artifactKind);
+      if (!artifactKind || !artifactKindValues.includes(artifactKind as ArtifactKind)) {
+        return toolError(`artifactKind must be one of: ${artifactKindValues.join(', ')}.`);
+      }
+
+      const contentType = toNonEmptyString(input.contentType);
+      if (!contentType) return toolError('contentType is required.');
+
+      const sourceUrl = toNonEmptyString(input.sourceUrl);
+      if (!sourceUrl) return toolError('sourceUrl is required.');
+
+      const expectedSizeBytes = Number(input.expectedSizeBytes);
+      if (!Number.isInteger(expectedSizeBytes) || expectedSizeBytes < 0) {
+        return toolError('expectedSizeBytes must be a non-negative integer.');
+      }
+
+      const expectedSha256 = toNonEmptyString(input.expectedSha256)?.toLowerCase();
+      if (!expectedSha256 || !/^[a-f0-9]{64}$/.test(expectedSha256)) {
+        return toolError('expectedSha256 must be a 64-character hex digest.');
+      }
+
+      const filename = toNonEmptyString(input.filename);
+      if (filename && !isSafeArtifactFilename(filename)) {
+        return toolError('filename contains unsafe characters or is too long.');
+      }
+
+      const label = toNonEmptyString(input.label);
+      if (label && !isSafeArtifactText(label, artifactReferenceLimits.label)) {
+        return toolError('label contains unsafe characters or is too long.');
+      }
+
+      const tags = Array.isArray(input.tags) ? (input.tags as string[]) : undefined;
+      if (tags) {
+        if (tags.length > artifactReferenceLimits.tags) {
+          return toolError(`Too many tags. Max: ${artifactReferenceLimits.tags}`);
+        }
+        for (const tag of tags) {
+          if (!isSafeArtifactText(tag, artifactReferenceLimits.tag)) {
+            return toolError(`Tag "${tag}" contains unsafe characters or is too long.`);
+          }
+        }
+      }
+
+      const metadata = getRecordValue(input.metadata);
+
+      const result = await saveArtifactFromUrl({
+        requestId,
+        artifactKind: artifactKind as ArtifactKind,
+        contentType,
+        sourceUrl,
+        expectedSizeBytes,
+        expectedSha256,
+        filename,
+        label,
+        tags,
+        metadata,
+        event,
+      });
+
+      if (!result.ok) {
+        return toolError(result.error);
+      }
+
+      return toolResult(result);
+    }
     case 'save_artifact':
       return callArtifactUpload(event, {
         requestId: input.requestId,
