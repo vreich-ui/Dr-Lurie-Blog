@@ -31,7 +31,7 @@ The mark-published step records publication state only. It must not accept, requ
 - `save_artifact` remains available only for legacy small-artifact MCP compatibility; legacy chunk/session tools are intentionally removed. Artifact listing/admin tools read the retained ArtifactReference indexes.
 - Never construct deterministic artifact keys in the model. The artifact tool is authoritative for `blobKey`, checksum, size, content type, and creation timestamp.
 - Treat `ArtifactReference` as immutable. Regeneration means a new upload and a new reference.
-- On upload or network failure, retry the same payload/chunk and rely on checksum deduplication; do not create alternate handles manually.
+- On upload or network failure, retry the same payload or direct upload intent and rely on checksum deduplication; do not create alternate handles manually.
 - Before publishing, re-fetch the current request state and pass `artifactReferences` to the publishing payload. The `publish-article` function resolves artifact references to base64 media entries before committing to GitHub.
 - Agents must never ask for or transmit Netlify/GitHub credentials; upload and publish tools use server-side configuration only.
 

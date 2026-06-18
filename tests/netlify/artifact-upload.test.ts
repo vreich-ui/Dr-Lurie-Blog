@@ -4,6 +4,7 @@ import test from 'node:test';
 import sharp from 'sharp';
 
 import artifactUploadHandler from '../../netlify/functions/artifact-upload.js';
+import { handler as mcpHandler } from '../../netlify/functions/mcp.js';
 import { ArtifactKind } from '../../netlify/lib/artifacts.js';
 import {
   createArtifactUploadToken,
@@ -294,6 +295,77 @@ test('artifact-upload function accepts raw binary POSTs and returns ArtifactRefe
     } finally {
       if (previousSecret === undefined) delete process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
       else process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = previousSecret;
+    }
+  });
+});
+
+test('create_artifact_upload_intent plus artifact-upload handler chain correctly', async () => {
+  await withBlobStores(async ({ artifactValues, indexValues }) => {
+    const previousSecret = process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
+    const bytes = Buffer.from('%PDF-1.7\ncontract test pdf');
+    const expectedSha256 = sha256Hex(bytes);
+    process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = 'chain-test-secret';
+    process.env.NETLIFY_PUBLISH_SECRET = 'chain-publish-secret';
+
+    try {
+      // 1. Create intent via MCP
+      const intentResponse = await mcpHandler({
+        httpMethod: 'POST',
+        headers: { 'content-type': 'application/json', 'x-publish-key': 'chain-publish-secret' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'create_artifact_upload_intent',
+            arguments: {
+              requestId: 'chain-request',
+              artifactKind: 'pdf',
+              contentType: 'application/pdf',
+              expectedSizeBytes: bytes.byteLength,
+              expectedSha256,
+              filename: 'chain.pdf',
+              label: 'Chain PDF',
+            },
+          },
+        }),
+      });
+      const intentResult = JSON.parse(intentResponse.body).result as {
+        structuredContent: {
+          uploadUrl: string;
+          requiredHeaders: Record<string, string>;
+        };
+      };
+
+      assert.equal(intentResponse.statusCode, 200);
+      assert.ok(intentResult.structuredContent.uploadUrl);
+      assert.ok(intentResult.structuredContent.requiredHeaders);
+
+      // 2. Upload using returned requiredHeaders
+      const uploadHeaders: Record<string, string> = {};
+      for (const [key, value] of Object.entries(intentResult.structuredContent.requiredHeaders)) {
+        uploadHeaders[key.toLowerCase()] = value;
+      }
+
+      const uploadResponse = await parseJsonResponse(
+        await artifactUploadHandler(
+          makeDirectUploadRequest({
+            bytes,
+            headers: uploadHeaders,
+          })
+        )
+      );
+
+      assert.equal(uploadResponse.status, 200);
+      assert.equal(uploadResponse.body.ok, true);
+      const artifact = uploadResponse.body.artifact as { blobKey: string; sha256: string };
+      assert.equal(artifact.sha256, expectedSha256);
+      assert.equal(artifactValues.has(artifact.blobKey), true);
+      assert.equal(indexValues.has(`request-artifacts/chain-request/${expectedSha256}.json`), true);
+    } finally {
+      if (previousSecret === undefined) delete process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
+      else process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = previousSecret;
+      delete process.env.NETLIFY_PUBLISH_SECRET;
     }
   });
 });
