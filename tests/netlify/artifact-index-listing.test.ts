@@ -182,10 +182,28 @@ test('Artifact listing and metadata retrieval', async () => {
     assert.equal(searchTag.structuredContent.artifacts[0].sha256, sha1);
 
     // 7. Test get_artifact_metadata (the new tool)
-    const meta = await callMcp('get_artifact_metadata', { requestId: requestId1, sha256: sha1 });
-    assert.equal(meta.structuredContent.sha256, sha1);
-    assert.equal(meta.structuredContent.label, 'Direct PDF');
-    assert.ok(meta.structuredContent.blobKey);
+    const artifactStore = (await getArtifactBlobStore({})) as any;
+    const originalGet = artifactStore.get;
+    let bytesRead = false;
+    artifactStore.get = async (...args: any[]) => {
+      bytesRead = true;
+      return originalGet.apply(artifactStore, args);
+    };
+
+    try {
+      const meta = await callMcp('get_artifact_metadata', { requestId: requestId1, sha256: sha1 });
+      assert.equal(meta.structuredContent.sha256, sha1);
+      assert.equal(meta.structuredContent.label, 'Direct PDF');
+      assert.ok(meta.structuredContent.blobKey);
+      assert.equal(bytesRead, false, 'get_artifact_metadata should not read artifact bytes');
+
+      // Test metadata not found
+      const metaNotFound = await callMcp('get_artifact_metadata', { requestId: requestId1, sha256: '0'.repeat(64) });
+      assert.equal(metaNotFound.isError, true);
+      assert.match(metaNotFound.structuredContent.error, /not found/i);
+    } finally {
+      artifactStore.get = originalGet;
+    }
 
     // 8. Test soft delete and filtering
     await callMcp('soft_delete_artifact', { requestId: requestId1, sha256: sha1 });
