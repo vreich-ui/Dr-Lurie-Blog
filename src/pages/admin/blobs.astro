@@ -62,7 +62,8 @@ const metadata = {
         <table class="blobs-table">
           <thead>
             <tr>
-              <th scope="col">Key</th>
+              <th scope="col" class="col-preview">Preview</th>
+              <th scope="col">Key / Info</th>
               <th scope="col" class="col-actions">Actions</th>
             </tr>
           </thead>
@@ -111,6 +112,7 @@ const metadata = {
             />
           </label>
           <p class="editor-meta" id="editor-meta"></p>
+          <div id="editor-preview-wrap" class="editor-preview-box" hidden></div>
           <div id="editor-text-wrap">
             <label class="field">
               <span class="field-label">Content</span>
@@ -286,6 +288,68 @@ const metadata = {
   .blob-key {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     word-break: break-all;
+  }
+
+  .col-preview {
+    width: 64px;
+    padding-right: 0 !important;
+  }
+
+  .blob-preview-cell {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(0 0 0 / 5%);
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .blob-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .blob-icon {
+    font-size: 1.5rem;
+  }
+
+  .blob-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .blob-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--aw-color-text-heading);
+  }
+
+  .blob-meta-details {
+    font-size: 0.8rem;
+    color: var(--aw-color-text-muted);
+    margin-top: 0.1rem;
+  }
+
+  .blob-meta-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+  }
+
+  .blob-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    background: rgb(94 140 138 / 15%);
+    color: rgb(74 120 118);
+    border-radius: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
   .col-actions {
@@ -479,6 +543,30 @@ const metadata = {
     font-size: 0.85rem;
   }
 
+  .editor-preview-box {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: rgb(0 0 0 / 5%);
+    border-radius: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+  }
+
+  .editor-preview-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  .editor-preview-pdf {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
   .editor-status {
     margin: 0;
     font-size: 0.9rem;
@@ -542,6 +630,7 @@ const metadata = {
       const editorDownload = document.querySelector('#editor-download');
       const editorStatus = document.querySelector('#editor-status');
       const editorSave = document.querySelector('#editor-save');
+      const editorPreviewWrap = document.querySelector('#editor-preview-wrap');
 
       let clerkLoadPromise;
       let activeToken = '';
@@ -550,6 +639,7 @@ const metadata = {
       let editorMode = 'create';
       let editorEncoding = 'text';
       let managerStarted = false;
+      const artifactMetadataCache = new Map();
 
       const setGatedContentVisible = (visible) => {
         gatedContent.forEach((element) => {
@@ -662,11 +752,70 @@ const metadata = {
 
       const getActiveStore = () => storeSelect?.value || '';
 
+      const getArtifactIcon = (kind) => {
+        switch (kind) {
+          case 'image': return '🖼️';
+          case 'pdf': return '📄';
+          case 'video': return '🎬';
+          case 'audio': return '🎵';
+          case 'doc': return '📝';
+          default: return '📦';
+        }
+      };
+
+      const fetchMetadataForRow = async (row, key) => {
+        const store = getActiveStore();
+        if (store !== 'artifacts') return;
+
+        const infoCell = row.querySelector('.blob-info');
+        const previewCell = row.querySelector('.blob-preview-cell');
+
+        try {
+          let metadata = artifactMetadataCache.get(key);
+          if (!metadata) {
+            const result = await callApi('get-artifact-metadata', { blobKey: key });
+            metadata = result.artifact;
+            artifactMetadataCache.set(key, metadata);
+          }
+
+          if (metadata) {
+            const label = metadata.label || metadata.originalFilename || key;
+            const tagsHtml = (metadata.tags || [])
+              .map(tag => `<span class="blob-tag">${escapeHtml(tag)}</span>`)
+              .join('');
+
+            const dateStr = metadata.createdAtISO ? new Date(metadata.createdAtISO).toLocaleDateString() : '';
+            const sizeStr = metadata.sizeBytes ? formatBytes(metadata.sizeBytes) : '';
+            const metaLine = [sizeStr, dateStr].filter(Boolean).join(' • ');
+
+            infoCell.innerHTML = `
+              <div class="blob-label">${escapeHtml(label)}</div>
+              <div class="blob-key">${escapeHtml(key)}</div>
+              ${metaLine ? `<div class="blob-meta-details">${escapeHtml(metaLine)}</div>` : ''}
+              <div class="blob-meta-tags">${tagsHtml}</div>
+            `;
+
+            const kind = metadata.artifactKind || 'other';
+            if (kind === 'image') {
+              previewCell.innerHTML = `<img src="/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(key)}" class="blob-thumbnail" loading="lazy" />`;
+            } else if (kind === 'pdf') {
+              previewCell.innerHTML = `<span class="blob-icon">📕</span>`;
+            } else {
+              previewCell.innerHTML = `<span class="blob-icon">${getArtifactIcon(kind)}</span>`;
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch metadata for ${key}`, error);
+        }
+      };
+
       const renderBlobs = (keys) => {
         const hasKeys = keys.length > 0;
         if (tableWrap) tableWrap.hidden = !hasKeys;
         if (emptyState) emptyState.hidden = hasKeys;
         if (!tableBody) return;
+
+        const store = getActiveStore();
 
         tableBody.innerHTML = keys
           .map((key) => {
@@ -674,7 +823,14 @@ const metadata = {
             const attrKey = encodeURIComponent(key);
             return `
               <tr data-key="${attrKey}">
-                <td class="blob-key">${safeKey}</td>
+                <td class="col-preview">
+                  <div class="blob-preview-cell">
+                    <span class="blob-icon">📦</span>
+                  </div>
+                </td>
+                <td class="blob-info">
+                  <div class="blob-key">${safeKey}</div>
+                </td>
                 <td class="col-actions">
                   <div class="row-actions">
                     <button class="row-btn" type="button" data-action="view">View</button>
@@ -686,6 +842,16 @@ const metadata = {
               </tr>`;
           })
           .join('');
+
+        if (store === 'artifacts') {
+          const rows = tableBody.querySelectorAll('tr[data-key]');
+          // Simple lazy-ish loading: fetch metadata for visible rows or just all of them in this case
+          // but we can optimize it if needed.
+          rows.forEach(row => {
+            const key = decodeURIComponent(row.dataset.key);
+            fetchMetadataForRow(row, key);
+          });
+        }
       };
 
       const loadStores = async () => {
@@ -745,6 +911,7 @@ const metadata = {
         if (editorMeta) editorMeta.textContent = `Creating in store “${getActiveStore()}”.`;
         if (editorTextWrap) editorTextWrap.hidden = false;
         if (editorBinaryWrap) editorBinaryWrap.hidden = true;
+        if (editorPreviewWrap) editorPreviewWrap.hidden = true;
         setEditorStatus('');
         if (drawer) drawer.hidden = false;
         editorKey?.focus();
@@ -763,16 +930,49 @@ const metadata = {
         if (editorMeta) editorMeta.textContent = 'Loading…';
         if (editorTextWrap) editorTextWrap.hidden = true;
         if (editorBinaryWrap) editorBinaryWrap.hidden = true;
+        if (editorPreviewWrap) editorPreviewWrap.hidden = true;
         setEditorStatus('');
         if (drawer) drawer.hidden = false;
+
+        let metadata;
+        if (store === 'artifacts') {
+          try {
+            metadata = artifactMetadataCache.get(key);
+            if (!metadata) {
+              const result = await callApi('get-artifact-metadata', { blobKey: key });
+              metadata = result.artifact;
+              artifactMetadataCache.set(key, metadata);
+            }
+          } catch (e) {
+            console.warn('Metadata lookup failed during edit', e);
+          }
+        }
 
         try {
           const result = await callApi('get-blob', { store, key });
           editorEncoding = result.encoding || 'text';
           const meta = result.metadata && typeof result.metadata === 'object' ? result.metadata : {};
-          const declaredType = meta.contentType || meta['content-type'] || result.contentType || '';
+          const declaredType = metadata?.contentType || meta.contentType || meta['content-type'] || result.contentType || '';
           if (editorContentType) editorContentType.value = declaredType;
-          if (editorMeta) editorMeta.textContent = `${formatBytes(result.size)} • ${declaredType || 'unknown type'}`;
+
+          let metaText = `${formatBytes(result.size)} • ${declaredType || 'unknown type'}`;
+          if (metadata) {
+            metaText = `${metadata.label || metadata.originalFilename} • ${metaText}`;
+          }
+          if (editorMeta) editorMeta.textContent = metaText;
+
+          if (editorPreviewWrap) {
+            const kind = metadata?.artifactKind || (declaredType.startsWith('image/') ? 'image' : declaredType === 'application/pdf' ? 'pdf' : 'other');
+            if (kind === 'image') {
+              editorPreviewWrap.innerHTML = `<img src="/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(key)}" class="editor-preview-image" />`;
+              editorPreviewWrap.hidden = false;
+            } else if (kind === 'pdf') {
+              editorPreviewWrap.innerHTML = `<iframe src="/.netlify/functions/admin-get-blob-pdf?blobKey=${encodeURIComponent(key)}" class="editor-preview-pdf"></iframe>`;
+              editorPreviewWrap.hidden = false;
+            } else {
+              editorPreviewWrap.hidden = true;
+            }
+          }
 
           if (result.encoding === 'text' && !result.truncated) {
             if (editorTextWrap) editorTextWrap.hidden = false;
