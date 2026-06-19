@@ -1,22 +1,23 @@
 ---
 publishDate: 2026-05-18T14:47:00.000Z
-title: "Why Some People Smell Stronger Than Others"
-excerpt: "In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age. Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself."
-image: "~/assets/images/uploads/why-some-people-smell-stronger-than-others/People-Breathing.webp"
-ctaText: "Get your confidence back"
+title: 'Why Some People Smell Stronger Than Others'
+excerpt: 'In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age. Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself.'
+image: '~/assets/images/uploads/why-some-people-smell-stronger-than-others/People-Breathing.webp'
+ctaText: 'Get your confidence back'
 tags:
-  - "Body Odor"
-  - "Smell"
-  - "Health"
-author: "Roger Ebert-Smith"
+  - 'Body Odor'
+  - 'Smell'
+  - 'Health'
+author: 'Roger Ebert-Smith'
 ---
+
 There is a moment, usually sometime after forty, when people begin to notice that certain older relatives have a distinct scent. Not necessarily unpleasant. Just different. A little dry, faintly sweet, slightly musty in a way that seems to belong more to old books or stored fabric than to sweat itself.
 
 Most people assume this is simply what aging smells like. Or worse, that it reflects neglect. But the reality is stranger, and much more specific.
 
-In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age.  Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself.
+In 2001, researchers in Japan identified a compound called 2-Nonenal that appears increasingly on the skin with age. Unlike ordinary body odor, which is largely caused by bacteria breaking down sweat, 2-Nonenal comes from a slow oxidative process happening on the skin itself.
 
-As the body ages, its antioxidant defenses gradually weaken. The oils naturally present on the skin become more vulnerable to oxidation from sunlight, air, and ordinary environmental stress. One result of this breakdown is 2-Nonenal, an unsaturated aldehyde with an odor often described as grassy, waxy, or slightly oily. 
+As the body ages, its antioxidant defenses gradually weaken. The oils naturally present on the skin become more vulnerable to oxidation from sunlight, air, and ordinary environmental stress. One result of this breakdown is 2-Nonenal, an unsaturated aldehyde with an odor often described as grassy, waxy, or slightly oily.
 
 What makes it distinctive is not intensity, but persistence.
 
@@ -24,15 +25,15 @@ The compound clings to fabric unusually well. It settles into collars, bedding, 
 
 There is also an odd social distortion around it.
 
-One study found that older people’s body odor was actually rated by participants as less intense and less unpleasant than the odor of younger groups.  Yet culturally, “old person smell” carries disproportionate embarrassment. Researchers noted that reactions became more negative once people were told the scent came from an older individual.
+One study found that older people’s body odor was actually rated by participants as less intense and less unpleasant than the odor of younger groups. Yet culturally, “old person smell” carries disproportionate embarrassment. Researchers noted that reactions became more negative once people were told the scent came from an older individual.
 
 In other words, some of what people think they are smelling may partly be expectation.
 
-Still, recognition of the phenomenon has created a small but growing category of products designed specifically to target 2-Nonenal rather than ordinary sweat. Conventional soaps are not especially effective because they are designed mainly to remove surface oil or suppress odor-causing bacteria. 2-Nonenal behaves differently at a chemical level. 
+Still, recognition of the phenomenon has created a small but growing category of products designed specifically to target 2-Nonenal rather than ordinary sweat. Conventional soaps are not especially effective because they are designed mainly to remove surface oil or suppress odor-causing bacteria. 2-Nonenal behaves differently at a chemical level.
 
 The ingredient that appears most often in targeted formulations is Japanese persimmon extract.
 
-Persimmon contains a dense concentration of polyphenols that appear to work in two directions at once: helping reduce oxidative activity on the skin while also neutralizing existing odor compounds. In small clinical studies, soaps containing persimmon extract significantly reduced measurable 2-Nonenal after several weeks of use. 
+Persimmon contains a dense concentration of polyphenols that appear to work in two directions at once: helping reduce oxidative activity on the skin while also neutralizing existing odor compounds. In small clinical studies, soaps containing persimmon extract significantly reduced measurable 2-Nonenal after several weeks of use.
 
 What is interesting is how this shifts the entire framing of the issue.
 

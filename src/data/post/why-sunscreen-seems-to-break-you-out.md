@@ -1,26 +1,27 @@
 ---
-title: "Why Sunscreen Seems to Break You Out"
+title: 'Why Sunscreen Seems to Break You Out'
 publishDate: 2026-06-08T14:56:00.000Z
-excerpt: "Sunscreen may not be the only reason for new bumps. Formula, sweat, friction, removal, and irritation can all make SPF feel impossible."
+excerpt: 'Sunscreen may not be the only reason for new bumps. Formula, sweat, friction, removal, and irritation can all make SPF feel impossible.'
 tags:
-  - "sunscreen"
-  - "acne"
-  - "sensitive skin"
-  - "skin barrier"
-author: "Dr. Lurie Editorial Team"
+  - 'sunscreen'
+  - 'acne'
+  - 'sensitive skin'
+  - 'skin barrier'
+author: 'Dr. Lurie Editorial Team'
 sources:
-  - "source_id: reddit_spf_breakout_thread; name: Sunscreen breaks me out but I know I need to wear it; url: https://www.reddit.com/r/SkincareAddiction/comments/1o0psjp/sun_care_sunscreen_breaks_me_out_but_i_know_i/; publisher: Reddit r/SkincareAddiction"
-  - "source_id: aad_acne_habits; name: 10 skin care habits that can worsen acne; url: https://www.aad.org/public/diseases/acne/skin-care/habits-stop; publisher: American Academy of Dermatology Association"
-  - "source_id: aad_acne_makeup; name: I have acne! Is it okay to wear makeup?; url: https://www.aad.org/public/diseases/acne/causes/makeup; publisher: American Academy of Dermatology Association"
-  - "source_id: aad_workout_acne; name: Is your workout causing your acne?; url: https://www.aad.org/public/diseases/acne/causes/workouts; publisher: American Academy of Dermatology Association"
-  - "source_id: dermnet_sunscreen_allergy; name: Sunscreen allergy; url: https://dermnetnz.org/topics/sunscreen-allergy; publisher: DermNet"
-  - "source_id: dermnet_sunscreens; name: Sunscreens: A Complete Overview; url: https://dermnetnz.org/topics/topical-sunscreen-agents; publisher: DermNet"
-  - "source_id: jaad_comedogenicity_2025; name: Comedogenicity in cosmeceuticals; url: https://www.sciencedirect.com/science/article/pii/S2950198925000881; publisher: JAAD Reviews"
-  - "source_id: pubmed_octocrylene_review; name: Contact and photocontact allergy to octocrylene: a review; url: https://pubmed.ncbi.nlm.nih.gov/24628344/; publisher: PubMed"
-  - "source_id: pubmed_pityrosporum_review; name: Pityrosporum folliculitis: A retrospective review of 110 cases; url: https://pubmed.ncbi.nlm.nih.gov/29138059/; publisher: PubMed"
+  - 'source_id: reddit_spf_breakout_thread; name: Sunscreen breaks me out but I know I need to wear it; url: https://www.reddit.com/r/SkincareAddiction/comments/1o0psjp/sun_care_sunscreen_breaks_me_out_but_i_know_i/; publisher: Reddit r/SkincareAddiction'
+  - 'source_id: aad_acne_habits; name: 10 skin care habits that can worsen acne; url: https://www.aad.org/public/diseases/acne/skin-care/habits-stop; publisher: American Academy of Dermatology Association'
+  - 'source_id: aad_acne_makeup; name: I have acne! Is it okay to wear makeup?; url: https://www.aad.org/public/diseases/acne/causes/makeup; publisher: American Academy of Dermatology Association'
+  - 'source_id: aad_workout_acne; name: Is your workout causing your acne?; url: https://www.aad.org/public/diseases/acne/causes/workouts; publisher: American Academy of Dermatology Association'
+  - 'source_id: dermnet_sunscreen_allergy; name: Sunscreen allergy; url: https://dermnetnz.org/topics/sunscreen-allergy; publisher: DermNet'
+  - 'source_id: dermnet_sunscreens; name: Sunscreens: A Complete Overview; url: https://dermnetnz.org/topics/topical-sunscreen-agents; publisher: DermNet'
+  - 'source_id: jaad_comedogenicity_2025; name: Comedogenicity in cosmeceuticals; url: https://www.sciencedirect.com/science/article/pii/S2950198925000881; publisher: JAAD Reviews'
+  - 'source_id: pubmed_octocrylene_review; name: Contact and photocontact allergy to octocrylene: a review; url: https://pubmed.ncbi.nlm.nih.gov/24628344/; publisher: PubMed'
+  - 'source_id: pubmed_pityrosporum_review; name: Pityrosporum folliculitis: A retrospective review of 110 cases; url: https://pubmed.ncbi.nlm.nih.gov/29138059/; publisher: PubMed'
 metadata:
-  description: "Sunscreen may not be the only reason for new bumps. Learn how formula, sweat, removal, irritation, and skin state can make SPF feel impossible."
+  description: 'Sunscreen may not be the only reason for new bumps. Learn how formula, sweat, removal, irritation, and skin state can make SPF feel impossible.'
 ---
+
 # Why Sunscreen Seems to Break You Out
 
 If every sunscreen seems to leave you bumpy, greasy, itchy, or irritated, it is easy to decide that SPF is the problem. That reaction makes sense. Sunscreen is often the last product added before the skin starts acting up, so it gets blamed first.

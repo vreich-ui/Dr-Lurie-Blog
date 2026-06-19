@@ -1,16 +1,16 @@
 ---
 publishDate: 2026-06-12T17:10:25Z
-title: "The Small Weather of Stairwells"
-excerpt: "A short, strange essay about the in-between places that quietly teach us how buildings breathe."
-category: "Essay"
+title: 'The Small Weather of Stairwells'
+excerpt: 'A short, strange essay about the in-between places that quietly teach us how buildings breathe.'
+category: 'Essay'
 tags:
-  - "architecture"
-  - "everyday-observations"
-  - "city-life"
-  - "essay"
-author: "Dr. Lurie"
+  - 'architecture'
+  - 'everyday-observations'
+  - 'city-life'
+  - 'essay'
+author: 'Dr. Lurie'
 metadata:
-  description: "A short, strange essay about stairwells, buildings, and the quiet weather inside overlooked in-between spaces."
+  description: 'A short, strange essay about stairwells, buildings, and the quiet weather inside overlooked in-between spaces.'
 ---
 
 ![Quiet stairwell after rain with soft light on the landing.](src/assets/images/uploads/the-small-weather-of-stairwells/stairwell-inline-micro.png)

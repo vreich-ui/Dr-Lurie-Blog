@@ -34,7 +34,6 @@ type LambdaEvent = {
   queryStringParameters?: Record<string, string | undefined> | null;
 };
 
-
 const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   statusCode,
   headers: {

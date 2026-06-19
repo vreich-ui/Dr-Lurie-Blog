@@ -199,7 +199,12 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
               aria-label="Search the site"
             />
           </div>
-          <p class="text-sm text-muted" aria-live="polite">Search coming soon…</p>
+          <div
+            id="mobile-search-results"
+            class="hidden max-h-[40vh] overflow-y-auto rounded-2xl bg-surface p-2 shadow-inner"
+            data-mobile-search-results
+          >
+          </div>
         </div>
         <a
           class="inline-flex w-full justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950"
@@ -267,7 +272,7 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     <div class="mb-4 flex items-center justify-between gap-4">
       <div>
         <h2 id="header-search-title" class="text-lg font-semibold text-default">Search Dr. Lurié</h2>
-        <p class="mt-1 text-sm text-muted">Search support is being prepared.</p>
+        <p class="mt-1 text-sm text-muted" data-header-search-description>Quickly find articles, topics, and guides.</p>
       </div>
       <button
         type="button"
@@ -293,8 +298,9 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
           data-header-search-input
         />
       </div>
-      <p class="mt-3 text-sm text-muted" aria-live="polite" data-header-search-status>Search coming soon…</p>
+      <p class="mt-3 text-sm text-muted" aria-live="polite" data-header-search-status></p>
     </form>
+    <div id="header-search-results" class="mt-4 max-h-[50vh] overflow-y-auto pr-2" data-header-search-results></div>
   </div>
 </div>
 
@@ -401,11 +407,90 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     const controller = new AbortController();
     searchWindow.awHeaderSearchController = controller;
 
-    const setSearchStatus = () => {
-      if (!status) return;
+    interface SearchItem {
+      title: string;
+      excerpt?: string;
+      permalink: string;
+      category?: string;
+      tags?: string[];
+      publishDate: string;
+    }
 
-      const query = input.value.trim();
-      status.textContent = query ? `Search coming soon for “${query}”.` : 'Search coming soon…';
+    let searchIndex: SearchItem[] | null = null;
+    const desktopResults = document.querySelector<HTMLElement>('[data-header-search-results]');
+    const mobileInput = document.querySelector<HTMLInputElement>('#mobile-menu-search-input');
+    const mobileResults = document.querySelector<HTMLElement>('[data-mobile-search-results]');
+
+    const fetchIndex = async () => {
+      if (searchIndex) return;
+      try {
+        const response = await fetch('/search.json');
+        searchIndex = (await response.json()) as SearchItem[];
+      } catch (e) {
+        console.error('Failed to load search index', e);
+      }
+    };
+
+    const performSearch = (query: string, resultsContainer: HTMLElement | null, statusElement: HTMLElement | null) => {
+      if (!searchIndex || !resultsContainer) return;
+
+      const normalizedQuery = query.toLowerCase().trim();
+      if (!normalizedQuery) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.classList.add('hidden');
+        if (statusElement) statusElement.textContent = '';
+        return;
+      }
+
+      const results = searchIndex.filter(
+        (item) =>
+          item.title.toLowerCase().includes(normalizedQuery) ||
+          item.excerpt?.toLowerCase().includes(normalizedQuery) ||
+          item.category?.toLowerCase().includes(normalizedQuery) ||
+          item.tags?.some((tag) => tag.toLowerCase().includes(normalizedQuery))
+      );
+
+      if (results.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="py-8 text-center">
+            <p class="text-default font-semibold">No results found for “${query}”</p>
+            <p class="text-sm text-muted mt-1">Try a different keyword or topic.</p>
+          </div>
+        `;
+        resultsContainer.classList.remove('hidden');
+        if (statusElement) statusElement.textContent = `No results for “${query}”.`;
+        return;
+      }
+
+      resultsContainer.innerHTML = results
+        .map(
+          (result) => `
+        <a href="/${result.permalink}" class="block p-3 rounded-2xl hover:bg-gray-100 dark:hover:bg-slate-900 transition-colors group mb-1">
+          <span class="block text-sm font-bold text-default group-hover:text-primary transition-colors">${result.title}</span>
+          ${result.excerpt ? `<span class="block text-xs text-muted mt-1 line-clamp-2">${result.excerpt}</span>` : ''}
+          <span class="flex items-center gap-2 mt-2">
+            ${result.category ? `<span class="text-[10px] uppercase tracking-wider font-extrabold text-accent bg-accent/10 px-1.5 py-0.5 rounded-md">${result.category}</span>` : ''}
+            <span class="text-[10px] text-muted font-medium">${new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(result.publishDate))}</span>
+          </span>
+        </a>
+      `
+        )
+        .join('');
+
+      resultsContainer.classList.remove('hidden');
+      if (statusElement)
+        statusElement.textContent = `Found ${results.length} result${results.length === 1 ? '' : 's'} for “${query}”.`;
+    };
+
+    const handleInput = () => {
+      const query = input.value;
+      performSearch(query, desktopResults, status);
+    };
+
+    const handleMobileInput = () => {
+      if (!mobileInput) return;
+      const query = mobileInput.value;
+      performSearch(query, mobileResults, null);
     };
 
     const closeSearch = () => {
@@ -420,17 +505,34 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
       overlay.classList.remove('hidden');
       triggers.forEach((trigger) => trigger.setAttribute('aria-expanded', 'true'));
       window.requestAnimationFrame(() => input.focus());
-      setSearchStatus();
+      handleInput();
     };
 
-    triggers.forEach((trigger) => trigger.addEventListener('click', openSearch, { signal: controller.signal }));
+    triggers.forEach((trigger) =>
+      trigger.addEventListener(
+        'click',
+        async () => {
+          await fetchIndex();
+          openSearch();
+        },
+        { signal: controller.signal }
+      )
+    );
     closeButtons.forEach((button) => button.addEventListener('click', closeSearch, { signal: controller.signal }));
-    input.addEventListener('input', setSearchStatus, { signal: controller.signal });
+    input.addEventListener('input', handleInput, { signal: controller.signal });
+    mobileInput?.addEventListener(
+      'input',
+      async () => {
+        await fetchIndex();
+        handleMobileInput();
+      },
+      { signal: controller.signal }
+    );
     form?.addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
-        setSearchStatus();
+        handleInput();
       },
       { signal: controller.signal }
     );

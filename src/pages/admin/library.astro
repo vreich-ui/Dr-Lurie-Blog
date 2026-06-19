@@ -489,12 +489,12 @@ const formatDate = (date: Date) => {
           const result = await response.json();
           if (result.posts?.length) {
             draftsContainer.innerHTML = result.posts.map(renderDraft).join('');
-            if (draftsStatus) draftsStatus.hidden = true;
+            if (draftsStatus) (draftsStatus as HTMLElement).hidden = true;
             bindPublishControls();
           } else {
             if (draftsStatus) draftsStatus.textContent = 'No unpublished drafts found.';
           }
-        } catch (e) {
+        } catch {
           if (draftsStatus) draftsStatus.textContent = 'Failed to load drafts.';
         }
       };
@@ -553,7 +553,7 @@ const formatDate = (date: Date) => {
           }
         } catch (e) {
           btn.textContent = originalText;
-          window.alert(e.message);
+          window.alert(e instanceof Error ? e.message : 'Failed to update status');
         } finally {
           btn.disabled = false;
         }
@@ -595,7 +595,7 @@ const formatDate = (date: Date) => {
             setAuthStatus('Access denied.');
             redirectToHome();
           }
-        } catch (e) {
+        } catch {
           setAuthStatus('Authentication failed.');
           redirectToHome();
         }

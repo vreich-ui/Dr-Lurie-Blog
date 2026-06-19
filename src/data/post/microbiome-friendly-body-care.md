@@ -1,18 +1,19 @@
 ---
 publishDate: 2026-06-16T11:50:00.000Z
-title: "Microbiome-Friendly Body Care: What the Label Should Mean"
-excerpt: "A practical look at the body-care trend, the ingredients behind it, and how to separate useful claims from marketing noise."
-category: "Skin Health"
+title: 'Microbiome-Friendly Body Care: What the Label Should Mean'
+excerpt: 'A practical look at the body-care trend, the ingredients behind it, and how to separate useful claims from marketing noise.'
+category: 'Skin Health'
 tags:
-  - "microbiome"
-  - "body care"
-  - "skin barrier"
-  - "clean beauty"
-  - "dermatology"
-author: "Dr. Lurie"
+  - 'microbiome'
+  - 'body care'
+  - 'skin barrier'
+  - 'clean beauty'
+  - 'dermatology'
+author: 'Dr. Lurie'
 metadata:
-  description: "A practical guide to microbiome-friendly body care, including ingredients, gentle cleansing, certification, and claim caution."
+  description: 'A practical guide to microbiome-friendly body care, including ingredients, gentle cleansing, certification, and claim caution.'
 ---
+
 Microbiome-friendly body care is moving from a niche skincare idea into the body wash, deodorant, and lotion aisle. That shift makes sense: once people understand that the skin is not a sterile surface, but a living ecosystem, the daily products used from neck to toe start to look more important.
 
 The skin microbiome is the community of bacteria, fungi, and other microorganisms that live on the skin's surface. In a healthy state, that community works alongside the skin barrier. It does not need to be scrubbed away. It needs a stable place to live: the right level of moisture, a mildly acidic environment, and as little unnecessary irritation as possible.

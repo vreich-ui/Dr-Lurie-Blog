@@ -263,7 +263,6 @@ const validateFinalArtifact = async (event: LambdaEvent, input: UploadRequest, b
   return validateImageArtifact(input, bytes);
 };
 
-
 const getArrayBuffer = async (store: BlobStore, key: string) => {
   const binaryStore = store as BinaryReadableBlobStore;
   const value = await binaryStore.get(key, { type: 'arrayBuffer' });
@@ -337,7 +336,6 @@ const saveFinalArtifact = async (store: BlobStore, reference: ArtifactReference,
 
   return { deduped: false, integrityError };
 };
-
 
 const mergeArtifactReferenceDisplayFields = (
   existingReference: ArtifactReference,

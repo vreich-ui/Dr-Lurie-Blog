@@ -1,27 +1,28 @@
 ---
-title: "Retinol Recovery Rules: When to Pause, Restart, or Scale Back-Copy"
+title: 'Retinol Recovery Rules: When to Pause, Restart, or Scale Back-Copy'
 publishDate: 2026-06-10T11:42:00.000Z
-excerpt: "Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset."
+excerpt: 'Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset.'
 tags:
-  - "retinol"
-  - "retinoids"
-  - "skin barrier"
-  - "irritation"
-  - "sensitive skin"
-  - "skincare"
-  - "patient education"
-author: "Dr. Lurié"
+  - 'retinol'
+  - 'retinoids'
+  - 'skin barrier'
+  - 'irritation'
+  - 'sensitive skin'
+  - 'skincare'
+  - 'patient education'
+author: 'Dr. Lurié'
 sources:
-  - "source_id: aad_retinoid_retinol; name: Retinoid or retinol?; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol; publisher: American Academy of Dermatology Association; accessed_at: 2026-06-08"
-  - "source_id: cleveland_retinol; name: Retinol: Cream"
-  - "Serum"
-  - "What It Is"
-  - "Benefits"
-  - "How To Use; url: https://my.clevelandclinic.org/health/treatments/23293-retinol; publisher: Cleveland Clinic; accessed_at: 2026-06-08"
-  - "source_id: mayo_tretinoin_proper_use; name: Tretinoin topical route proper use and precautions; url: https://www.mayoclinic.org/proper-use/drg-20066521; publisher: Mayo Clinic; accessed_at: 2026-06-08"
+  - 'source_id: aad_retinoid_retinol; name: Retinoid or retinol?; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol; publisher: American Academy of Dermatology Association; accessed_at: 2026-06-08'
+  - 'source_id: cleveland_retinol; name: Retinol: Cream'
+  - 'Serum'
+  - 'What It Is'
+  - 'Benefits'
+  - 'How To Use; url: https://my.clevelandclinic.org/health/treatments/23293-retinol; publisher: Cleveland Clinic; accessed_at: 2026-06-08'
+  - 'source_id: mayo_tretinoin_proper_use; name: Tretinoin topical route proper use and precautions; url: https://www.mayoclinic.org/proper-use/drg-20066521; publisher: Mayo Clinic; accessed_at: 2026-06-08'
 metadata:
-  description: "Learn when retinol irritation is a normal adjustment, when to pause, and how to restart with moisturizer, sunscreen, and fewer irritating products."
+  description: 'Learn when retinol irritation is a normal adjustment, when to pause, and how to restart with moisturizer, sunscreen, and fewer irritating products.'
 ---
+
 # Retinol Recovery Rules: When to Pause, Restart, or Scale Back
 
 ![Unbranded retinol bottle set aside beside barrier moisturizer and a folded washcloth on a softly lit bathroom counter.](~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy/req_retinol-recovery-rules-20260608-001-b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg)

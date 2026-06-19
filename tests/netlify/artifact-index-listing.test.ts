@@ -4,10 +4,7 @@ import test from 'node:test';
 import { handler as mcpHandler } from '../../netlify/functions/mcp.js';
 import { saveArtifactBytes } from '../../netlify/lib/artifact-upload.js';
 import { handler as saveArtifactLegacyHandler } from '../../netlify/functions/save-artifact.js';
-import {
-  getArtifactBlobStore,
-  setNetlifyBlobsModuleForTesting,
-} from '../../netlify/lib/blob-store.js';
+import { getArtifactBlobStore, setNetlifyBlobsModuleForTesting } from '../../netlify/lib/blob-store.js';
 import { ArtifactKind, type ArtifactReference } from '../../netlify/lib/artifacts.js';
 
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -15,14 +12,20 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 type FakeStoreValue = Buffer | string;
 
 interface FakeStore {
-  set(key: string, value: string | Buffer | Uint8Array, options?: { onlyIfNew?: boolean }): Promise<{ modified: boolean }>;
+  set(
+    key: string,
+    value: string | Buffer | Uint8Array,
+    options?: { onlyIfNew?: boolean }
+  ): Promise<{ modified: boolean }>;
   setJSON(key: string, value: unknown): Promise<{ modified: boolean }>;
   get(key: string, options?: { type?: 'arrayBuffer' }): Promise<ArrayBuffer | string | null>;
   del(key: string): Promise<void>;
   list(options?: { prefix?: string }): Promise<{ blobs: { key: string; etag: string }[]; directories: string[] }>;
 }
 
-const createFakeStore = (values = new Map<string, FakeStoreValue>()): { values: Map<string, FakeStoreValue>; store: FakeStore } => ({
+const createFakeStore = (
+  values = new Map<string, FakeStoreValue>()
+): { values: Map<string, FakeStoreValue>; store: FakeStore } => ({
   values,
   store: {
     async set(key: string, value: string | Buffer | Uint8Array, options?: { onlyIfNew?: boolean }) {
