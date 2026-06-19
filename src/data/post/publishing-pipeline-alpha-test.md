@@ -1,16 +1,17 @@
 ---
-title: "Publishing Pipeline Alpha Test: From Draft to Release"
-excerpt: "A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness."
-category: "Editorial"
+title: 'Publishing Pipeline Alpha Test: From Draft to Release'
+excerpt: 'A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness.'
+category: 'Editorial'
 tags:
-  - "Publishing"
-  - "Alpha Test"
-  - "Workflow"
-  - "Editorial Operations"
-author: "Dr. Lurié"
+  - 'Publishing'
+  - 'Alpha Test'
+  - 'Workflow'
+  - 'Editorial Operations'
+author: 'Dr. Lurié'
 metadata:
-  description: "A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness."
+  description: 'A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness.'
 ---
+
 # Publishing Pipeline Alpha Test: From Draft to Release
 
 This is a focused alpha test of the publishing pipeline. The goal is simple: confirm that an article can be created, paired with image assets, written into the workflow record, and prepared for immediate release without blurring the distinction between draft state, final article state, and published state.

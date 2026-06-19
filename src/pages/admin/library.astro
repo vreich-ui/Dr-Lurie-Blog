@@ -1,0 +1,610 @@
+---
+import AdminNav from '~/components/admin/AdminNav.astro';
+import Layout from '~/layouts/PageLayout.astro';
+import { fetchPosts } from '~/utils/blog';
+import { getPermalink } from '~/utils/permalinks';
+
+const posts = await fetchPosts();
+const pageTitle = 'Library Management';
+const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
+const formatDate = (date: Date) => {
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+};
+---
+
+<Layout metadata={metadata}>
+  <section
+    class="admin-library mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14"
+    data-admin-shell
+    data-clerk-publishable-key={clerkPublishableKey}
+    hidden
+  >
+    <header class="library-header">
+      <div>
+        <p class="library-kicker">Admin workspace</p>
+        <h1>{pageTitle}</h1>
+        <p class="library-intro">
+          Manage the public article library, review unpublished GitHub drafts, and toggle publish status.
+        </p>
+      </div>
+      <a class="btn-primary" href="/admin/publish">Create new article</a>
+    </header>
+
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
+    <AdminNav />
+
+    <div class="tabs" data-auth-gated hidden>
+      <button class="tab-btn active" data-tab="published">Published Articles</button>
+      <button class="tab-btn" data-tab="drafts">Unpublished Drafts</button>
+    </div>
+
+    <section class="library-content" data-auth-gated hidden>
+      <div id="published-list" class="tab-content active">
+        <div class="list-header">
+          <h2>Published Articles</h2>
+          <p class="hint">{posts.length} articles currently visible in the public library.</p>
+        </div>
+
+        <ul class="article-list">
+          {
+            posts.map((post) => (
+              <li class="article-item" data-post-preview data-post-slug={post.slug} data-post-draft="false">
+                <div class="article-info">
+                  <span class="article-date">{formatDate(post.publishDate)}</span>
+                  <h3 class="article-title">{post.title}</h3>
+                  <p class="article-meta">
+                    {post.author && <span>By {post.author.replaceAll('-', ' ')}</span>}
+                    {post.category && <span> · {post.category.title}</span>}
+                  </p>
+                </div>
+                <div class="article-actions">
+                  <button
+                    type="button"
+                    class="action-btn"
+                    data-admin-publish-toggle
+                    data-post-slug={post.slug}
+                    data-post-draft="false"
+                    title="Unpublish article"
+                  >
+                    Unpublish
+                  </button>
+                  <a class="action-btn" href={`/admin/publish?edit=${encodeURIComponent(post.slug)}`}>
+                    Edit
+                  </a>
+                  <a class="action-btn" href={getPermalink(post.permalink, 'post')} target="_blank">
+                    View
+                  </a>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <div id="drafts-list" class="tab-content">
+        <div class="list-header">
+          <h2>Unpublished Drafts</h2>
+          <p class="hint">GitHub-backed Markdown drafts marked as <code>draft: true</code>.</p>
+        </div>
+        <p id="drafts-status" class="list-status">Loading drafts…</p>
+        <ul id="drafts-container" class="article-list"></ul>
+      </div>
+    </section>
+  </section>
+
+  <dialog
+    class="w-[min(92vw,32rem)] rounded-2xl border border-gray-200 bg-white p-0 text-default shadow-2xl backdrop:bg-slate-950/50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+    data-admin-publish-confirm
+  >
+    <form method="dialog" class="p-6">
+      <div class="flex items-start gap-3">
+        <div
+          class="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+            <path d="M12 9v4"></path>
+            <path d="M12 17h.01"></path>
+          </svg>
+        </div>
+        <div>
+          <h2 class="font-heading text-xl font-bold">Confirm status change</h2>
+          <p class="mt-2 text-sm leading-6 text-muted dark:text-slate-300" data-admin-publish-confirm-message></p>
+        </div>
+      </div>
+      <div class="mt-6 flex flex-wrap justify-end gap-3">
+        <button class="btn-secondary" type="submit" value="cancel">Cancel</button>
+        <button class="btn-primary" type="submit" value="confirm">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+</Layout>
+
+<style>
+  .admin-library {
+    color: var(--aw-color-text-default);
+  }
+
+  .library-header {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgb(229 231 235);
+    padding-bottom: 1.5rem;
+  }
+
+  :global(.dark) .library-header {
+    border-color: rgb(30 41 59);
+  }
+
+  .library-kicker {
+    margin: 0 0 0.5rem;
+    color: var(--aw-color-accent);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .library-header h1 {
+    margin: 0;
+    font-family: var(--aw-font-heading, inherit);
+    font-weight: 800;
+    line-height: 1.05;
+    font-size: clamp(2.35rem, 7vw, 4rem);
+  }
+
+  .library-intro {
+    max-width: 42rem;
+    margin: 1rem 0 0;
+    font-size: 1.1rem;
+    color: var(--aw-color-text-muted);
+  }
+
+  .auth-status {
+    margin: -0.75rem 0 1.5rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .tab-btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 999px;
+    font-weight: 800;
+    font-size: 0.9rem;
+    color: var(--aw-color-text-muted);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .tab-btn:hover {
+    background: rgb(94 140 138 / 5%);
+    color: var(--aw-color-text-heading);
+  }
+
+  .tab-btn.active {
+    background: rgb(94 140 138 / 12%);
+    color: var(--aw-color-text-heading);
+    border-color: rgb(94 140 138 / 30%);
+  }
+
+  .tab-content {
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+
+  .list-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .list-header h2 {
+    font-family: var(--aw-font-heading, inherit);
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 0 0.5rem;
+  }
+
+  .hint {
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .article-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 1rem;
+  }
+
+  .article-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem;
+    background: rgb(255 255 255 / 0.5);
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1rem;
+    transition: all 0.2s;
+  }
+
+  :global(.dark) .article-item {
+    background: rgb(15 23 42 / 0.3);
+    border-color: rgb(30 41 59);
+  }
+
+  .article-item:hover {
+    border-color: var(--aw-color-accent);
+    background: rgb(255 255 255 / 0.8);
+  }
+
+  :global(.dark) .article-item:hover {
+    background: rgb(15 23 42 / 0.5);
+  }
+
+  .article-info {
+    flex: 1;
+    min-width: 0;
+    padding-right: 1.5rem;
+  }
+
+  .article-date {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--aw-color-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+
+  .article-title {
+    margin: 0 0 0.25rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .article-meta {
+    font-size: 0.85rem;
+    color: var(--aw-color-text-muted);
+  }
+
+  .article-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .action-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    background: rgb(243 244 246);
+    color: rgb(55 65 81);
+    border: 1px solid rgb(209 213 219);
+    transition: all 0.2s;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  :global(.dark) .action-btn {
+    background: rgb(31 41 55);
+    color: rgb(209 213 219);
+    border-color: rgb(75 85 99);
+  }
+
+  .action-btn:hover {
+    background: rgb(229 231 235);
+    border-color: rgb(156 163 175);
+  }
+
+  :global(.dark) .action-btn:hover {
+    background: rgb(55 65 81);
+    border-color: rgb(107 114 128);
+  }
+
+  .list-status {
+    padding: 2rem;
+    text-align: center;
+    color: var(--aw-color-text-muted);
+    font-weight: 700;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.72rem 1.25rem;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+  }
+
+  .btn-primary {
+    border: 1px solid rgb(94 140 138 / 55%);
+    background: rgb(94 140 138 / 18%);
+    color: var(--aw-color-text-heading);
+  }
+
+  .btn-secondary {
+    border: 1px solid rgb(209 213 219);
+    color: var(--aw-color-text-heading);
+  }
+
+  @media (max-width: 640px) {
+    .library-header {
+      flex-direction: column;
+    }
+
+    .article-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .article-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }
+</style>
+
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  import { loadClerk } from '~/utils/clerkLoader';
+
+  (() => {
+    const initializeAdminLibraryPage = () => {
+      const pageRoot = document.querySelector('.admin-library');
+      if (!pageRoot || pageRoot.dataset.adminLibraryInitialized === 'true') return;
+      pageRoot.dataset.adminLibraryInitialized = 'true';
+
+      const clerkPublishableKey = pageRoot.dataset.clerkPublishableKey || '';
+      const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+      const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+      const authStatus = document.querySelector('[data-auth-status]');
+      const draftsContainer = document.querySelector('#drafts-container');
+      const draftsStatus = document.querySelector('#drafts-status');
+      const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+      const tabContents = Array.from(document.querySelectorAll('.tab-content'));
+
+      let clerkLoadPromise;
+      let activeClerk;
+
+      const setGatedContentVisible = (visible) => {
+        gatedContent.forEach((element) => {
+          element.hidden = !visible;
+        });
+      };
+
+      const getClerk = async () => {
+        if (!clerkPublishableKey) {
+          throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
+        }
+        clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
+        return clerkLoadPromise;
+      };
+
+      const setAdminShellVisible = (visible) => {
+        if (pageRoot) pageRoot.hidden = !visible;
+      };
+
+      const redirectToHome = () => {
+        window.location.replace('/');
+      };
+
+      const setAuthStatus = (message) => {
+        if (authStatus) authStatus.textContent = message || '';
+      };
+
+      const getAdminStateForClerk = async (clerk) => {
+        if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
+        const token = await clerk.session.getToken();
+        const response = await fetch('/.netlify/functions/admin-auth-state', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        return response.json();
+      };
+
+      const escapeHtml = (value) =>
+        String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+
+      const formatDate = (value) => {
+        const date = new Date(value);
+        if (Number.isNaN(date.valueOf())) return '';
+        return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+      };
+
+      const renderDraft = (post) => {
+        const title = escapeHtml(post.title || post.slug || 'Untitled draft');
+        const slug = escapeHtml(post.slug || '');
+        const date = formatDate(post.publishDate);
+        const author = post.author ? `By ${escapeHtml(String(post.author).replaceAll('-', ' '))}` : '';
+        const category = post.category ? ` · ${escapeHtml(post.category)}` : '';
+
+        return `
+          <li class="article-item" data-post-preview data-post-slug="${slug}" data-post-draft="true">
+            <div class="article-info">
+              <span class="article-date">${date}</span>
+              <h3 class="article-title">${title}</h3>
+              <p class="article-meta">${author}${category}</p>
+            </div>
+            <div class="article-actions">
+              <button type="button" class="action-btn" data-admin-publish-toggle data-post-slug="${slug}" data-post-draft="true">Publish</button>
+              <a class="action-btn" href="/admin/publish?edit=${encodeURIComponent(post.slug || '')}">Edit</a>
+            </div>
+          </li>
+        `;
+      };
+
+      const loadDrafts = async (clerk) => {
+        if (!draftsContainer) return;
+        const token = await clerk.session.getToken();
+        try {
+          const response = await fetch('/.netlify/functions/list-draft-articles', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const result = await response.json();
+          if (result.posts?.length) {
+            draftsContainer.innerHTML = result.posts.map(renderDraft).join('');
+            if (draftsStatus) (draftsStatus as HTMLElement).hidden = true;
+            bindPublishControls();
+          } else {
+            if (draftsStatus) draftsStatus.textContent = 'No unpublished drafts found.';
+          }
+        } catch {
+          if (draftsStatus) draftsStatus.textContent = 'Failed to load drafts.';
+        }
+      };
+
+      const confirmPublishChange = async (willDraft) => {
+        const dialog = document.querySelector('[data-admin-publish-confirm]');
+        const message = dialog?.querySelector('[data-admin-publish-confirm-message]');
+        const warning = willDraft
+          ? 'Unpublishing removes this article from the public library after the site redeploys.'
+          : 'Publishing makes this article visible on the public library after the site redeploys.';
+
+        if (message) message.textContent = warning;
+        if (!(dialog instanceof HTMLDialogElement)) return window.confirm(warning);
+
+        return new Promise((resolve) => {
+          const handleClose = () => {
+            dialog.removeEventListener('close', handleClose);
+            resolve(dialog.returnValue === 'confirm');
+          };
+          dialog.addEventListener('close', handleClose);
+          dialog.showModal();
+        });
+      };
+
+      const togglePublishState = async (btn) => {
+        const slug = btn.dataset.postSlug;
+        const isDraft = btn.dataset.postDraft === 'true';
+        const willDraft = !isDraft;
+        const confirmed = await confirmPublishChange(willDraft);
+
+        if (!confirmed) return;
+
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = willDraft ? 'Unpublishing…' : 'Publishing…';
+
+        try {
+          const clerk = activeClerk || (await getClerk());
+          const token = await clerk.session.getToken();
+          const response = await fetch('/.netlify/functions/toggle-article-publish', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ slug, draft: willDraft }),
+          });
+
+          if (response.ok) {
+            btn.dataset.postDraft = String(willDraft);
+            btn.textContent = willDraft ? 'Publish' : 'Unpublish';
+            btn.title = willDraft ? 'Publish article' : 'Unpublish article';
+            // Optionally refresh or show success
+          } else {
+            throw new Error('Failed to update status');
+          }
+        } catch (e) {
+          btn.textContent = originalText;
+          window.alert(e instanceof Error ? e.message : 'Failed to update status');
+        } finally {
+          btn.disabled = false;
+        }
+      };
+
+      const bindPublishControls = () => {
+        document.querySelectorAll('[data-admin-publish-toggle]').forEach((btn) => {
+          if (btn.dataset.bound) return;
+          btn.dataset.bound = 'true';
+          btn.addEventListener('click', () => togglePublishState(btn));
+        });
+      };
+
+      const setupTabs = () => {
+        tabs.forEach((tab) => {
+          tab.addEventListener('click', () => {
+            const target = tab.dataset.tab;
+            tabs.forEach((t) => t.classList.toggle('active', t === tab));
+            tabContents.forEach((c) => c.classList.toggle('active', c.id === `${target}-list`));
+          });
+        });
+      };
+
+      const initialize = async () => {
+        setAuthStatus('Checking admin access…');
+        try {
+          const clerk = await getClerk();
+          activeClerk = clerk;
+          const adminState = await getAdminStateForClerk(clerk);
+
+          if (adminState.isAdmin) {
+            setAuthStatus('');
+            setAdminShellVisible(true);
+            setGatedContentVisible(true);
+            setupTabs();
+            bindPublishControls();
+            loadDrafts(clerk);
+          } else {
+            setAuthStatus('Access denied.');
+            redirectToHome();
+          }
+        } catch {
+          setAuthStatus('Authentication failed.');
+          redirectToHome();
+        }
+      };
+
+      initialize();
+    };
+
+    document.addEventListener('astro:page-load', initializeAdminLibraryPage);
+    initializeAdminLibraryPage();
+  })();
+</script>

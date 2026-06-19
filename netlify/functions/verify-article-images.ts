@@ -132,7 +132,9 @@ const verifyImage = async (expected: string, pageUrl: URL, extractedSources: Set
       ok,
       ...(!present ? { error: 'Expected image was not found in page <img> sources.' } : {}),
       ...(response.status !== 200 ? { error: `Expected image returned status ${response.status}.` } : {}),
-      ...(response.status === 200 && !hasImageContentType ? { error: 'Expected image did not return an image content-type.' } : {}),
+      ...(response.status === 200 && !hasImageContentType
+        ? { error: 'Expected image did not return an image content-type.' }
+        : {}),
     };
   } catch (error) {
     return {
@@ -190,8 +192,12 @@ export const handler = async (event: LambdaEvent) => {
     });
     const html = await pageResponse.text();
     const extractedSources = extractImageSources(html, pageUrl);
-    const images = await Promise.all(expectedImages.map((expected) => verifyImage(expected, pageUrl, extractedSources)));
-    const errors = images.filter((image) => !image.ok).map((image) => `${image.expected}: ${image.error ?? 'Verification failed.'}`);
+    const images = await Promise.all(
+      expectedImages.map((expected) => verifyImage(expected, pageUrl, extractedSources))
+    );
+    const errors = images
+      .filter((image) => !image.ok)
+      .map((image) => `${image.expected}: ${image.error ?? 'Verification failed.'}`);
     const verified = pageResponse.status === 200 && images.every((image) => image.ok);
 
     return jsonResponse(200, {

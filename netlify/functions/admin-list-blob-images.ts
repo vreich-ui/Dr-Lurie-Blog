@@ -1,14 +1,6 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import {
-  isArtifactReference,
-  isDeletedArtifactReference,
-  type ArtifactReference,
-} from '../lib/artifacts.js';
-import {
-  listArtifactIndexKeys,
-  resolveArtifactPointer,
-  type ArtifactIndexStore,
-} from '../lib/artifact-index.js';
+import { isArtifactReference, isDeletedArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
+import { listArtifactIndexKeys, resolveArtifactPointer, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
 
 const jsonHeaders = {
@@ -22,7 +14,6 @@ type LambdaEvent = {
   httpMethod?: string;
   queryStringParameters?: Record<string, string | undefined> | null;
 };
-
 
 const requestArtifactPrefix = 'request-artifacts/';
 const imageArtifactKind = 'image';
@@ -67,12 +58,10 @@ const listImageArtifacts = async (indexStore: ArtifactIndexStore, requestId: str
         pointerKeys.map(async (key) => resolveArtifactPointer(indexStore, await parseJsonBlob(indexStore, key)))
       )
     : await Promise.all(
-        (await listArtifactIndexKeys(indexStore, getRequestArtifactPrefix(requestId))).map(
-          async (key) => {
-            const parsed = await parseJsonBlob(indexStore, key);
-            return isArtifactReference(parsed) ? parsed : undefined;
-          }
-        )
+        (await listArtifactIndexKeys(indexStore, getRequestArtifactPrefix(requestId))).map(async (key) => {
+          const parsed = await parseJsonBlob(indexStore, key);
+          return isArtifactReference(parsed) ? parsed : undefined;
+        })
       );
 
   return candidates.filter((reference): reference is ArtifactReference =>

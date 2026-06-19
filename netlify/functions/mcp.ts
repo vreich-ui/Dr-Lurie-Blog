@@ -1010,8 +1010,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'get_artifact_metadata',
-    description:
-      'Get full ArtifactReference metadata for a requestId and sha256. Does not read artifact bytes.',
+    description: 'Get full ArtifactReference metadata for a requestId and sha256. Does not read artifact bytes.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns the artifact.'),
@@ -2055,9 +2054,7 @@ const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) =
   const pointerKeys = await listArtifactIndexKeys(store, pointerPrefix);
 
   const artifacts = pointerKeys.length
-    ? await Promise.all(
-        pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key)))
-      )
+    ? await Promise.all(pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key))))
     : await Promise.all(
         (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`)).map(
           (key) => parseJsonBlob(store, key)
@@ -2219,7 +2216,6 @@ const getMigrationTags = (value: unknown) => {
 
   return tags.length ? tags : undefined;
 };
-
 
 const migrateArtifactIndexRecord = async (store: ArtifactIndexStore, key: string, input: { dryRun: boolean }) => {
   const parsedKey = parseRequestArtifactIndexKey(key);

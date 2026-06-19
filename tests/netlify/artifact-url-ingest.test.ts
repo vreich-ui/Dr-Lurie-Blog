@@ -132,8 +132,8 @@ test('saveArtifactFromUrl successfully ingests a PDF from a valid URL', async (t
     assert.equal(result.fetchedBytes, bytes.length);
 
     if (result.ok) {
-        assert.equal(artifactValues.has(result.artifact.blobKey), true);
-        assert.equal(indexValues.has(`request-artifacts/ingest-request/${expectedSha256}.json`), true);
+      assert.equal(artifactValues.has(result.artifact.blobKey), true);
+      assert.equal(indexValues.has(`request-artifacts/ingest-request/${expectedSha256}.json`), true);
     }
   });
 });
@@ -172,7 +172,7 @@ test('saveArtifactFromUrl successfully ingests an image from a valid URL', async
 
     assert.equal(result.ok, true);
     if (result.ok) {
-        assert.equal(artifactValues.has(result.artifact.blobKey), true);
+      assert.equal(artifactValues.has(result.artifact.blobKey), true);
     }
   });
 });
@@ -225,52 +225,52 @@ test('saveArtifactFromUrl rejects private IP addresses', async (t) => {
 });
 
 test('saveArtifactFromUrl rejects IPv4-mapped loopback IPv6', async (t) => {
-    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:127.0.0.1', family: 6 }]);
+  t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:127.0.0.1', family: 6 }]);
 
-    const result = await saveArtifactFromUrl({
-        requestId: 'test',
-        artifactKind: ArtifactKind.Data,
-        contentType: 'application/octet-stream',
-        sourceUrl: 'https://mapped-loopback.local/test.bin',
-        expectedSizeBytes: 10,
-        expectedSha256: 'a'.repeat(64),
-    });
+  const result = await saveArtifactFromUrl({
+    requestId: 'test',
+    artifactKind: ArtifactKind.Data,
+    contentType: 'application/octet-stream',
+    sourceUrl: 'https://mapped-loopback.local/test.bin',
+    expectedSizeBytes: 10,
+    expectedSha256: 'a'.repeat(64),
+  });
 
-    assert.equal(result.ok, false);
-    assert.match(result.error || '', /Forbidden source IP address/);
+  assert.equal(result.ok, false);
+  assert.match(result.error || '', /Forbidden source IP address/);
 });
 
 test('saveArtifactFromUrl rejects IPv4-mapped private IPv6', async (t) => {
-    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:10.0.0.1', family: 6 }]);
+  t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:10.0.0.1', family: 6 }]);
 
-    const result = await saveArtifactFromUrl({
-        requestId: 'test',
-        artifactKind: ArtifactKind.Data,
-        contentType: 'application/octet-stream',
-        sourceUrl: 'https://mapped-private.local/test.bin',
-        expectedSizeBytes: 10,
-        expectedSha256: 'a'.repeat(64),
-    });
+  const result = await saveArtifactFromUrl({
+    requestId: 'test',
+    artifactKind: ArtifactKind.Data,
+    contentType: 'application/octet-stream',
+    sourceUrl: 'https://mapped-private.local/test.bin',
+    expectedSizeBytes: 10,
+    expectedSha256: 'a'.repeat(64),
+  });
 
-    assert.equal(result.ok, false);
-    assert.match(result.error || '', /Forbidden source IP address/);
+  assert.equal(result.ok, false);
+  assert.match(result.error || '', /Forbidden source IP address/);
 });
 
 test('saveArtifactFromUrl accepts safe IPv4-mapped public IPv6', async (t) => {
-    const bytes = Buffer.from('public-mapped');
-    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:93.184.216.34', family: 6 }]);
-    t.mock.method(_ingestInternal, 'fetch', async () => new Response(bytes, { status: 200 }));
+  const bytes = Buffer.from('public-mapped');
+  t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:93.184.216.34', family: 6 }]);
+  t.mock.method(_ingestInternal, 'fetch', async () => new Response(bytes, { status: 200 }));
 
-    const result = await saveArtifactFromUrl({
-        requestId: 'test',
-        artifactKind: ArtifactKind.Data,
-        contentType: 'application/octet-stream',
-        sourceUrl: 'https://mapped-public.local/test.bin',
-        expectedSizeBytes: bytes.length,
-        expectedSha256: sha256Hex(bytes),
-    });
+  const result = await saveArtifactFromUrl({
+    requestId: 'test',
+    artifactKind: ArtifactKind.Data,
+    contentType: 'application/octet-stream',
+    sourceUrl: 'https://mapped-public.local/test.bin',
+    expectedSizeBytes: bytes.length,
+    expectedSha256: sha256Hex(bytes),
+  });
 
-    assert.equal(result.ok, true);
+  assert.equal(result.ok, true);
 });
 
 test('saveArtifactFromUrl rejects SHA-256 mismatch', async (t) => {
@@ -324,7 +324,7 @@ test('saveArtifactFromUrl follows redirects and re-validates URL safety', async 
   t.mock.method(_ingestInternal, 'fetch', async (url: string) => {
     fetchCount++;
     if (url === initialUrl) {
-      return new Response(null, { status: 302, headers: { 'Location': redirectUrl } });
+      return new Response(null, { status: 302, headers: { Location: redirectUrl } });
     }
     if (url === redirectUrl) {
       return new Response(bytes, { status: 200 });
@@ -357,7 +357,7 @@ test('saveArtifactFromUrl rejects redirect to private IP', async (t) => {
 
   t.mock.method(_ingestInternal, 'fetch', async (url: string) => {
     if (url === initialUrl) {
-      return new Response(null, { status: 302, headers: { 'Location': redirectUrl } });
+      return new Response(null, { status: 302, headers: { Location: redirectUrl } });
     }
     return new Response(null, { status: 404 });
   });
@@ -381,7 +381,7 @@ test('saveArtifactFromUrl rejects more than MAX_REDIRECTS', async (t) => {
     const parts = url.split('/');
     const last = parts.pop() || '0';
     const nextNum = parseInt(last, 10) + 1;
-    return new Response(null, { status: 302, headers: { 'Location': `https://example.com/${nextNum}` } });
+    return new Response(null, { status: 302, headers: { Location: `https://example.com/${nextNum}` } });
   });
 
   const result = await saveArtifactFromUrl({
@@ -398,162 +398,170 @@ test('saveArtifactFromUrl rejects more than MAX_REDIRECTS', async (t) => {
 });
 
 test('saveArtifactFromUrl rejects oversized Content-Length', async (t) => {
-    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
-    t.mock.method(_ingestInternal, 'fetch', async () => {
-        return new Response(null, {
-            status: 200,
-            headers: { 'Content-Length': '1000000000' }
-        });
+  t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
+  t.mock.method(_ingestInternal, 'fetch', async () => {
+    return new Response(null, {
+      status: 200,
+      headers: { 'Content-Length': '1000000000' },
     });
+  });
 
-    const result = await saveArtifactFromUrl({
-        requestId: 'test',
-        artifactKind: ArtifactKind.Data,
-        contentType: 'application/octet-stream',
-        sourceUrl: 'https://example.com/large.bin',
-        expectedSizeBytes: 10,
-        expectedSha256: 'a'.repeat(64),
-    });
+  const result = await saveArtifactFromUrl({
+    requestId: 'test',
+    artifactKind: ArtifactKind.Data,
+    contentType: 'application/octet-stream',
+    sourceUrl: 'https://example.com/large.bin',
+    expectedSizeBytes: 10,
+    expectedSha256: 'a'.repeat(64),
+  });
 
-    assert.equal(result.ok, false);
-    assert.match(result.error || '', /exceeds limit/);
+  assert.equal(result.ok, false);
+  assert.match(result.error || '', /exceeds limit/);
 });
 
 test('saveArtifactFromUrl rejects oversized body even without Content-Length', async (t) => {
-    const largeBuffer = Buffer.alloc(getDirectArtifactUploadMaxBytes() + 1);
-    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
-    t.mock.method(_ingestInternal, 'fetch', async () => {
-        return new Response(largeBuffer, {
-            status: 200,
-            headers: {} // No Content-Length
-        });
+  const largeBuffer = Buffer.alloc(getDirectArtifactUploadMaxBytes() + 1);
+  t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
+  t.mock.method(_ingestInternal, 'fetch', async () => {
+    return new Response(largeBuffer, {
+      status: 200,
+      headers: {}, // No Content-Length
     });
+  });
 
-    const result = await saveArtifactFromUrl({
-        requestId: 'test',
-        artifactKind: ArtifactKind.Data,
-        contentType: 'application/octet-stream',
-        sourceUrl: 'https://example.com/large-no-cl.bin',
-        expectedSizeBytes: largeBuffer.length,
-        expectedSha256: sha256Hex(largeBuffer),
-    });
+  const result = await saveArtifactFromUrl({
+    requestId: 'test',
+    artifactKind: ArtifactKind.Data,
+    contentType: 'application/octet-stream',
+    sourceUrl: 'https://example.com/large-no-cl.bin',
+    expectedSizeBytes: largeBuffer.length,
+    expectedSha256: sha256Hex(largeBuffer),
+  });
 
-    assert.equal(result.ok, false);
-    assert.match(result.error || '', /exceeds limit/);
+  assert.equal(result.ok, false);
+  assert.match(result.error || '', /exceeds limit/);
 });
 
 test('saveArtifactFromUrl rejects non-2xx fetch response', async (t) => {
-    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
-    t.mock.method(_ingestInternal, 'fetch', async () => {
-        return new Response(null, { status: 500, statusText: 'Internal Server Error' });
-    });
+  t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
+  t.mock.method(_ingestInternal, 'fetch', async () => {
+    return new Response(null, { status: 500, statusText: 'Internal Server Error' });
+  });
 
-    const result = await saveArtifactFromUrl({
-        requestId: 'test',
-        artifactKind: ArtifactKind.Data,
-        contentType: 'application/octet-stream',
-        sourceUrl: 'https://example.com/error.bin',
-        expectedSizeBytes: 10,
-        expectedSha256: 'a'.repeat(64),
-    });
+  const result = await saveArtifactFromUrl({
+    requestId: 'test',
+    artifactKind: ArtifactKind.Data,
+    contentType: 'application/octet-stream',
+    sourceUrl: 'https://example.com/error.bin',
+    expectedSizeBytes: 10,
+    expectedSha256: 'a'.repeat(64),
+  });
 
-    assert.equal(result.ok, false);
-    assert.match(result.error || '', /HTTP 500/);
+  assert.equal(result.ok, false);
+  assert.match(result.error || '', /HTTP 500/);
 });
 
 test('saveArtifactFromUrl rejects invalid image bytes', async (t) => {
-    await withBlobStores(async () => {
-        const bytes = Buffer.from('not an image');
-        const expectedSha256 = sha256Hex(bytes);
-        const sourceUrl = 'https://example.com/bad.png';
+  await withBlobStores(async () => {
+    const bytes = Buffer.from('not an image');
+    const expectedSha256 = sha256Hex(bytes);
+    const sourceUrl = 'https://example.com/bad.png';
 
-        t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
-        t.mock.method(_ingestInternal, 'fetch', async () => new Response(bytes, { status: 200, headers: { 'Content-Type': 'image/png' } }));
+    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
+    t.mock.method(
+      _ingestInternal,
+      'fetch',
+      async () => new Response(bytes, { status: 200, headers: { 'Content-Type': 'image/png' } })
+    );
 
-        const result = await saveArtifactFromUrl({
-            requestId: 'test',
-            artifactKind: ArtifactKind.Image,
-            contentType: 'image/png',
-            sourceUrl,
-            expectedSizeBytes: bytes.length,
-            expectedSha256,
-            filename: 'bad.png'
-        });
-
-        assert.equal(result.ok, false);
-        assert.match(result.error || '', /Invalid image artifact/);
+    const result = await saveArtifactFromUrl({
+      requestId: 'test',
+      artifactKind: ArtifactKind.Image,
+      contentType: 'image/png',
+      sourceUrl,
+      expectedSizeBytes: bytes.length,
+      expectedSha256,
+      filename: 'bad.png',
     });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error || '', /Invalid image artifact/);
+  });
 });
 
 test('MCP tools/list includes create_artifact_from_url', async () => {
-    const previousSecret = process.env.NETLIFY_PUBLISH_SECRET;
-    process.env.NETLIFY_PUBLISH_SECRET = 'mcp-secret';
-    try {
-        const response = await mcpHandler({
-            httpMethod: 'POST',
-            headers: { 'content-type': 'application/json', 'x-publish-key': 'mcp-secret' },
-            body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'tools/list'
-            })
-        });
+  const previousSecret = process.env.NETLIFY_PUBLISH_SECRET;
+  process.env.NETLIFY_PUBLISH_SECRET = 'mcp-secret';
+  try {
+    const response = await mcpHandler({
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json', 'x-publish-key': 'mcp-secret' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/list',
+      }),
+    });
 
-        assert.equal(response.statusCode, 200);
-        const body = JSON.parse(response.body);
-        const tools = body.result.tools;
-        const hasTool = tools.some((t: { name: string }) => t.name === 'create_artifact_from_url');
-        assert.equal(hasTool, true);
-    } finally {
-        if (previousSecret) process.env.NETLIFY_PUBLISH_SECRET = previousSecret;
-        else delete process.env.NETLIFY_PUBLISH_SECRET;
-    }
+    assert.equal(response.statusCode, 200);
+    const body = JSON.parse(response.body);
+    const tools = body.result.tools;
+    const hasTool = tools.some((t: { name: string }) => t.name === 'create_artifact_from_url');
+    assert.equal(hasTool, true);
+  } finally {
+    if (previousSecret) process.env.NETLIFY_PUBLISH_SECRET = previousSecret;
+    else delete process.env.NETLIFY_PUBLISH_SECRET;
+  }
 });
 
 test('MCP tool create_artifact_from_url handles valid input and returns success', async (t) => {
-    await withBlobStores(async ({ artifactValues, indexValues }) => {
-        void artifactValues;
-        void indexValues;
-        const bytes = Buffer.from('%PDF-1.7\nmcp ingest pdf');
-        const expectedSha256 = sha256Hex(bytes);
-        const sourceUrl = 'https://example.com/mcp.pdf';
-        const previousSecret = process.env.NETLIFY_PUBLISH_SECRET;
-        process.env.NETLIFY_PUBLISH_SECRET = 'mcp-secret';
+  await withBlobStores(async ({ artifactValues, indexValues }) => {
+    void artifactValues;
+    void indexValues;
+    const bytes = Buffer.from('%PDF-1.7\nmcp ingest pdf');
+    const expectedSha256 = sha256Hex(bytes);
+    const sourceUrl = 'https://example.com/mcp.pdf';
+    const previousSecret = process.env.NETLIFY_PUBLISH_SECRET;
+    process.env.NETLIFY_PUBLISH_SECRET = 'mcp-secret';
 
-        t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
-        t.mock.method(_ingestInternal, 'fetch', async () => new Response(bytes, { status: 200, headers: { 'Content-Type': 'application/pdf' } }));
+    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '93.184.216.34', family: 4 }]);
+    t.mock.method(
+      _ingestInternal,
+      'fetch',
+      async () => new Response(bytes, { status: 200, headers: { 'Content-Type': 'application/pdf' } })
+    );
 
-        try {
-            const response = await mcpHandler({
-                httpMethod: 'POST',
-                headers: { 'content-type': 'application/json', 'x-publish-key': 'mcp-secret' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    id: 1,
-                    method: 'tools/call',
-                    params: {
-                        name: 'create_artifact_from_url',
-                        arguments: {
-                            requestId: 'mcp-ingest-request',
-                            artifactKind: 'pdf',
-                            contentType: 'application/pdf',
-                            sourceUrl,
-                            expectedSizeBytes: bytes.length,
-                            expectedSha256,
-                            filename: 'mcp.pdf'
-                        }
-                    }
-                })
-            });
+    try {
+      const response = await mcpHandler({
+        httpMethod: 'POST',
+        headers: { 'content-type': 'application/json', 'x-publish-key': 'mcp-secret' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'create_artifact_from_url',
+            arguments: {
+              requestId: 'mcp-ingest-request',
+              artifactKind: 'pdf',
+              contentType: 'application/pdf',
+              sourceUrl,
+              expectedSizeBytes: bytes.length,
+              expectedSha256,
+              filename: 'mcp.pdf',
+            },
+          },
+        }),
+      });
 
-            assert.equal(response.statusCode, 200);
-            const body = JSON.parse(response.body);
-            assert.equal(body.result.structuredContent.ok, true);
-            assert.equal(body.result.structuredContent.sourceUrl, sourceUrl);
-            assert.ok(body.result.structuredContent.artifact);
-        } finally {
-            if (previousSecret) process.env.NETLIFY_PUBLISH_SECRET = previousSecret;
-            else delete process.env.NETLIFY_PUBLISH_SECRET;
-        }
-    });
+      assert.equal(response.statusCode, 200);
+      const body = JSON.parse(response.body);
+      assert.equal(body.result.structuredContent.ok, true);
+      assert.equal(body.result.structuredContent.sourceUrl, sourceUrl);
+      assert.ok(body.result.structuredContent.artifact);
+    } finally {
+      if (previousSecret) process.env.NETLIFY_PUBLISH_SECRET = previousSecret;
+      else delete process.env.NETLIFY_PUBLISH_SECRET;
+    }
+  });
 });

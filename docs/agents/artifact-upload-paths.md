@@ -11,6 +11,7 @@ The retained binary artifact path is the direct upload flow:
 If a browser or cloud agent cannot perform a raw binary HTTP POST to `/api/artifacts/upload`, it should use the `create_artifact_from_url` tool. This is the **preferred fallback** for restricted environments.
 
 The `create_artifact_from_url` tool requires:
+
 - `requestId`: The workflow request id.
 - `artifactKind`: The kind of artifact (e.g., `image`, `pdf`).
 - `contentType`: The MIME type of the artifact.
@@ -20,6 +21,7 @@ The `create_artifact_from_url` tool requires:
 - Optional: `filename`, `label`, `tags`, `metadata`.
 
 **Behavior:**
+
 1. The server validates the `sourceUrl` (HTTPS only, no credentials, public IP validation, redirect limits).
 2. The server fetches the bytes from the URL.
 3. The server verifies that the received bytes match the `expectedSizeBytes` and `expectedSha256`.

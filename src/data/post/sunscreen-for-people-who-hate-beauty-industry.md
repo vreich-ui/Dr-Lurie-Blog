@@ -1,16 +1,17 @@
 ---
 publishDate: 2026-05-29T11:18:00.000Z
-title: "Sunscreen for People Who Don’t Want a Beauty Routine"
-image: "~/assets/images/uploads/sunscreen-for-people-who-hate-beauty-industry/serene-skincare-display-in-soft-light.png"
+title: 'Sunscreen for People Who Don’t Want a Beauty Routine'
+image: '~/assets/images/uploads/sunscreen-for-people-who-hate-beauty-industry/serene-skincare-display-in-soft-light.png'
 tags:
-  - "sunscreen"
-  - "photoaging"
-  - "sun protection"
-  - "skin over 40"
-  - "dark spots"
-  - "aging skin"
-  - "skin health"
+  - 'sunscreen'
+  - 'photoaging'
+  - 'sun protection'
+  - 'skin over 40'
+  - 'dark spots'
+  - 'aging skin'
+  - 'skin health'
 ---
+
 You may not think of yourself as a sunscreen person. You may not follow skincare trends, want a shelf full of products, or care about “glow.” But then, sometime after 40, the skin starts giving more visible records: brown spots across the cheeks or backs of the hands, rougher texture around the nose, fine lines that seem to stay after your face relaxes, tone that looks less even in ordinary bathroom light.
 
 That does not mean you need to become interested in the beauty industry. It does mean sun protection may be worth thinking about differently.

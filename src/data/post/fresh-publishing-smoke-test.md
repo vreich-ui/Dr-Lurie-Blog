@@ -1,17 +1,18 @@
 ---
 publishDate: 2026-06-12
-title: "Fresh Publishing Smoke Test: A Clean Path to Live"
-excerpt: "A compact alpha article used to validate immediate publishing with generated image assets."
-category: "Editorial"
+title: 'Fresh Publishing Smoke Test: A Clean Path to Live'
+excerpt: 'A compact alpha article used to validate immediate publishing with generated image assets.'
+category: 'Editorial'
 tags:
-  - "Publishing"
-  - "Smoke Test"
-  - "Workflow"
-  - "Alpha"
-author: "Dr. Lurié"
+  - 'Publishing'
+  - 'Smoke Test'
+  - 'Workflow'
+  - 'Alpha'
+author: 'Dr. Lurié'
 metadata:
-  description: "A compact alpha article used to validate immediate publishing with generated image assets."
+  description: 'A compact alpha article used to validate immediate publishing with generated image assets.'
 ---
+
 # Fresh Publishing Smoke Test: A Clean Path to Live
 
 This article is a fresh alpha test of the publishing pipeline. It exists to confirm that a new article can move from generated content to a completed workflow record and then into the publishing queue without relying on old state.

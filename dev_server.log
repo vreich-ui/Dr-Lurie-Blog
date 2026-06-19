@@ -1,0 +1,112 @@
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> @onwidget/astrowind@1.0.0-beta.52 dev
+> astro dev
+
+11:38:54 [astrowind] Astrowind `./src/config.yaml` has been loaded.
+11:38:54 [types] Generated 1ms
+11:38:55 [content] Syncing content
+11:38:55 [content] Synced content
+11:38:55 [vite] Re-optimizing dependencies because vite config has changed
+
+ astro  v5.12.9 ready in 2701 ms
+
+┃ Local    http://localhost:4321/
+┃ Network  use --host to expose
+
+11:38:55 watching for file changes...
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+11:39:10 [200] / 1633ms
+11:39:10 [200] /search.json 2ms
+11:39:29 [200] / 21ms
+11:39:29 [200] /search.json 1ms
+11:39:30 [200] / 16ms
+11:39:30 [200] /search.json 1ms
+11:41:44 [watch] src/components/widgets/Header.astro
+11:41:44 [watch] src/components/widgets/Header.astro
+11:43:15 [watch] src/components/widgets/Header.astro
+11:43:15 [watch] src/components/widgets/Header.astro
+11:43:23 [watch] src/pages/admin/library.astro
+11:43:23 [watch] src/pages/admin/library.astro
+11:44:24 [watch] src/components/blog/ListItem.astro
+11:44:24 [watch] src/components/blog/ListItem.astro
+11:44:26 [watch] src/components/widgets/Header.astro
+11:44:26 [watch] src/components/widgets/Header.astro
+11:44:26 [watch] src/data/post/a-small-argument-for-aimless-walks.md
+11:44:26 [watch] src/data/post/a-small-argument-for-aimless-walks.md
+11:44:26 [watch] src/data/post/dark-spots-uneven-tone-age-spots-melasma.md
+11:44:26 [watch] src/data/post/dark-spots-uneven-tone-age-spots-melasma.md
+11:44:26 [watch] src/data/post/fresh-publishing-smoke-test.md
+11:44:26 [watch] src/data/post/fresh-publishing-smoke-test.md
+11:44:26 [watch] src/data/post/hormonal-skin-changes-without-anti-aging-panic.md
+11:44:26 [watch] src/data/post/hormonal-skin-changes-without-anti-aging-panic.md
+11:44:26 [watch] src/data/post/how-to-start-retinol-without-wrecking-your-skin-barrier.md
+11:44:26 [watch] src/data/post/how-to-start-retinol-without-wrecking-your-skin-barrier.md
+11:44:26 [watch] src/data/post/mcp-connection-test-2026-06-11.md
+11:44:26 [watch] src/data/post/mcp-connection-test-2026-06-11.md
+11:44:26 [watch] src/data/post/microbiome-friendly-body-care.md
+11:44:26 [watch] src/data/post/microbiome-friendly-body-care.md
+11:44:26 [glob-loader] Reloaded data from a-small-argument-for-aimless-walks.md
+11:44:26 [watch] src/data/post/publishing-pipeline-alpha-test.md
+11:44:26 [watch] src/data/post/publishing-pipeline-alpha-test.md
+11:44:26 [glob-loader] Reloaded data from dark-spots-uneven-tone-age-spots-melasma.md
+11:44:26 [glob-loader] Reloaded data from fresh-publishing-smoke-test.md
+11:44:26 [glob-loader] Reloaded data from hormonal-skin-changes-without-anti-aging-panic.md
+11:44:26 [glob-loader] Reloaded data from how-to-start-retinol-without-wrecking-your-skin-barrier.md
+11:44:26 [glob-loader] Reloaded data from mcp-connection-test-2026-06-11.md
+11:44:26 [glob-loader] Reloaded data from microbiome-friendly-body-care.md
+11:44:26 [watch] src/data/post/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy.md
+11:44:26 [watch] src/data/post/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy.md
+11:44:26 [watch] src/data/post/silymarin.md
+11:44:26 [watch] src/data/post/silymarin.md
+11:44:26 [watch] src/data/post/sunscreen-for-people-who-hate-beauty-industry.md
+11:44:26 [watch] src/data/post/sunscreen-for-people-who-hate-beauty-industry.md
+11:44:26 [watch] src/data/post/sunscreen-for-people-who-hate-the-beauty-industry.md
+11:44:26 [watch] src/data/post/sunscreen-for-people-who-hate-the-beauty-industry.md
+11:44:27 [watch] src/data/post/the-blue-dot-on-the-floor.md
+11:44:27 [watch] src/data/post/the-blue-dot-on-the-floor.md
+11:44:27 [watch] src/data/post/the-global-skincare-industry.md
+11:44:27 [watch] src/data/post/the-global-skincare-industry.md
+11:44:27 [watch] src/data/post/the-small-weather-of-stairwells.md
+11:44:27 [watch] src/data/post/the-small-weather-of-stairwells.md
+11:44:27 [watch] src/data/post/understanding-the-differences-between-lotions-creams-and-gels.md
+11:44:27 [watch] src/data/post/understanding-the-differences-between-lotions-creams-and-gels.md
+11:44:27 [glob-loader] Reloaded data from publishing-pipeline-alpha-test.md
+11:44:27 [watch] src/data/post/why-some-people-smell-stronger-than-others.md
+11:44:27 [watch] src/data/post/why-some-people-smell-stronger-than-others.md
+11:44:27 [glob-loader] Reloaded data from retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy.md
+11:44:27 [glob-loader] Reloaded data from silymarin.md
+11:44:27 [glob-loader] Reloaded data from sunscreen-for-people-who-hate-beauty-industry.md
+11:44:27 [glob-loader] Reloaded data from sunscreen-for-people-who-hate-the-beauty-industry.md
+11:44:27 [glob-loader] Reloaded data from the-blue-dot-on-the-floor.md
+11:44:27 [glob-loader] Reloaded data from the-global-skincare-industry.md
+11:44:27 [glob-loader] Reloaded data from the-small-weather-of-stairwells.md
+11:44:27 [glob-loader] Reloaded data from understanding-the-differences-between-lotions-creams-and-gels.md
+11:44:27 [watch] src/data/post/why-sunscreen-seems-to-break-you-out.md
+11:44:27 [watch] src/data/post/why-sunscreen-seems-to-break-you-out.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-10.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-10.md
+11:44:27 [glob-loader] Reloaded data from why-some-people-smell-stronger-than-others.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-120.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-120.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-40-test.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-40-test.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-40.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-40.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-65.md
+11:44:27 [watch] src/data/post/why-your-skin-barrier-changes-after-65.md
+11:44:27 [watch] src/data/post/why-your-skin-can-seem-to-change-all-at-once-after-40.md
+11:44:27 [watch] src/data/post/why-your-skin-can-seem-to-change-all-at-once-after-40.md
+11:44:27 [glob-loader] Reloaded data from why-sunscreen-seems-to-break-you-out.md
+11:44:27 [glob-loader] Reloaded data from why-your-skin-barrier-changes-after-10.md
+11:44:27 [glob-loader] Reloaded data from why-your-skin-barrier-changes-after-120.md
+11:44:27 [glob-loader] Reloaded data from why-your-skin-barrier-changes-after-40-test.md
+11:44:27 [glob-loader] Reloaded data from why-your-skin-barrier-changes-after-40.md
+11:44:27 [glob-loader] Reloaded data from why-your-skin-barrier-changes-after-65.md
+11:44:27 [glob-loader] Reloaded data from why-your-skin-can-seem-to-change-all-at-once-after-40.md
+11:49:14 [watch] src/pages/admin/library.astro
+11:49:14 [watch] src/pages/admin/library.astro
+11:50:39 [watch] src/pages/admin/library.astro
+11:50:39 [watch] src/pages/admin/library.astro

@@ -19,15 +19,10 @@ const { post } = Astro.props;
 const image = (await findImage(post.image)) as ImageMetadata | undefined;
 
 const link = APP_BLOG?.post?.isEnabled ? getPermalink(post.permalink, 'post') : '';
-const adminEditHref = `/admin/publish?edit=${encodeURIComponent(post.slug)}`;
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 ---
 
 <article
   class={`max-w-md mx-auto md:max-w-none grid gap-6 md:gap-8 intersect-once intersect-quarter motion-safe:md:opacity-0 motion-safe:md:intersect:animate-fade ${image ? 'md:grid-cols-2' : ''}`}
-  data-post-preview
-  data-post-unpublished={String(Boolean(post.draft))}
-  data-clerk-publishable-key={clerkPublishableKey}
 >
   {
     image &&
@@ -94,51 +89,6 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
             )
           }
         </span>
-        <div class="ml-auto inline-flex shrink-0 items-center gap-1" data-admin-preview-actions>
-          <span
-            class="hidden rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[0.6875rem] font-semibold leading-none text-amber-800 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-200"
-            data-admin-publish-badge
-          >
-            Draft
-          </span>
-          <button
-            type="button"
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-wait disabled:opacity-60 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-            data-admin-publish-toggle
-            data-post-slug={post.slug}
-            data-post-draft={String(Boolean(post.draft))}
-            hidden
-            aria-pressed={!post.draft}
-            aria-label={post.draft ? 'Publish article' : 'Unpublish article'}
-            title={post.draft ? 'Publish article' : 'Unpublish article'}
-          >
-            <Icon
-              name="tabler:cloud-upload"
-              class={`h-4 w-4 ${post.draft ? '' : 'hidden'}`}
-              data-admin-publish-icon="publish"
-              aria-hidden="true"
-            />
-            <Icon
-              name="tabler:cloud-off"
-              class={`h-4 w-4 ${post.draft ? 'hidden' : ''}`}
-              data-admin-publish-icon="unpublish"
-              aria-hidden="true"
-            />
-            <span class="sr-only" data-admin-publish-status>
-              {post.draft ? 'Publish article' : 'Unpublish article'}
-            </span>
-          </button>
-          <a
-            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted transition hover:bg-gray-100 hover:text-default focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
-            href={adminEditHref}
-            data-admin-edit
-            hidden
-            aria-label="Edit article"
-          >
-            <Icon name="tabler:pencil" class="h-4 w-4" aria-hidden="true" />
-            <span class="sr-only">Edit article</span>
-          </a>
-        </div>
       </div>
       <h2 class="text-xl sm:text-2xl font-bold leading-tight mb-2 font-heading dark:text-slate-300">
         {
@@ -174,19 +124,3 @@ const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
     }
   </div>
 </article>
-
-<style>
-  [data-admin-edit][hidden],
-  [data-admin-publish-toggle][hidden] {
-    display: none !important;
-  }
-
-  [data-post-preview][data-post-unpublished='true'] {
-    opacity: 0.62;
-    filter: grayscale(0.45);
-  }
-
-  [data-post-preview][data-post-unpublished='true'] [data-admin-publish-badge] {
-    display: inline-flex;
-  }
-</style>

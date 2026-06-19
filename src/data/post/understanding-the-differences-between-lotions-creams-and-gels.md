@@ -1,12 +1,12 @@
 ---
 publishDate: 2026-05-22
-title: "Understanding the Differences Between Lotions, Creams, and Gels"
-excerpt: "When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best."
-image: "~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.webp"
+title: 'Understanding the Differences Between Lotions, Creams, and Gels'
+excerpt: 'When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best.'
+image: '~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.webp'
 tags:
-- "Lotions"
-- "Creams"
-- "Gels"
+  - 'Lotions'
+  - 'Creams'
+  - 'Gels'
 ---
 
 When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best.
@@ -15,7 +15,7 @@ When navigating skincare shelves, lotions, creams, and gels might seem like just
 
 **Creams** generally have a higher oil content than lotions, making them thicker and richer. This denser formulation forms a more occlusive barrier on the skin, locking in moisture effectively. For those with dry, mature, or irritated skin, creams provide sustained hydration and a protective feel. The extra oils and emollients in creams contribute to their nourishing quality.
 
-*Gels** differ from lotions and creams as they are water-based with added gelling agents that give them a semi-solid, jelly-like texture. Gels are often cooling and fast absorbing, which works well for oily or acne-prone skin by providing hydration without heaviness. Their transparent texture is also handy for layering under makeup or in combination with other skincare.\n\nThe key to these formulation differences lies in the balance of water, oils, and thickening agents:
+\*Gels\*\* differ from lotions and creams as they are water-based with added gelling agents that give them a semi-solid, jelly-like texture. Gels are often cooling and fast absorbing, which works well for oily or acne-prone skin by providing hydration without heaviness. Their transparent texture is also handy for layering under makeup or in combination with other skincare.\n\nThe key to these formulation differences lies in the balance of water, oils, and thickening agents:
 
 - Higher water content and emulsifiers create the lighter feel of lotions.
 - Increased oils and emollients produce the richness of creams.
@@ -32,6 +32,5 @@ These distinctions matter because they influence not just how a product feels im
 By understanding these formulation differences, you can move beyond marketing labels and select products that genuinely fit your skin's texture, hydration needs, and comfort preferences. This empowers you to create a personalized skincare routine that feels intentional and effective.
 
 Remember, while these guidelines provide a useful starting point, individual skin responses vary. It's always helpful to test how a formulation feels and works for you specifically.
-
 
 This article aims to clarify common questions about lotions, creams, and gels without overselling any product type, acknowledging the nuanced and personal nature of skincare.

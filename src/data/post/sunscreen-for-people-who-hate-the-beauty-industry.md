@@ -1,17 +1,18 @@
 ---
 publishDate: 2026-05-27T00:00:00.000Z
-title: "Sunscreen for People Who Hate the Beauty Industry"
-excerpt: "A plain-language guide to treating sunscreen as skin maintenance after 40: why photoaging shows up later, what broad-spectrum really means, and how to make sun protection tolerable if you hate the feel or the marketing."
-image: "~/assets/images/uploads/sunscreen-for-people-who-hate-the-beauty-industry/chatgpt-image-may-29-2026-01_55_14-pm.png"
-category: "Health"
+title: 'Sunscreen for People Who Hate the Beauty Industry'
+excerpt: 'A plain-language guide to treating sunscreen as skin maintenance after 40: why photoaging shows up later, what broad-spectrum really means, and how to make sun protection tolerable if you hate the feel or the marketing.'
+image: '~/assets/images/uploads/sunscreen-for-people-who-hate-the-beauty-industry/chatgpt-image-may-29-2026-01_55_14-pm.png'
+category: 'Health'
 tags:
-  - "sunscreen"
-  - "photoaging"
-  - "sun protection"
-  - "dark spots"
-  - "skin health"
-author: "Rebbeca Stevenson"
+  - 'sunscreen'
+  - 'photoaging'
+  - 'sun protection'
+  - 'dark spots'
+  - 'skin health'
+author: 'Rebbeca Stevenson'
 ---
+
 If you are not interested in beauty routines, sunscreen can sound like one more thing you were supposed to care about years ago.
 
 That framing is part of the problem.

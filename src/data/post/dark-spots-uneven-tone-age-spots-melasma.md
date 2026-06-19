@@ -1,29 +1,30 @@
 ---
-title: "Not Every Dark Spot Is the Same"
+title: 'Not Every Dark Spot Is the Same'
 publishDate: 2026-05-29T16:16:00.000Z
-excerpt: "Age spots, sun spots, post-inflammatory marks, and melasma-like patches often get sold under one “brightening” promise. Your skin is more specific than that."
-image: "~/assets/images/uploads/dark-spots-uneven-tone-age-spots-melasma/chatgpt-image-may-29-2026-08_38_27-pm.png"
+excerpt: 'Age spots, sun spots, post-inflammatory marks, and melasma-like patches often get sold under one “brightening” promise. Your skin is more specific than that.'
+image: '~/assets/images/uploads/dark-spots-uneven-tone-age-spots-melasma/chatgpt-image-may-29-2026-08_38_27-pm.png'
 tags:
-  - "dark spots"
-  - "uneven tone"
-  - "hyperpigmentation"
-  - "age spots"
-  - "melasma"
-  - "sun protection"
-  - "skin over 40"
-  - "melanin-rich skin"
+  - 'dark spots'
+  - 'uneven tone'
+  - 'hyperpigmentation'
+  - 'age spots'
+  - 'melasma'
+  - 'sun protection'
+  - 'skin over 40'
+  - 'melanin-rich skin'
 sources:
-  - "name: American Academy of Dermatology — Melasma self-care; url: https://www.aad.org/public/diseases/a-z/melasma-self-care"
-  - "name: American Academy of Dermatology — How to fade dark spots in darker skin tones; url: https://staging.aad.org/public/everyday-care/skin-care-secrets/routine/fade-dark-spots"
-  - "name: DermNet — Solar lentigo; url: https://dermnetnz.org/topics/solar-lentigo"
-  - "name: DermNet — Postinflammatory hyperpigmentation; url: https://dermnetnz.org/topics/postinflammatory-hyperpigmentation"
-  - "name: DermNet — Melasma; url: https://dermnetnz.org/topics/melasma"
-  - "name: American Academy of Dermatology — ABCDEs of melanoma; url: https://www.aad.org/public/diseases/skin-cancer/find/at-risk/abcdes"
-  - "name: National Cancer Institute — Skin cancer in people with darker skin; url: https://www.cancer.gov/types/skin/skin-cancer-in-black-or-brown-skin"
-  - "name: FDA — Sunscreen: How to help protect your skin from the sun; url: https://www.fda.gov/drugs/understanding-over-counter-medicines/sunscreen-how-help-protect-your-skin-sun"
+  - 'name: American Academy of Dermatology — Melasma self-care; url: https://www.aad.org/public/diseases/a-z/melasma-self-care'
+  - 'name: American Academy of Dermatology — How to fade dark spots in darker skin tones; url: https://staging.aad.org/public/everyday-care/skin-care-secrets/routine/fade-dark-spots'
+  - 'name: DermNet — Solar lentigo; url: https://dermnetnz.org/topics/solar-lentigo'
+  - 'name: DermNet — Postinflammatory hyperpigmentation; url: https://dermnetnz.org/topics/postinflammatory-hyperpigmentation'
+  - 'name: DermNet — Melasma; url: https://dermnetnz.org/topics/melasma'
+  - 'name: American Academy of Dermatology — ABCDEs of melanoma; url: https://www.aad.org/public/diseases/skin-cancer/find/at-risk/abcdes'
+  - 'name: National Cancer Institute — Skin cancer in people with darker skin; url: https://www.cancer.gov/types/skin/skin-cancer-in-black-or-brown-skin'
+  - 'name: FDA — Sunscreen: How to help protect your skin from the sun; url: https://www.fda.gov/drugs/understanding-over-counter-medicines/sunscreen-how-help-protect-your-skin-sun'
 metadata:
-  description: "A calm guide to dark spots and uneven tone after 40, including age spots, sun spots, post-inflammatory hyperpigmentation, melasma-like patterns, sunscreen, melanin-rich skin, and when to have a lesion checked."
+  description: 'A calm guide to dark spots and uneven tone after 40, including age spots, sun spots, post-inflammatory hyperpigmentation, melasma-like patterns, sunscreen, melanin-rich skin, and when to have a lesion checked.'
 ---
+
 A flat brown spot on the back of the hand. A patch across both cheeks that looks more noticeable by late summer. A mark that stayed behind after a breakout, an eczema flare, or a product that stung around the nose.
 
 In ads, these often become one thing: “dark spots.” One serum, one promise, one before-and-after. But on real skin, especially after 40, uneven tone can come from several different processes. Treating every mark as the same problem is one reason brightening routines can feel confusing, disappointing, or unnecessarily aggressive.

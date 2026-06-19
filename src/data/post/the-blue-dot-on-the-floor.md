@@ -1,18 +1,19 @@
 ---
 publishDate: 2026-06-14T11:36:00.000Z
-title: "The Blue Dot on the Floor"
-excerpt: "A small reflection from a phone screen becomes a quiet way back into memory."
-image: "~/assets/images/uploads/the-blue-dot-on-the-floor/scrolling-mood.webp"
-category: "Essay"
+title: 'The Blue Dot on the Floor'
+excerpt: 'A small reflection from a phone screen becomes a quiet way back into memory.'
+image: '~/assets/images/uploads/the-blue-dot-on-the-floor/scrolling-mood.webp'
+category: 'Essay'
 tags:
-  - "attention"
-  - "nostalgia"
-  - "small moments"
-  - "reflection"
-author: "Dr. Lurie"
+  - 'attention'
+  - 'nostalgia'
+  - 'small moments'
+  - 'reflection'
+author: 'Dr. Lurie'
 metadata:
-  description: "A quiet essay about a tiny reflected light, pointless scrolling, and the small nostalgia hidden in ordinary rooms."
+  description: 'A quiet essay about a tiny reflected light, pointless scrolling, and the small nostalgia hidden in ordinary rooms.'
 ---
+
 There is a tiny blue dot on the floorboards when the phone is tilted just so.
 
 Most nights, it is nothing. It is not even a dot, exactly. It is a reflection from some bright corner of the screen, a little spilled pixel trembling beside the chair leg. It appears only when the room is dark enough and the hand is tired enough to let the phone sag. It lives in the pause between one video and the next.
