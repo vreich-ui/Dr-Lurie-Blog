@@ -224,6 +224,55 @@ test('saveArtifactFromUrl rejects private IP addresses', async (t) => {
   assert.match(result.error || '', /Forbidden source IP address/);
 });
 
+test('saveArtifactFromUrl rejects IPv4-mapped loopback IPv6', async (t) => {
+    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:127.0.0.1', family: 6 }]);
+
+    const result = await saveArtifactFromUrl({
+        requestId: 'test',
+        artifactKind: ArtifactKind.Data,
+        contentType: 'application/octet-stream',
+        sourceUrl: 'https://mapped-loopback.local/test.bin',
+        expectedSizeBytes: 10,
+        expectedSha256: 'a'.repeat(64),
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error || '', /Forbidden source IP address/);
+});
+
+test('saveArtifactFromUrl rejects IPv4-mapped private IPv6', async (t) => {
+    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:10.0.0.1', family: 6 }]);
+
+    const result = await saveArtifactFromUrl({
+        requestId: 'test',
+        artifactKind: ArtifactKind.Data,
+        contentType: 'application/octet-stream',
+        sourceUrl: 'https://mapped-private.local/test.bin',
+        expectedSizeBytes: 10,
+        expectedSha256: 'a'.repeat(64),
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.error || '', /Forbidden source IP address/);
+});
+
+test('saveArtifactFromUrl accepts safe IPv4-mapped public IPv6', async (t) => {
+    const bytes = Buffer.from('public-mapped');
+    t.mock.method(_ingestInternal, 'dnsLookup', async () => [{ address: '::ffff:93.184.216.34', family: 6 }]);
+    t.mock.method(_ingestInternal, 'fetch', async () => new Response(bytes, { status: 200 }));
+
+    const result = await saveArtifactFromUrl({
+        requestId: 'test',
+        artifactKind: ArtifactKind.Data,
+        contentType: 'application/octet-stream',
+        sourceUrl: 'https://mapped-public.local/test.bin',
+        expectedSizeBytes: bytes.length,
+        expectedSha256: sha256Hex(bytes),
+    });
+
+    assert.equal(result.ok, true);
+});
+
 test('saveArtifactFromUrl rejects SHA-256 mismatch', async (t) => {
   const bytes = Buffer.from('some content');
   const sourceUrl = 'https://example.com/test.bin';

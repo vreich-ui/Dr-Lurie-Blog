@@ -28,6 +28,8 @@ The `create_artifact_from_url` tool requires:
 
 `save_artifact` remains registered only as a legacy small-artifact MCP compatibility path for tiny base64-encoded payloads. Agents should prefer direct upload or the `create_artifact_from_url` pull path.
 
+**Production Recommendation:** For enhanced security, set the `ARTIFACT_URL_INGEST_ALLOWED_HOSTS` environment variable to a comma-separated list of trusted domains (e.g., `images.unsplash.com,.dropbox.com`). If unset, the server allows any public HTTPS host that passes strict IP checks, which carries a residual DNS-rebinding risk.
+
 Final artifact bytes are stored under `{artifactKind}/{safeRequestId}/{sha256}{extension}`. Retained indexes are written under:
 
 - `request-artifacts/{requestId}/{sha256}.json`

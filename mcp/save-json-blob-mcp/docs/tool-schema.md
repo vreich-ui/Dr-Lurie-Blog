@@ -9,7 +9,7 @@ Production `/mcp` registers workflow tools plus the retained artifact tools:
 
 Generated binary files and images should use `create_artifact_upload_intent`, then raw HTTP `POST /api/artifacts/upload` with `application/octet-stream` and the returned required headers.
 
-Clients that cannot perform raw binary POST should use `create_artifact_from_url` to trigger a server-side fetch of a public HTTPS URL. This tool requires `requestId`, `artifactKind`, `contentType`, `sourceUrl`, `expectedSizeBytes`, and `expectedSha256`. The server verifies integrity and format before saving.
+Clients that cannot perform raw binary POST should use `create_artifact_from_url` to trigger a server-side fetch of a public HTTPS URL. This tool requires `requestId`, `artifactKind`, `contentType`, `sourceUrl`, `expectedSizeBytes`, and `expectedSha256`. The server verifies integrity and format before saving. In production, it is highly recommended to set the `ARTIFACT_URL_INGEST_ALLOWED_HOSTS` environment variable to limit ingestion to trusted domains.
 
 `save_artifact` accepts a single base64 payload and remains only for legacy/tiny-artifact clients. It writes the final artifact blob and retained ArtifactReference indexes.
 

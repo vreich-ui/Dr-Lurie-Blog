@@ -49,6 +49,15 @@ export const _ingestInternal = {
  */
 const isSafeIp = (ip: string): boolean => {
   const version = isIP(ip);
+
+  // Handle IPv4-mapped IPv6 addresses (::ffff:1.2.3.4)
+  if (version === 6 && ip.toLowerCase().startsWith('::ffff:')) {
+    const lastPart = ip.split(':').pop();
+    if (lastPart && isIP(lastPart) === 4) {
+      return isSafeIp(lastPart);
+    }
+  }
+
   if (version === 4) {
     const parts = ip.split('.').map(Number);
     // 0.0.0.0/8 - "This" network
