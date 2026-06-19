@@ -1,0 +1,28 @@
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> @onwidget/astrowind@1.0.0-beta.52 dev
+> astro dev
+
+11:21:34 [astrowind] Astrowind `./src/config.yaml` has been loaded.
+11:21:34 [types] Generated 1ms
+
+ update  ▶ New version of Astro available: 6.4.8
+  Run npx @astrojs/upgrade to update
+
+11:21:34 [content] Syncing content
+11:21:35 [content] Synced content
+11:21:35 [vite] Re-optimizing dependencies because vite config has changed
+
+ astro  v5.12.9 ready in 2634 ms
+
+┃ Local    http://localhost:4321/
+┃ Network  use --host to expose
+
+11:21:35 watching for file changes...
+Browserslist: caniuse-lite is outdated. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+11:22:05 [200] /learn/library 1349ms
+11:22:06 [200] /_image 11ms
+11:22:09 [200] /admin/library 35ms
+11:22:09 [200] / 15ms
