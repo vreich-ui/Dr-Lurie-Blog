@@ -1,20 +1,21 @@
 ---
 publishDate: 2026-05-29T15:56:00.000Z
-title: "Your Products May Not Have Stopped Working"
-excerpt: "Perimenopause and menopause can change skin comfort, tolerance, oil balance, and hair patterns. That does not make every change an anti-aging emergency."
-image: "~/assets/images/uploads/hormonal-skin-changes-without-anti-aging-panic/serene-skincare-display-in-soft-light-small-.png"
+title: 'Your Products May Not Have Stopped Working'
+excerpt: 'Perimenopause and menopause can change skin comfort, tolerance, oil balance, and hair patterns. That does not make every change an anti-aging emergency.'
+image: '~/assets/images/uploads/hormonal-skin-changes-without-anti-aging-panic/serene-skincare-display-in-soft-light-small-.png'
 tags:
-  - "perimenopause"
-  - "menopause"
-  - "hormonal skin changes"
-  - "dry skin"
-  - "sensitive skin"
-  - "adult acne"
-  - "midlife skincare"
-  - "hair changes"
+  - 'perimenopause'
+  - 'menopause'
+  - 'hormonal skin changes'
+  - 'dry skin'
+  - 'sensitive skin'
+  - 'adult acne'
+  - 'midlife skincare'
+  - 'hair changes'
 metadata:
-  description: "Midlife skin changes can feel sudden. Learn how perimenopause and menopause may affect dryness, sensitivity, breakouts, facial hair, and scalp hair without routine panic."
+  description: 'Midlife skin changes can feel sudden. Learn how perimenopause and menopause may affect dryness, sensitivity, breakouts, facial hair, and scalp hair without routine panic.'
 ---
+
 The first clue may not look dramatic. A cleanser you have used for years starts to sting across the cheeks or around the nose. Skin that once stayed comfortable all day feels tight again by lunch. At the same time, a few bumps appear along the chin, or the part in your hair looks a little wider in bright bathroom light.
 
 It is easy to read this as product failure: the moisturizer stopped working, the serum is not strong enough, the whole routine needs replacing. Sometimes a product really is no longer the right fit. But in midlife, another possibility is simpler and more useful: the skin it was working on has changed.

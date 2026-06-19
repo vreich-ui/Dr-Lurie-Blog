@@ -1,9 +1,4 @@
-import {
-  isArtifactReference,
-  safePathSegment,
-  type ArtifactKind,
-  type ArtifactReference,
-} from './artifacts.js';
+import { isArtifactReference, safePathSegment, type ArtifactKind, type ArtifactReference } from './artifacts.js';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 
 export type ArtifactIndexStore = {
@@ -76,9 +71,7 @@ export const writeArtifactReferenceIndexes = async (
     indexStore.setJSON(fullReferenceKey, reference, { metadata: fullReferenceMetadata }),
     indexStore.setJSON(artifactKindPointerKey(reference), pointer, { metadata: pointerMetadata }),
     indexStore.setJSON(artifactRequestPointerKey(requestId, reference), pointer, { metadata: pointerMetadata }),
-    ...artifactTagPointerKeys(reference).map((key) =>
-      indexStore.setJSON(key, pointer, { metadata: pointerMetadata })
-    ),
+    ...artifactTagPointerKeys(reference).map((key) => indexStore.setJSON(key, pointer, { metadata: pointerMetadata })),
   ]);
 };
 
@@ -115,11 +108,11 @@ export const resolveArtifactPointer = async (
   return readArtifactReference(indexStore, requestId, sha256);
 };
 
-export const listArtifactIndexKeys = async (
-  indexStore: ArtifactIndexStore,
-  prefix: string
-): Promise<string[]> => {
+export const listArtifactIndexKeys = async (indexStore: ArtifactIndexStore, prefix: string): Promise<string[]> => {
   const result = await indexStore.list({ prefix, directories: false, paginate: true });
   const items = await collectBlobListItems(result as BlobListResponse);
-  return items.map((item) => item.key).filter((key) => key.endsWith('.json')).sort();
+  return items
+    .map((item) => item.key)
+    .filter((key) => key.endsWith('.json'))
+    .sort();
 };

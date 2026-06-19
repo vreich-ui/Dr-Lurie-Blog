@@ -12,6 +12,7 @@ tags:
   - "40+ skincare"
   - "skin barrier"
 ---
+
 For many people over 40, this is the moment skincare first becomes hard to ignore.
 That does not mean you have done something wrong. It also does not mean you have to enter the beauty industry, learn a new vocabulary overnight, or build a complicated routine. More often, it means your skin is behaving under changed conditions — and the habits that once worked quietly in the background may no longer give it enough support.
 Why it can feel sudden

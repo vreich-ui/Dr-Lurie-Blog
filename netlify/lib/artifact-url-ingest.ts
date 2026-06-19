@@ -1,11 +1,7 @@
 import dns from 'node:dns/promises';
 import { isIP } from 'node:net';
 
-import {
-  getDirectArtifactUploadMaxBytes,
-  saveArtifactBytes,
-  type SaveArtifactBytesResult,
-} from './artifact-upload.js';
+import { getDirectArtifactUploadMaxBytes, saveArtifactBytes, type SaveArtifactBytesResult } from './artifact-upload.js';
 import { type ArtifactKind } from './artifacts.js';
 import { sha256Hex } from './crypto.js';
 
@@ -179,7 +175,9 @@ const validateUrlSafety = async (url: URL) => {
     if (error instanceof Error && error.message.includes('Forbidden source IP')) {
       throw error;
     }
-    throw new Error(`Failed to resolve hostname ${hostname}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to resolve hostname ${hostname}: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 };
 
@@ -240,7 +238,9 @@ export const fetchArtifactBytesFromUrl = async (
       }
 
       if (bytes.length !== input.expectedSizeBytes) {
-        throw new Error(`Artifact size mismatch: expected ${input.expectedSizeBytes} bytes, received ${bytes.length} bytes.`);
+        throw new Error(
+          `Artifact size mismatch: expected ${input.expectedSizeBytes} bytes, received ${bytes.length} bytes.`
+        );
       }
 
       const actualSha256 = sha256Hex(bytes);

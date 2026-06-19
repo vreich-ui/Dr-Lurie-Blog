@@ -9,11 +9,7 @@ import {
   type ArtifactKind,
   type ArtifactReference,
 } from './artifacts.js';
-import {
-  readArtifactReference,
-  writeArtifactReferenceIndexes,
-  type ArtifactIndexStore,
-} from './artifact-index.js';
+import { readArtifactReference, writeArtifactReferenceIndexes, type ArtifactIndexStore } from './artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from './blob-store.js';
 import { sha256Hex } from './crypto.js';
 import { ImageValidationError, validatePublishImageBytes } from './image-validation.js';

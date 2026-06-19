@@ -12,6 +12,7 @@ const normalizePath = (path: string) => {
 const currentPath = normalizePath(Astro.props.activePath ?? Astro.url.pathname);
 const navItems = [
   { href: '/admin/', label: 'Dashboard' },
+  { href: '/admin/library', label: 'Library' },
   { href: '/admin/publish', label: 'Publish' },
   { href: '/admin/drafts', label: 'Drafts', activePaths: ['/admin/drafts', '/admin/review'] },
   { href: '/admin/agent-admin', label: 'AI Publisher' },

@@ -1,26 +1,27 @@
 ---
-title: "How to Start Retinol Without Wrecking Your Skin Barrier"
+title: 'How to Start Retinol Without Wrecking Your Skin Barrier'
 publishDate: 2026-06-08T15:57:00.000Z
-excerpt: "Retinol can be useful, but the first win is tolerance: go slowly, moisturize well, and let sunscreen do its quiet daily work."
+excerpt: 'Retinol can be useful, but the first win is tolerance: go slowly, moisturize well, and let sunscreen do its quiet daily work.'
 tags:
-  - "retinol"
-  - "retinoids"
-  - "skin barrier"
-  - "sensitive skin"
-  - "skincare"
-  - "patient education"
-author: "Dr. Lurié"
+  - 'retinol'
+  - 'retinoids'
+  - 'skin barrier'
+  - 'sensitive skin'
+  - 'skincare'
+  - 'patient education'
+author: 'Dr. Lurié'
 sources:
-  - "source_id: aad_retinoid_retinol; name: Retinoid or retinol?; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol; publisher: American Academy of Dermatology Association; accessed_at: 2026-06-08"
-  - "source_id: cleveland_retinol; name: Retinol: Cream"
-  - "Serum"
-  - "What It Is"
-  - "Benefits"
-  - "How To Use; url: https://my.clevelandclinic.org/health/treatments/23293-retinol; publisher: Cleveland Clinic; accessed_at: 2026-06-08"
-  - "source_id: mayo_tretinoin; name: Tretinoin topical route proper use and precautions; url: https://www.mayoclinic.org/proper-use/drg-20066521; publisher: Mayo Clinic; accessed_at: 2026-06-08"
+  - 'source_id: aad_retinoid_retinol; name: Retinoid or retinol?; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol; publisher: American Academy of Dermatology Association; accessed_at: 2026-06-08'
+  - 'source_id: cleveland_retinol; name: Retinol: Cream'
+  - 'Serum'
+  - 'What It Is'
+  - 'Benefits'
+  - 'How To Use; url: https://my.clevelandclinic.org/health/treatments/23293-retinol; publisher: Cleveland Clinic; accessed_at: 2026-06-08'
+  - 'source_id: mayo_tretinoin; name: Tretinoin topical route proper use and precautions; url: https://www.mayoclinic.org/proper-use/drg-20066521; publisher: Mayo Clinic; accessed_at: 2026-06-08'
 metadata:
-  description: "Learn how to introduce retinol gently, reduce irritation, support your skin barrier, and know when to pause or seek clinician guidance."
+  description: 'Learn how to introduce retinol gently, reduce irritation, support your skin barrier, and know when to pause or seek clinician guidance.'
 ---
+
 # How to Start Retinol Without Wrecking Your Skin Barrier
 
 Retinol has a reputation for doing everything at once: smoothing texture, softening the look of fine lines, helping with uneven tone, and supporting acne-prone routines. That reputation is partly why people overdo it. The better first goal is not dramatic peeling. It is tolerance.

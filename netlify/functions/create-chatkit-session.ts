@@ -48,7 +48,10 @@ const verifyClerkAdminSession = async (
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { status: 'error', error: 'This Clerk user is not authorized to create ChatKit sessions.' });
+    return jsonResponse(403, {
+      status: 'error',
+      error: 'This Clerk user is not authorized to create ChatKit sessions.',
+    });
   }
 
   if (!adminState.userId) {
