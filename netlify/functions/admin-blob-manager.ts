@@ -1,4 +1,6 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { readArtifactReference } from '../lib/artifact-index.js';
+import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
 import { getManagedBlobStore, listManagedBlobStores } from '../lib/blob-admin.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import type { Store } from '@netlify/blobs';
@@ -301,6 +303,33 @@ const handleWipeAll: ActionHandler = async (params, event) => {
   return jsonResponse(200, { stores: summary, totalDeleted });
 };
 
+const handleGetArtifactMetadata: ActionHandler = async (params, event) => {
+  const blobKey = asString(params.blobKey);
+  if (!blobKey) return jsonResponse(400, { error: 'A blobKey is required.' });
+
+  const normalized = normalizeArtifactBlobKey(blobKey);
+  const parts = normalized.split('/');
+  if (parts.length < 3) {
+    return jsonResponse(400, { error: 'Invalid artifact blob key structure.' });
+  }
+
+  const [, requestId, filename] = parts;
+  const sha256 = filename?.match(/^[a-f0-9]{64}/i)?.[0]?.toLowerCase();
+
+  if (!requestId || !sha256) {
+    return jsonResponse(400, { error: 'Could not extract requestId or sha256 from blob key.' });
+  }
+
+  const indexStore = getStoreHandle('artifact-index', event) as any;
+  const artifact = await readArtifactReference(indexStore, requestId, sha256);
+
+  if (!artifact) {
+    return jsonResponse(404, { error: 'Artifact metadata not found.' });
+  }
+
+  return jsonResponse(200, { artifact });
+};
+
 const actionHandlers: Record<string, ActionHandler> = {
   'list-stores': handleListStores,
   'list-blobs': handleListBlobs,
@@ -311,6 +340,7 @@ const actionHandlers: Record<string, ActionHandler> = {
   'rename-blob': handleRenameBlob,
   'wipe-store': handleWipeStore,
   'wipe-all': handleWipeAll,
+  'get-artifact-metadata': handleGetArtifactMetadata,
 };
 
 export const handler = async (event: LambdaEvent) => {
