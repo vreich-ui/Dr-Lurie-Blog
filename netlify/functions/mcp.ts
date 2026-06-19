@@ -2703,7 +2703,11 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       });
 
       if (!result.ok) {
-        return toolError(result.error);
+        return toolError(result.error, {
+          statusCode: result.statusCode,
+          sourceUrl: result.sourceUrl,
+          maxBytes: result.maxBytes,
+        });
       }
 
       return toolResult(result);

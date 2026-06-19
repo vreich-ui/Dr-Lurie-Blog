@@ -48,33 +48,82 @@ export const _ingestInternal = {
  * Validates that an IP address is a public, non-loopback, non-private address.
  */
 const isSafeIp = (ip: string): boolean => {
-  if (isIP(ip) === 4) {
+  const version = isIP(ip);
+  if (version === 4) {
     const parts = ip.split('.').map(Number);
-    // Loopback: 127.0.0.0/8
-    if (parts[0] === 127) return false;
-    // Private: 10.0.0.0/8
+    // 0.0.0.0/8 - "This" network
+    if (parts[0] === 0) return false;
+    // 10.0.0.0/8 - Private-Use
     if (parts[0] === 10) return false;
-    // Private: 172.16.0.0/12
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
-    // Private: 192.168.0.0/16
-    if (parts[0] === 192 && parts[1] === 168) return false;
-    // Link-local / Metadata: 169.254.0.0/16
+    // 100.64.0.0/10 - Shared Address Space
+    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return false;
+    // 127.0.0.0/8 - Loopback
+    if (parts[0] === 127) return false;
+    // 169.254.0.0/16 - Link-Local
     if (parts[0] === 169 && parts[1] === 254) return false;
-    // Broadcast: 255.255.255.255
+    // 172.16.0.0/12 - Private-Use
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return false;
+    // 192.0.0.0/24 - IETF Protocol Assignments
+    if (parts[0] === 192 && parts[1] === 0 && parts[2] === 0) return false;
+    // 192.0.2.0/24 - Documentation (TEST-NET-1)
+    if (parts[0] === 192 && parts[1] === 0 && parts[2] === 2) return false;
+    // 192.168.0.0/16 - Private-Use
+    if (parts[0] === 192 && parts[1] === 168) return false;
+    // 198.18.0.0/15 - Benchmarking
+    if (parts[0] === 198 && parts[1] >= 18 && parts[1] <= 19) return false;
+    // 198.51.100.0/24 - Documentation (TEST-NET-2)
+    if (parts[0] === 198 && parts[1] === 51 && parts[2] === 100) return false;
+    // 203.0.113.0/24 - Documentation (TEST-NET-3)
+    if (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) return false;
+    // 224.0.0.0/4 - Multicast
+    if (parts[0] >= 224 && parts[0] <= 239) return false;
+    // 240.0.0.0/4 - Reserved
+    if (parts[0] >= 240) return false;
+    // 255.255.255.255/32 - Limited Broadcast
     if (ip === '255.255.255.255') return false;
 
     return true;
   }
 
-  if (isIP(ip) === 6) {
+  if (version === 6) {
+    const normalized = ip.toLowerCase();
+    // Unspecified: ::
+    if (normalized === '::' || normalized === '0:0:0:0:0:0:0:0') return false;
     // Loopback: ::1
-    if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return false;
+    if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return false;
     // Unique Local: fc00::/7
-    if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) return false;
-    // Link-local: fe80::/10
-    if (ip.toLowerCase().startsWith('fe8') || ip.toLowerCase().startsWith('fe9') || ip.toLowerCase().startsWith('fea') || ip.toLowerCase().startsWith('feb')) return false;
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return false;
+    // Link-Local: fe80::/10
+    if (/^fe[89ab]/i.test(normalized)) return false;
+    // Multicast: ff00::/8
+    if (normalized.startsWith('ff')) return false;
 
     return true;
+  }
+
+  return false;
+};
+
+const isHostnameAllowed = (hostname: string): boolean => {
+  const envValue =
+    (globalThis as unknown as { Netlify?: { env?: { get?: (k: string) => string | undefined } } }).Netlify?.env?.get?.(
+      'ARTIFACT_URL_INGEST_ALLOWED_HOSTS'
+    ) || process.env.ARTIFACT_URL_INGEST_ALLOWED_HOSTS;
+  if (!envValue) return true;
+
+  const allowed = envValue
+    .split(',')
+    .map((s: string) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length === 0) return true;
+
+  const lowerHost = hostname.toLowerCase();
+  for (const entry of allowed) {
+    if (entry.startsWith('.')) {
+      if (lowerHost.endsWith(entry) || lowerHost === entry.slice(1)) return true;
+    } else if (lowerHost === entry) {
+      return true;
+    }
   }
 
   return false;
@@ -92,6 +141,10 @@ const validateUrlSafety = async (url: URL) => {
   const hostname = url.hostname;
   if (!hostname) {
     throw new Error('Invalid source URL: missing hostname.');
+  }
+
+  if (!isHostnameAllowed(hostname)) {
+    throw new Error(`Hostname "${hostname}" is not in the allowed list for artifact ingestion.`);
   }
 
   // If it's already an IP, validate it.
