@@ -3,12 +3,13 @@
 ## Artifact-aware publishing path
 
 1. Agents create or fetch the MCP workflow request and keep MCP state authoritative.
-2. When an agent generates an image, PDF, video, document, audio, data, attachment, or other artifact, it immediately uploads bytes using `create_artifact_upload_intent` plus raw HTTP `POST /api/artifacts/upload` as the default path. `save_artifact` remains available only for legacy small-artifact MCP compatibility.
-3. The returned `ArtifactReference` is the deterministic handle. Store the whole reference in the workflow record or stage output; never derive `blobKey` in the model.
-4. If upload fails or the tool call times out, retry the same payload or direct upload intent. Uploads are idempotent: direct upload and checksum deduplication return the existing reference without duplicating final bytes. The obsolete MCP JSON chunk and upload-session transports are removed.
-5. Before final publication, re-fetch the workflow/request state and build `publication.publish_payload` from the latest article body plus current `artifactReferences` and any existing base64 `mediaEntries`.
-6. The server-side publishing path resolves `artifactReferences` to base64 media entries and commits them through the existing GitHub media flow. Agents must not request, store, or forward Netlify/GitHub credentials.
-7. After the trusted publish process returns commit/deploy metadata, call `save_json_blob_mark_published`, then check in the workflow lock.
+2. For agent-orchestrated artifact generation, agents call `pdf-tool` directly and then patch the returned Dr. Lurie-native `ArtifactReference` into workflow JSON; see `docs/agents/pdf-tool-artifacts.md`. Dr. Lurie remains the workflow owner, while `pdf-tool` is the artifact generation/storage utility.
+3. For direct byte uploads to Dr. Lurie, agents upload bytes using `create_artifact_upload_intent` plus raw HTTP `POST /api/artifacts/upload` as the default path. `save_artifact` remains available only for legacy small-artifact MCP compatibility.
+4. The returned `ArtifactReference` is the deterministic handle. Store the whole reference in the workflow record or stage output; never derive `blobKey` in the model and never store binary bytes or base64 payloads in workflow JSON.
+5. If upload or generation fails, retry the same idempotent upload/job flow when safe and use the ArtifactReference returned by the artifact system. The obsolete MCP JSON chunk and upload-session transports are removed.
+6. Before final publication, re-fetch the workflow/request state and build `publication.publish_payload` from the latest article body plus current `artifactReferences` and any existing base64 `mediaEntries`.
+7. The server-side publishing path resolves `artifactReferences` to base64 media entries and commits them through the existing GitHub media flow. Agents must not request, store, or forward Netlify/GitHub credentials.
+8. After the trusted publish process returns commit/deploy metadata, call `save_json_blob_mark_published`, then check in the workflow lock.
 
 ## Workflow contract source
 
