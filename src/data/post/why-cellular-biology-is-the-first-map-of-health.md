@@ -1,7 +1,8 @@
 ---
-publishDate: 2026-06-20T20:52:39+03:00
+publishDate: 2026-06-20T21:11:01+03:00
 title: "Why Cellular Biology Is the First Map of Health"
 excerpt: "Cellular biology explains how life is organized at its smallest working scale, from DNA instructions to mitochondria, proteins, cell membranes, and communication."
+image: "~/assets/images/uploads/why-cellular-biology-is-the-first-map-of-health/cellular-biology-first-map-of-health-hero.png"
 category: "Science Blog"
 tags:
   - "cellular biology"
@@ -13,6 +14,10 @@ author: "Dr. Lurie"
 metadata:
   description: "A clear, accessible science blog explainer on what cells do, why DNA and organelles matter, and how cellular biology helps us understand health."
 ---
+![Editorial illustration of a eukaryotic cell with nucleus, mitochondria, DNA, and molecular details for a cellular biology article.](../../assets/images/uploads/why-cellular-biology-is-the-first-map-of-health/cellular-biology-first-map-of-health-hero.png)
+
+*Cellular biology begins with organized work inside living cells.*
+
 Cells are often introduced as the basic unit of life. That phrase is accurate, but it can sound almost too small for what a cell actually does. A cell is not a passive container. It is an organized, responsive, energy-using system that reads instructions, builds materials, senses its surroundings, repairs damage, and communicates with its neighbors.
 
 That is why cellular biology matters. It gives us the first practical map of health: not health as a slogan, but health as coordinated work happening at a scale too small to see with the naked eye.
