@@ -1,5 +1,5 @@
 ---
-publishDate: 2026-06-20T20:44:45+03:00
+publishDate: 2026-06-20T20:52:39+03:00
 title: "Why Cellular Biology Is the First Map of Health"
 excerpt: "Cellular biology explains how life is organized at its smallest working scale, from DNA instructions to mitochondria, proteins, cell membranes, and communication."
 category: "Science Blog"
