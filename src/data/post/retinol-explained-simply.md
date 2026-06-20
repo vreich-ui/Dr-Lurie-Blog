@@ -1,7 +1,8 @@
 ---
-publishDate: 2026-06-20T22:08:00+03:00
+publishDate: 2026-06-20T22:28:00+03:00
 title: "Retinol, Explained Simply"
 excerpt: "Retinol can be useful for texture, mild acne, pigmentation, and fine lines, but it works best when introduced slowly and paired with sunscreen and barrier care."
+image: "~/assets/images/uploads/retinol-explained-simply/retinol-explained-product-hero.png"
 category: "Science Blog"
 tags:
   - "retinol"
