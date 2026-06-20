@@ -172,6 +172,15 @@ The server-side OpenAI Agents SDK runner lives at `netlify/functions/run-publish
 
 `NETLIFY_PUBLISH_SECRET` and `PUBLISH_SECRET` should contain the same secret value in Netlify, but the code intentionally keeps the names separate so the existing publish endpoint secret behavior remains intact. Do not expose either variable to browser code.
 
+#### Agent artifact generation runtime
+
+Agent runtimes can generate and store artifacts through `pdf-tool` without adding Dr. Lurie MCP wrapper tools. Dr. Lurie remains the owner of workflow JSON; agents call `pdf-tool` directly, then patch the returned Dr. Lurie-native `ArtifactReference` into workflow JSON with the existing MCP checkout/patch/checkin tools. Configure the agent/runtime environment with:
+
+- `PDF_TOOL_BASE_URL=https://pdf-x.netlify.app`
+- `PDF_TOOL_AGENT_RUN_TOKEN`
+
+Keep `PDF_TOOL_AGENT_RUN_TOKEN` in server-side or agent-runtime secrets only. Do not expose it to browser code, checked-in configuration, workflow JSON, prompts, or tool schemas. Workflow JSON should store only immutable `ArtifactReference` objects, never binary bytes or base64 payloads.
+
 #### OpenAI Agent Builder / Agents SDK publish handoff
 
 `/.netlify/functions/run-publisher-agent` expects JSON with these top-level fields: `slug`, `title`, one of `markdown` or `content`, and optional `description`, `publishDate`, `author`, `tags`, `images`, `overwrite`.
