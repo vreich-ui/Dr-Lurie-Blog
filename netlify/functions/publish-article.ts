@@ -346,6 +346,9 @@ const getArtifactRequestId = (reference: ArtifactReference, fallback: string) =>
   return requestId || fallback;
 };
 
+const isImageArtifactReference = (reference: ArtifactReference) =>
+  reference.contentType.toLowerCase().startsWith('image/') || reference.blobKey.startsWith('image/');
+
 const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: string) => {
   const originalFilename = toStringValue(reference.originalFilename);
   const metadataFilename =
@@ -844,6 +847,12 @@ const getMediaEntries = async (
       Boolean(file.base64 && file.name)
     );
 
+  if (uploadedFiles.length) {
+    logPublishMedia(event, input, 'publish_media_legacy_files_payload_received', slug, articlePath, {
+      fileCount: uploadedFiles.length,
+    });
+  }
+
   const adminEntries = uploadedFiles.map((file) => {
     const filename = sanitizeFilename(file.name);
 
@@ -995,6 +1004,10 @@ const getMediaEntries = async (
   const indexStore = artifactReferences.length ? await getArtifactIndexBlobStore(event) : undefined;
   const artifactEntries = await Promise.all(
     artifactReferences.map(async (reference) => {
+      if (!isImageArtifactReference(reference)) {
+        throw new PublishError(422, 'Only image artifactReferences can be published as article media entries.');
+      }
+
       if (!artifactStore) {
         throw new PublishError(500, 'Artifact blob store is not available.');
       }
