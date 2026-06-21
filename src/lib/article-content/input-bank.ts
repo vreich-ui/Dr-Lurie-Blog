@@ -1,7 +1,7 @@
 import {
   type ArticleBodyNode,
   articleBodyNodeSchema
-} from '../../schema/article-content-v1.js';
+} from '../../schema/article-content-v1.ts';
 
 /**
  * Generates an opaque, stable-looking ID for article nodes.
@@ -286,15 +286,16 @@ export function getArticleNodeTemplate(templateId: string): ArticleNodeTemplate 
 /**
  * Creates a valid article node based on a template.
  */
-export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNode {
+export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNode & { templateId: string } {
   const template = getArticleNodeTemplate(templateId);
   if (!template) {
     throw new Error(`Template not found: ${templateId}`);
   }
 
-  const node: ArticleBodyNode = {
+  const node: ArticleBodyNode & { templateId: string } = {
     ...JSON.parse(JSON.stringify(template.defaults)),
-    id: createOpaqueNodeId()
+    id: createOpaqueNodeId(),
+    templateId
   };
 
   // Double-check validation
@@ -309,9 +310,10 @@ export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNo
 /**
  * Creates a legacy content node from a markdown string.
  */
-export function createLegacyBodyNode(markdown: string): ArticleBodyNode {
-  const node: ArticleBodyNode = {
+export function createLegacyBodyNode(markdown: string): ArticleBodyNode & { templateId: string } {
+  return {
     id: createOpaqueNodeId(),
+    templateId: 'prose_section',
     kind: 'content',
     public: {
       body: markdown
@@ -319,7 +321,23 @@ export function createLegacyBodyNode(markdown: string): ArticleBodyNode {
     rendering: {
       presentation: 'plain'
     }
-  };
+  } as ArticleBodyNode & { templateId: string };
+}
 
-  return node;
+/**
+ * Infers the closest matching template ID for a node that lacks one.
+ */
+export function inferTemplateId(node: Partial<ArticleBodyNode>): string {
+  if (node.rendering?.presentation === 'faq') return 'faq';
+  if (node.rendering?.presentation === 'summary') return 'summary';
+  if (node.rendering?.presentation === 'offerCard') return 'commerce_offer';
+  if (node.rendering?.presentation === 'offerInline') return 'contextual_offer';
+  if (node.rendering?.presentation === 'adSlot') return 'ad_slot';
+  if (node.rendering?.presentation === 'chatInvite') return 'chat_invite';
+  if (node.rendering?.presentation === 'callout') return 'callout';
+  if (node.rendering?.presentation === 'plain') return 'plain_text';
+  if (node.commercial?.type === 'productMention') return 'product_mention';
+  if (node.kind === 'action') return 'soft_action';
+
+  return 'prose_section';
 }
