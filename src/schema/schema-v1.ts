@@ -11,6 +11,8 @@ import {
   type WorkflowStatus,
 } from './workflow-contract.js';
 
+import { articleBodyV1Schema, type ArticleBodyV1 } from './article-content-v1.js';
+
 export {
   allowedAgentNames,
   knownPublicationStatuses,
@@ -177,6 +179,9 @@ export type ContentSourceV1 = {
     title?: string;
     deck?: string;
     description?: string;
+
+    // structured content (canonical)
+    article_body?: ArticleBodyV1;
 
     // structured content (future canonical)
     structure?: {
@@ -484,6 +489,7 @@ export const contentSourceV1Schema = z
         title: z.string().optional(),
         deck: z.string().optional(),
         description: z.string().optional(),
+        article_body: articleBodyV1Schema.optional(),
         structure: z
           .object({
             schema_version: z.literal('content_structure.v1').optional(),

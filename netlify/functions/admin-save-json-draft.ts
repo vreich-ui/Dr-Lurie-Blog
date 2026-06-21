@@ -127,13 +127,37 @@ const updateIndexes = async (
 
 const getPublishPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
 
+const hasBodyContent = (input: ContentSourceV1) => {
+  const payload = getPublishPayload(input);
+  if (payload?.markdown?.trim() || payload?.content?.trim()) return true;
+  if (input.editorial?.draft_markdown?.trim()) return true;
+
+  if (Array.isArray(input.content?.article_body?.nodes)) {
+    // If structured body exists, we allow it to count as content if there's at least one node
+    // (even if it's just a media node or CTA without text body)
+    if (input.content!.article_body!.nodes.length > 0) return true;
+  }
+
+  if (Array.isArray(input.content?.blocks)) {
+    const hasMarkdownBlock = input.content!.blocks!.some(
+      (b) => b.block_type === 'markdown' && typeof b.payload === 'string' && b.payload.trim()
+    );
+    if (hasMarkdownBlock) return true;
+  }
+
+  return false;
+};
+
 const hasRequiredDraftFields = (input: ContentSourceV1) => {
   const payload = getPublishPayload(input);
   const title = payload?.title?.trim() || input.content?.title?.trim() || '';
   const slug = payload?.slug?.trim() || slugify(title);
   const author = payload?.author?.trim() || '';
 
-  return Boolean(title && slug && author);
+  const hasTitleSlugAuthor = Boolean(title && slug && author);
+  if (!hasTitleSlugAuthor) return false;
+
+  return hasBodyContent(input);
 };
 
 const withDraftPublication = (input: ContentSourceV1, previousInput?: ContentSourceV1): ContentSourceV1 => {
