@@ -158,6 +158,63 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
   }
 });
 
+test('publish-article rejects non-image artifactReferences before creating media entries', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestId = `artifact-non-image-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'not-an-image.pdf',
+    encoding: 'base64',
+    payload: Buffer.from('%PDF-1.7 non image').toString('base64'),
+  });
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    requestedUrls.push(url);
+
+    if (url.includes('/contents/src/data/post/non-image-artifact-reference.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    return new Response('unexpected fetch', { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'non-image-artifact-reference',
+        title: 'Non-image Artifact Reference',
+        markdown: '# Non-image artifact reference\n\nThis article has enough words for publishing.',
+        artifactReferences: [upload.artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(JSON.parse(response.body).error, /Only image artifactReferences/);
+    assert.equal(
+      requestedUrls.some((url) => url.endsWith('/git/blobs')),
+      false,
+      'Non-image artifact references should fail before creating GitHub blobs.'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article fails fast when artifactReferences contains non-ArtifactReference media', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;

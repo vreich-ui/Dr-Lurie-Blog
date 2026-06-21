@@ -31,6 +31,123 @@ test('admin publish flow re-fetches workflow state and requires lock before publ
   assert.ok(artifactReferenceIndex > publishIndex, 'Publish payload must use latest artifact references.');
 });
 
+test('admin saved artifact picker is constrained to image artifacts', async () => {
+  const source = await readPublishPage();
+
+  const modalIndex = indexAfter(source, 'id="blob-image-modal"', 0);
+  const copyIndex = indexAfter(source, 'Saved images', modalIndex);
+  const imageOptionIndex = indexAfter(source, '<option value="image" selected>Image</option>', copyIndex);
+  const filterIndex = indexAfter(source, 'const filterBlobImageArtifacts = (artifacts', imageOptionIndex);
+  const imageGuardIndex = indexAfter(source, 'if (!isImageArtifactReference(artifact)) return false;', filterIndex);
+  const selectIndex = indexAfter(source, 'const selectMarkedBlobImages = () =>', imageGuardIndex);
+  const selectGuardIndex = indexAfter(
+    source,
+    'stagedBlobImageKeys.has(artifact.blobKey) && isImageArtifactReference(artifact)',
+    selectIndex
+  );
+
+  assert.equal(source.includes('<option value="pdf">PDF</option>'), false, 'Image picker should not expose PDFs.');
+  assert.equal(
+    source.includes('<option value="video">Video</option>'),
+    false,
+    'Image picker should not expose videos.'
+  );
+  assert.ok(copyIndex > modalIndex, 'Modal copy should describe saved images.');
+  assert.ok(imageOptionIndex > copyIndex, 'Image should be the only artifact kind option.');
+  assert.ok(imageGuardIndex > filterIndex, 'Browse results should be filtered to image artifact references.');
+  assert.ok(selectGuardIndex > selectIndex, 'Selection should ignore non-image references defensively.');
+});
+
+test('admin import migrates inline media entries to artifact references before draft persistence', async () => {
+  const source = await readPublishPage();
+
+  const persistableHelperIndex = indexAfter(source, 'const getPersistableSelectedMediaEntries = () =>', 0);
+  const stripInlineIndex = indexAfter(source, '!hasUsableMediaEntryContent(entry)', persistableHelperIndex);
+  const importIndex = indexAfter(
+    source,
+    'const applyContentSourceImportFormData = async (formData) =>',
+    stripInlineIndex
+  );
+  const inlineDetectIndex = indexAfter(
+    source,
+    'const importedInlineMediaEntries = importedMediaEntries.filter',
+    importIndex
+  );
+  const immediateUploadIndex = indexAfter(source, 'await uploadInlineMediaEntriesAsArtifacts(', inlineDetectIndex);
+  const stageIndex = indexAfter(source, 'stagedInlineMediaEntries = mergeMediaEntries', immediateUploadIndex);
+  const saveDraftIndex = indexAfter(source, 'const saveJsonDraftToBlobs = async () =>', 0);
+  const uploadAfterSaveIndex = indexAfter(
+    source,
+    'await uploadStagedInlineMediaEntriesForRequest(savedRequestId)',
+    saveDraftIndex
+  );
+  const secondSaveIndex = indexAfter(
+    source,
+    'await postJsonDraftToBlobs(clerkToken, savedRequestId',
+    uploadAfterSaveIndex
+  );
+  const saveBeforePublishIndex = indexAfter(source, 'await saveJsonDraftToBlobs();', 0);
+  const publishInlineGuardIndex = indexAfter(
+    source,
+    'if (selectedMediaEntries.some(hasUsableMediaEntryContent))',
+    saveBeforePublishIndex
+  );
+  const publishIndex = indexAfter(source, "fetch('/.netlify/functions/publish-article'", publishInlineGuardIndex);
+  const publishPayloadIndex = indexAfter(source, 'getPersistableSelectedMediaEntries().length', publishIndex);
+
+  assert.ok(stripInlineIndex > persistableHelperIndex, 'Persistable media helper should strip inline image bytes.');
+  assert.ok(inlineDetectIndex > importIndex, 'Import should detect inline media entries.');
+  assert.ok(immediateUploadIndex > inlineDetectIndex, 'Import should upload inline media when a request exists.');
+  assert.ok(stageIndex > immediateUploadIndex, 'Import should stage inline media when no request exists yet.');
+  assert.ok(
+    uploadAfterSaveIndex > saveDraftIndex,
+    'Draft save should upload staged inline media after request creation.'
+  );
+  assert.ok(
+    secondSaveIndex > uploadAfterSaveIndex,
+    'Draft save should persist returned artifact references after upload.'
+  );
+  assert.ok(
+    publishInlineGuardIndex > saveBeforePublishIndex,
+    'Publish should block if inline media remains after save.'
+  );
+  assert.ok(publishPayloadIndex > publishIndex, 'Publish payload should use media entries without inline bytes.');
+});
+
+test('admin publish flow blocks when selected artifact references are missing from latest workflow state', async () => {
+  const source = await readPublishPage();
+
+  const helperIndex = indexAfter(source, 'const getLatestSelectedArtifactReferences = (latestWorkflowRecord) =>', 0);
+  const referencesReturnIndex = indexAfter(source, 'return { references: [], missingBlobKeys: [] };', helperIndex);
+  const missingKeysIndex = indexAfter(source, 'const missingBlobKeys = selectedBlobKeys.filter', referencesReturnIndex);
+  const messageIndex = indexAfter(
+    source,
+    'const formatMissingArtifactWorkflowMessage = (missingBlobKeys) =>',
+    missingKeysIndex
+  );
+  const refetchIndex = indexAfter(source, 'await fetchLatestWorkflowRequest(requestId);', messageIndex);
+  const reconcileIndex = indexAfter(
+    source,
+    'const latestSelectedArtifacts = getLatestSelectedArtifactReferences',
+    refetchIndex
+  );
+  const blockIndex = indexAfter(source, 'if (latestSelectedArtifacts.missingBlobKeys.length)', reconcileIndex);
+  const statusIndex = indexAfter(
+    source,
+    'formatMissingArtifactWorkflowMessage(latestSelectedArtifacts.missingBlobKeys)',
+    blockIndex
+  );
+  const publishIndex = indexAfter(source, "fetch('/.netlify/functions/publish-article'", statusIndex);
+
+  assert.ok(referencesReturnIndex > helperIndex, 'Helper should return structured reconciliation results.');
+  assert.ok(missingKeysIndex > referencesReturnIndex, 'Helper should compute missing selected artifact blob keys.');
+  assert.ok(messageIndex > missingKeysIndex, 'Missing artifact status copy should be available.');
+  assert.ok(reconcileIndex > refetchIndex, 'Publish should reconcile artifacts after fetching latest workflow state.');
+  assert.ok(blockIndex > reconcileIndex, 'Publish should check for missing artifacts before validation.');
+  assert.ok(statusIndex > blockIndex, 'Missing artifacts should produce an actionable status message.');
+  assert.ok(publishIndex > statusIndex, 'Publish request must not be reached before the missing-artifact guard.');
+});
+
 test('admin publish flow sends lock_token to mark_published and checks in after success', async () => {
   const source = await readPublishPage();
   const markIndex = indexAfter(source, "mcpToolCall('save_json_blob_mark_published'", 0);

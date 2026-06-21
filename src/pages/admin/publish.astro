@@ -91,20 +91,20 @@ const metadata = {
             <div class="json-draft-modal-card">
               <div class="json-draft-modal-header">
                 <div>
-                  <p class="sidebar-kicker">Saved JSON</p>
-                  <h3 id="json-draft-modal-heading">Open JSON from Blobs</h3>
+                  <p class="sidebar-kicker">Saved drafts</p>
+                  <h3 id="json-draft-modal-heading">Open saved draft</h3>
                 </div>
                 <button
                   id="json-draft-modal-close"
                   class="module-icon-button"
                   type="button"
-                  aria-label="Close saved JSON dialog"
+                  aria-label="Close saved draft dialog"
                 >
                   <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
                 </button>
               </div>
               <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
-                Select a saved JSON draft to load into the Import JSON module.
+                Select a saved draft to load into the form.
               </p>
               <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
               <div id="json-draft-list" class="json-draft-list"></div>
@@ -205,8 +205,8 @@ const metadata = {
               </div>
               <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
               <p class="hint">
-                Selected images will be committed with the article under <code>src/assets/images/uploads/</code>.
-                Allowed types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
+                Images are saved to the draft media library (Blobs) first. Publishing uses locked image records from the
+                saved draft. Allowed types: <span id="image-allowed-types">png/jpg/webp</span>. Max file size: currently
                 <span id="image-max-file-size">0.5MB</span>. Max count: <span id="image-max-count">10</span>.
               </p>
               <ul id="image-list" class="image-list" aria-live="polite"></ul>
@@ -215,8 +215,8 @@ const metadata = {
                 <div class="json-draft-modal-card">
                   <div class="json-draft-modal-header">
                     <div>
-                      <p class="sidebar-kicker">Saved Images</p>
-                      <h3 id="blob-image-modal-heading">Select Image from Blobs</h3>
+                      <p class="sidebar-kicker">Saved images</p>
+                      <h3 id="blob-image-modal-heading">Select Saved Image</h3>
                     </div>
                     <button
                       id="blob-image-modal-close"
@@ -228,20 +228,13 @@ const metadata = {
                     </button>
                   </div>
                   <p id="blob-image-modal-status" class="json-draft-modal-status" aria-live="polite">
-                    Select saved image artifacts to add to this article.
+                    Select saved images to add to this article.
                   </p>
-                  <div class="blob-image-modal-filters" aria-label="Saved artifact filters">
+                  <div class="blob-image-modal-filters" aria-label="Saved image filters">
                     <label>
                       <span>Kind</span>
                       <select id="blob-image-kind-filter">
                         <option value="image" selected>Image</option>
-                        <option value="pdf">PDF</option>
-                        <option value="video">Video</option>
-                        <option value="doc">Doc</option>
-                        <option value="audio">Audio</option>
-                        <option value="data">Data</option>
-                        <option value="attachment">Attachment</option>
-                        <option value="other">Other</option>
                       </select>
                     </label>
                     <label>
@@ -750,6 +743,7 @@ const metadata = {
   .json-draft-modal {
     width: min(92vw, 680px);
     max-height: min(82vh, 720px);
+    overflow: hidden;
     border: 0;
     border-radius: 1.35rem;
     padding: 0;
@@ -2027,6 +2021,7 @@ const metadata = {
       let imageNames = [];
       let selectedFiles = [];
       let selectedMediaEntries = [];
+      let stagedInlineMediaEntries = [];
       let selectedImagePathEntries = [];
       let selectedArtifactReferences = [];
       let availableBlobImageArtifacts = [];
@@ -2648,6 +2643,24 @@ const metadata = {
         return getMediaEntryPreviewPath(entry);
       };
 
+      const getMediaEntryBase64Content = (entry) => {
+        const content = getMediaEntryContent(entry);
+        if (!content) return '';
+        if (content.startsWith('data:')) return content.split(',').pop() || '';
+        return content;
+      };
+
+      const getMediaEntryUploadFile = (entry) => {
+        const base64 = getMediaEntryBase64Content(entry);
+        if (!base64) return undefined;
+        const contentType = getMediaEntryContentType(entry) || 'image/png';
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+        const filename = getMediaEntryImageName(entry) || `imported-image${extensionForContentType(contentType)}`;
+        return new File([bytes], filename, { type: contentType });
+      };
+
       const getPreviewableImagePath = (value) => {
         const raw = toTrimmedString(value);
         if (!raw || !imagePathPattern.test(raw)) return '';
@@ -2805,6 +2818,9 @@ const metadata = {
           : fields.existingFeaturedImagePath.value.trim();
       };
 
+      const getPersistableSelectedMediaEntries = () =>
+        selectedMediaEntries.filter((entry) => !hasUsableMediaEntryContent(entry));
+
       const getDraft = () => ({
         title: fields.title.value,
         slug: fields.slug.value,
@@ -2818,7 +2834,7 @@ const metadata = {
         sources: fields.sources.value,
         imageNames,
         artifactReferences: selectedArtifactReferences,
-        mediaEntries: selectedMediaEntries,
+        mediaEntries: getPersistableSelectedMediaEntries(),
         featuredImage: fields.featuredImage.value,
         existingFeaturedImagePath: getExistingFeaturedImagePathForPayload(),
         videoLink: fields.videoLink.value,
@@ -2859,6 +2875,7 @@ const metadata = {
         const author = fields.author.value.trim();
         const tags = parseTags(fields.tags.value);
         const publishDate = getPublishDate().toISOString();
+        const persistableSelectedMediaEntries = getPersistableSelectedMediaEntries();
         const payload = {
           slug,
           title,
@@ -2887,7 +2904,7 @@ const metadata = {
             uploaded_image_names: imageNames,
             ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
           },
-          ...(selectedMediaEntries.length ? { mediaEntries: selectedMediaEntries } : {}),
+          ...(persistableSelectedMediaEntries.length ? { mediaEntries: persistableSelectedMediaEntries } : {}),
           ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
         };
 
@@ -3089,7 +3106,7 @@ const metadata = {
 
       const fetchArtifactPreviewResponse = async (artifactReference, clerkToken) => {
         const params = getArtifactPreviewParams(artifactReference);
-        if (!params) throw new Error('Image artifact reference is missing a blob key.');
+        if (!params) throw new Error('Saved image reference is missing a blob key.');
 
         return fetch(`/.netlify/functions/admin-get-blob-image?${params.toString()}`, {
           method: 'GET',
@@ -3195,16 +3212,16 @@ const metadata = {
             : image.kind === 'path'
               ? 'existing preview path'
               : image.kind === 'artifact'
-                ? 'publishable blob artifact'
+                ? 'saved image record'
                 : 'image';
 
       const getSelectedImageMeta = (image) => {
         if (image.kind === 'file') return `${formatFileSize(image.file.size)} • ${image.file.type || 'unknown type'}`;
         if (image.kind === 'media')
           return `embedded media data • ${getMediaEntryContentType(image.mediaEntry) || 'image'}`;
-        if (image.kind === 'path') return 'existing preview path • not a blob artifact';
+        if (image.kind === 'path') return 'existing preview path • not saved to the draft media library';
         if (image.kind === 'artifact') {
-          return `${formatFileSize(image.artifactReference.sizeBytes)} • ${image.artifactReference.contentType || 'saved image artifact'}`;
+          return `${formatFileSize(image.artifactReference.sizeBytes)} • ${image.artifactReference.contentType || 'saved image'}`;
         }
         return 'Image';
       };
@@ -3764,21 +3781,40 @@ const metadata = {
       };
 
       const getLatestSelectedArtifactReferences = (latestWorkflowRecord) => {
-        const selectedBlobKeys = new Set(
-          selectedArtifactReferences.map((reference) => String(reference?.blobKey || '').trim()).filter(Boolean)
-        );
-        if (!selectedBlobKeys.size) return [];
+        const selectedBlobKeys = selectedArtifactReferences
+          .map((reference) => String(reference?.blobKey || '').trim())
+          .filter(Boolean);
+        if (!selectedBlobKeys.length) return { references: [], missingBlobKeys: [] };
 
         const latestByBlobKey = new Map(
           getLatestArtifactReferences(latestWorkflowRecord)
-            .filter((reference) => selectedBlobKeys.has(String(reference?.blobKey || '').trim()))
+            .filter((reference) => selectedBlobKeys.includes(String(reference?.blobKey || '').trim()))
             .map((reference) => [String(reference?.blobKey || '').trim(), reference])
         );
+        const missingBlobKeys = selectedBlobKeys.filter((blobKey) => !latestByBlobKey.has(blobKey));
 
-        return selectedArtifactReferences.map((reference) => {
-          const blobKey = String(reference?.blobKey || '').trim();
-          return latestByBlobKey.get(blobKey) || reference;
-        });
+        return {
+          references: selectedArtifactReferences.map((reference) => {
+            const blobKey = String(reference?.blobKey || '').trim();
+            return latestByBlobKey.get(blobKey) || reference;
+          }),
+          missingBlobKeys,
+        };
+      };
+
+      const formatMissingArtifactWorkflowMessage = (missingBlobKeys) => {
+        const details = missingBlobKeys
+          .slice(0, 5)
+          .map((blobKey) => {
+            const selectedReference = selectedArtifactReferences.find((reference) => reference?.blobKey === blobKey);
+            const name = selectedReference ? getArtifactImageName(selectedReference) : blobKey;
+            return `${shortenFilename(name, 24)} (${shortenFilename(blobKey, 36)})`;
+          })
+          .join(', ');
+        const suffix = missingBlobKeys.length > 5 ? `, +${missingBlobKeys.length - 5} more` : '';
+        return `Some selected images were not saved into the draft. Save the draft again or re-select the images before publishing.${
+          details ? ` Missing: ${details}${suffix}.` : ''
+        }`;
       };
 
       const getArtifactFailureReference = (failure) => failure?.reference || failure;
@@ -3850,7 +3886,7 @@ const metadata = {
         const details = failures.map((failure) => failure?.failureMessage).filter(Boolean);
         const detailMessage = details.length ? ` Details: ${details.join('; ')}.` : '';
 
-        return `Image artifact${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}.${detailMessage} Re-select or re-upload ${
+        return `Saved image${names.length === 1 ? '' : 's'} could not be read: ${names.join(', ')}.${detailMessage} Re-select or re-upload ${
           names.length === 1 ? 'this image' : 'these images'
         } before publishing.`;
       };
@@ -3876,7 +3912,7 @@ const metadata = {
               await response.blob();
               return { reference, readable: true };
             } catch (error) {
-              console.warn(`${logContext} image artifact could not be read.`, error);
+              console.warn(`${logContext} saved image could not be read.`, error);
               return {
                 reference,
                 readable: false,
@@ -3898,7 +3934,7 @@ const metadata = {
         if (!artifactReferences.length) return artifactReferences;
 
         setStatus(
-          `Validating ${artifactReferences.length} selected image artifact${artifactReferences.length === 1 ? '' : 's'}…`,
+          `Checking ${artifactReferences.length} saved image record${artifactReferences.length === 1 ? '' : 's'}…`,
           false
         );
 
@@ -3949,6 +3985,7 @@ const metadata = {
         fields.seoDescription.value = '';
         fields.overwrite.checked = false;
         selectedImages = [];
+        stagedInlineMediaEntries = [];
         syncImageNames();
         availableBlobImageArtifacts = [];
         imageUploadMessage = '';
@@ -3964,6 +4001,37 @@ const metadata = {
         setStatus('Ready for a new article.', false);
         window.history.replaceState({}, '', '/admin/publish');
         fields.title.focus();
+      };
+
+      const replaceInlineMediaEntriesWithArtifacts = (mediaEntries, artifactReferences) => {
+        const uploadedEntries = new Set(mediaEntries);
+        selectedArtifactReferences = mergeArtifactReferences(selectedArtifactReferences, artifactReferences);
+        selectedImages = [
+          ...selectedImages.filter((image) => !(image.kind === 'media' && uploadedEntries.has(image.mediaEntry))),
+          ...artifactReferences.map(createArtifactSelectedImage),
+        ];
+        stagedInlineMediaEntries = stagedInlineMediaEntries.filter((entry) => !uploadedEntries.has(entry));
+        syncImageNames();
+      };
+
+      const uploadStagedInlineMediaEntriesForRequest = async (requestId) => {
+        const mediaEntries = mergeMediaEntries(
+          stagedInlineMediaEntries,
+          selectedMediaEntries.filter(hasUsableMediaEntryContent)
+        );
+        if (!requestId || !mediaEntries.length) return [];
+
+        const artifactReferences = await uploadInlineMediaEntriesAsArtifacts(mediaEntries, requestId);
+        replaceInlineMediaEntriesWithArtifacts(mediaEntries, artifactReferences);
+        imageImportWarningMessage = '';
+        if (fields.imageImportWarning) {
+          fields.imageImportWarning.textContent = '';
+          fields.imageImportWarning.hidden = true;
+        }
+        renderImages();
+        updatePreview();
+        updatePublishOutput();
+        return artifactReferences;
       };
 
       const postJsonDraftToBlobs = async (clerkToken, requestId, lockToken) => {
@@ -4018,6 +4086,31 @@ const metadata = {
           workflowReadOnlyMode = false;
         }
 
+        if (
+          savedRequestId &&
+          (stagedInlineMediaEntries.length || selectedMediaEntries.some(hasUsableMediaEntryContent))
+        ) {
+          try {
+            const uploadedReferences = await uploadStagedInlineMediaEntriesForRequest(savedRequestId);
+            if (uploadedReferences.length) {
+              const latestLock = getCheckedOutWorkflowDraft();
+              ({ response, result } = await postJsonDraftToBlobs(clerkToken, savedRequestId, latestLock.lockToken));
+              if (!response.ok) {
+                const message = result.message || result.error || `JSON draft could not be saved (${response.status}).`;
+                throw new Error(message);
+              }
+            }
+          } catch (error) {
+            console.warn('Imported inline media artifact upload failed after draft save.', error);
+            imageImportWarningMessage =
+              'An imported image could not be saved to the draft media library. Re-upload or re-select the image before publishing.';
+            if (fields.imageImportWarning) {
+              fields.imageImportWarning.textContent = imageImportWarningMessage;
+              fields.imageImportWarning.hidden = false;
+            }
+          }
+        }
+
         return result;
       };
 
@@ -4025,17 +4118,17 @@ const metadata = {
         const saveButton = fields.saveDraft;
 
         if (!getHasMinimumDraftContent()) {
-          setStatus('Title, publishing target, and author are required to save JSON draft.', false);
+          setStatus('Title, publishing target, and author are required to save the draft.', false);
           return false;
         }
 
         if (confirm) {
-          const confirmed = window.confirm('Save draft JSON to Blobs?');
+          const confirmed = window.confirm('Save this draft to Blobs as the source version?');
           if (!confirmed) return false;
         }
 
         saveButton.disabled = true;
-        setStatus('Saving JSON draft to Blobs…', false);
+        setStatus('Saving draft to Blobs (source of truth)…', false);
 
         try {
           const result = await saveJsonDraftToBlobs();
@@ -4044,7 +4137,7 @@ const metadata = {
           lastSavedBy = workflowLockOwnerLabel;
           setUnsavedChanges(false);
           const savedRequestId = lastSavedDraftId ? ` (${lastSavedDraftId})` : '';
-          setStatus(`Draft saved to Blobs${savedRequestId}.`, false);
+          setStatus(`Draft saved to Blobs (source of truth)${savedRequestId}.`, false);
           return true;
         } catch (error) {
           if (isAbortError(error)) {
@@ -4052,17 +4145,17 @@ const metadata = {
             return false;
           }
 
-          console.error('JSON draft save failed.', error);
+          console.error('Draft save failed.', error);
           const recoverySaved = saveLocalRecoveryDraft();
           const message = isWorkflowLockError(error)
             ? formatWorkflowLockMessage(error)
             : error instanceof Error
               ? error.message
-              : 'JSON draft could not be saved.';
+              : 'Draft could not be saved.';
           setStatus(
             recoverySaved
-              ? `${message} A local recovery draft was saved, but JSON was not saved to Blobs.`
-              : `${message} JSON was not saved to Blobs and local recovery failed.`,
+              ? `${message} A local recovery draft was saved, but the draft was not saved to Blobs.`
+              : `${message} the draft was not saved to Blobs and local recovery failed.`,
             false
           );
           return false;
@@ -4111,6 +4204,7 @@ const metadata = {
         fields.overwrite.checked = false;
         fields.existingFeaturedImagePath.value = article.image || article.featuredImage || '';
         selectedImages = [];
+        stagedInlineMediaEntries = [];
         syncImageNames();
         imageImportWarningMessage = '';
         renderImages();
@@ -4474,13 +4568,41 @@ const metadata = {
         const importedMediaEntries = formData.mediaEntries?.exists
           ? mergeMediaEntries(formData.mediaEntries.value)
           : [];
+        const importedInlineMediaEntries = importedMediaEntries.filter(hasUsableMediaEntryContent);
+        const importedReferenceMediaEntries = importedMediaEntries.filter(
+          (entry) => !hasUsableMediaEntryContent(entry)
+        );
+        let importedInlineArtifactReferences = [];
+        let inlineMediaUploadWarning = '';
+        if (importedInlineMediaEntries.length) {
+          const { requestId } = getCheckedOutWorkflowDraft();
+          if (requestId) {
+            try {
+              importedInlineArtifactReferences = await uploadInlineMediaEntriesAsArtifacts(
+                importedInlineMediaEntries,
+                requestId
+              );
+            } catch (error) {
+              console.warn('Imported inline media could not be uploaded as artifacts.', error);
+              inlineMediaUploadWarning =
+                'An imported image could not be saved to the draft media library. Re-upload or re-select the image before publishing.';
+            }
+          } else {
+            stagedInlineMediaEntries = mergeMediaEntries(stagedInlineMediaEntries, importedInlineMediaEntries);
+            inlineMediaUploadWarning =
+              'An imported image is ready to save to the draft media library after you save the draft.';
+          }
+        }
 
         const importedRawImageNames = formData.imageNames?.exists
           ? formData.imageNames.value.map((name) => String(name || '').trim()).filter(Boolean)
           : [];
         const importedImagePathEntries = mergeImagePathEntries(importedRawImageNames);
         selectedImages = [
-          ...importedMediaEntries.map(createMediaSelectedImage),
+          ...importedReferenceMediaEntries.map(createMediaSelectedImage),
+          ...(importedInlineArtifactReferences.length
+            ? importedInlineArtifactReferences.map(createArtifactSelectedImage)
+            : importedInlineMediaEntries.map(createMediaSelectedImage)),
           ...importedImagePathEntries.map(createPathSelectedImage),
           ...importedReadableArtifactReferences.map(createArtifactSelectedImage),
         ];
@@ -4500,7 +4622,9 @@ const metadata = {
         const metadataOnlyImageWarning = metadataOnlyImageCount
           ? 'Image names were found in JSON, but no blob references or image data were available for thumbnails.'
           : '';
-        imageImportWarningMessage = [unreadableArtifactWarning, metadataOnlyImageWarning].filter(Boolean).join(' ');
+        imageImportWarningMessage = [unreadableArtifactWarning, metadataOnlyImageWarning, inlineMediaUploadWarning]
+          .filter(Boolean)
+          .join(' ');
         imageUploadMessage = imageNames.length
           ? `${imageNames.length} previewable image${imageNames.length === 1 ? '' : 's'} loaded from JSON.`
           : '';
@@ -4537,7 +4661,7 @@ const metadata = {
             previewableImportedFeaturedImage;
           if (featuredValue) {
             const featuredSuffix = matchingArtifactName
-              ? 'publishable blob artifact'
+              ? 'saved image record'
               : matchingMediaEntryName
                 ? 'embedded media data'
                 : matchingPathEntry
@@ -4550,7 +4674,7 @@ const metadata = {
             fields.featuredImage.value = '';
             imageImportWarningMessage = [
               imageImportWarningMessage,
-              `Featured image ${shortenFilename(importedFeaturedImage, 24)} was found in JSON, but no readable blob artifact, embedded media data, or existing image path was available.`,
+              `Featured image ${shortenFilename(importedFeaturedImage, 24)} was found in JSON, but no saved image record, embedded image data, or existing image path was available.`,
             ]
               .filter(Boolean)
               .join(' ');
@@ -4773,7 +4897,7 @@ const metadata = {
         const draftId = getQueryDraftId();
         if (!draftId) return false;
 
-        setStatus(`Loading draft ${draftId} from Blobs…`, false);
+        setStatus(`Loading saved draft ${draftId}…`, false);
 
         let draftInput;
         try {
@@ -4856,14 +4980,12 @@ const metadata = {
           ?.addEventListener('click', async () => {
             try {
               const loaded = await applyBlobDraftInput(draftId, draftInput, { readOnly: true });
-              if (!loaded) throw new Error('Saved JSON draft could not be opened read-only.');
+              if (!loaded) throw new Error('Saved draft could not be opened read-only.');
               setStatus(`Opened saved JSON ${draftId} read-only. No workflow lock was acquired.`, false);
               closeJsonDraftModal();
             } catch (readOnlyError) {
               setJsonDraftModalStatus(
-                readOnlyError instanceof Error
-                  ? readOnlyError.message
-                  : 'Saved JSON draft could not be opened read-only.',
+                readOnlyError instanceof Error ? readOnlyError.message : 'Saved draft could not be opened read-only.',
                 true
               );
             }
@@ -4880,9 +5002,7 @@ const metadata = {
               closeJsonDraftModal();
             } catch (recoverError) {
               setJsonDraftModalStatus(
-                recoverError instanceof Error
-                  ? recoverError.message
-                  : 'Saved JSON draft session could not be recovered.',
+                recoverError instanceof Error ? recoverError.message : 'Saved draft session could not be recovered.',
                 true
               );
             }
@@ -4930,14 +5050,14 @@ const metadata = {
 
       const renderJsonDraftChoices = (drafts) => {
         if (!drafts.length) {
-          fields.jsonDraftList.innerHTML = '<p class="json-draft-empty">No saved JSON drafts were found.</p>';
+          fields.jsonDraftList.innerHTML = '<p class="json-draft-empty">No saved drafts were found.</p>';
           return;
         }
 
         fields.jsonDraftList.innerHTML = drafts
           .map((draft) => {
             const id = draft.id || draft.key || draft.request_id || '';
-            const title = draft.title || 'Untitled JSON draft';
+            const title = draft.title || 'Untitled draft';
             const slug = draft.slug || 'no-slug';
             const author = draft.author || 'unknown author';
             const updatedAt = formatJsonDraftDate(draft.updatedAt || draft.updated_at || draft.modifiedAt);
@@ -4956,7 +5076,7 @@ const metadata = {
 
       const loadJsonDraftChoices = async () => {
         fields.jsonDraftList.innerHTML = '';
-        setJsonDraftModalStatus('Loading saved JSON drafts…');
+        setJsonDraftModalStatus('Loading saved drafts…');
 
         try {
           const token = await getClerkSessionToken();
@@ -4969,22 +5089,16 @@ const metadata = {
           });
           const result = await response.json().catch(() => ({}));
 
-          if (!response.ok)
-            throw new Error(result.error || `Saved JSON drafts could not be listed (${response.status}).`);
+          if (!response.ok) throw new Error(result.error || `Saved drafts could not be listed (${response.status}).`);
 
           const drafts = Array.isArray(result.drafts) ? result.drafts : [];
           renderJsonDraftChoices(drafts);
           setJsonDraftModalStatus(
-            drafts.length
-              ? 'Select a saved JSON draft to load into the Import JSON module.'
-              : 'No saved JSON drafts were found.'
+            drafts.length ? 'Select a saved draft to load into the form.' : 'No saved drafts were found.'
           );
         } catch (error) {
           console.error('Saved JSON draft list failed.', error);
-          setJsonDraftModalStatus(
-            error instanceof Error ? error.message : 'Saved JSON drafts could not be listed.',
-            true
-          );
+          setJsonDraftModalStatus(error instanceof Error ? error.message : 'Saved drafts could not be listed.', true);
         }
       };
 
@@ -5044,6 +5158,7 @@ const metadata = {
           .toLowerCase();
         return sortArtifactsByCreatedDesc(
           artifacts.filter((artifact) => {
+            if (!isImageArtifactReference(artifact)) return false;
             if (artifactKind && artifactKindFromReference(artifact) !== artifactKind) return false;
             if (requestScope === 'current' && requestId && getArtifactRequestId(artifact) !== requestId) return false;
             if (normalizedSearch && !getArtifactSearchText(artifact).includes(normalizedSearch)) return false;
@@ -5105,7 +5220,7 @@ const metadata = {
 
       const renderBlobImageChoices = (artifacts) => {
         if (!artifacts.length) {
-          fields.blobImageList.innerHTML = '<p class="json-draft-empty">No saved artifacts matched these filters.</p>';
+          fields.blobImageList.innerHTML = '<p class="json-draft-empty">No saved images matched these filters.</p>';
           return;
         }
 
@@ -5147,7 +5262,7 @@ const metadata = {
 
       const loadBlobImageChoices = async () => {
         fields.blobImageList.innerHTML = '';
-        setBlobImageModalStatus('Loading saved artifacts…');
+        setBlobImageModalStatus('Loading saved images…');
 
         try {
           availableBlobImageArtifacts = await loadBlobImageArtifactsFromMcp();
@@ -5156,15 +5271,12 @@ const metadata = {
           renderBlobImageChoices(availableBlobImageArtifacts);
           setBlobImageModalStatus(
             availableBlobImageArtifacts.length
-              ? 'Choose saved artifacts to add to this article. Results are sorted newest first.'
-              : 'No saved artifacts matched these filters.'
+              ? 'Choose saved images to add to this article. Results are sorted newest first.'
+              : 'No saved images matched these filters.'
           );
         } catch (error) {
-          console.error('Saved artifact list failed.', error);
-          setBlobImageModalStatus(
-            error instanceof Error ? error.message : 'Saved artifacts could not be listed.',
-            true
-          );
+          console.error('Saved image list failed.', error);
+          setBlobImageModalStatus(error instanceof Error ? error.message : 'Saved images could not be listed.', true);
         }
       };
 
@@ -5182,7 +5294,7 @@ const metadata = {
 
       const selectMarkedBlobImages = () => {
         const artifactImages = availableBlobImageArtifacts
-          .filter((artifact) => stagedBlobImageKeys.has(artifact.blobKey))
+          .filter((artifact) => stagedBlobImageKeys.has(artifact.blobKey) && isImageArtifactReference(artifact))
           .map(createArtifactSelectedImage);
         selectedImages = [...selectedImages.filter((image) => image.kind !== 'artifact'), ...artifactImages];
         syncImageNames();
@@ -5207,9 +5319,7 @@ const metadata = {
       const loadSelectedJsonDraft = async (draftId) => {
         if (!draftId) return;
         if (hasUnsavedChanges) {
-          const replaceDraft = window.confirm(
-            'Open this saved JSON draft? Unsaved changes in the form will be replaced.'
-          );
+          const replaceDraft = window.confirm('Open this saved draft? Unsaved changes in the form will be replaced.');
           if (!replaceDraft) return;
         }
 
@@ -5221,22 +5331,19 @@ const metadata = {
           const draftResult = await fetchJsonDraftInput(draftId, token);
           draftInput = draftResult.draftInput;
           const loaded = await applyBlobDraftInput(draftId, draftInput, draftResult.result);
-          if (!loaded) throw new Error('Saved JSON draft could not be applied to the form.');
+          if (!loaded) throw new Error('Saved draft could not be applied to the form.');
 
           fields.jsonUploadName.textContent = draftId;
           setJsonImportStatus(`Opened saved JSON ${draftId}.`);
           setStatus(`Opened saved JSON ${draftId}.`, true);
           closeJsonDraftModal();
         } catch (error) {
-          console.error('Saved JSON draft open failed.', error);
+          console.error('Saved draft open failed.', error);
           if (isWorkflowLockError(error) && draftInput) {
             showWorkflowLockActions({ draftId, draftInput, error });
             return;
           }
-          setJsonDraftModalStatus(
-            error instanceof Error ? error.message : 'Saved JSON draft could not be opened.',
-            true
-          );
+          setJsonDraftModalStatus(error instanceof Error ? error.message : 'Saved draft could not be opened.', true);
         }
       };
 
@@ -5364,7 +5471,7 @@ const metadata = {
       const startNewDraft = async () => {
         if (hasUnsavedChanges) {
           const saveFirst = window.confirm(
-            'Save the current JSON draft before starting a new article? Choose Cancel to disregard it instead.'
+            'Save the current draft before starting a new article? Choose Cancel to disregard it instead.'
           );
 
           if (saveFirst) {
@@ -5386,16 +5493,62 @@ const metadata = {
         setStatus('Inline preview refreshed.');
       });
       fields.preview.addEventListener('click', openDedicatedPreviewPage);
-      const fileToBase64 = (file) =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.addEventListener('load', () => {
-            const result = String(reader.result || '');
-            resolve(result.includes(',') ? result.split(',').pop() : result);
-          });
-          reader.addEventListener('error', () => reject(reader.error));
-          reader.readAsDataURL(file);
+      const arrayBufferToHex = (buffer) =>
+        Array.from(new Uint8Array(buffer))
+          .map((byte) => byte.toString(16).padStart(2, '0'))
+          .join('');
+
+      const getFileSha256 = async (file) =>
+        arrayBufferToHex(await crypto.subtle.digest('SHA-256', await file.arrayBuffer()));
+
+      const uploadFileAsArtifact = async (file, requestId) => {
+        const filename = sanitizeFilename(file.name);
+        if (!filename) throw new Error(`Invalid upload filename: ${file.name}`);
+
+        const contentType = file.type || 'application/octet-stream';
+        const expectedSha256 = await getFileSha256(file);
+        const intent = await mcpToolCall('create_artifact_upload_intent', {
+          requestId,
+          artifactKind: 'image',
+          contentType,
+          expectedSizeBytes: file.size,
+          expectedSha256,
+          filename,
+          label: filename,
         });
+        const uploadUrl = intent.uploadUrl || '/api/artifacts/upload';
+        const requiredHeaders = intent.requiredHeaders || {};
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: requiredHeaders,
+          body: file,
+        });
+        const uploadResult = await uploadResponse.json().catch(() => ({}));
+        if (!uploadResponse.ok || !uploadResult?.artifact) {
+          throw new Error(uploadResult.error || `Artifact upload failed for ${filename} (${uploadResponse.status}).`);
+        }
+
+        return uploadResult.artifact;
+      };
+
+      const uploadInlineMediaEntriesAsArtifacts = async (mediaEntries, requestId) => {
+        const files = mediaEntries.map(getMediaEntryUploadFile);
+        if (files.some((file) => !file)) {
+          throw new Error('Imported image data could not be decoded for artifact upload.');
+        }
+        return Promise.all(files.map((file) => uploadFileAsArtifact(file, requestId)));
+      };
+
+      const uploadSelectedFilesAsArtifacts = async (requestId) => {
+        const files = selectedFiles.filter(Boolean);
+        if (!files.length) return [];
+
+        setStatus(
+          `Saving ${files.length} selected image${files.length === 1 ? '' : 's'} to the draft media library…`,
+          false
+        );
+        return Promise.all(files.map((file) => uploadFileAsArtifact(file, requestId)));
+      };
 
       const publishArticle = async () => {
         updatePreview();
@@ -5436,8 +5589,8 @@ const metadata = {
 
         const confirmed = window.confirm(
           articleStatus.published
-            ? 'Overwrite the published article on GitHub? This will replace the live content.'
-            : 'Publish this article to GitHub? This will commit the article and any selected images.'
+            ? 'Save the draft, check its saved image records, then overwrite the published article on GitHub? This replaces the live version.'
+            : 'Save the draft, check its saved image records, then publish this article to GitHub?'
         );
         if (!confirmed) return;
 
@@ -5447,7 +5600,7 @@ const metadata = {
 
         try {
           const clerkToken = await getClerkSessionToken();
-          setStatus('Saving JSON draft to Blobs…', false);
+          setStatus('Saving draft to Blobs (source of truth)…', false);
           await saveJsonDraftToBlobs();
           const { requestId, lockToken } = getCheckedOutWorkflowDraft();
           if (!requestId || !lockToken) {
@@ -5455,23 +5608,38 @@ const metadata = {
               'A checked-out workflow lock is required before publishing. Save the draft again to acquire a lock.'
             );
           }
+          if (selectedMediaEntries.some(hasUsableMediaEntryContent)) {
+            setStatus(
+              'An imported image could not be saved to the draft media library. Re-upload or re-select the image before publishing.',
+              false
+            );
+            return;
+          }
 
-          setStatus('Refreshing latest workflow state…', false);
+          const uploadedArtifactReferences = await uploadSelectedFilesAsArtifacts(requestId);
+          if (uploadedArtifactReferences.length) {
+            selectedArtifactReferences = mergeArtifactReferences(
+              selectedArtifactReferences,
+              uploadedArtifactReferences
+            );
+            setStatus('Saving image records to the draft…', false);
+            await saveJsonDraftToBlobs();
+          }
+
+          setStatus('Checking the saved draft for image records…', false);
           const latestWorkflowRecord = await fetchLatestWorkflowRequest(requestId);
+          const latestSelectedArtifacts = getLatestSelectedArtifactReferences(latestWorkflowRecord);
+          if (latestSelectedArtifacts.missingBlobKeys.length) {
+            setStatus(formatMissingArtifactWorkflowMessage(latestSelectedArtifacts.missingBlobKeys), false);
+            return;
+          }
           const artifactReferences = await validateReadableArtifactReferences(
-            getLatestSelectedArtifactReferences(latestWorkflowRecord),
+            mergeArtifactReferences(latestSelectedArtifacts.references, uploadedArtifactReferences),
             clerkToken
           );
 
-          setStatus('Publishing article to GitHub…', false);
+          setStatus('Committing article content to GitHub…', false);
 
-          const files = await Promise.all(
-            selectedFiles.filter(Boolean).map(async (file) => ({
-              base64: await fileToBase64(file),
-              name: sanitizeFilename(file.name),
-              type: file.type,
-            }))
-          );
           const response = await fetch('/.netlify/functions/publish-article', {
             method: 'POST',
             headers: {
@@ -5500,9 +5668,10 @@ const metadata = {
               requestId,
               request_id: requestId,
               lock_token: lockToken,
-              ...(selectedMediaEntries.length ? { mediaEntries: selectedMediaEntries } : {}),
+              ...(getPersistableSelectedMediaEntries().length
+                ? { mediaEntries: getPersistableSelectedMediaEntries() }
+                : {}),
               ...(artifactReferences.length ? { artifactReferences } : {}),
-              files,
             }),
           });
           const result = await response.json().catch(() => ({}));
