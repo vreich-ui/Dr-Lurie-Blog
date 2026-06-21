@@ -112,6 +112,11 @@ export const normalizeContentSourceImportToFormData = (
     ['publication', 'publish_payload', 'metadata', 'artifactReferences'],
   ]);
   const mediaEntries = getPathValue(contentSource, ['publication', 'publish_payload', 'mediaEntries']);
+  const articleBody = getFirstImportPathValue(contentSource, [
+    ['content', 'article_body'],
+    ['publication', 'publish_payload', 'article_body'],
+    ['article_body'],
+  ]);
 
   return {
     schemaVersion: contentSource.schema_version,
@@ -153,6 +158,10 @@ export const normalizeContentSourceImportToFormData = (
     mediaEntries: {
       exists: mediaEntries.exists,
       value: Array.isArray(mediaEntries.value) ? mediaEntries.value : [],
+    },
+    articleBody: {
+      exists: articleBody.exists,
+      value: articleBody.value,
     },
   };
 };
