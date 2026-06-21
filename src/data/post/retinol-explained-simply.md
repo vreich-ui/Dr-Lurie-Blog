@@ -1,8 +1,8 @@
 ---
-publishDate: 2026-06-20T22:28:00+03:00
+publishDate: 2026-06-21T11:55:00+03:00
 title: "Retinol, Explained Simply"
 excerpt: "Retinol can be useful for texture, mild acne, pigmentation, and fine lines, but it works best when introduced slowly and paired with sunscreen and barrier care."
-image: "~/assets/images/uploads/retinol-explained-simply/retinol-explained-product-hero.png"
+image: "~/assets/images/uploads/retinol-explained-simply/retinol-featured-compact.webp"
 category: "Science Blog"
 tags:
   - "retinol"
@@ -17,6 +17,10 @@ metadata:
 Retinol is one of the most talked-about skin-care ingredients, but it is also one of the easiest to misunderstand. It is often presented as either a miracle product or a guaranteed irritation problem. The truth is quieter and more useful: retinol is a vitamin A-derived ingredient that can support healthier-looking skin over time, but it works best when it is introduced slowly and used with a simple, protective routine.
 
 For beginners, the goal is not to use the strongest product as quickly as possible. The goal is to help the skin adapt.
+
+![Simple skincare routine still life with serum dropper, moisturizer, and sunscreen.](../../assets/images/uploads/retinol-explained-simply/retinol-inline-compact.webp)
+
+*A gentle routine helps the skin adapt to retinol.*
 
 ## What retinol is
 
