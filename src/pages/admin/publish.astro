@@ -175,10 +175,31 @@ const metadata = {
             </div>
 
             <div class="field">
-              <label for="content">Article Body</label>
+              <div class="field-header">
+                <label for="content">Article Body (Legacy Fallback)</label>
+                <div class="field-actions">
+                  <button id="convert-to-pieces" class="btn-tertiary btn-xs" type="button">Convert to Pieces</button>
+                </div>
+              </div>
               <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
               ></textarea>
             </div>
+
+            <section id="article-content-pieces" class="article-content-pieces">
+              <div class="pieces-header">
+                <h3>Article Content Pieces</h3>
+                <p class="hint">Structured content for agent-first publishing.</p>
+              </div>
+
+              <div id="pieces-container" class="pieces-container"></div>
+
+              <div class="pieces-actions">
+                <button id="add-piece" class="btn-secondary" type="button">
+                  <Icon name="tabler:plus" class="piece-action-icon" aria-hidden="true" />
+                  <span>Add piece</span>
+                </button>
+              </div>
+            </section>
 
             <div class="field">
               <label for="sources">Sources</label>
@@ -1027,6 +1048,111 @@ const metadata = {
     font-size: clamp(1.35rem, 3vw, 1.7rem);
     font-weight: 700;
     letter-spacing: -0.02em;
+  }
+
+  .field-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.45rem;
+  }
+
+  .field-header label {
+    margin-bottom: 0;
+  }
+
+  .btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .article-content-pieces {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--aw-color-border);
+  }
+
+  .pieces-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .pieces-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .pieces-container {
+    display: grid;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  :global(.article-piece) {
+    position: relative;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    background: var(--aw-color-bg-surface);
+  }
+
+  :global(.piece-header) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--aw-color-border);
+  }
+
+  :global(.piece-id) {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: var(--aw-color-text-muted);
+  }
+
+  :global(.piece-controls) {
+    display: flex;
+    gap: 0.25rem;
+  }
+
+  :global(.piece-form) {
+    display: grid;
+    gap: 1rem;
+  }
+
+  :global(.piece-template-selector) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  :global(.piece-advanced) {
+    margin-top: 0.5rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.piece-advanced summary) {
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--aw-color-text-muted);
+  }
+
+  :global(.piece-advanced-content) {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--aw-color-border);
+  }
+
+  .piece-action-icon {
+    width: 1.1rem;
+    height: 1.1rem;
   }
 
   .field {
@@ -1899,6 +2025,13 @@ const metadata = {
   // @ts-nocheck
   import { normalizeContentSourceImportToFormData } from '../../lib/contentSourceImportFormData';
   import { loadClerk } from '~/utils/clerkLoader';
+  import {
+    articleNodeTemplates,
+    createDefaultNodeFromTemplate,
+    createLegacyBodyNode,
+    inferTemplateId
+  } from '../../lib/article-content/input-bank';
+  import { articleBodyToMarkdown } from '../../lib/article-content/to-markdown';
 
   const allowedImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
   const allowedImageTypeLabels = ['png', 'jpg', 'webp'];
@@ -2015,8 +2148,12 @@ const metadata = {
         publishMode: document.querySelector('#publish-mode'),
         preview: document.querySelector('#preview'),
         toast: document.querySelector('#toast'),
+        piecesContainer: document.querySelector('#pieces-container'),
+        addPiece: document.querySelector('#add-piece'),
+        convertToPieces: document.querySelector('#convert-to-pieces'),
       };
 
+      let articleNodes = [];
       let selectedImages = [];
       let imageNames = [];
       let selectedFiles = [];
@@ -2908,6 +3045,11 @@ const metadata = {
           ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
         };
 
+        const articleBody = {
+          schema_version: 'article_body.v1',
+          nodes: articleNodes
+        };
+
         return {
           record_type: 'content_source',
           schema_version: 'content_source.v1',
@@ -2917,6 +3059,7 @@ const metadata = {
             ...(fields.excerpt.value.trim()
               ? { deck: fields.excerpt.value.trim(), description: fields.excerpt.value.trim() }
               : {}),
+            article_body: articleBody,
             blocks: fields.content.value.trim()
               ? [
                   {
@@ -3250,6 +3393,242 @@ const metadata = {
         details.append(thumbnail);
       };
 
+      const renderPieces = () => {
+        fields.piecesContainer.innerHTML = '';
+        if (articleNodes.length === 0) {
+          articleNodes.push(createDefaultNodeFromTemplate('prose_section'));
+        }
+
+        articleNodes.forEach((node, index) => {
+          const piece = document.createElement('div');
+          piece.className = 'article-piece';
+          piece.dataset.nodeId = node.id;
+
+          const activeTemplateId = node.templateId || inferTemplateId(node);
+          const template = articleNodeTemplates[activeTemplateId] || articleNodeTemplates['prose_section'];
+          const allFields = [...template.fields.public, ...template.fields.optional];
+
+          const templateOptions = Object.values(articleNodeTemplates)
+            .map(t => {
+              const option = document.createElement('option');
+              option.value = t.id;
+              option.textContent = t.name;
+              if (activeTemplateId === t.id) option.selected = true;
+              return option.outerHTML;
+            })
+            .join('');
+
+          const showTitle = allFields.includes('title');
+          const showBody = allFields.includes('body');
+          const showItems = allFields.includes('items');
+          const showCta = allFields.includes('ctaText') || allFields.includes('ctaLink');
+          const showLabel = allFields.includes('label');
+
+          piece.innerHTML = `
+            <div class="piece-header">
+              <span class="piece-id">${escapeHtml(node.id)}</span>
+              <div class="piece-controls">
+                <button class="btn-tertiary btn-xs move-up" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
+                <button class="btn-tertiary btn-xs move-down" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
+                <button class="btn-tertiary btn-xs duplicate-piece" type="button">Duplicate</button>
+                <button class="btn-tertiary btn-xs remove-piece" type="button" ${articleNodes.length === 1 ? 'disabled' : ''}>Remove</button>
+              </div>
+            </div>
+            <div class="piece-form">
+              <div class="field piece-template-selector">
+                <label>Template</label>
+                <select class="template-select">
+                  ${templateOptions}
+                </select>
+              </div>
+
+              ${showTitle ? `
+              <div class="field">
+                <label>Public Title</label>
+                <input type="text" class="piece-title" value="${escapeHtml(node.public?.title || '')}" placeholder="Title" />
+              </div>` : ''}
+
+              ${showBody ? `
+              <div class="field">
+                <label>Reader text (Body)</label>
+                <textarea class="piece-body" rows="4" placeholder="Body content">${escapeHtml(node.public?.body || '')}</textarea>
+              </div>` : ''}
+
+              ${showItems ? `
+              <div class="field">
+                <label>Items (One per line)</label>
+                <textarea class="piece-items" rows="3" placeholder="List items">${escapeHtml((node.public?.items || []).join('\n'))}</textarea>
+              </div>` : ''}
+
+              ${showLabel ? `
+              <div class="field">
+                <label>Label</label>
+                <input type="text" class="piece-label" value="${escapeHtml(node.public?.label || '')}" placeholder="Label" />
+              </div>` : ''}
+
+              ${showCta ? `
+              <div class="field-grid">
+                <div class="field">
+                  <label>CTA Text</label>
+                  <input type="text" class="piece-cta-text" value="${escapeHtml(node.public?.ctaText || '')}" placeholder="Learn more" />
+                </div>
+                <div class="field">
+                  <label>CTA Link</label>
+                  <input type="url" class="piece-cta-link" value="${escapeHtml(node.public?.ctaLink || '')}" placeholder="https://..." />
+                </div>
+              </div>` : ''}
+
+              <details class="piece-advanced">
+                <summary>Advanced Settings</summary>
+                <div class="piece-advanced-content">
+                  <div class="field">
+                    <label>Visibility</label>
+                    <select class="piece-visibility">
+                      <option value="public" ${node.visibility === 'public' ? 'selected' : ''}>Public</option>
+                      <option value="internal" ${node.visibility === 'internal' ? 'selected' : ''}>Internal</option>
+                      <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Internal Strategy</label>
+                    <select class="piece-strategy">
+                      <option value="">None</option>
+                      ${[
+                        'hook', 'agitation', 'context', 'explanation', 'proof',
+                        'example', 'comparison', 'myth', 'step', 'recommendation',
+                        'resolution', 'summary'
+                      ].map(s => `<option value="${s}" ${node.private?.strategy === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Presentation Hint</label>
+                    <select class="piece-presentation">
+                      <option value="">Default</option>
+                      ${[
+                        'plain', 'section', 'callout', 'inline', 'card', 'panel',
+                        'faq', 'summary', 'chatInvite', 'adSlot', 'offerInline', 'offerCard'
+                      ].map(p => `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+              </details>
+            </div>
+          `;
+
+          // Event Listeners for Piece Controls
+          piece.querySelector('.template-select').addEventListener('change', (e) => {
+            const templateId = e.target.value;
+            const newNode = createDefaultNodeFromTemplate(templateId);
+            newNode.id = node.id; // Keep the same ID
+            newNode.templateId = templateId;
+            articleNodes[index] = newNode;
+            renderPieces();
+            updateFromPieces();
+          });
+
+          if (showBody) {
+            piece.querySelector('.piece-body').addEventListener('input', (e) => {
+              node.public.body = e.target.value;
+              updateFromPieces();
+            });
+          }
+
+          if (showTitle) {
+            piece.querySelector('.piece-title').addEventListener('input', (e) => {
+              node.public.title = e.target.value;
+              updateFromPieces();
+            });
+          }
+
+          if (showItems) {
+            piece.querySelector('.piece-items').addEventListener('input', (e) => {
+              node.public.items = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+              updateFromPieces();
+            });
+          }
+
+          if (showLabel) {
+            piece.querySelector('.piece-label').addEventListener('input', (e) => {
+              node.public.label = e.target.value;
+              updateFromPieces();
+            });
+          }
+
+          if (showCta) {
+            piece.querySelector('.piece-cta-text').addEventListener('input', (e) => {
+              node.public.ctaText = e.target.value;
+              updateFromPieces();
+            });
+            piece.querySelector('.piece-cta-link').addEventListener('input', (e) => {
+              node.public.ctaLink = e.target.value;
+              updateFromPieces();
+            });
+          }
+
+          piece.querySelector('.piece-visibility').addEventListener('change', (e) => {
+            node.visibility = e.target.value;
+            updateFromPieces();
+          });
+
+          piece.querySelector('.piece-strategy').addEventListener('change', (e) => {
+            node.private = node.private || {};
+            node.private.strategy = e.target.value || undefined;
+            updateFromPieces();
+          });
+
+          piece.querySelector('.piece-presentation').addEventListener('change', (e) => {
+            node.rendering = node.rendering || {};
+            node.rendering.presentation = e.target.value || undefined;
+            updateFromPieces();
+          });
+
+          piece.querySelector('.move-up').addEventListener('click', () => {
+            if (index > 0) {
+              [articleNodes[index - 1], articleNodes[index]] = [articleNodes[index], articleNodes[index - 1]];
+              renderPieces();
+              updateFromPieces();
+            }
+          });
+
+          piece.querySelector('.move-down').addEventListener('click', () => {
+            if (index < articleNodes.length - 1) {
+              [articleNodes[index + 1], articleNodes[index]] = [articleNodes[index], articleNodes[index + 1]];
+              renderPieces();
+              updateFromPieces();
+            }
+          });
+
+          piece.querySelector('.duplicate-piece').addEventListener('click', () => {
+            const newNode = JSON.parse(JSON.stringify(node));
+            newNode.id = createOpaqueNodeId();
+            articleNodes.splice(index + 1, 0, newNode);
+            renderPieces();
+            updateFromPieces();
+          });
+
+          piece.querySelector('.remove-piece').addEventListener('click', () => {
+            if (articleNodes.length > 1) {
+              articleNodes.splice(index, 1);
+              renderPieces();
+              updateFromPieces();
+            }
+          });
+
+          fields.piecesContainer.appendChild(piece);
+        });
+      };
+
+      const updateFromPieces = () => {
+        const markdown = articleBodyToMarkdown({
+          schema_version: 'article_body.v1',
+          nodes: articleNodes
+        });
+        fields.content.value = markdown;
+        updatePreview();
+        updatePublishOutput();
+        setUnsavedChanges(true);
+      };
+
       const renderImages = () => {
         const previousFeaturedImage = fields.featuredImage.value;
         fields.imageList.innerHTML = '';
@@ -3354,6 +3733,12 @@ const metadata = {
       };
 
       const updatePreview = () => {
+        // Sync articleNodes with current content if nodes are empty
+        if (articleNodes.length === 0 && fields.content.value.trim()) {
+           articleNodes = [createLegacyBodyNode(fields.content.value)];
+           renderPieces();
+        }
+
         const featuredPath = getFeaturedImagePath();
         const imagePreviewUrl = getFeaturedImagePreviewUrl();
         const excerpt = fields.excerpt.value.trim();
@@ -3984,6 +4369,8 @@ const metadata = {
         fields.ctaText.value = '';
         fields.seoDescription.value = '';
         fields.overwrite.checked = false;
+        articleNodes = [];
+        renderPieces();
         selectedImages = [];
         stagedInlineMediaEntries = [];
         syncImageNames();
@@ -4195,7 +4582,18 @@ const metadata = {
         fields.category.value = article.category || '';
         fields.tags.value = Array.isArray(article.tags) ? article.tags.join(', ') : article.tags || '';
         fields.draft.checked = Boolean(article.draft);
-        fields.content.value = article.content || '';
+
+        // Handle article_body pieces
+        const articleBody = article.content?.article_body || article.article_body;
+        if (articleBody && Array.isArray(articleBody.nodes)) {
+          articleNodes = articleBody.nodes;
+          renderPieces();
+          fields.content.value = articleBodyToMarkdown(articleBody);
+        } else {
+          fields.content.value = article.content || '';
+          articleNodes = [createLegacyBodyNode(fields.content.value)];
+          renderPieces();
+        }
         fields.sources.value = Array.isArray(article.sources) ? article.sources.join('\n') : article.sources || '';
         fields.videoLink.value = article.videoLink || article.video || '';
         fields.ctaLink.value = article.ctaLink || '';
@@ -4550,7 +4948,16 @@ const metadata = {
         if (formData.author.exists) fields.author.value = formData.author.value;
         if (formData.excerpt.exists) fields.excerpt.value = formData.excerpt.value;
         if (formData.seoDescription.exists) fields.seoDescription.value = formData.seoDescription.value;
-        if (formData.content.exists) fields.content.value = formData.content.value;
+        if (formData.content.exists) {
+          fields.content.value = formData.content.value;
+          // Sync pieces from imported content
+          if (formData.articleBody?.exists && Array.isArray(formData.articleBody.value?.nodes)) {
+            articleNodes = formData.articleBody.value.nodes;
+          } else {
+            articleNodes = [createLegacyBodyNode(fields.content.value)];
+          }
+          renderPieces();
+        }
         if (formData.tags.exists) fields.tags.value = formData.tags.value;
         if (formData.sources.exists) fields.sources.value = formData.sources.value;
 
@@ -5486,6 +5893,20 @@ const metadata = {
         resetPublisherForm();
       };
 
+      fields.addPiece.addEventListener('click', () => {
+        articleNodes.push(createDefaultNodeFromTemplate('prose_section'));
+        renderPieces();
+        updateFromPieces();
+      });
+
+      fields.convertToPieces.addEventListener('click', () => {
+        if (fields.content.value.trim()) {
+          articleNodes = [createLegacyBodyNode(fields.content.value)];
+          renderPieces();
+          updateFromPieces();
+        }
+      });
+
       fields.newDraft.addEventListener('click', startNewDraft);
       fields.saveDraft.addEventListener('click', () => saveDraft());
       fields.refreshPreview.addEventListener('click', () => {
@@ -5665,6 +6086,10 @@ const metadata = {
               ctaLink: fields.ctaLink.value,
               ctaText: fields.ctaText.value,
               overwrite: fields.overwrite.checked,
+              article_body: {
+                schema_version: 'article_body.v1',
+                nodes: articleNodes
+              },
               requestId,
               request_id: requestId,
               lock_token: lockToken,

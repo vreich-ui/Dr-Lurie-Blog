@@ -188,6 +188,7 @@ export const articleBodyNodeSchema = z
       .optional(),
     rendering: articleRenderingHintsSchema.optional(),
     visibility: z.enum(['public', 'internal', 'hidden']).optional(),
+    templateId: z.string().optional(),
   })
   .strict();
 
