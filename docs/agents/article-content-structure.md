@@ -91,3 +91,12 @@ The schema defines *what* the content is and *how* it should be emphasized, but 
 1. **Node IDs**: Must be opaque stable IDs (e.g., `n_8f31a2`). They **must not** include descriptive strategy words like `hook`, `agitation`, `cta`, `advert`, `offer`, etc.
 2. **Required Nodes**: At least one node must be present in the `nodes` array.
 3. **Kind**: Each node must have a valid `kind` (`content`, `action`, `placement`, `interactive`, `reference`).
+
+## Input Templates (Editor/Agent Help)
+
+To assist editors and agents in creating structured content, the system provides **Input Templates**.
+
+- **Purpose**: Templates act as blueprints for common node types (e.g., `prose_section`, `commerce_offer`, `faq`).
+- **Input Helpers Only**: These templates are strictly helpers for data entry. They are **not** UI component references or widget names.
+- **Data Independence**: A node created from a `commerce_offer` template is just a `placement` kind node with specific public and commercial metadata. The frontend decides how to render it based on its `kind` and `rendering.presentation` hint, not by looking up the template ID.
+- **Opaque IDs**: All nodes generated from templates receive a stable, opaque ID (e.g., `n_8f31a2`) to ensure reader privacy and data independence.
