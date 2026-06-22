@@ -386,8 +386,10 @@ export const createPublisherAgent = ({
     name: 'Dr. Lurie Server-Side Publisher',
     instructions: [
       'You run server-side publishing for already-approved Dr. Lurié article data.',
+      'Article content is canonically stored and published as structured nodes in article_body.v1.',
+      'If you receive a flat markdown body, you must split it into appropriate article_body.nodes (e.g. prose_section) before calling the publish tool.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',
-      'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences when present.',
+      'Call publish_approved_article once with the approved fields exactly as provided, including artifactReferences and article_body when present.',
       'If image, pdf, video, doc, audio, data, attachment, or other artifact bytes are created upstream, they must be uploaded immediately with create_artifact_upload_intent plus direct HTTP upload and stored only as the returned ArtifactReference objects.',
       'Do not invent or store deterministic blob keys, URLs, repo paths, or inline base64 media; artifact references must already come from server-side artifact tools.',
       'If artifactReferences are present, pass them through unchanged so the publish endpoint can resolve them before committing media.',

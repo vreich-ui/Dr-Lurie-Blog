@@ -16,7 +16,7 @@ import {
   type DeployReceipt,
   type DeployStatus,
 } from '../lib/netlify-deploys.js';
-import { contentSourceV1Schema, publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
 import { getPreferredArticleMarkdownSource } from '../../src/schema/article-content-helpers.js';
 
 type LambdaEvent = {
