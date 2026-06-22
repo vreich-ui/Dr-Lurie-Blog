@@ -134,13 +134,13 @@ test('admin JSON draft save rejects structured bodies without meaningful public 
           schema_version: 'article_body.v1',
           nodes: [
             {
-              id: 'nempty',
+              id: 'n_empty',
               kind: 'content',
               public: { body: '   ' },
               visibility: 'public',
             },
             {
-              id: 'ninternal',
+              id: 'n_internal',
               kind: 'content',
               public: { body: 'Internal planning notes.' },
               visibility: 'internal',
@@ -171,7 +171,7 @@ test('admin JSON draft save accepts structured bodies with meaningful public rea
           schema_version: 'article_body.v1',
           nodes: [
             {
-              id: 'nvisible',
+              id: 'n_visible',
               kind: 'content',
               public: { body: 'Reader-facing structured body.' },
               visibility: 'public',
