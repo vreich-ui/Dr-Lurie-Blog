@@ -40,7 +40,7 @@ export interface ArticleNodeTemplate {
 export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
   prose_section: {
     id: 'prose_section',
-    name: 'Prose Section',
+    name: 'Text',
     description: 'A standard section of text with an optional title.',
     kind: 'content',
     fields: {
@@ -122,7 +122,7 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
   },
   soft_action: {
     id: 'soft_action',
-    name: 'Soft Action',
+    name: 'Action',
     description: 'An inline call to action with optional text.',
     kind: 'action',
     fields: {
@@ -286,16 +286,19 @@ export function getArticleNodeTemplate(templateId: string): ArticleNodeTemplate 
 /**
  * Creates a valid article node based on a template.
  */
-export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNode & { templateId: string } {
+export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNode {
   const template = getArticleNodeTemplate(templateId);
   if (!template) {
     throw new Error(`Template not found: ${templateId}`);
   }
 
-  const node: ArticleBodyNode & { templateId: string } = {
+  const node: ArticleBodyNode = {
     ...JSON.parse(JSON.stringify(template.defaults)),
     id: createOpaqueNodeId(),
-    templateId
+    private: {
+      ...(template.defaults.private || {}),
+      inputTemplateId: templateId
+    }
   };
 
   // Double-check validation
@@ -310,24 +313,29 @@ export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNo
 /**
  * Creates a legacy content node from a markdown string.
  */
-export function createLegacyBodyNode(markdown: string): ArticleBodyNode & { templateId: string } {
+export function createLegacyBodyNode(markdown: string): ArticleBodyNode {
   return {
     id: createOpaqueNodeId(),
-    templateId: 'prose_section',
     kind: 'content',
     public: {
-      body: markdown
+      body: markdown.trim()
+    },
+    private: {
+      inputTemplateId: 'prose_section'
     },
     rendering: {
-      presentation: 'plain'
-    }
-  } as ArticleBodyNode & { templateId: string };
+      presentation: 'section'
+    },
+    visibility: 'public'
+  };
 }
 
 /**
  * Infers the closest matching template ID for a node that lacks one.
  */
 export function inferTemplateId(node: Partial<ArticleBodyNode>): string {
+  if (node.private?.inputTemplateId) return node.private.inputTemplateId;
+
   if (node.rendering?.presentation === 'faq') return 'faq';
   if (node.rendering?.presentation === 'summary') return 'summary';
   if (node.rendering?.presentation === 'offerCard') return 'commerce_offer';

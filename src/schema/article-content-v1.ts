@@ -84,6 +84,7 @@ export const articlePrivateMetadataSchema = z
     intent: z.enum(['educate', 'persuade', 'reassure', 'convert', 'navigate']).optional(),
     agentNotes: z.string().optional(),
     sourcePromptId: z.string().optional(),
+    inputTemplateId: z.string().optional(),
   })
   .strict();
 
@@ -193,17 +194,6 @@ export const articleBodyNodeSchema = z
   .strict();
 
 export type ArticleBodyNode = z.infer<typeof articleBodyNodeSchema>;
-
-/**
- * A reference to another node by its ID.
- */
-export const articleBodyNodeRefSchema = z
-  .object({
-    ref_id: z.string(),
-  })
-  .strict();
-
-export type ArticleBodyNodeRef = z.infer<typeof articleBodyNodeRefSchema>;
 
 /**
  * The root container for structured article content.
