@@ -942,6 +942,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'save_json_blob_publish_article_now',
+    description:
+      'Promote a content_source.v1 article draft to publication.publication_status: ready, publish it immediately through the existing secure article publisher, then mark workflow_status: published only after successful publish. Requires checkout lock_token. Server-only publish credentials are never accepted as inputs or returned.',
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema(),
+        expected_record_version: intSchema(
+          'Optional workflow record version that should be visible before marking published.'
+        ),
+        lock_token: lockTokenSchema,
+      },
+      ['request_id', 'lock_token']
+    ),
+  },
+  {
     name: 'save_json_blob_publish_scheduled',
     description:
       'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, and publication.scheduled_for due now or in the short server due window. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
@@ -1503,6 +1518,89 @@ const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string,
   }
 
   return toolResult(body);
+};
+
+const omitStructuredArticleBodyForPublish = (payload: Record<string, unknown>) => {
+  const { article_body, ...publishPayload } = payload;
+  void article_body;
+  return publishPayload;
+};
+
+const callPublishArticleNow = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const requestId = toNonEmptyString(input.request_id);
+  const lockToken = toNonEmptyString(input.lock_token);
+  if (!requestId || !lockToken) return toolError('request_id and lock_token are required.');
+
+  const getResult = await invokeSaveJsonBlob(event, { action: 'get_request', request_id: requestId });
+  if ('isError' in getResult) return getResult;
+
+  const record = getRecordValue(getResult.record);
+  const recordInput = getRecordValue(record?.input);
+  if (recordInput?.record_type !== 'content_source' || recordInput?.schema_version !== 'content_source.v1') {
+    return toolError('Publish-now requires a content_source.v1 workflow record.', {
+      error_code: 'invalid_workflow_record_type',
+      record_type: recordInput?.record_type,
+      schema_version: recordInput?.schema_version,
+    });
+  }
+
+  const publication = getRecordValue(recordInput.publication);
+  const existingPayload = getRecordValue(publication?.publish_payload);
+
+  const prepareResult = await invokeSaveJsonBlob(event, {
+    action: 'prepare_publish_now',
+    request_id: requestId,
+    expected_record_version: input.expected_record_version,
+    lock_token: lockToken,
+    publish_payload: existingPayload,
+  });
+  if ('isError' in prepareResult) return prepareResult;
+
+  const publishPayload = getRecordValue(prepareResult.publish_payload);
+  if (!publishPayload) {
+    return toolError('Prepared workflow did not return a publish payload.', {
+      error_code: 'missing_prepared_publish_payload',
+    });
+  }
+
+  const publishResult = await callPublishArticle(event, {
+    ...omitStructuredArticleBodyForPublish(publishPayload),
+    requestId,
+    request_id: requestId,
+    lock_token: lockToken,
+  });
+
+  if (!publishResult.ok) {
+    return toolError('Article was not published.', {
+      error_code: 'publish_now_failed',
+      publish_status: publishResult.statusCode,
+      publish_result: publishResult.body,
+    });
+  }
+
+  const commitMetadata = {
+    commit: publishResult.body.commit,
+    articlePath: publishResult.body.articlePath ?? publishResult.body.path,
+    deployStatus: publishResult.body.deployStatus,
+    message: publishResult.body.message,
+    publish_now: true,
+  };
+
+  const markResult = await invokeSaveJsonBlob(event, {
+    action: 'mark_published',
+    request_id: requestId,
+    expected_record_version: input.expected_record_version,
+    lock_token: lockToken,
+    commit_metadata: commitMetadata,
+  });
+
+  if ('isError' in markResult) return markResult;
+
+  return toolResult({
+    record: markResult.record,
+    publish_result: publishResult.body,
+    commit_metadata: commitMetadata,
+  });
 };
 
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
@@ -2685,6 +2783,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         },
         'record'
       );
+    case 'save_json_blob_publish_article_now':
+      return callPublishArticleNow(event, input);
     case 'save_json_blob_publish_scheduled':
       return callScheduledPublish(event, input);
     case 'deploy_status':

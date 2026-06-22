@@ -15,6 +15,7 @@
  * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
  * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
  * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
+ * - prepare_publish_now: { "action": "prepare_publish_now", "request_id": "req_123", "lock_token": "lock_123", "publish_payload": { "slug": "example", "title": "Example", "author": "Dr. Lurie", "markdown": "Body" } }
  * - mark_published: { "action": "mark_published", "request_id": "req_123", "expected_record_version": 4, "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
@@ -30,6 +31,7 @@ import {
   type AllowedAgentName,
   type WorkflowStatus,
 } from '../../src/schema/workflow-contract.js';
+import { getPreferredArticleMarkdownSource } from '../../src/schema/article-content-helpers.js';
 import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
@@ -115,6 +117,7 @@ const requestSchema = z
       'refresh_lock',
       'checkin_request',
       'force_unlock',
+      'prepare_publish_now',
       'mark_published',
     ]),
     request_id: z.string().min(1).optional(),
@@ -147,6 +150,7 @@ const requestSchema = z
     deployStatus: z.string().min(1).optional(),
     message: z.string().min(1).optional(),
     validation_mode: z.enum(['admin_publish_draft']).optional(),
+    publish_payload: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 
@@ -1552,6 +1556,157 @@ const loadRecordReadyForPublish = async (store: WorkflowBlobStore, body: Workflo
   return { record: preferredRecord };
 };
 
+const slugifyPublishTitle = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'article';
+
+const normalizePublishNowPayload = (input: ContentSourceV1, rawPayload: unknown) => {
+  const publication = input.publication ?? {};
+  const previousPayload: Partial<PublishPayload> = publication.publish_payload ?? {};
+  const incomingPayload: Record<string, unknown> = isRecordValue(rawPayload) ? rawPayload : {};
+  const title =
+    nonEmptyText(incomingPayload.title) ?? nonEmptyText(previousPayload.title) ?? nonEmptyText(input.content?.title);
+  const slug =
+    nonEmptyText(incomingPayload.slug) ??
+    nonEmptyText(previousPayload.slug) ??
+    (title ? slugifyPublishTitle(title) : undefined);
+  const author = nonEmptyText(incomingPayload.author) ?? nonEmptyText(previousPayload.author);
+  const markdown = getPreferredArticleMarkdownSource({
+    ...input,
+    publication: {
+      ...publication,
+      publish_payload: { ...previousPayload, ...incomingPayload } as PublishPayload,
+    },
+  });
+
+  const issues: AdminPublishDraftIssue[] = [];
+  if (!slug)
+    issues.push({
+      path: ['publication', 'publish_payload', 'slug'],
+      message: 'Publish-now requires a slug or content.title.',
+    });
+  if (!title)
+    issues.push({
+      path: ['publication', 'publish_payload', 'title'],
+      message: 'Publish-now requires a title or content.title.',
+    });
+  if (!author)
+    issues.push({ path: ['publication', 'publish_payload', 'author'], message: 'Publish-now requires an author.' });
+  if (!markdown) {
+    issues.push({
+      path: ['publication', 'publish_payload', 'markdown'],
+      message:
+        'Publish-now requires content.article_body or legacy fallback body text at publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown.',
+    });
+  }
+
+  if (issues.length > 0) return { ok: false as const, issues };
+
+  const publishPayload: PublishPayload = {
+    ...previousPayload,
+    ...incomingPayload,
+    slug: slug!,
+    title: title!,
+    author: author!,
+    markdown: markdown!,
+  } as PublishPayload;
+
+  return { ok: true as const, publishPayload };
+};
+
+export const preparePublishNow = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  const requestId = body.request_id as string;
+  const previousRecord = body.lock_token
+    ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
+    : await loadRecord(store, requestId);
+  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+  const lockFailure = validateMutationLock(previousRecord, body);
+  if (lockFailure) return lockFailure;
+
+  if (
+    previousRecord.input.record_type !== 'content_source' ||
+    previousRecord.input.schema_version !== 'content_source.v1'
+  ) {
+    return jsonResponse(409, {
+      action: body.action,
+      conflict: true,
+      error: 'Publish-now requires a content_source.v1 workflow record.',
+    });
+  }
+
+  const normalized = normalizePublishNowPayload(previousRecord.input, body.publish_payload);
+  if (!normalized.ok) {
+    return jsonResponse(400, {
+      action: body.action,
+      error: 'Invalid publish-now payload.',
+      issues: normalized.issues,
+    });
+  }
+
+  const timestamp = nowIso();
+  const completedAgents: WorkflowRecord['completed_agents'] = previousRecord.completed_agents.includes('final_article')
+    ? previousRecord.completed_agents
+    : [...previousRecord.completed_agents, 'final_article'];
+  const existingFinalOutput = previousRecord.agent_outputs.final_article;
+  const nextRecord: WorkflowRecord = preserveAgentOutputs(
+    {
+      ...previousRecord,
+      updated_at: timestamp,
+      workflow_status: 'completed',
+      current_stage: null,
+      next_agent: null,
+      completed_agents: completedAgents,
+      failed_agents: previousRecord.failed_agents.filter((agent) => agent !== 'final_article'),
+      input: {
+        ...previousRecord.input,
+        publication: {
+          ...(previousRecord.input.publication ?? {}),
+          schema_version: 'publication.v1',
+          publication_status: 'ready',
+          publish_payload: normalized.publishPayload,
+        },
+      },
+      agent_outputs: {
+        ...previousRecord.agent_outputs,
+        final_article: existingFinalOutput ?? {
+          version: 1,
+          updated_at: timestamp,
+          output: { publish_payload: normalized.publishPayload },
+          expected_agent_version: 0,
+        },
+      },
+      history: [
+        ...previousRecord.history,
+        {
+          at: timestamp,
+          action: body.action,
+          agent_name: 'final_article',
+          details: {
+            owner_id: previousRecord.lock?.owner_id,
+            owner_label: previousRecord.lock?.owner_label,
+            publication_status: 'ready',
+          },
+        },
+      ],
+      version: previousRecord.version + 1,
+    },
+    previousRecord
+  );
+
+  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
+
+  return jsonResponse(200, { action: body.action, record: savedRecord, publish_payload: normalized.publishPayload });
+};
+
 export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
@@ -1630,6 +1785,8 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
       return checkinRequest(store, body);
     case 'force_unlock':
       return forceUnlock(store, body);
+    case 'prepare_publish_now':
+      return preparePublishNow(store, body);
     case 'mark_published':
       return markPublished(store, body);
   }
