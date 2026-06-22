@@ -20,3 +20,10 @@ The canonical workflow contract lives in `src/schema/workflow-contract.ts`. Use 
 - `ArtifactReference` is immutable: `blobKey`, `sha256`, `sizeBytes`, `contentType`, and `createdAtISO` describe one uploaded byte sequence.
 - Regeneration means a new upload and a new reference.
 - Publication must use current MCP state, not stale local guesses.
+
+## Publication status semantics
+
+- `publication_status: "draft"` means the article payload is not publishable yet.
+- `publication_status: "ready"` means publish now through the immediate publishing path.
+- `publication_status: "scheduled"` plus `scheduled_for` means publish later through the due scheduled-publish path.
+- `workflow_status: "published"` is set only after actual successful publish.

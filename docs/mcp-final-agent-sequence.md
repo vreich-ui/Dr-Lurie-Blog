@@ -2,7 +2,7 @@
 
 ## Decision: MCP marks publication state only
 
-The production MCP endpoint should expose workflow-state tools, not a tool that directly invokes article publishing. The final article agent must prepare and validate the article, then either hand the payload to the existing server-side publishing path or receive commit/deploy metadata from a trusted server-side publish process. After that publish step has succeeded or been handed off, MCP records the state transition with `save_json_blob_mark_published`.
+The production MCP endpoint exposes workflow-state tools plus a minimal immediate-publish wrapper for approved `content_source.v1` article drafts. The final article agent must prepare and validate the article, then either call `save_json_blob_publish_article_now` for `publication_status: "ready"`, use the due scheduled-publish path for `publication_status: "scheduled"`, or hand the payload to another trusted server-side publishing process. After an actual successful publish, MCP records the state transition with `save_json_blob_mark_published`.
 
 This separation keeps publication credentials in server-only runtimes, avoids adding publish credentials to MCP tool schemas or model-facing instructions, and preserves the existing `publish-article` Netlify Function as the single place that performs repository writes.
 
@@ -15,6 +15,13 @@ This separation keeps publication credentials in server-only runtimes, avoids ad
 3. **Re-fetch artifact state, then publish or hand off.** MCP does not publish directly. Before publication, re-fetch the current workflow/request state and use the latest immutable `ArtifactReference` objects; do not publish with stale, guessed, or model-generated blob keys. A trusted server-side process may read `record.input.publication.publish_payload` or the final article output, validate it again, resolve `artifactReferences` to media bytes in the existing publishing endpoint with server-only credentials, and return commit/deploy metadata. If publishing is handled outside the agent runtime, hand off the payload and wait for the same metadata.
 4. **Mark published.** With the workflow lock still held, call `save_json_blob_mark_published` with `request_id`, `lock_token`, and `commit_metadata`. The tool forwards `mark_published` to `save-json-blob.ts` and returns the updated workflow record with `workflow_status: "published"`.
 5. **Check in.** Release the workflow lock with `save_json_blob_checkin_request` after the record is marked published.
+
+## Publication status semantics
+
+- `publication_status: "draft"` means the payload is not publishable yet.
+- `publication_status: "ready"` means publish now using `save_json_blob_publish_article_now` or the existing immediate publish path.
+- `publication_status: "scheduled"` with `scheduled_for` means publish later through the scheduled-publish path when due.
+- `workflow_status: "published"` is set only after an actual successful publish.
 
 ## `save_json_blob_mark_published` inputs
 
