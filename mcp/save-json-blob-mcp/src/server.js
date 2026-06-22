@@ -250,19 +250,43 @@ export const createServer = () => {
     'save_json_blob_create_request',
     {
       description:
-        'Create a save-json-blob workflow request and return its record. MCP-created admin-publish article drafts should pass validation_mode: "admin_publish_draft" so the backend rejects skeletal drafts before workflow creation.',
+        'Create a save-json-blob workflow request and return its record. MCP-created admin-publish article drafts should pass validation_mode: "admin_publish_draft". Prefer input.content.article_body with schema_version "article_body.v1" and nodes[] containing at least one public node; publication.publish_payload.markdown is a generated legacy fallback and node.private is internal only.',
       inputSchema: {
         input: z.any(),
         request_id: z.string().min(1).optional(),
         validation_mode: z
           .enum(['admin_publish_draft'])
           .optional()
-          .describe('Required validation mode for MCP-created admin-publish article drafts.'),
+          .describe(
+            'Required validation mode for MCP-created admin-publish article drafts. Prefer content.article_body; legacy markdown/content fields remain fallback.'
+          ),
       },
     },
     async ({ input, request_id, validation_mode }) =>
       callAction(
         { action: 'create_request', input, request_id: request_id ?? createRequestId(), validation_mode },
+        'record'
+      )
+  );
+
+  server.registerTool(
+    'save_json_blob_create_article_draft',
+    {
+      description:
+        'Helper for agents creating structured admin-publish drafts. Wraps save_json_blob_create_request with validation_mode: "admin_publish_draft". Use input.content.article_body.schema_version = "article_body.v1" and input.content.article_body.nodes[] with at least one public node; node.private is internal only and never visible copy.',
+      inputSchema: {
+        input: z.any(),
+        request_id: z.string().min(1).optional(),
+      },
+    },
+    async ({ input, request_id }) =>
+      callAction(
+        {
+          action: 'create_request',
+          input,
+          request_id: request_id ?? createRequestId(),
+          validation_mode: 'admin_publish_draft',
+        },
         'record'
       )
   );

@@ -15,6 +15,7 @@ Agent Builder expects underscore-only tool names. Use the registered underscore-
 Core registered tool names:
 
 - `save_json_blob_create_request`
+- `save_json_blob_create_article_draft`
 - `save_json_blob_get_request`
 - `save_json_blob_list_pending_requests`
 - `save_json_blob_patch_agent_output`
@@ -29,10 +30,12 @@ For full tool schemas, versioning rules, helper tool names, and sample calls, se
 
 For MCP-created admin-publish article drafts, call `save_json_blob_create_request` with `validation_mode: "admin_publish_draft"`. The backend then validates the `content_source.v1` input before writing a workflow record. Agents should provide:
 
+- Preferred structured body at `content.article_body.schema_version = "article_body.v1"` and `content.article_body.nodes[]` with at least one public node.
 - `publication.publish_payload.slug` (the current validator can still compute a slug from `content.title` for backwards compatibility).
 - `publication.publish_payload.title` (the current validator can still use `content.title` for backwards compatibility).
 - `publication.publish_payload.author`.
-- Body markdown/content in the implemented precedence order: `publication.publish_payload.markdown`, then `publication.publish_payload.content`, then `editorial.draft_markdown`, then markdown blocks in `content.blocks` where `block_type === "markdown"`.
+- Legacy body fallback, when structured body is unavailable or a legacy publishing path needs generated Markdown: `publication.publish_payload.markdown`, then `publication.publish_payload.content`, then `editorial.draft_markdown`, then markdown blocks in `content.blocks` where `block_type === "markdown"`. Treat `publication.publish_payload.markdown` as generated fallback from `content.article_body`, not the preferred source.
+- Visible copy in `article_body.nodes[].public`. `article_body.nodes[].private` is internal only and must never be used as visible copy.
 
 Keep workflow/routing fields such as `current_agent`, `next_agent`, and `workflow.workflow_id` optional unless the backend validator starts requiring them.
 
@@ -74,7 +77,7 @@ Remote endpoints:
 
 If you set `MCP_HTTP_PATH`, connect Agent Builder to `https://<your-public-host><MCP_HTTP_PATH>` instead of `/mcp`. If you set `MCP_HTTP_HEALTH_PATH`, use that path instead of `/health` for health checks.
 
-The HTTP transport is stateless Streamable HTTP. Each MCP POST request receives a fresh `createServer()` instance with the same 16 registered tool names used by the stdio server.
+The HTTP transport is stateless Streamable HTTP. Each MCP POST request receives a fresh `createServer()` instance with the same registered tool names used by the stdio server.
 
 Optional remote access token:
 
@@ -140,3 +143,5 @@ The server maps backend non-2xx responses to tool errors without exposing respon
 - Other non-2xx responses -> `HTTP <status>: <raw response text>`
 
 For unmapped statuses, the raw backend response text is intentionally surfaced for debugging. Avoid returning secrets or sensitive details from the backend response body because the MCP tool error will show that text to the agent client.
+
+For copy/paste `article_body.v1` agent examples, see [`../../docs/agents/mcp-article-body-v1.md`](../../docs/agents/mcp-article-body-v1.md).
