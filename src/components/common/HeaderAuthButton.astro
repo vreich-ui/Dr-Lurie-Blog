@@ -404,8 +404,9 @@ const authRootAttributes = {
             return;
           }
 
+          const willOpen = trigger.getAttribute('aria-expanded') !== 'true';
           closeAllMenus();
-          setMenuOpen(root, true);
+          setMenuOpen(root, willOpen);
           renderAuthState().catch((error) => {
             console.error('Header authentication refresh failed.', error);
           });
@@ -443,7 +444,7 @@ const authRootAttributes = {
         if (!root) closeAllMenus();
       });
 
-      document.addEventListener('mouseover', (event) => {
+      const handleAuthPointerEnter = (event) => {
         const target = event.target instanceof Element ? event.target : undefined;
         const root = target?.closest('[data-header-auth]');
         const trigger = target?.closest('[data-auth-trigger]');
@@ -453,9 +454,9 @@ const authRootAttributes = {
 
         clearAuthMenuCloseTimer();
         setMenuOpen(root, true);
-      });
+      };
 
-      document.addEventListener('mouseout', (event) => {
+      const handleAuthPointerLeave = (event) => {
         const target = event.target instanceof Element ? event.target : undefined;
         const root = target?.closest('[data-header-auth]');
         const nextTarget = event.relatedTarget;
@@ -464,7 +465,10 @@ const authRootAttributes = {
         if (nextTarget instanceof Node && root.contains(nextTarget)) return;
 
         scheduleAuthMenuClose(root);
-      });
+      };
+
+      document.addEventListener('pointerover', handleAuthPointerEnter);
+      document.addEventListener('pointerout', handleAuthPointerLeave);
 
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeAllMenus();
