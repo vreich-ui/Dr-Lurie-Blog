@@ -1,9 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  articleBodyToMarkdown,
-  normalizeArticleBodyFromLegacy
-} from './to-markdown.ts';
+import { articleBodyToMarkdown, normalizeArticleBodyFromLegacy } from './to-markdown.ts';
 import type { ArticleBodyV1 } from '../../schema/article-content-v1.ts';
 import { assertReaderSafe } from './assert-reader-safe.ts';
 
@@ -16,9 +13,9 @@ describe('Article Body Serialization and Safety', () => {
           {
             id: 'n_1',
             kind: 'content',
-            public: { title: 'Public Title', body: 'Public Body' }
-          }
-        ]
+            public: { title: 'Public Title', body: 'Public Body' },
+          },
+        ],
       };
       const md = articleBodyToMarkdown(body);
       assert.ok(md.includes('### Public Title'));
@@ -33,21 +30,21 @@ describe('Article Body Serialization and Safety', () => {
             id: 'n_hidden',
             kind: 'content',
             public: { body: 'Hidden Body' },
-            visibility: 'hidden'
+            visibility: 'hidden',
           },
           {
             id: 'n_internal',
             kind: 'content',
             public: { body: 'Internal Body' },
-            visibility: 'internal'
+            visibility: 'internal',
           },
           {
             id: 'n_public',
             kind: 'content',
             public: { body: 'Visible Body' },
-            visibility: 'public'
-          }
-        ]
+            visibility: 'public',
+          },
+        ],
       };
       const md = articleBodyToMarkdown(body);
       assert.ok(!md.includes('Hidden Body'));
@@ -66,10 +63,10 @@ describe('Article Body Serialization and Safety', () => {
             private: {
               strategy: 'hook',
               agentNotes: 'Secret strategy',
-              inputTemplateId: 'prose_section'
-            }
-          }
-        ]
+              inputTemplateId: 'prose_section',
+            },
+          },
+        ],
       };
       const md = articleBodyToMarkdown(body);
       assert.ok(md.includes('Visible content'));
@@ -89,11 +86,11 @@ describe('Article Body Serialization and Safety', () => {
             commercial: {
               disclosure: {
                 required: true,
-                label: 'Partner Content'
-              }
-            }
-          }
-        ]
+                label: 'Partner Content',
+              },
+            },
+          },
+        ],
       };
       const md = articleBodyToMarkdown(body);
       assert.ok(md.includes('*Partner Content*'));
@@ -109,10 +106,10 @@ describe('Article Body Serialization and Safety', () => {
             kind: 'content',
             public: {
               title: 'Alt Text',
-              media: 'src/assets/images/test.jpg'
-            }
-          }
-        ]
+              media: 'src/assets/images/test.jpg',
+            },
+          },
+        ],
       };
       const md = articleBodyToMarkdown(body);
       assert.ok(md.includes('![Alt Text](~/assets/images/test.jpg)'));
@@ -126,6 +123,7 @@ describe('Article Body Serialization and Safety', () => {
       assert.strictEqual(body.nodes.length, 1);
       assert.strictEqual(body.nodes[0].public.body, markdown);
       assert.strictEqual(body.nodes[0].visibility, 'public');
+      assert.match(body.nodes[0].id, /^n_[a-z0-9]+$/);
     });
   });
 

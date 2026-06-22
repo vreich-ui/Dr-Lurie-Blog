@@ -1,7 +1,4 @@
-import {
-  type ArticleBodyV1,
-  type ArticleBodyNode,
-} from '../../schema/article-content-v1.ts';
+import { type ArticleBodyV1, type ArticleBodyNode } from '../../schema/article-content-v1.ts';
 
 /**
  * Serializes a structured article body into Markdown.
@@ -26,14 +23,14 @@ export function normalizeArticleBodyFromLegacy(markdown: string): ArticleBodyV1 
     schema_version: 'article_body.v1',
     nodes: [
       {
-        id: `n_legacy_${Math.random().toString(36).substring(2, 9)}`,
+        id: `n_legacy${Math.random().toString(36).substring(2, 9)}`,
         kind: 'content',
         public: {
-          body: markdown.trim()
+          body: markdown.trim(),
         },
-        visibility: 'public'
-      }
-    ]
+        visibility: 'public',
+      },
+    ],
   };
 }
 
@@ -75,7 +72,7 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
 
   // 3. Items rendering (list)
   if (Array.isArray(node.public?.items) && node.public.items.length > 0) {
-    const list = node.public.items.map(item => `- ${item}`).join('\n');
+    const list = node.public.items.map((item) => `- ${item}`).join('\n');
     parts.push(list);
   }
 
