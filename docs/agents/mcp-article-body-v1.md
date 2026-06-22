@@ -2,6 +2,13 @@
 
 Use this guide when creating admin-publish drafts through the Dr. Lurie MCP server.
 
+## Publication status semantics
+
+- `publication_status: "draft"` means the article payload is not publishable yet.
+- `publication_status: "ready"` means the article should be published now through the immediate publishing path.
+- `publication_status: "scheduled"` plus `scheduled_for` means the article should be published later by the due scheduled-publish path.
+- `workflow_status: "published"` is set only after an actual successful publish, never as a substitute for publishing.
+
 ## Preferred body field
 
 For new structured article drafts, put reader-facing content in:
