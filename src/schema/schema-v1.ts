@@ -56,6 +56,7 @@ export type PublishPayload = {
   title: string;
   markdown?: string;
   content?: string;
+  article_body?: ArticleBodyV1;
   description?: string;
   publishDate?: string;
   author?: string;
@@ -346,6 +347,7 @@ export const publishPayloadSchema = z
     title: z.string(),
     markdown: z.string().optional(),
     content: z.string().optional(),
+    article_body: articleBodyV1Schema.optional(),
     description: z.string().optional(),
     publishDate: z.string().optional(),
     author: z.string().optional(),
