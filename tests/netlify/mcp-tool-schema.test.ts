@@ -246,13 +246,8 @@ test('save_json_blob_publish_scheduled exposes gated scheduled publish inputs', 
   const tool = body.result.tools.find((item) => item.name === 'save_json_blob_publish_scheduled');
 
   assert.ok(tool, 'Expected save_json_blob_publish_scheduled to be registered.');
-  assert.deepEqual(tool.inputSchema.required, [
-    'request_id',
-    'lock_token',
-    'scheduled_publish_token',
-    'agent_id',
-    'agent_owner',
-  ]);
+  assert.deepEqual(tool.inputSchema.required, ['request_id', 'lock_token', 'agent_id', 'agent_owner']);
+  assert.equal(property(tool.inputSchema, 'scheduled_publish_token'), undefined);
   assert.ok(property(tool.inputSchema, 'expected_record_version'));
   assert.ok(property(tool.inputSchema, 'agent_label'));
   assert.match(String((tool as { description?: string }).description), /publication\.publication_status: scheduled/);

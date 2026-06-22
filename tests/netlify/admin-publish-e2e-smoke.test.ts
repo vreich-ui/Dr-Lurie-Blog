@@ -314,7 +314,6 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
 test('scheduled publish tool publishes due scheduled records and returns not-due reasons for future records', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
-  process.env.SCHEDULED_PUBLISH_TOKEN = 'scheduled-publish-test-token';
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
   process.env.GITHUB_CONTENT_TOKEN = 'github-scheduled-smoke-token';
@@ -383,7 +382,6 @@ test('scheduled publish tool publishes due scheduled records and returns not-due
     request_id: requestId,
     expected_record_version: completeRecord.version,
     lock_token: lockToken,
-    scheduled_publish_token: 'scheduled-publish-test-token',
     agent_id: 'agent-scheduled-smoke',
     agent_owner: 'QA',
   });
@@ -403,7 +401,6 @@ test('scheduled publish tool publishes due scheduled records and returns not-due
       request_id: requestId,
       expected_record_version: completeRecord.version,
       lock_token: lockToken,
-      scheduled_publish_token: 'scheduled-publish-test-token',
       agent_id: 'agent-scheduled-smoke',
       agent_owner: 'QA',
       agent_label: 'Scheduled Smoke Agent',
