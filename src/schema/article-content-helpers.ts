@@ -1,5 +1,6 @@
 import type { ContentSourceV1 } from './schema-v1.js';
 import type { ArticleBodyV1 } from './article-content-v1.js';
+import { articleBodyToMarkdown } from '../lib/article-content/to-markdown.js';
 
 /**
  * Checks if the content source has a structured article body with at least one node.
@@ -49,14 +50,7 @@ export function createArticleBodyFromLegacyMarkdown(
 export function getPreferredArticleMarkdownSource(input: ContentSourceV1): string | undefined {
   // 1. Structured Article Body
   if (hasStructuredArticleBody(input)) {
-    const nodes = input.content!.article_body!.nodes;
-    const contentParts = nodes
-      .filter((node) => node.public.body)
-      .map((node) => node.public.body);
-
-    if (contentParts.length > 0) {
-      return contentParts.join('\n\n');
-    }
+    return articleBodyToMarkdown(input.content!.article_body!);
   }
 
   // 2. Publication Payload Markdown

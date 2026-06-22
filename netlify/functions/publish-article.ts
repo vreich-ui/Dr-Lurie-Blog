@@ -16,7 +16,8 @@ import {
   type DeployReceipt,
   type DeployStatus,
 } from '../lib/netlify-deploys.js';
-import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
+import { contentSourceV1Schema, publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { getPreferredArticleMarkdownSource } from '../../src/schema/article-content-helpers.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -99,6 +100,7 @@ type PublishInput = {
   images?: unknown;
   mediaEntries?: unknown;
   artifactReferences?: unknown;
+  article_body?: unknown;
   metadata?: unknown;
   requestId?: unknown;
   request_id?: unknown;
@@ -507,6 +509,7 @@ const getPublishPayloadIssue = (
     images: Array.isArray(input.images) ? input.images : undefined,
     mediaEntries: Array.isArray(input.mediaEntries) ? input.mediaEntries : undefined,
     artifactReferences: Array.isArray(input.artifactReferences) ? input.artifactReferences : undefined,
+    article_body: input.article_body && typeof input.article_body === 'object' ? input.article_body : undefined,
     overwrite: toBooleanValue(input.overwrite),
     draft: toBooleanValue(input.draft),
     articlePath: toStringValue(input.articlePath),
@@ -1093,12 +1096,15 @@ export const handler = async (event: LambdaEvent) => {
   const slug = rawSlug ? slugify(rawSlug) : undefined;
   const markdownInput = toStringValue(input.markdown);
   const content = toStringValue(input.content);
+  const article_body = input.article_body && typeof input.article_body === 'object' ? input.article_body : undefined;
   const title = toStringValue(input.title);
   const publishDate = toStringValue(input.publishDate) ?? new Date().toISOString();
-  const isAgentPayload = Boolean(markdownInput || input.articlePath || input.images || input.commitMessage);
+  const isAgentPayload = Boolean(
+    markdownInput || input.articlePath || article_body || input.images || input.commitMessage
+  );
   const missing = [
     !slug ? 'slug' : undefined,
-    !markdownInput && !content ? (isAgentPayload ? 'markdown' : 'content') : undefined,
+    !markdownInput && !content && !article_body ? (isAgentPayload ? 'markdown' : 'content') : undefined,
     !markdownInput && !isAgentPayload && !title ? 'title' : undefined,
     !isAgentPayload && !publishDate ? 'publishDate' : undefined,
   ].filter(Boolean);
@@ -1186,10 +1192,33 @@ export const handler = async (event: LambdaEvent) => {
     await validateMediaEntries(entriesToValidate);
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
     const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
+
+    const tempContentSource: ContentSourceV1 = {
+      record_type: 'content_source',
+      schema_version: 'content_source.v1',
+      content: {
+        title,
+        article_body: article_body as any,
+      },
+      editorial: {
+        draft_markdown: markdownInput ?? content,
+      },
+      publication: {
+        publish_payload: {
+          slug: slug || '',
+          title: title || '',
+          markdown: markdownInput,
+          content,
+        },
+      },
+    };
+
+    const resolvedMarkdown = getPreferredArticleMarkdownSource(tempContentSource) || '';
+
     const rawMarkdown = buildFrontmatter({
       author: toStringValue(input.author),
       category: toStringValue(input.category),
-      content: markdownInput ?? content ?? '',
+      content: resolvedMarkdown,
       ctaLink: toStringValue(input.ctaLink),
       ctaText: toStringValue(input.ctaText),
       draft: toBooleanValue(input.draft),

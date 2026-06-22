@@ -1,6 +1,7 @@
 import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
 import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/publisher-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
+import { articleBodyV1Schema } from '../../src/schema/article-content-v1.js';
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
 
@@ -94,6 +95,7 @@ const publishToolInputSchema = z
     tags: z.array(z.string().trim().min(1)).optional(),
     images: z.array(publishImageSchema).optional(),
     artifactReferences: z.array(z.unknown()).optional(),
+    article_body: articleBodyV1Schema.optional(),
     overwrite: z.boolean().optional(),
   })
   .superRefine((value, ctx) => {
@@ -320,6 +322,7 @@ const createPublishTool = ({
         title,
         images: normalizedImages.length ? normalizedImages : [],
         artifactReferences,
+        article_body: parsed.article_body,
         commitMessage: `Publish article: ${title}`,
         overwrite: parsed.overwrite ?? defaultInput.overwrite,
       };
