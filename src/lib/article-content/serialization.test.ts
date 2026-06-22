@@ -1,123 +1,146 @@
 import { describe, it } from 'node:test';
-import assert from 'node:assert';
+import assert from 'node:assert/strict';
 import { articleBodyToMarkdown, normalizeArticleBodyFromLegacy } from './to-markdown.ts';
-import { assertReaderSafe } from './assert-reader-safe.ts';
 import type { ArticleBodyV1 } from '../../schema/article-content-v1.ts';
+import { assertReaderSafe } from './assert-reader-safe.ts';
 
-describe('Article Serialization & Safety', () => {
-  const complexArticle: ArticleBodyV1 = {
-    schema_version: 'article_body.v1',
-    nodes: [
-      {
-        id: 'n_1',
-        kind: 'content',
-        public: {
-          title: 'Welcome',
-          body: 'This is a great article.',
-        },
-        private: {
-          strategy: 'hook',
-          agentNotes: 'Make it catchy.',
-        },
-      },
-      {
-        id: 'n_2',
-        kind: 'content',
-        public: {
-          title: 'Another Section',
-          body: 'Still reading.',
-        },
-        private: {
-          strategy: 'explanation',
-        },
-      },
-      {
-        id: 'n_3',
-        kind: 'action',
-        public: {
-          ctaText: 'Buy Now',
-          ctaLink: 'https://example.com/buy',
-        },
-        commercial: {
-          type: 'offer',
-          disclosure: { required: true, label: 'Partner Offer', mode: 'section' },
-          offer: { couponCode: 'SAVE10' },
-        },
-        rendering: { presentation: 'offerCard' },
-      },
-      {
-        id: 'n_4',
-        kind: 'content',
-        public: { body: 'Hidden gem' },
-        visibility: 'hidden',
-      },
-    ],
-  };
+describe('Article Body Serialization and Safety', () => {
+  describe('articleBodyToMarkdown', () => {
+    it('should serialize public nodes with default visibility', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_1',
+            kind: 'content',
+            public: { title: 'Public Title', body: 'Public Body' },
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('### Public Title'));
+      assert.ok(md.includes('Public Body'));
+    });
 
-  it('serializes a multi-node body correctly', () => {
-    const markdown = articleBodyToMarkdown(complexArticle);
+    it('should skip hidden and internal nodes', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_hidden',
+            kind: 'content',
+            public: { body: 'Hidden Body' },
+            visibility: 'hidden',
+          },
+          {
+            id: 'n_internal',
+            kind: 'content',
+            public: { body: 'Internal Body' },
+            visibility: 'internal',
+          },
+          {
+            id: 'n_public',
+            kind: 'content',
+            public: { body: 'Visible Body' },
+            visibility: 'public',
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(!md.includes('Hidden Body'));
+      assert.ok(!md.includes('Internal Body'));
+      assert.ok(md.includes('Visible Body'));
+    });
 
-    assert.ok(markdown.includes('### Welcome'));
-    assert.ok(markdown.includes('This is a great article.'));
-    assert.ok(markdown.includes('### Another Section'));
-    assert.ok(markdown.includes('**[Buy Now](https://example.com/buy)**'));
-    assert.ok(markdown.includes('Partner Offer'));
-    assert.ok(markdown.includes('SAVE10'));
+    it('should never render private metadata or inputTemplateId', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_1',
+            kind: 'content',
+            public: { body: 'Visible content' },
+            private: {
+              strategy: 'hook',
+              agentNotes: 'Secret strategy',
+              inputTemplateId: 'prose_section',
+            },
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('Visible content'));
+      assert.ok(!md.includes('hook'));
+      assert.ok(!md.includes('Secret strategy'));
+      assert.ok(!md.includes('prose_section'));
+    });
+
+    it('should render visible commercial disclosure when required', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_1',
+            kind: 'placement',
+            public: { body: 'Sponsored offer' },
+            commercial: {
+              disclosure: {
+                required: true,
+                label: 'Partner Content',
+              },
+            },
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('*Partner Content*'));
+      assert.ok(md.includes('Sponsored offer'));
+    });
+
+    it('should render media as a markdown image', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_media',
+            kind: 'content',
+            public: {
+              title: 'Alt Text',
+              media: 'src/assets/images/test.jpg',
+            },
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('![Alt Text](~/assets/images/test.jpg)'));
+    });
   });
 
-  it('skips hidden nodes', () => {
-    const markdown = articleBodyToMarkdown(complexArticle);
-    assert.strictEqual(markdown.includes('Hidden gem'), false);
+  describe('normalizeArticleBodyFromLegacy', () => {
+    it('should normalize legacy markdown into a single public node', () => {
+      const markdown = 'Some legacy text';
+      const body = normalizeArticleBodyFromLegacy(markdown);
+      assert.strictEqual(body.nodes.length, 1);
+      assert.strictEqual(body.nodes[0].public.body, markdown);
+      assert.strictEqual(body.nodes[0].visibility, 'public');
+      assert.match(body.nodes[0].id, /^n_[a-z0-9]+$/);
+    });
   });
 
-  it('does not include private metadata in markdown', () => {
-    const markdown = articleBodyToMarkdown(complexArticle);
+  describe('assertReaderSafe', () => {
+    it('should catch leakage of private field names', () => {
+      const leaked = { title: 'Hello', private: { something: 'bad' } };
+      assert.throws(() => assertReaderSafe(leaked), /Found forbidden internal keyword "private"/);
+    });
 
-    assert.strictEqual(markdown.includes('hook'), false);
-    assert.strictEqual(markdown.includes('agentNotes'), false);
-    assert.strictEqual(markdown.includes('catchy'), false);
-  });
+    it('should catch technical metadata keys in markdown strings', () => {
+      const leakedMd = 'Some text with strategy: hook leakage';
+      assert.throws(() => assertReaderSafe(leakedMd), /Found forbidden internal keyword "strategy"/);
+    });
 
-  it('serializes inline offers differently from cards', () => {
-    const inlineOffer: ArticleBodyV1 = {
-      schema_version: 'article_body.v1',
-      nodes: [
-        {
-          id: 'n_5',
-          kind: 'content',
-          public: { body: 'Check this out.' },
-          commercial: { offer: { couponCode: 'INLINE5' } },
-          rendering: { presentation: 'offerInline' },
-        },
-      ],
-    };
-
-    const markdown = articleBodyToMarkdown(inlineOffer);
-    assert.ok(markdown.includes('Use code **INLINE5** to save!'));
-    assert.strictEqual(markdown.includes('Offer Details'), false);
-  });
-
-  it('assertReaderSafe fails on forbidden keywords', () => {
-    assert.throws(() => assertReaderSafe('This is a hook.'), /Reader safety violation/);
-    assert.throws(() => assertReaderSafe({ private: { strategy: 'hook' } }), /Reader safety violation/);
-  });
-
-  it('assertReaderSafe passes on safe content', () => {
-    assert.doesNotThrow(() => assertReaderSafe('This is perfectly safe content.'));
-    const safeMarkdown = articleBodyToMarkdown(complexArticle);
-    assert.doesNotThrow(() => assertReaderSafe(safeMarkdown));
-  });
-
-  it('normalizes legacy markdown correctly', () => {
-    const legacyMd = '# Legacy\n\nSome content';
-    const normalized = normalizeArticleBodyFromLegacy(legacyMd, 'Legacy Title');
-
-    assert.strictEqual(normalized.nodes.length, 1);
-    assert.strictEqual(normalized.nodes[0].public.title, 'Legacy Title');
-    assert.strictEqual(normalized.nodes[0].public.body, legacyMd);
-
-    const markdown = articleBodyToMarkdown(normalized);
-    assert.ok(markdown.includes('## Legacy Title'));
-    assert.ok(markdown.includes('# Legacy'));
+    it('should allow normal words like resolution', () => {
+      const safeMd = 'We achieved a high resolution image.';
+      assert.doesNotThrow(() => assertReaderSafe(safeMd));
+    });
   });
 });

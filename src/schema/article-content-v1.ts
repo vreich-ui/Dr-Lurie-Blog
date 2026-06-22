@@ -16,9 +16,7 @@ export const commercialMetadataSchema = z
         'housePromotion',
       ])
       .optional(),
-    source: z
-      .enum(['firstParty', 'sponsor', 'affiliate', 'partner', 'programmatic', 'directSold'])
-      .optional(),
+    source: z.enum(['firstParty', 'sponsor', 'affiliate', 'partner', 'programmatic', 'directSold']).optional(),
     sponsorName: z.string().optional(),
     advertiserName: z.string().optional(),
     merchantName: z.string().optional(),
@@ -50,7 +48,7 @@ export const commercialMetadataSchema = z
         adUnitPath: z.string().optional(),
         sizes: z.array(z.tuple([z.number(), z.number()])).optional(),
         lazyLoad: z.boolean().optional(),
-        targeting: z.record(z.union([z.string(), z.array(z.string())])).optional(),
+        targeting: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional(),
         fallbackNodeId: z.string().optional(),
       })
       .optional(),
@@ -84,6 +82,7 @@ export const articlePrivateMetadataSchema = z
     intent: z.enum(['educate', 'persuade', 'reassure', 'convert', 'navigate']).optional(),
     agentNotes: z.string().optional(),
     sourcePromptId: z.string().optional(),
+    inputTemplateId: z.string().optional(),
   })
   .strict();
 
@@ -126,7 +125,7 @@ export const articleChatConfigSchema = z
     promptOverride: z.string().optional(),
     welcomeMessage: z.string().optional(),
     suggestedQuestions: z.array(z.string()).optional(),
-    metadata: z.record(z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 
@@ -176,7 +175,7 @@ export const articleBodyNodeSchema = z
             'Node ID must be opaque and not contain strategy or commercial keywords (hook, agitation, cta, advert, offer, etc.)',
         }
       ),
-    kind: z.enum(['content', 'action', 'placement', 'interactive', 'reference']),
+    kind: z.enum(['content', 'action', 'placement', 'interactive']),
     public: articleNodePublicSchema,
     private: articlePrivateMetadataSchema.optional(),
     commercial: commercialMetadataSchema.optional(),
@@ -188,22 +187,10 @@ export const articleBodyNodeSchema = z
       .optional(),
     rendering: articleRenderingHintsSchema.optional(),
     visibility: z.enum(['public', 'internal', 'hidden']).optional(),
-    templateId: z.string().optional(),
   })
   .strict();
 
 export type ArticleBodyNode = z.infer<typeof articleBodyNodeSchema>;
-
-/**
- * A reference to another node by its ID.
- */
-export const articleBodyNodeRefSchema = z
-  .object({
-    ref_id: z.string(),
-  })
-  .strict();
-
-export type ArticleBodyNodeRef = z.infer<typeof articleBodyNodeRefSchema>;
 
 /**
  * The root container for structured article content.
@@ -221,8 +208,8 @@ export const articleBodyV1Schema = z
       }
     ),
     chat: articleChatConfigSchema.optional(),
-    defaults: z.record(z.unknown()).optional(),
-    metadata: z.record(z.unknown()).optional(),
+    defaults: z.record(z.string(), z.unknown()).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .strict();
 

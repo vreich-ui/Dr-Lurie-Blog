@@ -2612,12 +2612,15 @@ const metadata = {
       };
 
       const escapeHtml = (value) =>
-        String(value)
+    String(value || '')
           .replaceAll('&', '&amp;')
           .replaceAll('<', '&lt;')
           .replaceAll('>', '&gt;')
           .replaceAll('"', '&quot;')
           .replaceAll("'", '&#039;');
+
+  // Expose escapeHtml to the global scope for the Pieces UI script
+  window.escapeHtml = escapeHtml;
 
       const formatDateTimeLocal = (date) => {
         const offset = date.getTimezoneOffset();
@@ -3404,29 +3407,42 @@ const metadata = {
           piece.className = 'article-piece';
           piece.dataset.nodeId = node.id;
 
-          const activeTemplateId = node.templateId || inferTemplateId(node);
+          const activeTemplateId = inferTemplateId(node);
           const template = articleNodeTemplates[activeTemplateId] || articleNodeTemplates['prose_section'];
           const allFields = [...template.fields.public, ...template.fields.optional];
 
-          const templateOptions = Object.values(articleNodeTemplates)
-            .map(t => {
-              const option = document.createElement('option');
-              option.value = t.id;
-              option.textContent = t.name;
-              if (activeTemplateId === t.id) option.selected = true;
-              return option.outerHTML;
-            })
-            .join('');
+          const mainTemplateIds = ['prose_section', 'callout', 'summary', 'faq', 'soft_action'];
+
+          const mainTemplates = mainTemplateIds.map(id => articleNodeTemplates[id]);
+          const advancedTemplates = Object.values(articleNodeTemplates).filter(t => !mainTemplateIds.includes(t.id));
+
+          const createOption = (t) => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = t.name;
+            if (activeTemplateId === t.id) opt.selected = true;
+            return opt.outerHTML;
+          };
+
+          const templateOptions = `
+            <optgroup label="Common">
+              ${mainTemplates.map(createOption).join('')}
+            </optgroup>
+            <optgroup label="Advanced / Commercial">
+              ${advancedTemplates.map(createOption).join('')}
+            </optgroup>
+          `;
 
           const showTitle = allFields.includes('title');
           const showBody = allFields.includes('body');
           const showItems = allFields.includes('items');
           const showCta = allFields.includes('ctaText') || allFields.includes('ctaLink');
           const showLabel = allFields.includes('label');
+          const showMedia = allFields.includes('media');
 
           piece.innerHTML = `
             <div class="piece-header">
-              <span class="piece-id">${escapeHtml(node.id)}</span>
+              <span class="piece-id">${window.escapeHtml(node.id)}</span>
               <div class="piece-controls">
                 <button class="btn-tertiary btn-xs move-up" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
                 <button class="btn-tertiary btn-xs move-down" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
@@ -3445,46 +3461,46 @@ const metadata = {
               ${showTitle ? `
               <div class="field">
                 <label>Public Title</label>
-                <input type="text" class="piece-title" value="${escapeHtml(node.public?.title || '')}" placeholder="Title" />
+                <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Title" />
               </div>` : ''}
 
               ${showBody ? `
               <div class="field">
                 <label>Reader text (Body)</label>
-                <textarea class="piece-body" rows="4" placeholder="Body content">${escapeHtml(node.public?.body || '')}</textarea>
+                <textarea class="piece-body" rows="4" placeholder="Body content">${window.escapeHtml(node.public?.body || '')}</textarea>
               </div>` : ''}
 
               ${showItems ? `
               <div class="field">
                 <label>Items (One per line)</label>
-                <textarea class="piece-items" rows="3" placeholder="List items">${escapeHtml((node.public?.items || []).join('\n'))}</textarea>
-              </div>` : ''}
-
-              ${showLabel ? `
-              <div class="field">
-                <label>Label</label>
-                <input type="text" class="piece-label" value="${escapeHtml(node.public?.label || '')}" placeholder="Label" />
+                <textarea class="piece-items" rows="3" placeholder="List items">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
               </div>` : ''}
 
               ${showCta ? `
               <div class="field-grid">
                 <div class="field">
                   <label>CTA Text</label>
-                  <input type="text" class="piece-cta-text" value="${escapeHtml(node.public?.ctaText || '')}" placeholder="Learn more" />
+                  <input type="text" class="piece-cta-text" value="${window.escapeHtml(node.public?.ctaText || '')}" placeholder="Learn more" />
                 </div>
                 <div class="field">
                   <label>CTA Link</label>
-                  <input type="url" class="piece-cta-link" value="${escapeHtml(node.public?.ctaLink || '')}" placeholder="https://..." />
+                  <input type="url" class="piece-cta-link" value="${window.escapeHtml(node.public?.ctaLink || '')}" placeholder="https://..." />
                 </div>
               </div>` : ''}
 
+              ${showMedia ? `
+              <div class="field">
+                <label>Media URL / Path</label>
+                <input type="text" class="piece-media" value="${window.escapeHtml(node.public?.media || '')}" placeholder="~/assets/images/..." />
+              </div>` : ''}
+
               <details class="piece-advanced">
-                <summary>Advanced Settings</summary>
+                <summary>Advanced / Agent Settings</summary>
                 <div class="piece-advanced-content">
                   <div class="field">
                     <label>Visibility</label>
                     <select class="piece-visibility">
-                      <option value="public" ${node.visibility === 'public' ? 'selected' : ''}>Public</option>
+                      <option value="public" ${(!node.visibility || node.visibility === 'public') ? 'selected' : ''}>Public</option>
                       <option value="internal" ${node.visibility === 'internal' ? 'selected' : ''}>Internal</option>
                       <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
                     </select>
@@ -3510,6 +3526,18 @@ const metadata = {
                       ].map(p => `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
                     </select>
                   </div>
+                  ${showLabel ? `
+                  <div class="field">
+                    <label>Admin Label</label>
+                    <input type="text" class="piece-label" value="${window.escapeHtml(node.public?.label || '')}" placeholder="Label" />
+                  </div>` : ''}
+                  <div class="field">
+                    <label>Disclosure Required</label>
+                    <div class="checkbox-field">
+                      <input type="checkbox" class="piece-disclosure" ${node.commercial?.disclosure?.required ? 'checked' : ''} />
+                      <span>Show sponsored label</span>
+                    </div>
+                  </div>
                 </div>
               </details>
             </div>
@@ -3520,7 +3548,6 @@ const metadata = {
             const templateId = e.target.value;
             const newNode = createDefaultNodeFromTemplate(templateId);
             newNode.id = node.id; // Keep the same ID
-            newNode.templateId = templateId;
             articleNodes[index] = newNode;
             renderPieces();
             updateFromPieces();
@@ -3554,6 +3581,13 @@ const metadata = {
             });
           }
 
+          if (showMedia) {
+            piece.querySelector('.piece-media').addEventListener('input', (e) => {
+              node.public.media = e.target.value;
+              updateFromPieces();
+            });
+          }
+
           if (showCta) {
             piece.querySelector('.piece-cta-text').addEventListener('input', (e) => {
               node.public.ctaText = e.target.value;
@@ -3579,6 +3613,13 @@ const metadata = {
           piece.querySelector('.piece-presentation').addEventListener('change', (e) => {
             node.rendering = node.rendering || {};
             node.rendering.presentation = e.target.value || undefined;
+            updateFromPieces();
+          });
+
+          piece.querySelector('.piece-disclosure').addEventListener('change', (e) => {
+            node.commercial = node.commercial || {};
+            node.commercial.disclosure = node.commercial.disclosure || { required: false };
+            node.commercial.disclosure.required = e.target.checked;
             updateFromPieces();
           });
 

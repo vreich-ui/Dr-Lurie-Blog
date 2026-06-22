@@ -143,29 +143,6 @@ const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
   return Boolean(provided && safeSecretsMatch(provided, expected));
 };
 
-const verifyScheduledPublishToken = (token: unknown) => {
-  const provided = toNonEmptyString(token);
-  const expected = process.env.SCHEDULED_PUBLISH_TOKEN;
-
-  if (!expected) {
-    return {
-      ok: false as const,
-      error: 'Scheduled publishing is not configured on the server.',
-      error_code: 'scheduled_publish_not_configured',
-    };
-  }
-
-  if (!provided || !safeSecretsMatch(provided, expected)) {
-    return {
-      ok: false as const,
-      error: 'Scheduled publish token is missing or invalid.',
-      error_code: 'invalid_scheduled_publish_token',
-    };
-  }
-
-  return { ok: true as const };
-};
-
 const getScheduledTime = (publication: Record<string, unknown>, publishPayload?: Record<string, unknown>) =>
   toNonEmptyString(publication.scheduled_for) ??
   toNonEmptyString(publication.scheduledFor) ??
@@ -891,7 +868,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_publish_scheduled',
     description:
-      'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, publication.scheduled_for due now or in the short server due window, and a server-configured scheduled publish token. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
+      'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, and publication.scheduled_for due now or in the short server due window. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
@@ -899,14 +876,11 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           'Optional workflow record version that should be visible before marking published.'
         ),
         lock_token: lockTokenSchema,
-        scheduled_publish_token: stringSchema(
-          'One-time or short-lived scheduled publish authorization token provided by an admin-controlled channel.'
-        ),
         agent_id: stringSchema('Stable identifier for the agent or process requesting scheduled publication.'),
         agent_owner: stringSchema('Human, team, or admin owner responsible for the scheduled publishing agent.'),
         agent_label: stringSchema('Optional human-readable label for audit metadata.'),
       },
-      ['request_id', 'lock_token', 'scheduled_publish_token', 'agent_id', 'agent_owner']
+      ['request_id', 'lock_token', 'agent_id', 'agent_owner']
     ),
   },
   {
@@ -1456,9 +1430,6 @@ const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string,
 };
 
 const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const tokenResult = verifyScheduledPublishToken(input.scheduled_publish_token);
-  if (!tokenResult.ok) return toolError(tokenResult.error, tokenResult);
-
   const agentId = toNonEmptyString(input.agent_id);
   const agentOwner = toNonEmptyString(input.agent_owner);
   const agentLabel = toNonEmptyString(input.agent_label);

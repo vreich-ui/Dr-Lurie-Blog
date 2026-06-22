@@ -1,14 +1,13 @@
 /**
  * Forbidden keywords that indicate accidental leakage of private strategy metadata.
+ * Focuses on technical field names and metadata containers that should never reach the reader.
  */
 export const FORBIDDEN_READER_KEYWORDS = [
   'private',
   'strategy',
   'agentNotes',
   'sourcePromptId',
-  'hook',
-  'agitation',
-  'resolution',
+  'inputTemplateId',
 ];
 
 /**
@@ -23,7 +22,6 @@ export function assertReaderSafe(content: string | object | unknown): void {
   for (const keyword of FORBIDDEN_READER_KEYWORDS) {
     // Case-insensitive search for keywords, ensuring we don't catch them as part of larger words
     // unless it's a field name in an object.
-    // For markdown, we mostly care about the literal words appearing in a way that reveals strategy.
     const regex = new RegExp(`\\b${keyword}\\b`, 'i');
     if (regex.test(contentString)) {
       throw new Error(`Reader safety violation: Found forbidden internal keyword "${keyword}" in content.`);

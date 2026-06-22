@@ -1,7 +1,4 @@
-import {
-  type ArticleBodyNode,
-  articleBodyNodeSchema
-} from '../../schema/article-content-v1.ts';
+import { type ArticleBodyNode, articleBodyNodeSchema } from '../../schema/article-content-v1.ts';
 
 /**
  * Generates an opaque, stable-looking ID for article nodes.
@@ -15,7 +12,7 @@ export function createOpaqueNodeId(): string {
   while (attempts < 100) {
     id = `n_${Math.random().toString(36).substring(2, 10)}`;
     const lowerId = id.toLowerCase();
-    if (!forbidden.some(word => lowerId.includes(word))) {
+    if (!forbidden.some((word) => lowerId.includes(word))) {
       return id;
     }
     attempts++;
@@ -40,23 +37,23 @@ export interface ArticleNodeTemplate {
 export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
   prose_section: {
     id: 'prose_section',
-    name: 'Prose Section',
+    name: 'Text',
     description: 'A standard section of text with an optional title.',
     kind: 'content',
     fields: {
       public: ['body'],
-      optional: ['title']
+      optional: ['title'],
     },
     defaults: {
       kind: 'content',
       public: {
         title: '',
-        body: ''
+        body: '',
       },
       rendering: {
-        presentation: 'section'
-      }
-    }
+        presentation: 'section',
+      },
+    },
   },
   plain_text: {
     id: 'plain_text',
@@ -65,17 +62,17 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'content',
     fields: {
       public: ['body'],
-      optional: []
+      optional: [],
     },
     defaults: {
       kind: 'content',
       public: {
-        body: ''
+        body: '',
       },
       rendering: {
-        presentation: 'plain'
-      }
-    }
+        presentation: 'plain',
+      },
+    },
   },
   callout: {
     id: 'callout',
@@ -84,18 +81,18 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'content',
     fields: {
       public: ['body'],
-      optional: ['title']
+      optional: ['title'],
     },
     defaults: {
       kind: 'content',
       public: {
         title: '',
-        body: ''
+        body: '',
       },
       rendering: {
-        presentation: 'callout'
-      }
-    }
+        presentation: 'callout',
+      },
+    },
   },
   summary: {
     id: 'summary',
@@ -104,42 +101,42 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'content',
     fields: {
       public: [],
-      optional: ['title', 'items']
+      optional: ['title', 'items'],
     },
     defaults: {
       kind: 'content',
       public: {
         title: 'Summary',
-        items: []
+        items: [],
       },
       private: {
-        strategy: 'summary'
+        strategy: 'summary',
       },
       rendering: {
-        presentation: 'summary'
-      }
-    }
+        presentation: 'summary',
+      },
+    },
   },
   soft_action: {
     id: 'soft_action',
-    name: 'Soft Action',
+    name: 'Action',
     description: 'An inline call to action with optional text.',
     kind: 'action',
     fields: {
       public: ['ctaText', 'ctaLink'],
-      optional: ['body']
+      optional: ['body'],
     },
     defaults: {
       kind: 'action',
       public: {
         body: '',
         ctaText: 'Learn More',
-        ctaLink: ''
+        ctaLink: '',
       },
       rendering: {
-        presentation: 'inline'
-      }
-    }
+        presentation: 'inline',
+      },
+    },
   },
   contextual_offer: {
     id: 'contextual_offer',
@@ -148,22 +145,22 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'action',
     fields: {
       public: ['body'],
-      optional: ['ctaText', 'ctaLink']
+      optional: ['ctaText', 'ctaLink'],
     },
     defaults: {
       kind: 'action',
       public: {
         body: '',
         ctaText: '',
-        ctaLink: ''
+        ctaLink: '',
       },
       commercial: {
-        type: 'offer'
+        type: 'offer',
       },
       rendering: {
-        presentation: 'offerInline'
-      }
-    }
+        presentation: 'offerInline',
+      },
+    },
   },
   commerce_offer: {
     id: 'commerce_offer',
@@ -172,7 +169,7 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'placement',
     fields: {
       public: ['title', 'ctaText', 'ctaLink'],
-      optional: ['body', 'media']
+      optional: ['body', 'media'],
     },
     defaults: {
       kind: 'placement',
@@ -180,15 +177,15 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
         title: '',
         body: '',
         ctaText: 'Buy Now',
-        ctaLink: ''
+        ctaLink: '',
       },
       commercial: {
-        type: 'offer'
+        type: 'offer',
       },
       rendering: {
-        presentation: 'offerCard'
-      }
-    }
+        presentation: 'offerCard',
+      },
+    },
   },
   product_mention: {
     id: 'product_mention',
@@ -197,20 +194,20 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'content',
     fields: {
       public: ['body'],
-      optional: []
+      optional: [],
     },
     defaults: {
       kind: 'content',
       public: {
-        body: ''
+        body: '',
       },
       commercial: {
-        type: 'productMention'
+        type: 'productMention',
       },
       rendering: {
-        presentation: 'inline'
-      }
-    }
+        presentation: 'inline',
+      },
+    },
   },
   ad_slot: {
     id: 'ad_slot',
@@ -219,20 +216,20 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'placement',
     fields: {
       public: [],
-      optional: ['label']
+      optional: ['label'],
     },
     defaults: {
       kind: 'placement',
       public: {
-        label: 'Advertisement'
+        label: 'Advertisement',
       },
       commercial: {
-        type: 'adSlot'
+        type: 'adSlot',
       },
       rendering: {
-        presentation: 'adSlot'
-      }
-    }
+        presentation: 'adSlot',
+      },
+    },
   },
   chat_invite: {
     id: 'chat_invite',
@@ -241,18 +238,18 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'interactive',
     fields: {
       public: [],
-      optional: ['title', 'body']
+      optional: ['title', 'body'],
     },
     defaults: {
       kind: 'interactive',
       public: {
         title: 'Have questions?',
-        body: 'Ask our assistant about this article.'
+        body: 'Ask our assistant about this article.',
       },
       rendering: {
-        presentation: 'chatInvite'
-      }
-    }
+        presentation: 'chatInvite',
+      },
+    },
   },
   faq: {
     id: 'faq',
@@ -261,19 +258,19 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
     kind: 'content',
     fields: {
       public: ['items'],
-      optional: ['title']
+      optional: ['title'],
     },
     defaults: {
       kind: 'content',
       public: {
         title: 'Frequently Asked Questions',
-        items: []
+        items: [],
       },
       rendering: {
-        presentation: 'faq'
-      }
-    }
-  }
+        presentation: 'faq',
+      },
+    },
+  },
 };
 
 /**
@@ -286,16 +283,19 @@ export function getArticleNodeTemplate(templateId: string): ArticleNodeTemplate 
 /**
  * Creates a valid article node based on a template.
  */
-export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNode & { templateId: string } {
+export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNode {
   const template = getArticleNodeTemplate(templateId);
   if (!template) {
     throw new Error(`Template not found: ${templateId}`);
   }
 
-  const node: ArticleBodyNode & { templateId: string } = {
+  const node: ArticleBodyNode = {
     ...JSON.parse(JSON.stringify(template.defaults)),
     id: createOpaqueNodeId(),
-    templateId
+    private: {
+      ...(template.defaults.private || {}),
+      inputTemplateId: templateId,
+    },
   };
 
   // Double-check validation
@@ -310,24 +310,29 @@ export function createDefaultNodeFromTemplate(templateId: string): ArticleBodyNo
 /**
  * Creates a legacy content node from a markdown string.
  */
-export function createLegacyBodyNode(markdown: string): ArticleBodyNode & { templateId: string } {
+export function createLegacyBodyNode(markdown: string): ArticleBodyNode {
   return {
     id: createOpaqueNodeId(),
-    templateId: 'prose_section',
     kind: 'content',
     public: {
-      body: markdown
+      body: markdown.trim(),
+    },
+    private: {
+      inputTemplateId: 'prose_section',
     },
     rendering: {
-      presentation: 'plain'
-    }
-  } as ArticleBodyNode & { templateId: string };
+      presentation: 'section',
+    },
+    visibility: 'public',
+  };
 }
 
 /**
  * Infers the closest matching template ID for a node that lacks one.
  */
 export function inferTemplateId(node: Partial<ArticleBodyNode>): string {
+  if (node.private?.inputTemplateId) return node.private.inputTemplateId;
+
   if (node.rendering?.presentation === 'faq') return 'faq';
   if (node.rendering?.presentation === 'summary') return 'summary';
   if (node.rendering?.presentation === 'offerCard') return 'commerce_offer';
