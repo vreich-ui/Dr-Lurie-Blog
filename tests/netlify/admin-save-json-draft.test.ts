@@ -122,6 +122,71 @@ test('admin JSON draft save rejects missing author', async () => {
   assert.equal(body.error, 'Title, slug, and author are required to save JSON draft.');
 });
 
+test('admin JSON draft save rejects structured bodies without meaningful public reader-facing content', async () => {
+  const store = createMemoryStore();
+  const input = validInput({
+    publish_payload: { content: '' },
+    input: {
+      content: {
+        schema_version: 'content_blocks.v1',
+        title: 'Skin Barrier Draft',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'nempty',
+              kind: 'content',
+              public: { body: '   ' },
+              visibility: 'public',
+            },
+            {
+              id: 'ninternal',
+              kind: 'content',
+              public: { body: 'Internal planning notes.' },
+              visibility: 'internal',
+            },
+          ],
+        },
+      },
+    },
+  });
+
+  const response = await saveAdminJsonDraft(store, { input });
+  const body = parseBody(response);
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'Title, slug, and author are required to save JSON draft.');
+});
+
+test('admin JSON draft save accepts structured bodies with meaningful public reader-facing content', async () => {
+  const store = createMemoryStore();
+  const input = validInput({
+    publish_payload: { content: '' },
+    input: {
+      content: {
+        schema_version: 'content_blocks.v1',
+        title: 'Skin Barrier Draft',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'nvisible',
+              kind: 'content',
+              public: { body: 'Reader-facing structured body.' },
+              visibility: 'public',
+            },
+          ],
+        },
+      },
+    },
+  });
+
+  const response = await saveAdminJsonDraft(store, { input });
+
+  assert.equal(response.statusCode, 201);
+});
+
 test('admin JSON draft save creates a new blob draft workflow record', async () => {
   const store = createMemoryStore();
 

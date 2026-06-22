@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import type { BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import type { ArticleBodyNode } from '../../src/schema/article-content-v1.js';
 import { workflowStatuses, type WorkflowStatus } from '../../src/schema/workflow-contract.js';
 import {
   parseContentSourceV1,
@@ -127,15 +128,40 @@ const updateIndexes = async (
 
 const getPublishPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
 
+const hasReaderFacingText = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+
+const hasReaderFacingItems = (value: unknown) => Array.isArray(value) && value.some(hasReaderFacingText);
+
+const hasReaderFacingMedia = (value: unknown) => {
+  if (!value || typeof value !== 'object') return false;
+
+  const media = value as { alt?: unknown; caption?: unknown; src?: unknown };
+  return hasReaderFacingText(media.alt) || hasReaderFacingText(media.caption) || hasReaderFacingText(media.src);
+};
+
+const hasMeaningfulPublicNodeContent = (node: ArticleBodyNode) => {
+  if (node.visibility && node.visibility !== 'public') return false;
+
+  const publicFields = node.public;
+  return (
+    hasReaderFacingText(publicFields.eyebrow) ||
+    hasReaderFacingText(publicFields.title) ||
+    hasReaderFacingText(publicFields.body) ||
+    hasReaderFacingItems(publicFields.items) ||
+    hasReaderFacingText(publicFields.ctaText) ||
+    hasReaderFacingText(publicFields.ctaLink) ||
+    hasReaderFacingText(publicFields.label) ||
+    hasReaderFacingMedia(publicFields.media)
+  );
+};
+
 const hasBodyContent = (input: ContentSourceV1) => {
   const payload = getPublishPayload(input);
   if (payload?.markdown?.trim() || payload?.content?.trim()) return true;
   if (input.editorial?.draft_markdown?.trim()) return true;
 
   if (Array.isArray(input.content?.article_body?.nodes)) {
-    // If structured body exists, we allow it to count as content if there's at least one node
-    // (even if it's just a media node or CTA without text body)
-    if (input.content!.article_body!.nodes.length > 0) return true;
+    if (input.content.article_body.nodes.some(hasMeaningfulPublicNodeContent)) return true;
   }
 
   if (Array.isArray(input.content?.blocks)) {
