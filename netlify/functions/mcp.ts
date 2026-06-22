@@ -313,7 +313,7 @@ const adminPublishValidationModeSchema = {
   type: 'string',
   enum: ['admin_publish_draft'],
   description:
-    'Required validation mode for MCP-created admin-publish article drafts. The backend rejects skeletal drafts unless publication.publish_payload.title (or content.title), publication.publish_payload.slug (or content.title), publication.publish_payload.author, and a body field at publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown are present.',
+    'Required validation mode for MCP-created admin-publish article drafts. Prefer content.article_body with schema_version article_body.v1 and at least one public node. Legacy fallback body fields are publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown; publication.publish_payload.markdown may be generated from article_body for legacy publishing.',
 };
 
 const artifactKindJsonSchema = (description?: string) => ({
@@ -464,7 +464,60 @@ const publishPayloadJsonSchema = objectSchema(
     metadata: metadataBagSchema('Optional publish-payload extension data.'),
   },
   ['slug', 'title'],
-  'Publication payload used by the publishing step. MCP-created admin-publish drafts must include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and one body field: publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown.'
+  'Publication payload used by the publishing step. MCP-created admin-publish drafts must include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, and publication.publish_payload.author. Prefer content.article_body for body content; publication.publish_payload.markdown is a generated legacy fallback when needed.'
+);
+
+const articleBodyNodeJsonSchema = objectSchema(
+  {
+    id: stringSchema('Stable opaque node id starting with n_; do not include strategy or commercial keywords.'),
+    kind: { type: 'string', enum: ['content', 'action', 'placement', 'interactive'] },
+    public: objectSchema(
+      {
+        eyebrow: stringSchema('Visible eyebrow text.'),
+        title: stringSchema('Visible node title.'),
+        body: stringSchema('Visible Markdown-capable body copy.'),
+        items: stringArraySchema('Visible list items.'),
+        ctaText: stringSchema('Visible CTA text.'),
+        ctaLink: stringSchema('Visible CTA URL.'),
+        label: stringSchema('Visible label.'),
+        media: objectSchema({
+          type: { type: 'string', enum: ['image', 'video', 'audio', 'embed'] },
+          src: stringSchema('Visible media source URL.'),
+          alt: stringSchema('Accessible visible alt text.'),
+          caption: stringSchema('Visible media caption.'),
+        }),
+      },
+      [],
+      'Reader-visible node fields. Use these for visible copy.'
+    ),
+    private: metadataBagSchema(
+      'Internal-only strategy metadata for agents/editors. Never use node.private as reader-visible copy.'
+    ),
+    commercial: metadataBagSchema('Optional commercial metadata, disclosures, destinations, and offer details.'),
+    chat: objectSchema({
+      invitationText: stringSchema('Visible chat invitation text.'),
+      suggestedQuery: stringSchema('Suggested chat query.'),
+    }),
+    rendering: metadataBagSchema('Optional rendering hints such as presentation, placement, or emphasis.'),
+    visibility: { type: 'string', enum: ['public', 'internal', 'hidden'] },
+  },
+  ['id', 'kind', 'public'],
+  'One article_body.v1 node. Minimum useful article bodies include at least one public node with reader-facing public fields.'
+);
+
+const articleBodyV1JsonSchema = objectSchema(
+  {
+    schema_version: constStringSchema('article_body.v1'),
+    nodes: arraySchema(
+      articleBodyNodeJsonSchema,
+      'Structured article nodes. Minimum required body is one node; at least one node must be public or omit visibility.'
+    ),
+    chat: metadataBagSchema('Optional article-level chat configuration.'),
+    defaults: metadataBagSchema('Optional article-level rendering/default metadata.'),
+    metadata: metadataBagSchema('Optional article-level metadata.'),
+  },
+  ['schema_version', 'nodes'],
+  'Preferred structured article body for admin-publish drafts. Use content.article_body.schema_version = "article_body.v1" and content.article_body.nodes[]. publication.publish_payload.markdown is a generated legacy fallback, not the preferred authoring field.'
 );
 
 const contentBlockJsonSchema = objectSchema(
@@ -590,7 +643,11 @@ const contentSourceV1JsonSchema = objectSchema(
           )
         ),
       }),
-      blocks: arraySchema(contentBlockJsonSchema, 'Structured content blocks.'),
+      article_body: articleBodyV1JsonSchema,
+      blocks: arraySchema(
+        contentBlockJsonSchema,
+        'Legacy structured content blocks. Prefer content.article_body for new admin-publish drafts.'
+      ),
     }),
     taxonomy: objectSchema({
       schema_version: constStringSchema('taxonomy.v1'),
@@ -745,14 +802,14 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
   },
   ['record_type', 'schema_version'],
-  'Structured content_source.v1 workflow input. For MCP admin-publish drafts, include importable article fields: publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown.'
+  'Structured content_source.v1 workflow input. For MCP admin-publish drafts, include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and preferred content.article_body with schema_version article_body.v1 plus at least one public node. Legacy fallback body fields remain supported.'
 );
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_request',
     description:
-      'Create a save-json-blob workflow request and return its record. MCP-created article drafts are validated as admin-publish drafts: include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and a body at publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown.',
+      'Create a save-json-blob workflow request and return its record. MCP-created article drafts are validated as admin-publish drafts: include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and preferred content.article_body (article_body.v1) with at least one public node. Legacy fallback body fields are still supported.',
     inputSchema: objectSchema(
       {
         input: contentSourceV1JsonSchema,
@@ -766,6 +823,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         validation_mode: adminPublishValidationModeSchema,
       },
       ['input', 'validation_mode']
+    ),
+  },
+
+  {
+    name: 'save_json_blob_create_article_draft',
+    description:
+      'Non-breaking helper for agents creating structured admin-publish drafts. Wraps save_json_blob_create_request with validation_mode: "admin_publish_draft". Use input.content.article_body.schema_version = "article_body.v1" and input.content.article_body.nodes[] with at least one public node; node.private is internal only and never visible copy.',
+    inputSchema: objectSchema(
+      {
+        input: contentSourceV1JsonSchema,
+        request_id: stringSchema('Optional request id. A UUID-based id is generated when omitted.'),
+        current_agent: agentNameJsonSchema(
+          'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
+        ),
+        next_agent: nullableAgentNameJsonSchema(
+          'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
+        ),
+      },
+      ['input']
     ),
   },
   {
@@ -2538,6 +2614,20 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           current_agent: input.current_agent,
           next_agent: input.next_agent,
           validation_mode: input.validation_mode ?? 'admin_publish_draft',
+        },
+        'record'
+      );
+
+    case 'save_json_blob_create_article_draft':
+      return callAction(
+        event,
+        {
+          action: 'create_request',
+          input: input.input,
+          request_id: input.request_id ?? createRequestId(),
+          current_agent: input.current_agent,
+          next_agent: input.next_agent,
+          validation_mode: 'admin_publish_draft',
         },
         'record'
       );

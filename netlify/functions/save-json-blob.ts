@@ -842,6 +842,32 @@ const getAdminMarkdownBlockText = (payload: unknown) => {
   return undefined;
 };
 
+const hasMeaningfulArticleBodyNode = (node: unknown) => {
+  if (!isRecordValue(node)) return false;
+  if (node.visibility && node.visibility !== 'public') return false;
+
+  const publicFields = isRecordValue(node.public) ? node.public : undefined;
+  const media = isRecordValue(publicFields?.media) ? publicFields.media : undefined;
+
+  return hasAdminImportableText(
+    publicFields?.eyebrow,
+    publicFields?.title,
+    publicFields?.body,
+    ...(Array.isArray(publicFields?.items) ? publicFields.items : []),
+    publicFields?.ctaText,
+    publicFields?.ctaLink,
+    publicFields?.label,
+    media?.src,
+    media?.alt,
+    media?.caption
+  );
+};
+
+const hasAdminArticleBodyContent = (input: ContentSourceV1) =>
+  input.content?.article_body?.schema_version === 'article_body.v1' &&
+  Array.isArray(input.content.article_body.nodes) &&
+  input.content.article_body.nodes.some(hasMeaningfulArticleBodyNode);
+
 const getAdminMarkdownBlocksText = (input: ContentSourceV1) =>
   input.content?.blocks
     ?.filter((block) => block.block_type === 'markdown')
@@ -880,13 +906,14 @@ const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
       payload?.markdown,
       payload?.content,
       input.editorial?.draft_markdown,
+      hasAdminArticleBodyContent(input) ? 'content.article_body' : undefined,
       getAdminMarkdownBlocksText(input)
     )
   ) {
     issues.push({
       path: ['publication', 'publish_payload', 'content'],
       message:
-        'Admin-publish drafts require publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown body text.',
+        'Admin-publish drafts require preferred content.article_body with at least one public node, or legacy fallback body text at publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown. publication.publish_payload.markdown may be generated later as a legacy fallback from content.article_body.',
     });
   }
 
