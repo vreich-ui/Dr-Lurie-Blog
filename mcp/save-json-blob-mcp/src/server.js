@@ -16,7 +16,7 @@ export const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', '
 export const WORKFLOW_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'published'];
 export const KNOWN_PUBLICATION_STATUSES = ['draft', 'ready', 'scheduled'];
 export const PUBLICATION_STATUS_DESCRIPTION =
-  'Article payload status separate from workflow_status. Known first-party values are draft, ready, and scheduled; published/live are not publication_status values. Scheduled records require publication.scheduled_for and a server-authorized scheduled publish call when due. Use workflow_status: published after mark_published for the committed live article state.';
+  'Article payload status separate from workflow_status. publication_status: draft means the payload is not publishable yet; ready means publish now through the immediate publishing path; scheduled plus publication.scheduled_for means publish later through the due scheduled-publish path. published/live are not publication_status values. Use workflow_status: published only after actual successful publish and mark_published for the committed live article state.';
 const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 
@@ -407,6 +407,80 @@ export const createServer = () => {
       },
     },
     async ({ request_id, lock_token }) => callAction({ action: 'checkin_request', request_id, lock_token }, 'record')
+  );
+
+  server.registerTool(
+    'save_json_blob_mark_published',
+    {
+      description:
+        'Mark a completed workflow record as published after the final article has been validated and publishing has succeeded or been handed off. This tool only updates workflow state; it does not invoke the article publishing endpoint. Server-only publish credentials are never accepted as inputs or returned.',
+      inputSchema: {
+        request_id: z.string().min(1),
+        expected_record_version: z.number().int().nonnegative().optional(),
+        lock_token: z.string().min(1),
+        commit_metadata: z
+          .record(z.string(), z.any())
+          .describe(
+            'Optional publication result metadata such as commit SHA, commit URL, article path, deploy status, and a human-readable message.'
+          )
+          .optional(),
+      },
+    },
+    async ({ request_id, expected_record_version, lock_token, commit_metadata }) =>
+      callAction(
+        { action: 'mark_published', request_id, expected_record_version, lock_token, commit_metadata },
+        'record'
+      )
+  );
+
+  server.registerTool(
+    'save_json_blob_publish_article_now',
+    {
+      description:
+        'Promote a content_source.v1 article draft to publication.publication_status: ready, publish it immediately through the existing secure article publisher, then mark workflow_status: published only after successful publish. Requires checkout lock_token. Server-only publish credentials are never accepted as inputs or returned.',
+      inputSchema: {
+        request_id: z.string().min(1),
+        expected_record_version: z.number().int().nonnegative().optional(),
+        lock_token: z.string().min(1),
+      },
+    },
+    async ({ request_id, expected_record_version, lock_token }) =>
+      callAction(
+        { action: 'prepare_publish_now', request_id, expected_record_version, lock_token },
+        'record'
+      )
+  );
+
+  server.registerTool(
+    'save_json_blob_publish_scheduled',
+    {
+      description:
+        'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, and publication.scheduled_for due now or in the short server due window. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
+      inputSchema: {
+        request_id: z.string().min(1),
+        expected_record_version: z.number().int().nonnegative().optional(),
+        lock_token: z.string().min(1),
+        agent_id: z.string().min(1).describe('Stable identifier for the agent or process requesting scheduled publication.'),
+        agent_owner: z.string().min(1).describe('Human, team, or admin owner responsible for the scheduled publishing agent.'),
+        agent_label: z.string().min(1).optional().describe('Optional human-readable label for audit metadata.'),
+      },
+    },
+    async ({ request_id, expected_record_version, lock_token, agent_id, agent_owner, agent_label }) =>
+      callAction(
+        {
+          action: 'mark_published',
+          request_id,
+          expected_record_version,
+          lock_token,
+          commit_metadata: {
+            scheduled_publish: true,
+            agent_id,
+            agent_owner,
+            agent_label,
+          },
+        },
+        'record'
+      )
   );
 
   if (ADMIN_TOOLS_ENABLED) {
