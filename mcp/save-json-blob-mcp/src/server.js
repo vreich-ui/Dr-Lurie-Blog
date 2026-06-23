@@ -14,9 +14,9 @@ const REQUIRED_ENV = ['NETLIFY_PUBLISH_SECRET', 'SAVE_JSON_BLOB_BASE_URL'];
 // mcp/save-json-blob-mcp/test/workflow-contract-mirror.test.js asserts parity.
 export const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
 export const WORKFLOW_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'published'];
-export const KNOWN_PUBLICATION_STATUSES = ['draft', 'ready', 'scheduled'];
+export const KNOWN_PUBLICATION_STATUSES = ['draft', 'ready', 'scheduled', 'published'];
 export const PUBLICATION_STATUS_DESCRIPTION =
-  'Article payload status separate from workflow_status. publication_status: draft means the payload is not publishable yet; ready means publish now through the immediate publishing path; scheduled plus publication.scheduled_for means publish later through the due scheduled-publish path. published/live are not publication_status values. Use workflow_status: published only after actual successful publish and mark_published for the committed live article state.';
+  'Article payload status separate from workflow_status. publication_status: draft means the payload is not publishable yet; ready means publish now through the immediate publishing path; scheduled plus publication.scheduled_for means publish later through the due scheduled-publish path. published is reserved for records whose publication payload has been published; use workflow_status: published only after actual successful publish and mark_published for the committed live article state.';
 const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 
@@ -478,6 +478,35 @@ export const createServer = () => {
             agent_owner,
             agent_label,
           },
+        },
+        'record'
+      )
+  );
+
+  server.registerTool(
+    'save_json_blob_update_publication_status',
+    {
+      description:
+        'Update publication fields on an existing content_source.v1 workflow record without creating a duplicate workflow record. For immediate scheduled publishing, set publication_status: scheduled and scheduled_for to the current ISO timestamp before calling save_json_blob_publish_scheduled.',
+      inputSchema: {
+        request_id: z.string().min(1),
+        publication_status: z.enum(['draft', 'ready', 'scheduled', 'published']),
+        scheduled_for: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            'ISO timestamp to write to input.publication.scheduled_for. Required when publication_status is scheduled; optional otherwise and left unchanged when omitted.'
+          ),
+      },
+    },
+    async ({ request_id, publication_status, scheduled_for }) =>
+      callAction(
+        {
+          action: 'update_publication_status',
+          request_id,
+          publication_status,
+          scheduled_for,
         },
         'record'
       )

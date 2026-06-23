@@ -27,6 +27,7 @@ export const KNOWN_PUBLICATION_STATUSES = {
   draft: 'Saved admin draft; not publication-ready yet.',
   ready: 'Final article payload is ready for the publishing step.',
   scheduled: 'Final article payload is scheduled for server-gated publishing at publication.scheduled_for.',
+  published: 'Final article payload has been published.',
 } as const satisfies Record<KnownPublicationStatus, string>;
 
 export type AgentOutputEnvelope = {

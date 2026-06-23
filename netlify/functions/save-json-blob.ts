@@ -118,6 +118,7 @@ const requestSchema = z
       'checkin_request',
       'force_unlock',
       'prepare_publish_now',
+      'update_publication_status',
       'mark_published',
     ]),
     request_id: z.string().min(1).optional(),
@@ -151,6 +152,8 @@ const requestSchema = z
     message: z.string().min(1).optional(),
     validation_mode: z.enum(['admin_publish_draft']).optional(),
     publish_payload: z.record(z.string(), z.unknown()).optional(),
+    publication_status: z.enum(['draft', 'ready', 'scheduled', 'published']).optional(),
+    scheduled_for: z.string().min(1).optional(),
   })
   .strict();
 
@@ -1857,6 +1860,84 @@ export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequ
   return jsonResponse(409, { action: body.action, conflict: true });
 };
 
+export const updatePublicationStatus = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  if (!body.publication_status) {
+    return jsonResponse(400, { action: body.action, error: 'publication_status is required.' });
+  }
+
+  if (body.publication_status === 'scheduled' && body.scheduled_for === undefined) {
+    return jsonResponse(400, {
+      action: body.action,
+      error: 'scheduled_for is required when publication_status is scheduled.',
+    });
+  }
+
+  if (body.scheduled_for !== undefined && Number.isNaN(Date.parse(body.scheduled_for))) {
+    return jsonResponse(400, {
+      action: body.action,
+      error: 'scheduled_for must be a valid ISO timestamp when provided.',
+    });
+  }
+
+  const requestId = body.request_id as string;
+
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const previousRecord = await loadRecord(store, requestId);
+    if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+    if (
+      previousRecord.input.record_type !== 'content_source' ||
+      previousRecord.input.schema_version !== 'content_source.v1'
+    ) {
+      return jsonResponse(409, {
+        action: body.action,
+        conflict: true,
+        error: 'Publication status updates require a content_source.v1 workflow record.',
+      });
+    }
+
+    const timestamp = nowIso();
+    const nextRecord: WorkflowRecord = preserveAgentOutputs(
+      {
+        ...previousRecord,
+        updated_at: timestamp,
+        input: {
+          ...previousRecord.input,
+          publication: {
+            ...(previousRecord.input.publication ?? {}),
+            schema_version: 'publication.v1',
+            publication_status: body.publication_status,
+            ...(body.scheduled_for !== undefined ? { scheduled_for: body.scheduled_for } : {}),
+          },
+        },
+        history: [
+          ...previousRecord.history,
+          {
+            at: timestamp,
+            action: body.action,
+            details: {
+              publication_status: body.publication_status,
+              ...(body.scheduled_for !== undefined ? { scheduled_for: body.scheduled_for } : {}),
+            },
+          },
+        ],
+        version: previousRecord.version + 1,
+      },
+      previousRecord
+    );
+
+    const saveResult = await saveRecordIfVersionUnchanged(store, previousRecord, nextRecord);
+
+    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: saveResult.record });
+    if ('notFound' in saveResult) return jsonResponse(404, { action: body.action, not_found: true });
+  }
+
+  return jsonResponse(409, { action: body.action, conflict: true });
+};
+
 const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   switch (body.action) {
     case 'create_request':
@@ -1879,6 +1960,8 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
       return forceUnlock(store, body);
     case 'prepare_publish_now':
       return preparePublishNow(store, body);
+    case 'update_publication_status':
+      return updatePublicationStatus(store, body);
     case 'mark_published':
       return markPublished(store, body);
   }

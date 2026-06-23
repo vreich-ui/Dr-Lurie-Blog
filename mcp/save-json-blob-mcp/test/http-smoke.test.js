@@ -8,6 +8,7 @@ import { createHttpServer } from '../src/http.js';
 
 const EXPECTED_TOOL_NAMES = [
   'save_json_blob_create_request',
+  'save_json_blob_create_article_draft',
   'save_json_blob_get_request',
   'save_json_blob_list_pending_requests',
   'save_json_blob_patch_agent_output',
@@ -15,6 +16,10 @@ const EXPECTED_TOOL_NAMES = [
   'save_json_blob_checkout_request',
   'save_json_blob_refresh_lock',
   'save_json_blob_checkin_request',
+  'save_json_blob_mark_published',
+  'save_json_blob_publish_article_now',
+  'save_json_blob_publish_scheduled',
+  'save_json_blob_update_publication_status',
   'ping',
   'reader_insight_update_output',
   'reader_insight_mark_complete',
