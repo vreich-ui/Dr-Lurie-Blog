@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const EXPECTED_CORE_TOOL_NAMES = [
   'save_json_blob_create_request',
+  'save_json_blob_create_article_draft',
   'save_json_blob_get_request',
   'save_json_blob_list_pending_requests',
   'save_json_blob_patch_agent_output',
@@ -11,6 +12,9 @@ const EXPECTED_CORE_TOOL_NAMES = [
   'save_json_blob_checkout_request',
   'save_json_blob_refresh_lock',
   'save_json_blob_checkin_request',
+  'save_json_blob_mark_published',
+  'save_json_blob_publish_article_now',
+  'save_json_blob_publish_scheduled',
 ];
 
 test('registered MCP tools use Agent Builder underscore-only names', async () => {
