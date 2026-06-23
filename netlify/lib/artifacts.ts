@@ -44,6 +44,7 @@ export type ArtifactReference = {
 
 export type ReadableArtifactBlobStore = {
   get(key: string, options: { type: 'arrayBuffer' }): Promise<Buffer | ArrayBuffer | string | null>;
+  get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }): Promise<string | Buffer | ArrayBuffer | null>;
   list?: (options?: {
     prefix?: string;
     directories?: boolean;
@@ -130,7 +131,7 @@ const getGlobalArtifactKeys = async (store: ReadableArtifactBlobStore, normalize
 
   return listArtifactKeysForPrefixes(
     store,
-    kinds.flatMap((kind) => [`${kind}/`, `artifacts/${kind}/`, `/${kind}/`])
+    kinds.flatMap((kind: ArtifactKind) => [`${kind}/`, `artifacts/${kind}/`, `/${kind}/`])
   );
 };
 
