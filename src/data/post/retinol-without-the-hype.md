@@ -1,7 +1,8 @@
 ---
-publishDate: 2026-06-22T18:23:00+03:00
+publishDate: 2026-06-23T00:00:00Z
 title: "Retinol Without the Hype: A Skeptical Beginner's Guide"
 excerpt: "Retinol is not magic, and it is not mandatory. It is a tool. Here is how to decide whether it belongs on your shelf."
+image: "~/assets/images/uploads/retinol-without-the-hype/retinol-without-the-hype-featured.png"
 ctaLink: "/resources/retinol-reality-check"
 ctaText: "Download the Retinol Reality Check"
 category: "Skincare"
