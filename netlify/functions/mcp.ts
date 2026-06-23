@@ -308,6 +308,11 @@ const workflowStatusJsonSchema = (description?: string) => ({
   enum: workflowStatuses,
   ...(description ? { description } : {}),
 });
+const publicationStatusJsonSchema = (description?: string) => ({
+  type: 'string',
+  enum: ['draft', 'ready', 'scheduled', 'published'],
+  ...(description ? { description } : {}),
+});
 
 const adminPublishValidationModeSchema = {
   type: 'string',
@@ -972,6 +977,21 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         agent_label: stringSchema('Optional human-readable label for audit metadata.'),
       },
       ['request_id', 'lock_token', 'agent_id', 'agent_owner']
+    ),
+  },
+  {
+    name: 'save_json_blob_update_publication_status',
+    description:
+      'Update publication fields on an existing content_source.v1 workflow record without creating a duplicate workflow record. For immediate scheduled publishing, set publication_status: scheduled and scheduled_for to the current ISO timestamp before calling save_json_blob_publish_scheduled.',
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema('Existing workflow request id to update.'),
+        publication_status: publicationStatusJsonSchema('One of draft, ready, scheduled, or published.'),
+        scheduled_for: stringSchema(
+          'ISO timestamp to write to input.publication.scheduled_for. Required when publication_status is scheduled; optional otherwise and left unchanged when omitted.'
+        ),
+      },
+      ['request_id', 'publication_status']
     ),
   },
   {
@@ -2781,6 +2801,17 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callPublishArticleNow(event, input);
     case 'save_json_blob_publish_scheduled':
       return callScheduledPublish(event, input);
+    case 'save_json_blob_update_publication_status':
+      return callAction(
+        event,
+        {
+          action: 'update_publication_status',
+          request_id: input.request_id,
+          publication_status: input.publication_status,
+          scheduled_for: input.scheduled_for,
+        },
+        'record'
+      );
     case 'deploy_status':
       return callDeployStatus(event, input);
     case 'verify_article_images':

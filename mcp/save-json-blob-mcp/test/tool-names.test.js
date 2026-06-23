@@ -15,6 +15,7 @@ const EXPECTED_CORE_TOOL_NAMES = [
   'save_json_blob_mark_published',
   'save_json_blob_publish_article_now',
   'save_json_blob_publish_scheduled',
+  'save_json_blob_update_publication_status',
 ];
 
 test('registered MCP tools use Agent Builder underscore-only names', async () => {
