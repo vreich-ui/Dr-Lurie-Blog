@@ -174,21 +174,13 @@ const metadata = {
               <label for="draft">Save as draft</label>
             </div>
 
-            <div class="field">
-              <div class="field-header">
-                <label for="content">Article Body (Legacy Fallback)</label>
-                <div class="field-actions">
-                  <button id="convert-to-pieces" class="btn-tertiary btn-xs" type="button">Convert to Pieces</button>
-                </div>
-              </div>
-              <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
-              ></textarea>
-            </div>
-
             <section id="article-content-pieces" class="article-content-pieces">
               <div class="pieces-header">
                 <h3>Article Content Pieces</h3>
                 <p class="hint">Structured content for agent-first publishing.</p>
+                <p id="legacy-markdown-conversion-notice" class="legacy-markdown-conversion-notice" hidden>
+                  Legacy markdown was converted into one editable content piece.
+                </p>
               </div>
 
               <div id="pieces-container" class="pieces-container"></div>
@@ -200,6 +192,20 @@ const metadata = {
                 </button>
               </div>
             </section>
+
+            <details class="legacy-fallback-debug">
+              <summary>Legacy fallback / debug</summary>
+              <div class="field legacy-fallback-debug-content">
+                <div class="field-header">
+                  <label for="content">Article Body (Legacy Fallback)</label>
+                  <div class="field-actions">
+                    <button id="convert-to-pieces" class="btn-tertiary btn-xs" type="button">Convert to Pieces</button>
+                  </div>
+                </div>
+                <textarea id="content" name="content" placeholder="Paste article content here. Markdown is supported."
+                ></textarea>
+              </div>
+            </details>
 
             <div class="field">
               <label for="sources">Sources</label>
@@ -880,17 +886,22 @@ const metadata = {
     font-weight: 900;
   }
 
-  :global(.json-draft-lifecycle.is-published) {
+  :global(.json-draft-lifecycle.is-published),
+  :global(.json-draft-lifecycle.is-published-saved-json) {
     background: rgb(22 163 74 / 12%);
     color: rgb(22 101 52);
   }
 
-  :global(.json-draft-lifecycle.is-saved) {
+  :global(.json-draft-lifecycle.is-saved),
+  :global(.json-draft-lifecycle.is-saved-json-only),
+  :global(.json-draft-lifecycle.is-draft-workflow),
+  :global(.json-draft-lifecycle.is-mcp-workflow-record) {
     background: rgb(107 114 128 / 12%);
     color: rgb(75 85 99);
   }
 
-  :global(.json-draft-lifecycle.is-modified) {
+  :global(.json-draft-lifecycle.is-modified),
+  :global(.json-draft-lifecycle.is-unpublished-changes) {
     background: rgb(245 158 11 / 14%);
     color: rgb(146 64 14);
   }
@@ -1076,6 +1087,34 @@ const metadata = {
     margin-bottom: 1.5rem;
   }
 
+  .legacy-markdown-conversion-notice {
+    margin: 0.65rem 0 0;
+    border-left: 3px solid var(--aw-color-accent);
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.55rem;
+    background: rgb(94 140 138 / 10%);
+    color: var(--aw-color-text-muted);
+    font-size: 0.86rem;
+  }
+
+  .legacy-fallback-debug {
+    margin-top: 1.25rem;
+    border: 1px solid var(--aw-color-border);
+    border-radius: 0.8rem;
+    padding: 0.85rem 1rem;
+    background: rgb(255 255 255 / 70%);
+  }
+
+  .legacy-fallback-debug summary {
+    cursor: pointer;
+    color: var(--aw-color-text-heading);
+    font-weight: 800;
+  }
+
+  .legacy-fallback-debug-content {
+    margin-top: 0.85rem;
+  }
+
   .pieces-header h3 {
     margin: 0;
     font-size: 1.25rem;
@@ -1113,7 +1152,15 @@ const metadata = {
 
   :global(.piece-controls) {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.25rem;
+  }
+
+  :global(.piece-add-controls) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0.25rem 0 0.75rem;
   }
 
   :global(.piece-form) {
@@ -1148,6 +1195,22 @@ const metadata = {
     margin-top: 0.75rem;
     padding-top: 0.75rem;
     border-top: 1px solid var(--aw-color-border);
+  }
+
+  :global(.piece-type-change) {
+    border: 1px dashed var(--aw-color-border);
+    border-radius: 0.65rem;
+    padding: 0.65rem;
+  }
+
+  :global(.piece-type-change summary) {
+    cursor: pointer;
+    font-weight: 800;
+  }
+
+  :global(.piece-raw-json) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
   }
 
   .piece-action-icon {
@@ -2151,6 +2214,7 @@ const metadata = {
         piecesContainer: document.querySelector('#pieces-container'),
         addPiece: document.querySelector('#add-piece'),
         convertToPieces: document.querySelector('#convert-to-pieces'),
+        legacyMarkdownConversionNotice: document.querySelector('#legacy-markdown-conversion-notice'),
       };
 
       let articleNodes = [];
@@ -2180,6 +2244,12 @@ const metadata = {
       let workflowLockExpiresAt = '';
       let workflowLockRefreshTimer;
       let workflowReadOnlyMode = false;
+
+      const setLegacyMarkdownConversionNotice = (visible) => {
+        if (fields.legacyMarkdownConversionNotice) {
+          fields.legacyMarkdownConversionNotice.hidden = !visible;
+        }
+      };
       let articleStatus = { state: 'draft', published: null, checkedSlug: '' };
       let articleStatusRequestId = 0;
       const workflowLockOwnerId = 'admin-publish-ui';
@@ -3408,8 +3478,33 @@ const metadata = {
           piece.dataset.nodeId = node.id;
 
           const activeTemplateId = inferTemplateId(node);
-          const template = articleNodeTemplates[activeTemplateId] || articleNodeTemplates['prose_section'];
-          const allFields = [...template.fields.public, ...template.fields.optional];
+          const publicFields = node.public || {};
+          const hasPublicField = (field) => Object.prototype.hasOwnProperty.call(publicFields, field);
+          const mediaValue = publicFields.media;
+          const mediaIsObject = mediaValue && typeof mediaValue === 'object' && !Array.isArray(mediaValue);
+          const mediaSrc = mediaIsObject ? mediaValue.src || '' : typeof mediaValue === 'string' ? mediaValue : '';
+          const mediaAlt = mediaIsObject ? mediaValue.alt || '' : '';
+          const mediaCaption = mediaIsObject ? mediaValue.caption || '' : '';
+          const mediaType = mediaIsObject ? mediaValue.type || 'image' : 'image';
+          const commercialTypes = [
+            'adSlot',
+            'sponsoredPlacement',
+            'productMention',
+            'affiliateMention',
+            'partnerResource',
+            'offer',
+            'housePromotion',
+          ];
+          const commercialType = node.commercial?.type || '';
+          const commercialTypeOptions = [
+            '<option value="">None</option>',
+            ...(commercialType && !commercialTypes.includes(commercialType)
+              ? [`<option value="${window.escapeHtml(commercialType)}" selected>${window.escapeHtml(commercialType)}</option>`]
+              : []),
+            ...commercialTypes.map(
+              (type) => `<option value="${type}" ${commercialType === type ? 'selected' : ''}>${type}</option>`
+            ),
+          ].join('');
 
           const mainTemplateIds = ['prose_section', 'callout', 'summary', 'faq', 'soft_action'];
 
@@ -3433,16 +3528,28 @@ const metadata = {
             </optgroup>
           `;
 
-          const showTitle = allFields.includes('title');
-          const showBody = allFields.includes('body');
-          const showItems = allFields.includes('items');
-          const showCta = allFields.includes('ctaText') || allFields.includes('ctaLink');
-          const showLabel = allFields.includes('label');
-          const showMedia = allFields.includes('media');
+          const showTitle = hasPublicField('title');
+          const showBody = hasPublicField('body');
+          const showItems = hasPublicField('items');
+          const showCta = hasPublicField('ctaText') || hasPublicField('ctaLink');
+          const showLabel = hasPublicField('label');
+          const showMedia = hasPublicField('media');
+          const showCommercial = Boolean(node.commercial);
+          const showDisclosure = Boolean(node.commercial?.disclosure);
+          const showChat = Boolean(node.chat) || node.rendering?.presentation === 'chatInvite';
+          const showAddControls = !showCta || !showCommercial || !showChat || !showMedia || !showDisclosure;
+          const pieceSummary =
+            publicFields.label ||
+            publicFields.title ||
+            (Array.isArray(publicFields.items) && publicFields.items.length ? `${publicFields.items.length} item${publicFields.items.length === 1 ? '' : 's'}` : '') ||
+            (typeof publicFields.body === 'string' && publicFields.body.trim()
+              ? `${publicFields.body.trim().slice(0, 90)}${publicFields.body.trim().length > 90 ? '…' : ''}`
+              : '') ||
+            activeTemplateId.replaceAll('_', ' ');
 
           piece.innerHTML = `
             <div class="piece-header">
-              <span class="piece-id">${window.escapeHtml(node.id)}</span>
+              <span class="piece-id">${window.escapeHtml(pieceSummary)}</span>
               <div class="piece-controls">
                 <button class="btn-tertiary btn-xs move-up" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
                 <button class="btn-tertiary btn-xs move-down" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
@@ -3451,13 +3558,6 @@ const metadata = {
               </div>
             </div>
             <div class="piece-form">
-              <div class="field piece-template-selector">
-                <label>Template</label>
-                <select class="template-select">
-                  ${templateOptions}
-                </select>
-              </div>
-
               ${showTitle ? `
               <div class="field">
                 <label>Public Title</label>
@@ -3468,12 +3568,6 @@ const metadata = {
               <div class="field">
                 <label>Reader text (Body)</label>
                 <textarea class="piece-body" rows="4" placeholder="Body content">${window.escapeHtml(node.public?.body || '')}</textarea>
-              </div>` : ''}
-
-              ${showItems ? `
-              <div class="field">
-                <label>Items (One per line)</label>
-                <textarea class="piece-items" rows="3" placeholder="List items">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
               </div>` : ''}
 
               ${showCta ? `
@@ -3488,15 +3582,18 @@ const metadata = {
                 </div>
               </div>` : ''}
 
-              ${showMedia ? `
-              <div class="field">
-                <label>Media URL / Path</label>
-                <input type="text" class="piece-media" value="${window.escapeHtml(node.public?.media || '')}" placeholder="~/assets/images/..." />
-              </div>` : ''}
-
               <details class="piece-advanced">
                 <summary>Advanced / Agent Settings</summary>
                 <div class="piece-advanced-content">
+                  <details class="piece-type-change">
+                    <summary>Change piece type</summary>
+                    <div class="field piece-template-selector">
+                      <label>Template</label>
+                      <select class="template-select">
+                        ${templateOptions}
+                      </select>
+                    </div>
+                  </details>
                   <div class="field">
                     <label>Visibility</label>
                     <select class="piece-visibility">
@@ -3505,38 +3602,123 @@ const metadata = {
                       <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
                     </select>
                   </div>
-                  <div class="field">
-                    <label>Internal Strategy</label>
-                    <select class="piece-strategy">
-                      <option value="">None</option>
-                      ${[
-                        'hook', 'agitation', 'context', 'explanation', 'proof',
-                        'example', 'comparison', 'myth', 'step', 'recommendation',
-                        'resolution', 'summary'
-                      ].map(s => `<option value="${s}" ${node.private?.strategy === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('')}
-                    </select>
+                  <div class="field-grid">
+                    <div class="field">
+                      <label>Internal Strategy</label>
+                      <select class="piece-strategy">
+                        <option value="">None</option>
+                        ${[
+                          'hook', 'agitation', 'context', 'explanation', 'proof',
+                          'example', 'comparison', 'myth', 'step', 'recommendation',
+                          'resolution', 'summary'
+                        ].map(s => `<option value="${s}" ${node.private?.strategy === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Internal Intent</label>
+                      <select class="piece-intent">
+                        <option value="">None</option>
+                        ${['educate', 'persuade', 'reassure', 'convert', 'navigate'].map(intent => `<option value="${intent}" ${node.private?.intent === intent ? 'selected' : ''}>${intent.charAt(0).toUpperCase() + intent.slice(1)}</option>`).join('')}
+                      </select>
+                    </div>
                   </div>
-                  <div class="field">
-                    <label>Presentation Hint</label>
-                    <select class="piece-presentation">
-                      <option value="">Default</option>
-                      ${[
-                        'plain', 'section', 'callout', 'inline', 'card', 'panel',
-                        'faq', 'summary', 'chatInvite', 'adSlot', 'offerInline', 'offerCard'
-                      ].map(p => `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
-                    </select>
+                  <div class="field-grid">
+                    <div class="field">
+                      <label>Presentation Hint</label>
+                      <select class="piece-presentation">
+                        <option value="">Default</option>
+                        ${[
+                          'plain', 'section', 'callout', 'inline', 'card', 'panel',
+                          'faq', 'summary', 'chatInvite', 'adSlot', 'offerInline', 'offerCard'
+                        ].map(p => `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Placement Hint</label>
+                      <select class="piece-placement">
+                        <option value="">Default</option>
+                        ${['inline', 'section', 'sidebar', 'afterParagraph', 'footer'].map(placement => `<option value="${placement}" ${node.rendering?.placement === placement ? 'selected' : ''}>${placement}</option>`).join('')}
+                      </select>
+                    </div>
                   </div>
+                  ${showItems ? `
+                  <div class="field">
+                    <label>Items (One per line)</label>
+                    <textarea class="piece-items" rows="3" placeholder="List items">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
+                  </div>` : ''}
+                  ${showMedia ? `
+                  <div class="field-grid">
+                    <div class="field">
+                      <label>Media Type</label>
+                      <select class="piece-media-type">
+                        ${['image', 'video', 'audio', 'embed'].map((type) => `<option value="${type}" ${mediaType === type ? 'selected' : ''}>${type.charAt(0).toUpperCase() + type.slice(1)}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Media URL / Path</label>
+                      <input type="text" class="piece-media" value="${window.escapeHtml(mediaSrc)}" placeholder="~/assets/images/..." />
+                    </div>
+                  </div>
+                  <div class="field-grid">
+                    <div class="field">
+                      <label>Media Alt Text</label>
+                      <input type="text" class="piece-media-alt" value="${window.escapeHtml(mediaAlt)}" placeholder="Brief description" />
+                    </div>
+                    <div class="field">
+                      <label>Media Caption</label>
+                      <input type="text" class="piece-media-caption" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption" />
+                    </div>
+                  </div>` : ''}
+                  ${showChat ? `
+                  <div class="field-grid">
+                    <div class="field">
+                      <label>Chat Invite Text</label>
+                      <input type="text" class="piece-chat-invitation" value="${window.escapeHtml(node.chat?.invitationText || '')}" placeholder="Ask our assistant" />
+                    </div>
+                    <div class="field">
+                      <label>Suggested Chat Query</label>
+                      <input type="text" class="piece-chat-query" value="${window.escapeHtml(node.chat?.suggestedQuery || '')}" placeholder="What should readers ask?" />
+                    </div>
+                  </div>` : ''}
+                  ${showAddControls ? `
+                  <div class="piece-add-controls">
+                    ${!showCta ? '<button class="btn-tertiary btn-xs add-cta" type="button">Add CTA</button>' : ''}
+                    ${!showCommercial ? '<button class="btn-tertiary btn-xs add-commercial" type="button">Add commercial metadata</button>' : ''}
+                    ${!showChat ? '<button class="btn-tertiary btn-xs add-chat" type="button">Add chat invite</button>' : ''}
+                    ${!showMedia ? '<button class="btn-tertiary btn-xs add-media" type="button">Add media</button>' : ''}
+                    ${!showDisclosure ? '<button class="btn-tertiary btn-xs add-disclosure" type="button">Add disclosure</button>' : ''}
+                  </div>` : ''}
                   ${showLabel ? `
                   <div class="field">
                     <label>Admin Label</label>
                     <input type="text" class="piece-label" value="${window.escapeHtml(node.public?.label || '')}" placeholder="Label" />
                   </div>` : ''}
+                  ${showCommercial ? `
+                  <div class="field-grid">
+                    <div class="field">
+                      <label>Commercial Type</label>
+                      <select class="piece-commercial-type">${commercialTypeOptions}</select>
+                    </div>
+                    <div class="field">
+                      <label>Sponsor / Merchant</label>
+                      <input type="text" class="piece-commercial-sponsor" value="${window.escapeHtml(node.commercial?.sponsorName || node.commercial?.merchantName || node.commercial?.advertiserName || '')}" placeholder="Optional sponsor" />
+                    </div>
+                  </div>` : ''}
+                  ${showDisclosure ? `
                   <div class="field">
                     <label>Disclosure Required</label>
                     <div class="checkbox-field">
                       <input type="checkbox" class="piece-disclosure" ${node.commercial?.disclosure?.required ? 'checked' : ''} />
                       <span>Show sponsored label</span>
                     </div>
+                  </div>
+                  <div class="field">
+                    <label>Disclosure Label</label>
+                    <input type="text" class="piece-disclosure-label" value="${window.escapeHtml(node.commercial?.disclosure?.label || '')}" placeholder="Sponsored" />
+                  </div>` : ''}
+                  <div class="field">
+                    <label>Raw node JSON</label>
+                    <textarea class="piece-raw-json" rows="8" spellcheck="false">${window.escapeHtml(JSON.stringify(node, null, 2))}</textarea>
                   </div>
                 </div>
               </details>
@@ -3582,8 +3764,31 @@ const metadata = {
           }
 
           if (showMedia) {
-            piece.querySelector('.piece-media').addEventListener('input', (e) => {
-              node.public.media = e.target.value;
+            const updateMedia = () => {
+              node.public = node.public || {};
+              node.public.media = {
+                type: piece.querySelector('.piece-media-type')?.value || 'image',
+                src: piece.querySelector('.piece-media')?.value || '',
+                alt: piece.querySelector('.piece-media-alt')?.value || undefined,
+                caption: piece.querySelector('.piece-media-caption')?.value || undefined,
+              };
+              updateFromPieces();
+            };
+            piece.querySelector('.piece-media-type')?.addEventListener('change', updateMedia);
+            piece.querySelector('.piece-media')?.addEventListener('input', updateMedia);
+            piece.querySelector('.piece-media-alt')?.addEventListener('input', updateMedia);
+            piece.querySelector('.piece-media-caption')?.addEventListener('input', updateMedia);
+          }
+
+          if (showChat) {
+            piece.querySelector('.piece-chat-invitation')?.addEventListener('input', (e) => {
+              node.chat = node.chat || {};
+              node.chat.invitationText = e.target.value;
+              updateFromPieces();
+            });
+            piece.querySelector('.piece-chat-query')?.addEventListener('input', (e) => {
+              node.chat = node.chat || {};
+              node.chat.suggestedQuery = e.target.value;
               updateFromPieces();
             });
           }
@@ -3610,16 +3815,96 @@ const metadata = {
             updateFromPieces();
           });
 
+          piece.querySelector('.piece-intent').addEventListener('change', (e) => {
+            node.private = node.private || {};
+            node.private.intent = e.target.value || undefined;
+            updateFromPieces();
+          });
+
           piece.querySelector('.piece-presentation').addEventListener('change', (e) => {
             node.rendering = node.rendering || {};
             node.rendering.presentation = e.target.value || undefined;
             updateFromPieces();
           });
 
-          piece.querySelector('.piece-disclosure').addEventListener('change', (e) => {
+          piece.querySelector('.piece-placement').addEventListener('change', (e) => {
+            node.rendering = node.rendering || {};
+            node.rendering.placement = e.target.value || undefined;
+            updateFromPieces();
+          });
+
+          piece.querySelector('.piece-raw-json').addEventListener('change', (e) => {
+            try {
+              const parsedNode = JSON.parse(e.target.value);
+              articleNodes[index] = parsedNode;
+              renderPieces();
+              updateFromPieces();
+            } catch (error) {
+              window.alert(error instanceof Error ? `Raw node JSON is invalid: ${error.message}` : 'Raw node JSON is invalid.');
+            }
+          });
+
+          if (showCommercial) {
+            piece.querySelector('.piece-commercial-type')?.addEventListener('change', (e) => {
+              node.commercial = node.commercial || {};
+              node.commercial.type = e.target.value || undefined;
+              updateFromPieces();
+            });
+            piece.querySelector('.piece-commercial-sponsor')?.addEventListener('input', (e) => {
+              node.commercial = node.commercial || {};
+              node.commercial.sponsorName = e.target.value || undefined;
+              updateFromPieces();
+            });
+          }
+
+          if (showDisclosure) {
+            piece.querySelector('.piece-disclosure')?.addEventListener('change', (e) => {
+              node.commercial = node.commercial || {};
+              node.commercial.disclosure = node.commercial.disclosure || { required: false };
+              node.commercial.disclosure.required = e.target.checked;
+              updateFromPieces();
+            });
+            piece.querySelector('.piece-disclosure-label')?.addEventListener('input', (e) => {
+              node.commercial = node.commercial || {};
+              node.commercial.disclosure = node.commercial.disclosure || { required: false };
+              node.commercial.disclosure.label = e.target.value || undefined;
+              updateFromPieces();
+            });
+          }
+
+          piece.querySelector('.add-cta')?.addEventListener('click', () => {
+            node.public = node.public || {};
+            node.public.ctaText = node.public.ctaText || '';
+            node.public.ctaLink = node.public.ctaLink || '';
+            renderPieces();
+            updateFromPieces();
+          });
+
+          piece.querySelector('.add-commercial')?.addEventListener('click', () => {
+            node.commercial = node.commercial || { type: 'offer' };
+            renderPieces();
+            updateFromPieces();
+          });
+
+          piece.querySelector('.add-chat')?.addEventListener('click', () => {
+            node.chat = node.chat || { invitationText: '', suggestedQuery: '' };
+            node.rendering = node.rendering || {};
+            node.rendering.presentation = node.rendering.presentation || 'chatInvite';
+            renderPieces();
+            updateFromPieces();
+          });
+
+          piece.querySelector('.add-media')?.addEventListener('click', () => {
+            node.public = node.public || {};
+            node.public.media = { type: 'image', src: '' };
+            renderPieces();
+            updateFromPieces();
+          });
+
+          piece.querySelector('.add-disclosure')?.addEventListener('click', () => {
             node.commercial = node.commercial || {};
-            node.commercial.disclosure = node.commercial.disclosure || { required: false };
-            node.commercial.disclosure.required = e.target.checked;
+            node.commercial.disclosure = node.commercial.disclosure || { required: true, label: 'Sponsored' };
+            renderPieces();
             updateFromPieces();
           });
 
@@ -3778,6 +4063,7 @@ const metadata = {
         if (articleNodes.length === 0 && fields.content.value.trim()) {
            articleNodes = [createLegacyBodyNode(fields.content.value)];
            renderPieces();
+           setLegacyMarkdownConversionNotice(true);
         }
 
         const featuredPath = getFeaturedImagePath();
@@ -4412,6 +4698,7 @@ const metadata = {
         fields.overwrite.checked = false;
         articleNodes = [];
         renderPieces();
+        setLegacyMarkdownConversionNotice(false);
         selectedImages = [];
         stagedInlineMediaEntries = [];
         syncImageNames();
@@ -4630,10 +4917,12 @@ const metadata = {
           articleNodes = articleBody.nodes;
           renderPieces();
           fields.content.value = articleBodyToMarkdown(articleBody);
+          setLegacyMarkdownConversionNotice(false);
         } else {
           fields.content.value = article.content || '';
           articleNodes = [createLegacyBodyNode(fields.content.value)];
           renderPieces();
+          setLegacyMarkdownConversionNotice(Boolean(fields.content.value.trim()));
         }
         fields.sources.value = Array.isArray(article.sources) ? article.sources.join('\n') : article.sources || '';
         fields.videoLink.value = article.videoLink || article.video || '';
@@ -4887,14 +5176,155 @@ const metadata = {
         }
       };
 
-      const normalizeContentSourceImportWrapper = (data, currentSchemaVersion) => {
+
+      const partialPublishPayloadImportFields = ['slug', 'title', 'content', 'markdown', 'publishDate', 'draft'];
+      const partialPublishPayloadSignalFields = ['slug', 'markdown', 'publishDate', 'draft'];
+      const legacyArticleImportFields = ['title', 'content', 'excerpt', 'tags', 'sources'];
+      const legacyArticleSignalFields = ['excerpt', 'tags', 'sources'];
+
+      const hasAnyImportField = (object, fields) => fields.some((field) => hasOwn(object, field));
+
+      const normalizePublishPayloadImport = (payload) => ({
+        record_type: 'content_source',
+        schema_version: baselineContentSourceSchemaVersion,
+        content: {
+          title: typeof payload.title === 'string' ? payload.title : '',
+          markdown:
+            typeof payload.markdown === 'string'
+              ? payload.markdown
+              : typeof payload.content === 'string'
+                ? payload.content
+                : '',
+        },
+        publication: {
+          schema_version: 'publication.v1',
+          publication_status: payload.draft === true ? 'draft' : 'ready',
+          publish_payload: payload,
+        },
+        taxonomy: {
+          tags: Array.isArray(payload.tags) ? payload.tags : [],
+        },
+        sources: {
+          source_list: Array.isArray(payload.sources) ? payload.sources : [],
+        },
+      });
+
+      const normalizeArticleBodyImport = (articleBody) => ({
+        record_type: 'content_source',
+        schema_version: baselineContentSourceSchemaVersion,
+        content: {
+          article_body: articleBody,
+          markdown: articleBodyToMarkdown(articleBody),
+        },
+        publication: {
+          schema_version: 'publication.v1',
+          publication_status: 'draft',
+          publish_payload: {
+            markdown: articleBodyToMarkdown(articleBody),
+            article_body: articleBody,
+            draft: true,
+          },
+        },
+      });
+
+      const normalizeLegacyArticleImport = (article) => {
+        const articleBody = article.content?.article_body || article.article_body;
+        const markdown =
+          articleBody && Array.isArray(articleBody.nodes)
+            ? articleBodyToMarkdown(articleBody)
+            : typeof article.markdown === 'string'
+              ? article.markdown
+              : typeof article.content === 'string'
+                ? article.content
+                : '';
+
+        return {
+          record_type: 'content_source',
+          schema_version: baselineContentSourceSchemaVersion,
+          content: {
+            title: typeof article.title === 'string' ? article.title : '',
+            deck: typeof article.excerpt === 'string' ? article.excerpt : '',
+            markdown,
+            ...(articleBody && Array.isArray(articleBody.nodes) ? { article_body: articleBody } : {}),
+          },
+          publication: {
+            schema_version: 'publication.v1',
+            publication_status: article.draft === true ? 'draft' : 'ready',
+            publish_payload: {
+              title: article.title,
+              slug: article.slug,
+              author: article.author,
+              excerpt: article.excerpt,
+              description: article.description,
+              seoDescription: article.seoDescription || article.metadata?.description,
+              content: markdown,
+              markdown,
+              tags: article.tags,
+              sources: article.sources,
+              featuredImage: article.featuredImage || article.image,
+              image: article.image || article.featuredImage,
+              draft: article.draft,
+              ...(articleBody && Array.isArray(articleBody.nodes) ? { article_body: articleBody } : {}),
+            },
+          },
+          taxonomy: {
+            tags: Array.isArray(article.tags) ? article.tags : [],
+          },
+          sources: {
+            source_list: Array.isArray(article.sources) ? article.sources : [],
+          },
+        };
+      };
+
+      const classifyJsonImport = (data) => {
         if (!isPlainObject(data)) {
           throw new Error(
             'JSON import must be a single top-level object. Arrays or multiple article objects are not supported.'
           );
         }
 
-        const candidate = isPlainObject(data.input) ? data.input : data;
+        if (isPlainObject(data.input) && data.input.record_type === 'content_source') {
+          return { contentSource: data.input, loadedMessage: 'Loaded workflow record' };
+        }
+
+        if (data.record_type === 'content_source' && data.schema_version === baselineContentSourceSchemaVersion) {
+          return { contentSource: data, loadedMessage: 'Loaded published payload' };
+        }
+
+        if (data.schema_version === 'article_body.v1' && Array.isArray(data.nodes)) {
+          return {
+            contentSource: normalizeArticleBodyImport(data),
+            loadedMessage: 'Loaded article_body draft',
+            allowIncomplete: true,
+          };
+        }
+
+        if (
+          hasAnyImportField(data, legacyArticleSignalFields) ||
+          (hasAnyImportField(data, legacyArticleImportFields) && !hasAnyImportField(data, partialPublishPayloadSignalFields))
+        ) {
+          return {
+            contentSource: normalizeLegacyArticleImport(data),
+            loadedMessage: 'Loaded legacy markdown fallback',
+            allowIncomplete: true,
+          };
+        }
+
+        if (hasAnyImportField(data, partialPublishPayloadImportFields)) {
+          return {
+            contentSource: normalizePublishPayloadImport(data),
+            loadedMessage: 'Loaded partial publish payload',
+            isPartial: true,
+            allowIncomplete: true,
+          };
+        }
+
+        return { contentSource: data, loadedMessage: 'Loaded published payload' };
+      };
+
+      const normalizeContentSourceImportWrapper = (data, currentSchemaVersion) => {
+        const classification = classifyJsonImport(data);
+        const candidate = classification.contentSource;
         const allowedSchemaVersions = getAllowedContentSourceSchemaVersions(currentSchemaVersion);
         if (candidate.record_type !== 'content_source' || !allowedSchemaVersions.has(candidate.schema_version)) {
           throw new Error(getUnsupportedSchemaMessage(currentSchemaVersion));
@@ -4953,7 +5383,7 @@ const metadata = {
         ]);
         assertOptionalSourceListPath(candidate);
 
-        return candidate;
+        return { ...classification, contentSource: candidate };
       };
 
       const validateContentSourceImportFormData = (formData) => {
@@ -4961,6 +5391,8 @@ const metadata = {
         if (!allowedSchemaVersions.has(formData.schemaVersion)) {
           throw new Error(getUnsupportedSchemaMessage(formData.currentSchemaVersion));
         }
+
+        if (formData.allowIncomplete) return;
 
         if (!formData.title.exists || !formData.title.value.trim()) {
           throw new Error('Import JSON must include a non-empty title.');
@@ -4977,8 +5409,11 @@ const metadata = {
 
       const parseContentSourceImportFormData = async (data) => {
         const currentSchemaVersion = await getCurrentContentSourceSchemaVersion();
-        const contentSource = normalizeContentSourceImportWrapper(data, currentSchemaVersion);
-        const formData = normalizeContentSourceImportToFormData(contentSource, currentSchemaVersion);
+        const importData = normalizeContentSourceImportWrapper(data, currentSchemaVersion);
+        const formData = normalizeContentSourceImportToFormData(importData.contentSource, currentSchemaVersion);
+        formData.loadedMessage = importData.loadedMessage;
+        formData.isPartial = Boolean(importData.isPartial);
+        formData.allowIncomplete = Boolean(importData.allowIncomplete || importData.isPartial);
         validateContentSourceImportFormData(formData);
         return formData;
       };
@@ -4994,8 +5429,10 @@ const metadata = {
           // Sync pieces from imported content
           if (formData.articleBody?.exists && Array.isArray(formData.articleBody.value?.nodes)) {
             articleNodes = formData.articleBody.value.nodes;
+            setLegacyMarkdownConversionNotice(false);
           } else {
             articleNodes = [createLegacyBodyNode(fields.content.value)];
+            setLegacyMarkdownConversionNotice(Boolean(fields.content.value.trim()));
           }
           renderPieces();
         }
@@ -5230,7 +5667,11 @@ const metadata = {
           await applyContentSourceImportFormData(formData);
           setUnsavedChanges(true);
           await fetchPublishedArticleStatus({ force: true });
-          setJsonImportStatus(`${formData.schemaVersion} JSON loaded into the publishing form.`);
+          setJsonImportStatus(
+            formData.isPartial
+              ? `${formData.loadedMessage}. Partial data was loaded; review missing article fields before publishing.`
+              : `${formData.loadedMessage || `${formData.schemaVersion} JSON loaded into the publishing form.`}.`
+          );
           return true;
         } catch (error) {
           const message = error instanceof Error ? error.message : 'JSON import could not be parsed.';
@@ -5475,9 +5916,15 @@ const metadata = {
       };
 
       const getJsonDraftLifecycleLabel = (draft) => {
-        if (draft.lifecycleStatus === 'modified') return { label: '⚠ Unpublished Changes', className: 'is-modified' };
-        if (draft.published?.exists) return { label: '✓ Published', className: 'is-published' };
-        return { label: '○ Saved Draft', className: 'is-saved' };
+        const status = draft.recordStatus || draft.lifecycleStatus;
+        if (status === 'published') return { label: 'Published', className: 'is-published' };
+        if (status === 'published_saved_json') return { label: 'Published + Saved JSON', className: 'is-published-saved-json' };
+        if (status === 'saved_json_only') return { label: 'Saved JSON only', className: 'is-saved-json-only' };
+        if (status === 'draft_workflow') return { label: 'Draft workflow', className: 'is-draft-workflow' };
+        if (status === 'unpublished_changes' || status === 'modified') return { label: 'Unpublished changes', className: 'is-unpublished-changes' };
+        if (status === 'mcp_workflow_record') return { label: 'MCP workflow record', className: 'is-mcp-workflow-record' };
+        if (draft.published?.exists) return { label: 'Published', className: 'is-published' };
+        return { label: 'Saved JSON only', className: 'is-saved-json-only' };
       };
 
       const renderJsonDraftLifecycleMeta = (draft) => {
@@ -5936,6 +6383,7 @@ const metadata = {
 
       fields.addPiece.addEventListener('click', () => {
         articleNodes.push(createDefaultNodeFromTemplate('prose_section'));
+        setLegacyMarkdownConversionNotice(false);
         renderPieces();
         updateFromPieces();
       });
@@ -5943,6 +6391,7 @@ const metadata = {
       fields.convertToPieces.addEventListener('click', () => {
         if (fields.content.value.trim()) {
           articleNodes = [createLegacyBodyNode(fields.content.value)];
+          setLegacyMarkdownConversionNotice(true);
           renderPieces();
           updateFromPieces();
         }

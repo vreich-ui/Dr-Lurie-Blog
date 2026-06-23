@@ -30,6 +30,7 @@ type PublishedSummary = {
   date: string;
   by: string;
   articlePath: string;
+  articleExists: boolean;
 };
 
 type DraftSummary = {
@@ -42,7 +43,14 @@ type DraftSummary = {
   savedAt: string;
   savedBy: string;
   published: PublishedSummary;
-  lifecycleStatus: 'saved' | 'published' | 'modified';
+  recordStatus:
+    | 'published'
+    | 'published_saved_json'
+    | 'saved_json_only'
+    | 'draft_workflow'
+    | 'unpublished_changes'
+    | 'mcp_workflow_record';
+  lifecycleStatus?: 'saved' | 'published' | 'modified';
   readiness: {
     isReady: boolean;
     missing: string[];
@@ -74,6 +82,12 @@ const getHistoryDetails = (entry: WorkflowRecord['history'][number]) =>
 const getLastHistoryEntry = (record: WorkflowRecord, action: string) =>
   [...record.history].reverse().find((entry) => entry.action === action);
 
+const getInputWorkflowStatus = (record: WorkflowRecord) =>
+  isRecord(record.input) ? toText((record.input as Record<string, unknown>).workflow_status) : '';
+
+const hasPublishedWorkflowStatus = (record: WorkflowRecord) =>
+  getInputWorkflowStatus(record) === 'published' || record.workflow_status === 'published';
+
 const getSavedMetadata = (record: WorkflowRecord, author: string) => {
   const savedEntry = getLastHistoryEntry(record, 'admin_save_draft');
   const details = savedEntry ? getHistoryDetails(savedEntry) : {};
@@ -83,12 +97,23 @@ const getSavedMetadata = (record: WorkflowRecord, author: string) => {
   };
 };
 
+const getCommitMetadata = (details: Record<string, unknown>) =>
+  details.commit_metadata && typeof details.commit_metadata === 'object'
+    ? (details.commit_metadata as Record<string, unknown>)
+    : {};
+
 const getMarkedPublishedMetadata = (record: WorkflowRecord, author: string) => {
   const publishedEntry = getLastHistoryEntry(record, 'mark_published');
   const details = publishedEntry ? getHistoryDetails(publishedEntry) : {};
+  const commitMetadata = getCommitMetadata(details);
+  const articlePath = toText(commitMetadata.articlePath) || toText(commitMetadata.article_path);
+  const commit = toText(commitMetadata.commit) || toText(commitMetadata.sha);
+  const reliable = Boolean(publishedEntry?.at && (articlePath || commit));
+
   return {
-    date: publishedEntry?.at || '',
-    by: toText(details.owner_label) || author || 'Unknown',
+    date: reliable ? publishedEntry?.at || '' : '',
+    by: reliable ? toText(details.owner_label) || author || 'Unknown' : '',
+    reliable,
   };
 };
 
@@ -135,7 +160,13 @@ const getPublishedArticleMetadata = async (slug: string, record: WorkflowRecord,
   const marked = getMarkedPublishedMetadata(record, author);
 
   if (!slug || !token || !repo) {
-    return { exists: false, date: marked.date, by: marked.by, articlePath };
+    return {
+      exists: hasPublishedWorkflowStatus(record) || marked.reliable,
+      date: marked.date,
+      by: marked.by,
+      articlePath,
+      articleExists: false,
+    };
   }
 
   try {
@@ -145,7 +176,13 @@ const getPublishedArticleMetadata = async (slug: string, record: WorkflowRecord,
     );
 
     if (!file || file.encoding !== 'base64' || !file.content) {
-      return { exists: false, date: marked.date, by: marked.by, articlePath };
+      return {
+        exists: hasPublishedWorkflowStatus(record) || marked.reliable,
+        date: marked.date,
+        by: marked.by,
+        articlePath,
+        articleExists: false,
+      };
     }
 
     const markdown = Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8');
@@ -154,17 +191,46 @@ const getPublishedArticleMetadata = async (slug: string, record: WorkflowRecord,
       date: marked.date || parseFrontmatterScalar(markdown, 'publishDate'),
       by: marked.by || parseFrontmatterScalar(markdown, 'author') || author || 'Unknown',
       articlePath,
+      articleExists: true,
     };
   } catch (error) {
     console.warn('Published article metadata could not be loaded for JSON draft status.', { articlePath, error });
-    return { exists: false, date: marked.date, by: marked.by, articlePath };
+    return {
+      exists: hasPublishedWorkflowStatus(record) || marked.reliable,
+      date: marked.date,
+      by: marked.by,
+      articlePath,
+      articleExists: false,
+    };
   }
 };
 
-const getLifecycleStatus = (savedAt: string, published: PublishedSummary): DraftSummary['lifecycleStatus'] => {
-  if (!published.exists) return 'saved';
-  if (savedAt && published.date && Date.parse(savedAt) > Date.parse(published.date)) return 'modified';
-  return 'published';
+const isNewerIsoDate = (left: string, right: string) => {
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime > rightTime;
+};
+
+const getRecordStatus = (
+  record: WorkflowRecord,
+  savedAt: string,
+  published: PublishedSummary,
+  isAdminRecord: boolean
+): DraftSummary['recordStatus'] => {
+  if (published.exists && savedAt && published.date && isNewerIsoDate(savedAt, published.date))
+    return 'unpublished_changes';
+  if (published.articleExists) return 'published_saved_json';
+  if (published.exists) return 'published';
+  if (isAdminRecord && record.input.publication?.publication_status === 'draft') return 'draft_workflow';
+  if (!isAdminRecord) return 'mcp_workflow_record';
+  return 'saved_json_only';
+};
+
+const getLifecycleStatus = (recordStatus: DraftSummary['recordStatus']): DraftSummary['lifecycleStatus'] => {
+  if (recordStatus === 'unpublished_changes') return 'modified';
+  if (recordStatus === 'published' || recordStatus === 'published_saved_json') return 'published';
+  return 'saved';
 };
 
 const getPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
@@ -196,6 +262,8 @@ const toDraftSummary = async (key: string, record: WorkflowRecord): Promise<Draf
   const { author, markdown, slug, title } = getDraftFields(record);
   const { savedAt, savedBy } = getSavedMetadata(record, author);
   const published = await getPublishedArticleMetadata(slug, record, author);
+  const adminRecord = isAdminDraftRecord(record);
+  const recordStatus = getRecordStatus(record, savedAt, published, adminRecord);
   const missing = [
     ...(title && title !== 'Untitled draft' ? [] : ['title']),
     ...(author ? [] : ['author']),
@@ -214,7 +282,8 @@ const toDraftSummary = async (key: string, record: WorkflowRecord): Promise<Draf
     savedAt,
     savedBy,
     published,
-    lifecycleStatus: getLifecycleStatus(savedAt, published),
+    recordStatus,
+    lifecycleStatus: getLifecycleStatus(recordStatus),
     readiness: {
       isReady: missing.length === 0,
       missing,
@@ -251,7 +320,7 @@ const listJsonDrafts = async (store: WorkflowBlobStore) => {
     keys.map(async (key) => {
       const record = await loadRecord(store, key);
 
-      return record && isAdminDraftRecord(record) ? await toDraftSummary(key, record) : undefined;
+      return record ? await toDraftSummary(key, record) : undefined;
     })
   );
 
