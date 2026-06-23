@@ -1520,12 +1520,6 @@ const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string,
   return toolResult(body);
 };
 
-const omitStructuredArticleBodyForPublish = (payload: Record<string, unknown>) => {
-  const { article_body, ...publishPayload } = payload;
-  void article_body;
-  return publishPayload;
-};
-
 const callPublishArticleNow = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const requestId = toNonEmptyString(input.request_id);
   const lockToken = toNonEmptyString(input.lock_token);
@@ -1564,7 +1558,7 @@ const callPublishArticleNow = async (event: LambdaEvent, input: Record<string, u
   }
 
   const publishResult = await callPublishArticle(event, {
-    ...omitStructuredArticleBodyForPublish(publishPayload),
+    ...publishPayload,
     requestId,
     request_id: requestId,
     lock_token: lockToken,

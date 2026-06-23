@@ -159,3 +159,18 @@ Each agent should patch its stage output with `save_json_blob_patch_agent_output
   "metadata": {}
 }
 ```
+
+## Finalization and MCP image publishing
+
+For MCP article publishing, `agent_outputs.final_article` is a reviewed candidate output only. The reusable publish-now flow promotes that candidate into root `input.publication.publish_payload` before invoking the article publisher. After promotion, root `input.publication.publish_payload` is the canonical finalized payload used for publishing and `input.publication.publication_status` is set to `ready`.
+
+Status semantics:
+
+- `publication_status: "draft"` means the payload is saved but not publishable yet.
+- `publication_status: "ready"` means the payload is approved for immediate publish-now.
+- `publication_status: "scheduled"` plus `publication.scheduled_for` means the due scheduled-publish helper may publish it when due.
+- `workflow_status: "published"` means an actual publish completed successfully; do not use `mark_published` as a substitute for publishing.
+
+For `article_body.v1`, keep `input.content.article_body` as canonical content. The publishing flow may generate body-only Markdown from `article_body` for legacy publisher compatibility, and `node.private` remains internal metadata that must never be serialized into generated Markdown.
+
+MCP image artifacts must be normalized before publishing. The publish-now promotion helper accepts common final article image shapes such as `image`, `featuredImage`, `featured_image`, `artifactReferences[]`, `mediaEntries[]`, and `images[]`, preserves the immutable artifact reference, and selects an explicit featured artifact first or the first valid image artifact otherwise. Optional image-normalization problems are reported as warnings instead of silently dropping the image.

@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createRequest } from '../../netlify/functions/save-json-blob.js';
+import { handler as publishHandler } from '../../netlify/functions/publish-article.js';
+import { handler as saveArtifactHandler } from '../../netlify/functions/save-artifact.js';
+import {
+  checkoutRequest,
+  createRequest,
+  markPublished,
+  patchAgentOutput,
+  preparePublishNow,
+} from '../../netlify/functions/save-json-blob.js';
 import { normalizeContentSourceImportToFormData } from '../../src/lib/contentSourceImportFormData.js';
 import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import { validateContentSourceV1 } from '../../src/schema/schema-v1.js';
@@ -258,6 +266,173 @@ test('create_request honors explicit initial routing fields over workflow defaul
   assert.equal(body.ok, true);
   assert.equal(body.record.current_stage, 'final_article');
   assert.equal(body.record.next_agent, null);
+});
+
+test('prepare_publish_now promotes final_article with article_body and image artifact normalization', async () => {
+  const store = createMemoryStore();
+  const input = adminPublishDraftInputWithBody({
+    content: {
+      title: 'Structured Final Article',
+      article_body: {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_a1b2c3',
+            kind: 'content',
+            public: { body: 'Structured public body wins.' },
+            private: { strategy: 'Do not publish this private note.' },
+          },
+        ],
+      },
+    },
+    publication: {
+      publication_status: 'draft',
+      publish_payload: {
+        slug: 'structured-final-article',
+        title: 'Draft shell title',
+        markdown: 'Legacy markdown should lose.',
+      },
+    },
+  });
+  const publishSecret = 'content-source-publish-secret';
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-content-source-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  const pngBytesBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8DwnwEJMDGgAcQBAJkKBAU8O1d8AAAAAElFTkSuQmCC';
+  const uploadResponse = await saveArtifactHandler({
+    httpMethod: 'POST',
+    headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      requestId: 'req_prepare_publish_final_article',
+      artifactKind: 'image',
+      contentType: 'image/png',
+      filename: 'normalized-hero.png',
+      encoding: 'base64',
+      payload: pngBytesBase64,
+      metadata: { alt: 'Hero alt text', caption: 'Hero caption' },
+    }),
+  });
+  assert.ok(uploadResponse.statusCode >= 200 && uploadResponse.statusCode < 300, uploadResponse.body);
+  const artifactReference = JSON.parse(uploadResponse.body).artifact;
+
+  const createResponse = await createRequest(store, {
+    action: 'create_request',
+    request_id: 'req_prepare_publish_final_article',
+    input,
+    current_agent: 'final_article',
+    next_agent: null,
+    validation_mode: 'admin_publish_draft',
+  });
+  assert.equal(createResponse.statusCode, 201, createResponse.body);
+
+  const checkoutResponse = await checkoutRequest(store, {
+    action: 'checkout_request',
+    request_id: 'req_prepare_publish_final_article',
+    owner_id: 'test-agent',
+    owner_label: 'Test agent',
+  });
+  const checkoutBody = parseResponseBody(checkoutResponse);
+  const lockToken = checkoutBody.record.lock.token;
+
+  const patchResponse = await patchAgentOutput(store, {
+    action: 'patch_agent_output',
+    request_id: 'req_prepare_publish_final_article',
+    agent_name: 'final_article',
+    expected_agent_version: 0,
+    lock_token: lockToken,
+    output: {
+      title: 'Reviewed Final Title',
+      slug: 'structured-final-article',
+      author: 'Dr. Lurié',
+      image: { artifactReference, alt: 'Hero alt text', caption: 'Hero caption' },
+    },
+  });
+  const patchBody = parseResponseBody(patchResponse);
+  assert.equal(patchResponse.statusCode, 200, patchResponse.body);
+
+  const prepareResponse = await preparePublishNow(store, {
+    action: 'prepare_publish_now',
+    request_id: 'req_prepare_publish_final_article',
+    expected_record_version: patchBody.record.version,
+    lock_token: lockToken,
+  });
+  const prepareBody = parseResponseBody(prepareResponse);
+  assert.equal(prepareResponse.statusCode, 200, prepareResponse.body);
+  assert.equal(prepareBody.record.input.publication.publication_status, 'ready');
+  assert.equal(prepareBody.record.workflow_status, 'completed');
+  assert.equal(prepareBody.publish_payload.title, 'Reviewed Final Title');
+  assert.equal(prepareBody.publish_payload.markdown, 'Structured public body wins.');
+  assert.equal(prepareBody.publish_payload.markdown.includes('Do not publish this private note.'), false);
+  assert.deepEqual(
+    prepareBody.publish_payload.article_body,
+    (input.content as { article_body?: unknown }).article_body
+  );
+  assert.equal(prepareBody.publish_payload.featuredImage, artifactReference.blobKey);
+  assert.deepEqual(prepareBody.publish_payload.artifactReferences, [artifactReference]);
+  assert.deepEqual(prepareBody.record.agent_outputs.final_article.output.image.artifactReference, artifactReference);
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  globalThis.fetch = (async (fetchInput: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(fetchInput);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/structured-final-article.md'))
+      return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const publishResponse = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...prepareBody.publish_payload,
+        requestId: 'req_prepare_publish_final_article',
+        request_id: 'req_prepare_publish_final_article',
+        lock_token: lockToken,
+      }),
+    });
+    assert.equal(publishResponse.statusCode, 201, publishResponse.body);
+    assert.match(
+      blobWrites[0]?.content ?? '',
+      /image: "~\/assets\/images\/uploads\/structured-final-article\/normalized-hero\.png"/
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  const markResponse = await markPublished(store, {
+    action: 'mark_published',
+    request_id: 'req_prepare_publish_final_article',
+    expected_record_version: prepareBody.record.version,
+    lock_token: lockToken,
+    commit_metadata: {
+      commit: 'commit-after-real-publish',
+      articlePath: 'src/data/post/structured-final-article.md',
+      deployStatus: 'queued',
+    },
+  });
+  const markBody = parseResponseBody(markResponse);
+  assert.equal(markResponse.statusCode, 200, markResponse.body);
+  assert.equal(markBody.record.workflow_status, 'published');
+  assert.equal(markBody.record.lock, undefined);
 });
 
 test('create_request accepts a minimal admin-publish draft with publish payload markdown', async () => {

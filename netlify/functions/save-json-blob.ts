@@ -787,6 +787,8 @@ const finalArticleStringKeyMappings: Array<{ from: string; to: keyof PublishPayl
   { from: 'excerpt', to: 'excerpt' },
   { from: 'seoDescription', to: 'seoDescription' },
   { from: 'featuredImage', to: 'featuredImage' },
+  { from: 'featured_image', to: 'featuredImage' },
+  { from: 'image', to: 'featuredImage' },
   { from: 'content', to: 'content' },
   { from: 'markdown', to: 'markdown' },
   { from: 'body', to: 'content' },
@@ -796,7 +798,86 @@ const finalArticleArrayKeyMappings: Array<{ from: string; to: keyof PublishPaylo
   { from: 'tags', to: 'tags' },
   { from: 'mediaEntries', to: 'mediaEntries' },
   { from: 'artifactReferences', to: 'artifactReferences' },
+  { from: 'images', to: 'images' },
 ];
+
+const isLikelyImageArtifactReference = (value: unknown): value is Record<string, unknown> => {
+  if (!isRecordValue(value) || typeof value.blobKey !== 'string') return false;
+
+  const contentType = typeof value.contentType === 'string' ? value.contentType.toLowerCase() : '';
+  return contentType.startsWith('image/') || value.blobKey.startsWith('image/');
+};
+
+const readArtifactReferenceFromImageValue = (value: unknown) => {
+  if (isLikelyImageArtifactReference(value)) return value;
+  if (!isRecordValue(value)) return undefined;
+
+  const nestedReference = value.artifactReference ?? value.artifact_reference ?? value.reference;
+  if (isLikelyImageArtifactReference(nestedReference)) return nestedReference;
+
+  return undefined;
+};
+
+const appendUniqueArtifactReference = (references: unknown[], reference: Record<string, unknown>) => {
+  const blobKey = typeof reference.blobKey === 'string' ? reference.blobKey : undefined;
+  if (!blobKey) return references;
+  if (references.some((entry) => isRecordValue(entry) && entry.blobKey === blobKey)) return references;
+
+  return [...references, reference];
+};
+
+const normalizeFinalArticleImageArtifacts = (
+  publishPayload: Partial<PublishPayload>,
+  outputRecord: Record<string, unknown> | undefined,
+  input: ContentSourceV1
+) => {
+  const warnings: string[] = [];
+  const previousReferences = Array.isArray(publishPayload.artifactReferences) ? publishPayload.artifactReferences : [];
+  let artifactReferences = [...previousReferences];
+
+  const explicitImageValue = outputRecord?.featuredImage ?? outputRecord?.featured_image ?? outputRecord?.image;
+  const explicitReference = readArtifactReferenceFromImageValue(explicitImageValue);
+
+  const inputWithArtifacts = input as ContentSourceV1 & {
+    artifactReferences?: unknown;
+    mediaEntries?: unknown;
+    images?: unknown;
+  };
+  const candidateArrays = [
+    outputRecord?.artifactReferences,
+    inputWithArtifacts.artifactReferences,
+    inputWithArtifacts.mediaEntries,
+    inputWithArtifacts.images,
+    outputRecord?.mediaEntries,
+    outputRecord?.images,
+  ];
+
+  for (const candidateArray of candidateArrays) {
+    if (!Array.isArray(candidateArray)) continue;
+    for (const candidate of candidateArray) {
+      const reference = readArtifactReferenceFromImageValue(candidate);
+      if (reference) artifactReferences = appendUniqueArtifactReference(artifactReferences, reference);
+    }
+  }
+
+  if (explicitReference) {
+    artifactReferences = appendUniqueArtifactReference(artifactReferences, explicitReference);
+    publishPayload.featuredImage = explicitReference.blobKey as string;
+  } else if (!publishPayload.featuredImage) {
+    const firstReference = artifactReferences.find(isLikelyImageArtifactReference);
+    if (firstReference) publishPayload.featuredImage = firstReference.blobKey as string;
+  }
+
+  if (artifactReferences.length) publishPayload.artifactReferences = artifactReferences as never;
+
+  if (explicitImageValue && !explicitReference && isRecordValue(explicitImageValue)) {
+    warnings.push(
+      'final_article image field did not contain a valid image ArtifactReference; publishing will continue without using it as the featured artifact.'
+    );
+  }
+
+  return warnings;
+};
 
 const readFinalArticleOutputContainer = (output: unknown) => {
   if (!isRecordValue(output)) return undefined;
@@ -813,6 +894,8 @@ const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, output: u
   const previousPayload: Partial<PublishPayload> = previousPublication.publish_payload ?? {};
   const publishPayload: Partial<PublishPayload> = { ...previousPayload };
 
+  if (input.content?.article_body) publishPayload.article_body = input.content.article_body;
+
   if (outputRecord) {
     for (const { from, to } of finalArticleStringKeyMappings) {
       const value = nonEmptyText(outputRecord[from]);
@@ -825,11 +908,14 @@ const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, output: u
     }
   }
 
+  const normalizationWarnings = normalizeFinalArticleImageArtifacts(publishPayload, outputRecord, input);
+
   return {
     ...input,
     publication: {
       ...previousPublication,
       schema_version: 'publication.v1',
+      ...(normalizationWarnings.length ? { normalization_warnings: normalizationWarnings } : {}),
       publish_payload: publishPayload as PublishPayload,
     },
   };
@@ -1610,6 +1696,7 @@ const normalizePublishNowPayload = (input: ContentSourceV1, rawPayload: unknown)
   const publishPayload: PublishPayload = {
     ...previousPayload,
     ...incomingPayload,
+    ...(input.content?.article_body ? { article_body: input.content.article_body } : {}),
     slug: slug!,
     title: title!,
     author: author!,
@@ -1643,7 +1730,11 @@ export const preparePublishNow = async (store: WorkflowBlobStore, body: Workflow
     });
   }
 
-  const normalized = normalizePublishNowPayload(previousRecord.input, body.publish_payload);
+  const promotedInput = normalizeFinalArticlePublicationInput(
+    previousRecord.input,
+    previousRecord.agent_outputs.final_article?.output
+  );
+  const normalized = normalizePublishNowPayload(promotedInput, body.publish_payload);
   if (!normalized.ok) {
     return jsonResponse(400, {
       action: body.action,
@@ -1669,7 +1760,7 @@ export const preparePublishNow = async (store: WorkflowBlobStore, body: Workflow
       input: {
         ...previousRecord.input,
         publication: {
-          ...(previousRecord.input.publication ?? {}),
+          ...(promotedInput.publication ?? {}),
           schema_version: 'publication.v1',
           publication_status: 'ready',
           publish_payload: normalized.publishPayload,
@@ -1739,6 +1830,7 @@ export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequ
         ...latestRecord,
         updated_at: timestamp,
         workflow_status: 'published',
+        lock: undefined,
         history: [
           ...latestRecord.history,
           {
