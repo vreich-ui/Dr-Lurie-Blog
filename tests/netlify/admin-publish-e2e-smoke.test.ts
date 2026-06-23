@@ -292,7 +292,7 @@ test('admin publish pseudo-E2E propagates lock through draft save, publish, mark
     assert.equal(publishedRecord.next_agent, null);
     assert.deepEqual(publishedRecord.completed_agents, finalCompleteRecord.completed_agents);
     assert.deepEqual(publishedRecord.agent_outputs.final_article, finalCompleteRecord.agent_outputs.final_article);
-    assert.equal(publishedRecord.lock?.token, lockToken);
+    assert.equal(publishedRecord.lock, undefined);
     assert.deepEqual(publishedRecord.history.at(-1)?.details?.commit_metadata, {
       commit: 'published-smoke-commit',
       articlePath: 'src/data/post/admin-publish-e2e-smoke.md',
