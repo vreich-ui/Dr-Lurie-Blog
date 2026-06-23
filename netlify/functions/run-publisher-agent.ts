@@ -101,7 +101,7 @@ const publishToolInputSchema = z
   .superRefine((value, ctx) => {
     if (!value.markdown && !value.content) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'Either markdown or content is required.',
         path: ['markdown'],
       });
