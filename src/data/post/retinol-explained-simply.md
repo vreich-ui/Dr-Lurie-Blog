@@ -1,8 +1,8 @@
 ---
-publishDate: 2026-06-23T11:02:00Z
+publishDate: 2026-06-23T12:09:00Z
 title: "Retinol, Explained Simply"
 excerpt: "Retinol can be useful, but it works best when introduced slowly, paired with sunscreen, and treated as a long-term routine rather than a quick fix."
-image: "~/assets/images/uploads/retinol-explained-simply/retinol-explained-simply-hero.png"
+image: "~/assets/images/uploads/retinol-explained-simply/retinol-explained-simply-no-text-hero.png"
 ctaLink: "/resources/retinol-start-low-slow"
 ctaText: "Use the Retinol Starter Plan"
 category: "Skin Health"
