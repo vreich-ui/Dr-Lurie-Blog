@@ -280,7 +280,7 @@ test('prepare_publish_now promotes final_article with article_body and image art
             id: 'n_a1b2c3',
             kind: 'content',
             public: { body: 'Structured public body wins.' },
-            private: { strategy: 'Do not publish this private note.' },
+            private: { agentNotes: 'Do not publish this private note.' },
           },
         ],
       },

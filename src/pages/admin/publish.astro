@@ -40,7 +40,7 @@ const metadata = {
 
     <AdminNav />
 
-    <div class="publish-workspace" data-auth-gated hidden>
+    <div class="publish-workspace" data-auth-gated>
       <section class="admin-card json-import-panel" aria-labelledby="json-import-heading">
         <div class="json-import-card">
           <div class="json-import-header">
@@ -184,6 +184,20 @@ const metadata = {
                 </p>
               </div>
 
+              <div class="pieces-quick-add" aria-label="Quick add content">
+                <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button>
+                <button class="btn-tertiary btn-xs quick-add" data-template="soft_action" type="button">+ CTA</button>
+                <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button">+ Offer</button>
+                <button class="btn-tertiary btn-xs quick-add" data-template="chat_invite" type="button">+ Chat</button>
+                <button class="btn-tertiary btn-xs quick-add" data-template="faq" type="button">+ FAQ</button>
+              </div>
+
+              <div id="pieces-empty-state" class="pieces-empty-state" hidden>
+                <h4>Build Your Article</h4>
+                <p>Articles are made of reusable content blocks. Start with a text section.</p>
+                <button class="btn-primary btn-sm quick-add" data-template="prose_section" type="button">Add First Section</button>
+              </div>
+
               <div id="pieces-container" class="pieces-container"></div>
 
               <div class="pieces-actions">
@@ -192,6 +206,23 @@ const metadata = {
                   <span>Add piece</span>
                 </button>
               </div>
+
+              <dialog id="block-library-modal" class="json-draft-modal" aria-labelledby="block-library-heading">
+                <div class="json-draft-modal-card">
+                  <div class="json-draft-modal-header">
+                    <div>
+                      <p class="sidebar-kicker">Block Library</p>
+                      <h3 id="block-library-heading">Choose a content piece type</h3>
+                    </div>
+                    <button id="block-library-close" class="module-icon-button" type="button" aria-label="Close library">
+                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div id="block-library-list" class="block-library-list">
+                    <!-- Templates will be rendered here -->
+                  </div>
+                </div>
+              </dialog>
             </section>
 
             <details class="legacy-fallback-debug">
@@ -1152,27 +1183,170 @@ const metadata = {
     margin-bottom: 1.5rem;
   }
 
+  .pieces-quick-add {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--aw-color-bg-surface);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 0.75rem;
+  }
+
+  .pieces-empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--aw-color-bg-surface);
+    border: 2px dashed var(--aw-color-border);
+    border-radius: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .pieces-empty-state h4 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .pieces-empty-state p {
+    color: var(--aw-color-text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .block-library-list {
+    display: grid;
+    gap: 0.75rem;
+    max-height: 60vh;
+    overflow: auto;
+  }
+
+  :global(.block-template-choice) {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    width: 100%;
+    padding: 1rem;
+    text-align: left;
+    background: var(--aw-color-bg-surface);
+    border: 1px solid var(--aw-color-border);
+    border-radius: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  :global(.block-template-choice:hover) {
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 3px rgb(94 140 138 / 14%);
+  }
+
+  :global(.block-template-choice strong) {
+    display: block;
+    font-size: 1.1rem;
+    margin-bottom: 0.25rem;
+  }
+
+  :global(.block-template-choice p) {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--aw-color-text-muted);
+  }
+
   :global(.article-piece) {
     position: relative;
     border: 1px solid var(--aw-color-border);
     border-radius: 1rem;
-    padding: 1.25rem;
     background: var(--aw-color-bg-surface);
+    overflow: hidden;
   }
 
-  :global(.piece-header) {
+  :global(.piece-card) {
+    display: block;
+    width: 100%;
+  }
+
+  :global(.piece-card summary) {
+    list-style: none;
+    cursor: pointer;
+    padding: 1rem 1.25rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--aw-color-border);
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.piece-card summary::-webkit-details-marker) {
+    display: none;
+  }
+
+  :global(.piece-summary-view) {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  :global(.piece-type-tag) {
+    flex: 0 0 auto;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.5rem;
+    background: var(--aw-color-accent);
+    color: white;
+    border-radius: 0.4rem;
+  }
+
+  :global(.piece-summary-content) {
+    min-width: 0;
+    flex: 1;
+  }
+
+  :global(.piece-summary-title) {
+    display: block;
+    font-weight: 700;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :global(.piece-summary-body) {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--aw-color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :global(.piece-card-chevron) {
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1.25rem;
+    transition: transform 0.2s ease;
+    color: var(--aw-color-text-muted);
+  }
+
+  :global(.piece-card[open] .piece-card-chevron) {
+    transform: rotate(180deg);
   }
 
   :global(.piece-id) {
     font-family: ui-monospace, monospace;
     font-size: 0.75rem;
     color: var(--aw-color-text-muted);
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  :global(.piece-header) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    background: var(--aw-color-bg-surface);
+    border-bottom: 1px solid var(--aw-color-border);
   }
 
   :global(.piece-controls) {
@@ -2238,6 +2412,10 @@ const metadata = {
         preview: document.querySelector('#preview'),
         toast: document.querySelector('#toast'),
         piecesContainer: document.querySelector('#pieces-container'),
+        piecesEmptyState: document.querySelector('#pieces-empty-state'),
+        blockLibraryModal: document.querySelector('#block-library-modal'),
+        blockLibraryClose: document.querySelector('#block-library-close'),
+        blockLibraryList: document.querySelector('#block-library-list'),
         addPiece: document.querySelector('#add-piece'),
         convertToPieces: document.querySelector('#convert-to-pieces'),
         legacyMarkdownConversionNotice: document.querySelector('#legacy-markdown-conversion-notice'),
@@ -3520,9 +3698,8 @@ const metadata = {
 
       const renderPieces = () => {
         fields.piecesContainer.innerHTML = '';
-        if (articleNodes.length === 0) {
-          articleNodes.push(createDefaultNodeFromTemplate('prose_section'));
-        }
+        const hasNodes = articleNodes.length > 0;
+        if (fields.piecesEmptyState) fields.piecesEmptyState.hidden = hasNodes;
 
         articleNodes.forEach((node, index) => {
           const piece = document.createElement('div');
@@ -3530,6 +3707,7 @@ const metadata = {
           piece.dataset.nodeId = node.id;
 
           const activeTemplateId = inferTemplateId(node);
+          const template = articleNodeTemplates[activeTemplateId] || articleNodeTemplates.prose_section;
           const publicFields = node.public || {};
           const hasPublicField = (field) => Object.prototype.hasOwnProperty.call(publicFields, field);
           const mediaValue = publicFields.media;
@@ -3600,16 +3778,27 @@ const metadata = {
             activeTemplateId.replaceAll('_', ' ');
 
           piece.innerHTML = `
-            <div class="piece-header">
-              <span class="piece-id">${window.escapeHtml(pieceSummary)}</span>
-              <div class="piece-controls">
-                <button class="btn-tertiary btn-xs move-up" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
-                <button class="btn-tertiary btn-xs move-down" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
-                <button class="btn-tertiary btn-xs duplicate-piece" type="button">Duplicate</button>
-                <button class="btn-tertiary btn-xs remove-piece" type="button" ${articleNodes.length === 1 ? 'disabled' : ''}>Remove</button>
+            <details class="piece-card" ${!node.public?.body && !node.public?.title ? 'open' : ''}>
+              <summary>
+                <div class="piece-summary-view">
+                  <span class="piece-type-tag">${window.escapeHtml(template.name)}</span>
+                  <div class="piece-summary-content">
+                    <span class="piece-summary-title">${window.escapeHtml(node.public?.title || '')}</span>
+                    <span class="piece-summary-body">${window.escapeHtml(pieceSummary)}</span>
+                  </div>
+                </div>
+                <span class="piece-card-chevron" aria-hidden="true">▼</span>
+              </summary>
+              <div class="piece-header">
+                <span class="piece-id">ID: ${window.escapeHtml(node.id)}</span>
+                <div class="piece-controls">
+                  <button class="btn-tertiary btn-xs move-up" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
+                  <button class="btn-tertiary btn-xs move-down" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
+                  <button class="btn-tertiary btn-xs duplicate-piece" type="button">Duplicate</button>
+                  <button class="btn-tertiary btn-xs remove-piece" type="button">Remove</button>
+                </div>
               </div>
-            </div>
-            <div class="piece-form">
+              <div class="piece-form" style="padding: 1.25rem;">
               ${showTitle ? `
               <div class="field">
                 <label>Public Title</label>
@@ -3775,6 +3964,7 @@ const metadata = {
                 </div>
               </details>
             </div>
+            </details>
           `;
 
           // Event Listeners for Piece Controls
@@ -6438,11 +6628,52 @@ const metadata = {
         resetPublisherForm();
       };
 
-      fields.addPiece.addEventListener('click', () => {
-        articleNodes.push(createDefaultNodeFromTemplate('prose_section'));
+      const openBlockLibrary = () => {
+        fields.blockLibraryList.innerHTML = Object.values(articleNodeTemplates)
+          .map((t) => `
+            <button class="block-template-choice" type="button" data-template-id="${window.escapeHtml(t.id)}">
+              <span>
+                <strong>${window.escapeHtml(t.name)}</strong>
+                <p>${window.escapeHtml(t.description)}</p>
+              </span>
+              <span style="font-size: 1.5rem; font-weight: bold; color: var(--aw-color-accent);">+</span>
+            </button>
+          `)
+          .join('');
+
+        if (fields.blockLibraryModal?.showModal) fields.blockLibraryModal.showModal();
+        else fields.blockLibraryModal?.setAttribute('open', '');
+      };
+
+      const closeBlockLibrary = () => {
+        if (fields.blockLibraryModal?.close) fields.blockLibraryModal.close();
+        else fields.blockLibraryModal?.removeAttribute('open');
+      };
+
+      fields.addPiece.addEventListener('click', openBlockLibrary);
+      fields.blockLibraryClose.addEventListener('click', closeBlockLibrary);
+      fields.blockLibraryList.addEventListener('click', (e) => {
+        const btn = e.target.closest('.block-template-choice');
+        if (!btn) return;
+        const templateId = btn.dataset.templateId;
+        articleNodes.push(createDefaultNodeFromTemplate(templateId));
         setLegacyMarkdownConversionNotice(false);
         renderPieces();
         updateFromPieces();
+        closeBlockLibrary();
+        // Scroll to new piece
+        fields.piecesContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
+      });
+
+      document.querySelectorAll('.quick-add').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const templateId = btn.dataset.templateId;
+          articleNodes.push(createDefaultNodeFromTemplate(templateId));
+          setLegacyMarkdownConversionNotice(false);
+          renderPieces();
+          updateFromPieces();
+          fields.piecesContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
+        });
       });
 
       fields.convertToPieces.addEventListener('click', () => {
