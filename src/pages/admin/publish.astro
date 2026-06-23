@@ -87,6 +87,7 @@ const metadata = {
             <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
           </div>
           <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+          <div id="content-model-indicator" class="content-model-indicator" aria-live="polite"></div>
           <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
             <div class="json-draft-modal-card">
               <div class="json-draft-modal-header">
@@ -743,6 +744,30 @@ const metadata = {
     color: var(--aw-color-text-muted);
     font-size: 0.88rem;
     text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .content-model-indicator {
+    margin: 0.5rem 0 0;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.75rem;
+    background: var(--aw-color-bg-surface);
+    border: 1px solid var(--aw-color-border);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.5;
+    color: var(--aw-color-text-muted);
+  }
+
+  .content-model-indicator div {
+    display: flex;
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  .content-model-indicator strong {
+    color: var(--aw-color-text-heading);
+    font-weight: 700;
     white-space: nowrap;
   }
 
@@ -2151,6 +2176,7 @@ const metadata = {
         jsonUpload: document.querySelector('#json-upload'),
         jsonUploadName: document.querySelector('#json-upload-name'),
         jsonImportStatus: document.querySelector('#json-import-status'),
+        contentModelIndicator: document.querySelector('#content-model-indicator'),
         jsonDraftModal: document.querySelector('#json-draft-modal'),
         jsonDraftModalClose: document.querySelector('#json-draft-modal-close'),
         jsonDraftModalStatus: document.querySelector('#json-draft-modal-status'),
@@ -2233,6 +2259,7 @@ const metadata = {
       let imageUploadMessageIsError = false;
       let imageImportWarningMessage = '';
       let lastLoadedJsonImportValue = '';
+      let contentModel = 'article_body.v1';
       let isAdmin = false;
       let editArticleLoaded = false;
       let hasUnsavedChanges = false;
@@ -2402,6 +2429,30 @@ const metadata = {
         }
       };
 
+      const updateContentModelIndicator = () => {
+        if (!fields.contentModelIndicator) return;
+
+        const hasPublished = Boolean(articleStatus.published);
+        const { requestId, lockToken } = getCheckedOutWorkflowDraft();
+        const pubStatus = getCurrentArticleStatusState();
+
+        let workflowStatusLabel = 'none';
+        if (lockToken) workflowStatusLabel = 'checked_out';
+        else if (requestId || lastSavedDraftId) workflowStatusLabel = 'pending';
+
+        const lines = [
+          contentModel === 'article_body.v1'
+            ? '<div><strong>Structured article:</strong> article_body.v1</div>'
+            : '<div><strong>Legacy markdown converted to structured piece</strong></div>',
+          `<div><strong>Workflow record:</strong> ${workflowStatusLabel}</div>`,
+          `<div><strong>Publication status:</strong> ${pubStatus}</div>`,
+          `<div><strong>Published article:</strong> ${hasPublished ? 'yes' : 'no'}</div>`,
+          '<div><strong>Canonical source:</strong> article_body</div>'
+        ];
+
+        fields.contentModelIndicator.innerHTML = lines.join('');
+      };
+
       const updatePublishDecisionControls = () => {
         const hasPublishedArticle = Boolean(articleStatus.published);
         fields.publish.textContent = hasPublishedArticle ? 'Overwrite Published Article' : 'Publish Article';
@@ -2413,6 +2464,7 @@ const metadata = {
         );
         fields.publish.classList.toggle('is-overwrite-required', hasPublishedArticle && !fields.overwrite.checked);
         renderArticleStatusCard();
+        updateContentModelIndicator();
       };
 
       const updateArticleStatusCard = () => {
@@ -4710,6 +4762,7 @@ const metadata = {
         updateJsonImportButtonState();
         setEditorModeCopy('publish');
         validateSlug();
+        contentModel = 'article_body.v1';
         updatePreview();
         updatePublishOutput();
         setUnsavedChanges(false);
@@ -4915,12 +4968,14 @@ const metadata = {
         const articleBody = article.content?.article_body || article.article_body;
         if (articleBody && Array.isArray(articleBody.nodes)) {
           articleNodes = articleBody.nodes;
+          contentModel = 'article_body.v1';
           renderPieces();
           fields.content.value = articleBodyToMarkdown(articleBody);
           setLegacyMarkdownConversionNotice(false);
         } else {
           fields.content.value = article.content || '';
           articleNodes = [createLegacyBodyNode(fields.content.value)];
+          contentModel = 'legacy_markdown_converted';
           renderPieces();
           setLegacyMarkdownConversionNotice(Boolean(fields.content.value.trim()));
         }
@@ -5429,9 +5484,11 @@ const metadata = {
           // Sync pieces from imported content
           if (formData.articleBody?.exists && Array.isArray(formData.articleBody.value?.nodes)) {
             articleNodes = formData.articleBody.value.nodes;
+            contentModel = 'article_body.v1';
             setLegacyMarkdownConversionNotice(false);
           } else {
             articleNodes = [createLegacyBodyNode(fields.content.value)];
+            contentModel = 'legacy_markdown_converted';
             setLegacyMarkdownConversionNotice(Boolean(fields.content.value.trim()));
           }
           renderPieces();
@@ -6391,6 +6448,7 @@ const metadata = {
       fields.convertToPieces.addEventListener('click', () => {
         if (fields.content.value.trim()) {
           articleNodes = [createLegacyBodyNode(fields.content.value)];
+          contentModel = 'legacy_markdown_converted';
           setLegacyMarkdownConversionNotice(true);
           renderPieces();
           updateFromPieces();
