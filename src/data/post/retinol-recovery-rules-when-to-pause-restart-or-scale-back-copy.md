@@ -1,5 +1,6 @@
 ---
 title: 'Retinol Recovery Rules: When to Pause, Restart, or Scale Back-Copy'
+draft: true
 publishDate: 2026-06-10T11:42:00.000Z
 excerpt: 'Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset.'
 tags:
@@ -22,7 +23,6 @@ sources:
 metadata:
   description: 'Learn when retinol irritation is a normal adjustment, when to pause, and how to restart with moisturizer, sunscreen, and fewer irritating products.'
 ---
-
 # Retinol Recovery Rules: When to Pause, Restart, or Scale Back
 
 ![Unbranded retinol bottle set aside beside barrier moisturizer and a folded washcloth on a softly lit bathroom counter.](~/assets/images/uploads/retinol-recovery-rules-when-to-pause-restart-or-scale-back-copy/req_retinol-recovery-rules-20260608-001-b5133771b7019c7eb14b5acb679ca84c5a6da457d08ec5e0d0d8ee97597e6eb2.jpg)
