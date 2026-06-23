@@ -18,6 +18,7 @@ const EXPECTED_TOOL_NAMES = [
   'save_json_blob_mark_published',
   'save_json_blob_publish_article_now',
   'save_json_blob_publish_scheduled',
+  'save_json_blob_update_publication_status',
   'ping',
   'reader_insight_update_output',
   'reader_insight_mark_complete',
