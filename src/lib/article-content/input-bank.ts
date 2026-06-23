@@ -37,7 +37,7 @@ export interface ArticleNodeTemplate {
 export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
   prose_section: {
     id: 'prose_section',
-    name: 'Text',
+    name: 'Text Section',
     description: 'A standard section of text with an optional title.',
     kind: 'content',
     fields: {
@@ -119,7 +119,7 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
   },
   soft_action: {
     id: 'soft_action',
-    name: 'Action',
+    name: 'Soft CTA',
     description: 'An inline call to action with optional text.',
     kind: 'action',
     fields: {
