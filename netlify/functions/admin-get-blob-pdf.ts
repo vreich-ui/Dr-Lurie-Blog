@@ -57,7 +57,7 @@ export const handler = async (event: LambdaEvent) => {
 
   try {
     const store = await getArtifactBlobStore(event);
-    const result = await store.get(blobKey, { type: 'arrayBuffer' }) as unknown as ArrayBuffer | null;
+    const result = await (store as any).get(blobKey, { type: 'arrayBuffer' }) as unknown as ArrayBuffer | null;
 
     if (!result) {
       return jsonResponse(404, { error: 'PDF artifact not found.' });

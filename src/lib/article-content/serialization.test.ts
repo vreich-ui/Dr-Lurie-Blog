@@ -106,7 +106,10 @@ describe('Article Body Serialization and Safety', () => {
             kind: 'content',
             public: {
               title: 'Alt Text',
-              media: 'src/assets/images/test.jpg',
+              media: {
+                type: 'image',
+                src: 'src/assets/images/test.jpg',
+              },
             },
           },
         ],
