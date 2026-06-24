@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-06-24T17:56:48.930Z
-published_time: 2026-06-24T17:56:48.930Z
+publishDate: 2026-06-24T18:02:56.967Z
+published_time: 2026-06-24T18:02:56.967Z
 title: "Retinol, Explained Simply"
 excerpt: "A calm beginner guide to what retinol is, what it may help, how to start slowly, and when to pause or ask for clinical guidance."
 image: "~/assets/images/uploads/retinol-explained-simply/retinol-featured-small.webp"
