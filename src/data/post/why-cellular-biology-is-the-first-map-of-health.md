@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-06-24T17:25:38.508Z
-published_time: 2026-06-24T17:25:38.508Z
+publishDate: 2026-06-24T17:26:51.849Z
+published_time: 2026-06-24T17:26:51.849Z
 title: "Why Cellular Biology Is the First Map of Health"
 excerpt: "A plain-language guide to why cells are the smallest practical level for understanding health, resilience, and disease risk."
 tags:
