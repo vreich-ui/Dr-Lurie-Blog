@@ -3,11 +3,8 @@ import { z } from 'zod';
 
 import {
   allowedAgentNames,
-  knownPublicationStatuses,
-  publicationStatusDescription,
   workflowStatuses,
   type AllowedAgentName,
-  type KnownPublicationStatus,
   type WorkflowStatus,
 } from './workflow-contract.js';
 
@@ -15,20 +12,10 @@ import { articleBodyV1Schema, type ArticleBodyV1 } from './article-content-v1.js
 
 export {
   allowedAgentNames,
-  knownPublicationStatuses,
-  publicationStatusDescription,
   workflowStatuses,
   type AllowedAgentName,
-  type KnownPublicationStatus,
   type WorkflowStatus,
 } from './workflow-contract.js';
-
-export const KNOWN_PUBLICATION_STATUSES = {
-  draft: 'Saved admin draft; not publication-ready yet.',
-  ready: 'Final article payload is ready for the publishing step.',
-  scheduled: 'Final article payload is scheduled for server-gated publishing at publication.scheduled_for.',
-  published: 'Final article payload has been published.',
-} as const satisfies Record<KnownPublicationStatus, string>;
 
 export type AgentOutputEnvelope = {
   version: number; // agent output version (repo contract)
@@ -66,7 +53,6 @@ export type PublishPayload = {
   mediaEntries?: unknown[];
   artifactReferences?: unknown[];
   overwrite?: boolean;
-  draft?: boolean;
   articlePath?: string;
   category?: string;
   excerpt?: string;
@@ -238,8 +224,6 @@ export type ContentSourceV1 = {
   editorial?: {
     schema_version?: 'editorial.v1';
     writer_notes?: string;
-    // optional “flat” draft content if agents prefer
-    draft_markdown?: string;
   };
 
   emotional_strategy?: {
@@ -287,10 +271,8 @@ export type ContentSourceV1 = {
   };
 
   publication?: {
-    schema_version?: 'publication.v1';
-    publication_status?: string; // open string; see publicationStatusDescription for first-party semantics
-    scheduled_for?: string; // ISO timestamp used when publication_status is scheduled
-    publish_payload?: PublishPayload; // repo naming precedence
+    schema_version?: 'publication.v2';
+    published_time?: string | null;
   };
 
   workflow?: {
@@ -340,7 +322,6 @@ export type WorkflowRecord = {
 const metadataBagSchema = z.record(z.string(), z.unknown());
 const allowedAgentNameSchema = z.enum(allowedAgentNames);
 const workflowStatusSchema = z.enum(workflowStatuses);
-export const knownPublicationStatusSchema = z.enum(knownPublicationStatuses);
 
 export const publishPayloadSchema = z
   .object({
@@ -357,7 +338,6 @@ export const publishPayloadSchema = z
     mediaEntries: z.array(z.unknown()).optional(),
     artifactReferences: z.array(z.unknown()).optional(),
     overwrite: z.boolean().optional(),
-    draft: z.boolean().optional(),
     articlePath: z.string().optional(),
     category: z.string().optional(),
     excerpt: z.string().optional(),
@@ -573,7 +553,6 @@ export const contentSourceV1Schema = z
       .object({
         schema_version: z.literal('editorial.v1').optional(),
         writer_notes: z.string().optional(),
-        draft_markdown: z.string().optional(),
       })
       .strict()
       .optional(),
@@ -641,10 +620,8 @@ export const contentSourceV1Schema = z
       .optional(),
     publication: z
       .object({
-        schema_version: z.literal('publication.v1').optional(),
-        publication_status: z.string().describe(publicationStatusDescription).optional(),
-        scheduled_for: z.string().optional(),
-        publish_payload: publishPayloadSchema.optional(),
+        schema_version: z.literal('publication.v2').optional(),
+        published_time: z.string().nullable().optional(),
       })
       .strict()
       .optional(),

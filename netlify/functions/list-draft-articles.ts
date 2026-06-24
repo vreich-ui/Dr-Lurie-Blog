@@ -18,7 +18,7 @@ type GitHubContentFile = {
 type DraftPost = {
   author?: string;
   category?: string;
-  draft: true;
+  published_time?: string | null;
   excerpt?: string;
   publishDate?: string;
   slug: string;
@@ -150,14 +150,16 @@ const toDraftPost = (file: GitHubContentFile) => {
   const markdown = Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8');
   const data = parseFrontmatter(markdown);
 
-  if (data.draft !== true) return undefined;
+  const publishedTime = toStringValue(data.published_time);
+  const publishedMs = publishedTime ? Date.parse(publishedTime) : Number.NaN;
+  if (Number.isFinite(publishedMs) && publishedMs <= Date.now()) return undefined;
 
   const slug = slugify(file.name.replace(/\.(md|mdx)$/i, ''));
   const title = toStringValue(data.title) ?? slug;
   const post: DraftPost = {
     slug,
     title,
-    draft: true,
+    published_time: publishedTime ?? null,
     publishDate: toStringValue(data.publishDate),
     excerpt: toStringValue(data.excerpt),
     category: toStringValue(data.category),

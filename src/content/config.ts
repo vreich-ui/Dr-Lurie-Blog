@@ -50,6 +50,7 @@ const postCollection = defineCollection({
   loader: glob({ pattern: ['*.md', '*.mdx'], base: 'src/data/post' }),
   schema: z.object({
     publishDate: z.date().optional(),
+    published_time: z.date().nullable().optional(),
     updateDate: z.date().optional(),
     draft: z.boolean().optional(),
 

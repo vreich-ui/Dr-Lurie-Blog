@@ -34,11 +34,11 @@ export const handler = async (event: LambdaEvent) => {
 
   if (!hasValidNetlifyPublishSecret(event)) {
     const adminState = await getAdminStateFromEvent(event);
-  if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
-    });
-  }
+    if (!adminState.authenticated) {
+      return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
+        error: adminState.error || 'A valid Clerk session token is required.',
+      });
+    }
 
     if (!adminState.isAdmin) {
       return jsonResponse(403, { error: 'This Clerk user is not authorized to read saved PDF artifacts.' });
@@ -57,7 +57,9 @@ export const handler = async (event: LambdaEvent) => {
 
   try {
     const store = await getArtifactBlobStore(event);
-    const result = await (store as any).get(blobKey, { type: 'arrayBuffer' }) as unknown as ArrayBuffer | null;
+    const result = (await (
+      store as { get: (key: string, options: { type: 'arrayBuffer' }) => Promise<ArrayBuffer | null> }
+    ).get(blobKey, { type: 'arrayBuffer' })) as ArrayBuffer | null;
 
     if (!result) {
       return jsonResponse(404, { error: 'PDF artifact not found.' });

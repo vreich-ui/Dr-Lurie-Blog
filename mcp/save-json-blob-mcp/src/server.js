@@ -13,10 +13,7 @@ const REQUIRED_ENV = ['NETLIFY_PUBLISH_SECRET', 'SAVE_JSON_BLOB_BASE_URL'];
 // Keep this runtime mirror in sync with src/schema/workflow-contract.ts;
 // mcp/save-json-blob-mcp/test/workflow-contract-mirror.test.js asserts parity.
 export const ALLOWED_AGENTS = ['reader_insight', 'research', 'angle', 'draft', 'final_article'];
-export const WORKFLOW_STATUSES = ['pending', 'in_progress', 'completed', 'failed', 'published'];
-export const KNOWN_PUBLICATION_STATUSES = ['draft', 'ready', 'scheduled', 'published'];
-export const PUBLICATION_STATUS_DESCRIPTION =
-  'Article payload status separate from workflow_status. publication_status: draft means the payload is not publishable yet; ready means publish now through the immediate publishing path; scheduled plus publication.scheduled_for means publish later through the due scheduled-publish path. published is reserved for records whose publication payload has been published; use workflow_status: published only after actual successful publish and mark_published for the committed live article state.';
+export const WORKFLOW_STATUSES = ['pending', 'in_progress', 'completed', 'failed'];
 const ALLOWED_AGENT_SET = new Set(ALLOWED_AGENTS);
 const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 
@@ -250,7 +247,7 @@ export const createServer = () => {
     'save_json_blob_create_request',
     {
       description:
-        'Create a save-json-blob workflow request and return its record. MCP-created admin-publish article drafts should pass validation_mode: "admin_publish_draft". Prefer input.content.article_body with schema_version "article_body.v1" and nodes[] containing at least one public node; publication.publish_payload.markdown is a generated legacy fallback and node.private is internal only.',
+        'Create a save-json-blob workflow request and return its record. MCP-created admin-publish article drafts should pass validation_mode: "admin_publish_draft". Prefer input.content.article_body with schema_version "article_body.v1" and nodes[] containing at least one public node; publication.published_time is the only publication control field and node.private is internal only.',
       inputSchema: {
         input: z.any(),
         request_id: z.string().min(1).optional(),
@@ -258,7 +255,7 @@ export const createServer = () => {
           .enum(['admin_publish_draft'])
           .optional()
           .describe(
-            'Required validation mode for MCP-created admin-publish article drafts. Prefer content.article_body; legacy markdown/content fields remain fallback.'
+            'Required validation mode for MCP-created admin-publish article drafts. Use content.article_body with schema_version article_body.v1.'
           ),
       },
     },
@@ -410,106 +407,18 @@ export const createServer = () => {
   );
 
   server.registerTool(
-    'save_json_blob_mark_published',
+    'save_json_blob_publish_by_time',
     {
       description:
-        'Mark a completed workflow record as published after the final article has been validated and publishing has succeeded or been handed off. This tool only updates workflow state; it does not invoke the article publishing endpoint. Server-only publish credentials are never accepted as inputs or returned.',
+        'Set input.publication.published_time. Future timestamps save only; current/past timestamps publish content.article_body through the secure article publisher and write a publish receipt. Requires checkout lock_token.',
       inputSchema: {
         request_id: z.string().min(1),
-        expected_record_version: z.number().int().nonnegative().optional(),
         lock_token: z.string().min(1),
-        commit_metadata: z
-          .record(z.string(), z.any())
-          .describe(
-            'Optional publication result metadata such as commit SHA, commit URL, article path, deploy status, and a human-readable message.'
-          )
-          .optional(),
+        published_time: z.string().min(1).nullable().optional(),
       },
     },
-    async ({ request_id, expected_record_version, lock_token, commit_metadata }) =>
-      callAction(
-        { action: 'mark_published', request_id, expected_record_version, lock_token, commit_metadata },
-        'record'
-      )
-  );
-
-  server.registerTool(
-    'save_json_blob_publish_article_now',
-    {
-      description:
-        'Promote a content_source.v1 article draft to publication.publication_status: ready, publish it immediately through the existing secure article publisher, then mark workflow_status: published only after successful publish. Requires checkout lock_token. Server-only publish credentials are never accepted as inputs or returned.',
-      inputSchema: {
-        request_id: z.string().min(1),
-        expected_record_version: z.number().int().nonnegative().optional(),
-        lock_token: z.string().min(1),
-      },
-    },
-    async ({ request_id, expected_record_version, lock_token }) =>
-      callAction(
-        { action: 'prepare_publish_now', request_id, expected_record_version, lock_token },
-        'record'
-      )
-  );
-
-  server.registerTool(
-    'save_json_blob_publish_scheduled',
-    {
-      description:
-        'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, and publication.scheduled_for due now or in the short server due window. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
-      inputSchema: {
-        request_id: z.string().min(1),
-        expected_record_version: z.number().int().nonnegative().optional(),
-        lock_token: z.string().min(1),
-        agent_id: z.string().min(1).describe('Stable identifier for the agent or process requesting scheduled publication.'),
-        agent_owner: z.string().min(1).describe('Human, team, or admin owner responsible for the scheduled publishing agent.'),
-        agent_label: z.string().min(1).optional().describe('Optional human-readable label for audit metadata.'),
-      },
-    },
-    async ({ request_id, expected_record_version, lock_token, agent_id, agent_owner, agent_label }) =>
-      callAction(
-        {
-          action: 'mark_published',
-          request_id,
-          expected_record_version,
-          lock_token,
-          commit_metadata: {
-            scheduled_publish: true,
-            agent_id,
-            agent_owner,
-            agent_label,
-          },
-        },
-        'record'
-      )
-  );
-
-  server.registerTool(
-    'save_json_blob_update_publication_status',
-    {
-      description:
-        'Update publication fields on an existing content_source.v1 workflow record without creating a duplicate workflow record. For immediate scheduled publishing, set publication_status: scheduled and scheduled_for to the current ISO timestamp before calling save_json_blob_publish_scheduled.',
-      inputSchema: {
-        request_id: z.string().min(1),
-        publication_status: z.enum(['draft', 'ready', 'scheduled', 'published']),
-        scheduled_for: z
-          .string()
-          .min(1)
-          .optional()
-          .describe(
-            'ISO timestamp to write to input.publication.scheduled_for. Required when publication_status is scheduled; optional otherwise and left unchanged when omitted.'
-          ),
-      },
-    },
-    async ({ request_id, publication_status, scheduled_for }) =>
-      callAction(
-        {
-          action: 'update_publication_status',
-          request_id,
-          publication_status,
-          scheduled_for,
-        },
-        'record'
-      )
+    async ({ request_id, lock_token, published_time }) =>
+      callAction({ action: 'set_published_time', request_id, lock_token, published_time }, 'record')
   );
 
   if (ADMIN_TOOLS_ENABLED) {

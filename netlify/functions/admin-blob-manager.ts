@@ -1,5 +1,5 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { readArtifactReference } from '../lib/artifact-index.js';
+import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
 import { getManagedBlobStore, listManagedBlobStores } from '../lib/blob-admin.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
@@ -320,7 +320,7 @@ const handleGetArtifactMetadata: ActionHandler = async (params, event) => {
     return jsonResponse(400, { error: 'Could not extract requestId or sha256 from blob key.' });
   }
 
-  const indexStore = getStoreHandle('artifact-index', event) as any;
+  const indexStore = getStoreHandle('artifact-index', event) as unknown as ArtifactIndexStore;
   const artifact = await readArtifactReference(indexStore, requestId, sha256);
 
   if (!artifact) {

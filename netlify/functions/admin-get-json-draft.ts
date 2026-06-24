@@ -41,7 +41,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(v
 
 const stripFrontmatter = (markdown: string) => markdown.replace(/^---\s*\r?\n[\s\S]*?\r?\n---\s*\r?\n?/, '').trim();
 
-const getPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
+const getPayload = (_input: ContentSourceV1) => undefined as Record<string, unknown> | undefined;
 
 const getMarkdown = (input: ContentSourceV1) => getContentSourceMarkdown(input);
 
