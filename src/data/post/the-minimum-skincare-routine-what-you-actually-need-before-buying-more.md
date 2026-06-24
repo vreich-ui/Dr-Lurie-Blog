@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-06-24T14:12:33.622Z
-published_time: 2026-06-24T14:12:33.622Z
+publishDate: 2026-06-24T14:37:22.656Z
+published_time: 2026-06-24T14:37:22.656Z
 title: "The Minimum Skincare Routine: What You Actually Need Before Buying More"
 excerpt: "A plain-language starting point for newcomers who want healthy skin without building a complicated shelf of products."
 image: "~/assets/images/uploads/the-minimum-skincare-routine-what-you-actually-need-before-buying-more/minimum-skincare-routine-featured.webp"
