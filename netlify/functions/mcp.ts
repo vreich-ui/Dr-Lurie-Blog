@@ -1,7 +1,7 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
-import { handler as saveJsonBlobHandler } from './save-json-blob.js';
+import { handler as saveJsonBlobHandler, type WorkflowRecord } from './save-json-blob.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
@@ -1254,7 +1254,7 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
     return toolError('Server-side workflow storage credentials are not configured.');
   }
 
-  const saveResponse = await saveJsonBlobHandler({
+  const saveResponse = await _mcpInternal.saveJsonBlobHandler({
     httpMethod: 'POST',
     headers: createSaveJsonBlobHeaders(event, publishSecret),
     body: JSON.stringify(payload),
@@ -1332,7 +1332,7 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
     };
   }
 
-  const publishResponse = await publishArticleHandler({
+  const publishResponse = await _mcpInternal.publishArticleHandler({
     httpMethod: 'POST',
     headers: {
       ...(event.headers ?? {}),
@@ -1484,23 +1484,104 @@ const slugifyPublishTitle = (value: string) =>
 const buildCanonicalPublishPayload = (
   requestId: string,
   lockToken: string,
-  recordInput: Record<string, unknown>,
+  record: WorkflowRecord,
   articleBody: Record<string, unknown>,
-  publishedTime: string
+  publishedTime: string,
+  artifactReferences: ArtifactReference[]
 ) => {
+  const recordInput = getRecordValue(record.input) || {};
   const content = getRecordValue(recordInput.content);
   const taxonomy = getRecordValue(recordInput.taxonomy);
   const seo = getRecordValue(recordInput.seo);
   const media = getRecordValue(recordInput.media);
-  const imageAssets = Array.isArray(media?.image_asset_register) ? media.image_asset_register : [];
-  const firstImage = imageAssets
-    .map(getRecordValue)
-    .find((asset) => toNonEmptyString(asset?.repoPath) || toNonEmptyString(asset?.url));
   const title = toNonEmptyString(content?.title);
 
   if (!title) {
     return { ok: false as const, error: 'Publishing requires input.content.title.', error_code: 'missing_title' };
   }
+
+  type ImageCandidate = { path: string; priority: number };
+  const candidates: ImageCandidate[] = [];
+
+  const isHeroAsset = (asset: Record<string, unknown> | undefined) => {
+    if (!asset) return false;
+    const metadata = getRecordValue(asset.metadata);
+    const purpose = toNonEmptyString(asset.purpose) || toNonEmptyString(metadata?.purpose);
+    const status = toNonEmptyString(asset.status) || toNonEmptyString(metadata?.status);
+    const isPrimary =
+      asset.primary === true ||
+      asset.primary === 'true' ||
+      metadata?.primary === true ||
+      metadata?.primary === 'true' ||
+      metadata?.hero === true ||
+      metadata?.hero === 'true';
+
+    return (
+      purpose?.toLowerCase() === 'hero' ||
+      purpose?.toLowerCase() === 'article' ||
+      status?.toLowerCase() === 'primary' ||
+      isPrimary
+    );
+  };
+
+  const imageAssets = Array.isArray(media?.image_asset_register) ? media.image_asset_register : [];
+  for (const asset of imageAssets) {
+    const assetRecord = getRecordValue(asset);
+    const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
+    if (path) {
+      candidates.push({ path, priority: isHeroAsset(assetRecord) ? 10 : 5 });
+    }
+  }
+
+  const imageSets = Array.isArray(media?.image_sets) ? media.image_sets : [];
+  for (const set of imageSets) {
+    const setRecord = getRecordValue(set);
+    const assetIds = Array.isArray(setRecord?.asset_ids) ? setRecord.asset_ids : [];
+    const isHeroSet = isHeroAsset(setRecord);
+    for (const assetId of assetIds) {
+      const asset = imageAssets.find((a: any) => getRecordValue(a)?.asset_id === assetId);
+      const assetRecord = getRecordValue(asset);
+      const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
+      if (path) {
+        candidates.push({ path, priority: isHeroSet ? 12 : 6 });
+      }
+    }
+  }
+
+  const nodes = Array.isArray(articleBody.nodes) ? articleBody.nodes : [];
+  for (const node of nodes) {
+    const nodeRecord = getRecordValue(node);
+    const nodePublic = getRecordValue(nodeRecord?.public);
+    const nodeMedia = getRecordValue(nodePublic?.media);
+    const path = toNonEmptyString(nodeMedia?.src);
+    if (path && nodeMedia?.type === 'image') {
+      const rendering = getRecordValue(nodeRecord?.rendering);
+      const isHeroNode = rendering?.presentation === 'hero' || nodeRecord?.id === 'n_hero';
+      candidates.push({ path, priority: isHeroNode ? 10 : 3 });
+    }
+  }
+
+  const allRefs = [...artifactReferences];
+  const finalArticleOutput = getRecordValue(record.agent_outputs?.final_article?.output);
+  const finalRefs = Array.isArray(finalArticleOutput?.artifactReferences) ? finalArticleOutput.artifactReferences : [];
+  for (const ref of finalRefs) {
+    const refRecord = getRecordValue(ref);
+    if (refRecord && !allRefs.find((r) => r.sha256 === refRecord.sha256)) {
+      if (isArtifactReference(refRecord)) {
+        allRefs.push(refRecord);
+      }
+    }
+  }
+
+  for (const ref of allRefs) {
+    if (ref.contentType.startsWith('image/')) {
+      const isHeroArtifact = isHeroAsset(ref as unknown as Record<string, unknown>);
+      candidates.push({ path: ref.blobKey, priority: isHeroArtifact ? 10 : 2 });
+    }
+  }
+
+  candidates.sort((a, b) => b.priority - a.priority);
+  const featuredImage = candidates[0]?.path;
 
   return {
     ok: true as const,
@@ -1517,7 +1598,8 @@ const buildCanonicalPublishPayload = (
       excerpt: toNonEmptyString(content?.deck),
       seoDescription: toNonEmptyString(seo?.meta_description),
       tags: Array.isArray(taxonomy?.tags) ? taxonomy.tags : undefined,
-      featuredImage: toNonEmptyString(firstImage?.repoPath) ?? toNonEmptyString(firstImage?.url),
+      featuredImage,
+      artifactReferences: allRefs,
       overwrite: true,
     },
   };
@@ -1561,13 +1643,16 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
   const bodyValidation = validateCanonicalArticleBody(recordInput);
   if (!bodyValidation.ok) return toolError(bodyValidation.error, bodyValidation);
 
+  const artifactReferences = await getArtifactReferencesForRequest(event, requestId);
+
   if (publishedTime === null) {
     const payloadResult = buildCanonicalPublishPayload(
       requestId,
       lockToken,
-      recordInput,
+      record as unknown as WorkflowRecord,
       bodyValidation.articleBody,
-      now.toISOString()
+      now.toISOString(),
+      artifactReferences
     );
     if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
 
@@ -1589,6 +1674,7 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
       message: unpublishResult.body.message,
       published_time: null,
       unpublished: true,
+      media: unpublishResult.body.media,
     };
 
     const clearResult = await invokeSaveJsonBlob(event, {
@@ -1606,6 +1692,7 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
       commit_sha: receipt.commit_sha,
       record: clearResult.record,
       publish_result: unpublishResult.body,
+      media: unpublishResult.body.media,
     });
   }
 
@@ -1614,9 +1701,10 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
   const payloadResult = buildCanonicalPublishPayload(
     requestId,
     lockToken,
-    recordInput,
+    record as unknown as WorkflowRecord,
     bodyValidation.articleBody,
-    publishedTime
+    publishedTime,
+    artifactReferences
   );
   if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
 
@@ -1637,6 +1725,7 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
     deployStatus: publishResult.body.deployStatus,
     message: publishResult.body.message,
     published_time: publishedTime,
+    media: publishResult.body.media,
   };
 
   const saveResult = await invokeSaveJsonBlob(event, {
@@ -1655,6 +1744,7 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
     commit_sha: receipt.commit_sha,
     record: saveResult.record,
     publish_result: publishResult.body,
+    media: receipt.media,
   });
 };
 
@@ -2043,7 +2133,7 @@ const listArtifactsFromPointerPrefixes = async (
   prefixes: string[],
   options: ArtifactBrowseOptions
 ) => {
-  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const pointerKeys: string[] = [];
 
   for (const prefix of prefixes) {
@@ -2141,26 +2231,34 @@ const normalizeDeletedByInput = (value: unknown, fallback: string) => {
   return { ok: true as const, deletedBy };
 };
 
+const getArtifactReferencesForRequest = async (event: LambdaEvent, requestId: string): Promise<ArtifactReference[]> => {
+  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const pointerPrefix = `by-request/${encodeURIComponent(requestId)}/`;
+  const pointerKeys = await listArtifactIndexKeys(store, pointerPrefix);
+
+  const artifacts = pointerKeys.length
+    ? await Promise.all(pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key))))
+    : await Promise.all(
+        (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(requestId)}/`)).map(
+          (key) => parseJsonBlob(store, key)
+        )
+      );
+
+  return artifacts.filter(
+    (artifact): artifact is ArtifactReference => artifact !== undefined && !isDeletedArtifactReference(artifact)
+  );
+};
+
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
   const normalizedRequestId = typeof requestId === 'string' ? requestId.trim() : '';
   if (!normalizedRequestId) {
     return toolError('requestId is required.');
   }
 
-  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
-  const pointerPrefix = `by-request/${encodeURIComponent(normalizedRequestId)}/`;
-  const pointerKeys = await listArtifactIndexKeys(store, pointerPrefix);
-
-  const artifacts = pointerKeys.length
-    ? await Promise.all(pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key))))
-    : await Promise.all(
-        (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(normalizedRequestId)}/`)).map(
-          (key) => parseJsonBlob(store, key)
-        )
-      );
+  const artifacts = await getArtifactReferencesForRequest(event, normalizedRequestId);
 
   return toolResult({
-    artifacts: artifacts.filter((artifact) => artifact !== undefined && !isDeletedArtifactReference(artifact)),
+    artifacts,
   });
 };
 
@@ -2173,7 +2271,7 @@ const getArtifactMetadata = async (event: LambdaEvent, requestId: unknown, sha25
   const normalizedSha256 = normalizeArtifactSha256Input(sha256);
   if (!normalizedSha256.ok) return toolError(normalizedSha256.error);
 
-  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const artifact = await readArtifactReference(store, normalizedRequestId, normalizedSha256.sha256);
 
   if (!artifact) return toolError('Artifact reference was not found.');
@@ -2571,7 +2669,7 @@ const softDeleteArtifact = async (event: LambdaEvent, input: Record<string, unkn
   const sha256 = normalizeArtifactSha256Input(input.sha256);
   if (!sha256.ok) return toolError(sha256.error);
 
-  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
   if (!loaded.ok) return toolError(loaded.error);
 
@@ -2601,7 +2699,7 @@ const restoreArtifact = async (event: LambdaEvent, input: Record<string, unknown
   const sha256 = normalizeArtifactSha256Input(input.sha256);
   if (!sha256.ok) return toolError(sha256.error);
 
-  const store = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
   const loaded = await loadArtifactReferenceForAdminMutation(store, requestId, sha256.sha256);
   if (!loaded.ok) return toolError(loaded.error);
 
@@ -2623,7 +2721,7 @@ const reconcileArtifactIndexes = async (event: LambdaEvent, input: Record<string
 
   const requestId = toNonEmptyString(input.requestId);
   const prefix = requestId ? `request-artifacts/${encodeURIComponent(requestId)}/` : 'request-artifacts/';
-  const indexStore = await getArtifactIndexBlobStore(event);
+  const indexStore = await _mcpInternal.getArtifactIndexBlobStore(event);
   const artifactStore = await getArtifactBlobStore(event);
   const keys = await loadArtifactIndexKeysFromPrefix(indexStore, prefix, limit.value);
   const { results, skipped } = await reconcileArtifactIndexKeys(
@@ -2930,6 +3028,12 @@ const handleRpcRequest = async (event: LambdaEvent, request: JsonRpcRequest): Pr
       event.log?.({ event: 'rpc_method_not_found', rpcMethod, slug });
       return rpcError(request.id, -32601, `Method not found: ${request.method}`);
   }
+};
+
+export const _mcpInternal = {
+  saveJsonBlobHandler,
+  publishArticleHandler,
+  getArtifactIndexBlobStore,
 };
 
 export const handler = async (rawEvent: LambdaEvent) => {
