@@ -43,6 +43,11 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
     parts.push(`*${label}*`);
   }
 
+  // 1.5 Eyebrow rendering
+  if (node.public?.eyebrow) {
+    parts.push(`*${node.public.eyebrow}*`);
+  }
+
   // 2. Title rendering (if present)
   if (node.public?.title) {
     // Determine level based on presentation
