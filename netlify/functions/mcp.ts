@@ -1449,6 +1449,44 @@ const hasReaderVisibleArticleBodyNode = (node: unknown) => {
   return textValues.some((value) => toNonEmptyString(value) !== undefined);
 };
 
+const countPublicArticleBodyNodes = (articleBody: Record<string, unknown> | undefined) => {
+  if (!Array.isArray(articleBody?.nodes)) return 0;
+  return (articleBody.nodes as unknown[]).filter(hasReaderVisibleArticleBodyNode).length;
+};
+
+const extractAgentFinalArticleBody = (record: Record<string, unknown> | undefined) => {
+  const output = getRecordValue(getRecordValue(getRecordValue(record?.agent_outputs)?.final_article)?.output);
+  if (!output) return undefined;
+
+  const directBody = getRecordValue(output.article_body);
+  if (directBody?.schema_version === 'article_body.v1' && Array.isArray(directBody.nodes)) return directBody;
+
+  const contentBody = getRecordValue(getRecordValue(output.content)?.article_body);
+  if (contentBody?.schema_version === 'article_body.v1' && Array.isArray(contentBody.nodes)) return contentBody;
+
+  return undefined;
+};
+
+const promoteAgentArticleBodyIfRicher = (
+  record: Record<string, unknown> | undefined,
+  recordInput: Record<string, unknown> | undefined
+) => {
+  const agentBody = extractAgentFinalArticleBody(record);
+  if (!agentBody) return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
+
+  const inputContent = getRecordValue(recordInput?.content);
+  const inputArticleBody = getRecordValue(inputContent?.article_body);
+
+  if (countPublicArticleBodyNodes(agentBody) <= countPublicArticleBodyNodes(inputArticleBody)) {
+    return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
+  }
+
+  return {
+    effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: agentBody } },
+    promotedArticleBody: agentBody,
+  };
+};
+
 const validateCanonicalArticleBody = (recordInput: Record<string, unknown> | undefined) => {
   const content = getRecordValue(recordInput?.content);
   const articleBody = getRecordValue(content?.article_body);
@@ -1640,7 +1678,8 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
     });
   }
 
-  const bodyValidation = validateCanonicalArticleBody(recordInput);
+  const { effectiveRecordInput, promotedArticleBody } = promoteAgentArticleBodyIfRicher(record, recordInput);
+  const bodyValidation = validateCanonicalArticleBody(effectiveRecordInput);
   if (!bodyValidation.ok) return toolError(bodyValidation.error, bodyValidation);
 
   const artifactReferences = await getArtifactReferencesForRequest(event, requestId);
@@ -1683,6 +1722,7 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
       lock_token: lockToken,
       published_time: null,
       publish_receipt: receipt,
+      ...(promotedArticleBody ? { article_body: promotedArticleBody } : {}),
     });
     if ('isError' in clearResult) return clearResult;
     return toolResult({
@@ -1734,6 +1774,7 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
     lock_token: lockToken,
     published_time: publishedTime,
     publish_receipt: receipt,
+    ...(promotedArticleBody ? { article_body: promotedArticleBody } : {}),
   });
   if ('isError' in saveResult) return saveResult;
 
