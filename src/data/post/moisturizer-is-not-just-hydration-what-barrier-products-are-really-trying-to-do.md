@@ -1,8 +1,9 @@
 ---
-publishDate: 2026-06-24T12:12:07.439Z
-published_time: 2026-06-24T12:12:07.439Z
+publishDate: 2026-06-24T14:12:39.941Z
+published_time: 2026-06-24T14:12:39.941Z
 title: "Moisturizer Is Not Just Hydration: What Barrier Products Are Really Trying to Do"
 excerpt: "A practical guide to moisturizer language for readers who are confused by barrier repair, hydration, creams, gels, and anti-aging claims."
+image: "~/assets/images/uploads/moisturizer-is-not-just-hydration-what-barrier-products-are-really-trying-to-do/moisturizer-barrier-products-featured.webp"
 tags:
   - "Skincare Basics"
   - "Moisturizer"
