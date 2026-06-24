@@ -13,6 +13,8 @@ export interface Post {
 
   /**  */
   publishDate: Date;
+  /** Timestamp controlling whether the article is live. */
+  published_time?: Date | null;
   /**  */
   updateDate?: Date;
 

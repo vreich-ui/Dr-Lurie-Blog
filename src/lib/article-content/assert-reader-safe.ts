@@ -2,13 +2,7 @@
  * Forbidden keywords that indicate accidental leakage of private strategy metadata.
  * Focuses on technical field names and metadata containers that should never reach the reader.
  */
-export const FORBIDDEN_READER_KEYWORDS = [
-  'private',
-  'strategy',
-  'agentNotes',
-  'sourcePromptId',
-  'inputTemplateId',
-];
+export const FORBIDDEN_READER_KEYWORDS = ['private', 'strategy', 'agentNotes', 'sourcePromptId', 'inputTemplateId'];
 
 /**
  * Asserts that the provided content (string or object) is safe for reader consumption.

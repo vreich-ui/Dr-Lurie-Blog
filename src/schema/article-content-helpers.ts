@@ -40,43 +40,11 @@ export function createArticleBodyFromLegacyMarkdown(
 }
 
 /**
- * Returns the preferred markdown/content source based on the requested precedence:
- * 1. content.article_body.nodes (concatenated public.body)
- * 2. publication.publish_payload.markdown
- * 3. publication.publish_payload.content
- * 4. editorial.draft_markdown
- * 5. content.blocks where block_type === "markdown"
+ * Returns markdown rendered from the canonical structured article body only.
  */
 export function getPreferredArticleMarkdownSource(input: ContentSourceV1): string | undefined {
-  // 1. Structured Article Body
   if (hasStructuredArticleBody(input)) {
     return articleBodyToMarkdown(input.content!.article_body!);
-  }
-
-  // 2. Publication Payload Markdown
-  if (input.publication?.publish_payload?.markdown) {
-    return input.publication.publish_payload.markdown;
-  }
-
-  // 3. Publication Payload Content
-  if (input.publication?.publish_payload?.content) {
-    return input.publication.publish_payload.content;
-  }
-
-  // 4. Editorial Draft Markdown
-  if (input.editorial?.draft_markdown) {
-    return input.editorial.draft_markdown;
-  }
-
-  // 5. Content Blocks
-  if (Array.isArray(input.content?.blocks)) {
-    const markdownBlocks = input.content!.blocks!
-      .filter((block) => block.block_type === 'markdown' && typeof block.payload === 'string')
-      .map((block) => block.payload as string);
-
-    if (markdownBlocks.length > 0) {
-      return markdownBlocks.join('\n\n');
-    }
   }
 
   return undefined;

@@ -67,56 +67,25 @@ export const normalizeContentSourceImportToFormData = (
   contentSource: Record<string, unknown>,
   currentSchemaVersion: string
 ) => {
-  const title = normalizeTextImportField(contentSource, [
-    ['publication', 'publish_payload', 'title'],
-    ['content', 'title'],
-  ]);
-  const slug = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'slug']]);
+  const title = normalizeTextImportField(contentSource, [['content', 'title']]);
+  const slug = { exists: false, value: '' };
   const computedSlug = slugify(slug.value || title.value);
-  const author = normalizeTextImportField(contentSource, [['publication', 'publish_payload', 'author']]);
-  const excerpt = normalizeTextImportField(contentSource, [
-    ['publication', 'publish_payload', 'excerpt'],
-    ['publication', 'publish_payload', 'description'],
-    ['content', 'deck'],
-  ]);
-  const seoDescription = normalizeTextImportField(contentSource, [
-    ['publication', 'publish_payload', 'seoDescription'],
-    ['seo', 'meta_description'],
-    ['publication', 'publish_payload', 'description'],
-  ]);
+  const author = { exists: false, value: '' };
+  const excerpt = normalizeTextImportField(contentSource, [['content', 'deck']]);
+  const seoDescription = normalizeTextImportField(contentSource, [['seo', 'meta_description']]);
   const markdown = getContentSourceMarkdown(contentSource);
   const content = {
     exists: Boolean(markdown),
     value: markdown,
   };
-  const importedTags = getFirstImportPathValue(contentSource, [
-    ['publication', 'publish_payload', 'tags'],
-    ['taxonomy', 'tags'],
-  ]);
+  const importedTags = getFirstImportPathValue(contentSource, [['taxonomy', 'tags']]);
   const importedSources = getPathValue(contentSource, ['sources', 'source_list']);
-  const featuredImage = normalizeTextImportField(contentSource, [
-    ['publication', 'publish_payload', 'featuredImage'],
-    ['publication', 'publish_payload', 'image'],
-  ]);
-  const existingFeaturedImagePath = normalizeTextImportField(contentSource, [
-    ['publication', 'publish_payload', 'existingFeaturedImagePath'],
-    ['publication', 'publish_payload', 'featuredImage'],
-    ['publication', 'publish_payload', 'image'],
-  ]);
-  const uploadedImageNames = getFirstImportPathValue(contentSource, [
-    ['publication', 'publish_payload', 'metadata', 'uploaded_image_names'],
-    ['publication', 'publish_payload', 'imageNames'],
-  ]);
-  const artifactReferences = getFirstImportPathValue(contentSource, [
-    ['publication', 'publish_payload', 'artifactReferences'],
-    ['publication', 'publish_payload', 'metadata', 'artifactReferences'],
-  ]);
-  const mediaEntries = getPathValue(contentSource, ['publication', 'publish_payload', 'mediaEntries']);
-  const articleBody = getFirstImportPathValue(contentSource, [
-    ['content', 'article_body'],
-    ['publication', 'publish_payload', 'article_body'],
-    ['article_body'],
-  ]);
+  const featuredImage = { exists: false, value: '' };
+  const existingFeaturedImagePath = { exists: false, value: '' };
+  const uploadedImageNames: { exists: boolean; value: unknown } = { exists: false, value: undefined };
+  const artifactReferences: { exists: boolean; value: unknown } = { exists: false, value: undefined };
+  const mediaEntries: { exists: boolean; value: unknown } = { exists: false, value: undefined };
+  const articleBody = getFirstImportPathValue(contentSource, [['content', 'article_body'], ['article_body']]);
 
   return {
     schemaVersion: contentSource.schema_version,

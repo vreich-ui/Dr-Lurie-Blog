@@ -57,7 +57,7 @@ const formatDate = (date: Date) => {
         <ul class="article-list">
           {
             posts.map((post) => (
-              <li class="article-item" data-post-preview data-post-slug={post.slug} data-post-draft="false">
+              <li class="article-item" data-post-preview data-post-slug={post.slug} data-post-unpublished="false">
                 <div class="article-info">
                   <span class="article-date">{formatDate(post.publishDate)}</span>
                   <h3 class="article-title">{post.title}</h3>
@@ -72,7 +72,7 @@ const formatDate = (date: Date) => {
                     class="action-btn"
                     data-admin-publish-toggle
                     data-post-slug={post.slug}
-                    data-post-draft="false"
+                    data-post-unpublished="false"
                     title="Unpublish article"
                   >
                     Unpublish
@@ -93,7 +93,7 @@ const formatDate = (date: Date) => {
       <div id="drafts-list" class="tab-content">
         <div class="list-header">
           <h2>Unpublished Drafts</h2>
-          <p class="hint">GitHub-backed Markdown drafts marked as <code>draft: true</code>.</p>
+          <p class="hint">GitHub-backed unpublished articles with no current published_time.</p>
         </div>
         <p id="drafts-status" class="list-status">Loading drafts…</p>
         <ul id="drafts-container" class="article-list"></ul>
@@ -458,21 +458,21 @@ const formatDate = (date: Date) => {
       };
 
       const renderDraft = (post) => {
-        const title = escapeHtml(post.title || post.slug || 'Untitled draft');
+        const title = escapeHtml(post.title || post.slug || 'Untitled article');
         const slug = escapeHtml(post.slug || '');
         const date = formatDate(post.publishDate);
         const author = post.author ? `By ${escapeHtml(String(post.author).replaceAll('-', ' '))}` : '';
         const category = post.category ? ` · ${escapeHtml(post.category)}` : '';
 
         return `
-          <li class="article-item" data-post-preview data-post-slug="${slug}" data-post-draft="true">
+          <li class="article-item" data-post-preview data-post-slug="${slug}" data-post-unpublished="true">
             <div class="article-info">
               <span class="article-date">${date}</span>
               <h3 class="article-title">${title}</h3>
               <p class="article-meta">${author}${category}</p>
             </div>
             <div class="article-actions">
-              <button type="button" class="action-btn" data-admin-publish-toggle data-post-slug="${slug}" data-post-draft="true">Publish</button>
+              <button type="button" class="action-btn" data-admin-publish-toggle data-post-slug="${slug}" data-post-unpublished="true">Publish</button>
               <a class="action-btn" href="/admin/publish?edit=${encodeURIComponent(post.slug || '')}">Edit</a>
             </div>
           </li>
@@ -499,10 +499,10 @@ const formatDate = (date: Date) => {
         }
       };
 
-      const confirmPublishChange = async (willDraft) => {
+      const confirmPublishChange = async (willUnpublish) => {
         const dialog = document.querySelector('[data-admin-publish-confirm]');
         const message = dialog?.querySelector('[data-admin-publish-confirm-message]');
-        const warning = willDraft
+        const warning = willUnpublish
           ? 'Unpublishing removes this article from the public library after the site redeploys.'
           : 'Publishing makes this article visible on the public library after the site redeploys.';
 
@@ -521,15 +521,15 @@ const formatDate = (date: Date) => {
 
       const togglePublishState = async (btn) => {
         const slug = btn.dataset.postSlug;
-        const isDraft = btn.dataset.postDraft === 'true';
-        const willDraft = !isDraft;
-        const confirmed = await confirmPublishChange(willDraft);
+        const isUnpublished = btn.dataset.postUnpublished === 'true';
+        const willUnpublish = !isUnpublished;
+        const confirmed = await confirmPublishChange(willUnpublish);
 
         if (!confirmed) return;
 
         btn.disabled = true;
         const originalText = btn.textContent;
-        btn.textContent = willDraft ? 'Unpublishing…' : 'Publishing…';
+        btn.textContent = willUnpublish ? 'Unpublishing…' : 'Publishing…';
 
         try {
           const clerk = activeClerk || (await getClerk());
@@ -540,13 +540,13 @@ const formatDate = (date: Date) => {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ slug, draft: willDraft }),
+            body: JSON.stringify({ slug, published_time: willUnpublish ? null : new Date().toISOString() }),
           });
 
           if (response.ok) {
-            btn.dataset.postDraft = String(willDraft);
-            btn.textContent = willDraft ? 'Publish' : 'Unpublish';
-            btn.title = willDraft ? 'Publish article' : 'Unpublish article';
+            btn.dataset.postUnpublished = String(willUnpublish);
+            btn.textContent = willUnpublish ? 'Publish' : 'Unpublish';
+            btn.title = willUnpublish ? 'Publish article' : 'Unpublish article';
             // Optionally refresh or show success
           } else {
             throw new Error('Failed to update status');

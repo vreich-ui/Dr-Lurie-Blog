@@ -7,7 +7,6 @@ export type PublishArticlePayload = {
   requestId?: string;
   request_id?: string;
   lock_token?: string;
-  draft?: boolean;
   author?: string;
   category?: string;
   tags?: string[] | string;
