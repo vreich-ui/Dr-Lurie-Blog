@@ -13,11 +13,7 @@ import {
   getDirectArtifactUploadMaxBytes,
 } from '../lib/artifact-upload.js';
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import {
-  allowedAgentNames,
-  publicationStatusDescription,
-  workflowStatuses,
-} from '../../src/schema/workflow-contract.js';
+import { allowedAgentNames, workflowStatuses } from '../../src/schema/workflow-contract.js';
 import {
   artifactKindValues,
   artifactReferenceLimits,
@@ -92,7 +88,6 @@ const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
 const ARTIFACT_LIST_MAX_LIMIT = 100;
 const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
 const WIPE_BLOB_SAMPLE_LIMIT = 20;
-const SCHEDULED_PUBLISH_DUE_WINDOW_MS = 5 * 60 * 1000;
 const SINGLE_SHOT_ARTIFACT_GUIDANCE_MAX_BYTES = 750_000;
 
 const jsonHeaders = {
@@ -142,12 +137,6 @@ const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
 
   return Boolean(provided && safeSecretsMatch(provided, expected));
 };
-
-const getScheduledTime = (publication: Record<string, unknown>, publishPayload?: Record<string, unknown>) =>
-  toNonEmptyString(publication.scheduled_for) ??
-  toNonEmptyString(publication.scheduledFor) ??
-  toNonEmptyString(publishPayload?.scheduled_for) ??
-  toNonEmptyString(publishPayload?.scheduledFor);
 
 const parseJsonResponseBody = (bodyText: string | undefined) => {
   if (!bodyText) return {};
@@ -308,17 +297,11 @@ const workflowStatusJsonSchema = (description?: string) => ({
   enum: workflowStatuses,
   ...(description ? { description } : {}),
 });
-const publicationStatusJsonSchema = (description?: string) => ({
-  type: 'string',
-  enum: ['draft', 'ready', 'scheduled', 'published'],
-  ...(description ? { description } : {}),
-});
-
 const adminPublishValidationModeSchema = {
   type: 'string',
   enum: ['admin_publish_draft'],
   description:
-    'Required validation mode for MCP-created admin-publish article drafts. Prefer content.article_body with schema_version article_body.v1 and at least one public node. Legacy fallback body fields are publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown; publication.publish_payload.markdown may be generated from article_body for legacy publishing.',
+    'Required validation mode for MCP-created admin-publish article drafts. Use content.article_body with schema_version article_body.v1 and at least one reader-visible public node.',
 };
 
 const artifactKindJsonSchema = (description?: string) => ({
@@ -433,45 +416,6 @@ const isoDateStringSchema = (description: string) => ({
   description,
 });
 
-const publishPayloadJsonSchema = objectSchema(
-  {
-    slug: stringSchema(
-      'Destination slug for the published article; admin import requires this or enough content.title text to compute one.'
-    ),
-    title: stringSchema('Published article title; admin import requires this or content.title.'),
-    markdown: stringSchema('Markdown body to publish; one accepted admin-import body field.'),
-    content: stringSchema('Alternate article body content to publish; one accepted admin-import body field.'),
-    description: stringSchema('Published article summary or meta description.'),
-    publishDate: stringSchema('Publish date string.'),
-    author: stringSchema('Article author name; required for admin import.'),
-    tags: stringArraySchema('Article tags.'),
-    images: arraySchema({}, 'Image metadata or asset references.'),
-    mediaEntries: arraySchema(
-      {},
-      'Permissive media entry payloads accepted by the runtime publisher; use for existing base64 media entries when needed.'
-    ),
-    artifactReferences: arraySchema(
-      {},
-      'ArtifactReference objects returned by create_artifact_upload_intent plus direct upload or legacy save_artifact. Store these objects exactly as returned; never invent or rewrite blobKey, sha256, size, contentType, or timestamp values.'
-    ),
-    overwrite: { type: 'boolean', description: 'Whether an existing article at the slug may be overwritten.' },
-    draft: { type: 'boolean', description: 'Whether to publish the article as a draft.' },
-    articlePath: stringSchema('Optional normalized repository path, usually src/data/post/{slug}.md.'),
-    category: stringSchema('Article category.'),
-    excerpt: stringSchema('Article excerpt.'),
-    seoDescription: stringSchema('SEO description.'),
-    featuredImage: stringSchema('Featured image filename or path.'),
-    existingFeaturedImagePath: stringSchema('Existing repository image path for the featured image.'),
-    videoLink: stringSchema('Optional video link.'),
-    ctaLink: stringSchema('Optional CTA link.'),
-    ctaText: stringSchema('Optional CTA text.'),
-    commitMessage: stringSchema('Optional publish commit message.'),
-    metadata: metadataBagSchema('Optional publish-payload extension data.'),
-  },
-  ['slug', 'title'],
-  'Publication payload used by the publishing step. MCP-created admin-publish drafts must include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, and publication.publish_payload.author. Prefer content.article_body for body content; publication.publish_payload.markdown is a generated legacy fallback when needed.'
-);
-
 const articleBodyNodeJsonSchema = objectSchema(
   {
     id: stringSchema('Stable opaque node id starting with n_; do not include strategy or commercial keywords.'),
@@ -522,7 +466,7 @@ const articleBodyV1JsonSchema = objectSchema(
     metadata: metadataBagSchema('Optional article-level metadata.'),
   },
   ['schema_version', 'nodes'],
-  'Preferred structured article body for admin-publish drafts. Use content.article_body.schema_version = "article_body.v1" and content.article_body.nodes[]. publication.publish_payload.markdown is a generated legacy fallback, not the preferred authoring field.'
+  'Canonical structured article body for admin-publish drafts. Use content.article_body.schema_version = "article_body.v1" and content.article_body.nodes[].'
 );
 
 const contentBlockJsonSchema = objectSchema(
@@ -651,7 +595,7 @@ const contentSourceV1JsonSchema = objectSchema(
       article_body: articleBodyV1JsonSchema,
       blocks: arraySchema(
         contentBlockJsonSchema,
-        'Legacy structured content blocks. Prefer content.article_body for new admin-publish drafts.'
+        'Non-publishing structured content blocks. Publishing uses only content.article_body.'
       ),
     }),
     taxonomy: objectSchema({
@@ -707,9 +651,6 @@ const contentSourceV1JsonSchema = objectSchema(
     editorial: objectSchema({
       schema_version: constStringSchema('editorial.v1'),
       writer_notes: stringSchema('Notes for writers and editors.'),
-      draft_markdown: stringSchema(
-        'Markdown draft body agents can pass between drafting, revision, and publishing steps.'
-      ),
     }),
     sources: objectSchema({
       schema_version: constStringSchema('sources.v1'),
@@ -747,12 +688,12 @@ const contentSourceV1JsonSchema = objectSchema(
       approval_status: stringSchema('Approval status.'),
     }),
     publication: objectSchema({
-      schema_version: constStringSchema('publication.v1'),
-      publication_status: stringSchema(publicationStatusDescription),
-      scheduled_for: stringSchema(
-        'ISO timestamp for scheduled publication. Due scheduled-publish calls may publish when this timestamp is now, in the past, or within the short server due window.'
-      ),
-      publish_payload: publishPayloadJsonSchema,
+      schema_version: constStringSchema('publication.v2'),
+      published_time: {
+        anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }],
+        description:
+          'Only publication control field. Null/missing/invalid means not live and not scheduled; future ISO timestamp schedules; current or past ISO timestamp publishes/live.',
+      },
     }),
     workflow: objectSchema({
       schema_version: constStringSchema('content_workflow.v1'),
@@ -807,14 +748,14 @@ const contentSourceV1JsonSchema = objectSchema(
     }),
   },
   ['record_type', 'schema_version'],
-  'Structured content_source.v1 workflow input. For MCP admin-publish drafts, include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and preferred content.article_body with schema_version article_body.v1 plus at least one public node. Legacy fallback body fields remain supported.'
+  'Structured content_source.v1 workflow input. For MCP admin-publish drafts, use content.article_body with schema_version article_body.v1 plus at least one reader-visible public node. Publication is controlled only by input.publication.published_time.'
 );
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_request',
     description:
-      'Create a save-json-blob workflow request and return its record. MCP-created article drafts are validated as admin-publish drafts: include publication.publish_payload.title or content.title, publication.publish_payload.slug or content.title, publication.publish_payload.author, and preferred content.article_body (article_body.v1) with at least one public node. Legacy fallback body fields are still supported.',
+      'Create a save-json-blob workflow request and return its record. MCP-created article drafts are validated as admin-publish drafts: use content.article_body (article_body.v1) with at least one reader-visible public node. Publication is controlled only by input.publication.published_time.',
     inputSchema: objectSchema(
       {
         input: contentSourceV1JsonSchema,
@@ -926,72 +867,18 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 
   {
-    name: 'save_json_blob_mark_published',
+    name: 'save_json_blob_publish_by_time',
     description:
-      'Mark a completed workflow record as published after the final article has been validated and publishing has succeeded or been handed off. This tool only updates workflow state; it does not invoke the article publishing endpoint. Server-only publish credentials are never accepted as inputs or returned.',
+      'Set input.publication.published_time. Future timestamps save only; current/past timestamps publish content.article_body through the secure article publisher and write a publish receipt. Requires checkout lock_token.',
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
-        expected_record_version: intSchema(
-          'Optional workflow record version that should be visible before marking published.'
-        ),
         lock_token: lockTokenSchema,
-        commit_metadata: {
-          type: 'object',
-          description:
-            'Optional publication result metadata such as commit SHA, commit URL, article path, deploy status, and a human-readable message.',
-          additionalProperties: true,
-        },
-      },
-      ['request_id', 'lock_token', 'commit_metadata']
-    ),
-  },
-  {
-    name: 'save_json_blob_publish_article_now',
-    description:
-      'Promote a content_source.v1 article draft to publication.publication_status: ready, publish it immediately through the existing secure article publisher, then mark workflow_status: published only after successful publish. Requires checkout lock_token. Server-only publish credentials are never accepted as inputs or returned.',
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        expected_record_version: intSchema(
-          'Optional workflow record version that should be visible before marking published.'
+        published_time: nullableStringSchema(
+          'Optional ISO timestamp. Omit to publish now. Future timestamps schedule; null clears publication time.'
         ),
-        lock_token: lockTokenSchema,
       },
       ['request_id', 'lock_token']
-    ),
-  },
-  {
-    name: 'save_json_blob_publish_scheduled',
-    description:
-      'Publish a due scheduled content_source.v1 record to GitHub, then mark the workflow published. Requires checkout lock_token, agent identity, publication.publication_status: scheduled, and publication.scheduled_for due now or in the short server due window. Returns structured reasons when validation or publishing prevents publication. Server-only publish credentials are never accepted as inputs or returned.',
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema(),
-        expected_record_version: intSchema(
-          'Optional workflow record version that should be visible before marking published.'
-        ),
-        lock_token: lockTokenSchema,
-        agent_id: stringSchema('Stable identifier for the agent or process requesting scheduled publication.'),
-        agent_owner: stringSchema('Human, team, or admin owner responsible for the scheduled publishing agent.'),
-        agent_label: stringSchema('Optional human-readable label for audit metadata.'),
-      },
-      ['request_id', 'lock_token', 'agent_id', 'agent_owner']
-    ),
-  },
-  {
-    name: 'save_json_blob_update_publication_status',
-    description:
-      'Update publication fields on an existing content_source.v1 workflow record without creating a duplicate workflow record. For immediate scheduled publishing, set publication_status: scheduled and scheduled_for to the current ISO timestamp before calling save_json_blob_publish_scheduled.',
-    inputSchema: objectSchema(
-      {
-        request_id: stringSchema('Existing workflow request id to update.'),
-        publication_status: publicationStatusJsonSchema('One of draft, ready, scheduled, or published.'),
-        scheduled_for: stringSchema(
-          'ISO timestamp to write to input.publication.scheduled_for. Required when publication_status is scheduled; optional otherwise and left unchanged when omitted.'
-        ),
-      },
-      ['request_id', 'publication_status']
     ),
   },
   {
@@ -1318,8 +1205,6 @@ const getSlugFromValue = (value: unknown): string | null => {
     toNonEmptyString(record.articleSlug) ??
     toNonEmptyString(record.article_slug) ??
     getSlugFromValue(record.publication) ??
-    getSlugFromValue(record.publish_payload) ??
-    getSlugFromValue(record.publishPayload) ??
     getSlugFromValue(record.content)
   );
 };
@@ -1540,10 +1425,125 @@ const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string,
   return toolResult(body);
 };
 
-const callPublishArticleNow = async (event: LambdaEvent, input: Record<string, unknown>) => {
+const hasReaderVisibleArticleBodyNode = (node: unknown) => {
+  const record = getRecordValue(node);
+  if (!record) return false;
+  if (record.visibility && record.visibility !== 'public') return false;
+
+  const publicFields = getRecordValue(record.public);
+  if (!publicFields) return false;
+  const media = getRecordValue(publicFields.media);
+  const textValues = [
+    publicFields.eyebrow,
+    publicFields.title,
+    publicFields.body,
+    ...(Array.isArray(publicFields.items) ? publicFields.items : []),
+    publicFields.ctaText,
+    publicFields.ctaLink,
+    publicFields.label,
+    media?.src,
+    media?.alt,
+    media?.caption,
+  ];
+
+  return textValues.some((value) => toNonEmptyString(value) !== undefined);
+};
+
+const validateCanonicalArticleBody = (recordInput: Record<string, unknown> | undefined) => {
+  const content = getRecordValue(recordInput?.content);
+  const articleBody = getRecordValue(content?.article_body);
+
+  if (articleBody?.schema_version !== 'article_body.v1') {
+    return {
+      ok: false as const,
+      error: 'Publishing requires input.content.article_body.schema_version === "article_body.v1".',
+      error_code: 'invalid_article_body_schema',
+    };
+  }
+
+  if (!Array.isArray(articleBody.nodes) || !articleBody.nodes.some(hasReaderVisibleArticleBodyNode)) {
+    return {
+      ok: false as const,
+      error: 'Publishing requires input.content.article_body.nodes with at least one reader-visible public node.',
+      error_code: 'article_body_missing_public_node',
+    };
+  }
+
+  return { ok: true as const, articleBody, content };
+};
+
+const slugifyPublishTitle = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'article';
+
+const buildCanonicalPublishPayload = (
+  requestId: string,
+  lockToken: string,
+  recordInput: Record<string, unknown>,
+  articleBody: Record<string, unknown>,
+  publishedTime: string
+) => {
+  const content = getRecordValue(recordInput.content);
+  const taxonomy = getRecordValue(recordInput.taxonomy);
+  const seo = getRecordValue(recordInput.seo);
+  const media = getRecordValue(recordInput.media);
+  const imageAssets = Array.isArray(media?.image_asset_register) ? media.image_asset_register : [];
+  const firstImage = imageAssets
+    .map(getRecordValue)
+    .find((asset) => toNonEmptyString(asset?.repoPath) || toNonEmptyString(asset?.url));
+  const title = toNonEmptyString(content?.title);
+
+  if (!title) {
+    return { ok: false as const, error: 'Publishing requires input.content.title.', error_code: 'missing_title' };
+  }
+
+  return {
+    ok: true as const,
+    payload: {
+      requestId,
+      request_id: requestId,
+      lock_token: lockToken,
+      article_body: articleBody,
+      title,
+      slug: slugifyPublishTitle(title),
+      publishDate: publishedTime,
+      published_time: publishedTime,
+      description: toNonEmptyString(content?.description) ?? toNonEmptyString(content?.deck),
+      excerpt: toNonEmptyString(content?.deck),
+      seoDescription: toNonEmptyString(seo?.meta_description),
+      tags: Array.isArray(taxonomy?.tags) ? taxonomy.tags : undefined,
+      featuredImage: toNonEmptyString(firstImage?.repoPath) ?? toNonEmptyString(firstImage?.url),
+      overwrite: true,
+    },
+  };
+};
+
+const callPublishByTime = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const requestId = toNonEmptyString(input.request_id);
   const lockToken = toNonEmptyString(input.lock_token);
   if (!requestId || !lockToken) return toolError('request_id and lock_token are required.');
+
+  const now = new Date();
+  const rawPublishedTime = input.published_time;
+  const publishedTime =
+    rawPublishedTime === undefined
+      ? now.toISOString()
+      : rawPublishedTime === null
+        ? null
+        : toNonEmptyString(rawPublishedTime);
+
+  const publishedMs = publishedTime ? Date.parse(publishedTime) : Number.NaN;
+  if (publishedTime !== null && (!publishedTime || Number.isNaN(publishedMs))) {
+    return toolError('published_time must be omitted, null, or a valid ISO timestamp.', {
+      error_code: 'invalid_published_time',
+      published_time: rawPublishedTime,
+    });
+  }
 
   const getResult = await invokeSaveJsonBlob(event, { action: 'get_request', request_id: requestId });
   if ('isError' in getResult) return getResult;
@@ -1551,171 +1551,110 @@ const callPublishArticleNow = async (event: LambdaEvent, input: Record<string, u
   const record = getRecordValue(getResult.record);
   const recordInput = getRecordValue(record?.input);
   if (recordInput?.record_type !== 'content_source' || recordInput?.schema_version !== 'content_source.v1') {
-    return toolError('Publish-now requires a content_source.v1 workflow record.', {
+    return toolError('Publishing requires a content_source.v1 workflow record.', {
       error_code: 'invalid_workflow_record_type',
       record_type: recordInput?.record_type,
       schema_version: recordInput?.schema_version,
     });
   }
 
-  const publication = getRecordValue(recordInput.publication);
-  const existingPayload = getRecordValue(publication?.publish_payload);
+  const bodyValidation = validateCanonicalArticleBody(recordInput);
+  if (!bodyValidation.ok) return toolError(bodyValidation.error, bodyValidation);
 
-  const prepareResult = await invokeSaveJsonBlob(event, {
-    action: 'prepare_publish_now',
-    request_id: requestId,
-    expected_record_version: input.expected_record_version,
-    lock_token: lockToken,
-    publish_payload: existingPayload,
-  });
-  if ('isError' in prepareResult) return prepareResult;
+  if (publishedTime === null) {
+    const payloadResult = buildCanonicalPublishPayload(
+      requestId,
+      lockToken,
+      recordInput,
+      bodyValidation.articleBody,
+      now.toISOString()
+    );
+    if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
 
-  const publishPayload = getRecordValue(prepareResult.publish_payload);
-  if (!publishPayload) {
-    return toolError('Prepared workflow did not return a publish payload.', {
-      error_code: 'missing_prepared_publish_payload',
+    const unpublishResult = await callPublishArticle(event, { ...payloadResult.payload, published_time: null });
+    if (!unpublishResult.ok) {
+      return toolError('Article was not unpublished; published_time was not changed.', {
+        error_code: 'unpublish_failed',
+        publish_status: unpublishResult.statusCode,
+        publish_result: unpublishResult.body,
+      });
+    }
+
+    const receipt = {
+      commit: unpublishResult.body.commit,
+      commit_sha: unpublishResult.body.commit,
+      article_path: unpublishResult.body.articlePath ?? unpublishResult.body.path,
+      articlePath: unpublishResult.body.articlePath ?? unpublishResult.body.path,
+      deployStatus: unpublishResult.body.deployStatus,
+      message: unpublishResult.body.message,
+      published_time: null,
+      unpublished: true,
+    };
+
+    const clearResult = await invokeSaveJsonBlob(event, {
+      action: 'set_published_time',
+      request_id: requestId,
+      lock_token: lockToken,
+      published_time: null,
+      publish_receipt: receipt,
+    });
+    if ('isError' in clearResult) return clearResult;
+    return toolResult({
+      status: 'unpublished',
+      published_time: null,
+      article_path: receipt.article_path,
+      commit_sha: receipt.commit_sha,
+      record: clearResult.record,
+      publish_result: unpublishResult.body,
     });
   }
 
-  const publishResult = await callPublishArticle(event, {
-    ...publishPayload,
-    requestId,
-    request_id: requestId,
-    lock_token: lockToken,
-  });
+  const isFuturePublish = publishedMs > now.getTime();
 
+  const payloadResult = buildCanonicalPublishPayload(
+    requestId,
+    lockToken,
+    recordInput,
+    bodyValidation.articleBody,
+    publishedTime
+  );
+  if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
+
+  const publishResult = await callPublishArticle(event, payloadResult.payload);
   if (!publishResult.ok) {
-    return toolError('Article was not published.', {
-      error_code: 'publish_now_failed',
+    return toolError('Article file was not written; published_time was not changed.', {
+      error_code: 'publish_by_time_failed',
       publish_status: publishResult.statusCode,
       publish_result: publishResult.body,
     });
   }
 
-  const commitMetadata = {
+  const receipt = {
     commit: publishResult.body.commit,
+    commit_sha: publishResult.body.commit,
+    article_path: publishResult.body.articlePath ?? publishResult.body.path,
     articlePath: publishResult.body.articlePath ?? publishResult.body.path,
     deployStatus: publishResult.body.deployStatus,
     message: publishResult.body.message,
-    publish_now: true,
+    published_time: publishedTime,
   };
 
-  const markResult = await invokeSaveJsonBlob(event, {
-    action: 'mark_published',
+  const saveResult = await invokeSaveJsonBlob(event, {
+    action: 'set_published_time',
     request_id: requestId,
-    expected_record_version: input.expected_record_version,
     lock_token: lockToken,
-    commit_metadata: commitMetadata,
+    published_time: publishedTime,
+    publish_receipt: receipt,
   });
-
-  if ('isError' in markResult) return markResult;
+  if ('isError' in saveResult) return saveResult;
 
   return toolResult({
-    record: markResult.record,
+    status: isFuturePublish ? 'time_set' : 'published',
+    published_time: publishedTime,
+    article_path: receipt.article_path,
+    commit_sha: receipt.commit_sha,
+    record: saveResult.record,
     publish_result: publishResult.body,
-    commit_metadata: commitMetadata,
-  });
-};
-
-const callScheduledPublish = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const agentId = toNonEmptyString(input.agent_id);
-  const agentOwner = toNonEmptyString(input.agent_owner);
-  const agentLabel = toNonEmptyString(input.agent_label);
-
-  if (!agentId || !agentOwner) {
-    return toolError('agent_id and agent_owner are required for scheduled publishing.', {
-      error_code: 'missing_scheduled_publish_agent_identity',
-    });
-  }
-
-  const requestId = toNonEmptyString(input.request_id);
-  const lockToken = toNonEmptyString(input.lock_token);
-  if (!requestId || !lockToken) return toolError('request_id and lock_token are required.');
-
-  const getResult = await invokeSaveJsonBlob(event, { action: 'get_request', request_id: requestId });
-  if ('isError' in getResult) return getResult;
-
-  const record = getRecordValue(getResult.record);
-  const recordInput = getRecordValue(record?.input);
-  const publication = getRecordValue(recordInput?.publication);
-  const publishPayload = getRecordValue(publication?.publish_payload);
-  const publicationStatus = toNonEmptyString(publication?.publication_status)?.toLowerCase();
-
-  if (publicationStatus !== 'scheduled') {
-    return toolError('Scheduled publish requires publication.publication_status: scheduled.', {
-      error_code: 'publication_not_scheduled',
-      publication_status: publication?.publication_status,
-    });
-  }
-
-  const scheduledFor = publication ? getScheduledTime(publication, publishPayload) : undefined;
-  const scheduledMs = scheduledFor ? Date.parse(scheduledFor) : Number.NaN;
-
-  if (!scheduledFor || Number.isNaN(scheduledMs)) {
-    return toolError('Scheduled publish requires a valid publication.scheduled_for ISO timestamp.', {
-      error_code: 'invalid_scheduled_for',
-      scheduled_for: scheduledFor,
-    });
-  }
-
-  const nowMs = Date.now();
-  if (scheduledMs > nowMs + SCHEDULED_PUBLISH_DUE_WINDOW_MS) {
-    return toolError('Scheduled article is not due for publishing yet.', {
-      error_code: 'scheduled_publish_not_due',
-      scheduled_for: scheduledFor,
-      now: new Date(nowMs).toISOString(),
-      due_window_ms: SCHEDULED_PUBLISH_DUE_WINDOW_MS,
-    });
-  }
-
-  if (!publishPayload) {
-    return toolError('Scheduled publish requires publication.publish_payload.', {
-      error_code: 'missing_publish_payload',
-    });
-  }
-
-  const publishResult = await callPublishArticle(event, {
-    ...publishPayload,
-    requestId,
-    request_id: requestId,
-    lock_token: lockToken,
-  });
-
-  if (!publishResult.ok) {
-    return toolError('Scheduled article was not published.', {
-      error_code: 'scheduled_publish_failed',
-      publish_status: publishResult.statusCode,
-      publish_result: publishResult.body,
-      scheduled_for: scheduledFor,
-    });
-  }
-
-  const commitMetadata = {
-    commit: publishResult.body.commit,
-    articlePath: publishResult.body.articlePath ?? publishResult.body.path,
-    deployStatus: publishResult.body.deployStatus,
-    message: publishResult.body.message,
-    scheduled_for: scheduledFor,
-    scheduled_publish: true,
-    agent_id: agentId,
-    agent_owner: agentOwner,
-    ...(agentLabel ? { agent_label: agentLabel } : {}),
-  };
-
-  const markResult = await invokeSaveJsonBlob(event, {
-    action: 'mark_published',
-    request_id: requestId,
-    expected_record_version: input.expected_record_version,
-    lock_token: lockToken,
-    commit_metadata: commitMetadata,
-  });
-
-  if ('isError' in markResult) return markResult;
-
-  return toolResult({
-    record: markResult.record,
-    publish_result: publishResult.body,
-    commit_metadata: commitMetadata,
   });
 };
 
@@ -2785,33 +2724,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         { action: 'checkin_request', request_id: input.request_id, lock_token: input.lock_token },
         'record'
       );
-    case 'save_json_blob_mark_published':
-      return callAction(
-        event,
-        {
-          action: 'mark_published',
-          request_id: input.request_id,
-          expected_record_version: input.expected_record_version,
-          lock_token: input.lock_token,
-          commit_metadata: input.commit_metadata,
-        },
-        'record'
-      );
-    case 'save_json_blob_publish_article_now':
-      return callPublishArticleNow(event, input);
-    case 'save_json_blob_publish_scheduled':
-      return callScheduledPublish(event, input);
-    case 'save_json_blob_update_publication_status':
-      return callAction(
-        event,
-        {
-          action: 'update_publication_status',
-          request_id: input.request_id,
-          publication_status: input.publication_status,
-          scheduled_for: input.scheduled_for,
-        },
-        'record'
-      );
+    case 'save_json_blob_publish_by_time':
+      return callPublishByTime(event, input);
     case 'deploy_status':
       return callDeployStatus(event, input);
     case 'verify_article_images':

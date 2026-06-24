@@ -57,6 +57,7 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
     category: rawCategory,
     author,
     draft = false,
+    published_time: rawPublishedTime,
     metadata = {},
   } = data;
 
@@ -96,6 +97,7 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
     author: author,
 
     draft: draft,
+    published_time: rawPublishedTime,
 
     metadata,
 
@@ -112,7 +114,10 @@ const load = async function (): Promise<Array<Post>> {
 
   const results = (await Promise.all(normalizedPosts))
     .sort((a, b) => b.publishDate.valueOf() - a.publishDate.valueOf())
-    .filter((post) => !post.draft);
+    .filter((post) => {
+      const publishedTime = post.published_time instanceof Date ? post.published_time.getTime() : Number.NaN;
+      return Number.isFinite(publishedTime) && publishedTime <= Date.now();
+    });
 
   return results;
 };

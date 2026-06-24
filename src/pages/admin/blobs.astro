@@ -754,12 +754,18 @@ const metadata = {
 
       const getArtifactIcon = (kind) => {
         switch (kind) {
-          case 'image': return '🖼️';
-          case 'pdf': return '📄';
-          case 'video': return '🎬';
-          case 'audio': return '🎵';
-          case 'doc': return '📝';
-          default: return '📦';
+          case 'image':
+            return '🖼️';
+          case 'pdf':
+            return '📄';
+          case 'video':
+            return '🎬';
+          case 'audio':
+            return '🎵';
+          case 'doc':
+            return '📝';
+          default:
+            return '📦';
         }
       };
 
@@ -781,7 +787,7 @@ const metadata = {
           if (metadata) {
             const label = metadata.label || metadata.originalFilename || key;
             const tagsHtml = (metadata.tags || [])
-              .map(tag => `<span class="blob-tag">${escapeHtml(tag)}</span>`)
+              .map((tag) => `<span class="blob-tag">${escapeHtml(tag)}</span>`)
               .join('');
 
             const dateStr = metadata.createdAtISO ? new Date(metadata.createdAtISO).toLocaleDateString() : '';
@@ -847,7 +853,7 @@ const metadata = {
           const rows = tableBody.querySelectorAll('tr[data-key]');
           // Simple lazy-ish loading: fetch metadata for visible rows or just all of them in this case
           // but we can optimize it if needed.
-          rows.forEach(row => {
+          rows.forEach((row) => {
             const key = decodeURIComponent(row.dataset.key);
             fetchMetadataForRow(row, key);
           });
@@ -952,7 +958,8 @@ const metadata = {
           const result = await callApi('get-blob', { store, key });
           editorEncoding = result.encoding || 'text';
           const meta = result.metadata && typeof result.metadata === 'object' ? result.metadata : {};
-          const declaredType = metadata?.contentType || meta.contentType || meta['content-type'] || result.contentType || '';
+          const declaredType =
+            metadata?.contentType || meta.contentType || meta['content-type'] || result.contentType || '';
           if (editorContentType) editorContentType.value = declaredType;
 
           let metaText = `${formatBytes(result.size)} • ${declaredType || 'unknown type'}`;
@@ -962,7 +969,9 @@ const metadata = {
           if (editorMeta) editorMeta.textContent = metaText;
 
           if (editorPreviewWrap) {
-            const kind = metadata?.artifactKind || (declaredType.startsWith('image/') ? 'image' : declaredType === 'application/pdf' ? 'pdf' : 'other');
+            const kind =
+              metadata?.artifactKind ||
+              (declaredType.startsWith('image/') ? 'image' : declaredType === 'application/pdf' ? 'pdf' : 'other');
             if (kind === 'image') {
               editorPreviewWrap.innerHTML = `<img src="/.netlify/functions/admin-get-blob-image?blobKey=${encodeURIComponent(key)}" class="editor-preview-image" />`;
               editorPreviewWrap.hidden = false;

@@ -82,11 +82,13 @@ const getHistoryDetails = (entry: WorkflowRecord['history'][number]) =>
 const getLastHistoryEntry = (record: WorkflowRecord, action: string) =>
   [...record.history].reverse().find((entry) => entry.action === action);
 
-const getInputWorkflowStatus = (record: WorkflowRecord) =>
-  isRecord(record.input) ? toText((record.input as Record<string, unknown>).workflow_status) : '';
+const getPublishedTime = (record: WorkflowRecord) => toText(record.input.publication?.published_time);
 
-const hasPublishedWorkflowStatus = (record: WorkflowRecord) =>
-  getInputWorkflowStatus(record) === 'published' || record.workflow_status === 'published';
+const hasLivePublishedTime = (record: WorkflowRecord) => {
+  const value = getPublishedTime(record);
+  const ms = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(ms) && ms <= Date.now();
+};
 
 const getSavedMetadata = (record: WorkflowRecord, author: string) => {
   const savedEntry = getLastHistoryEntry(record, 'admin_save_draft');
@@ -103,7 +105,7 @@ const getCommitMetadata = (details: Record<string, unknown>) =>
     : {};
 
 const getMarkedPublishedMetadata = (record: WorkflowRecord, author: string) => {
-  const publishedEntry = getLastHistoryEntry(record, 'mark_published');
+  const publishedEntry = getLastHistoryEntry(record, 'set_published_time');
   const details = publishedEntry ? getHistoryDetails(publishedEntry) : {};
   const commitMetadata = getCommitMetadata(details);
   const articlePath = toText(commitMetadata.articlePath) || toText(commitMetadata.article_path);
@@ -161,7 +163,7 @@ const getPublishedArticleMetadata = async (slug: string, record: WorkflowRecord,
 
   if (!slug || !token || !repo) {
     return {
-      exists: hasPublishedWorkflowStatus(record) || marked.reliable,
+      exists: hasLivePublishedTime(record) || marked.reliable,
       date: marked.date,
       by: marked.by,
       articlePath,
@@ -177,7 +179,7 @@ const getPublishedArticleMetadata = async (slug: string, record: WorkflowRecord,
 
     if (!file || file.encoding !== 'base64' || !file.content) {
       return {
-        exists: hasPublishedWorkflowStatus(record) || marked.reliable,
+        exists: hasLivePublishedTime(record) || marked.reliable,
         date: marked.date,
         by: marked.by,
         articlePath,
@@ -196,7 +198,7 @@ const getPublishedArticleMetadata = async (slug: string, record: WorkflowRecord,
   } catch (error) {
     console.warn('Published article metadata could not be loaded for JSON draft status.', { articlePath, error });
     return {
-      exists: hasPublishedWorkflowStatus(record) || marked.reliable,
+      exists: hasLivePublishedTime(record) || marked.reliable,
       date: marked.date,
       by: marked.by,
       articlePath,
@@ -213,7 +215,7 @@ const isNewerIsoDate = (left: string, right: string) => {
 };
 
 const getRecordStatus = (
-  record: WorkflowRecord,
+  _record: WorkflowRecord,
   savedAt: string,
   published: PublishedSummary,
   isAdminRecord: boolean
@@ -222,7 +224,7 @@ const getRecordStatus = (
     return 'unpublished_changes';
   if (published.articleExists) return 'published_saved_json';
   if (published.exists) return 'published';
-  if (isAdminRecord && record.input.publication?.publication_status === 'draft') return 'draft_workflow';
+  if (isAdminRecord) return 'draft_workflow';
   if (!isAdminRecord) return 'mcp_workflow_record';
   return 'saved_json_only';
 };
@@ -233,7 +235,7 @@ const getLifecycleStatus = (recordStatus: DraftSummary['recordStatus']): DraftSu
   return 'saved';
 };
 
-const getPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
+const getPayload = (_input: ContentSourceV1) => undefined as Record<string, unknown> | undefined;
 
 const getDraftMarkdown = (input: ContentSourceV1) => getContentSourceMarkdown(input);
 
@@ -248,13 +250,8 @@ const getDraftFields = (record: WorkflowRecord) => {
 };
 
 const isAdminDraftRecord = (record: WorkflowRecord) => {
-  const payload = getPayload(record.input);
-
   return Boolean(
-    record.request_id.startsWith('admin-draft-') ||
-      record.input.publication?.publication_status === 'draft' ||
-      payload?.draft === true ||
-      record.history.some((entry) => entry.action === 'admin_save_draft')
+    record.request_id.startsWith('admin-draft-') || record.history.some((entry) => entry.action === 'admin_save_draft')
   );
 };
 
