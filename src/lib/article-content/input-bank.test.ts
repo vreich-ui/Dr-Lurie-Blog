@@ -27,11 +27,11 @@ describe('Article Content Input Bank', () => {
   });
 
   describe('articleNodeTemplates', () => {
-    it('should contain all 11 required templates', () => {
+    it('should contain all 12 required templates', () => {
       const required = [
         'prose_section', 'plain_text', 'callout', 'summary',
         'soft_action', 'contextual_offer', 'commerce_offer',
-        'product_mention', 'ad_slot', 'chat_invite', 'faq'
+        'product_mention', 'ad_slot', 'chat_invite', 'faq', 'image'
       ];
       for (const id of required) {
         assert.ok(articleNodeTemplates[id], `Missing template: ${id}`);
