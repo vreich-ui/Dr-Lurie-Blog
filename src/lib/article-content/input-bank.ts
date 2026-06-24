@@ -55,6 +55,30 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
       },
     },
   },
+  image: {
+    id: 'image',
+    name: 'Image',
+    description: 'A standalone image with an optional caption.',
+    kind: 'content',
+    fields: {
+      public: ['media'],
+      optional: ['title', 'body'],
+    },
+    defaults: {
+      kind: 'content',
+      public: {
+        title: '',
+        body: '',
+        media: {
+          type: 'image',
+          src: '',
+        },
+      },
+      rendering: {
+        presentation: 'section',
+      },
+    },
+  },
   plain_text: {
     id: 'plain_text',
     name: 'Plain Text',
