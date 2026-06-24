@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-06-24T14:37:22.656Z
-published_time: 2026-06-24T14:37:22.656Z
+publishDate: 2026-06-24T16:05:58.754Z
+published_time: 2026-06-24T16:05:58.754Z
 title: "The Minimum Skincare Routine: What You Actually Need Before Buying More"
 excerpt: "A plain-language starting point for newcomers who want healthy skin without building a complicated shelf of products."
 image: "~/assets/images/uploads/the-minimum-skincare-routine-what-you-actually-need-before-buying-more/minimum-skincare-routine-featured.webp"
@@ -15,9 +15,11 @@ metadata:
 ---
 ### The minimum skincare routine
 
+![The minimum skincare routine](~/assets/images/uploads/the-minimum-skincare-routine-what-you-actually-need-before-buying-more/minimum-skincare-routine-featured.webp)
+
 If you are new to skincare, the market can make it seem as if a real routine needs a cleanser, toner, serum, eye cream, exfoliant, retinoid, mask, oil, and a product for every square inch of your face. That is not the best place to start.
 
-A useful routine begins with three jobs: clean the skin without stripping it, keep the barrier comfortable, and protect the skin from daily ultraviolet exposure. Everything else should earn its place.
+A useful routine begins with three jobs: clean the skin without stripping it, keep the barrier comfortable, and protect the skin from daily ultraviolet exposure. The [American Academy of Dermatology](https://www.aad.org/public/everyday-care/skin-care-basics/care/skin-care-budget) also frames budget-friendly skincare around practical basics rather than a crowded shelf.
 
 ### Job 1: cleanse without punishing your skin
 
@@ -55,6 +57,12 @@ Skincare can support comfort, appearance, and healthy habits, but it is not a su
 
 The minimum routine is not a downgrade. It is the clearest starting point. Once the skin is calmer and the jobs are visible, better decisions become much easier.
 
-### A calmer next step
+### Build your three-product baseline
 
 Use your current products to fill the three basic jobs first: cleanser, moisturizer, sunscreen. Only then decide what one additional concern is worth targeting.
+
+[Open Skincare Basics](/category/skincare-basics)
+
+### Ask a product question
+
+Need help translating a product promise into a routine job? Bring the claim back to what the product is supposed to do for your skin.
