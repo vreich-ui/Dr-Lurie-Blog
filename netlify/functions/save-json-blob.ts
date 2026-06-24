@@ -31,6 +31,7 @@ import {
   type WorkflowStatus,
 } from '../../src/schema/workflow-contract.js';
 import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { type ArticleBodyV1 } from '../../src/schema/article-content-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -149,6 +150,7 @@ const requestSchema = z
     validation_mode: z.enum(['admin_publish_draft']).optional(),
     published_time: z.string().min(1).nullable().optional(),
     publish_receipt: z.record(z.string(), z.unknown()).optional(),
+    article_body: z.unknown().optional(),
   })
   .strict();
 
@@ -1388,6 +1390,7 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
       published_time: body.published_time ?? null,
     };
 
+    const hasPromotedBody = body.article_body !== undefined && body.article_body !== null;
     const nextRecord: WorkflowRecord = preserveAgentOutputs(
       {
         ...previousRecord,
@@ -1395,6 +1398,14 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
         input: {
           ...previousRecord.input,
           publication: nextPublication,
+          ...(hasPromotedBody
+            ? {
+                content: {
+                  ...previousRecord.input.content,
+                  article_body: body.article_body as ArticleBodyV1,
+                },
+              }
+            : {}),
         },
         history: [
           ...previousRecord.history,
@@ -1405,6 +1416,7 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
               owner_id: previousRecord.lock?.owner_id,
               owner_label: previousRecord.lock?.owner_label,
               published_time: body.published_time ?? null,
+              ...(hasPromotedBody ? { article_body_canonicalized: true } : {}),
               ...(body.publish_receipt ? { publish_receipt: body.publish_receipt } : {}),
             },
           },
