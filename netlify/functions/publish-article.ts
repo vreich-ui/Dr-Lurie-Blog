@@ -1098,7 +1098,7 @@ export const handler = async (event: LambdaEvent) => {
   const isAgentPayload = Boolean(input.articlePath || article_body || input.images || input.commitMessage);
   const missing = [
     !slug ? 'slug' : undefined,
-    !article_body ? 'article_body' : undefined,
+    (!article_body && !toStringValue(input.markdown)) ? 'article_body' : undefined,
     !title ? 'title' : undefined,
     !isAgentPayload && !publishDate ? 'publishDate' : undefined,
   ].filter(Boolean);
@@ -1187,16 +1187,20 @@ export const handler = async (event: LambdaEvent) => {
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
     const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
 
-    const tempContentSource: ContentSourceV1 = {
-      record_type: 'content_source',
-      schema_version: 'content_source.v1',
-      content: {
-        title,
-        article_body: article_body as ContentSourceV1['content'] extends { article_body?: infer T } ? T : never,
-      },
-    };
-
-    const resolvedMarkdown = articleBodyToMarkdown(tempContentSource.content!.article_body!);
+    let resolvedMarkdown: string;
+    if (article_body) {
+      const tempContentSource: ContentSourceV1 = {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        content: {
+          title,
+          article_body: article_body as ContentSourceV1['content'] extends { article_body?: infer T } ? T : never,
+        },
+      };
+      resolvedMarkdown = articleBodyToMarkdown(tempContentSource.content!.article_body!);
+    } else {
+      resolvedMarkdown = toStringValue(input.markdown) || '';
+    }
 
     const rawMarkdown = buildFrontmatter({
       author: toStringValue(input.author),
