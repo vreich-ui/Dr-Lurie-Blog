@@ -4,7 +4,7 @@ import {
   articleNodeTemplates,
   createDefaultNodeFromTemplate,
   createLegacyBodyNode,
-  createOpaqueNodeId
+  createOpaqueNodeId,
 } from './input-bank.ts';
 import { articleBodyNodeSchema } from '../../schema/article-content-v1.ts';
 
@@ -32,6 +32,17 @@ describe('Article Content Input Bank', () => {
         'prose_section', 'plain_text', 'callout', 'summary',
         'soft_action', 'contextual_offer', 'commerce_offer',
         'product_mention', 'ad_slot', 'chat_invite', 'faq', 'image'
+        'prose_section',
+        'plain_text',
+        'callout',
+        'summary',
+        'soft_action',
+        'contextual_offer',
+        'commerce_offer',
+        'product_mention',
+        'ad_slot',
+        'chat_invite',
+        'faq',
       ];
       for (const id of required) {
         assert.ok(articleNodeTemplates[id], `Missing template: ${id}`);
@@ -44,7 +55,11 @@ describe('Article Content Input Bank', () => {
       for (const templateId in articleNodeTemplates) {
         const node = createDefaultNodeFromTemplate(templateId);
         const result = articleBodyNodeSchema.safeParse(node);
-        assert.strictEqual(result.success, true, `Validation failed for ${templateId}: ${result.success ? '' : result.error.message}`);
+        assert.strictEqual(
+          result.success,
+          true,
+          `Validation failed for ${templateId}: ${result.success ? '' : result.error.message}`
+        );
       }
     });
 

@@ -36,11 +36,11 @@ test('admin-get-blob-pdf streams PDF artifact with admin access', async () => {
     queryStringParameters: { blobKey },
   };
 
-  const response = await handler(event as any);
+  const response = await handler(event as Parameters<typeof handler>[0]);
 
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers['Content-Type'], 'application/pdf');
-  assert.equal(response.isBase64Encoded, true);
+  assert.equal((response as { isBase64Encoded?: boolean }).isBase64Encoded, true);
   assert.equal(Buffer.from(response.body, 'base64').toString(), bytes.toString());
 });
 
@@ -52,7 +52,7 @@ test('admin-get-blob-pdf rejects missing blobKey', async () => {
     queryStringParameters: {},
   };
 
-  const response = await handler(event as any);
+  const response = await handler(event as Parameters<typeof handler>[0]);
   assert.equal(response.statusCode, 400);
   assert.match(response.body, /blobKey query parameter is required/);
 });
@@ -65,7 +65,7 @@ test('admin-get-blob-pdf rejects invalid blobKey shape', async () => {
     queryStringParameters: { blobKey: 'not-a-pdf-key' },
   };
 
-  const response = await handler(event as any);
+  const response = await handler(event as Parameters<typeof handler>[0]);
   assert.equal(response.statusCode, 400);
   assert.match(response.body, /valid PDF artifact blobKey is required/);
 });
@@ -79,7 +79,7 @@ test('admin-get-blob-pdf returns 404 for missing PDF', async () => {
     queryStringParameters: { blobKey },
   };
 
-  const response = await handler(event as any);
+  const response = await handler(event as Parameters<typeof handler>[0]);
   assert.equal(response.statusCode, 404);
   assert.match(response.body, /PDF artifact not found/);
 });

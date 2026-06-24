@@ -7,19 +7,14 @@ import type { BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import type { ArticleBodyNode } from '../../src/schema/article-content-v1.js';
 import { workflowStatuses, type WorkflowStatus } from '../../src/schema/workflow-contract.js';
-import {
-  parseContentSourceV1,
-  type ContentSourceV1,
-  type PublishPayload,
-  type WorkflowRecord,
-} from '../../src/schema/schema-v1.js';
+import { parseContentSourceV1, type ContentSourceV1, type WorkflowRecord } from '../../src/schema/schema-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
   'Cache-Control': 'no-store',
 };
 
-const draftError = 'Title, slug, and author are required to save JSON draft.';
+const draftError = 'Title and structured article body are required to save JSON draft.';
 const missingLockTokenMessage = 'lock_token is required to update a checked-out draft.';
 const lockExpiredMessage = 'The workflow lock has expired. Check out the draft again and retry.';
 const lockMismatchMessage = 'The provided lock_token does not match the active workflow lock.';
@@ -78,13 +73,6 @@ const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 const stageIndexKey = (nextAgent: string, requestId: string) => `workflows/index/by-stage/${nextAgent}/${requestId}`;
 const statusIndexKey = (status: string, requestId: string) => `workflows/index/by-status/${status}/${requestId}`;
 
-const slugify = (value: string) =>
-  value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
 const loadRecord = async (store: WorkflowBlobStore, requestId: string) => {
   const value = await store.get(recordKey(requestId));
 
@@ -126,8 +114,6 @@ const updateIndexes = async (
   await store.set(statusIndexKey(nextRecord.workflow_status, nextRecord.request_id), '');
 };
 
-const getPublishPayload = (input: ContentSourceV1) => input.publication?.publish_payload;
-
 const hasReaderFacingText = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
 
 const hasReaderFacingItems = (value: unknown) => Array.isArray(value) && value.some(hasReaderFacingText);
@@ -155,63 +141,22 @@ const hasMeaningfulPublicNodeContent = (node: ArticleBodyNode) => {
   );
 };
 
-const hasBodyContent = (input: ContentSourceV1) => {
-  const payload = getPublishPayload(input);
-  if (payload?.markdown?.trim() || payload?.content?.trim()) return true;
-  if (input.editorial?.draft_markdown?.trim()) return true;
+const hasBodyContent = (input: ContentSourceV1) =>
+  input.content?.article_body?.schema_version === 'article_body.v1' &&
+  Array.isArray(input.content.article_body.nodes) &&
+  input.content.article_body.nodes.some(hasMeaningfulPublicNodeContent);
 
-  if (Array.isArray(input.content?.article_body?.nodes)) {
-    if (input.content.article_body.nodes.some(hasMeaningfulPublicNodeContent)) return true;
-  }
+const hasRequiredDraftFields = (input: ContentSourceV1) =>
+  Boolean(input.content?.title?.trim() && hasBodyContent(input));
 
-  if (Array.isArray(input.content?.blocks)) {
-    const hasMarkdownBlock = input.content!.blocks!.some(
-      (b) => b.block_type === 'markdown' && typeof b.payload === 'string' && b.payload.trim()
-    );
-    if (hasMarkdownBlock) return true;
-  }
-
-  return false;
-};
-
-const hasRequiredDraftFields = (input: ContentSourceV1) => {
-  const payload = getPublishPayload(input);
-  const title = payload?.title?.trim() || input.content?.title?.trim() || '';
-  const slug = payload?.slug?.trim() || slugify(title);
-  const author = payload?.author?.trim() || '';
-
-  const hasTitleSlugAuthor = Boolean(title && slug && author);
-  if (!hasTitleSlugAuthor) return false;
-
-  return hasBodyContent(input);
-};
-
-const withDraftPublication = (input: ContentSourceV1, previousInput?: ContentSourceV1): ContentSourceV1 => {
-  const incomingPublication = input.publication ?? {};
-  const previousPublication = previousInput?.publication ?? {};
-  const incomingPayload: Partial<PublishPayload> = incomingPublication.publish_payload ?? {};
-  const previousPayload: Partial<PublishPayload> = previousPublication.publish_payload ?? {};
-  const title = incomingPayload.title?.trim() || input.content?.title?.trim() || previousPayload.title;
-  const slug = incomingPayload.slug?.trim() || (title ? slugify(title) : previousPayload.slug);
-
-  return {
-    ...previousInput,
-    ...input,
-    publication: {
-      ...previousPublication,
-      ...incomingPublication,
-      schema_version: 'publication.v1',
-      publication_status: 'draft',
-      publish_payload: {
-        ...previousPayload,
-        ...incomingPayload,
-        slug: slug ?? '',
-        title: title ?? '',
-        draft: true,
-      },
-    },
-  };
-};
+const withDraftPublication = (input: ContentSourceV1, previousInput?: ContentSourceV1): ContentSourceV1 => ({
+  ...previousInput,
+  ...input,
+  publication: {
+    schema_version: 'publication.v2',
+    published_time: input.publication?.published_time ?? previousInput?.publication?.published_time ?? null,
+  },
+});
 
 const getLockExpirationMs = (expiresAt: string) => {
   const expiresAtMs = Date.parse(expiresAt);

@@ -10,7 +10,7 @@ type LambdaEvent = {
 };
 
 type ToggleInput = {
-  draft?: unknown;
+  published_time?: unknown;
   slug?: unknown;
 };
 
@@ -96,32 +96,35 @@ const parseBody = (event: LambdaEvent): ToggleInput | undefined => {
   return parsed && typeof parsed === 'object' ? (parsed as ToggleInput) : undefined;
 };
 
-const updateDraftFrontmatter = (markdown: string, draft: boolean) => {
+const updatePublishedTimeFrontmatter = (markdown: string, publishedTime: string | null) => {
   const frontmatterMatch = markdown.match(/^---\s*\r?\n([\s\S]*?)\r?\n---\s*\r?\n?/);
+  const line = publishedTime === null ? 'published_time: null' : `published_time: ${publishedTime}`;
 
   if (!frontmatterMatch) {
-    return draft ? `---\ndraft: true\n---\n\n${markdown}` : markdown;
+    return `---\n${line}\n---\n\n${markdown}`;
   }
 
   const block = frontmatterMatch[1];
   const lineEnding = block.includes('\r\n') ? '\r\n' : '\n';
   const lines = block.split(/\r?\n/);
-  let sawDraft = false;
-  const nextLines = lines.reduce<string[]>((accumulator, line) => {
-    if (/^draft\s*:/i.test(line.trim())) {
-      sawDraft = true;
-      if (draft) accumulator.push('draft: true');
+  let sawPublishedTime = false;
+  const nextLines = lines.reduce<string[]>((accumulator, existingLine) => {
+    if (/^published_time\s*:/i.test(existingLine.trim())) {
+      sawPublishedTime = true;
+      accumulator.push(line);
       return accumulator;
     }
 
-    accumulator.push(line);
+    if (/^draft\s*:/i.test(existingLine.trim())) return accumulator;
+
+    accumulator.push(existingLine);
     return accumulator;
   }, []);
 
-  if (draft && !sawDraft) {
-    const titleIndex = nextLines.findIndex((line) => /^title\s*:/i.test(line.trim()));
-    const insertIndex = titleIndex >= 0 ? titleIndex + 1 : nextLines.length;
-    nextLines.splice(insertIndex, 0, 'draft: true');
+  if (!sawPublishedTime) {
+    const publishDateIndex = nextLines.findIndex((existingLine) => /^publishDate\s*:/i.test(existingLine.trim()));
+    const insertIndex = publishDateIndex >= 0 ? publishDateIndex + 1 : nextLines.length;
+    nextLines.splice(insertIndex, 0, line);
   }
 
   const frontmatter = `---${lineEnding}${nextLines.join(lineEnding)}${lineEnding}---${lineEnding}`;
@@ -178,14 +181,15 @@ export const handler = async (event: LambdaEvent) => {
   try {
     input = parseBody(event);
   } catch {
-    return jsonResponse(400, { error: 'Invalid request body. Send JSON with slug and draft.' });
+    return jsonResponse(400, { error: 'Invalid request body. Send JSON with slug and published_time.' });
   }
 
   const rawSlug = toStringValue(input?.slug);
   const slug = rawSlug ? slugify(rawSlug) : undefined;
 
-  if (!slug || typeof input?.draft !== 'boolean') {
-    return jsonResponse(400, { error: 'A valid slug and draft boolean are required.' });
+  const publishedTime = input?.published_time === null ? null : toStringValue(input?.published_time);
+  if (!slug || (publishedTime !== null && (!publishedTime || Number.isNaN(Date.parse(publishedTime))))) {
+    return jsonResponse(400, { error: 'A valid slug and published_time value are required.' });
   }
 
   const token = process.env.GITHUB_CONTENT_TOKEN;
@@ -198,7 +202,6 @@ export const handler = async (event: LambdaEvent) => {
     });
   }
 
-  const draft = input.draft;
   const articlePath = normalizeRepoPath(`${repoContentRoot}/${slug}.md`);
 
   if (!articlePath || !isExpectedArticlePath(articlePath, slug)) {
@@ -224,13 +227,13 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     const markdown = Buffer.from(file.content.replace(/\s/g, ''), 'base64').toString('utf8');
-    const nextMarkdown = updateDraftFrontmatter(markdown, draft);
+    const nextMarkdown = updatePublishedTimeFrontmatter(markdown, publishedTime);
 
     if (nextMarkdown === markdown) {
       return jsonResponse(200, {
         ok: true,
         slug,
-        draft,
+        published_time: publishedTime,
         articlePath,
         commit: null,
       });
@@ -249,7 +252,7 @@ export const handler = async (event: LambdaEvent) => {
     return jsonResponse(200, {
       ok: true,
       slug,
-      draft,
+      published_time: publishedTime,
       articlePath,
       commit: result.commit?.sha ?? null,
     });

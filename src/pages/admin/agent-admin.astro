@@ -627,13 +627,8 @@ const metadata = {
       const base64Pattern = /^(?:data:[^;]+;base64,)?[A-Za-z0-9+/]+={0,2}$/;
       const toText = (value) => (typeof value === 'string' ? value.trim() : '');
       const isRecord = (value) => Boolean(value && typeof value === 'object');
-      const getPublishPayloadObject = (payload) =>
-        isRecord(payload?.publication?.publish_payload) ? payload.publication.publish_payload : payload;
-      const getPayloadMarkdown = (payload) => {
-        const contentSourceMarkdown = isRecord(payload) ? getContentSourceMarkdown(payload) : '';
-        const payloadObject = getPublishPayloadObject(payload);
-        return contentSourceMarkdown || toText(payloadObject?.markdown) || toText(payloadObject?.content);
-      };
+      const getPublishPayloadObject = (payload) => payload;
+      const getPayloadMarkdown = (payload) => (isRecord(payload) ? getContentSourceMarkdown(payload) : '');
       const getPayloadText = (payload, field) => toText(getPublishPayloadObject(payload)?.[field]);
       const getMarkdownWordCount = (value) => toText(value).split(/\s+/).filter(Boolean).length;
       const getHasMinimumMarkdown = (payload) => getMarkdownWordCount(getPayloadMarkdown(payload)) >= 5;

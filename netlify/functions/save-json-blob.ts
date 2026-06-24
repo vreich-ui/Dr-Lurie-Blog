@@ -15,8 +15,7 @@
  * - refresh_lock: { "action": "refresh_lock", "request_id": "req_123", "lock_token": "lock_123", "lease_seconds": 900 }
  * - checkin_request: { "action": "checkin_request", "request_id": "req_123", "lock_token": "lock_123" }
  * - force_unlock: { "action": "force_unlock", "request_id": "req_123" }
- * - prepare_publish_now: { "action": "prepare_publish_now", "request_id": "req_123", "lock_token": "lock_123", "publish_payload": { "slug": "example", "title": "Example", "author": "Dr. Lurie", "markdown": "Body" } }
- * - mark_published: { "action": "mark_published", "request_id": "req_123", "expected_record_version": 4, "lock_token": "lock_123", "commit_metadata": { "commit": "abc123", "articlePath": "src/data/post/example.md" } }
+ * - set_published_time: { "action": "set_published_time", "request_id": "req_123", "lock_token": "lock_123", "published_time": "2026-06-24T12:00:00.000Z" }
  */
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
@@ -31,8 +30,8 @@ import {
   type AllowedAgentName,
   type WorkflowStatus,
 } from '../../src/schema/workflow-contract.js';
-import { getPreferredArticleMarkdownSource } from '../../src/schema/article-content-helpers.js';
-import { parseContentSourceV1, type ContentSourceV1, type PublishPayload } from '../../src/schema/schema-v1.js';
+import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
+import { type ArticleBodyV1 } from '../../src/schema/article-content-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -117,9 +116,7 @@ const requestSchema = z
       'refresh_lock',
       'checkin_request',
       'force_unlock',
-      'prepare_publish_now',
-      'update_publication_status',
-      'mark_published',
+      'set_published_time',
     ]),
     request_id: z.string().min(1).optional(),
     input: z.unknown().optional(),
@@ -151,9 +148,9 @@ const requestSchema = z
     deployStatus: z.string().min(1).optional(),
     message: z.string().min(1).optional(),
     validation_mode: z.enum(['admin_publish_draft']).optional(),
-    publish_payload: z.record(z.string(), z.unknown()).optional(),
-    publication_status: z.enum(['draft', 'ready', 'scheduled', 'published']).optional(),
-    scheduled_for: z.string().min(1).optional(),
+    published_time: z.string().min(1).nullable().optional(),
+    publish_receipt: z.record(z.string(), z.unknown()).optional(),
+    article_body: z.unknown().optional(),
   })
   .strict();
 
@@ -217,8 +214,6 @@ const CHECKIN_STALE_READ_RETRY_DELAY_MS = 25;
 const GET_REQUEST_STALE_READ_RETRY_DELAY_MS = 25;
 const LOCK_TOKEN_STALE_READ_MAX_RETRIES = 5;
 const LOCK_TOKEN_STALE_READ_RETRY_DELAY_MS = 25;
-const PUBLISH_READY_STABILIZATION_ATTEMPTS = 5;
-const PUBLISH_READY_STABILIZATION_DELAY_MS = 25;
 const WORKFLOW_MUTATION_MAX_RETRIES = 3;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
@@ -327,27 +322,6 @@ const validateMutationLock = (record: WorkflowRecord, body: WorkflowRequest) => 
   if (!isLockActive(record.lock, nowMs)) return lockExpiredResponse(body, record.lock, nowMs);
 
   return undefined;
-};
-
-const commitMetadataFields = [
-  'commit',
-  'commit_sha',
-  'commit_url',
-  'article_path',
-  'articlePath',
-  'deploy_status',
-  'deployStatus',
-  'message',
-] as const;
-
-const getCommitMetadata = (body: WorkflowRequest) => {
-  const metadata: Record<string, unknown> = { ...(body.commit_metadata ?? {}) };
-
-  for (const field of commitMetadataFields) {
-    if (body[field] !== undefined) metadata[field] = body[field];
-  }
-
-  return Object.keys(metadata).length > 0 ? metadata : undefined;
 };
 
 const loadRecord = async (store: WorkflowBlobStore, requestId: string, options?: WorkflowBlobReadOptions) => {
@@ -636,14 +610,8 @@ const saveRecordIfVersionUnchanged = async (
   return { saved: true as const, record: recordToSave };
 };
 
-const hasHistoryAction = (record: WorkflowRecord, action: WorkflowAction) => {
-  return record.history.some((entry) => entry.action === action);
-};
-
 const isPreferredCheckinCandidate = (candidate: WorkflowRecord, current: WorkflowRecord) => {
   if (candidate.version !== current.version) return candidate.version > current.version;
-  if (!hasHistoryAction(current, 'mark_published') && hasHistoryAction(candidate, 'mark_published')) return true;
-
   return candidate.history.length > current.history.length;
 };
 
@@ -772,8 +740,6 @@ const requireRequestId = (body: WorkflowRequest) => {
   return undefined;
 };
 
-const isRecordValue = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
-
 const nonEmptyText = (value: unknown) => {
   if (typeof value !== 'string') return undefined;
 
@@ -781,232 +747,59 @@ const nonEmptyText = (value: unknown) => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-const nonEmptyArray = (value: unknown) => (Array.isArray(value) && value.length > 0 ? value : undefined);
-
-const finalArticleStringKeyMappings: Array<{ from: string; to: keyof PublishPayload }> = [
-  { from: 'title', to: 'title' },
-  { from: 'slug', to: 'slug' },
-  { from: 'author', to: 'author' },
-  { from: 'excerpt', to: 'excerpt' },
-  { from: 'seoDescription', to: 'seoDescription' },
-  { from: 'featuredImage', to: 'featuredImage' },
-  { from: 'featured_image', to: 'featuredImage' },
-  { from: 'image', to: 'featuredImage' },
-  { from: 'content', to: 'content' },
-  { from: 'markdown', to: 'markdown' },
-  { from: 'body', to: 'content' },
-];
-
-const finalArticleArrayKeyMappings: Array<{ from: string; to: keyof PublishPayload }> = [
-  { from: 'tags', to: 'tags' },
-  { from: 'mediaEntries', to: 'mediaEntries' },
-  { from: 'artifactReferences', to: 'artifactReferences' },
-  { from: 'images', to: 'images' },
-];
-
-const isLikelyImageArtifactReference = (value: unknown): value is Record<string, unknown> => {
-  if (!isRecordValue(value) || typeof value.blobKey !== 'string') return false;
-
-  const contentType = typeof value.contentType === 'string' ? value.contentType.toLowerCase() : '';
-  return contentType.startsWith('image/') || value.blobKey.startsWith('image/');
-};
-
-const readArtifactReferenceFromImageValue = (value: unknown) => {
-  if (isLikelyImageArtifactReference(value)) return value;
-  if (!isRecordValue(value)) return undefined;
-
-  const nestedReference = value.artifactReference ?? value.artifact_reference ?? value.reference;
-  if (isLikelyImageArtifactReference(nestedReference)) return nestedReference;
-
-  return undefined;
-};
-
-const appendUniqueArtifactReference = (references: unknown[], reference: Record<string, unknown>) => {
-  const blobKey = typeof reference.blobKey === 'string' ? reference.blobKey : undefined;
-  if (!blobKey) return references;
-  if (references.some((entry) => isRecordValue(entry) && entry.blobKey === blobKey)) return references;
-
-  return [...references, reference];
-};
-
-const normalizeFinalArticleImageArtifacts = (
-  publishPayload: Partial<PublishPayload>,
-  outputRecord: Record<string, unknown> | undefined,
-  input: ContentSourceV1
-) => {
-  const warnings: string[] = [];
-  const previousReferences = Array.isArray(publishPayload.artifactReferences) ? publishPayload.artifactReferences : [];
-  let artifactReferences = [...previousReferences];
-
-  const explicitImageValue = outputRecord?.featuredImage ?? outputRecord?.featured_image ?? outputRecord?.image;
-  const explicitReference = readArtifactReferenceFromImageValue(explicitImageValue);
-
-  const inputWithArtifacts = input as ContentSourceV1 & {
-    artifactReferences?: unknown;
-    mediaEntries?: unknown;
-    images?: unknown;
-  };
-  const candidateArrays = [
-    outputRecord?.artifactReferences,
-    inputWithArtifacts.artifactReferences,
-    inputWithArtifacts.mediaEntries,
-    inputWithArtifacts.images,
-    outputRecord?.mediaEntries,
-    outputRecord?.images,
-  ];
-
-  for (const candidateArray of candidateArrays) {
-    if (!Array.isArray(candidateArray)) continue;
-    for (const candidate of candidateArray) {
-      const reference = readArtifactReferenceFromImageValue(candidate);
-      if (reference) artifactReferences = appendUniqueArtifactReference(artifactReferences, reference);
-    }
-  }
-
-  if (explicitReference) {
-    artifactReferences = appendUniqueArtifactReference(artifactReferences, explicitReference);
-    publishPayload.featuredImage = explicitReference.blobKey as string;
-  } else if (!publishPayload.featuredImage) {
-    const firstReference = artifactReferences.find(isLikelyImageArtifactReference);
-    if (firstReference) publishPayload.featuredImage = firstReference.blobKey as string;
-  }
-
-  if (artifactReferences.length) publishPayload.artifactReferences = artifactReferences as never;
-
-  if (explicitImageValue && !explicitReference && isRecordValue(explicitImageValue)) {
-    warnings.push(
-      'final_article image field did not contain a valid image ArtifactReference; publishing will continue without using it as the featured artifact.'
-    );
-  }
-
-  return warnings;
-};
-
-const readFinalArticleOutputContainer = (output: unknown) => {
-  if (!isRecordValue(output)) return undefined;
-
-  const nestedPayload = output.publish_payload;
-  if (isRecordValue(nestedPayload)) return { ...output, ...nestedPayload };
-
-  return output;
-};
-
-const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, output: unknown): ContentSourceV1 => {
-  const outputRecord = readFinalArticleOutputContainer(output);
-  const previousPublication = input.publication ?? {};
-  const previousPayload: Partial<PublishPayload> = previousPublication.publish_payload ?? {};
-  const publishPayload: Partial<PublishPayload> = { ...previousPayload };
-
-  if (input.content?.article_body) publishPayload.article_body = input.content.article_body;
-
-  if (outputRecord) {
-    for (const { from, to } of finalArticleStringKeyMappings) {
-      const value = nonEmptyText(outputRecord[from]);
-      if (value !== undefined) publishPayload[to] = value as never;
-    }
-
-    for (const { from, to } of finalArticleArrayKeyMappings) {
-      const value = nonEmptyArray(outputRecord[from]);
-      if (value !== undefined) publishPayload[to] = value as never;
-    }
-  }
-
-  const normalizationWarnings = normalizeFinalArticleImageArtifacts(publishPayload, outputRecord, input);
-
-  return {
-    ...input,
-    publication: {
-      ...previousPublication,
-      schema_version: 'publication.v1',
-      ...(normalizationWarnings.length ? { normalization_warnings: normalizationWarnings } : {}),
-      publish_payload: publishPayload as PublishPayload,
-    },
-  };
-};
-
-type AdminPublishDraftIssue = { path: string[]; message: string };
-
-const hasAdminImportableText = (...values: unknown[]) => values.some((value) => nonEmptyText(value) !== undefined);
-
-const getAdminMarkdownBlockText = (payload: unknown) => {
-  if (typeof payload === 'string') return payload;
-  if (isRecordValue(payload) && typeof payload.markdown === 'string') return payload.markdown;
-
-  return undefined;
-};
-
-const hasMeaningfulArticleBodyNode = (node: unknown) => {
-  if (!isRecordValue(node)) return false;
-  if (node.visibility && node.visibility !== 'public') return false;
-
-  const publicFields = isRecordValue(node.public) ? node.public : undefined;
-  const media = isRecordValue(publicFields?.media) ? publicFields.media : undefined;
-
-  return hasAdminImportableText(
-    publicFields?.eyebrow,
-    publicFields?.title,
-    publicFields?.body,
-    ...(Array.isArray(publicFields?.items) ? publicFields.items : []),
-    publicFields?.ctaText,
-    publicFields?.ctaLink,
-    publicFields?.label,
-    media?.src,
-    media?.alt,
-    media?.caption
-  );
-};
+const normalizeFinalArticlePublicationInput = (input: ContentSourceV1, _output: unknown): ContentSourceV1 => ({
+  ...input,
+  publication: {
+    ...(input.publication ?? {}),
+    schema_version: 'publication.v2',
+  },
+});
 
 const hasAdminArticleBodyContent = (input: ContentSourceV1) =>
   input.content?.article_body?.schema_version === 'article_body.v1' &&
   Array.isArray(input.content.article_body.nodes) &&
   input.content.article_body.nodes.some(hasMeaningfulArticleBodyNode);
 
-const getAdminMarkdownBlocksText = (input: ContentSourceV1) =>
-  input.content?.blocks
-    ?.filter((block) => block.block_type === 'markdown')
-    .map((block) => getAdminMarkdownBlockText(block.payload))
-    .filter((value): value is string => nonEmptyText(value) !== undefined)
-    .join('\n\n');
+type AdminPublishDraftIssue = { path: string[]; message: string };
+
+const hasMeaningfulArticleBodyNode = (node: unknown) => {
+  if (!node || typeof node !== 'object') return false;
+  const record = node as { visibility?: unknown; public?: Record<string, unknown> };
+  if (record.visibility && record.visibility !== 'public') return false;
+  const publicFields = record.public && typeof record.public === 'object' ? record.public : undefined;
+  if (!publicFields) return false;
+  const media =
+    publicFields.media && typeof publicFields.media === 'object'
+      ? (publicFields.media as Record<string, unknown>)
+      : undefined;
+  return hasAdminImportableText(
+    publicFields.eyebrow,
+    publicFields.title,
+    publicFields.body,
+    ...(Array.isArray(publicFields.items) ? publicFields.items : []),
+    publicFields.ctaText,
+    publicFields.ctaLink,
+    publicFields.label,
+    media?.src,
+    media?.alt,
+    media?.caption
+  );
+};
+
+const hasAdminImportableText = (...values: unknown[]) => values.some((value) => nonEmptyText(value) !== undefined);
 
 const validateAdminPublishDraftInput = (input: ContentSourceV1) => {
-  const payload = input.publication?.publish_payload;
   const issues: AdminPublishDraftIssue[] = [];
 
-  if (!hasAdminImportableText(payload?.title, input.content?.title)) {
-    issues.push({
-      path: ['publication', 'publish_payload', 'title'],
-      message: 'Admin-publish drafts require publication.publish_payload.title or content.title.',
-    });
+  if (!hasAdminImportableText(input.content?.title)) {
+    issues.push({ path: ['content', 'title'], message: 'Admin-publish drafts require content.title.' });
   }
 
-  if (!hasAdminImportableText(payload?.slug, input.content?.title)) {
+  if (!hasAdminArticleBodyContent(input)) {
     issues.push({
-      path: ['publication', 'publish_payload', 'slug'],
+      path: ['content', 'article_body'],
       message:
-        'Admin-publish drafts require publication.publish_payload.slug or enough content.title text to compute one.',
-    });
-  }
-
-  if (!hasAdminImportableText(payload?.author)) {
-    issues.push({
-      path: ['publication', 'publish_payload', 'author'],
-      message: 'Admin-publish drafts require publication.publish_payload.author.',
-    });
-  }
-
-  if (
-    !hasAdminImportableText(
-      payload?.markdown,
-      payload?.content,
-      input.editorial?.draft_markdown,
-      hasAdminArticleBodyContent(input) ? 'content.article_body' : undefined,
-      getAdminMarkdownBlocksText(input)
-    )
-  ) {
-    issues.push({
-      path: ['publication', 'publish_payload', 'content'],
-      message:
-        'Admin-publish drafts require preferred content.article_body with at least one public node, or legacy fallback body text at publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown. publication.publish_payload.markdown may be generated later as a legacy fallback from content.article_body.',
+        'Admin-publish drafts require content.article_body with schema_version article_body.v1 and at least one reader-visible public node.',
     });
   }
 
@@ -1557,336 +1350,28 @@ const forceUnlock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   return jsonResponse(200, { action: body.action, record: savedRecord });
 };
 
-const getPublishPreconditionFailure = (record: WorkflowRecord) => {
-  if (record.workflow_status !== 'completed') return 'Workflow must be completed before publishing.';
-  if (!record.completed_agents.includes('final_article')) return 'final_article must be completed before publishing.';
-  if (!record.agent_outputs.final_article) return 'final_article output must be present before publishing.';
-  if (record.current_stage !== null) return 'current_stage must be null before publishing the completed final article.';
-
-  return undefined;
-};
-
-const isRecordReadyForPublish = (record: WorkflowRecord, body: WorkflowRequest, nowMs = Date.now()) => {
-  if (body.expected_record_version !== undefined && record.version < body.expected_record_version) return false;
-  if (record.workflow_status !== 'completed') return false;
-  if (!record.completed_agents.includes('final_article')) return false;
-  if (record.current_stage !== null) return false;
-  if (!record.agent_outputs.final_article) return false;
-  if (!body.lock_token || !hasActiveMatchingLockToken(record, body.lock_token, nowMs)) return false;
-
-  return true;
-};
-
-const getPublishReadinessScore = (record: WorkflowRecord, body: WorkflowRequest, nowMs = Date.now()) => {
-  let score = 0;
-
-  if (body.expected_record_version === undefined || record.version >= body.expected_record_version) score += 1;
-  if (record.workflow_status === 'completed') score += 1;
-  if (record.completed_agents.includes('final_article')) score += 1;
-  if (record.current_stage === null) score += 1;
-  if (record.agent_outputs.final_article) score += 1;
-  if (body.lock_token && hasActiveMatchingLockToken(record, body.lock_token, nowMs)) score += 1;
-
-  return score;
-};
-
-const isPreferredPublishCandidate = (
-  candidate: WorkflowRecord,
-  current: WorkflowRecord | undefined,
-  body: WorkflowRequest,
-  nowMs = Date.now()
-) => {
-  if (!current) return true;
-
-  const candidateReady = isRecordReadyForPublish(candidate, body, nowMs);
-  const currentReady = isRecordReadyForPublish(current, body, nowMs);
-  if (candidateReady !== currentReady) return candidateReady;
-
-  const candidateHasFinalOutput = hasAgentOutput(candidate, 'final_article');
-  const currentHasFinalOutput = hasAgentOutput(current, 'final_article');
-  if (candidateHasFinalOutput !== currentHasFinalOutput) return candidateHasFinalOutput;
-
-  const candidateScore = getPublishReadinessScore(candidate, body, nowMs);
-  const currentScore = getPublishReadinessScore(current, body, nowMs);
-  if (candidateScore !== currentScore) return candidateScore > currentScore;
-
-  if (candidate.version !== current.version) return candidate.version > current.version;
-
-  const candidateOutputCount = agentOutputKeys(candidate).length;
-  const currentOutputCount = agentOutputKeys(current).length;
-  if (candidateOutputCount !== currentOutputCount) return candidateOutputCount > currentOutputCount;
-
-  return candidate.history.length > current.history.length;
-};
-
-const loadRecordReadyForPublish = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
-  const requestId = body.request_id as string;
-  let preferredRecord: WorkflowRecord | undefined;
-
-  for (let attempt = 0; attempt < PUBLISH_READY_STABILIZATION_ATTEMPTS; attempt += 1) {
-    const candidate = await loadRecord(store, requestId);
-    const nowMs = Date.now();
-
-    if (candidate && isPreferredPublishCandidate(candidate, preferredRecord, body, nowMs)) {
-      preferredRecord = preferredRecord ? preserveAgentOutputs(candidate, preferredRecord) : candidate;
-    } else if (candidate && preferredRecord) {
-      preferredRecord = preserveAgentOutputs(preferredRecord, candidate);
-    }
-
-    if (preferredRecord && isRecordReadyForPublish(preferredRecord, body, nowMs)) {
-      return { record: preferredRecord };
-    }
-
-    if (attempt < PUBLISH_READY_STABILIZATION_ATTEMPTS - 1) {
-      await delay(PUBLISH_READY_STABILIZATION_DELAY_MS);
-    }
-  }
-
-  return { record: preferredRecord };
-};
-
-const slugifyPublishTitle = (value: string) =>
-  value
-    .trim()
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'article';
-
-const normalizePublishNowPayload = (input: ContentSourceV1, rawPayload: unknown) => {
-  const publication = input.publication ?? {};
-  const previousPayload: Partial<PublishPayload> = publication.publish_payload ?? {};
-  const incomingPayload: Record<string, unknown> = isRecordValue(rawPayload) ? rawPayload : {};
-  const title =
-    nonEmptyText(incomingPayload.title) ?? nonEmptyText(previousPayload.title) ?? nonEmptyText(input.content?.title);
-  const slug =
-    nonEmptyText(incomingPayload.slug) ??
-    nonEmptyText(previousPayload.slug) ??
-    (title ? slugifyPublishTitle(title) : undefined);
-  const author = nonEmptyText(incomingPayload.author) ?? nonEmptyText(previousPayload.author);
-  const markdown = getPreferredArticleMarkdownSource({
-    ...input,
-    publication: {
-      ...publication,
-      publish_payload: { ...previousPayload, ...incomingPayload } as PublishPayload,
-    },
-  });
-
-  const issues: AdminPublishDraftIssue[] = [];
-  if (!slug)
-    issues.push({
-      path: ['publication', 'publish_payload', 'slug'],
-      message: 'Publish-now requires a slug or content.title.',
-    });
-  if (!title)
-    issues.push({
-      path: ['publication', 'publish_payload', 'title'],
-      message: 'Publish-now requires a title or content.title.',
-    });
-  if (!author)
-    issues.push({ path: ['publication', 'publish_payload', 'author'], message: 'Publish-now requires an author.' });
-  if (!markdown) {
-    issues.push({
-      path: ['publication', 'publish_payload', 'markdown'],
-      message:
-        'Publish-now requires content.article_body or legacy fallback body text at publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown.',
-    });
-  }
-
-  if (issues.length > 0) return { ok: false as const, issues };
-
-  const publishPayload: PublishPayload = {
-    ...previousPayload,
-    ...incomingPayload,
-    ...(input.content?.article_body ? { article_body: input.content.article_body } : {}),
-    slug: slug!,
-    title: title!,
-    author: author!,
-    markdown: markdown!,
-  } as PublishPayload;
-
-  return { ok: true as const, publishPayload };
-};
-
-export const preparePublishNow = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
-
-  const requestId = body.request_id as string;
-  const previousRecord = body.lock_token
-    ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
-    : await loadRecord(store, requestId);
-  if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
-
-  const lockFailure = validateMutationLock(previousRecord, body);
-  if (lockFailure) return lockFailure;
 
   if (
-    previousRecord.input.record_type !== 'content_source' ||
-    previousRecord.input.schema_version !== 'content_source.v1'
+    body.published_time !== null &&
+    body.published_time !== undefined &&
+    Number.isNaN(Date.parse(body.published_time))
   ) {
-    return jsonResponse(409, {
-      action: body.action,
-      conflict: true,
-      error: 'Publish-now requires a content_source.v1 workflow record.',
-    });
-  }
-
-  const promotedInput = normalizeFinalArticlePublicationInput(
-    previousRecord.input,
-    previousRecord.agent_outputs.final_article?.output
-  );
-  const normalized = normalizePublishNowPayload(promotedInput, body.publish_payload);
-  if (!normalized.ok) {
-    return jsonResponse(400, {
-      action: body.action,
-      error: 'Invalid publish-now payload.',
-      issues: normalized.issues,
-    });
-  }
-
-  const timestamp = nowIso();
-  const completedAgents: WorkflowRecord['completed_agents'] = previousRecord.completed_agents.includes('final_article')
-    ? previousRecord.completed_agents
-    : [...previousRecord.completed_agents, 'final_article'];
-  const existingFinalOutput = previousRecord.agent_outputs.final_article;
-  const nextRecord: WorkflowRecord = preserveAgentOutputs(
-    {
-      ...previousRecord,
-      updated_at: timestamp,
-      workflow_status: 'completed',
-      current_stage: null,
-      next_agent: null,
-      completed_agents: completedAgents,
-      failed_agents: previousRecord.failed_agents.filter((agent) => agent !== 'final_article'),
-      input: {
-        ...previousRecord.input,
-        publication: {
-          ...(promotedInput.publication ?? {}),
-          schema_version: 'publication.v1',
-          publication_status: 'ready',
-          publish_payload: normalized.publishPayload,
-        },
-      },
-      agent_outputs: {
-        ...previousRecord.agent_outputs,
-        final_article: existingFinalOutput ?? {
-          version: 1,
-          updated_at: timestamp,
-          output: { publish_payload: normalized.publishPayload },
-          expected_agent_version: 0,
-        },
-      },
-      history: [
-        ...previousRecord.history,
-        {
-          at: timestamp,
-          action: body.action,
-          agent_name: 'final_article',
-          details: {
-            owner_id: previousRecord.lock?.owner_id,
-            owner_label: previousRecord.lock?.owner_label,
-            publication_status: 'ready',
-          },
-        },
-      ],
-      version: previousRecord.version + 1,
-    },
-    previousRecord
-  );
-
-  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
-
-  return jsonResponse(200, { action: body.action, record: savedRecord, publish_payload: normalized.publishPayload });
-};
-
-export const markPublished = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
-  const missingRequestId = requireRequestId(body);
-  if (missingRequestId) return missingRequestId;
-
-  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const publishLoad = await loadRecordReadyForPublish(store, body);
-    const latestRecord = publishLoad.record;
-    if (!latestRecord) return jsonResponse(404, { action: body.action, not_found: true });
-
-    const lockFailure = validateMutationLock(latestRecord, body);
-    if (lockFailure) return lockFailure;
-
-    if (latestRecord.workflow_status === 'published') {
-      return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
-    }
-
-    if (body.expected_record_version !== undefined && latestRecord.version < body.expected_record_version) {
-      return jsonResponse(409, { action: body.action, conflict: true });
-    }
-
-    const preconditionFailure = getPublishPreconditionFailure(latestRecord);
-    if (preconditionFailure) {
-      return jsonResponse(409, { action: body.action, conflict: true, error: preconditionFailure });
-    }
-
-    const timestamp = nowIso();
-    const commitMetadata = getCommitMetadata(body);
-    const nextRecord: WorkflowRecord = preserveAgentOutputs(
-      {
-        ...latestRecord,
-        updated_at: timestamp,
-        workflow_status: 'published',
-        lock: undefined,
-        history: [
-          ...latestRecord.history,
-          {
-            at: timestamp,
-            action: body.action,
-            details: {
-              owner_id: latestRecord.lock?.owner_id,
-              owner_label: latestRecord.lock?.owner_label,
-              ...(commitMetadata ? { commit_metadata: commitMetadata } : {}),
-            },
-          },
-        ],
-        version: latestRecord.version + 1,
-      },
-      latestRecord
-    );
-
-    const saveResult = await saveRecordIfVersionUnchanged(store, latestRecord, nextRecord);
-
-    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: saveResult.record });
-    if ('notFound' in saveResult) return jsonResponse(404, { action: body.action, not_found: true });
-  }
-
-  return jsonResponse(409, { action: body.action, conflict: true });
-};
-
-export const updatePublicationStatus = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
-  const missingRequestId = requireRequestId(body);
-  if (missingRequestId) return missingRequestId;
-
-  if (!body.publication_status) {
-    return jsonResponse(400, { action: body.action, error: 'publication_status is required.' });
-  }
-
-  if (body.publication_status === 'scheduled' && body.scheduled_for === undefined) {
-    return jsonResponse(400, {
-      action: body.action,
-      error: 'scheduled_for is required when publication_status is scheduled.',
-    });
-  }
-
-  if (body.scheduled_for !== undefined && Number.isNaN(Date.parse(body.scheduled_for))) {
-    return jsonResponse(400, {
-      action: body.action,
-      error: 'scheduled_for must be a valid ISO timestamp when provided.',
-    });
+    return jsonResponse(400, { action: body.action, error: 'published_time must be null or a valid ISO timestamp.' });
   }
 
   const requestId = body.request_id as string;
 
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const previousRecord = await loadRecord(store, requestId);
+    const previousRecord = body.lock_token
+      ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
+      : await loadRecord(store, requestId);
     if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+    const lockFailure = validateMutationLock(previousRecord, body);
+    if (lockFailure) return lockFailure;
 
     if (
       previousRecord.input.record_type !== 'content_source' ||
@@ -1895,23 +1380,32 @@ export const updatePublicationStatus = async (store: WorkflowBlobStore, body: Wo
       return jsonResponse(409, {
         action: body.action,
         conflict: true,
-        error: 'Publication status updates require a content_source.v1 workflow record.',
+        error: 'Publication time updates require a content_source.v1 workflow record.',
       });
     }
 
     const timestamp = nowIso();
+    const nextPublication = {
+      schema_version: 'publication.v2' as const,
+      published_time: body.published_time ?? null,
+    };
+
+    const hasPromotedBody = body.article_body !== undefined && body.article_body !== null;
     const nextRecord: WorkflowRecord = preserveAgentOutputs(
       {
         ...previousRecord,
         updated_at: timestamp,
         input: {
           ...previousRecord.input,
-          publication: {
-            ...(previousRecord.input.publication ?? {}),
-            schema_version: 'publication.v1',
-            publication_status: body.publication_status,
-            ...(body.scheduled_for !== undefined ? { scheduled_for: body.scheduled_for } : {}),
-          },
+          publication: nextPublication,
+          ...(hasPromotedBody
+            ? {
+                content: {
+                  ...previousRecord.input.content,
+                  article_body: body.article_body as ArticleBodyV1,
+                },
+              }
+            : {}),
         },
         history: [
           ...previousRecord.history,
@@ -1919,8 +1413,11 @@ export const updatePublicationStatus = async (store: WorkflowBlobStore, body: Wo
             at: timestamp,
             action: body.action,
             details: {
-              publication_status: body.publication_status,
-              ...(body.scheduled_for !== undefined ? { scheduled_for: body.scheduled_for } : {}),
+              owner_id: previousRecord.lock?.owner_id,
+              owner_label: previousRecord.lock?.owner_label,
+              published_time: body.published_time ?? null,
+              ...(hasPromotedBody ? { article_body_canonicalized: true } : {}),
+              ...(body.publish_receipt ? { publish_receipt: body.publish_receipt } : {}),
             },
           },
         ],
@@ -1958,12 +1455,8 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
       return checkinRequest(store, body);
     case 'force_unlock':
       return forceUnlock(store, body);
-    case 'prepare_publish_now':
-      return preparePublishNow(store, body);
-    case 'update_publication_status':
-      return updatePublicationStatus(store, body);
-    case 'mark_published':
-      return markPublished(store, body);
+    case 'set_published_time':
+      return setPublishedTime(store, body);
   }
 };
 

@@ -49,6 +49,85 @@ const metadata = {
           <!-- Article Details Card -->
           <section class="admin-card article-details-card" aria-labelledby="details-heading">
             <h2 id="details-heading" class="sr-only">Article Details</h2>
+      <section class="admin-card json-import-panel" aria-labelledby="json-import-heading">
+        <div class="json-import-card">
+          <div class="json-import-header">
+            <div>
+              <h2 id="json-import-heading">Import JSON</h2>
+              <p class="hint">
+                Paste article JSON or upload a single <code>.json</code> file to populate this form.
+              </p>
+            </div>
+            <div class="json-import-toolbar" aria-label="JSON import options">
+              <button id="open-json-drafts" class="json-upload-button" type="button">
+                <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
+                <span>Open JSON</span>
+              </button>
+              <label class="json-upload-button" for="json-upload">
+                <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
+                <span>Upload JSON</span>
+              </label>
+            </div>
+            <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
+          </div>
+          <textarea
+            id="json-import"
+            class="json-import-input"
+            rows="6"
+            placeholder='{
+  "record_type": "content_source",
+  "schema_version": "content_source.v1",
+  "content": {
+    "title": "Article title",
+    "article_body": { "schema_version": "article_body.v1", "nodes": [] }
+  },
+  "publication": { "schema_version": "publication.v2", "published_time": null },
+  "sources": { "source_list": ["Source citation"] }
+}'
+          ></textarea>
+          <div class="json-import-actions">
+            <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
+              <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
+              <span>Update</span>
+            </button>
+            <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
+          </div>
+          <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+          <div id="content-model-indicator" class="content-model-indicator" aria-live="polite"></div>
+          <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
+            <div class="json-draft-modal-card">
+              <div class="json-draft-modal-header">
+                <div>
+                  <p class="sidebar-kicker">Saved drafts</p>
+                  <h3 id="json-draft-modal-heading">Open saved draft</h3>
+                </div>
+                <button
+                  id="json-draft-modal-close"
+                  class="module-icon-button"
+                  type="button"
+                  aria-label="Close saved draft dialog"
+                >
+                  <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                </button>
+              </div>
+              <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
+                Select a saved draft to load into the form.
+              </p>
+              <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
+              <div id="json-draft-list" class="json-draft-list"></div>
+            </div>
+          </dialog>
+        </div>
+      </section>
+
+      <main class="publish-main" aria-label="Publishing editor">
+        <section class="admin-card" aria-label="Publishing form">
+          <form id="publish-form" class="admin-form">
+            <div class="field">
+              <label for="title">Title</label>
+              <input id="title" name="title" type="text" autocomplete="off" />
+            </div>
+
             <div class="field">
               <label for="title">Article Title</label>
               <input id="title" name="title" class="title-input text-2xl font-bold" type="text" autocomplete="off" placeholder="Enter article title..." />
@@ -90,8 +169,13 @@ const metadata = {
               <div class="pieces-quick-add bg-surface/50 mb-6 flex flex-wrap gap-2 rounded-xl border border-dashed border-gray-200 p-4 dark:border-slate-800" aria-label="Quick add content">
                 <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button>
                 <button class="btn-tertiary btn-xs quick-add" data-template="image" type="button">+ Image</button>
+              <div class="pieces-quick-add" aria-label="Quick add content">
+                <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button
+                >
                 <button class="btn-tertiary btn-xs quick-add" data-template="soft_action" type="button">+ CTA</button>
-                <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button">+ Offer</button>
+                <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button"
+                  >+ Offer</button
+                >
                 <button class="btn-tertiary btn-xs quick-add" data-template="chat_invite" type="button">+ Chat</button>
                 <button class="btn-tertiary btn-xs quick-add" data-template="faq" type="button">+ FAQ</button>
               </div>
@@ -100,6 +184,12 @@ const metadata = {
                 <h3 class="text-xl font-bold">Build Your Article</h3>
                 <p class="text-muted mt-2">Start by adding your first content section.</p>
                 <button class="btn-primary btn-sm mt-6 quick-add" data-template="prose_section" type="button">Add First Section</button>
+              <div id="pieces-empty-state" class="pieces-empty-state" hidden>
+                <h4>Build Your Article</h4>
+                <p>Articles are made of reusable content blocks. Start with a text section.</p>
+                <button class="btn-primary btn-sm quick-add" data-template="prose_section" type="button"
+                  >Add First Section</button
+                >
               </div>
 
               <div id="pieces-container" class="pieces-container space-y-6"></div>
@@ -118,7 +208,12 @@ const metadata = {
                       <p class="sidebar-kicker">Block Library</p>
                       <h3 id="block-library-heading">Choose a block type</h3>
                     </div>
-                    <button id="block-library-close" class="module-icon-button" type="button" aria-label="Close library">
+                    <button
+                      id="block-library-close"
+                      class="module-icon-button"
+                      type="button"
+                      aria-label="Close library"
+                    >
                       <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
                     </button>
                   </div>
@@ -2199,7 +2294,7 @@ const metadata = {
     articleNodeTemplates,
     createDefaultNodeFromTemplate,
     createLegacyBodyNode,
-    inferTemplateId
+    inferTemplateId,
   } from '../../lib/article-content/input-bank';
   import { articleBodyToMarkdown } from '../../lib/article-content/to-markdown';
 
@@ -2536,7 +2631,7 @@ const metadata = {
           `<div><strong>Workflow record:</strong> ${workflowStatusLabel}</div>`,
           `<div><strong>Publication status:</strong> ${pubStatus}</div>`,
           `<div><strong>Published article:</strong> ${hasPublished ? 'yes' : 'no'}</div>`,
-          '<div><strong>Canonical source:</strong> article_body</div>'
+          '<div><strong>Canonical source:</strong> article_body</div>',
         ];
 
         fields.contentModelIndicator.innerHTML = lines.join('');
@@ -2838,15 +2933,15 @@ const metadata = {
       };
 
       const escapeHtml = (value) =>
-    String(value || '')
+        String(value || '')
           .replaceAll('&', '&amp;')
           .replaceAll('<', '&lt;')
           .replaceAll('>', '&gt;')
           .replaceAll('"', '&quot;')
           .replaceAll("'", '&#039;');
 
-  // Expose escapeHtml to the global scope for the Pieces UI script
-  window.escapeHtml = escapeHtml;
+      // Expose escapeHtml to the global scope for the Pieces UI script
+      window.escapeHtml = escapeHtml;
 
       const formatDateTimeLocal = (date) => {
         const offset = date.getTimezoneOffset();
@@ -3235,48 +3330,11 @@ const metadata = {
       };
 
       const buildContentSourceDraft = () => {
-        const { slug, markdown } = buildMarkdown();
-        const featuredImage = getFeaturedImagePath();
         const title = fields.title.value.trim();
-        const author = fields.author.value.trim();
         const tags = parseTags(fields.tags.value);
-        const publishDate = getPublishDate().toISOString();
-        const persistableSelectedMediaEntries = getPersistableSelectedMediaEntries();
-        const payload = {
-          slug,
-          title,
-          markdown,
-          content: fields.content.value,
-          publishDate,
-          author,
-          tags,
-          draft: true,
-          overwrite: fields.overwrite.checked,
-          ...(fields.excerpt.value.trim()
-            ? { excerpt: fields.excerpt.value.trim(), description: fields.excerpt.value.trim() }
-            : {}),
-          ...(fields.category.value.trim() ? { category: fields.category.value.trim() } : {}),
-          ...(fields.seoDescription.value.trim() ? { seoDescription: fields.seoDescription.value.trim() } : {}),
-          ...(featuredImage ? { featuredImage } : {}),
-          ...(getExistingFeaturedImagePathForPayload()
-            ? { existingFeaturedImagePath: getExistingFeaturedImagePathForPayload() }
-            : {}),
-          ...(fields.videoLink.value.trim() ? { videoLink: fields.videoLink.value.trim() } : {}),
-          ...(fields.ctaLink.value.trim() ? { ctaLink: fields.ctaLink.value.trim() } : {}),
-          ...(fields.ctaText.value.trim() ? { ctaText: fields.ctaText.value.trim() } : {}),
-          metadata: {
-            form_schema: 'admin_publish_form.v1',
-            raw_sources: parseSources(fields.sources.value),
-            uploaded_image_names: imageNames,
-            ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
-          },
-          ...(persistableSelectedMediaEntries.length ? { mediaEntries: persistableSelectedMediaEntries } : {}),
-          ...(selectedArtifactReferences.length ? { artifactReferences: selectedArtifactReferences } : {}),
-        };
-
         const articleBody = {
           schema_version: 'article_body.v1',
-          nodes: articleNodes
+          nodes: articleNodes,
         };
 
         return {
@@ -3311,12 +3369,10 @@ const metadata = {
           },
           editorial: {
             schema_version: 'editorial.v1',
-            draft_markdown: fields.content.value,
           },
           publication: {
-            schema_version: 'publication.v1',
-            publication_status: 'draft',
-            publish_payload: payload,
+            schema_version: 'publication.v2',
+            published_time: null,
           },
           workflow: {
             schema_version: 'content_workflow.v1',
@@ -3655,7 +3711,9 @@ const metadata = {
           const commercialTypeOptions = [
             '<option value="">None</option>',
             ...(commercialType && !commercialTypes.includes(commercialType)
-              ? [`<option value="${window.escapeHtml(commercialType)}" selected>${window.escapeHtml(commercialType)}</option>`]
+              ? [
+                  `<option value="${window.escapeHtml(commercialType)}" selected>${window.escapeHtml(commercialType)}</option>`,
+                ]
               : []),
             ...commercialTypes.map(
               (type) => `<option value="${type}" ${commercialType === type ? 'selected' : ''}>${type}</option>`
@@ -3664,8 +3722,8 @@ const metadata = {
 
           const mainTemplateIds = ['prose_section', 'callout', 'summary', 'faq', 'soft_action'];
 
-          const mainTemplates = mainTemplateIds.map(id => articleNodeTemplates[id]);
-          const advancedTemplates = Object.values(articleNodeTemplates).filter(t => !mainTemplateIds.includes(t.id));
+          const mainTemplates = mainTemplateIds.map((id) => articleNodeTemplates[id]);
+          const advancedTemplates = Object.values(articleNodeTemplates).filter((t) => !mainTemplateIds.includes(t.id));
 
           const createOption = (t) => {
             const opt = document.createElement('option');
@@ -3697,7 +3755,9 @@ const metadata = {
           const pieceSummary =
             publicFields.label ||
             publicFields.title ||
-            (Array.isArray(publicFields.items) && publicFields.items.length ? `${publicFields.items.length} item${publicFields.items.length === 1 ? '' : 's'}` : '') ||
+            (Array.isArray(publicFields.items) && publicFields.items.length
+              ? `${publicFields.items.length} item${publicFields.items.length === 1 ? '' : 's'}`
+              : '') ||
             (typeof publicFields.body === 'string' && publicFields.body.trim()
               ? `${publicFields.body.trim().slice(0, 90)}${publicFields.body.trim().length > 90 ? '…' : ''}`
               : '') ||
@@ -3730,8 +3790,20 @@ const metadata = {
                 <label class="text-sm font-bold text-default mb-2">Block Title</label>
                 <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Enter title (visible to readers)..." />
               </div>` : ''}
+              <div class="piece-form" style="padding: 1.25rem;">
+              ${
+                showTitle
+                  ? `
+              <div class="field">
+                <label>Public Title</label>
+                <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Title" />
+              </div>`
+                  : ''
+              }
 
-              ${showBody ? `
+              ${
+                showBody
+                  ? `
               <div class="field">
                 <label class="text-sm font-bold text-default mb-2">Content / Body</label>
                 <textarea class="piece-body" rows="6" placeholder="Write your content here... Markdown is supported.">${window.escapeHtml(node.public?.body || '')}</textarea>
@@ -3751,6 +3823,19 @@ const metadata = {
                     <label class="text-[11px] font-bold text-muted mb-1">Source (Artifact Ref or URL)</label>
                     <input type="text" class="piece-media text-sm" value="${window.escapeHtml(mediaSrc)}" placeholder="artifact-id or https://..." />
                   </div>
+                <label>Reader text (Body)</label>
+                <textarea class="piece-body" rows="4" placeholder="Body content">${window.escapeHtml(node.public?.body || '')}</textarea>
+              </div>`
+                  : ''
+              }
+
+              ${
+                showCta
+                  ? `
+              <div class="field-grid">
+                <div class="field">
+                  <label>CTA Text</label>
+                  <input type="text" class="piece-cta-text" value="${window.escapeHtml(node.public?.ctaText || '')}" placeholder="Learn more" />
                 </div>
                 <div class="field-grid grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                   <div class="field">
@@ -3762,7 +3847,9 @@ const metadata = {
                     <input type="text" class="piece-media-caption text-sm" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption..." />
                   </div>
                 </div>
-              </div>` : ''}
+              </div>`
+                  : ''
+              }
 
               ${showCta ? `
               <div class="cta-fields-group p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-900/20">
@@ -3794,7 +3881,7 @@ const metadata = {
                   <div class="field">
                     <label>Visibility</label>
                     <select class="piece-visibility">
-                      <option value="public" ${(!node.visibility || node.visibility === 'public') ? 'selected' : ''}>Public</option>
+                      <option value="public" ${!node.visibility || node.visibility === 'public' ? 'selected' : ''}>Public</option>
                       <option value="internal" ${node.visibility === 'internal' ? 'selected' : ''}>Internal</option>
                       <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
                     </select>
@@ -3805,17 +3892,31 @@ const metadata = {
                       <select class="piece-strategy">
                         <option value="">None</option>
                         ${[
-                          'hook', 'agitation', 'context', 'explanation', 'proof',
-                          'example', 'comparison', 'myth', 'step', 'recommendation',
-                          'resolution', 'summary'
-                        ].map(s => `<option value="${s}" ${node.private?.strategy === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join('')}
+                          'hook',
+                          'agitation',
+                          'context',
+                          'explanation',
+                          'proof',
+                          'example',
+                          'comparison',
+                          'myth',
+                          'step',
+                          'recommendation',
+                          'resolution',
+                          'summary',
+                        ]
+                          .map(
+                            (s) =>
+                              `<option value="${s}" ${node.private?.strategy === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
+                          )
+                          .join('')}
                       </select>
                     </div>
                     <div class="field">
                       <label>Internal Intent</label>
                       <select class="piece-intent">
                         <option value="">None</option>
-                        ${['educate', 'persuade', 'reassure', 'convert', 'navigate'].map(intent => `<option value="${intent}" ${node.private?.intent === intent ? 'selected' : ''}>${intent.charAt(0).toUpperCase() + intent.slice(1)}</option>`).join('')}
+                        ${['educate', 'persuade', 'reassure', 'convert', 'navigate'].map((intent) => `<option value="${intent}" ${node.private?.intent === intent ? 'selected' : ''}>${intent.charAt(0).toUpperCase() + intent.slice(1)}</option>`).join('')}
                       </select>
                     </div>
                   </div>
@@ -3825,25 +3926,46 @@ const metadata = {
                       <select class="piece-presentation">
                         <option value="">Default</option>
                         ${[
-                          'plain', 'section', 'callout', 'inline', 'card', 'panel',
-                          'faq', 'summary', 'chatInvite', 'adSlot', 'offerInline', 'offerCard'
-                        ].map(p => `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`).join('')}
+                          'plain',
+                          'section',
+                          'callout',
+                          'inline',
+                          'card',
+                          'panel',
+                          'faq',
+                          'summary',
+                          'chatInvite',
+                          'adSlot',
+                          'offerInline',
+                          'offerCard',
+                        ]
+                          .map(
+                            (p) =>
+                              `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`
+                          )
+                          .join('')}
                       </select>
                     </div>
                     <div class="field">
                       <label>Placement Hint</label>
                       <select class="piece-placement">
                         <option value="">Default</option>
-                        ${['inline', 'section', 'sidebar', 'afterParagraph', 'footer'].map(placement => `<option value="${placement}" ${node.rendering?.placement === placement ? 'selected' : ''}>${placement}</option>`).join('')}
+                        ${['inline', 'section', 'sidebar', 'afterParagraph', 'footer'].map((placement) => `<option value="${placement}" ${node.rendering?.placement === placement ? 'selected' : ''}>${placement}</option>`).join('')}
                       </select>
                     </div>
                   </div>
-                  ${showItems ? `
+                  ${
+                    showItems
+                      ? `
                   <div class="field">
                     <label>Items (One per line)</label>
                     <textarea class="piece-items" rows="3" placeholder="List items">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
-                  </div>` : ''}
-                  ${showMedia ? `
+                  </div>`
+                      : ''
+                  }
+                  ${
+                    showMedia
+                      ? `
                   <div class="field-grid">
                     <div class="field">
                       <label>Media Type</label>
@@ -3865,8 +3987,12 @@ const metadata = {
                       <label>Media Caption</label>
                       <input type="text" class="piece-media-caption" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption" />
                     </div>
-                  </div>` : ''}
-                  ${showChat ? `
+                  </div>`
+                      : ''
+                  }
+                  ${
+                    showChat
+                      ? `
                   <div class="field-grid">
                     <div class="field">
                       <label>Chat Invite Text</label>
@@ -3876,21 +4002,33 @@ const metadata = {
                       <label>Suggested Chat Query</label>
                       <input type="text" class="piece-chat-query" value="${window.escapeHtml(node.chat?.suggestedQuery || '')}" placeholder="What should readers ask?" />
                     </div>
-                  </div>` : ''}
-                  ${showAddControls ? `
+                  </div>`
+                      : ''
+                  }
+                  ${
+                    showAddControls
+                      ? `
                   <div class="piece-add-controls">
                     ${!showCta ? '<button class="btn-tertiary btn-xs add-cta" type="button">Add CTA</button>' : ''}
                     ${!showCommercial ? '<button class="btn-tertiary btn-xs add-commercial" type="button">Add commercial metadata</button>' : ''}
                     ${!showChat ? '<button class="btn-tertiary btn-xs add-chat" type="button">Add chat invite</button>' : ''}
                     ${!showMedia ? '<button class="btn-tertiary btn-xs add-media" type="button">Add media</button>' : ''}
                     ${!showDisclosure ? '<button class="btn-tertiary btn-xs add-disclosure" type="button">Add disclosure</button>' : ''}
-                  </div>` : ''}
-                  ${showLabel ? `
+                  </div>`
+                      : ''
+                  }
+                  ${
+                    showLabel
+                      ? `
                   <div class="field">
                     <label>Admin Label</label>
                     <input type="text" class="piece-label" value="${window.escapeHtml(node.public?.label || '')}" placeholder="Label" />
-                  </div>` : ''}
-                  ${showCommercial ? `
+                  </div>`
+                      : ''
+                  }
+                  ${
+                    showCommercial
+                      ? `
                   <div class="field-grid">
                     <div class="field">
                       <label>Commercial Type</label>
@@ -3900,8 +4038,12 @@ const metadata = {
                       <label>Sponsor / Merchant</label>
                       <input type="text" class="piece-commercial-sponsor" value="${window.escapeHtml(node.commercial?.sponsorName || node.commercial?.merchantName || node.commercial?.advertiserName || '')}" placeholder="Optional sponsor" />
                     </div>
-                  </div>` : ''}
-                  ${showDisclosure ? `
+                  </div>`
+                      : ''
+                  }
+                  ${
+                    showDisclosure
+                      ? `
                   <div class="field">
                     <label>Disclosure Required</label>
                     <div class="checkbox-field">
@@ -3912,7 +4054,9 @@ const metadata = {
                   <div class="field">
                     <label>Disclosure Label</label>
                     <input type="text" class="piece-disclosure-label" value="${window.escapeHtml(node.commercial?.disclosure?.label || '')}" placeholder="Sponsored" />
-                  </div>` : ''}
+                  </div>`
+                      : ''
+                  }
                   <div class="field">
                     <label class="text-xs font-bold text-muted mb-2">Raw Node JSON (Canonical)</label>
                     <textarea class="piece-raw-json font-mono text-[10px] bg-gray-50 dark:bg-slate-950 p-4 rounded-lg" rows="8" spellcheck="false">${window.escapeHtml(JSON.stringify(node, null, 2))}</textarea>
@@ -3949,7 +4093,10 @@ const metadata = {
 
           if (showItems) {
             piece.querySelector('.piece-items').addEventListener('input', (e) => {
-              node.public.items = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+              node.public.items = e.target.value
+                .split('\n')
+                .map((s) => s.trim())
+                .filter(Boolean);
               updateFromPieces();
             });
           }
@@ -4038,7 +4185,9 @@ const metadata = {
               renderPieces();
               updateFromPieces();
             } catch (error) {
-              window.alert(error instanceof Error ? `Raw node JSON is invalid: ${error.message}` : 'Raw node JSON is invalid.');
+              window.alert(
+                error instanceof Error ? `Raw node JSON is invalid: ${error.message}` : 'Raw node JSON is invalid.'
+              );
             }
           });
 
@@ -4145,7 +4294,7 @@ const metadata = {
       const updateFromPieces = () => {
         const markdown = articleBodyToMarkdown({
           schema_version: 'article_body.v1',
-          nodes: articleNodes
+          nodes: articleNodes,
         });
         fields.content.value = markdown;
         updatePreview();
@@ -4259,9 +4408,9 @@ const metadata = {
       const updatePreview = () => {
         // Sync articleNodes with current content if nodes are empty
         if (articleNodes.length === 0 && fields.content.value.trim()) {
-           articleNodes = [createLegacyBodyNode(fields.content.value)];
-           renderPieces();
-           setLegacyMarkdownConversionNotice(true);
+          articleNodes = [createLegacyBodyNode(fields.content.value)];
+          renderPieces();
+          setLegacyMarkdownConversionNotice(true);
         }
 
         const featuredPath = getFeaturedImagePath();
@@ -4384,7 +4533,6 @@ const metadata = {
       };
 
       const updatePublishOutput = () => {
-        const { slug, markdown } = buildMarkdown();
         fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
         fields.outputMarkdown.value = markdown;
         resizeOutputMarkdown();
@@ -4686,7 +4834,7 @@ const metadata = {
       };
 
       const getLatestArtifactReferences = (record) => {
-        const artifactReferences = record?.input?.publication?.publish_payload?.artifactReferences;
+        const artifactReferences = record?.input?.media?.artifactReferences || record?.input?.artifactReferences;
         return Array.isArray(artifactReferences) ? artifactReferences : [];
       };
 
@@ -5377,7 +5525,6 @@ const metadata = {
         }
       };
 
-
       const partialPublishPayloadImportFields = ['slug', 'title', 'content', 'markdown', 'publishDate', 'draft'];
       const partialPublishPayloadSignalFields = ['slug', 'markdown', 'publishDate', 'draft'];
       const legacyArticleImportFields = ['title', 'content', 'excerpt', 'tags', 'sources'];
@@ -5398,9 +5545,8 @@ const metadata = {
                 : '',
         },
         publication: {
-          schema_version: 'publication.v1',
-          publication_status: payload.draft === true ? 'draft' : 'ready',
-          publish_payload: payload,
+          schema_version: 'publication.v2',
+          published_time: null,
         },
         taxonomy: {
           tags: Array.isArray(payload.tags) ? payload.tags : [],
@@ -5418,13 +5564,8 @@ const metadata = {
           markdown: articleBodyToMarkdown(articleBody),
         },
         publication: {
-          schema_version: 'publication.v1',
-          publication_status: 'draft',
-          publish_payload: {
-            markdown: articleBodyToMarkdown(articleBody),
-            article_body: articleBody,
-            draft: true,
-          },
+          schema_version: 'publication.v2',
+          published_time: null,
         },
       });
 
@@ -5449,24 +5590,8 @@ const metadata = {
             ...(articleBody && Array.isArray(articleBody.nodes) ? { article_body: articleBody } : {}),
           },
           publication: {
-            schema_version: 'publication.v1',
-            publication_status: article.draft === true ? 'draft' : 'ready',
-            publish_payload: {
-              title: article.title,
-              slug: article.slug,
-              author: article.author,
-              excerpt: article.excerpt,
-              description: article.description,
-              seoDescription: article.seoDescription || article.metadata?.description,
-              content: markdown,
-              markdown,
-              tags: article.tags,
-              sources: article.sources,
-              featuredImage: article.featuredImage || article.image,
-              image: article.image || article.featuredImage,
-              draft: article.draft,
-              ...(articleBody && Array.isArray(articleBody.nodes) ? { article_body: articleBody } : {}),
-            },
+            schema_version: 'publication.v2',
+            published_time: null,
           },
           taxonomy: {
             tags: Array.isArray(article.tags) ? article.tags : [],
@@ -5502,7 +5627,8 @@ const metadata = {
 
         if (
           hasAnyImportField(data, legacyArticleSignalFields) ||
-          (hasAnyImportField(data, legacyArticleImportFields) && !hasAnyImportField(data, partialPublishPayloadSignalFields))
+          (hasAnyImportField(data, legacyArticleImportFields) &&
+            !hasAnyImportField(data, partialPublishPayloadSignalFields))
         ) {
           return {
             contentSource: normalizeLegacyArticleImport(data),
@@ -5534,54 +5660,16 @@ const metadata = {
         [
           ['content', ['content']],
           ['publication', ['publication']],
-          ['publication.publish_payload', ['publication', 'publish_payload']],
           ['editorial', ['editorial']],
           ['seo', ['seo']],
           ['taxonomy', ['taxonomy']],
           ['sources', ['sources']],
         ].forEach(([pathLabel, path]) => assertOptionalObject(candidate, pathLabel, path));
 
-        assertOptionalTextPath(candidate, 'publication.publish_payload.title or content.title', [
-          ['publication', 'publish_payload', 'title'],
-          ['content', 'title'],
-        ]);
-        assertOptionalTextPath(candidate, 'publication.publish_payload.slug', [
-          ['publication', 'publish_payload', 'slug'],
-        ]);
-        assertOptionalTextPath(candidate, 'publication.publish_payload.author', [
-          ['publication', 'publish_payload', 'author'],
-        ]);
-        assertOptionalTextPath(
-          candidate,
-          'publication.publish_payload.excerpt, publication.publish_payload.description, or content.deck',
-          [
-            ['publication', 'publish_payload', 'excerpt'],
-            ['publication', 'publish_payload', 'description'],
-            ['content', 'deck'],
-          ]
-        );
-        assertOptionalTextPath(
-          candidate,
-          'publication.publish_payload.seoDescription, seo.meta_description, or publication.publish_payload.description',
-          [
-            ['publication', 'publish_payload', 'seoDescription'],
-            ['seo', 'meta_description'],
-            ['publication', 'publish_payload', 'description'],
-          ]
-        );
-        assertOptionalTextPath(
-          candidate,
-          'publication.publish_payload.markdown, publication.publish_payload.content, editorial.draft_markdown, or content.blocks markdown',
-          [
-            ['publication', 'publish_payload', 'markdown'],
-            ['publication', 'publish_payload', 'content'],
-            ['editorial', 'draft_markdown'],
-          ]
-        );
-        assertOptionalStringArrayPath(candidate, 'publication.publish_payload.tags or taxonomy.tags', [
-          ['publication', 'publish_payload', 'tags'],
-          ['taxonomy', 'tags'],
-        ]);
+        assertOptionalTextPath(candidate, 'content.title', [['content', 'title']]);
+        assertOptionalTextPath(candidate, 'content.deck', [['content', 'deck']]);
+        assertOptionalTextPath(candidate, 'seo.meta_description', [['seo', 'meta_description']]);
+        assertOptionalStringArrayPath(candidate, 'taxonomy.tags', [['taxonomy', 'tags']]);
         assertOptionalSourceListPath(candidate);
 
         return { ...classification, contentSource: candidate };
@@ -5601,10 +5689,6 @@ const metadata = {
 
         if (!slugify(formData.title.value)) {
           throw new Error('Import JSON title must include enough text to compute a publishing target.');
-        }
-
-        if (!formData.author.exists || !formData.author.value.trim()) {
-          throw new Error('Import JSON must include a non-empty publication.publish_payload.author.');
         }
       };
 
@@ -5941,17 +6025,10 @@ const metadata = {
       const cloneContentSourceForCopy = (input) => {
         const copy = typeof structuredClone === 'function' ? structuredClone(input) : JSON.parse(JSON.stringify(input));
         copy.content ||= {};
-        copy.publication ||= {};
-        copy.publication.publish_payload ||= {};
-        const payload = copy.publication.publish_payload;
-        const currentTitle = payload.title || copy.content.title || 'Untitled article';
-        const currentSlug = slugify(payload.slug || currentTitle) || 'untitled-article';
+        copy.publication = { schema_version: 'publication.v2', published_time: null };
+        const currentTitle = copy.content.title || 'Untitled article';
         const copyTitle = appendCopySuffix(currentTitle, '-Copy');
-        payload.title = copyTitle;
         copy.content.title = copyTitle;
-        payload.slug = `${currentSlug}-copy`;
-        payload.overwrite = false;
-        copy.publication.publication_status = 'draft';
         return copy;
       };
 
@@ -6121,11 +6198,14 @@ const metadata = {
       const getJsonDraftLifecycleLabel = (draft) => {
         const status = draft.recordStatus || draft.lifecycleStatus;
         if (status === 'published') return { label: 'Published', className: 'is-published' };
-        if (status === 'published_saved_json') return { label: 'Published + Saved JSON', className: 'is-published-saved-json' };
+        if (status === 'published_saved_json')
+          return { label: 'Published + Saved JSON', className: 'is-published-saved-json' };
         if (status === 'saved_json_only') return { label: 'Saved JSON only', className: 'is-saved-json-only' };
         if (status === 'draft_workflow') return { label: 'Draft workflow', className: 'is-draft-workflow' };
-        if (status === 'unpublished_changes' || status === 'modified') return { label: 'Unpublished changes', className: 'is-unpublished-changes' };
-        if (status === 'mcp_workflow_record') return { label: 'MCP workflow record', className: 'is-mcp-workflow-record' };
+        if (status === 'unpublished_changes' || status === 'modified')
+          return { label: 'Unpublished changes', className: 'is-unpublished-changes' };
+        if (status === 'mcp_workflow_record')
+          return { label: 'MCP workflow record', className: 'is-mcp-workflow-record' };
         if (draft.published?.exists) return { label: 'Published', className: 'is-published' };
         return { label: 'Saved JSON only', className: 'is-saved-json-only' };
       };
@@ -6586,7 +6666,8 @@ const metadata = {
 
       const openBlockLibrary = () => {
         fields.blockLibraryList.innerHTML = Object.values(articleNodeTemplates)
-          .map((t) => `
+          .map(
+            (t) => `
             <button class="block-template-choice" type="button" data-template-id="${window.escapeHtml(t.id)}">
               <span>
                 <strong>${window.escapeHtml(t.name)}</strong>
@@ -6594,7 +6675,8 @@ const metadata = {
               </span>
               <span style="font-size: 1.5rem; font-weight: bold; color: var(--aw-color-accent);">+</span>
             </button>
-          `)
+          `
+          )
           .join('');
 
         if (fields.blockLibraryModal?.showModal) fields.blockLibraryModal.showModal();
@@ -6621,7 +6703,7 @@ const metadata = {
         fields.piecesContainer.lastElementChild?.scrollIntoView({ behavior: 'smooth' });
       });
 
-      document.querySelectorAll('.quick-add').forEach(btn => {
+      document.querySelectorAll('.quick-add').forEach((btn) => {
         btn.addEventListener('click', () => {
           const templateId = btn.dataset.templateId;
           articleNodes.push(createDefaultNodeFromTemplate(templateId));
@@ -6827,7 +6909,7 @@ const metadata = {
               overwrite: fields.overwrite.checked,
               article_body: {
                 schema_version: 'article_body.v1',
-                nodes: articleNodes
+                nodes: articleNodes,
               },
               requestId,
               request_id: requestId,
@@ -6864,11 +6946,11 @@ const metadata = {
           fields.overwrite.checked = false;
           let workflowWarning = '';
           try {
-            await mcpToolCall('save_json_blob_mark_published', {
+            await mcpToolCall('save_json_blob_publish_by_time', {
               request_id: requestId,
               expected_record_version: latestWorkflowRecord?.version,
               lock_token: lockToken,
-              commit_metadata: { commit, articlePath: publishedPath },
+              published_time: getPublishDate().toISOString(),
             });
             try {
               await checkinWorkflowRequest();
@@ -6877,8 +6959,8 @@ const metadata = {
               workflowWarning = ' Workflow lock could not be released automatically.';
             }
           } catch (error) {
-            console.warn('Published workflow status update failed.', error);
-            workflowWarning = ' Workflow status was not updated, so the workflow lock remains checked out.';
+            console.warn('Published workflow time update failed.', error);
+            workflowWarning = ' Workflow publication time was not updated, so the workflow lock remains checked out.';
           }
 
           setStatus(

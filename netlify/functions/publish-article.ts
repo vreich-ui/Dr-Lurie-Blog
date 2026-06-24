@@ -17,7 +17,7 @@ import {
   type DeployStatus,
 } from '../lib/netlify-deploys.js';
 import { publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
-import { getPreferredArticleMarkdownSource } from '../../src/schema/article-content-helpers.js';
+import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -92,7 +92,6 @@ type PublishInput = {
   description?: unknown;
   ctaLink?: unknown;
   ctaText?: unknown;
-  draft?: unknown;
   excerpt?: unknown;
   files?: unknown;
   featuredImage?: unknown;
@@ -108,6 +107,7 @@ type PublishInput = {
   markdown?: unknown;
   overwrite?: unknown;
   publishDate?: unknown;
+  published_time?: unknown;
   publishedDate?: unknown;
   seoDescription?: unknown;
   slug?: unknown;
@@ -488,8 +488,6 @@ const readArtifactBytes = async (
   throw new PublishError(422, staleImageReferencesMessage);
 };
 
-const hasFrontmatter = (markdown: string) => /^---(?:\s|$)/.test(markdown.trimStart());
-
 const getPublishPayloadIssue = (
   input: PublishInput,
   slug: string,
@@ -511,7 +509,6 @@ const getPublishPayloadIssue = (
     artifactReferences: Array.isArray(input.artifactReferences) ? input.artifactReferences : undefined,
     article_body: input.article_body && typeof input.article_body === 'object' ? input.article_body : undefined,
     overwrite: toBooleanValue(input.overwrite),
-    draft: toBooleanValue(input.draft),
     articlePath: toStringValue(input.articlePath),
     category: toStringValue(input.category),
     excerpt: toStringValue(input.excerpt),
@@ -610,10 +607,10 @@ const buildFrontmatter = ({
   content,
   ctaLink,
   ctaText,
-  draft,
   excerpt,
   imagePath,
   publishDate,
+  publishedTime,
   seoDescription,
   tags,
   title,
@@ -624,10 +621,10 @@ const buildFrontmatter = ({
   content: string;
   ctaLink?: string;
   ctaText?: string;
-  draft?: boolean;
   excerpt?: string;
   imagePath?: string;
   publishDate: string;
+  publishedTime?: string | null;
   seoDescription?: string;
   tags: string[];
   title: string;
@@ -636,8 +633,8 @@ const buildFrontmatter = ({
   const lines = [
     '---',
     `publishDate: ${publishDate}`,
+    ...(publishedTime === null ? ['published_time: null'] : publishedTime ? [`published_time: ${publishedTime}`] : []),
     `title: "${escapeYaml(title)}"`,
-    ...(draft ? ['draft: true'] : []),
     ...(excerpt ? [`excerpt: "${escapeYaml(excerpt)}"`] : []),
     ...(imagePath ? [`image: "${escapeYaml(imagePath)}"`] : []),
     ...(videoLink ? [`video: "${escapeYaml(videoLink)}"`] : []),
@@ -1094,18 +1091,15 @@ export const handler = async (event: LambdaEvent) => {
 
   const rawSlug = toStringValue(input.slug);
   const slug = rawSlug ? slugify(rawSlug) : undefined;
-  const markdownInput = toStringValue(input.markdown);
-  const content = toStringValue(input.content);
   const article_body = input.article_body && typeof input.article_body === 'object' ? input.article_body : undefined;
   const title = toStringValue(input.title);
   const publishDate = toStringValue(input.publishDate) ?? new Date().toISOString();
-  const isAgentPayload = Boolean(
-    markdownInput || input.articlePath || article_body || input.images || input.commitMessage
-  );
+  const publishedTime = input.published_time === null ? null : toStringValue(input.published_time);
+  const isAgentPayload = Boolean(input.articlePath || article_body || input.images || input.commitMessage);
   const missing = [
     !slug ? 'slug' : undefined,
-    !markdownInput && !content && !article_body ? (isAgentPayload ? 'markdown' : 'content') : undefined,
-    !markdownInput && !isAgentPayload && !title ? 'title' : undefined,
+    (!article_body && !toStringValue(input.markdown)) ? 'article_body' : undefined,
+    !title ? 'title' : undefined,
     !isAgentPayload && !publishDate ? 'publishDate' : undefined,
   ].filter(Boolean);
 
@@ -1119,8 +1113,8 @@ export const handler = async (event: LambdaEvent) => {
     return jsonResponse(400, { error: 'publishDate must be a valid date string.' });
   }
 
-  if ((markdownInput && hasFrontmatter(markdownInput)) || (content && hasFrontmatter(content))) {
-    return jsonResponse(400, { error: 'Submit body-only markdown. Frontmatter is generated server-side.' });
+  if (publishedTime !== undefined && publishedTime !== null && Number.isNaN(Date.parse(publishedTime))) {
+    return jsonResponse(400, { error: 'published_time must be null or a valid date string.' });
   }
 
   if (!title) {
@@ -1193,27 +1187,20 @@ export const handler = async (event: LambdaEvent) => {
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
     const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
 
-    const tempContentSource: ContentSourceV1 = {
-      record_type: 'content_source',
-      schema_version: 'content_source.v1',
-      content: {
-        title,
-        article_body: article_body as any,
-      },
-      editorial: {
-        draft_markdown: markdownInput ?? content,
-      },
-      publication: {
-        publish_payload: {
-          slug: slug || '',
-          title: title || '',
-          markdown: markdownInput,
-          content,
+    let resolvedMarkdown: string;
+    if (article_body) {
+      const tempContentSource: ContentSourceV1 = {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        content: {
+          title,
+          article_body: article_body as ContentSourceV1['content'] extends { article_body?: infer T } ? T : never,
         },
-      },
-    };
-
-    const resolvedMarkdown = getPreferredArticleMarkdownSource(tempContentSource) || '';
+      };
+      resolvedMarkdown = articleBodyToMarkdown(tempContentSource.content!.article_body!);
+    } else {
+      resolvedMarkdown = toStringValue(input.markdown) || '';
+    }
 
     const rawMarkdown = buildFrontmatter({
       author: toStringValue(input.author),
@@ -1221,10 +1208,10 @@ export const handler = async (event: LambdaEvent) => {
       content: resolvedMarkdown,
       ctaLink: toStringValue(input.ctaLink),
       ctaText: toStringValue(input.ctaText),
-      draft: toBooleanValue(input.draft),
       excerpt: toStringValue(input.excerpt) ?? toStringValue(input.seoDescription),
       imagePath,
       publishDate,
+      publishedTime,
       seoDescription: toStringValue(input.seoDescription),
       tags,
       title,
