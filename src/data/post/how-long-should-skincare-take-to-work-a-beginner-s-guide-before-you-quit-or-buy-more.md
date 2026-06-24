@@ -1,8 +1,9 @@
 ---
-publishDate: 2026-06-24T12:12:12.917Z
-published_time: 2026-06-24T12:12:12.917Z
+publishDate: 2026-06-24T14:12:53.655Z
+published_time: 2026-06-24T14:12:53.655Z
 title: "How Long Should Skincare Take to Work? A Beginner's Guide Before You Quit or Buy More"
 excerpt: "A calmer way to judge whether a product needs more time, does not fit, or is irritating your skin."
+image: "~/assets/images/uploads/how-long-should-skincare-take-to-work-a-beginner-s-guide-before-you-quit-or-buy-more/skincare-timeline-featured.webp"
 tags:
   - "Skincare Basics"
   - "Beginner Skincare"
