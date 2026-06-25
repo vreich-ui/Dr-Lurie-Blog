@@ -13,11 +13,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="blobs-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14"
-    data-admin-shell
-    hidden
-  >
+  <section class="blobs-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
     <header class="blobs-header">
       <div>
         <p class="blobs-kicker">Admin workspace</p>
@@ -643,7 +639,6 @@ const metadata = {
         });
       };
 
-
       const setAdminShellVisible = (visible) => {
         if (adminPage) adminPage.hidden = !visible;
       };
@@ -712,7 +707,9 @@ const metadata = {
           },
         });
 
-        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       // All blob operations route through this single endpoint with the action in the body.
@@ -1148,14 +1145,14 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-                const user = currentUser();
+        const user = currentUser();
         const signedIn = Boolean(user);
 
         if (signedIn) {
           const adminState = await getAdminStateForUser(user);
 
           if (adminState.isAdmin) {
-            activeToken = await getAccessToken() || '';
+            activeToken = (await getAccessToken()) || '';
             setAuthState('signed-in');
             if (!managerStarted) {
               managerStarted = true;
@@ -1177,8 +1174,8 @@ const metadata = {
         setAuthState('checking');
 
         try {
-        await handleOAuthCallback().catch(() => {});
-                    await renderAuthState();
+          await handleOAuthCallback().catch(() => {});
+          await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {

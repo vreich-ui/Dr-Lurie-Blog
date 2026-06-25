@@ -11,6 +11,7 @@ author: 'Dr. Lurié'
 metadata:
   description: 'Internal MCP workflow connectivity test.'
 ---
+
 ---
 
 title: "MCP Connection Test 2026-06-11"

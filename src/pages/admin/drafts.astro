@@ -13,11 +13,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="drafts-page mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14"
-    data-admin-shell
-    hidden
-  >
+  <section class="drafts-page mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
     <header class="drafts-header">
       <div>
         <p class="drafts-kicker">Admin workspace</p>
@@ -38,7 +34,9 @@ const metadata = {
         <div>
           <p class="drafts-kicker">Saved JSON drafts</p>
           <h2 id="drafts-heading">Netlify Blobs drafts</h2>
-          <p class="hint">Draft metadata is loaded through an admin-only server function after identity auth resolves.</p>
+          <p class="hint">
+            Draft metadata is loaded through an admin-only server function after identity auth resolves.
+          </p>
         </div>
         <div class="drafts-card-actions">
           <a class="btn-secondary btn-sm" href="/admin/publish">New</a>
@@ -587,7 +585,6 @@ const metadata = {
         });
       };
 
-
       const setAdminShellVisible = (visible) => {
         if (adminPage) adminPage.hidden = !visible;
       };
@@ -635,7 +632,9 @@ const metadata = {
           },
         });
 
-        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const escapeHtml = (value) =>
@@ -754,7 +753,7 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-                const user = currentUser();
+        const user = currentUser();
         const signedIn = Boolean(user);
 
         if (signedIn) {
@@ -778,8 +777,8 @@ const metadata = {
         setAuthState('checking');
 
         try {
-        await handleOAuthCallback().catch(() => {});
-                    await renderAuthState();
+          await handleOAuthCallback().catch(() => {});
+          await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {

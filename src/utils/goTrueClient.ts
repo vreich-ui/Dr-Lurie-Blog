@@ -151,7 +151,10 @@ export const refreshUser = async (): Promise<GoTrueUser | null> => {
         refresh_token: stored.token.refresh_token,
       }),
     });
-    if (!res.ok) { clearStorage(); return null; }
+    if (!res.ok) {
+      clearStorage();
+      return null;
+    }
     const tok = (await res.json()) as TokenResponse;
     const info = await fetchUserInfo(tok.access_token);
     const user = buildUser(info, tok);

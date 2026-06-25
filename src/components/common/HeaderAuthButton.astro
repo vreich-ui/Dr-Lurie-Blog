@@ -175,7 +175,10 @@ const { variant = 'desktop' } = Astro.props;
     const closeMobileNavigationAccordions = (exceptRoot = undefined) => {
       document.querySelectorAll('#header .dropdown.mobile-open').forEach((dropdown) => {
         if (dropdown === exceptRoot) return;
-        if (dropdown.hasAttribute('data-mobile-auth-menu')) { setMenuOpen(dropdown, false); return; }
+        if (dropdown.hasAttribute('data-mobile-auth-menu')) {
+          setMenuOpen(dropdown, false);
+          return;
+        }
         dropdown.classList.remove('mobile-open');
         dropdown.querySelector('[data-mobile-accordion-trigger]')?.setAttribute('aria-expanded', 'false');
       });
@@ -254,7 +257,7 @@ const { variant = 'desktop' } = Astro.props;
         }
         if (!signedIn) setMenuOpen(root, false);
         const email = adminState?.email || user?.email || '';
-        const displayName = email ? (email.split('@')[0] || email) : (user?.user_metadata?.full_name || 'Account');
+        const displayName = email ? email.split('@')[0] || email : user?.user_metadata?.full_name || 'Account';
         if (label) label.textContent = signedIn ? displayName : 'Account';
         if (signedOutPanel) signedOutPanel.hidden = signedIn;
         if (signedInPanel) signedInPanel.hidden = !signedIn;
@@ -376,7 +379,9 @@ const { variant = 'desktop' } = Astro.props;
 
       document.addEventListener('pointerover', handleAuthPointerEnter);
       document.addEventListener('pointerout', handleAuthPointerLeave);
-      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeAllMenus(); });
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeAllMenus();
+      });
       document.addEventListener('astro:page-load', initializeHeaderAuthState);
     }
   })();

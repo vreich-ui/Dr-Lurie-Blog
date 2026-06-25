@@ -566,8 +566,7 @@ const verifyPublisher = async (event: LambdaEvent, context?: LambdaContext) => {
   const adminState = await getAdminStateFromEvent(event, context);
 
   if (!adminState.authenticated) {
-    const error =
-      adminState.error || 'A valid x-publish-key header or identity token is required to publish articles.';
+    const error = adminState.error || 'A valid x-publish-key header or identity token is required to publish articles.';
 
     return jsonResponse(401, { error });
   }
@@ -1095,7 +1094,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   const isAgentPayload = Boolean(input.articlePath || article_body || input.images || input.commitMessage);
   const missing = [
     !slug ? 'slug' : undefined,
-    (!article_body && !toStringValue(input.markdown)) ? 'article_body' : undefined,
+    !article_body && !toStringValue(input.markdown) ? 'article_body' : undefined,
     !title ? 'title' : undefined,
     !isAgentPayload && !publishDate ? 'publishDate' : undefined,
   ].filter(Boolean);

@@ -57,11 +57,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="agent-admin-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
-    data-admin-shell
-    hidden
-  >
+  <section class="agent-admin-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
     <header class="agent-header">
       <div>
         <p class="agent-kicker">OpenAI Agent Builder</p>
@@ -488,7 +484,6 @@ const metadata = {
 
       setAuthState('checking');
 
-
       const getAdminStateForUser = async (_user) => {
         const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
@@ -501,11 +496,13 @@ const metadata = {
           },
         });
 
-        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const renderAuthState = async () => {
-                const user = currentUser();
+        const user = currentUser();
         const signedIn = Boolean(user);
 
         if (signedIn) {
@@ -528,8 +525,8 @@ const metadata = {
         setAuthState('checking');
 
         try {
-        await handleOAuthCallback().catch(() => {});
-                    await renderAuthState();
+          await handleOAuthCallback().catch(() => {});
+          await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {
@@ -908,7 +905,7 @@ const metadata = {
       const initializeChatKit = async () => {
         if (chatkitInitialized || !fields.chatkit) return;
 
-                const user = currentUser();
+        const user = currentUser();
         const signedIn = Boolean(user);
 
         if (!signedIn || !isAdmin) {
@@ -925,7 +922,7 @@ const metadata = {
         fields.chatkit.setOptions({
           api: {
             async getClientSecret() {
-                                          const token = await getAccessToken();
+              const token = await getAccessToken();
               if (!token) {
                 debugState.sessionRequestStatus = 'missing-token';
                 debugState.sessionHasClientSecret = false;

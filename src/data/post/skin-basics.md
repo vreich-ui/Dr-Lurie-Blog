@@ -1,21 +1,22 @@
 ---
 publishDate: 2026-06-23T10:46:00Z
-title: "Skin Basics"
-excerpt: "The best skin-care routine is not the longest one. Start with the habits that keep skin comfortable, protected, and consistent."
-image: "~/assets/images/uploads/skin-basics/skin-basics-featured.png"
-ctaLink: "/resources/skin-basics-reset"
-ctaText: "Use the Skin Basics Reset"
-category: "Skin Health"
+title: 'Skin Basics'
+excerpt: 'The best skin-care routine is not the longest one. Start with the habits that keep skin comfortable, protected, and consistent.'
+image: '~/assets/images/uploads/skin-basics/skin-basics-featured.png'
+ctaLink: '/resources/skin-basics-reset'
+ctaText: 'Use the Skin Basics Reset'
+category: 'Skin Health'
 tags:
-  - "skin care"
-  - "skin basics"
-  - "dermatology"
-  - "sun protection"
-  - "skin barrier"
-author: "Dr. Lurie"
+  - 'skin care'
+  - 'skin basics'
+  - 'dermatology'
+  - 'sun protection'
+  - 'skin barrier'
+author: 'Dr. Lurie'
 metadata:
-  description: "Learn the skin-care basics that matter most: gentle cleansing, moisturizer, sunscreen, careful use of extras, and when to seek professional advice."
+  description: 'Learn the skin-care basics that matter most: gentle cleansing, moisturizer, sunscreen, careful use of extras, and when to seek professional advice.'
 ---
+
 One corner of the internet says your skin needs a 10-step routine. Another says you need acids, retinoids, masks, oils, tools, and a separate routine for every mood your face has ever had. Before long, the bathroom shelf is crowded and your skin still feels tight, shiny, dry, irritated, or confusing.
 
 The useful place to begin is much simpler: your skin is a living barrier. Its outer layer helps keep water in and irritants out. A good routine should support that barrier so your skin feels comfortable and protected. If a routine constantly leaves you stinging, burning, peeling, or red, it may be doing too much.
@@ -50,7 +51,7 @@ For the next two weeks, keep the routine deliberately small: gentle cleanse, moi
 
 [Use the Skin Basics Reset](/resources/skin-basics-reset)
 
-*Sponsored Content*
+_Sponsored Content_
 
 ### Optional Offer: Routine Simplifier Review
 

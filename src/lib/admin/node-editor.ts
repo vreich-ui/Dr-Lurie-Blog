@@ -63,7 +63,8 @@ const listOnlyExtensions = () => [
 
 function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void, onCancel: () => void): HTMLElement {
   const bar = document.createElement('div');
-  bar.className = 'dl-editor-toolbar flex flex-wrap items-center gap-1 p-2 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-xs font-semibold';
+  bar.className =
+    'dl-editor-toolbar flex flex-wrap items-center gap-1 p-2 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-xs font-semibold';
 
   const btn = (label: string, title: string, action: () => void, isActive?: () => boolean) => {
     const b = document.createElement('button');
@@ -71,8 +72,14 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
     b.textContent = label;
     b.title = title;
     b.className = 'px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700';
-    b.addEventListener('click', (e) => { e.preventDefault(); action(); refreshActive(); });
-    const refreshActive = () => { b.setAttribute('aria-pressed', String(isActive?.() ?? false)); };
+    b.addEventListener('click', (e) => {
+      e.preventDefault();
+      action();
+      refreshActive();
+    });
+    const refreshActive = () => {
+      b.setAttribute('aria-pressed', String(isActive?.() ?? false));
+    };
     refreshActive();
     return b;
   };
@@ -82,16 +89,44 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
 
   if (isRichText) {
     bar.append(
-      btn('B', 'Bold', () => editor.chain().focus().toggleBold().run(), () => editor.isActive('bold')),
-      btn('I', 'Italic', () => editor.chain().focus().toggleItalic().run(), () => editor.isActive('italic')),
-      btn('H2', 'Heading 2', () => editor.chain().focus().toggleHeading({ level: 2 }).run(), () => editor.isActive('heading', { level: 2 })),
-      btn('H3', 'Heading 3', () => editor.chain().focus().toggleHeading({ level: 3 }).run(), () => editor.isActive('heading', { level: 3 })),
-      btn('🔗', 'Link', () => {
-        const url = window.prompt('URL', editor.getAttributes('link').href ?? '');
-        if (url === null) return;
-        if (url === '') { editor.chain().focus().unsetLink().run(); return; }
-        editor.chain().focus().setLink({ href: url }).run();
-      }, () => editor.isActive('link'))
+      btn(
+        'B',
+        'Bold',
+        () => editor.chain().focus().toggleBold().run(),
+        () => editor.isActive('bold')
+      ),
+      btn(
+        'I',
+        'Italic',
+        () => editor.chain().focus().toggleItalic().run(),
+        () => editor.isActive('italic')
+      ),
+      btn(
+        'H2',
+        'Heading 2',
+        () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+        () => editor.isActive('heading', { level: 2 })
+      ),
+      btn(
+        'H3',
+        'Heading 3',
+        () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+        () => editor.isActive('heading', { level: 3 })
+      ),
+      btn(
+        '🔗',
+        'Link',
+        () => {
+          const url = window.prompt('URL', editor.getAttributes('link').href ?? '');
+          if (url === null) return;
+          if (url === '') {
+            editor.chain().focus().unsetLink().run();
+            return;
+          }
+          editor.chain().focus().setLink({ href: url }).run();
+        },
+        () => editor.isActive('link')
+      )
     );
   }
 
@@ -110,7 +145,8 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.className = 'px-3 py-0.5 rounded-full border border-gray-300 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700';
+  cancelBtn.className =
+    'px-3 py-0.5 rounded-full border border-gray-300 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700';
   cancelBtn.addEventListener('click', onCancel);
   bar.append(cancelBtn);
 
@@ -176,11 +212,7 @@ export class NodeEditor {
     // Initial content: prefer body text; fall back to title
     const initialContent = node.public.body || node.public.title || '';
 
-    const extensions = isAction
-      ? plainTextExtensions()
-      : isList
-        ? listOnlyExtensions()
-        : richTextExtensions();
+    const extensions = isAction ? plainTextExtensions() : isList ? listOnlyExtensions() : richTextExtensions();
 
     this.editor = new Editor({
       element: this.editorEl,
@@ -224,7 +256,9 @@ export class NodeEditor {
     }
 
     // Hide the rendered preview and show the editor
-    const renderedPreview = wrapper.querySelector('.dl-node-body, section, aside, div:not(.dl-node-wrapper)') as HTMLElement | null;
+    const renderedPreview = wrapper.querySelector(
+      '.dl-node-body, section, aside, div:not(.dl-node-wrapper)'
+    ) as HTMLElement | null;
     if (renderedPreview) renderedPreview.style.display = 'none';
     wrapper.prepend(this.container);
 

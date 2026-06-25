@@ -44,7 +44,10 @@ export type ArtifactReference = {
 
 export type ReadableArtifactBlobStore = {
   get(key: string, options: { type: 'arrayBuffer' }): Promise<Buffer | ArrayBuffer | string | null>;
-  get(key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }): Promise<string | Buffer | ArrayBuffer | null>;
+  get(
+    key: string,
+    options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }
+  ): Promise<string | Buffer | ArrayBuffer | null>;
   list?: (options?: {
     prefix?: string;
     directories?: boolean;

@@ -29,33 +29,33 @@ describe('save_json_blob_publish_by_time media promotion', () => {
                 kind: 'content',
                 public: {
                   title: 'Hero Node',
-                  media: { type: 'image', src: 'https://example.com/node-hero.jpg' }
+                  media: { type: 'image', src: 'https://example.com/node-hero.jpg' },
                 },
-                rendering: { presentation: 'hero' }
-              }
-            ]
-          }
+                rendering: { presentation: 'hero' },
+              },
+            ],
+          },
         },
         media: {
           image_asset_register: [
             {
               asset_id: 'asset_1',
-              url: 'https://example.com/asset-regular.jpg'
+              url: 'https://example.com/asset-regular.jpg',
             },
             {
               asset_id: 'asset_hero',
               url: 'https://example.com/asset-hero.jpg',
-              metadata: { purpose: 'hero' }
-            }
+              metadata: { purpose: 'hero' },
+            },
           ],
           image_sets: [
             {
               set_id: 'set_hero',
               asset_ids: ['asset_1'],
-              metadata: { purpose: 'hero' }
-            }
-          ]
-        }
+              metadata: { purpose: 'hero' },
+            },
+          ],
+        },
       },
       agent_outputs: {
         final_article: {
@@ -66,14 +66,14 @@ describe('save_json_blob_publish_by_time media promotion', () => {
                 sha256: sha256_final,
                 contentType: 'image/png',
                 sizeBytes: 200,
-                createdAtISO: new Date().toISOString()
-              }
-            ]
-          }
-        }
+                createdAtISO: new Date().toISOString(),
+              },
+            ],
+          },
+        },
       },
       lock: { token: lockToken, expires_at: new Date(Date.now() + 10000).toISOString() },
-      version: 5
+      version: 5,
     };
 
     mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: Record<string, unknown>) => {
@@ -82,7 +82,16 @@ describe('save_json_blob_publish_by_time media promotion', () => {
         return { statusCode: 200, body: JSON.stringify({ ok: true, record: mockRecord }) };
       }
       if (body.action === 'set_published_time') {
-        return { statusCode: 200, body: JSON.stringify({ ok: true, record: { ...mockRecord, input: { ...mockRecord.input, publication: { published_time: body.published_time } } } }) };
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            ok: true,
+            record: {
+              ...mockRecord,
+              input: { ...mockRecord.input, publication: { published_time: body.published_time } },
+            },
+          }),
+        };
       }
       return { statusCode: 500, body: 'Unexpected action' };
     });
@@ -93,27 +102,27 @@ describe('save_json_blob_publish_by_time media promotion', () => {
       sha256: sha256_ref,
       contentType: 'image/png',
       sizeBytes: 100,
-      createdAtISO: new Date().toISOString()
+      createdAtISO: new Date().toISOString(),
     };
 
     mock.method(_mcpInternal, 'getArtifactIndexBlobStore', async () => ({
-       get: async (key: string) => {
-         if (key.includes(sha256_ref)) return JSON.stringify(mockArtifactRef);
-         if (key.includes('pointer')) return JSON.stringify({ requestId, sha256: sha256_ref });
-         return null;
-       },
-       list: async (options: { prefix?: string } | undefined) => {
-         return {
-           [Symbol.asyncIterator]: async function* () {
-             if (options?.prefix?.includes('by-request/')) {
-               yield { blobs: [{ key: `by-request/${encodeURIComponent(requestId)}/image/pointer.json` }] };
-             } else {
-               yield { blobs: [] };
-             }
-           }
-         };
-       },
-       setJSON: async () => {}
+      get: async (key: string) => {
+        if (key.includes(sha256_ref)) return JSON.stringify(mockArtifactRef);
+        if (key.includes('pointer')) return JSON.stringify({ requestId, sha256: sha256_ref });
+        return null;
+      },
+      list: async (options: { prefix?: string } | undefined) => {
+        return {
+          [Symbol.asyncIterator]: async function* () {
+            if (options?.prefix?.includes('by-request/')) {
+              yield { blobs: [{ key: `by-request/${encodeURIComponent(requestId)}/image/pointer.json` }] };
+            } else {
+              yield { blobs: [] };
+            }
+          },
+        };
+      },
+      setJSON: async () => {},
     }));
 
     // Let's mock publish-article and check its input.
@@ -126,8 +135,8 @@ describe('save_json_blob_publish_by_time media promotion', () => {
           success: true,
           articlePath: 'src/data/post/test-media-promotion.md',
           media: ['src/assets/images/uploads/test-media-promotion/ref.png'],
-          commit: 'new-commit-sha'
-        })
+          commit: 'new-commit-sha',
+        }),
       };
     });
 
@@ -135,7 +144,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
       httpMethod: 'POST',
       headers: {
         'content-type': 'application/json',
-        'authorization': `Bearer ${process.env.MCP_HTTP_AUTH_TOKEN}`
+        authorization: `Bearer ${process.env.MCP_HTTP_AUTH_TOKEN}`,
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
@@ -145,10 +154,10 @@ describe('save_json_blob_publish_by_time media promotion', () => {
           name: 'save_json_blob_publish_by_time',
           arguments: {
             request_id: requestId,
-            lock_token: lockToken
-          }
-        }
-      })
+            lock_token: lockToken,
+          },
+        },
+      }),
     };
 
     const response = await mcpHandler(event as Record<string, unknown>);

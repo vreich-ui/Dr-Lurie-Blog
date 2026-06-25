@@ -20,11 +20,7 @@ const formatDate = (date: Date) => {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="admin-library mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14"
-    data-admin-shell
-    hidden
-  >
+  <section class="admin-library mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
     <header class="library-header">
       <div>
         <p class="library-kicker">Admin workspace</p>
@@ -408,7 +404,6 @@ const formatDate = (date: Date) => {
         });
       };
 
-
       const setAdminShellVisible = (visible) => {
         if (pageRoot) pageRoot.hidden = !visible;
       };
@@ -433,7 +428,9 @@ const formatDate = (date: Date) => {
           },
         });
 
-        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const escapeHtml = (value) =>
@@ -576,7 +573,6 @@ const formatDate = (date: Date) => {
         try {
           await handleOAuthCallback().catch(() => {});
           const user = currentUser();
-
 
           activeUser = user;
           const adminState = await getAdminStateForUser(user);

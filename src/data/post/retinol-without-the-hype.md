@@ -1,21 +1,22 @@
 ---
 publishDate: 2026-06-23T00:00:00Z
 title: "Retinol Without the Hype: A Skeptical Beginner's Guide"
-excerpt: "Retinol is not magic, and it is not mandatory. It is a tool. Here is how to decide whether it belongs on your shelf."
-image: "~/assets/images/uploads/retinol-without-the-hype/retinol-without-the-hype-featured.png"
-ctaLink: "/resources/retinol-reality-check"
-ctaText: "Download the Retinol Reality Check"
-category: "Skincare"
+excerpt: 'Retinol is not magic, and it is not mandatory. It is a tool. Here is how to decide whether it belongs on your shelf.'
+image: '~/assets/images/uploads/retinol-without-the-hype/retinol-without-the-hype-featured.png'
+ctaLink: '/resources/retinol-reality-check'
+ctaText: 'Download the Retinol Reality Check'
+category: 'Skincare'
 tags:
-  - "retinol"
-  - "skincare"
-  - "beginner skincare"
-  - "evidence-based skincare"
-  - "skin barrier"
-author: "Dr. Lurie"
+  - 'retinol'
+  - 'skincare'
+  - 'beginner skincare'
+  - 'evidence-based skincare'
+  - 'skin barrier'
+author: 'Dr. Lurie'
 metadata:
   description: "A skeptical beginner's guide to retinol: what it can do, what it cannot do, who should avoid it, and how to try it carefully."
 ---
+
 If you have only just heard of retinol, you may have heard two stories at once.
 
 The first story says retinol is the ingredient: the thing everyone should be using if they care about acne, texture, pores, fine lines, or looking "better." The second story says the skincare industry has learned to turn every useful ingredient into a sales funnel.

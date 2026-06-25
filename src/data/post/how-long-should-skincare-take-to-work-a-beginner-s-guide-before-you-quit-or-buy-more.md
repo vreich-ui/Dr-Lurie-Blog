@@ -2,16 +2,17 @@
 publishDate: 2026-06-24T16:25:45.543Z
 published_time: 2026-06-24T16:25:45.543Z
 title: "How Long Should Skincare Take to Work? A Beginner's Guide Before You Quit or Buy More"
-excerpt: "A practical way to judge skincare results without giving up too early, pushing through irritation, or buying the next promise too soon."
-image: "~/assets/images/uploads/how-long-should-skincare-take-to-work-a-beginner-s-guide-before-you-quit-or-buy-more/skincare-timeline-editorial-featured.webp"
+excerpt: 'A practical way to judge skincare results without giving up too early, pushing through irritation, or buying the next promise too soon.'
+image: '~/assets/images/uploads/how-long-should-skincare-take-to-work-a-beginner-s-guide-before-you-quit-or-buy-more/skincare-timeline-editorial-featured.webp'
 tags:
-  - "skincare-basics"
-  - "beginner-skincare"
-  - "product-timelines"
-  - "skin-barrier"
+  - 'skincare-basics'
+  - 'beginner-skincare'
+  - 'product-timelines'
+  - 'skin-barrier'
 metadata:
-  description: "A beginner-friendly guide to skincare timelines, irritation stop signs, and when to keep going before buying more."
+  description: 'A beginner-friendly guide to skincare timelines, irritation stop signs, and when to keep going before buying more.'
 ---
+
 ### Good skincare needs the right clock
 
 ![Good skincare needs the right clock](~/assets/images/uploads/how-long-should-skincare-take-to-work-a-beginner-s-guide-before-you-quit-or-buy-more/skincare-timeline-editorial-featured.webp)

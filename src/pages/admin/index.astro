@@ -13,11 +13,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14"
-    data-admin-shell
-    hidden
-  >
+  <section class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
     <header class="dashboard-header">
       <div>
         <p class="dashboard-kicker">Admin workspace</p>
@@ -209,7 +205,6 @@ const metadata = {
         });
       };
 
-
       const setAdminShellVisible = (visible) => {
         if (adminShell) adminShell.hidden = !visible;
       };
@@ -251,11 +246,13 @@ const metadata = {
           },
         });
 
-        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const renderAuthState = async () => {
-                const user = currentUser();
+        const user = currentUser();
         const signedIn = Boolean(user);
 
         if (signedIn) {
@@ -277,8 +274,8 @@ const metadata = {
         setAuthState('checking');
 
         try {
-        await handleOAuthCallback().catch(() => {});
-                    await renderAuthState();
+          await handleOAuthCallback().catch(() => {});
+          await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {

@@ -53,13 +53,16 @@ Replace the current block-builder-with-textareas admin page
 composed-article viewer:
 
 ### Rendering
+
 - Article renders as it will actually look live: images in place, CTAs and
   affiliate links rendered as their real styled components (buttons/cards),
   not as raw URLs, markdown, or JSON
 - No markdown source view, no raw JSON view in the primary interface
 
 ### Editing interaction model (the core feature)
+
 For each block/region:
+
 - Default state: rendered, read-only-looking view (like GitHub's file view
   before you click "edit")
 - Click/select to enter a lightweight edit mode for that block only
@@ -78,6 +81,7 @@ For each block/region:
   likes.
 
 ### Lock integration (critical -- reuse existing system, don't build a new one)
+
 - On opening a block for editing, the UI must attempt to acquire the same
   lock an autonomous agent would use
 - If an agent currently holds the lock: render read-only with a visible
@@ -92,6 +96,7 @@ For each block/region:
   is only for the human-triggered "Ask AI" highlight action described above.
 
 ### Editor choice and rationale (carried over from planning discussion)
+
 - TipTap (MIT licensed, npm: @tiptap/react + @tiptap/starter-kit) for the
   per-block manual text editing fallback
 - Deliberately minimal extension set per block type (e.g. bold/italic/link
