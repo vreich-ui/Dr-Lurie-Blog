@@ -1577,7 +1577,7 @@ const buildCanonicalPublishPayload = (
     const assetIds = Array.isArray(setRecord?.asset_ids) ? setRecord.asset_ids : [];
     const isHeroSet = isHeroAsset(setRecord);
     for (const assetId of assetIds) {
-      const asset = imageAssets.find((a: any) => getRecordValue(a)?.asset_id === assetId);
+      const asset = imageAssets.find((a: unknown) => getRecordValue(a)?.asset_id === assetId);
       const assetRecord = getRecordValue(asset);
       const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
       if (path) {
