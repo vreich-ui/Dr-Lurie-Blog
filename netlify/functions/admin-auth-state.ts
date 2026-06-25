@@ -1,4 +1,4 @@
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 
 type LambdaEvent = {
   headers?: Record<string, string | undefined>;
@@ -16,15 +16,14 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event);
-  const statusCode = adminState.error === 'Clerk authentication is not configured.' ? 500 : 200;
+  const adminState = await getAdminStateFromEvent(event, context);
 
-  return jsonResponse(statusCode, {
+  return jsonResponse(200, {
     authenticated: adminState.authenticated,
     isAdmin: adminState.isAdmin,
     email: adminState.email,

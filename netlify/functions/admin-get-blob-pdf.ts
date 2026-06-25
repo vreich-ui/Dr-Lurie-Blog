@@ -1,4 +1,4 @@
-import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
 import { getArtifactBlobStore } from '../lib/blob-store.js';
 
 type LambdaEvent = {
@@ -27,21 +27,21 @@ const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
   return Boolean(provided && provided === expected);
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'GET') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
   if (!hasValidNetlifyPublishSecret(event)) {
-    const adminState = await getAdminStateFromEvent(event);
+    const adminState = await getAdminStateFromEvent(event, context);
     if (!adminState.authenticated) {
-      return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-        error: adminState.error || 'A valid Clerk session token is required.',
+      return jsonResponse(401, {
+        error: adminState.error || 'Authentication is required.',
       });
     }
 
     if (!adminState.isAdmin) {
-      return jsonResponse(403, { error: 'This Clerk user is not authorized to read saved PDF artifacts.' });
+      return jsonResponse(403, { error: 'This user is not authorized to read saved PDF artifacts.' });
     }
   }
 

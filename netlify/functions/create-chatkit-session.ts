@@ -1,4 +1,4 @@
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 
 declare const process: {
   env: Record<string, string | undefined>;
@@ -32,41 +32,39 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
   body: JSON.stringify(body),
 });
 
-const verifyClerkAdminSession = async (
-  event: LambdaEvent
+const verifyAdminSession = async (
+  event: LambdaEvent,
+  context?: LambdaContext
 ): Promise<VerifiedChatkitUser | ReturnType<typeof jsonResponse>> => {
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
 
   if (!adminState.authenticated) {
-    const statusCode = adminState.error === 'Clerk authentication is not configured.' ? 500 : 401;
-    const error =
-      adminState.error === 'A valid Clerk session token is required.'
-        ? 'A valid Clerk session token is required to create ChatKit sessions.'
-        : adminState.error || 'A valid Clerk session token is required to create ChatKit sessions.';
-
-    return jsonResponse(statusCode, { status: 'error', error });
+    return jsonResponse(401, {
+      status: 'error',
+      error: adminState.error || 'Authentication is required to create ChatKit sessions.',
+    });
   }
 
   if (!adminState.isAdmin) {
     return jsonResponse(403, {
       status: 'error',
-      error: 'This Clerk user is not authorized to create ChatKit sessions.',
+      error: 'This user is not authorized to create ChatKit sessions.',
     });
   }
 
   if (!adminState.userId) {
-    return jsonResponse(401, { status: 'error', error: 'Invalid Clerk session token.' });
+    return jsonResponse(401, { status: 'error', error: 'Invalid identity token.' });
   }
 
-  return { userId: `clerk-${adminState.userId}` };
+  return { userId: `netlify-${adminState.userId}` };
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { status: 'error', error: 'Method not allowed' });
   }
 
-  const verifiedUser = await verifyClerkAdminSession(event);
+  const verifiedUser = await verifyAdminSession(event, context);
 
   if ('statusCode' in verifiedUser) {
     return verifiedUser;

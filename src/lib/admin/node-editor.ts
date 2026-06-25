@@ -116,9 +116,7 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
 
   // Sync active state on editor transactions
   editor.on('transaction', () => {
-    bar.querySelectorAll('button[aria-pressed]').forEach((b) => {
-      // Individual buttons update themselves via their own refreshActive closure
-    });
+    // Individual buttons update themselves via their own refreshActive closure
   });
 
   return bar;

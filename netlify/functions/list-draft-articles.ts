@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 
 type LambdaEvent = {
   headers?: Record<string, string | undefined>;
@@ -170,21 +170,21 @@ const toDraftPost = (file: GitHubContentFile) => {
   return post;
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'GET') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
 
   if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
+    return jsonResponse(401, {
+      error: adminState.error || 'Authentication is required.',
     });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to view draft articles.' });
+    return jsonResponse(403, { error: 'This user is not authorized to view draft articles.' });
   }
 
   const token = process.env.GITHUB_CONTENT_TOKEN;

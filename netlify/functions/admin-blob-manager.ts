@@ -1,4 +1,4 @@
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
 import { getManagedBlobStore, listManagedBlobStores } from '../lib/blob-admin.js';
@@ -343,20 +343,20 @@ const actionHandlers: Record<string, ActionHandler> = {
   'get-artifact-metadata': handleGetArtifactMetadata,
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
   if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
+    return jsonResponse(401, {
+      error: adminState.error || 'Authentication is required.',
     });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to manage blob stores.' });
+    return jsonResponse(403, { error: 'This user is not authorized to manage blob stores.' });
   }
 
   const params = parseBody(event);

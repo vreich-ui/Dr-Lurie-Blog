@@ -1,6 +1,6 @@
 import { createMarkdownProcessor } from '@astrojs/markdown-remark';
 
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import { getContentSourceMarkdown } from '../../src/lib/contentSourceBody.js';
 import type { ContentSourceV1, WorkflowRecord } from '../../src/schema/schema-v1.js';
@@ -92,20 +92,20 @@ const toDraftPreview = async (record: WorkflowRecord) => {
   };
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'GET') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
   if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
+    return jsonResponse(401, {
+      error: adminState.error || 'Authentication is required.',
     });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to review JSON drafts.' });
+    return jsonResponse(403, { error: 'This user is not authorized to review JSON drafts.' });
   }
 
   const draftId = toText(event.queryStringParameters?.draftId);

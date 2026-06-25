@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 
-import { getAdminStateFromEvent, getHeader } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
 import {
   normalizeArtifactBlobKey,
   reconcileArtifactReference,
@@ -544,7 +544,7 @@ const parseTags = (value: unknown) => {
     : [];
 };
 
-const verifyPublisher = async (event: LambdaEvent) => {
+const verifyPublisher = async (event: LambdaEvent, context?: LambdaContext) => {
   const publishKey = getHeader(event.headers, 'x-publish-key').trim();
 
   if (publishKey) {
@@ -560,23 +560,20 @@ const verifyPublisher = async (event: LambdaEvent) => {
       return undefined;
     }
 
-    console.warn('Rejected publish request with invalid x-publish-key. Falling back to Clerk auth.');
+    console.warn('Rejected publish request with invalid x-publish-key. Falling back to identity auth.');
   }
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
 
   if (!adminState.authenticated) {
-    const statusCode = adminState.error === 'Clerk authentication is not configured.' ? 500 : 401;
     const error =
-      adminState.error === 'A valid Clerk session token is required.'
-        ? 'A valid x-publish-key header or Clerk session token is required to publish articles.'
-        : adminState.error || 'A valid x-publish-key header or Clerk session token is required to publish articles.';
+      adminState.error || 'A valid x-publish-key header or identity token is required to publish articles.';
 
-    return jsonResponse(statusCode, { error });
+    return jsonResponse(401, { error });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to publish articles.' });
+    return jsonResponse(403, { error: 'This user is not authorized to publish articles.' });
   }
 
   return undefined;
@@ -1060,12 +1057,12 @@ const getMediaEntries = async (
   return mediaEntries;
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const authResponse = await verifyPublisher(event);
+  const authResponse = await verifyPublisher(event, context);
 
   if (authResponse) {
     return authResponse;

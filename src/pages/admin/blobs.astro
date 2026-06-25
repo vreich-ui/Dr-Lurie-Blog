@@ -3,7 +3,6 @@ import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Blob Store Manager';
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
   robots: {
@@ -17,7 +16,6 @@ const metadata = {
   <section
     class="blobs-page mx-auto max-w-[1180px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
-    data-clerk-publishable-key={clerkPublishableKey}
     hidden
   >
     <header class="blobs-header">
@@ -594,7 +592,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadClerk } from '~/utils/clerkLoader';
+  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
 
   (() => {
     const initializeBlobManagerPage = () => {
@@ -603,8 +601,6 @@ const metadata = {
       pageRoot.dataset.blobManagerInitialized = 'true';
 
       const adminPage = pageRoot;
-      const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
-      const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const authStatus = document.querySelector('[data-auth-status]');
 
@@ -632,7 +628,7 @@ const metadata = {
       const editorSave = document.querySelector('#editor-save');
       const editorPreviewWrap = document.querySelector('#editor-preview-wrap');
 
-      let clerkLoadPromise;
+      let identityLoadPromise;
       let activeToken = '';
       let searchTimer;
       // Editor mode: 'create' for a brand-new blob, or 'edit' for an existing key.
@@ -648,14 +644,15 @@ const metadata = {
         });
       };
 
-      const getClerk = async () => {
-        if (!clerkPublishableKey) {
-          throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
-        }
+      const getIdentity = async () => {
 
-        clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
 
-        return clerkLoadPromise;
+        identityLoadPromise ||= loadNetlifyIdentity();
+
+
+        return identityLoadPromise;
+
+
       };
 
       const setAdminShellVisible = (visible) => {
@@ -714,22 +711,19 @@ const metadata = {
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
       };
 
-      const getAdminStateForClerk = async (clerk) => {
-        if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-
-        const token = await clerk.session.getToken();
-        if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
-
-        activeToken = token;
+      const getAdminStateForUser = async (user) => {
+        const token = user?.token?.access_token;
+        if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
           method: 'GET',
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         });
 
-        return response
-          .json()
-          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       // All blob operations route through this single endpoint with the action in the body.
@@ -1164,13 +1158,16 @@ const metadata = {
         }
       };
 
-      const renderAuthState = async (clerk) => {
-        const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+      const renderAuthState = async () => {
+        const identity = await getIdentity();
+        const user = identity.currentUser();
+        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
 
         if (signedIn) {
-          const adminState = await getAdminStateForClerk(clerk);
+          const adminState = await getAdminStateForUser(user);
 
           if (adminState.isAdmin) {
+            activeToken = user?.token?.access_token || '';
             setAuthState('signed-in');
             if (!managerStarted) {
               managerStarted = true;
@@ -1179,35 +1176,41 @@ const metadata = {
             return;
           }
 
+          activeToken = '';
           setAuthState('forbidden');
           return;
         }
 
+        activeToken = '';
         setAuthState('signed-out');
       };
 
-      const initializeClerkAuth = async () => {
+      const initializeIdentityAuth = async () => {
         setAuthState('checking');
 
         try {
-          const clerk = await getClerk();
-          await renderAuthState(clerk);
+          const identity = await getIdentity();
 
-          if (typeof clerk.addListener === 'function') {
-            clerk.addListener(() => {
-              renderAuthState(clerk).catch((error) => {
-                console.error('Clerk authentication refresh failed.', error);
-              });
+          await renderAuthState();
+
+          identity.on('login', () => {
+            renderAuthState().catch((error) => {
+              console.error('Identity authentication refresh failed.', error);
             });
-          }
+          });
+          identity.on('logout', () => {
+            renderAuthState().catch((error) => {
+              console.error('Identity authentication refresh failed.', error);
+            });
+          });
         } catch (error) {
-          console.error('Clerk authentication initialization failed.', error);
+          console.error('Identity authentication initialization failed.', error);
           setAuthState('error');
         }
       };
 
       bindEvents();
-      initializeClerkAuth();
+      initializeIdentityAuth();
     };
 
     if (!window.__drLurieBlobManagerPageLoadListener) {
