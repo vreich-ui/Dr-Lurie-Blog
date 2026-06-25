@@ -6811,7 +6811,7 @@ const metadata = {
       });
       fields.preview.addEventListener('click', openDedicatedPreviewPage);
       if (fields.topPreview) fields.topPreview.addEventListener('click', openDedicatedPreviewPage);
-      if (fields.topPublish) fields.topPublish.addEventListener('click', publishArticle);
+      if (fields.topPublish) fields.topPublish.addEventListener('click', () => publishArticle());
       const arrayBufferToHex = (buffer) =>
         Array.from(new Uint8Array(buffer))
           .map((byte) => byte.toString(16).padStart(2, '0'))
