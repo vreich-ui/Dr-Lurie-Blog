@@ -4609,6 +4609,7 @@ const metadata = {
       };
 
       const updatePublishOutput = () => {
+        const { slug, markdown } = buildMarkdown();
         fields.suggestedLocation.textContent = `src/data/post/${slug}.md`;
         fields.outputMarkdown.value = markdown;
         resizeOutputMarkdown();
