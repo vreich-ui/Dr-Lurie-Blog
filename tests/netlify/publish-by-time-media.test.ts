@@ -76,7 +76,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
       version: 5
     };
 
-    mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: any) => {
+    mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: Record<string, unknown>) => {
       const body = JSON.parse(event.body);
       if (body.action === 'get_request') {
         return { statusCode: 200, body: JSON.stringify({ ok: true, record: mockRecord }) };
@@ -102,7 +102,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
          if (key.includes('pointer')) return JSON.stringify({ requestId, sha256: sha256_ref });
          return null;
        },
-       list: async (options: any) => {
+       list: async (options: { prefix?: string } | undefined) => {
          return {
            [Symbol.asyncIterator]: async function* () {
              if (options?.prefix?.includes('by-request/')) {
@@ -117,8 +117,8 @@ describe('save_json_blob_publish_by_time media promotion', () => {
     }));
 
     // Let's mock publish-article and check its input.
-    let capturedPublishPayload: any = null;
-    mock.method(_mcpInternal, 'publishArticleHandler', async (event: any) => {
+    let capturedPublishPayload: Record<string, unknown> | null = null;
+    mock.method(_mcpInternal, 'publishArticleHandler', async (event: Record<string, unknown>) => {
       capturedPublishPayload = JSON.parse(event.body);
       return {
         statusCode: 201,
@@ -151,7 +151,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
       })
     };
 
-    const response = await mcpHandler(event as any);
+    const response = await mcpHandler(event as Record<string, unknown>);
     assert.equal(response.statusCode, 200);
     const body = JSON.parse(response.body);
     assert.ok(!body.error, `MCP Error: ${JSON.stringify(body.error)}`);
@@ -168,7 +168,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
 
     // Artifact references should include both from index and from final_article output
     assert.equal(capturedPublishPayload.artifactReferences.length, 2);
-    const shas = capturedPublishPayload.artifactReferences.map((r: any) => r.sha256);
+    const shas = capturedPublishPayload.artifactReferences.map((r: Record<string, unknown>) => r.sha256);
     assert.ok(shas.includes(sha256_ref));
     assert.ok(shas.includes(sha256_final));
   });
