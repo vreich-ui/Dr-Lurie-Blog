@@ -7,8 +7,6 @@ conversation with Claude (chat). It is NOT verified against the actual repo
 source. Your first job is to read the real files and confirm, correct, or flag
 contradictions before building anything.
 
-Repo: vreich-ui/Dr-Lurie-Blog, branch sub-main.
-
 ## What this project actually is
 
 This is an agentic CMS. Articles are NOT primarily edited by humans by hand.
