@@ -77,7 +77,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
     };
 
     mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: Record<string, unknown>) => {
-      const body = JSON.parse(event.body);
+      const body = JSON.parse(event.body as string);
       if (body.action === 'get_request') {
         return { statusCode: 200, body: JSON.stringify({ ok: true, record: mockRecord }) };
       }
@@ -119,7 +119,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
     // Let's mock publish-article and check its input.
     let capturedPublishPayload: Record<string, unknown> | null = null;
     mock.method(_mcpInternal, 'publishArticleHandler', async (event: Record<string, unknown>) => {
-      capturedPublishPayload = JSON.parse(event.body);
+      capturedPublishPayload = JSON.parse(event.body as string);
       return {
         statusCode: 201,
         body: JSON.stringify({
@@ -158,18 +158,20 @@ describe('save_json_blob_publish_by_time media promotion', () => {
 
     // Verify the captured publish payload has the promoted images
     assert.ok(capturedPublishPayload);
+    const payload = capturedPublishPayload as unknown as Record<string, unknown>;
     // Priority check:
     // set_hero (points to asset_1) has priority 12.
     // asset_hero has priority 10.
     // node-hero.jpg has priority 10.
     // asset-regular has priority 5.
     // Win: asset_1 path (https://example.com/asset-regular.jpg)
-    assert.equal(capturedPublishPayload.featuredImage, 'https://example.com/asset-regular.jpg');
+    assert.equal(payload.featuredImage, 'https://example.com/asset-regular.jpg');
 
     // Artifact references should include both from index and from final_article output
-    assert.equal(capturedPublishPayload.artifactReferences.length, 2);
-    const shas = capturedPublishPayload.artifactReferences.map((r: Record<string, unknown>) => r.sha256);
-    assert.ok(shas.includes(sha256_ref));
-    assert.ok(shas.includes(sha256_final));
+    const artifactRefs = payload.artifactReferences as Record<string, unknown>[];
+    assert.equal(artifactRefs.length, 2);
+    const shas = artifactRefs.map((r: Record<string, unknown>) => r.sha256);
+    assert.ok((shas as unknown[]).includes(sha256_ref));
+    assert.ok((shas as unknown[]).includes(sha256_final));
   });
 });
