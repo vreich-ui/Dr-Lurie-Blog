@@ -43,17 +43,7 @@ const normalizeTags = (tags: PublishArticlePayload['tags']) => {
   return [];
 };
 
-type NetlifyIdentityWindow = Window & {
-  netlifyIdentity?: {
-    currentUser: () => { token?: { access_token?: string } } | null;
-  };
-};
-
-const getNetlifyIdentityToken = () => {
-  const identity = (window as NetlifyIdentityWindow).netlifyIdentity;
-  const token = identity?.currentUser()?.token?.access_token;
-  return typeof token === 'string' ? token : '';
-};
+import { getAccessToken } from '~/utils/goTrueClient';
 
 export const publishArticleFromPayload = async (payload: PublishArticlePayload): Promise<PublishArticleResult> => {
   const slug = toText(payload.slug);
@@ -73,7 +63,7 @@ export const publishArticleFromPayload = async (payload: PublishArticlePayload):
   };
 
   try {
-    const token = getNetlifyIdentityToken();
+    const token = await getAccessToken();
     if (!token) {
       return { ok: false, status: 401, body: { error: 'Could not retrieve an identity token. Please sign in.' } };
     }

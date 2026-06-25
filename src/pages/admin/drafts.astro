@@ -562,7 +562,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
 
   (() => {
     const initializeAdminDraftsPage = () => {
@@ -579,7 +579,6 @@ const metadata = {
       const draftsEmpty = document.querySelector('#drafts-empty');
       const draftsListStatus = document.querySelector('#drafts-list-status');
       const refreshDraftsButton = document.querySelector('#refresh-drafts');
-      let identityLoadPromise;
       let activeToken = '';
 
       const setGatedContentVisible = (visible) => {
@@ -588,16 +587,6 @@ const metadata = {
         });
       };
 
-      const getIdentity = async () => {
-
-
-        identityLoadPromise ||= loadNetlifyIdentity();
-
-
-        return identityLoadPromise;
-
-
-      };
 
       const setAdminShellVisible = (visible) => {
         if (adminPage) adminPage.hidden = !visible;
@@ -634,8 +623,8 @@ const metadata = {
         if (!isSignedIn && state !== 'checking') redirectToHome();
       };
 
-      const getAdminStateForUser = async (user) => {
-        const token = user?.token?.access_token;
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -765,9 +754,8 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-        const identity = await getIdentity();
-        const user = identity.currentUser();
-        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
+                const user = currentUser();
+        const signedIn = Boolean(user);
 
         if (signedIn) {
           const adminState = await getAdminStateForUser(user);
@@ -790,16 +778,15 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          const identity = await getIdentity();
+        await handleOAuthCallback().catch(() => {});
+                    await renderAuthState();
 
-          await renderAuthState();
-
-          identity.on('login', () => {
+          document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });
           });
-          identity.on('logout', () => {
+          document.addEventListener('dr-lurie:logout', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });

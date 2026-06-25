@@ -326,7 +326,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
 
   (() => {
     const initializeAdminReviewPage = () => {
@@ -360,7 +360,6 @@ const metadata = {
         cta: document.querySelector('#preview-cta'),
         content: document.querySelector('#preview-content'),
       };
-      let identityLoadPromise;
 
       const setGatedContentVisible = (visible) => {
         gatedContent.forEach((element) => {
@@ -382,16 +381,6 @@ const metadata = {
         fields.loadStatus.classList.toggle('is-error', isError);
       };
 
-      const getIdentity = async () => {
-
-
-        identityLoadPromise ||= loadNetlifyIdentity();
-
-
-        return identityLoadPromise;
-
-
-      };
 
       const redirectToHome = () => {
         window.location.replace('/');
@@ -413,8 +402,8 @@ const metadata = {
         if (!isSignedIn && state !== 'checking') redirectToHome();
       };
 
-      const getAdminStateForUser = async (user) => {
-        const token = user?.token?.access_token;
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -532,9 +521,8 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-        const identity = await getIdentity();
-        const user = identity.currentUser();
-        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
+                const user = currentUser();
+        const signedIn = Boolean(user);
 
         if (signedIn) {
           const adminState = await getAdminStateForUser(user);
@@ -557,16 +545,15 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          const identity = await getIdentity();
+        await handleOAuthCallback().catch(() => {});
+                    await renderAuthState();
 
-          await renderAuthState();
-
-          identity.on('login', () => {
+          document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });
           });
-          identity.on('logout', () => {
+          document.addEventListener('dr-lurie:logout', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });

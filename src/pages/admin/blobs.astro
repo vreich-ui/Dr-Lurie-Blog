@@ -592,7 +592,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
 
   (() => {
     const initializeBlobManagerPage = () => {
@@ -628,7 +628,6 @@ const metadata = {
       const editorSave = document.querySelector('#editor-save');
       const editorPreviewWrap = document.querySelector('#editor-preview-wrap');
 
-      let identityLoadPromise;
       let activeToken = '';
       let searchTimer;
       // Editor mode: 'create' for a brand-new blob, or 'edit' for an existing key.
@@ -644,16 +643,6 @@ const metadata = {
         });
       };
 
-      const getIdentity = async () => {
-
-
-        identityLoadPromise ||= loadNetlifyIdentity();
-
-
-        return identityLoadPromise;
-
-
-      };
 
       const setAdminShellVisible = (visible) => {
         if (adminPage) adminPage.hidden = !visible;
@@ -711,8 +700,8 @@ const metadata = {
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
       };
 
-      const getAdminStateForUser = async (user) => {
-        const token = user?.token?.access_token;
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -1159,15 +1148,14 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-        const identity = await getIdentity();
-        const user = identity.currentUser();
-        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
+                const user = currentUser();
+        const signedIn = Boolean(user);
 
         if (signedIn) {
           const adminState = await getAdminStateForUser(user);
 
           if (adminState.isAdmin) {
-            activeToken = user?.token?.access_token || '';
+            activeToken = await getAccessToken() || '';
             setAuthState('signed-in');
             if (!managerStarted) {
               managerStarted = true;
@@ -1189,16 +1177,15 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          const identity = await getIdentity();
+        await handleOAuthCallback().catch(() => {});
+                    await renderAuthState();
 
-          await renderAuthState();
-
-          identity.on('login', () => {
+          document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });
           });
-          identity.on('logout', () => {
+          document.addEventListener('dr-lurie:logout', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });

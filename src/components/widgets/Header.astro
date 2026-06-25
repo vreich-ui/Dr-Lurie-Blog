@@ -4,6 +4,7 @@ import Logo from '~/components/Logo.astro';
 import ToggleTheme from '~/components/common/ToggleTheme.astro';
 import ToggleMenu from '~/components/common/ToggleMenu.astro';
 import HeaderAuthButton from '~/components/common/HeaderAuthButton.astro';
+import LoginModal from '~/components/common/LoginModal.astro';
 import { getHomePermalink } from '~/utils/permalinks';
 import { trimSlash, getAsset, getPermalink } from '~/utils/permalinks';
 import type { CallToAction } from '~/types';
@@ -257,6 +258,8 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
     </div>
   </div>
 </header>
+
+<LoginModal />
 
 <div
   id="header-search-overlay"

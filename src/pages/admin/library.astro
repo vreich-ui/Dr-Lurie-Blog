@@ -386,7 +386,7 @@ const formatDate = (date: Date) => {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
 
   (() => {
     const initializeAdminLibraryPage = () => {
@@ -400,7 +400,6 @@ const formatDate = (date: Date) => {
       const tabs = Array.from(document.querySelectorAll('.tab-btn'));
       const tabContents = Array.from(document.querySelectorAll('.tab-content'));
 
-      let identityLoadPromise;
       let activeUser;
 
       const setGatedContentVisible = (visible) => {
@@ -409,16 +408,6 @@ const formatDate = (date: Date) => {
         });
       };
 
-      const getIdentity = async () => {
-
-
-        identityLoadPromise ||= loadNetlifyIdentity();
-
-
-        return identityLoadPromise;
-
-
-      };
 
       const setAdminShellVisible = (visible) => {
         if (pageRoot) pageRoot.hidden = !visible;
@@ -432,8 +421,8 @@ const formatDate = (date: Date) => {
         if (authStatus) authStatus.textContent = message || '';
       };
 
-      const getAdminStateForUser = async (user) => {
-        const token = user?.token?.access_token;
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -585,9 +574,8 @@ const formatDate = (date: Date) => {
       const initialize = async () => {
         setAuthStatus('Checking admin access…');
         try {
-          const identity = await getIdentity();
-
-          const user = identity.currentUser();
+          await handleOAuthCallback().catch(() => {});
+          const user = currentUser();
 
 
           activeUser = user;

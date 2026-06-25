@@ -84,5 +84,34 @@ export const getAdminStateFromEvent = async (
     return { authenticated: false, isAdmin: false, error: 'Authentication is required.' };
   }
 
-  return { authenticated: false, isAdmin: false, error: 'Authentication token could not be verified.' };
+  // Fallback: verify token via GoTrue user endpoint (used when Netlify does not inject clientContext).
+  const siteUrl = process.env.URL ?? '';
+  const identityBase = process.env.IDENTITY_URL ?? (siteUrl ? `${siteUrl}/.netlify/identity` : '');
+  if (!identityBase) {
+    return { authenticated: false, isAdmin: false, error: 'Identity service is not configured.' };
+  }
+
+  try {
+    const userRes = await fetch(`${identityBase}/user`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!userRes.ok) {
+      return { authenticated: false, isAdmin: false, error: 'Authentication token could not be verified.' };
+    }
+    const userJson = (await userRes.json()) as {
+      id?: string;
+      email?: string;
+      user_metadata?: Record<string, unknown>;
+      app_metadata?: Record<string, unknown>;
+    };
+    const userId = toStringValue(userJson.id);
+    const email = toStringValue(userJson.email);
+    if (!userId) {
+      return { authenticated: false, isAdmin: false, error: 'Invalid identity token.' };
+    }
+    const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
+    return { authenticated: true, isAdmin: isAdminEmail(email, adminEmails), email, userId };
+  } catch {
+    return { authenticated: false, isAdmin: false, error: 'Authentication could not be completed.' };
+  }
 };

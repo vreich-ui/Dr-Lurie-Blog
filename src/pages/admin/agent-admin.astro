@@ -377,7 +377,7 @@ const metadata = {
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
   import { getContentSourceMarkdown } from '../../lib/contentSourceBody';
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
 
   (() => {
     const initializeAgentAdminPage = () => {
@@ -415,7 +415,6 @@ const metadata = {
       let capturedParsedPayload = null;
       let autoPublishOnOutput = false;
       const autoPublishedPayloadKeys = new Set();
-      let identityLoadPromise;
 
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const adminShell = document.querySelector('[data-admin-shell]');
@@ -489,19 +488,9 @@ const metadata = {
 
       setAuthState('checking');
 
-      const getIdentity = async () => {
 
-
-        identityLoadPromise ||= loadNetlifyIdentity();
-
-
-        return identityLoadPromise;
-
-
-      };
-
-      const getAdminStateForUser = async (user) => {
-        const token = user?.token?.access_token;
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -516,9 +505,8 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-        const identity = await getIdentity();
-        const user = identity.currentUser();
-        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
+                const user = currentUser();
+        const signedIn = Boolean(user);
 
         if (signedIn) {
           const adminState = await getAdminStateForUser(user);
@@ -540,17 +528,16 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          const identity = await getIdentity();
+        await handleOAuthCallback().catch(() => {});
+                    await renderAuthState();
 
-          await renderAuthState();
-
-          identity.on('login', () => {
+          document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
               setAuthState('error');
             });
           });
-          identity.on('logout', () => {
+          document.addEventListener('dr-lurie:logout', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
               setAuthState('error');
@@ -921,9 +908,8 @@ const metadata = {
       const initializeChatKit = async () => {
         if (chatkitInitialized || !fields.chatkit) return;
 
-        const identity = await getIdentity();
-        const user = identity.currentUser();
-        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
+                const user = currentUser();
+        const signedIn = Boolean(user);
 
         if (!signedIn || !isAdmin) {
           setAuthState(signedIn ? 'forbidden' : 'signed-out');
@@ -939,9 +925,7 @@ const metadata = {
         fields.chatkit.setOptions({
           api: {
             async getClientSecret() {
-              const identity = await getIdentity();
-              const user = identity.currentUser();
-              const token = user?.token?.access_token;
+                                          const token = await getAccessToken();
               if (!token) {
                 debugState.sessionRequestStatus = 'missing-token';
                 debugState.sessionHasClientSecret = false;
