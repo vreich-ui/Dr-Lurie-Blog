@@ -1,4 +1,4 @@
-import { type ArticleBodyV1, type ArticleBodyNode } from '../../schema/article-content-v1.js';
+import { type ArticleBodyV1, type ArticleBodyNode } from '../../schema/article-content-v1.ts';
 
 /**
  * Serializes a structured article body into Markdown.
