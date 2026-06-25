@@ -43,17 +43,15 @@ const normalizeTags = (tags: PublishArticlePayload['tags']) => {
   return [];
 };
 
-type ClerkWindow = Window & {
-  Clerk?: {
-    session?: {
-      getToken?: () => Promise<unknown>;
-    };
+type NetlifyIdentityWindow = Window & {
+  netlifyIdentity?: {
+    currentUser: () => { token?: { access_token?: string } } | null;
   };
 };
 
-const getClerkSessionToken = async () => {
-  const clerk = (window as ClerkWindow).Clerk;
-  const token = await clerk?.session?.getToken?.();
+const getNetlifyIdentityToken = () => {
+  const identity = (window as NetlifyIdentityWindow).netlifyIdentity;
+  const token = identity?.currentUser()?.token?.access_token;
   return typeof token === 'string' ? token : '';
 };
 
@@ -75,9 +73,9 @@ export const publishArticleFromPayload = async (payload: PublishArticlePayload):
   };
 
   try {
-    const token = await getClerkSessionToken();
+    const token = getNetlifyIdentityToken();
     if (!token) {
-      return { ok: false, status: 401, body: { error: 'Could not retrieve a Clerk session token.' } };
+      return { ok: false, status: 401, body: { error: 'Could not retrieve an identity token. Please sign in.' } };
     }
 
     const response = await fetch('/.netlify/functions/publish-article', {

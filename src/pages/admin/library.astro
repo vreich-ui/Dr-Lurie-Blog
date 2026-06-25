@@ -6,7 +6,6 @@ import { getPermalink } from '~/utils/permalinks';
 
 const posts = await fetchPosts();
 const pageTitle = 'Library Management';
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
   robots: {
@@ -24,7 +23,6 @@ const formatDate = (date: Date) => {
   <section
     class="admin-library mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
-    data-clerk-publishable-key={clerkPublishableKey}
     hidden
   >
     <header class="library-header">
@@ -388,16 +386,13 @@ const formatDate = (date: Date) => {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadClerk } from '~/utils/clerkLoader';
+  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
 
   (() => {
     const initializeAdminLibraryPage = () => {
       const pageRoot = document.querySelector('.admin-library');
       if (!pageRoot || pageRoot.dataset.adminLibraryInitialized === 'true') return;
       pageRoot.dataset.adminLibraryInitialized = 'true';
-
-      const clerkPublishableKey = pageRoot.dataset.clerkPublishableKey || '';
-      const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const authStatus = document.querySelector('[data-auth-status]');
       const draftsContainer = document.querySelector('#drafts-container');
@@ -405,8 +400,8 @@ const formatDate = (date: Date) => {
       const tabs = Array.from(document.querySelectorAll('.tab-btn'));
       const tabContents = Array.from(document.querySelectorAll('.tab-content'));
 
-      let clerkLoadPromise;
-      let activeClerk;
+      let identityLoadPromise;
+      let activeUser;
 
       const setGatedContentVisible = (visible) => {
         gatedContent.forEach((element) => {
@@ -414,12 +409,15 @@ const formatDate = (date: Date) => {
         });
       };
 
-      const getClerk = async () => {
-        if (!clerkPublishableKey) {
-          throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
-        }
-        clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
-        return clerkLoadPromise;
+      const getIdentity = async () => {
+
+
+        identityLoadPromise ||= loadNetlifyIdentity();
+
+
+        return identityLoadPromise;
+
+
       };
 
       const setAdminShellVisible = (visible) => {
@@ -434,13 +432,19 @@ const formatDate = (date: Date) => {
         if (authStatus) authStatus.textContent = message || '';
       };
 
-      const getAdminStateForClerk = async (clerk) => {
-        if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-        const token = await clerk.session.getToken();
+      const getAdminStateForUser = async (user) => {
+        const token = user?.token?.access_token;
+        if (!token) return { authenticated: false, isAdmin: false };
+
         const response = await fetch('/.netlify/functions/admin-auth-state', {
-          headers: { Authorization: `Bearer ${token}` },
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         });
-        return response.json();
+
+        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const escapeHtml = (value) =>
@@ -479,9 +483,9 @@ const formatDate = (date: Date) => {
         `;
       };
 
-      const loadDrafts = async (clerk) => {
+      const loadDrafts = async () => {
         if (!draftsContainer) return;
-        const token = await clerk.session.getToken();
+        const token = activeUser?.token?.access_token;
         try {
           const response = await fetch('/.netlify/functions/list-draft-articles', {
             headers: { Authorization: `Bearer ${token}` },
@@ -532,8 +536,9 @@ const formatDate = (date: Date) => {
         btn.textContent = willUnpublish ? 'Unpublishing…' : 'Publishing…';
 
         try {
-          const clerk = activeClerk || (await getClerk());
-          const token = await clerk.session.getToken();
+          await getIdentity();
+
+          const token = activeUser?.token?.access_token;
           const response = await fetch('/.netlify/functions/toggle-article-publish', {
             method: 'POST',
             headers: {
@@ -580,9 +585,13 @@ const formatDate = (date: Date) => {
       const initialize = async () => {
         setAuthStatus('Checking admin access…');
         try {
-          const clerk = await getClerk();
-          activeClerk = clerk;
-          const adminState = await getAdminStateForClerk(clerk);
+          const identity = await getIdentity();
+
+          const user = identity.currentUser();
+
+
+          activeUser = user;
+          const adminState = await getAdminStateForUser(user);
 
           if (adminState.isAdmin) {
             setAuthStatus('');
@@ -590,7 +599,7 @@ const formatDate = (date: Date) => {
             setGatedContentVisible(true);
             setupTabs();
             bindPublishControls();
-            loadDrafts(clerk);
+            loadDrafts();
           } else {
             setAuthStatus('Access denied.');
             redirectToHome();

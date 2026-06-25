@@ -1,9 +1,18 @@
-import { createClerkClient, verifyToken } from '@clerk/backend';
-
 type LambdaHeaders = Record<string, string | undefined> | undefined;
 
 export type LambdaEventWithHeaders = {
   headers?: LambdaHeaders;
+};
+
+export type LambdaContext = {
+  clientContext?: {
+    user?: {
+      sub?: string;
+      email?: string;
+      user_metadata?: Record<string, unknown>;
+      app_metadata?: Record<string, unknown>;
+    };
+  };
 };
 
 export type AdminAuthState = {
@@ -45,78 +54,20 @@ export const isAdminEmail = (email: string | undefined, adminEmails: string[]) =
   return adminEmails.some((adminEmail) => normalizeEmail(adminEmail) === normalizedEmail);
 };
 
-const getClaimString = (claims: Record<string, unknown>, keys: string[]) => {
-  for (const key of keys) {
-    const value = toStringValue(claims[key]);
+export const getAdminStateFromEvent = async (
+  event: LambdaEventWithHeaders,
+  context?: LambdaContext
+): Promise<AdminAuthState> => {
+  const netlifyUser = context?.clientContext?.user;
 
-    if (value) return value;
-  }
-
-  return undefined;
-};
-
-const getEmailFromClaims = (claims: Record<string, unknown>) => {
-  const directEmail = getClaimString(claims, [
-    'email',
-    'email_address',
-    'emailAddress',
-    'primary_email_address',
-    'primaryEmailAddress',
-  ]);
-
-  if (directEmail) return directEmail;
-
-  const user = claims.user;
-  if (user && typeof user === 'object') {
-    return getClaimString(user as Record<string, unknown>, ['email', 'email_address', 'emailAddress']);
-  }
-
-  return undefined;
-};
-
-const getEmailFromClerkUser = async (userId: string, secretKey: string) => {
-  const clerkClient = createClerkClient({ secretKey });
-  const user = await clerkClient.users.getUser(userId);
-  const primaryEmail = user.emailAddresses.find((emailAddress) => emailAddress.id === user.primaryEmailAddressId);
-
-  return primaryEmail?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
-};
-
-export const getAdminStateFromEvent = async (event: LambdaEventWithHeaders): Promise<AdminAuthState> => {
-  const token = getBearerToken(getHeader(event.headers, 'authorization'));
-
-  if (!token) {
-    return {
-      authenticated: false,
-      isAdmin: false,
-      error: 'A valid Clerk session token is required.',
-    };
-  }
-
-  const secretKey = process.env.CLERK_SECRET_KEY;
-
-  if (!secretKey) {
-    return {
-      authenticated: false,
-      isAdmin: false,
-      error: 'Clerk authentication is not configured.',
-    };
-  }
-
-  try {
-    const verifiedToken = await verifyToken(token, { secretKey });
-    const claims = verifiedToken as Record<string, unknown>;
-    const userId = toStringValue(verifiedToken.sub);
+  if (netlifyUser) {
+    const userId = toStringValue(netlifyUser.sub);
+    const email = toStringValue(netlifyUser.email);
 
     if (!userId) {
-      return {
-        authenticated: false,
-        isAdmin: false,
-        error: 'Invalid Clerk session token.',
-      };
+      return { authenticated: false, isAdmin: false, error: 'Invalid identity token.' };
     }
 
-    const email = getEmailFromClaims(claims) ?? (await getEmailFromClerkUser(userId, secretKey));
     const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
 
     return {
@@ -125,15 +76,13 @@ export const getAdminStateFromEvent = async (event: LambdaEventWithHeaders): Pro
       email,
       userId,
     };
-  } catch (error) {
-    console.warn('Rejected request with invalid Clerk token or user lookup failure.', error);
-
-    return {
-      authenticated: false,
-      isAdmin: false,
-      error: 'Invalid Clerk session token.',
-    };
   }
-};
 
-export const verifyClerkAdmin = getAdminStateFromEvent;
+  const token = getBearerToken(getHeader(event.headers, 'authorization'));
+
+  if (!token) {
+    return { authenticated: false, isAdmin: false, error: 'Authentication is required.' };
+  }
+
+  return { authenticated: false, isAdmin: false, error: 'Authentication token could not be verified.' };
+};

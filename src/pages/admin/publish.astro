@@ -3,7 +3,6 @@ import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Dr. Lurié Science Admin';
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
   robots: { index: false, follow: false },
@@ -14,7 +13,6 @@ const metadata = {
   <section
     class="admin-page mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-12"
     data-admin-shell
-    data-clerk-publishable-key={clerkPublishableKey}
     hidden
   >
     <header class="admin-top-bar">
@@ -280,7 +278,7 @@ const metadata = {
 </style>
 
 <script>
-  import { loadClerk, type Clerk } from '~/utils/clerkLoader';
+  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
   import { LockManager } from '~/lib/admin/lock-manager';
   import { renderNode, wrapNode } from '~/lib/admin/node-renderer';
   import { NodeEditor } from '~/lib/admin/node-editor';
@@ -288,7 +286,6 @@ const metadata = {
   import type { ArticleBodyNode } from '~/schema/article-content-v1';
 
   // ─── constants ──────────────────────────────────────────────────────────────
-  const CLERK_JS_SRC = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
   const DRAFT_ENDPOINT = '/.netlify/functions/admin-get-json-draft';
   const UPDATE_NODE_ENDPOINT = '/.netlify/functions/admin-update-node';
 
@@ -298,7 +295,6 @@ const metadata = {
     if (!page || page.dataset.publishInitialized === 'true') return;
     page.dataset.publishInitialized = 'true';
 
-    const clerkPublishableKey = page.dataset.clerkPublishableKey ?? '';
     const params = new URLSearchParams(window.location.search);
     const draftId = params.get('draftId') ?? params.get('requestId') ?? '';
 
@@ -330,16 +326,24 @@ const metadata = {
     };
 
     // ── State ──────────────────────────────────────────────────────────────────
-    let clerkRef: Clerk | null = null;
+    type IdentityInstance = Awaited<ReturnType<typeof loadNetlifyIdentity>>;
+    let identityRef: IdentityInstance | null = null;
     let lockManager: LockManager | null = null;
     let activeEditor: NodeEditor | null = null;
     let activeNodeWrapper: HTMLElement | null = null;
     let currentNodes: ArticleBodyNode[] = [];
-    let currentRequestId = draftId;
+    const currentRequestId = draftId;
 
+
+    const SESSION_KEY = 'dr-lurie-session-active';
+    const KEEP_KEY = 'dr-lurie-keep-signed-in';
+    const isLoggedIn = () => {
+      const user = identityRef?.currentUser();
+      return Boolean(user && (localStorage.getItem(KEEP_KEY) === '1' || sessionStorage.getItem(SESSION_KEY) === '1'));
+    };
 
     const getToken = async (): Promise<string> => {
-      const token = (await clerkRef?.session?.getToken?.()) as string | null | undefined;
+      const token = identityRef?.currentUser()?.token?.access_token;
       if (!token) throw new Error('Not authenticated');
       return token;
     };
@@ -704,20 +708,15 @@ const metadata = {
       }
     });
 
-    // ── Clerk bootstrap ───────────────────────────────────────────────────────
+    // ── Netlify Identity bootstrap ────────────────────────────────────────────
     authState('checking');
 
-    if (!clerkPublishableKey) {
-      authState('error');
-      return;
-    }
+    loadNetlifyIdentity().then(async (identity) => {
+      identityRef = identity;
 
-    const clerkPromise = loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: CLERK_JS_SRC });
+      if (!isLoggedIn()) { authState('signed-out'); return; }
 
-    clerkPromise.then(async (clerk) => {
-      if (!clerk.isSignedIn || !clerk.session) { authState('signed-out'); return; }
-
-      const authToken = (await clerk.session.getToken?.()) as string | null;
+      const authToken = identity.currentUser()?.token?.access_token;
       if (!authToken) { authState('error'); return; }
 
       // Check admin
@@ -727,16 +726,15 @@ const metadata = {
       const stateJson = await stateRes?.json().catch(() => null);
       if (!stateJson?.isAdmin) { authState('forbidden'); return; }
 
-      clerkRef = clerk;
       authState('signed-in');
       await loadDraft(authToken);
 
-      if (typeof clerk.addListener === 'function') {
-        clerk.addListener(() => {
-          if (!clerk.isSignedIn || !clerk.session) { authState('signed-out'); return; }
-          clerkRef = clerk;
-        });
-      }
+      identity.on('logout', () => authState('signed-out'));
+      identity.on('login', () => {
+        const t = identity.currentUser()?.token?.access_token;
+        if (!t) { authState('error'); return; }
+        authState('signed-in');
+      });
     }).catch(() => authState('error'));
   };
 

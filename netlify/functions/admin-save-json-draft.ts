@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import type { BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
 import type { ArticleBodyNode } from '../../src/schema/article-content-v1.js';
@@ -294,20 +294,20 @@ export const saveAdminJsonDraft = async (store: WorkflowBlobStore, body: AdminDr
   return jsonResponse(201, { action: 'admin_save_draft', record, created: true });
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
   if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
+    return jsonResponse(401, {
+      error: adminState.error || 'Authentication is required.',
     });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to save JSON drafts.' });
+    return jsonResponse(403, { error: 'This user is not authorized to save JSON drafts.' });
   }
 
   const parsedJson = safeJsonParse(event);

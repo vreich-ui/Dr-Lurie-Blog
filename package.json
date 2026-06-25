@@ -29,7 +29,6 @@
     "@astrojs/sitemap": "^3.4.2",
     "@astrolib/analytics": "^0.6.1",
     "@astrolib/seo": "^1.0.0-beta.8",
-    "@clerk/backend": "^3.4.1",
     "@fontsource-variable/inter": "^5.2.6",
     "@netlify/blobs": "^10.7.0",
     "@openai/agents": "^0.11.3",

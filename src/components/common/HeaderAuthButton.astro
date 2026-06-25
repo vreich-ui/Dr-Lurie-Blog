@@ -6,12 +6,10 @@ export interface Props {
 }
 
 const { variant = 'desktop' } = Astro.props;
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+const netlifyIdentityUrl = import.meta.env.PUBLIC_NETLIFY_IDENTITY_URL ?? '';
 const authRootAttributes = {
   'data-header-auth': true,
-  'data-clerk-publishable-key': clerkPublishableKey,
-  'data-clerk-js-src': clerkJsScriptSrc,
+  'data-netlify-identity-url': netlifyIdentityUrl,
 };
 ---
 
@@ -22,7 +20,7 @@ const authRootAttributes = {
         type="button"
         class="flex w-full items-center justify-between whitespace-nowrap border-b border-gray-200/70 px-1 py-4 text-left hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-slate-800 dark:hover:text-white dark:focus-visible:ring-offset-slate-950"
         data-auth-trigger
-        aria-haspopup="dialog"
+        aria-haspopup="menu"
         aria-expanded="false"
       >
         <span data-auth-trigger-label>Login</span>
@@ -55,6 +53,15 @@ const authRootAttributes = {
         </span>
       </button>
       <div class="dropdown-menu rounded-2xl pl-4 font-medium" data-auth-menu role="menu" hidden>
+        <div data-auth-signed-out>
+          <label class="flex items-center gap-2 py-2 text-sm text-muted" data-keep-signed-in-label>
+            <input type="checkbox" data-keep-signed-in checked class="rounded" />
+            <span>Keep me signed in</span>
+          </label>
+          <button type="button" data-auth-sign-in role="menuitem">
+            Sign in
+          </button>
+        </div>
         <div data-auth-signed-in hidden>
           <button type="button" data-auth-profile role="menuitem">
             Account settings
@@ -75,7 +82,7 @@ const authRootAttributes = {
         type="button"
         class="flex items-center whitespace-nowrap px-2 py-3 text-base font-medium tracking-[0.01rem] text-default transition-colors hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:hover:text-white dark:focus-visible:ring-offset-slate-950 md:text-[0.9375rem]"
         data-auth-trigger
-        aria-haspopup="dialog"
+        aria-haspopup="menu"
         aria-expanded="false"
       >
         <span data-auth-trigger-label>Login</span>
@@ -104,6 +111,21 @@ const authRootAttributes = {
           data-auth-label
         >
           Account
+        </div>
+
+        <div class="py-1" data-auth-signed-out>
+          <label class="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-slate-700 transition-colors hover:bg-gray-50 dark:text-slate-300 dark:hover:bg-slate-800/60">
+            <input type="checkbox" data-keep-signed-in checked class="h-3.5 w-3.5 rounded accent-[var(--aw-color-accent,#4f46e5)]" />
+            <span class="text-xs font-medium">Keep me signed in</span>
+          </label>
+          <button
+            type="button"
+            class="mt-1 w-full rounded-lg bg-[var(--aw-color-accent,#4f46e5)] px-2.5 py-1.5 text-left text-xs font-semibold text-white transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--aw-color-accent,#4f46e5)] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900"
+            data-auth-sign-in
+            role="menuitem"
+          >
+            Sign in
+          </button>
         </div>
 
         <div class="space-y-0.5" data-auth-signed-in hidden>
@@ -141,12 +163,12 @@ const authRootAttributes = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadClerk } from '~/utils/clerkLoader';
+  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
 
   (() => {
     if (!window.__drLurieHeaderAuth) {
       window.__drLurieHeaderAuth = {
-        clerkLoadPromise: undefined,
+        identityLoadPromise: undefined,
         initialized: false,
       };
     }
@@ -154,12 +176,20 @@ const authRootAttributes = {
     const headerAuthState = window.__drLurieHeaderAuth;
     const getAuthRoots = () => Array.from(document.querySelectorAll('[data-header-auth]'));
 
-    const getHeaderAuthConfig = () => {
+    const getIdentityUrl = () => {
       const firstRoot = getAuthRoots()[0];
-      return {
-        clerkPublishableKey: firstRoot?.dataset.clerkPublishableKey || '',
-        clerkJsScriptSrc: firstRoot?.dataset.clerkJsSrc || '',
-      };
+      return firstRoot?.dataset.netlifyIdentityUrl || undefined;
+    };
+
+    const SESSION_ACTIVE_KEY = 'dr-lurie-session-active';
+    const KEEP_SIGNED_IN_KEY = 'dr-lurie-keep-signed-in';
+
+    const isKeepSignedIn = () => localStorage.getItem(KEEP_SIGNED_IN_KEY) === '1';
+    const hasActiveSession = () => sessionStorage.getItem(SESSION_ACTIVE_KEY) === '1';
+
+    const getKeepSignedInCheckbox = () => {
+      const root = getAuthRoots().find((r) => !r.hasAttribute('data-mobile-auth-menu'));
+      return root?.querySelector('[data-keep-signed-in]');
     };
 
     const setMenuOpen = (root, open) => {
@@ -193,7 +223,6 @@ const authRootAttributes = {
 
     const clearAuthMenuCloseTimer = () => {
       if (!authMenuCloseTimer) return;
-
       window.clearTimeout(authMenuCloseTimer);
       authMenuCloseTimer = undefined;
     };
@@ -208,26 +237,16 @@ const authRootAttributes = {
       authMenuCloseTimer = window.setTimeout(() => setMenuOpen(root, false), 180);
     };
 
-    const getClerk = async () => {
-      const { clerkPublishableKey, clerkJsScriptSrc } = getHeaderAuthConfig();
-
-      if (!clerkPublishableKey) {
-        throw new Error('Header authentication is not configured.');
-      }
-
-      headerAuthState.clerkLoadPromise ||= loadClerk({
-        publishableKey: clerkPublishableKey,
-        scriptSrc: clerkJsScriptSrc,
-      });
-
-      return headerAuthState.clerkLoadPromise;
+    const getIdentity = async () => {
+      const identityUrl = getIdentityUrl();
+      headerAuthState.identityLoadPromise ||= loadNetlifyIdentity(
+        identityUrl ? { APIUrl: identityUrl } : undefined
+      );
+      return headerAuthState.identityLoadPromise;
     };
 
-    const getAdminState = async (clerk) => {
-      if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-
-      const token = await clerk.session.getToken();
-      if (!token) return { authenticated: true, isAdmin: false };
+    const getAdminState = async (token) => {
+      if (!token) return { authenticated: false, isAdmin: false };
 
       const response = await fetch('/.netlify/functions/admin-auth-state', {
         method: 'GET',
@@ -246,12 +265,11 @@ const authRootAttributes = {
       { href: '/admin/agent-admin', text: 'AI Publisher' },
     ];
 
-    const getSignedInLabel = (clerk, adminState) => {
-      const email = adminState?.email || clerk.user?.primaryEmailAddress?.emailAddress;
-      const name = clerk.user?.fullName || clerk.user?.firstName;
+    const getSignedInLabel = (user, adminState) => {
+      const email = adminState?.email || user?.email;
+      const name = user?.user_metadata?.full_name;
 
       if (email) return email.split('@')[0] || email;
-
       return name || 'Account';
     };
 
@@ -276,89 +294,116 @@ const authRootAttributes = {
       });
     };
 
-    const renderAuthState = async (clerk = undefined) => {
-      const activeClerk = clerk ?? (await getClerk());
-      const signedIn = Boolean(activeClerk.isSignedIn && activeClerk.session);
-      const adminState = signedIn ? await getAdminState(activeClerk) : { authenticated: false, isAdmin: false };
+    const renderAuthState = async (identity = undefined) => {
+      const activeIdentity = identity ?? (await getIdentity());
+      const user = activeIdentity.currentUser();
+      const signedIn = Boolean(user && (isKeepSignedIn() || hasActiveSession()));
+
+      if (user && !signedIn) {
+        await activeIdentity.logout();
+      }
+
+      const token = signedIn ? user?.token?.access_token : undefined;
+      const adminState = signedIn ? await getAdminState(token) : { authenticated: false, isAdmin: false };
 
       getAuthRoots().forEach((root) => {
         const trigger = root.querySelector('[data-auth-trigger]');
         const triggerLabel = root.querySelector('[data-auth-trigger-label]');
         const triggerChevron = root.querySelector('[data-auth-trigger-chevron]');
         const label = root.querySelector('[data-auth-label]');
+        const signedOutPanel = root.querySelector('[data-auth-signed-out]');
         const signedInPanel = root.querySelector('[data-auth-signed-in]');
         const adminLinks = root.querySelector('[data-auth-admin-links]');
 
         root.dataset.authSignedIn = String(signedIn);
         root.dataset.authAdmin = String(Boolean(adminState.isAdmin));
-        if (trigger) {
-          trigger.setAttribute('aria-haspopup', signedIn ? 'menu' : 'dialog');
-        }
+
         if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Login';
         if (triggerChevron) {
-          triggerChevron.classList.toggle('hidden', !signedIn);
-          triggerChevron.classList.toggle('rotate-180', signedIn && trigger?.getAttribute('aria-expanded') === 'true');
+          triggerChevron.classList.toggle('hidden', false);
+          triggerChevron.classList.toggle('rotate-180', trigger?.getAttribute('aria-expanded') === 'true');
         }
         if (!signedIn) setMenuOpen(root, false);
-        if (label) label.textContent = signedIn ? getSignedInLabel(activeClerk, adminState) : 'Welcome';
+        if (label) label.textContent = signedIn ? getSignedInLabel(user, adminState) : 'Account';
+        if (signedOutPanel) signedOutPanel.hidden = signedIn;
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
+
         document.querySelectorAll('[data-mobile-newsletter-cta]').forEach((cta) => {
           cta.hidden = signedIn;
         });
+
         const menu = root.querySelector('[data-auth-menu]');
         if (menu) menu.style.width = adminState.isAdmin ? 'min(15.5rem, calc(100vw - 2rem))' : '';
       });
+
+      // Sync checkbox state
+      const checkbox = getKeepSignedInCheckbox();
+      if (checkbox) checkbox.checked = isKeepSignedIn();
     };
 
-    const redirectToHostedSignIn = async (clerk) => {
-      if (typeof clerk.redirectToSignIn !== 'function') {
-        throw new Error('Clerk hosted sign-in redirect is unavailable.');
-      }
-
-      await clerk.redirectToSignIn({ redirectUrl: window.location.href });
+    const readKeepSignedIn = () => {
+      const checkbox = getKeepSignedInCheckbox();
+      return checkbox ? checkbox.checked : true;
     };
 
     const openSignIn = async () => {
-      const clerk = await getClerk();
+      const identity = await getIdentity();
 
-      if (typeof clerk.openSignIn === 'function') {
-        try {
-          await clerk.openSignIn();
-          await renderAuthState(clerk);
-          return;
-        } catch (error) {
-          console.error('Clerk modal sign-in failed. Falling back to hosted sign-in redirect.', error);
-        }
-      } else {
-        console.error('Clerk modal sign-in is unavailable. Falling back to hosted sign-in redirect.');
-      }
+      // Store keep-signed-in preference before opening modal (survives OAuth redirects)
+      const keep = readKeepSignedIn();
+      sessionStorage.setItem('dr-lurie-login-keep-preference', keep ? '1' : '0');
 
-      await redirectToHostedSignIn(clerk);
+      identity.open('login');
     };
 
     const openUserProfile = async () => {
-      const clerk = await getClerk();
-      if (typeof clerk.openUserProfile === 'function') {
-        await clerk.openUserProfile();
-      }
+      const identity = await getIdentity();
+      identity.open('login');
     };
 
     const signOut = async () => {
-      const clerk = await getClerk();
-      await clerk.signOut();
-      await renderAuthState(clerk);
+      const identity = await getIdentity();
+      localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+      sessionStorage.removeItem(SESSION_ACTIVE_KEY);
+      sessionStorage.removeItem('dr-lurie-login-keep-preference');
+      await identity.logout();
+      await renderAuthState(identity);
+      closeAllMenus();
+    };
+
+    const onLogin = async (identity, _user) => {
+      const keepPref = sessionStorage.getItem('dr-lurie-login-keep-preference');
+      const keep = keepPref === null ? true : keepPref === '1';
+
+      if (keep) {
+        localStorage.setItem(KEEP_SIGNED_IN_KEY, '1');
+      } else {
+        localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+      }
+      sessionStorage.setItem(SESSION_ACTIVE_KEY, '1');
+      sessionStorage.removeItem('dr-lurie-login-keep-preference');
+
+      await renderAuthState(identity);
       closeAllMenus();
     };
 
     const initializeHeaderAuthState = () => {
-      getClerk()
-        .then(async (clerk) => {
-          await renderAuthState(clerk);
-          if (typeof clerk.addListener === 'function' && !headerAuthState.clerkListenerAttached) {
-            headerAuthState.clerkListenerAttached = true;
-            clerk.addListener(() => {
-              renderAuthState(clerk).catch((error) => {
+      getIdentity()
+        .then(async (identity) => {
+          await renderAuthState(identity);
+
+          if (!headerAuthState.identityListenersAttached) {
+            headerAuthState.identityListenersAttached = true;
+
+            identity.on('login', (user) => {
+              onLogin(identity, user).catch((error) => {
+                console.error('Header authentication login handler failed.', error);
+              });
+            });
+
+            identity.on('logout', () => {
+              renderAuthState(identity).catch((error) => {
                 console.error('Header authentication refresh failed.', error);
               });
             });
@@ -386,31 +431,17 @@ const authRootAttributes = {
           event.preventDefault();
           event.stopPropagation();
 
-          if (root.dataset.authSignedIn !== 'true') {
-            openSignIn().catch((error) => {
-              console.error('Header sign-in failed.', error);
-            });
-            return;
-          }
-
           if (root.hasAttribute('data-mobile-auth-menu') && window.matchMedia('(max-width: 767px)').matches) {
             const willOpen = trigger.getAttribute('aria-expanded') !== 'true';
             closeAllMenus();
             closeMobileNavigationAccordions(root);
             setMenuOpen(root, willOpen);
-            renderAuthState().catch((error) => {
-              console.error('Header authentication refresh failed.', error);
-            });
             return;
           }
 
           const willOpen = trigger.getAttribute('aria-expanded') !== 'true';
           closeAllMenus();
           setMenuOpen(root, willOpen);
-          renderAuthState().catch((error) => {
-            console.error('Header authentication refresh failed.', error);
-          });
-
           return;
         }
 
@@ -427,7 +458,7 @@ const authRootAttributes = {
           event.preventDefault();
           event.stopPropagation();
           openUserProfile().catch((error) => {
-            console.error('Clerk account settings failed.', error);
+            console.error('Account settings failed.', error);
           });
           return;
         }
@@ -450,7 +481,7 @@ const authRootAttributes = {
         const trigger = target?.closest('[data-auth-trigger]');
         const menu = target?.closest('[data-auth-menu]');
 
-        if (!root || root.dataset.authSignedIn !== 'true' || (!trigger && !menu)) return;
+        if (!root || (!trigger && !menu)) return;
 
         clearAuthMenuCloseTimer();
         setMenuOpen(root, true);
@@ -461,7 +492,7 @@ const authRootAttributes = {
         const root = target?.closest('[data-header-auth]');
         const nextTarget = event.relatedTarget;
 
-        if (!root || root.dataset.authSignedIn !== 'true') return;
+        if (!root) return;
         if (nextTarget instanceof Node && root.contains(nextTarget)) return;
 
         scheduleAuthMenuClose(root);

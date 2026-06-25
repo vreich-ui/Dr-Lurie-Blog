@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -159,21 +159,21 @@ const githubRequest = async <T>(path: string, token: string, init: RequestInit =
   return (await response.json()) as T;
 };
 
-export const handler = async (event: LambdaEvent) => {
+export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
   }
 
-  const adminState = await getAdminStateFromEvent(event);
+  const adminState = await getAdminStateFromEvent(event, context);
 
   if (!adminState.authenticated) {
-    return jsonResponse(adminState.error === 'Clerk authentication is not configured.' ? 500 : 401, {
-      error: adminState.error || 'A valid Clerk session token is required.',
+    return jsonResponse(401, {
+      error: adminState.error || 'Authentication is required.',
     });
   }
 
   if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This Clerk user is not authorized to update article publish status.' });
+    return jsonResponse(403, { error: 'This user is not authorized to update article publish status.' });
   }
 
   let input: ToggleInput | undefined;

@@ -8,7 +8,6 @@ export function getStaticPaths() {
 
 const routeDraftId = Astro.params.draftId ?? '';
 const pageTitle = 'Review Draft';
-const clerkPublishableKey = import.meta.env.PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const metadata = {
   title: pageTitle,
   robots: {
@@ -22,7 +21,6 @@ const metadata = {
   <section
     class="review-page mx-auto max-w-[980px] px-4 py-10 sm:px-6 sm:py-14"
     data-admin-shell
-    data-clerk-publishable-key={clerkPublishableKey}
     data-route-draft-id={routeDraftId}
     hidden
   >
@@ -328,7 +326,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadClerk } from '~/utils/clerkLoader';
+  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
 
   (() => {
     const initializeAdminReviewPage = () => {
@@ -337,8 +335,6 @@ const metadata = {
       pageRoot.dataset.adminReviewInitialized = 'true';
 
       const adminPage = pageRoot;
-      const clerkPublishableKey = adminPage?.dataset.clerkPublishableKey || '';
-      const clerkJsScriptSrc = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const authStatus = document.querySelector('[data-auth-status]');
       const routeDraftId = adminPage?.dataset.routeDraftId || '';
@@ -364,7 +360,7 @@ const metadata = {
         cta: document.querySelector('#preview-cta'),
         content: document.querySelector('#preview-content'),
       };
-      let clerkLoadPromise;
+      let identityLoadPromise;
 
       const setGatedContentVisible = (visible) => {
         gatedContent.forEach((element) => {
@@ -386,14 +382,15 @@ const metadata = {
         fields.loadStatus.classList.toggle('is-error', isError);
       };
 
-      const getClerk = async () => {
-        if (!clerkPublishableKey) {
-          throw new Error('Admin authentication is not configured. Set PUBLIC_CLERK_PUBLISHABLE_KEY in Netlify.');
-        }
+      const getIdentity = async () => {
 
-        clerkLoadPromise ||= loadClerk({ publishableKey: clerkPublishableKey, scriptSrc: clerkJsScriptSrc });
 
-        return clerkLoadPromise;
+        identityLoadPromise ||= loadNetlifyIdentity();
+
+
+        return identityLoadPromise;
+
+
       };
 
       const redirectToHome = () => {
@@ -416,11 +413,9 @@ const metadata = {
         if (!isSignedIn && state !== 'checking') redirectToHome();
       };
 
-      const getAdminStateForClerk = async (clerk) => {
-        if (!clerk.isSignedIn || !clerk.session) return { authenticated: false, isAdmin: false };
-
-        const token = await clerk.session.getToken();
-        if (!token) return { authenticated: true, isAdmin: false, error: 'Could not retrieve a Clerk session token.' };
+      const getAdminStateForUser = async (user) => {
+        const token = user?.token?.access_token;
+        if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
           method: 'GET',
@@ -430,9 +425,7 @@ const metadata = {
           },
         });
 
-        return response
-          .json()
-          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const formatDate = (value) => {
@@ -538,14 +531,16 @@ const metadata = {
         }
       };
 
-      const renderAuthState = async (clerk) => {
-        const signedIn = Boolean(clerk.isSignedIn && clerk.session);
+      const renderAuthState = async () => {
+        const identity = await getIdentity();
+        const user = identity.currentUser();
+        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
 
         if (signedIn) {
-          const adminState = await getAdminStateForClerk(clerk);
+          const adminState = await getAdminStateForUser(user);
 
           if (adminState.isAdmin) {
-            const token = await clerk.session.getToken();
+            const token = activeUser?.token?.access_token;
             setAuthState('signed-in');
             await loadDraft(token);
             return;
@@ -558,22 +553,26 @@ const metadata = {
         setAuthState('signed-out');
       };
 
-      const initializeClerkAuth = async () => {
+      const initializeIdentityAuth = async () => {
         setAuthState('checking');
 
         try {
-          const clerk = await getClerk();
-          await renderAuthState(clerk);
+          const identity = await getIdentity();
 
-          if (typeof clerk.addListener === 'function') {
-            clerk.addListener(() => {
-              renderAuthState(clerk).catch((error) => {
-                console.error('Clerk authentication refresh failed.', error);
-              });
+          await renderAuthState();
+
+          identity.on('login', () => {
+            renderAuthState().catch((error) => {
+              console.error('Identity authentication refresh failed.', error);
             });
-          }
+          });
+          identity.on('logout', () => {
+            renderAuthState().catch((error) => {
+              console.error('Identity authentication refresh failed.', error);
+            });
+          });
         } catch (error) {
-          console.error('Clerk authentication initialization failed.', error);
+          console.error('Identity authentication initialization failed.', error);
           setAuthState('error');
         }
       };
@@ -583,7 +582,7 @@ const metadata = {
       if (fields.editDraftLink) fields.editDraftLink.href = `/admin/publish?draftId=${encodedDraftId}`;
       if (fields.notFoundEditLink) fields.notFoundEditLink.href = `/admin/publish?draftId=${encodedDraftId}`;
 
-      initializeClerkAuth();
+      initializeIdentityAuth();
     };
 
     if (!window.__drLurieAdminReviewPageLoadListener) {

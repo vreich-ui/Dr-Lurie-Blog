@@ -12,7 +12,7 @@ import {
   defaultArtifactUploadTokenTtlMs,
   getDirectArtifactUploadMaxBytes,
 } from '../lib/artifact-upload.js';
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { allowedAgentNames, workflowStatuses } from '../../src/schema/workflow-contract.js';
 import {
   artifactKindValues,
@@ -1348,7 +1348,7 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
     requestId: event.requestId,
     rpcMethod: event.rpcMethod,
     slug: event.slug,
-  });
+  }, {});
   const body = parseJsonResponseBody(publishResponse.body);
 
   if (publishResponse.statusCode < 200 || publishResponse.statusCode >= 300) {
@@ -3077,7 +3077,7 @@ export const _mcpInternal = {
   getArtifactIndexBlobStore,
 };
 
-export const handler = async (rawEvent: LambdaEvent) => {
+export const handler = async (rawEvent: LambdaEvent, _context?: LambdaContext) => {
   const event = withStructuredLogger(rawEvent);
   event.log?.({ event: 'mcp_request_received', rpcMethod: null, slug: null, httpMethod: event.httpMethod });
   if (event.httpMethod === 'OPTIONS') {
