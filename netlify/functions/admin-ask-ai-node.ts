@@ -80,9 +80,7 @@ const buildContext = (body: ArticleBodyV1, targetNodeId: string, articleTitle: s
     .map((n) => `[FOLLOWING] ${nodeContextSnippet(n)}`)
     .join('\n');
 
-  return [articleTitle ? `Article: "${articleTitle}"` : '', prevSnippets, nextSnippets]
-    .filter(Boolean)
-    .join('\n');
+  return [articleTitle ? `Article: "${articleTitle}"` : '', prevSnippets, nextSnippets].filter(Boolean).join('\n');
 };
 
 const callAnthropic = async (messages: AnthropicMessage[], apiKey: string, model: string): Promise<unknown> => {
@@ -144,9 +142,7 @@ export const handler = async (event: LambdaEvent) => {
   let rawBody: unknown;
   try {
     const text =
-      event.isBase64Encoded && event.body
-        ? Buffer.from(event.body, 'base64').toString('utf8')
-        : (event.body ?? '');
+      event.isBase64Encoded && event.body ? Buffer.from(event.body, 'base64').toString('utf8') : (event.body ?? '');
     rawBody = JSON.parse(text);
   } catch {
     return jsonResponse(400, { error: 'Invalid JSON body' });
@@ -174,9 +170,7 @@ export const handler = async (event: LambdaEvent) => {
     const context = buildContext(articleBody, nodeId, articleTitle);
 
     const currentContent = JSON.stringify(targetNode.public, null, 2);
-    const selectionClause = selectedText
-      ? `\nThe editor highlighted this specific span: """${selectedText}"""\n`
-      : '';
+    const selectionClause = selectedText ? `\nThe editor highlighted this specific span: """${selectedText}"""\n` : '';
 
     const userMessage = [
       'You are editing a block of content within a published article.',
@@ -202,7 +196,9 @@ export const handler = async (event: LambdaEvent) => {
       content?: Array<{ type: string; name?: string; input?: AnthropicToolInput }>;
     };
 
-    const toolUse = response.content?.find((block) => block.type === 'tool_use' && block.name === 'update_node_content');
+    const toolUse = response.content?.find(
+      (block) => block.type === 'tool_use' && block.name === 'update_node_content'
+    );
     if (!toolUse?.input) {
       return jsonResponse(502, { error: 'AI did not return a structured suggestion' });
     }

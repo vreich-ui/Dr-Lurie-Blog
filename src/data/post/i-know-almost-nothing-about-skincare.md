@@ -1,19 +1,20 @@
 ---
 publishDate: 2026-06-23T10:58:00Z
-title: "I Know Almost Nothing About Skincare"
+title: 'I Know Almost Nothing About Skincare'
 excerpt: "Start here: We'll walk you through the basics."
-image: "~/assets/images/uploads/i-know-almost-nothing-about-skincare/skincare-basics-beginner-hero.png"
-ctaLink: "/resources/first-skincare-routine"
-ctaText: "Build the Beginner Routine"
-category: "Skin Health"
+image: '~/assets/images/uploads/i-know-almost-nothing-about-skincare/skincare-basics-beginner-hero.png'
+ctaLink: '/resources/first-skincare-routine'
+ctaText: 'Build the Beginner Routine'
+category: 'Skin Health'
 tags:
-  - "skincare"
-  - "skin health"
-  - "beginner guide"
-author: "Dr. Lurie"
+  - 'skincare'
+  - 'skin health'
+  - 'beginner guide'
+author: 'Dr. Lurie'
 metadata:
-  description: "A beginner-friendly skincare guide covering cleansing, moisturizing, sunscreen, and how to keep a routine simple."
+  description: 'A beginner-friendly skincare guide covering cleansing, moisturizing, sunscreen, and how to keep a routine simple.'
 ---
+
 Start here: you do not need a 10-step routine, a shelf of tiny bottles, or a working knowledge of acids to begin taking care of your skin. If you know almost nothing about skincare, that is not a failure. It is actually a clean starting point.
 
 The first useful idea is that skincare is not about chasing perfect skin. It is about helping your skin do its everyday jobs: keeping moisture in, keeping irritants out, and protecting itself from the sun and environment. For most beginners, that comes down to three basic steps: cleanse, moisturize, and protect.
@@ -56,7 +57,7 @@ Choose one gentle cleanser, one moisturizer your skin tolerates, and one sunscre
 
 [Build the Beginner Routine](/resources/first-skincare-routine)
 
-*Sponsored Content*
+_Sponsored Content_
 
 ### Optional Offer: Routine Simplifier Review
 

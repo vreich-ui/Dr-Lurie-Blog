@@ -13,11 +13,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="drafts-page mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14"
-    data-admin-shell
-    hidden
-  >
+  <section class="drafts-page mx-auto max-w-[1080px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
     <header class="drafts-header">
       <div>
         <p class="drafts-kicker">Admin workspace</p>
@@ -38,7 +34,9 @@ const metadata = {
         <div>
           <p class="drafts-kicker">Saved JSON drafts</p>
           <h2 id="drafts-heading">Netlify Blobs drafts</h2>
-          <p class="hint">Draft metadata is loaded through an admin-only server function after identity auth resolves.</p>
+          <p class="hint">
+            Draft metadata is loaded through an admin-only server function after identity auth resolves.
+          </p>
         </div>
         <div class="drafts-card-actions">
           <a class="btn-secondary btn-sm" href="/admin/publish">New</a>
@@ -562,7 +560,7 @@ const metadata = {
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
 
   (() => {
     const initializeAdminDraftsPage = () => {
@@ -579,24 +577,12 @@ const metadata = {
       const draftsEmpty = document.querySelector('#drafts-empty');
       const draftsListStatus = document.querySelector('#drafts-list-status');
       const refreshDraftsButton = document.querySelector('#refresh-drafts');
-      let identityLoadPromise;
       let activeToken = '';
 
       const setGatedContentVisible = (visible) => {
         gatedContent.forEach((element) => {
           element.hidden = !visible;
         });
-      };
-
-      const getIdentity = async () => {
-
-
-        identityLoadPromise ||= loadNetlifyIdentity();
-
-
-        return identityLoadPromise;
-
-
       };
 
       const setAdminShellVisible = (visible) => {
@@ -634,8 +620,8 @@ const metadata = {
         if (!isSignedIn && state !== 'checking') redirectToHome();
       };
 
-      const getAdminStateForUser = async (user) => {
-        const token = user?.token?.access_token;
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
         if (!token) return { authenticated: false, isAdmin: false };
 
         const response = await fetch('/.netlify/functions/admin-auth-state', {
@@ -646,7 +632,9 @@ const metadata = {
           },
         });
 
-        return response.json().catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
       };
 
       const escapeHtml = (value) =>
@@ -765,9 +753,8 @@ const metadata = {
       };
 
       const renderAuthState = async () => {
-        const identity = await getIdentity();
-        const user = identity.currentUser();
-        const signedIn = Boolean(user && (localStorage.getItem('dr-lurie-keep-signed-in') === '1' || sessionStorage.getItem('dr-lurie-session-active') === '1'));
+        const user = currentUser();
+        const signedIn = Boolean(user);
 
         if (signedIn) {
           const adminState = await getAdminStateForUser(user);
@@ -790,16 +777,15 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          const identity = await getIdentity();
-
+          await handleOAuthCallback().catch(() => {});
           await renderAuthState();
 
-          identity.on('login', () => {
+          document.addEventListener('dr-lurie:login', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });
           });
-          identity.on('logout', () => {
+          document.addEventListener('dr-lurie:logout', () => {
             renderAuthState().catch((error) => {
               console.error('Identity authentication refresh failed.', error);
             });

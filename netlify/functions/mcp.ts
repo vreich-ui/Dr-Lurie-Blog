@@ -1332,23 +1332,28 @@ const callPublishArticle = async (event: LambdaEvent, payload: Record<string, un
     };
   }
 
-  const publishResponse = await _mcpInternal.publishArticleHandler({
-    httpMethod: 'POST',
-    headers: {
-      ...(event.headers ?? {}),
-      ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
-      ...(getHeader(event.headers, 'x-nf-deploy-id')
-        ? { 'x-nf-deploy-id': getHeader(event.headers, 'x-nf-deploy-id') }
-        : {}),
-      'x-publish-key': publishSecret,
-      'content-type': 'application/json',
+  const publishResponse = await _mcpInternal.publishArticleHandler(
+    {
+      httpMethod: 'POST',
+      headers: {
+        ...(event.headers ?? {}),
+        ...(getHeader(event.headers, 'x-nf-site-id')
+          ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') }
+          : {}),
+        ...(getHeader(event.headers, 'x-nf-deploy-id')
+          ? { 'x-nf-deploy-id': getHeader(event.headers, 'x-nf-deploy-id') }
+          : {}),
+        'x-publish-key': publishSecret,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      log: event.log,
+      requestId: event.requestId,
+      rpcMethod: event.rpcMethod,
+      slug: event.slug,
     },
-    body: JSON.stringify(payload),
-    log: event.log,
-    requestId: event.requestId,
-    rpcMethod: event.rpcMethod,
-    slug: event.slug,
-  }, {});
+    {}
+  );
   const body = parseJsonResponseBody(publishResponse.body);
 
   if (publishResponse.statusCode < 200 || publishResponse.statusCode >= 300) {
@@ -2280,8 +2285,8 @@ const getArtifactReferencesForRequest = async (event: LambdaEvent, requestId: st
   const artifacts = pointerKeys.length
     ? await Promise.all(pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key))))
     : await Promise.all(
-        (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(requestId)}/`)).map(
-          (key) => parseJsonBlob(store, key)
+        (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(requestId)}/`)).map((key) =>
+          parseJsonBlob(store, key)
         )
       );
 

@@ -27,12 +27,14 @@ function renderWordDiff(oldText: string, newText: string): HTMLElement {
   for (const change of changes) {
     if (change.added) {
       const ins = document.createElement('ins');
-      ins.className = 'dl-diff-ins bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 rounded px-0.5 no-underline';
+      ins.className =
+        'dl-diff-ins bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 rounded px-0.5 no-underline';
       ins.textContent = change.value;
       container.append(ins);
     } else if (change.removed) {
       const del = document.createElement('del');
-      del.className = 'dl-diff-del bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded px-0.5 line-through';
+      del.className =
+        'dl-diff-del bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 rounded px-0.5 line-through';
       del.textContent = change.value;
       container.append(del);
     } else {
@@ -42,11 +44,7 @@ function renderWordDiff(oldText: string, newText: string): HTMLElement {
   return container;
 }
 
-function renderFieldDiff(
-  fieldName: string,
-  oldValue: string | undefined,
-  newValue: string | undefined
-): HTMLElement {
+function renderFieldDiff(fieldName: string, oldValue: string | undefined, newValue: string | undefined): HTMLElement {
   const row = document.createElement('div');
   row.className = 'dl-diff-field flex flex-col gap-1 py-2 border-b border-gray-100 dark:border-slate-700 last:border-0';
 
@@ -55,7 +53,8 @@ function renderFieldDiff(
   label.textContent = fieldName;
   row.append(label);
 
-  const isProse = PROSE_FIELDS.includes(fieldName as keyof ArticleBodyNode['public']) &&
+  const isProse =
+    PROSE_FIELDS.includes(fieldName as keyof ArticleBodyNode['public']) &&
     ((oldValue ?? '').length > 80 || (newValue ?? '').length > 80);
 
   if (isProse) {
@@ -112,10 +111,12 @@ export function renderSuggestionOverlay(
 
   const changedFields = Object.keys(suggestion) as (keyof ArticleBodyNode['public'])[];
   if (changedFields.length === 0) {
-    body.append(Object.assign(document.createElement('p'), {
-      className: 'text-sm text-muted',
-      textContent: 'No changes suggested.',
-    }));
+    body.append(
+      Object.assign(document.createElement('p'), {
+        className: 'text-sm text-muted',
+        textContent: 'No changes suggested.',
+      })
+    );
   }
 
   for (const field of changedFields) {
@@ -175,9 +176,7 @@ export type AskAiOptions = {
   clerkToken: string;
 };
 
-export type AskAiResult =
-  | { ok: true; suggestion: Partial<ArticleBodyNode['public']> }
-  | { ok: false; error: string };
+export type AskAiResult = { ok: true; suggestion: Partial<ArticleBodyNode['public']> } | { ok: false; error: string };
 
 export async function askAiForNode(options: AskAiOptions): Promise<AskAiResult> {
   const { requestId, nodeId, selectedText, instruction, clerkToken } = options;
@@ -190,7 +189,11 @@ export async function askAiForNode(options: AskAiOptions): Promise<AskAiResult> 
       },
       body: JSON.stringify({ requestId, nodeId, selectedText, instruction }),
     });
-    const json = (await res.json()) as { ok?: boolean; suggestion?: Partial<ArticleBodyNode['public']>; error?: string };
+    const json = (await res.json()) as {
+      ok?: boolean;
+      suggestion?: Partial<ArticleBodyNode['public']>;
+      error?: string;
+    };
     if (!res.ok || !json.ok) return { ok: false, error: json.error ?? `HTTP ${res.status}` };
     if (!json.suggestion) return { ok: false, error: 'No suggestion returned' };
     return { ok: true, suggestion: json.suggestion };
@@ -217,7 +220,9 @@ export function showInstructionPopover(
 
   const titleEl = document.createElement('p');
   titleEl.className = 'text-sm font-bold';
-  titleEl.textContent = selectedText ? `Ask AI about: "${selectedText.slice(0, 60)}${selectedText.length > 60 ? '…' : ''}"` : 'Ask AI to revise this block';
+  titleEl.textContent = selectedText
+    ? `Ask AI about: "${selectedText.slice(0, 60)}${selectedText.length > 60 ? '…' : ''}"`
+    : 'Ask AI to revise this block';
   popover.append(titleEl);
 
   const textarea = document.createElement('textarea');
@@ -254,9 +259,15 @@ export function showInstructionPopover(
   submitBtn.addEventListener('click', submit);
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
-    if (e.key === 'Escape') { popover.remove(); onDismiss(); }
+    if (e.key === 'Escape') {
+      popover.remove();
+      onDismiss();
+    }
   });
-  cancelBtn.addEventListener('click', () => { popover.remove(); onDismiss(); });
+  cancelBtn.addEventListener('click', () => {
+    popover.remove();
+    onDismiss();
+  });
 
   row.append(cancelBtn, submitBtn);
   popover.append(row);
@@ -267,7 +278,11 @@ export function showInstructionPopover(
 
   // Dismiss on outside click
   const outside = (e: MouseEvent) => {
-    if (!popover.contains(e.target as Node)) { popover.remove(); onDismiss(); document.removeEventListener('click', outside, true); }
+    if (!popover.contains(e.target as Node)) {
+      popover.remove();
+      onDismiss();
+      document.removeEventListener('click', outside, true);
+    }
   };
   document.addEventListener('click', outside, true);
 

@@ -73,9 +73,7 @@ export const handler = async (event: LambdaEvent) => {
   let rawBody: unknown;
   try {
     const text =
-      event.isBase64Encoded && event.body
-        ? Buffer.from(event.body, 'base64').toString('utf8')
-        : (event.body ?? '');
+      event.isBase64Encoded && event.body ? Buffer.from(event.body, 'base64').toString('utf8') : (event.body ?? '');
     rawBody = JSON.parse(text);
   } catch {
     return jsonResponse(400, { error: 'Invalid JSON body' });
@@ -190,8 +188,7 @@ export const handler = async (event: LambdaEvent) => {
     }
 
     if (action === 'force_release') {
-      if (!record.lock)
-        return jsonResponse(200, { action, idempotent: true, message: 'No lock was held' });
+      if (!record.lock) return jsonResponse(200, { action, idempotent: true, message: 'No lock was held' });
 
       const nextRecord: WorkflowRecord = {
         ...record,

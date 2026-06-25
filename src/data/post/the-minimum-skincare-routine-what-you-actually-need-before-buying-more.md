@@ -1,18 +1,19 @@
 ---
 publishDate: 2026-06-24T16:23:32.939Z
 published_time: 2026-06-24T16:23:32.939Z
-title: "The Minimum Skincare Routine: What You Actually Need Before Buying More"
-excerpt: "A practical starting point for newcomers who want healthier skin without buying a complicated shelf of products."
-image: "~/assets/images/uploads/the-minimum-skincare-routine-what-you-actually-need-before-buying-more/minimum-routine-editorial-featured.webp"
+title: 'The Minimum Skincare Routine: What You Actually Need Before Buying More'
+excerpt: 'A practical starting point for newcomers who want healthier skin without buying a complicated shelf of products.'
+image: '~/assets/images/uploads/the-minimum-skincare-routine-what-you-actually-need-before-buying-more/minimum-routine-editorial-featured.webp'
 tags:
-  - "Skincare Basics"
-  - "Beginner Skincare"
-  - "Skin Barrier"
-  - "Sunscreen"
-  - "Skincare Routine"
+  - 'Skincare Basics'
+  - 'Beginner Skincare'
+  - 'Skin Barrier'
+  - 'Sunscreen'
+  - 'Skincare Routine'
 metadata:
-  description: "A practical beginner guide to the three skincare jobs that matter before buying more products: cleansing, moisturizing, and sun protection."
+  description: 'A practical beginner guide to the three skincare jobs that matter before buying more products: cleansing, moisturizing, and sun protection.'
 ---
+
 ### Start with the job, not the shelf
 
 ![Start with the job, not the shelf](~/assets/images/uploads/the-minimum-skincare-routine-what-you-actually-need-before-buying-more/minimum-routine-editorial-featured.webp)

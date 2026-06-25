@@ -69,9 +69,7 @@ export const handler = async (event: LambdaEvent) => {
   let rawBody: unknown;
   try {
     const text =
-      event.isBase64Encoded && event.body
-        ? Buffer.from(event.body, 'base64').toString('utf8')
-        : (event.body ?? '');
+      event.isBase64Encoded && event.body ? Buffer.from(event.body, 'base64').toString('utf8') : (event.body ?? '');
     rawBody = JSON.parse(text);
   } catch {
     return jsonResponse(400, { error: 'Invalid JSON body' });
@@ -95,7 +93,11 @@ export const handler = async (event: LambdaEvent) => {
       return jsonResponse(423, {
         error: 'lock_mismatch',
         locked: true,
-        lock: { owner_id: record.lock.owner_id, owner_label: record.lock.owner_label, expires_at: record.lock.expires_at },
+        lock: {
+          owner_id: record.lock.owner_id,
+          owner_label: record.lock.owner_label,
+          expires_at: record.lock.expires_at,
+        },
       });
     if (Date.parse(record.lock.expires_at) <= nowMs)
       return jsonResponse(423, { error: 'lock_expired', lock_expired: true });

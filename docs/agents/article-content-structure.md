@@ -4,7 +4,7 @@ This document defines the structured format for article content in the agent-fir
 
 ## Why this exists
 
-- **Agent-First Workflows**: Allows agents to understand the *intent* and *strategy* behind each part of an article.
+- **Agent-First Workflows**: Allows agents to understand the _intent_ and _strategy_ behind each part of an article.
 - **Commercial Integration**: Provides first-class support for ad slots, product mentions, and affiliate offers without polluting the content body.
 - **Interactive Features**: Enables per-node chat invitations and global chat configurations.
 - **Rendering Flexibility**: Decouples content from specific UI widgets while providing presentation hints.
@@ -68,6 +68,7 @@ Legacy articles can be represented as a single node to maintain compatibility:
 ## Commercial/Offer/Ad/Product Mention Rules
 
 Commercial intent is captured in the `node.commercial` field. This allows for:
+
 - Standardized disclosure management (required, label, mode).
 - Structured ad slot definitions (provider, ad unit path, sizes).
 - Product and offer metadata (coupon codes, expiration, terms).
@@ -80,7 +81,7 @@ Commercial intent is captured in the `node.commercial` field. This allows for:
 
 ## Data Independence from Widgets/UI
 
-The schema defines *what* the content is and *how* it should be emphasized, but it does not reference specific Astro components or UI widgets.
+The schema defines _what_ the content is and _how_ it should be emphasized, but it does not reference specific Astro components or UI widgets.
 
 - Use `rendering.presentation` (e.g., `card`, `callout`, `section`) to hint at the desired layout.
 - Use `rendering.emphasis` (e.g., `low`, `medium`, `high`) to guide the visual weight.

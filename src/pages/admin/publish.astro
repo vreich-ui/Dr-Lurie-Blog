@@ -10,11 +10,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section
-    class="admin-page mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-12"
-    data-admin-shell
-    hidden
-  >
+  <section class="admin-page mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-12" data-admin-shell hidden>
     <header class="admin-top-bar">
       <div>
         <p class="admin-kicker">Article Editor</p>
@@ -102,7 +98,9 @@ const metadata = {
 </Layout>
 
 <style>
-  .admin-page { color: var(--aw-color-text-default); }
+  .admin-page {
+    color: var(--aw-color-text-default);
+  }
 
   .admin-top-bar {
     display: flex;
@@ -113,7 +111,9 @@ const metadata = {
     padding-bottom: 1rem;
     border-bottom: 1px solid rgb(229 231 235);
   }
-  :global(.dark) .admin-top-bar { border-color: rgb(30 41 59); }
+  :global(.dark) .admin-top-bar {
+    border-color: rgb(30 41 59);
+  }
 
   .admin-kicker {
     margin: 0 0 0.25rem;
@@ -123,13 +123,31 @@ const metadata = {
     letter-spacing: 0.18em;
     text-transform: uppercase;
   }
-  .admin-top-bar-title { margin: 0; font-size: 1.5rem; font-weight: 800; }
+  .admin-top-bar-title {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
 
-  .top-bar-actions { display: flex; gap: 0.75rem; align-items: center; flex-shrink: 0; }
+  .top-bar-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-shrink: 0;
+  }
 
-  .auth-status { margin: -0.5rem 0 1rem; color: var(--aw-color-text-muted); font-size: 0.9rem; font-weight: 700; }
+  .auth-status {
+    margin: -0.5rem 0 1rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
 
-  .publish-workspace { display: flex; flex-direction: column; gap: 1.5rem; }
+  .publish-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
 
   /* Lock bar */
   .lock-bar {
@@ -148,26 +166,58 @@ const metadata = {
     border-color: rgb(239 68 68 / 30%);
     color: rgb(185 28 28);
   }
-  :global(.dark) .lock-bar[data-locked-by-agent] { color: rgb(252 165 165); }
+  :global(.dark) .lock-bar[data-locked-by-agent] {
+    color: rgb(252 165 165);
+  }
   .lock-bar[data-held] {
     background: rgb(16 185 129 / 6%);
     border-color: rgb(16 185 129 / 30%);
     color: rgb(6 95 70);
   }
-  :global(.dark) .lock-bar[data-held] { color: rgb(110 231 183); }
-  .lock-label { flex: 1; }
+  :global(.dark) .lock-bar[data-held] {
+    color: rgb(110 231 183);
+  }
+  .lock-label {
+    flex: 1;
+  }
 
   /* Load status */
-  .load-status { padding: 2rem; text-align: center; color: var(--aw-color-text-muted); font-weight: 700; }
+  .load-status {
+    padding: 2rem;
+    text-align: center;
+    color: var(--aw-color-text-muted);
+    font-weight: 700;
+  }
 
   /* Article view */
-  .article-view { display: flex; flex-direction: column; gap: 1.5rem; }
-  .article-meta-header { margin-bottom: 0.5rem; }
-  .article-preview-title { font-family: var(--aw-font-heading, inherit); font-size: clamp(1.8rem, 5vw, 2.6rem); font-weight: 800; margin: 0 0 0.5rem; line-height: 1.1; }
-  .article-preview-excerpt { color: var(--aw-color-text-muted); font-size: 0.95rem; font-style: italic; margin: 0; }
+  .article-view {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .article-meta-header {
+    margin-bottom: 0.5rem;
+  }
+  .article-preview-title {
+    font-family: var(--aw-font-heading, inherit);
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+    font-weight: 800;
+    margin: 0 0 0.5rem;
+    line-height: 1.1;
+  }
+  .article-preview-excerpt {
+    color: var(--aw-color-text-muted);
+    font-size: 0.95rem;
+    font-style: italic;
+    margin: 0;
+  }
 
   /* Nodes container */
-  .nodes-container { display: flex; flex-direction: column; gap: 2rem; }
+  .nodes-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
 
   /* Node wrapper — node action toolbar appears on hover */
   :global(.dl-node-wrapper) {
@@ -175,8 +225,12 @@ const metadata = {
     border-radius: 0.75rem;
     transition: box-shadow 0.15s;
   }
-  :global(.dl-node-wrapper:hover) { box-shadow: 0 0 0 2px rgb(94 140 138 / 30%); }
-  :global(.dl-node-wrapper[data-editing]) { box-shadow: 0 0 0 2px var(--aw-color-accent); }
+  :global(.dl-node-wrapper:hover) {
+    box-shadow: 0 0 0 2px rgb(94 140 138 / 30%);
+  }
+  :global(.dl-node-wrapper[data-editing]) {
+    box-shadow: 0 0 0 2px var(--aw-color-accent);
+  }
 
   /* Node toolbar (pen + AI buttons) */
   :global(.dl-node-toolbar) {
@@ -209,17 +263,43 @@ const metadata = {
     box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
     transition: background 0.1s;
   }
-  :global(.dark) :global(.dl-node-btn) { background: rgb(30 41 59 / 0.9); border-color: rgb(51 65 85); }
-  :global(.dl-node-btn:hover) { background: var(--aw-color-accent); color: white; border-color: transparent; }
-  :global(.dl-node-btn[title="Ask AI"]:hover) { background: rgb(124 58 237); }
+  :global(.dark) :global(.dl-node-btn) {
+    background: rgb(30 41 59 / 0.9);
+    border-color: rgb(51 65 85);
+  }
+  :global(.dl-node-btn:hover) {
+    background: var(--aw-color-accent);
+    color: white;
+    border-color: transparent;
+  }
+  :global(.dl-node-btn[title='Ask AI']:hover) {
+    background: rgb(124 58 237);
+  }
 
   /* TipTap editor chrome */
-  :global(.dl-node-editor) { margin: -0.25rem; }
-  :global(.dl-editor-content .ProseMirror) { outline: none; }
-  :global(.dl-editor-content .ProseMirror p) { margin: 0 0 0.75em; }
-  :global(.dl-editor-content .ProseMirror h2) { font-size: 1.4rem; font-weight: 700; margin: 0 0 0.5em; }
-  :global(.dl-editor-content .ProseMirror h3) { font-size: 1.15rem; font-weight: 600; margin: 0 0 0.5em; }
-  :global(.dl-editor-content .ProseMirror a) { text-decoration: underline; color: var(--aw-color-accent); }
+  :global(.dl-node-editor) {
+    margin: -0.25rem;
+  }
+  :global(.dl-editor-content .ProseMirror) {
+    outline: none;
+  }
+  :global(.dl-editor-content .ProseMirror p) {
+    margin: 0 0 0.75em;
+  }
+  :global(.dl-editor-content .ProseMirror h2) {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0 0 0.5em;
+  }
+  :global(.dl-editor-content .ProseMirror h3) {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0 0 0.5em;
+  }
+  :global(.dl-editor-content .ProseMirror a) {
+    text-decoration: underline;
+    color: var(--aw-color-accent);
+  }
 
   /* Admin card */
   .admin-card {
@@ -229,13 +309,28 @@ const metadata = {
     padding: 1.5rem;
     box-shadow: 0 1px 4px rgb(15 23 42 / 4%);
   }
-  :global(.dark) .admin-card { border-color: rgb(30 41 59); background: rgb(15 23 42 / 0.7); }
-  .card-section-title { font-size: 1rem; font-weight: 800; margin: 0 0 1rem; }
+  :global(.dark) .admin-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.7);
+  }
+  .card-section-title {
+    font-size: 1rem;
+    font-weight: 800;
+    margin: 0 0 1rem;
+  }
 
   /* Publish panel */
-  .publish-panel .field { margin-bottom: 0.75rem; }
-  .publish-panel label { display: block; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.25rem; }
-  .publish-panel input, .publish-panel textarea {
+  .publish-panel .field {
+    margin-bottom: 0.75rem;
+  }
+  .publish-panel label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  .publish-panel input,
+  .publish-panel textarea {
     width: 100%;
     border: 1px solid rgb(209 213 219);
     border-radius: 0.5rem;
@@ -245,13 +340,29 @@ const metadata = {
     color: inherit;
   }
   :global(.dark) .publish-panel input,
-  :global(.dark) .publish-panel textarea { border-color: rgb(51 65 85); background: rgb(15 23 42 / 0.5); }
-  .publish-panel .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-  .publish-status { min-height: 1.4em; font-size: 0.85rem; font-weight: 700; margin-top: 0.5rem; }
-  .publish-status.is-error { color: var(--aw-color-accent); }
+  :global(.dark) .publish-panel textarea {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42 / 0.5);
+  }
+  .publish-panel .field-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  .publish-status {
+    min-height: 1.4em;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
+  }
+  .publish-status.is-error {
+    color: var(--aw-color-accent);
+  }
 
   /* Buttons */
-  .btn-primary, .btn-secondary, .btn-tertiary {
+  .btn-primary,
+  .btn-secondary,
+  .btn-tertiary {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -268,17 +379,41 @@ const metadata = {
     background: rgb(94 140 138 / 18%);
     color: var(--aw-color-text-heading);
   }
-  .btn-secondary { padding: 0.72rem 1.25rem; border: 1px solid rgb(209 213 219); color: var(--aw-color-text-heading); background: transparent; }
-  .btn-tertiary { padding: 0.3rem 0.65rem; border: 1px solid rgb(209 213 219); color: var(--aw-color-text-muted); background: transparent; font-size: 0.8rem; }
-  .btn-sm { padding: 0.45rem 0.9rem; font-size: 0.85rem; }
-  .btn-xs { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .w-full { width: 100%; }
-  .mt-4 { margin-top: 1rem; }
+  .btn-secondary {
+    padding: 0.72rem 1.25rem;
+    border: 1px solid rgb(209 213 219);
+    color: var(--aw-color-text-heading);
+    background: transparent;
+  }
+  .btn-tertiary {
+    padding: 0.3rem 0.65rem;
+    border: 1px solid rgb(209 213 219);
+    color: var(--aw-color-text-muted);
+    background: transparent;
+    font-size: 0.8rem;
+  }
+  .btn-sm {
+    padding: 0.45rem 0.9rem;
+    font-size: 0.85rem;
+  }
+  .btn-xs {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .w-full {
+    width: 100%;
+  }
+  .mt-4 {
+    margin-top: 1rem;
+  }
 </style>
 
 <script>
-  import { loadNetlifyIdentity } from '~/utils/netlifyIdentityLoader';
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
   import { LockManager } from '~/lib/admin/lock-manager';
   import { renderNode, wrapNode } from '~/lib/admin/node-renderer';
   import { NodeEditor } from '~/lib/admin/node-editor';
@@ -326,37 +461,37 @@ const metadata = {
     };
 
     // ── State ──────────────────────────────────────────────────────────────────
-    type IdentityInstance = Awaited<ReturnType<typeof loadNetlifyIdentity>>;
-    let identityRef: IdentityInstance | null = null;
     let lockManager: LockManager | null = null;
     let activeEditor: NodeEditor | null = null;
     let activeNodeWrapper: HTMLElement | null = null;
     let currentNodes: ArticleBodyNode[] = [];
     const currentRequestId = draftId;
 
-
-    const SESSION_KEY = 'dr-lurie-session-active';
-    const KEEP_KEY = 'dr-lurie-keep-signed-in';
-    const isLoggedIn = () => {
-      const user = identityRef?.currentUser();
-      return Boolean(user && (localStorage.getItem(KEEP_KEY) === '1' || sessionStorage.getItem(SESSION_KEY) === '1'));
-    };
-
     const getToken = async (): Promise<string> => {
-      const token = identityRef?.currentUser()?.token?.access_token;
+      const token = await getAccessToken();
       if (!token) throw new Error('Not authenticated');
       return token;
     };
 
     // ── Auth shell (same pattern as existing admin pages) ─────────────────────
-    const setAuthStatus = (msg: string) => { if (els.authStatus) els.authStatus.textContent = msg; };
-    const setGated = (visible: boolean) => els.gated.forEach((el) => { el.hidden = !visible; });
-    const setPageVisible = (visible: boolean) => { if (page) page.hidden = !visible; };
+    const setAuthStatus = (msg: string) => {
+      if (els.authStatus) els.authStatus.textContent = msg;
+    };
+    const setGated = (visible: boolean) =>
+      els.gated.forEach((el) => {
+        el.hidden = !visible;
+      });
+    const setPageVisible = (visible: boolean) => {
+      if (page) page.hidden = !visible;
+    };
 
     const authState = (state: 'checking' | 'signed-out' | 'forbidden' | 'error' | 'signed-in') => {
       const msgs: Record<string, string> = {
-        checking: 'Checking admin access…', 'signed-out': 'Sign in to view admin tools.',
-        forbidden: 'Access denied.', error: 'Auth failed. Refresh or contact support.', 'signed-in': '',
+        checking: 'Checking admin access…',
+        'signed-out': 'Sign in to view admin tools.',
+        forbidden: 'Access denied.',
+        error: 'Auth failed. Refresh or contact support.',
+        'signed-in': '',
       };
       setAuthStatus(msgs[state] ?? '');
       setPageVisible(state === 'signed-in');
@@ -365,7 +500,12 @@ const metadata = {
     };
 
     // ── Lock bar ──────────────────────────────────────────────────────────────
-    const updateLockBar = (state: { held: boolean; agentLock?: { owner_label: string; expires_at: string }; lockToken?: string; expires_at?: string }) => {
+    const updateLockBar = (state: {
+      held: boolean;
+      agentLock?: { owner_label: string; expires_at: string };
+      lockToken?: string;
+      expires_at?: string;
+    }) => {
       els.lockBar.hidden = false;
       delete els.lockBar.dataset.lockedByAgent;
       delete els.lockBar.dataset.held;
@@ -380,9 +520,7 @@ const metadata = {
         els.lockBar.dataset.lockedByAgent = 'true';
         els.lockIcon.textContent = '🔒';
         const exp = new Date(state.agentLock.expires_at);
-        const expStr = Number.isFinite(exp.getTime())
-          ? `expires ${exp.toLocaleTimeString()}`
-          : 'expiry unknown';
+        const expStr = Number.isFinite(exp.getTime()) ? `expires ${exp.toLocaleTimeString()}` : 'expiry unknown';
         els.lockLabel.textContent = `Agent editing: ${state.agentLock.owner_label} (${expStr})`;
         els.btnDoneEditing.hidden = true;
         els.btnForceRelease.hidden = false;
@@ -517,17 +655,28 @@ const metadata = {
         selectedText,
         async (instruction) => {
           const spinnerEl = Object.assign(document.createElement('div'), {
-            className: 'absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/80 dark:bg-slate-900/80 text-sm font-bold',
+            className:
+              'absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-white/80 dark:bg-slate-900/80 text-sm font-bold',
             textContent: 'Asking AI…',
           });
           wrapper.style.position = 'relative';
           wrapper.append(spinnerEl);
 
           let token: string;
-          try { token = await getToken(); }
-          catch { spinnerEl.remove(); return; }
+          try {
+            token = await getToken();
+          } catch {
+            spinnerEl.remove();
+            return;
+          }
 
-          const result = await askAiForNode({ requestId: currentRequestId, nodeId: node.id, selectedText, instruction, clerkToken: token });
+          const result = await askAiForNode({
+            requestId: currentRequestId,
+            nodeId: node.id,
+            selectedText,
+            instruction,
+            clerkToken: token,
+          });
           spinnerEl.remove();
 
           if (!result.ok) {
@@ -543,7 +692,10 @@ const metadata = {
               // Accept: acquire lock if needed, then save
               if (!lockManager?.currentToken) {
                 const acquired = await acquireLock();
-                if (!acquired) { alert('Could not acquire edit lock to apply suggestion.'); return; }
+                if (!acquired) {
+                  alert('Could not acquire edit lock to apply suggestion.');
+                  return;
+                }
               }
               await saveNodeUpdate(node.id, fields, wrapper, node);
             },
@@ -562,11 +714,18 @@ const metadata = {
       originalNode: ArticleBodyNode
     ) => {
       const lockToken = lockManager?.currentToken;
-      if (!lockToken) { alert('Edit lock not held. Please retry.'); return; }
+      if (!lockToken) {
+        alert('Edit lock not held. Please retry.');
+        return;
+      }
 
       let token: string;
-      try { token = await getToken(); }
-      catch { alert('Authentication error. Please refresh.'); return; }
+      try {
+        token = await getToken();
+      } catch {
+        alert('Authentication error. Please refresh.');
+        return;
+      }
 
       const res = await fetch(UPDATE_NODE_ENDPOINT, {
         method: 'POST',
@@ -629,7 +788,7 @@ const metadata = {
         const seo = (input.seo ?? {}) as Record<string, unknown>;
         els.pubSeo.value = String(seo.meta_description ?? '');
         const ids = (input.ids ?? {}) as Record<string, unknown>;
-        const slug = String(ids.content_id ?? (input as Record<string,unknown>).slug ?? '');
+        const slug = String(ids.content_id ?? (input as Record<string, unknown>).slug ?? '');
         els.pubSlug.value = slug;
 
         const articleBody = content.article_body as { nodes?: ArticleBodyNode[] } | undefined;
@@ -673,8 +832,14 @@ const metadata = {
       els.publishStatus.className = 'publish-status';
 
       let token: string;
-      try { token = await getToken(); }
-      catch { els.publishStatus.textContent = 'Auth error'; els.publishStatus.className = 'publish-status is-error'; els.btnPublishConfirm.disabled = false; return; }
+      try {
+        token = await getToken();
+      } catch {
+        els.publishStatus.textContent = 'Auth error';
+        els.publishStatus.className = 'publish-status is-error';
+        els.btnPublishConfirm.disabled = false;
+        return;
+      }
 
       const lockToken = lockManager?.currentToken;
 
@@ -708,34 +873,49 @@ const metadata = {
       }
     });
 
-    // ── Netlify Identity bootstrap ────────────────────────────────────────────
+    // ── Auth bootstrap ────────────────────────────────────────────────────────
     authState('checking');
 
-    loadNetlifyIdentity().then(async (identity) => {
-      identityRef = identity;
+    (async () => {
+      try {
+        await handleOAuthCallback().catch(() => {});
+        const user = currentUser();
+        if (!user) {
+          authState('signed-out');
+          return;
+        }
 
-      if (!isLoggedIn()) { authState('signed-out'); return; }
+        const authToken = await getAccessToken();
+        if (!authToken) {
+          authState('error');
+          return;
+        }
 
-      const authToken = identity.currentUser()?.token?.access_token;
-      if (!authToken) { authState('error'); return; }
+        const stateRes = await fetch('/.netlify/functions/admin-auth-state', {
+          headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+        }).catch(() => null);
+        const stateJson = await stateRes?.json().catch(() => null);
+        if (!stateJson?.isAdmin) {
+          authState('forbidden');
+          return;
+        }
 
-      // Check admin
-      const stateRes = await fetch('/.netlify/functions/admin-auth-state', {
-        headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
-      }).catch(() => null);
-      const stateJson = await stateRes?.json().catch(() => null);
-      if (!stateJson?.isAdmin) { authState('forbidden'); return; }
-
-      authState('signed-in');
-      await loadDraft(authToken);
-
-      identity.on('logout', () => authState('signed-out'));
-      identity.on('login', () => {
-        const t = identity.currentUser()?.token?.access_token;
-        if (!t) { authState('error'); return; }
         authState('signed-in');
-      });
-    }).catch(() => authState('error'));
+        await loadDraft(authToken);
+
+        document.addEventListener('dr-lurie:logout', () => authState('signed-out'));
+        document.addEventListener('dr-lurie:login', async () => {
+          const t = await getAccessToken();
+          if (!t) {
+            authState('error');
+            return;
+          }
+          authState('signed-in');
+        });
+      } catch {
+        authState('error');
+      }
+    })();
   };
 
   document.addEventListener('astro:page-load', init);

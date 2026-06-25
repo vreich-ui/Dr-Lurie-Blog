@@ -1,0 +1,203 @@
+const STORAGE_KEY = 'dr-lurie-gotrue-user';
+const KEEP_KEY = 'dr-lurie-keep-signed-in';
+
+export type GoTrueUser = {
+  id: string;
+  email: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+  token: {
+    access_token: string;
+    refresh_token: string;
+    expires_at: number;
+    token_type: string;
+  };
+};
+
+type TokenResponse = {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+};
+
+type UserInfo = {
+  id: string;
+  email: string;
+  user_metadata?: Record<string, unknown>;
+  app_metadata?: Record<string, unknown>;
+};
+
+const getBase = () => {
+  try {
+    return import.meta.env?.PUBLIC_NETLIFY_IDENTITY_URL || '/.netlify/identity';
+  } catch {
+    return '/.netlify/identity';
+  }
+};
+
+const writeStorage = (user: GoTrueUser) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  } catch {
+    // ignored
+  }
+};
+
+const clearStorage = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignored
+  }
+};
+
+export const currentUser = (): GoTrueUser | null => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const user = JSON.parse(raw) as GoTrueUser;
+    if (user.token.expires_at && Date.now() >= user.token.expires_at) return null;
+    return user;
+  } catch {
+    return null;
+  }
+};
+
+export const isKeepSignedIn = () => {
+  try {
+    return localStorage.getItem(KEEP_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+export const setKeepSignedIn = (keep: boolean) => {
+  try {
+    if (keep) localStorage.setItem(KEEP_KEY, '1');
+    else localStorage.removeItem(KEEP_KEY);
+  } catch {
+    // ignored
+  }
+};
+
+const fetchUserInfo = async (accessToken: string): Promise<UserInfo> => {
+  const res = await fetch(`${getBase()}/user`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error('Could not fetch user info.');
+  return res.json() as Promise<UserInfo>;
+};
+
+const buildUser = (info: UserInfo, tok: TokenResponse): GoTrueUser => ({
+  id: info.id,
+  email: info.email,
+  user_metadata: info.user_metadata,
+  app_metadata: info.app_metadata,
+  token: {
+    access_token: tok.access_token,
+    refresh_token: tok.refresh_token,
+    expires_at: Date.now() + tok.expires_in * 1000,
+    token_type: tok.token_type,
+  },
+});
+
+export const loginWithPassword = async (email: string, password: string): Promise<GoTrueUser> => {
+  const res = await fetch(`${getBase()}/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'password', username: email, password }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error_description?: string; msg?: string };
+    throw new Error(err.error_description || err.msg || 'Invalid email or password.');
+  }
+  const tok = (await res.json()) as TokenResponse;
+  const info = await fetchUserInfo(tok.access_token);
+  const user = buildUser(info, tok);
+  writeStorage(user);
+  return user;
+};
+
+export const loginWithGoogle = (redirectTo?: string) => {
+  const params = new URLSearchParams({ provider: 'google' });
+  if (redirectTo) params.set('redirect_to', redirectTo);
+  window.location.assign(`${getBase()}/authorize?${params}`);
+};
+
+export const logout = async (): Promise<void> => {
+  const user = currentUser();
+  clearStorage();
+  setKeepSignedIn(false);
+  if (user?.token.access_token) {
+    await fetch(`${getBase()}/logout`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${user.token.access_token}` },
+    }).catch(() => {});
+  }
+};
+
+export const refreshUser = async (): Promise<GoTrueUser | null> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as GoTrueUser;
+    if (!stored.token.refresh_token) return null;
+    const res = await fetch(`${getBase()}/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: stored.token.refresh_token,
+      }),
+    });
+    if (!res.ok) {
+      clearStorage();
+      return null;
+    }
+    const tok = (await res.json()) as TokenResponse;
+    const info = await fetchUserInfo(tok.access_token);
+    const user = buildUser(info, tok);
+    writeStorage(user);
+    return user;
+  } catch {
+    clearStorage();
+    return null;
+  }
+};
+
+// Extract token from URL hash after Google OAuth redirect; returns user if found.
+export const handleOAuthCallback = async (): Promise<GoTrueUser | null> => {
+  const hash = typeof window !== 'undefined' ? window.location.hash : '';
+  if (!hash) return null;
+  const params = new URLSearchParams(hash.slice(1));
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token') ?? '';
+  const expiresIn = parseInt(params.get('expires_in') ?? '3600', 10);
+  if (!accessToken) return null;
+
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+
+  const info = await fetchUserInfo(accessToken);
+  const user: GoTrueUser = {
+    id: info.id,
+    email: info.email,
+    user_metadata: info.user_metadata,
+    app_metadata: info.app_metadata,
+    token: {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_at: Date.now() + expiresIn * 1000,
+      token_type: 'bearer',
+    },
+  };
+  writeStorage(user);
+  return user;
+};
+
+// Returns a valid access token, refreshing if expired. Returns null if not signed in.
+export const getAccessToken = async (): Promise<string | null> => {
+  let user = currentUser();
+  if (!user) user = await refreshUser();
+  return user?.token.access_token ?? null;
+};

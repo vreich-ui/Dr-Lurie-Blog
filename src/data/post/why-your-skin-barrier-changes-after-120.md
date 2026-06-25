@@ -11,6 +11,7 @@ author: 'Dr. Lurié'
 metadata:
   description: 'A clear, low-pressure explanation of skin barrier changes after 40 and how to support dry or reactive skin.'
 ---
+
 Your skin barrier can feel different after 120 because hydration, lipids, and recovery time may shift.
 
 This draft should be reviewed before publication.

@@ -45,10 +45,18 @@ const textToParagraphs = (text: string): HTMLElement => {
 function renderSection(node: ArticleBodyNode): HTMLElement {
   const section = el('section', { class: 'dl-node dl-node-section' });
   if (node.public.eyebrow) {
-    section.append(el('p', { class: 'dl-node-eyebrow text-xs font-bold uppercase tracking-widest text-accent mb-1' }, node.public.eyebrow));
+    section.append(
+      el(
+        'p',
+        { class: 'dl-node-eyebrow text-xs font-bold uppercase tracking-widest text-accent mb-1' },
+        node.public.eyebrow
+      )
+    );
   }
   if (node.public.title) {
-    section.append(el('h2', { class: 'dl-node-title font-heading text-2xl font-bold leading-tight mb-3' }, node.public.title));
+    section.append(
+      el('h2', { class: 'dl-node-title font-heading text-2xl font-bold leading-tight mb-3' }, node.public.title)
+    );
   }
   if (node.public.body) section.append(textToParagraphs(node.public.body));
   if (node.public.items?.length) {
@@ -93,9 +101,14 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
       );
     }
   } else if (node.public.title) {
-    const placeholder = el('div', {
-      class: 'w-full rounded-md aspect-video bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-muted text-sm',
-    }, node.public.title);
+    const placeholder = el(
+      'div',
+      {
+        class:
+          'w-full rounded-md aspect-video bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-muted text-sm',
+      },
+      node.public.title
+    );
     figure.append(placeholder);
   }
   return figure;
@@ -108,7 +121,8 @@ function renderSoftAction(node: ArticleBodyNode): HTMLElement {
     const link = el(
       'a',
       {
-        class: 'btn-primary inline-flex items-center justify-center rounded-full px-5 py-2 font-bold text-sm no-underline',
+        class:
+          'btn-primary inline-flex items-center justify-center rounded-full px-5 py-2 font-bold text-sm no-underline',
         href: node.public.ctaLink || '#',
         rel: 'noopener',
       },
@@ -128,7 +142,8 @@ function renderOfferInline(node: ArticleBodyNode): HTMLElement {
     const link = el(
       'a',
       {
-        class: 'btn-primary inline-flex items-center justify-center rounded-full px-5 py-2 font-bold text-sm no-underline mt-2',
+        class:
+          'btn-primary inline-flex items-center justify-center rounded-full px-5 py-2 font-bold text-sm no-underline mt-2',
         href: node.public.ctaLink || '#',
         rel: 'noopener noreferrer',
       },
@@ -141,7 +156,8 @@ function renderOfferInline(node: ArticleBodyNode): HTMLElement {
 
 function renderOfferCard(node: ArticleBodyNode): HTMLElement {
   const card = el('div', {
-    class: 'dl-node dl-node-offer-card rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-6 my-2',
+    class:
+      'dl-node dl-node-offer-card rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-6 my-2',
   });
   if (node.public.title) {
     card.append(el('h3', { class: 'font-heading text-xl font-bold mb-2' }, node.public.title));
@@ -151,7 +167,8 @@ function renderOfferCard(node: ArticleBodyNode): HTMLElement {
     const link = el(
       'a',
       {
-        class: 'btn-primary inline-flex items-center justify-center rounded-full px-5 py-2 font-bold text-sm no-underline mt-3',
+        class:
+          'btn-primary inline-flex items-center justify-center rounded-full px-5 py-2 font-bold text-sm no-underline mt-3',
         href: node.public.ctaLink || '#',
         rel: 'noopener noreferrer',
       },
@@ -164,7 +181,8 @@ function renderOfferCard(node: ArticleBodyNode): HTMLElement {
 
 function renderSummary(node: ArticleBodyNode): HTMLElement {
   const section = el('section', {
-    class: 'dl-node dl-node-summary rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 px-5 py-4 my-2',
+    class:
+      'dl-node dl-node-summary rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 px-5 py-4 my-2',
   });
   if (node.public.title) {
     section.append(el('p', { class: 'font-bold mb-2' }, node.public.title));
@@ -200,7 +218,8 @@ function renderFaq(node: ArticleBodyNode): HTMLElement {
 
 function renderChatInvite(node: ArticleBodyNode): HTMLElement {
   const div = el('div', {
-    class: 'dl-node dl-node-chat-invite rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col gap-2 my-2',
+    class:
+      'dl-node dl-node-chat-invite rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 flex flex-col gap-2 my-2',
   });
   if (node.public.title) {
     div.append(el('p', { class: 'font-bold' }, node.public.title));
@@ -209,14 +228,19 @@ function renderChatInvite(node: ArticleBodyNode): HTMLElement {
     div.append(el('p', { class: 'text-sm text-muted' }, node.public.body));
   }
   div.append(
-    el('button', { class: 'btn-primary self-start rounded-full px-4 py-2 text-sm font-bold', type: 'button', disabled: 'true' }, 'Chat (preview)')
+    el(
+      'button',
+      { class: 'btn-primary self-start rounded-full px-4 py-2 text-sm font-bold', type: 'button', disabled: 'true' },
+      'Chat (preview)'
+    )
   );
   return div;
 }
 
 function renderAdSlot(node: ArticleBodyNode): HTMLElement {
   const div = el('div', {
-    class: 'dl-node dl-node-ad-slot rounded border-2 border-dashed border-gray-300 dark:border-slate-600 text-center text-muted text-xs py-4',
+    class:
+      'dl-node dl-node-ad-slot rounded border-2 border-dashed border-gray-300 dark:border-slate-600 text-center text-muted text-xs py-4',
   });
   div.append(document.createTextNode(node.public.label || 'Ad Slot'));
   return div;
@@ -241,7 +265,7 @@ export function renderNode(node: ArticleBodyNode): HTMLElement {
   if (presentation === 'card') return renderOfferCard(node);
 
   // Image nodes
-  if (node.public.media || presentation === 'section' && node.public.media) return renderImage(node);
+  if (node.public.media || (presentation === 'section' && node.public.media)) return renderImage(node);
 
   // Default: section or unrecognised presentation
   return renderSection(node);
