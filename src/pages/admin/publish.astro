@@ -18,22 +18,21 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section
-    class="admin-page mx-auto max-w-[1800px] px-4 py-10 sm:px-6 sm:py-14"
+    class="admin-page mx-auto max-w-[1800px] px-4 py-8 sm:px-6 sm:py-12"
     data-admin-shell
     data-clerk-publishable-key={clerkPublishableKey}
     data-public-github-branch={publicGitHubBranch}
     data-public-github-repo-url={publicGitHubRepoUrl}
     hidden
   >
-    <header class="admin-top-bar mb-10 flex flex-col gap-6 border-b border-gray-200 pb-8 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
-      <div>
-        <p id="publish-mode" class="admin-kicker text-xs font-extrabold uppercase tracking-[0.2em] text-accent">
-          Agent-First Editor
-        </p>
-        <h1 class="mt-2 font-heading text-3xl font-bold tracking-tight text-default sm:text-4xl">{pageTitle}</h1>
+    <!-- ── Top action bar ──────────────────────────────────────── -->
+    <header class="admin-top-bar">
+      <div class="admin-top-bar-identity">
+        <p id="publish-mode" class="admin-kicker">Agent-First Editor</p>
+        <h1 class="admin-top-bar-title">{pageTitle}</h1>
       </div>
-      <div class="top-bar-actions flex gap-3">
-        <button id="top-preview" class="btn-secondary btn-sm" type="button">Preview Page</button>
+      <div class="top-bar-actions">
+        <button id="top-preview" class="btn-secondary btn-sm" type="button">Preview</button>
         <button id="top-save" class="btn-secondary btn-sm" type="button">Save Draft</button>
         <button id="top-publish" class="btn-primary btn-sm" type="button">Publish Article</button>
       </div>
@@ -44,98 +43,37 @@ const metadata = {
     <AdminNav />
 
     <div class="publish-workspace" data-auth-gated>
+      <!-- ── Main editor column ───────────────────────────────── -->
       <main class="publish-main" aria-label="Article editor">
         <form id="publish-form" class="admin-form">
-          <!-- Article Details Card -->
-          <section class="admin-card article-details-card" aria-labelledby="details-heading">
-            <h2 id="details-heading" class="sr-only">Article Details</h2>
-      <section class="admin-card json-import-panel" aria-labelledby="json-import-heading">
-        <div class="json-import-card">
-          <div class="json-import-header">
-            <div>
-              <h2 id="json-import-heading">Import JSON</h2>
-              <p class="hint">
-                Paste article JSON or upload a single <code>.json</code> file to populate this form.
-              </p>
-            </div>
-            <div class="json-import-toolbar" aria-label="JSON import options">
-              <button id="open-json-drafts" class="json-upload-button" type="button">
-                <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
-                <span>Open JSON</span>
-              </button>
-              <label class="json-upload-button" for="json-upload">
-                <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
-                <span>Upload JSON</span>
-              </label>
-            </div>
-            <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
-          </div>
-          <textarea
-            id="json-import"
-            class="json-import-input"
-            rows="6"
-            placeholder='{
-  "record_type": "content_source",
-  "schema_version": "content_source.v1",
-  "content": {
-    "title": "Article title",
-    "article_body": { "schema_version": "article_body.v1", "nodes": [] }
-  },
-  "publication": { "schema_version": "publication.v2", "published_time": null },
-  "sources": { "source_list": ["Source citation"] }
-}'
-          ></textarea>
-          <div class="json-import-actions">
-            <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
-              <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
-              <span>Update</span>
-            </button>
-            <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
-          </div>
-          <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
-          <div id="content-model-indicator" class="content-model-indicator" aria-live="polite"></div>
-          <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
-            <div class="json-draft-modal-card">
-              <div class="json-draft-modal-header">
-                <div>
-                  <p class="sidebar-kicker">Saved drafts</p>
-                  <h3 id="json-draft-modal-heading">Open saved draft</h3>
-                </div>
-                <button
-                  id="json-draft-modal-close"
-                  class="module-icon-button"
-                  type="button"
-                  aria-label="Close saved draft dialog"
-                >
-                  <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
-                </button>
-              </div>
-              <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
-                Select a saved draft to load into the form.
-              </p>
-              <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
-              <div id="json-draft-list" class="json-draft-list"></div>
-            </div>
-          </dialog>
-        </div>
-      </section>
 
-      <main class="publish-main" aria-label="Publishing editor">
-        <section class="admin-card" aria-label="Publishing form">
-          <form id="publish-form" class="admin-form">
-            <div class="field">
-              <label for="title">Title</label>
-              <input id="title" name="title" type="text" autocomplete="off" />
+          <!-- ── Article Details card ──────────────────────── -->
+          <section class="admin-card article-details-card" aria-labelledby="details-heading">
+            <div class="card-section-header">
+              <h2 id="details-heading">Article Details</h2>
             </div>
 
             <div class="field">
               <label for="title">Article Title</label>
-              <input id="title" name="title" class="title-input text-2xl font-bold" type="text" autocomplete="off" placeholder="Enter article title..." />
+              <input
+                id="title"
+                name="title"
+                type="text"
+                class="title-input"
+                autocomplete="off"
+                placeholder="Enter article title…"
+              />
             </div>
 
             <div class="field">
               <label for="excerpt">Excerpt / Summary</label>
-              <textarea id="excerpt" name="excerpt" rows="3" maxlength="300" placeholder="A brief summary for cards and search..."></textarea>
+              <textarea
+                id="excerpt"
+                name="excerpt"
+                rows="3"
+                maxlength="300"
+                placeholder="A brief summary shown on listing cards and search results…"
+              ></textarea>
             </div>
 
             <div class="field-grid">
@@ -143,99 +81,100 @@ const metadata = {
                 <label for="category">Category</label>
                 <input id="category" name="category" type="text" autocomplete="off" placeholder="e.g. Skin Science" />
               </div>
-
               <div class="field">
                 <label for="tags">Tags</label>
                 <input id="tags" name="tags" type="text" autocomplete="off" placeholder="e.g. barrier, lipids" />
               </div>
             </div>
 
-            <div class="field checkbox-field mt-4">
+            <div class="field checkbox-field mt-2">
               <input id="draft" name="draft" type="checkbox" />
-              <label for="draft" class="font-semibold text-muted">Save as draft (Unpublished)</label>
+              <label for="draft">Save as draft (unpublished)</label>
             </div>
           </section>
 
-          <!-- Article Builder Card -->
-          <section id="article-content-pieces" class="admin-card article-builder-card mt-8">
-              <div class="pieces-header mb-6">
-                <h2 class="text-xl font-bold text-default">Article Builder</h2>
-                <p class="hint">Add and arrange content blocks to build your article.</p>
-                <p id="legacy-markdown-conversion-notice" class="legacy-markdown-conversion-notice mt-2" hidden>
-                  Legacy content converted to editable blocks.
-                </p>
-              </div>
+          <!-- ── Article Builder card ──────────────────────── -->
+          <section
+            class="admin-card article-builder-card"
+            id="article-content-pieces"
+            aria-labelledby="builder-heading"
+          >
+            <div class="card-section-header">
+              <h2 id="builder-heading">Article Builder</h2>
+              <p class="hint">Add and arrange content blocks to build your article.</p>
+              <p id="legacy-markdown-conversion-notice" class="legacy-markdown-conversion-notice" hidden>
+                Legacy content converted to editable blocks.
+              </p>
+            </div>
 
-              <div class="pieces-quick-add bg-surface/50 mb-6 flex flex-wrap gap-2 rounded-xl border border-dashed border-gray-200 p-4 dark:border-slate-800" aria-label="Quick add content">
-                <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button>
-                <button class="btn-tertiary btn-xs quick-add" data-template="image" type="button">+ Image</button>
-              <div class="pieces-quick-add" aria-label="Quick add content">
-                <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button
-                >
-                <button class="btn-tertiary btn-xs quick-add" data-template="soft_action" type="button">+ CTA</button>
-                <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button"
-                  >+ Offer</button
-                >
-                <button class="btn-tertiary btn-xs quick-add" data-template="chat_invite" type="button">+ Chat</button>
-                <button class="btn-tertiary btn-xs quick-add" data-template="faq" type="button">+ FAQ</button>
-              </div>
+            <div class="pieces-quick-add" aria-label="Add content block">
+              <span class="quick-add-label">Add block:</span>
+              <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="image" type="button">+ Image</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="soft_action" type="button">+ CTA</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button">+ Offer</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="callout" type="button">+ Callout</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="summary" type="button">+ Summary</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="faq" type="button">+ FAQ</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="chat_invite" type="button">+ Chat</button>
+              <button id="add-piece" class="btn-secondary btn-xs" type="button">
+                <Icon name="tabler:plus" class="piece-action-icon" aria-hidden="true" />
+                More…
+              </button>
+            </div>
 
-              <div id="pieces-empty-state" class="pieces-empty-state rounded-2xl border-2 border-dashed border-gray-200 py-12 text-center dark:border-slate-800" hidden>
-                <h3 class="text-xl font-bold">Build Your Article</h3>
-                <p class="text-muted mt-2">Start by adding your first content section.</p>
-                <button class="btn-primary btn-sm mt-6 quick-add" data-template="prose_section" type="button">Add First Section</button>
-              <div id="pieces-empty-state" class="pieces-empty-state" hidden>
-                <h4>Build Your Article</h4>
-                <p>Articles are made of reusable content blocks. Start with a text section.</p>
-                <button class="btn-primary btn-sm quick-add" data-template="prose_section" type="button"
-                  >Add First Section</button
-                >
-              </div>
+            <div id="pieces-empty-state" class="pieces-empty-state" hidden>
+              <h3>Build Your Article</h3>
+              <p>Start by adding your first content section.</p>
+              <button class="btn-primary btn-sm mt-6 quick-add" data-template="prose_section" type="button">
+                Add First Section
+              </button>
+            </div>
 
-              <div id="pieces-container" class="pieces-container space-y-6"></div>
+            <div id="pieces-container" class="pieces-container"></div>
 
-              <div class="pieces-actions mt-8 flex justify-center">
-                <button id="add-piece" class="btn-secondary" type="button">
-                  <Icon name="tabler:plus" class="mr-2 h-5 w-5" aria-hidden="true" />
-                  <span>Add Block</span>
-                </button>
-              </div>
-
-              <dialog id="block-library-modal" class="json-draft-modal" aria-labelledby="block-library-heading">
-                <div class="json-draft-modal-card">
-                  <div class="json-draft-modal-header">
-                    <div>
-                      <p class="sidebar-kicker">Block Library</p>
-                      <h3 id="block-library-heading">Choose a block type</h3>
-                    </div>
-                    <button
-                      id="block-library-close"
-                      class="module-icon-button"
-                      type="button"
-                      aria-label="Close library"
-                    >
-                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
-                    </button>
+            <dialog id="block-library-modal" class="json-draft-modal" aria-labelledby="block-library-heading">
+              <div class="json-draft-modal-card">
+                <div class="json-draft-modal-header">
+                  <div>
+                    <p class="sidebar-kicker">Block Library</p>
+                    <h3 id="block-library-heading">Choose a block type</h3>
                   </div>
-                  <div id="block-library-list" class="block-library-list">
-                    <!-- Templates will be rendered here -->
-                  </div>
+                  <button
+                    id="block-library-close"
+                    class="module-icon-button"
+                    type="button"
+                    aria-label="Close library"
+                  >
+                    <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                  </button>
                 </div>
-              </dialog>
+                <div id="block-library-list" class="block-library-list"></div>
+              </div>
+            </dialog>
           </section>
 
-          <!-- Advanced Developer Tools -->
-          <details class="advanced-tools-accordion mt-12 overflow-hidden rounded-xl border border-gray-200 bg-gray-50/50 dark:border-slate-800 dark:bg-slate-900/30">
-            <summary class="cursor-pointer bg-gray-50 px-6 py-4 font-bold text-muted hover:text-default dark:bg-slate-900">
+          <!-- ── Advanced / Developer Tools ───────────────── -->
+          <details class="advanced-tools-accordion">
+            <summary class="advanced-tools-summary">
+              <Icon name="tabler:settings" class="advanced-tools-icon" aria-hidden="true" />
               Advanced / Developer Tools
             </summary>
 
-            <div class="advanced-tools-content space-y-8 p-6">
-              <!-- Article Identity & Targets -->
-              <div class="field-grid grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div class="advanced-tools-content">
+              <!-- Publishing identity -->
+              <div class="field-grid">
                 <div class="field">
                   <label for="slug">Publishing Target (Slug)</label>
-                  <input id="slug" name="slug" type="text" autocomplete="off" placeholder="article-slug" aria-describedby="slug-edit-hint" readonly />
+                  <input
+                    id="slug"
+                    name="slug"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="article-slug"
+                    aria-describedby="slug-edit-hint"
+                    readonly
+                  />
                   <p id="slug-edit-hint" class="hint" aria-live="polite" hidden></p>
                 </div>
                 <div class="field">
@@ -244,7 +183,7 @@ const metadata = {
                 </div>
               </div>
 
-              <div class="field-grid grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div class="field-grid">
                 <div class="field">
                   <label for="publish-date">Publish Date Override</label>
                   <input id="publish-date" name="publishDate" type="datetime-local" />
@@ -257,93 +196,193 @@ const metadata = {
 
               <div class="field">
                 <label for="sources">Sources</label>
-                <textarea id="sources" name="sources" class="sources-input" rows="3" placeholder="One source per line..."></textarea>
+                <textarea
+                  id="sources"
+                  name="sources"
+                  class="sources-input"
+                  rows="3"
+                  placeholder="One source per line…"
+                ></textarea>
               </div>
 
-              <hr class="border-gray-200 dark:border-slate-800" />
+              <hr class="advanced-tools-divider" />
 
-              <!-- Create/Import Article (Renamed from JSON Import) -->
+              <!-- Article JSON (Create / Edit Article / Upload Article) -->
               <section class="json-import-panel" aria-labelledby="json-import-heading">
-                <div class="json-import-header mb-4 flex items-center justify-between">
+                <div class="json-import-header">
                   <div>
-                    <h3 id="json-import-heading" class="text-lg font-bold">Article JSON (Canonical)</h3>
-                    <p class="hint">Edit raw article structure or import from file.</p>
+                    <h3 id="json-import-heading" class="adv-section-heading">Article JSON</h3>
+                    <p class="hint">Canonical article source. Paste, upload, or open a saved draft.</p>
                   </div>
-                  <div class="json-import-toolbar flex gap-2">
+                  <div class="json-import-toolbar">
                     <button id="open-json-drafts" class="json-upload-button" type="button">
-                      <Icon name="tabler:folder-open" class="h-4 w-4" aria-hidden="true" />
+                      <Icon name="tabler:folder-open" class="json-upload-icon" aria-hidden="true" />
                       <span>Edit Article</span>
                     </button>
                     <label class="json-upload-button" for="json-upload">
-                      <Icon name="tabler:upload" class="h-4 w-4" aria-hidden="true" />
+                      <Icon name="tabler:upload" class="json-upload-icon" aria-hidden="true" />
                       <span>Upload Article</span>
                     </label>
                   </div>
                   <input id="json-upload" class="visually-hidden" type="file" accept=".json" />
                 </div>
-                <textarea id="json-import" class="json-import-input font-mono text-xs" rows="8" placeholder="Paste article JSON here..."></textarea>
-                <div class="json-import-actions mt-3 flex items-center justify-between">
-                  <button id="load-json" class="btn-secondary btn-sm" type="button" disabled>
-                    <Icon name="tabler:refresh" class="mr-1 h-4 w-4" aria-hidden="true" />
+                <textarea
+                  id="json-import"
+                  class="json-import-input"
+                  rows="8"
+                  placeholder='{ "record_type": "content_source", "schema_version": "content_source.v1", … }'
+                ></textarea>
+                <div class="json-import-actions">
+                  <button id="load-json" class="btn-secondary btn-sm json-update-button" type="button" disabled>
+                    <Icon name="tabler:refresh" class="json-update-icon" aria-hidden="true" />
                     <span>Create Article</span>
                   </button>
-                  <span id="json-upload-name" class="text-xs text-muted"></span>
+                  <span id="json-upload-name" class="json-upload-name" aria-live="polite"></span>
                 </div>
-                <p id="json-import-status" class="mt-2 text-sm font-bold"></p>
-                <div id="content-model-indicator" class="mt-4 rounded-lg bg-surface p-4 text-xs"></div>
+                <p id="json-import-status" class="json-import-status" aria-live="polite"></p>
+                <div id="content-model-indicator" class="content-model-indicator" aria-live="polite"></div>
               </section>
 
-              <hr class="border-gray-200 dark:border-slate-800" />
-
-              <!-- Legacy / Global Fields -->
-              <div class="legacy-global-fields space-y-6">
-                <div class="field">
-                  <div class="field-header flex items-center justify-between">
-                    <label for="content">Markdown Body (Legacy Fallback)</label>
-                    <button id="convert-to-pieces" class="btn-tertiary btn-xs" type="button">Convert to Blocks</button>
-                  </div>
-                  <textarea id="content" name="content" class="h-48" placeholder="Markdown content..."></textarea>
-                </div>
-
-                <div class="field">
-                  <label for="image-upload">Global Media Library</label>
-                  <div class="image-upload-actions flex gap-2">
-                    <label class="image-upload-button" for="image-upload">
-                      <Icon name="tabler:upload" class="h-4 w-4" aria-hidden="true" />
-                      <span>Upload Image</span>
-                    </label>
-                    <button id="select-blob-image" class="image-upload-button" type="button">
-                      <Icon name="tabler:photo-search" class="h-4 w-4" aria-hidden="true" />
-                      <span>Select Saved</span>
+              <dialog id="json-draft-modal" class="json-draft-modal" aria-labelledby="json-draft-modal-heading">
+                <div class="json-draft-modal-card">
+                  <div class="json-draft-modal-header">
+                    <div>
+                      <p class="sidebar-kicker">Saved drafts</p>
+                      <h3 id="json-draft-modal-heading">Edit Article</h3>
+                    </div>
+                    <button
+                      id="json-draft-modal-close"
+                      class="module-icon-button"
+                      type="button"
+                      aria-label="Close saved draft dialog"
+                    >
+                      <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
                     </button>
                   </div>
-                  <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
-                  <ul id="image-list" class="image-list mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6"></ul>
+                  <p id="json-draft-modal-status" class="json-draft-modal-status" aria-live="polite">
+                    Select a saved draft to load into the editor.
+                  </p>
+                  <div id="json-draft-modal-actions" class="json-draft-modal-actions" hidden></div>
+                  <div id="json-draft-list" class="json-draft-list"></div>
                 </div>
+              </dialog>
 
-                <div class="field-grid grid grid-cols-1 gap-6 md:grid-cols-3">
-                  <div class="field">
-                    <label for="featured-image">Featured Image</label>
-                    <select id="featured-image" name="featuredImage">
-                      <option value="">Select image...</option>
-                    </select>
-                    <input id="existing-featured-image-path" name="existingFeaturedImagePath" type="hidden" />
-                  </div>
-                  <div class="field">
-                    <label for="video-link">Optional Video</label>
-                    <input id="video-link" name="videoLink" type="url" placeholder="https://..." />
-                  </div>
-                  <div class="field">
-                    <label for="cta-link">Global CTA Link</label>
-                    <input id="cta-link" name="ctaLink" type="url" placeholder="https://..." />
-                  </div>
+              <hr class="advanced-tools-divider" />
+
+              <!-- Markdown body (legacy fallback) -->
+              <div class="field">
+                <div class="field-header">
+                  <label for="content">Markdown Body (Legacy Fallback)</label>
+                  <button id="convert-to-pieces" class="btn-tertiary btn-xs" type="button">Convert to Blocks</button>
                 </div>
+                <textarea id="content" name="content" class="h-48" placeholder="Markdown content…"></textarea>
+              </div>
+
+              <hr class="advanced-tools-divider" />
+
+              <!-- Global media library -->
+              <div class="field">
+                <label for="image-upload">Global Media Library</label>
+                <div class="image-upload-actions">
+                  <label class="image-upload-button" for="image-upload">
+                    <Icon name="tabler:upload" class="image-upload-icon" aria-hidden="true" />
+                    <span>Upload Image</span>
+                  </label>
+                  <button id="select-blob-image" class="image-upload-button" type="button">
+                    <Icon name="tabler:photo-search" class="image-upload-icon" aria-hidden="true" />
+                    <span>Select Saved</span>
+                  </button>
+                </div>
+                <input id="image-upload" class="visually-hidden" type="file" multiple accept="image/*" />
+                <p class="hint">
+                  Allowed: <span id="image-allowed-types">png/jpg/webp</span> · Max
+                  <span id="image-max-file-size">0.5MB</span> · Up to <span id="image-max-count">10</span> images.
+                </p>
+                <ul id="image-list" class="image-list" aria-live="polite"></ul>
+                <p id="image-import-warning" class="hint image-import-warning" role="status" hidden></p>
+
+                <dialog id="blob-image-modal" class="json-draft-modal" aria-labelledby="blob-image-modal-heading">
+                  <div class="json-draft-modal-card">
+                    <div class="json-draft-modal-header">
+                      <div>
+                        <p class="sidebar-kicker">Saved images</p>
+                        <h3 id="blob-image-modal-heading">Select Saved Image</h3>
+                      </div>
+                      <button
+                        id="blob-image-modal-close"
+                        class="module-icon-button"
+                        type="button"
+                        aria-label="Close saved image dialog"
+                      >
+                        <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
+                      </button>
+                    </div>
+                    <p id="blob-image-modal-status" class="json-draft-modal-status" aria-live="polite">
+                      Select saved images to add to this article.
+                    </p>
+                    <div class="blob-image-modal-filters" aria-label="Saved image filters">
+                      <label>
+                        <span>Kind</span>
+                        <select id="blob-image-kind-filter">
+                          <option value="image" selected>Image</option>
+                        </select>
+                      </label>
+                      <label>
+                        <span>Request</span>
+                        <select id="blob-image-request-filter">
+                          <option value="current" selected>Current draft/request</option>
+                          <option value="all">All requests</option>
+                        </select>
+                      </label>
+                      <label class="blob-image-search-filter">
+                        <span>Search</span>
+                        <input
+                          id="blob-image-search"
+                          type="search"
+                          placeholder="Label, filename, or tag"
+                          autocomplete="off"
+                        />
+                      </label>
+                      <button id="refresh-blob-images" class="btn-secondary btn-sm" type="button">Refresh</button>
+                    </div>
+                    <div class="blob-image-modal-actions">
+                      <button id="select-marked-blob-images" class="btn-primary btn-sm" type="button">
+                        Select Marked
+                      </button>
+                    </div>
+                    <div id="blob-image-list" class="json-draft-list blob-image-list"></div>
+                  </div>
+                </dialog>
+              </div>
+
+              <!-- Featured image, video, global CTA -->
+              <div class="field-grid adv-grid-3">
+                <div class="field">
+                  <label for="featured-image">Featured Image</label>
+                  <select id="featured-image" name="featuredImage">
+                    <option value="">Select image…</option>
+                  </select>
+                  <input id="existing-featured-image-path" name="existingFeaturedImagePath" type="hidden" />
+                </div>
+                <div class="field">
+                  <label for="video-link">Optional Video</label>
+                  <input id="video-link" name="videoLink" type="url" placeholder="https://…" />
+                </div>
+                <div class="field">
+                  <label for="cta-link">Global CTA Link</label>
+                  <input id="cta-link" name="ctaLink" type="url" placeholder="https://…" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="cta-text">Global CTA Text</label>
+                <input id="cta-text" name="ctaText" type="text" placeholder="Learn more" />
               </div>
             </div>
           </details>
+
         </form>
 
-        <!-- Inline Preview (Hidden Runtime) -->
+        <!-- Inline preview runtime (hidden) -->
         <div class="preview-runtime sr-only" aria-hidden="true" hidden>
           <button id="refresh-preview" type="button">Refresh inline preview</button>
           <p id="preview-excerpt" hidden></p>
@@ -355,34 +394,39 @@ const metadata = {
         </div>
       </main>
 
+      <!-- ── Publish sidebar ──────────────────────────────────── -->
       <aside class="publish-sidebar" aria-labelledby="publish-output-heading">
-        <section class="admin-card admin-panel readiness-card sticky top-6">
-          <p class="sidebar-kicker text-xs font-bold uppercase tracking-widest text-accent">Readiness & Status</p>
-          <h2 id="publish-output-heading" class="mb-6 text-2xl font-bold">Publish Settings</h2>
+        <section class="admin-card admin-panel readiness-card">
+          <p class="sidebar-kicker">Readiness & Status</p>
+          <h2 id="publish-output-heading" class="sidebar-heading">Publish Settings</h2>
 
-          <div id="article-status-card" class="article-status-card article-status-card--draft mb-8 overflow-hidden rounded-2xl border bg-surface p-6 shadow-sm" aria-live="polite">
-            <h3 class="mb-4 text-sm font-bold uppercase tracking-wide text-muted">Article Status</h3>
-            <div class="article-status-summary flex items-center gap-4">
-              <span id="article-status-icon" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-lg font-bold text-gray-500" aria-hidden="true">○</span>
+          <div
+            id="article-status-card"
+            class="article-status-card article-status-card--draft"
+            aria-live="polite"
+          >
+            <h3 class="article-status-label">Article Status</h3>
+            <div class="article-status-summary">
+              <span id="article-status-icon" class="article-status-icon" aria-hidden="true">○</span>
               <div>
-                <p id="article-status-title" class="text-lg font-bold text-default leading-none">Draft</p>
-                <p id="article-status-subtitle" class="text-sm font-medium text-muted mt-1">No published article found</p>
+                <p id="article-status-title" class="article-status-title">Draft</p>
+                <p id="article-status-subtitle" class="article-status-subtitle">No published article found</p>
               </div>
             </div>
-            <div id="article-status-details" class="mt-6 space-y-2 border-t border-gray-100 pt-4 text-sm dark:border-slate-800">
-              <p class="text-muted">Changes are not live until published.</p>
+            <div id="article-status-details" class="article-status-details">
+              <p>Changes are not live until published.</p>
             </div>
           </div>
 
-          <div class="publish-checklist mb-8" aria-labelledby="publish-checklist-heading">
-            <div class="flex items-center justify-between mb-4">
-              <h3 id="publish-checklist-heading" class="text-sm font-bold uppercase tracking-wide text-muted">Validation</h3>
+          <div class="publish-checklist" aria-labelledby="publish-checklist-heading">
+            <div class="checklist-header">
+              <h3 id="publish-checklist-heading" class="checklist-heading">Validation</h3>
               <details class="validation-details-toggle">
                 <summary class="cursor-pointer text-xs font-bold text-accent hover:underline">View issues</summary>
               </details>
             </div>
 
-            <ul id="publish-checklist" class="hidden-checklist space-y-3" aria-live="polite">
+            <ul id="publish-checklist" class="hidden-checklist" aria-live="polite">
               <li data-checklist-item="title">
                 <span class="checklist-icon" aria-hidden="true">☐</span>
                 <span class="checklist-copy">
@@ -457,12 +501,7 @@ const metadata = {
           <div class="publish-output-summary" aria-label="Content output summary">
             <div class="summary-heading-row">
               <p class="summary-label">Publishing target</p>
-              <a
-                class="summary-edit-link"
-                href="#slug"
-                aria-label="Edit publishing target"
-                title="Edit publishing target"
-              >
+              <a class="summary-edit-link" href="#slug" aria-label="Edit publishing target">
                 <Icon name="tabler:pencil" class="summary-edit-icon" aria-hidden="true" />
                 <span class="sr-only">Edit publishing target</span>
               </a>
@@ -484,13 +523,19 @@ const metadata = {
               >
                 Publish Article
               </button>
-              <p id="publish-blocked-message" class="publish-blocked-message" role="status" aria-live="polite" hidden>
+              <p
+                id="publish-blocked-message"
+                class="publish-blocked-message"
+                role="status"
+                aria-live="polite"
+                hidden
+              >
                 Complete required fields before publishing.
               </p>
             </div>
             <button id="save-draft" class="btn-secondary" type="button">Save Draft</button>
             <button id="preview" class="btn-secondary" type="button">Preview Page</button>
-            <button id="new-draft" class="btn-tertiary action-tertiary" type="button">New/reset</button>
+            <button id="new-draft" class="btn-tertiary action-tertiary" type="button">New / Reset</button>
           </div>
 
           <details class="markdown-backup" data-backup-panel open>
@@ -624,6 +669,8 @@ const metadata = {
   }
 
   .admin-form {
+    display: grid;
+    gap: 1.25rem;
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
@@ -2234,6 +2281,205 @@ const metadata = {
     }
   }
 
+  /* ── Top action bar ─────────────────────────────────────── */
+  .admin-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .admin-top-bar-identity {
+    min-width: 0;
+  }
+
+  .admin-kicker {
+    margin: 0 0 0.2rem;
+    color: var(--aw-color-accent);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  .admin-top-bar-title {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.4rem, 3vw, 1.85rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+
+  .top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    flex: 0 0 auto;
+  }
+
+  /* ── Card section header ─────────────────────────────────── */
+  .card-section-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .card-section-header h2 {
+    margin: 0 0 0.3rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .card-section-header .hint {
+    margin: 0;
+  }
+
+  /* ── Title input (large) ─────────────────────────────────── */
+  .title-input {
+    font-size: 1.15rem;
+    font-weight: 600;
+  }
+
+  /* ── Quick-add label ─────────────────────────────────────── */
+  .quick-add-label {
+    align-self: center;
+    color: var(--aw-color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  /* ── Pieces empty state ──────────────────────────────────── */
+  .pieces-empty-state h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Advanced tools accordion ────────────────────────────── */
+  .advanced-tools-accordion {
+    border: 1px solid var(--aw-color-border);
+    border-radius: 1.25rem;
+    overflow: hidden;
+    background: var(--aw-color-bg-page);
+  }
+
+  :global(.dark) .advanced-tools-accordion {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 72%);
+  }
+
+  .advanced-tools-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 1rem 1.5rem;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    list-style: none;
+    user-select: none;
+    background: var(--aw-color-bg-surface);
+    transition:
+      color 0.18s ease,
+      background 0.18s ease;
+  }
+
+  .advanced-tools-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .advanced-tools-summary:hover {
+    background: var(--aw-color-bg-page);
+    color: var(--aw-color-text-heading);
+  }
+
+  .advanced-tools-accordion[open] > .advanced-tools-summary {
+    border-bottom: 1px solid var(--aw-color-border);
+  }
+
+  .advanced-tools-icon {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex: 0 0 auto;
+  }
+
+  .advanced-tools-content {
+    display: grid;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+
+  .advanced-tools-divider {
+    border: 0;
+    border-top: 1px solid var(--aw-color-border);
+    margin: 0.25rem 0;
+  }
+
+  /* ── Advanced section heading ────────────────────────────── */
+  .adv-section-heading {
+    margin: 0 0 0.2rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  /* ── 3-column advanced grid ──────────────────────────────── */
+  @media (min-width: 768px) {
+    .adv-grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* ── Sidebar heading ─────────────────────────────────────── */
+  .sidebar-heading {
+    margin: 0 0 0.7rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: clamp(1.15rem, 2.5vw, 1.35rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* ── Article status label (h3) ───────────────────────────── */
+  .article-status-label {
+    margin: 0 0 0.7rem;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  /* ── Checklist header ────────────────────────────────────── */
+  .checklist-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .checklist-heading {
+    margin: 0;
+    color: var(--aw-color-text-heading);
+    font-family: var(--aw-font-heading);
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  /* ── Legacy markdown notice ──────────────────────────────── */
+  .legacy-markdown-conversion-notice[hidden] {
+    display: none;
+  }
+
   @media (max-width: 767px) {
     .admin-page {
       padding-top: 1.5rem;
@@ -3763,307 +4009,161 @@ const metadata = {
               : '') ||
             activeTemplateId.replaceAll('_', ' ');
 
+          const titleLabel =
+            activeTemplateId === 'summary' ? 'Summary Heading' :
+            activeTemplateId === 'faq' ? 'FAQ Heading' :
+            activeTemplateId === 'chat_invite' ? 'Invite Heading' :
+            activeTemplateId === 'commerce_offer' ? 'Offer Title' :
+            activeTemplateId === 'callout' ? 'Callout Heading' :
+            'Section Heading';
+
+          const bodyLabel =
+            activeTemplateId === 'image' ? 'Caption Text' :
+            activeTemplateId === 'chat_invite' ? 'Invite Message' :
+            activeTemplateId === 'product_mention' ? 'Description' :
+            ['soft_action', 'contextual_offer', 'commerce_offer'].includes(activeTemplateId) ? 'Context Text' :
+            'Content';
+
+          const itemsLabel = activeTemplateId === 'faq' ? 'Q&A Items (one per line)' : 'List Items (one per line)';
+
           piece.innerHTML = `
-            <details class="piece-card rounded-2xl overflow-hidden border border-gray-200 dark:border-slate-800 bg-surface shadow-sm" ${!node.public?.body && !node.public?.title ? 'open' : ''}>
-              <summary class="hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
+            <details class="piece-card" ${!node.public?.body && !node.public?.title ? 'open' : ''}>
+              <summary>
                 <div class="piece-summary-view">
-                  <span class="piece-type-tag px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest bg-accent text-white">${window.escapeHtml(template.name)}</span>
+                  <span class="piece-type-tag">${window.escapeHtml(template.name)}</span>
                   <div class="piece-summary-content">
-                    <span class="piece-summary-title font-bold text-default">${window.escapeHtml(node.public?.title || '')}</span>
-                    <span class="piece-summary-body text-sm text-muted">${window.escapeHtml(pieceSummary)}</span>
+                    <span class="piece-summary-title">${window.escapeHtml(node.public?.title || '')}</span>
+                    <span class="piece-summary-body">${window.escapeHtml(pieceSummary)}</span>
                   </div>
                 </div>
-                <span class="piece-card-chevron text-muted" aria-hidden="true">▼</span>
+                <span class="piece-card-chevron" aria-hidden="true">▼</span>
               </summary>
-              <div class="piece-header flex items-center justify-between px-6 py-3 border-b border-gray-100 dark:border-slate-800 bg-gray-50/50 dark:bg-slate-900/50">
-                <span class="piece-id font-mono text-[10px] text-muted">Node ID: ${window.escapeHtml(node.id)}</span>
-                <div class="piece-controls flex gap-1">
-                  <button class="btn-tertiary btn-xs move-up h-7 w-7 p-0 flex items-center justify-center rounded-full" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
-                  <button class="btn-tertiary btn-xs move-down h-7 w-7 p-0 flex items-center justify-center rounded-full" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
-                  <button class="btn-tertiary btn-xs duplicate-piece h-7 px-2 text-[10px] uppercase font-bold" type="button">Duplicate</button>
-                  <button class="btn-tertiary btn-xs remove-piece h-7 px-2 text-[10px] uppercase font-bold text-accent" type="button">Remove</button>
+              <div class="piece-header">
+                <div class="piece-controls">
+                  <button class="btn-tertiary btn-xs move-up" title="Move up" type="button" ${index === 0 ? 'disabled' : ''}>↑</button>
+                  <button class="btn-tertiary btn-xs move-down" title="Move down" type="button" ${index === articleNodes.length - 1 ? 'disabled' : ''}>↓</button>
+                  <button class="btn-tertiary btn-xs duplicate-piece" type="button">Duplicate</button>
+                  <button class="btn-tertiary btn-xs remove-piece" type="button">Remove</button>
                 </div>
               </div>
-              <div class="piece-form p-6 space-y-6">
-              ${showTitle ? `
-              <div class="field">
-                <label class="text-sm font-bold text-default mb-2">Block Title</label>
-                <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Enter title (visible to readers)..." />
-              </div>` : ''}
-              <div class="piece-form" style="padding: 1.25rem;">
-              ${
-                showTitle
-                  ? `
-              <div class="field">
-                <label>Public Title</label>
-                <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Title" />
-              </div>`
-                  : ''
-              }
-
-              ${
-                showBody
-                  ? `
-              <div class="field">
-                <label class="text-sm font-bold text-default mb-2">Content / Body</label>
-                <textarea class="piece-body" rows="6" placeholder="Write your content here... Markdown is supported.">${window.escapeHtml(node.public?.body || '')}</textarea>
-              </div>` : ''}
-
-              ${showMedia ? `
-              <div class="media-fields-group p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-900/20">
-                <h4 class="text-xs font-black uppercase tracking-widest text-muted mb-4">Media Settings</h4>
-                <div class="field-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div class="field">
-                    <label class="text-[11px] font-bold text-muted mb-1">Type</label>
-                    <select class="piece-media-type text-sm">
-                      ${['image', 'video', 'audio', 'embed'].map((type) => `<option value="${type}" ${mediaType === type ? 'selected' : ''}>${type.charAt(0).toUpperCase() + type.slice(1)}</option>`).join('')}
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label class="text-[11px] font-bold text-muted mb-1">Source (Artifact Ref or URL)</label>
-                    <input type="text" class="piece-media text-sm" value="${window.escapeHtml(mediaSrc)}" placeholder="artifact-id or https://..." />
-                  </div>
-                <label>Reader text (Body)</label>
-                <textarea class="piece-body" rows="4" placeholder="Body content">${window.escapeHtml(node.public?.body || '')}</textarea>
-              </div>`
-                  : ''
-              }
-
-              ${
-                showCta
-                  ? `
-              <div class="field-grid">
+              <div class="piece-form">
+                ${showTitle ? `
                 <div class="field">
-                  <label>CTA Text</label>
-                  <input type="text" class="piece-cta-text" value="${window.escapeHtml(node.public?.ctaText || '')}" placeholder="Learn more" />
+                  <label>${titleLabel}</label>
+                  <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Enter heading…" />
+                </div>` : ''}
+                ${showBody ? `
+                <div class="field">
+                  <label>${bodyLabel}</label>
+                  <textarea class="piece-body" rows="6" placeholder="Write your content here… Markdown is supported.">${window.escapeHtml(node.public?.body || '')}</textarea>
+                </div>` : ''}
+                ${showItems ? `
+                <div class="field">
+                  <label>${itemsLabel}</label>
+                  <textarea class="piece-items" rows="4" placeholder="One item per line…">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
+                </div>` : ''}
+                ${showMedia ? `
+                <div class="field">
+                  <label>Image URL</label>
+                  <input type="text" class="piece-media" value="${window.escapeHtml(mediaSrc)}" placeholder="artifact-id or https://…" />
                 </div>
-                <div class="field-grid grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div class="field-grid">
                   <div class="field">
-                    <label class="text-[11px] font-bold text-muted mb-1">Alt Text</label>
-                    <input type="text" class="piece-media-alt text-sm" value="${window.escapeHtml(mediaAlt)}" placeholder="Describe image for accessibility..." />
+                    <label>Alt Text</label>
+                    <input type="text" class="piece-media-alt" value="${window.escapeHtml(mediaAlt)}" placeholder="Describe the image for accessibility…" />
                   </div>
                   <div class="field">
-                    <label class="text-[11px] font-bold text-muted mb-1">Caption</label>
-                    <input type="text" class="piece-media-caption text-sm" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption..." />
+                    <label>Caption</label>
+                    <input type="text" class="piece-media-caption" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption…" />
                   </div>
-                </div>
-              </div>`
-                  : ''
-              }
-
-              ${showCta ? `
-              <div class="cta-fields-group p-4 rounded-xl border border-gray-100 dark:border-slate-800 bg-gray-50/30 dark:bg-slate-900/20">
-                <h4 class="text-xs font-black uppercase tracking-widest text-muted mb-4">Call to Action</h4>
-                <div class="field-grid grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div>` : ''}
+                ${showCta ? `
+                <div class="field-grid">
                   <div class="field">
-                    <label class="text-[11px] font-bold text-muted mb-1">Button Text</label>
-                    <input type="text" class="piece-cta-text text-sm" value="${window.escapeHtml(node.public?.ctaText || '')}" placeholder="e.g. Shop Now" />
+                    <label>Button Text</label>
+                    <input type="text" class="piece-cta-text" value="${window.escapeHtml(node.public?.ctaText || '')}" placeholder="Learn more" />
                   </div>
                   <div class="field">
-                    <label class="text-[11px] font-bold text-muted mb-1">Button Link</label>
-                    <input type="url" class="piece-cta-link text-sm" value="${window.escapeHtml(node.public?.ctaLink || '')}" placeholder="https://..." />
+                    <label>Button URL</label>
+                    <input type="url" class="piece-cta-link" value="${window.escapeHtml(node.public?.ctaLink || '')}" placeholder="https://…" />
                   </div>
-                </div>
-              </div>` : ''}
-
-              <details class="piece-advanced border-t border-gray-100 dark:border-slate-800 pt-6">
-                <summary class="text-xs font-black uppercase tracking-widest text-muted cursor-pointer hover:text-accent transition-colors">Advanced / Agent Settings</summary>
-                <div class="piece-advanced-content mt-6 space-y-6">
-                  <details class="piece-type-change p-4 rounded-xl border border-dashed border-gray-200 dark:border-slate-800">
-                    <summary>Change piece type</summary>
-                    <div class="field piece-template-selector">
-                      <label>Template</label>
-                      <select class="template-select">
-                        ${templateOptions}
-                      </select>
-                    </div>
-                  </details>
+                </div>` : ''}
+                ${showChat ? `
+                <div class="field-grid">
                   <div class="field">
-                    <label>Visibility</label>
-                    <select class="piece-visibility">
-                      <option value="public" ${!node.visibility || node.visibility === 'public' ? 'selected' : ''}>Public</option>
-                      <option value="internal" ${node.visibility === 'internal' ? 'selected' : ''}>Internal</option>
-                      <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
-                    </select>
+                    <label>Invite Text</label>
+                    <input type="text" class="piece-chat-invitation" value="${window.escapeHtml(node.chat?.invitationText || '')}" placeholder="Ask our assistant…" />
                   </div>
-                  <div class="field-grid">
+                  <div class="field">
+                    <label>Suggested Question</label>
+                    <input type="text" class="piece-chat-query" value="${window.escapeHtml(node.chat?.suggestedQuery || '')}" placeholder="What should readers ask?" />
+                  </div>
+                </div>` : ''}
+                ${showLabel ? `
+                <div class="field">
+                  <label>Display Label</label>
+                  <input type="text" class="piece-label" value="${window.escapeHtml(node.public?.label || '')}" placeholder="Advertisement" />
+                </div>` : ''}
+                <details class="piece-advanced">
+                  <summary>Advanced</summary>
+                  <div class="piece-advanced-content">
+                    <details class="piece-type-change">
+                      <summary>Change block type</summary>
+                      <div class="field piece-template-selector">
+                        <label>Block Type</label>
+                        <select class="template-select">${templateOptions}</select>
+                      </div>
+                    </details>
                     <div class="field">
-                      <label>Internal Strategy</label>
-                      <select class="piece-strategy">
-                        <option value="">None</option>
-                        ${[
-                          'hook',
-                          'agitation',
-                          'context',
-                          'explanation',
-                          'proof',
-                          'example',
-                          'comparison',
-                          'myth',
-                          'step',
-                          'recommendation',
-                          'resolution',
-                          'summary',
-                        ]
-                          .map(
-                            (s) =>
-                              `<option value="${s}" ${node.private?.strategy === s ? 'selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
-                          )
-                          .join('')}
+                      <label>Visibility</label>
+                      <select class="piece-visibility">
+                        <option value="public" ${!node.visibility || node.visibility === 'public' ? 'selected' : ''}>Public</option>
+                        <option value="internal" ${node.visibility === 'internal' ? 'selected' : ''}>Internal</option>
+                        <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
                       </select>
                     </div>
-                    <div class="field">
-                      <label>Internal Intent</label>
-                      <select class="piece-intent">
-                        <option value="">None</option>
-                        ${['educate', 'persuade', 'reassure', 'convert', 'navigate'].map((intent) => `<option value="${intent}" ${node.private?.intent === intent ? 'selected' : ''}>${intent.charAt(0).toUpperCase() + intent.slice(1)}</option>`).join('')}
-                      </select>
-                    </div>
-                  </div>
-                  <div class="field-grid">
-                    <div class="field">
-                      <label>Presentation Hint</label>
-                      <select class="piece-presentation">
-                        <option value="">Default</option>
-                        ${[
-                          'plain',
-                          'section',
-                          'callout',
-                          'inline',
-                          'card',
-                          'panel',
-                          'faq',
-                          'summary',
-                          'chatInvite',
-                          'adSlot',
-                          'offerInline',
-                          'offerCard',
-                        ]
-                          .map(
-                            (p) =>
-                              `<option value="${p}" ${node.rendering?.presentation === p ? 'selected' : ''}>${p.charAt(0).toUpperCase() + p.slice(1)}</option>`
-                          )
-                          .join('')}
-                      </select>
-                    </div>
-                    <div class="field">
-                      <label>Placement Hint</label>
-                      <select class="piece-placement">
-                        <option value="">Default</option>
-                        ${['inline', 'section', 'sidebar', 'afterParagraph', 'footer'].map((placement) => `<option value="${placement}" ${node.rendering?.placement === placement ? 'selected' : ''}>${placement}</option>`).join('')}
-                      </select>
-                    </div>
-                  </div>
-                  ${
-                    showItems
-                      ? `
-                  <div class="field">
-                    <label>Items (One per line)</label>
-                    <textarea class="piece-items" rows="3" placeholder="List items">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
-                  </div>`
-                      : ''
-                  }
-                  ${
-                    showMedia
-                      ? `
-                  <div class="field-grid">
+                    ${showMedia ? `
                     <div class="field">
                       <label>Media Type</label>
                       <select class="piece-media-type">
-                        ${['image', 'video', 'audio', 'embed'].map((type) => `<option value="${type}" ${mediaType === type ? 'selected' : ''}>${type.charAt(0).toUpperCase() + type.slice(1)}</option>`).join('')}
+                        ${['image', 'video', 'audio', 'embed'].map((t) => `<option value="${t}" ${mediaType === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
                       </select>
-                    </div>
-                    <div class="field">
-                      <label>Media URL / Path</label>
-                      <input type="text" class="piece-media" value="${window.escapeHtml(mediaSrc)}" placeholder="~/assets/images/..." />
-                    </div>
-                  </div>
-                  <div class="field-grid">
-                    <div class="field">
-                      <label>Media Alt Text</label>
-                      <input type="text" class="piece-media-alt" value="${window.escapeHtml(mediaAlt)}" placeholder="Brief description" />
-                    </div>
-                    <div class="field">
-                      <label>Media Caption</label>
-                      <input type="text" class="piece-media-caption" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption" />
-                    </div>
-                  </div>`
-                      : ''
-                  }
-                  ${
-                    showChat
-                      ? `
-                  <div class="field-grid">
-                    <div class="field">
-                      <label>Chat Invite Text</label>
-                      <input type="text" class="piece-chat-invitation" value="${window.escapeHtml(node.chat?.invitationText || '')}" placeholder="Ask our assistant" />
-                    </div>
-                    <div class="field">
-                      <label>Suggested Chat Query</label>
-                      <input type="text" class="piece-chat-query" value="${window.escapeHtml(node.chat?.suggestedQuery || '')}" placeholder="What should readers ask?" />
-                    </div>
-                  </div>`
-                      : ''
-                  }
-                  ${
-                    showAddControls
-                      ? `
-                  <div class="piece-add-controls">
-                    ${!showCta ? '<button class="btn-tertiary btn-xs add-cta" type="button">Add CTA</button>' : ''}
-                    ${!showCommercial ? '<button class="btn-tertiary btn-xs add-commercial" type="button">Add commercial metadata</button>' : ''}
-                    ${!showChat ? '<button class="btn-tertiary btn-xs add-chat" type="button">Add chat invite</button>' : ''}
-                    ${!showMedia ? '<button class="btn-tertiary btn-xs add-media" type="button">Add media</button>' : ''}
-                    ${!showDisclosure ? '<button class="btn-tertiary btn-xs add-disclosure" type="button">Add disclosure</button>' : ''}
-                  </div>`
-                      : ''
-                  }
-                  ${
-                    showLabel
-                      ? `
-                  <div class="field">
-                    <label>Admin Label</label>
-                    <input type="text" class="piece-label" value="${window.escapeHtml(node.public?.label || '')}" placeholder="Label" />
-                  </div>`
-                      : ''
-                  }
-                  ${
-                    showCommercial
-                      ? `
-                  <div class="field-grid">
-                    <div class="field">
-                      <label>Commercial Type</label>
-                      <select class="piece-commercial-type">${commercialTypeOptions}</select>
-                    </div>
-                    <div class="field">
-                      <label>Sponsor / Merchant</label>
-                      <input type="text" class="piece-commercial-sponsor" value="${window.escapeHtml(node.commercial?.sponsorName || node.commercial?.merchantName || node.commercial?.advertiserName || '')}" placeholder="Optional sponsor" />
-                    </div>
-                  </div>`
-                      : ''
-                  }
-                  ${
-                    showDisclosure
-                      ? `
-                  <div class="field">
-                    <label>Disclosure Required</label>
-                    <div class="checkbox-field">
+                    </div>` : ''}
+                    ${showAddControls ? `
+                    <div class="piece-add-controls">
+                      ${!showCta ? '<button class="btn-tertiary btn-xs add-cta" type="button">+ Add CTA Button</button>' : ''}
+                      ${!showCommercial ? '<button class="btn-tertiary btn-xs add-commercial" type="button">+ Add Commercial Info</button>' : ''}
+                      ${!showChat ? '<button class="btn-tertiary btn-xs add-chat" type="button">+ Add Chat Invite</button>' : ''}
+                      ${!showMedia ? '<button class="btn-tertiary btn-xs add-media" type="button">+ Add Image</button>' : ''}
+                      ${!showDisclosure ? '<button class="btn-tertiary btn-xs add-disclosure" type="button">+ Add Disclosure</button>' : ''}
+                    </div>` : ''}
+                    ${showCommercial ? `
+                    <div class="field-grid">
+                      <div class="field">
+                        <label>Commercial Type</label>
+                        <select class="piece-commercial-type">${commercialTypeOptions}</select>
+                      </div>
+                      <div class="field">
+                        <label>Sponsor</label>
+                        <input type="text" class="piece-commercial-sponsor" value="${window.escapeHtml(node.commercial?.sponsorName || node.commercial?.merchantName || node.commercial?.advertiserName || '')}" placeholder="Optional sponsor" />
+                      </div>
+                    </div>` : ''}
+                    ${showDisclosure ? `
+                    <div class="field checkbox-field">
                       <input type="checkbox" class="piece-disclosure" ${node.commercial?.disclosure?.required ? 'checked' : ''} />
-                      <span>Show sponsored label</span>
+                      <label>Show sponsored label</label>
+                    </div>
+                    <div class="field">
+                      <label>Disclosure Label</label>
+                      <input type="text" class="piece-disclosure-label" value="${window.escapeHtml(node.commercial?.disclosure?.label || '')}" placeholder="Sponsored" />
+                    </div>` : ''}
+                    <div class="field">
+                      <label>Raw Node JSON</label>
+                      <textarea class="piece-raw-json" rows="8" spellcheck="false">${window.escapeHtml(JSON.stringify(node, null, 2))}</textarea>
                     </div>
                   </div>
-                  <div class="field">
-                    <label>Disclosure Label</label>
-                    <input type="text" class="piece-disclosure-label" value="${window.escapeHtml(node.commercial?.disclosure?.label || '')}" placeholder="Sponsored" />
-                  </div>`
-                      : ''
-                  }
-                  <div class="field">
-                    <label class="text-xs font-bold text-muted mb-2">Raw Node JSON (Canonical)</label>
-                    <textarea class="piece-raw-json font-mono text-[10px] bg-gray-50 dark:bg-slate-950 p-4 rounded-lg" rows="8" spellcheck="false">${window.escapeHtml(JSON.stringify(node, null, 2))}</textarea>
-                  </div>
-                </div>
-              </details>
-            </div>
+                </details>
+              </div>
             </details>
           `;
 
@@ -4151,30 +4251,6 @@ const metadata = {
 
           piece.querySelector('.piece-visibility').addEventListener('change', (e) => {
             node.visibility = e.target.value;
-            updateFromPieces();
-          });
-
-          piece.querySelector('.piece-strategy').addEventListener('change', (e) => {
-            node.private = node.private || {};
-            node.private.strategy = e.target.value || undefined;
-            updateFromPieces();
-          });
-
-          piece.querySelector('.piece-intent').addEventListener('change', (e) => {
-            node.private = node.private || {};
-            node.private.intent = e.target.value || undefined;
-            updateFromPieces();
-          });
-
-          piece.querySelector('.piece-presentation').addEventListener('change', (e) => {
-            node.rendering = node.rendering || {};
-            node.rendering.presentation = e.target.value || undefined;
-            updateFromPieces();
-          });
-
-          piece.querySelector('.piece-placement').addEventListener('change', (e) => {
-            node.rendering = node.rendering || {};
-            node.rendering.placement = e.target.value || undefined;
             updateFromPieces();
           });
 
