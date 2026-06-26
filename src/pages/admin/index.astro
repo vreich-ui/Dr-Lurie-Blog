@@ -26,15 +26,19 @@ const metadata = {
 
     <!-- Shown when signed out -->
     <div data-admin-signin-prompt hidden class="admin-gate-panel">
+      <p class="dashboard-kicker">Admin login required</p>
       <p class="admin-gate-message">
         Sign in with your editor account to access publishing tools. Public articles remain available without login.
       </p>
-      <button type="button" class="btn-primary admin-gate-btn" data-admin-open-login> Sign in to editor </button>
+      <button type="button" class="btn-primary admin-gate-btn" data-admin-open-login>Sign in to editor</button>
     </div>
 
     <!-- Shown when signed in but not an admin -->
     <div data-admin-forbidden-prompt hidden class="admin-gate-panel">
-      <p class="admin-gate-message">Your account does not have editor permissions.</p>
+      <p class="dashboard-kicker">Access restricted</p>
+      <p class="admin-gate-message">
+        You are signed in, but this email is not listed in ADMIN_EMAILS. Contact the site admin to request access.
+      </p>
     </div>
 
     <!-- Shown when signed-in admin -->
@@ -315,7 +319,11 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          await handleOAuthCallback().catch(() => {});
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) {
+            // OAuth redirect landed on this page — close modal if somehow open
+            window.__drLurieLoginModal?.close();
+          }
           await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {

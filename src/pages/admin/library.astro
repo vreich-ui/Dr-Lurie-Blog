@@ -571,7 +571,8 @@ const formatDate = (date: Date) => {
       const initialize = async () => {
         setAuthStatus('Checking admin access…');
         try {
-          await handleOAuthCallback().catch(() => {});
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) window.__drLurieLoginModal?.close();
           const user = currentUser();
 
           activeUser = user;

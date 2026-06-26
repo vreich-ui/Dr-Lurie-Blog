@@ -1174,7 +1174,8 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          await handleOAuthCallback().catch(() => {});
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) window.__drLurieLoginModal?.close();
           await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {
