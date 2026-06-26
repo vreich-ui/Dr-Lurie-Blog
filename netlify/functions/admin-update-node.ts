@@ -1,5 +1,5 @@
 /**
- * Clerk-authenticated single-node write-back.
+ * Admin-authenticated single-node write-back.
  * Requires an active workflow lock held by the caller.
  * Updates only node.public fields; increments record version; preserves the lock.
  *

@@ -128,7 +128,7 @@ const getBearerToken = (authorization: string | undefined) => {
 };
 
 const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
-  const expected = toNonEmptyString(process.env.NETLIFY_PUBLISH_SECRET);
+  const expected = toNonEmptyString(process.env.PUBLISH_SECRET ?? process.env.NETLIFY_PUBLISH_SECRET);
   if (!expected) return false;
 
   const provided =
@@ -1248,7 +1248,7 @@ const createSaveJsonBlobHeaders = (event: LambdaEvent, publishSecret: string) =>
 });
 
 const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, unknown>) => {
-  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
   if (!publishSecret) {
     return toolError('Server-side workflow storage credentials are not configured.');
@@ -1282,7 +1282,7 @@ const invokeSaveJsonBlob = async (event: LambdaEvent, payload: Record<string, un
 };
 
 const invokeSaveArtifact = async (event: LambdaEvent, payload: Record<string, unknown>) => {
-  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
   if (!publishSecret) {
     return toolError('Server-side artifact storage is not configured.');
@@ -1396,7 +1396,7 @@ const callDeployStatus = async (event: LambdaEvent, payload: Record<string, unkn
 };
 
 const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string, unknown>) => {
-  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET;
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
   if (!publishSecret) {
     return toolError('Article image verification is not configured on the server.', {

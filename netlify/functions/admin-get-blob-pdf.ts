@@ -19,7 +19,7 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
 const toText = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 const hasValidNetlifyPublishSecret = (event: LambdaEvent) => {
-  const expected = toText(process.env.NETLIFY_PUBLISH_SECRET);
+  const expected = toText(process.env.PUBLISH_SECRET ?? process.env.NETLIFY_PUBLISH_SECRET);
   if (!expected) return false;
 
   const provided = toText(getHeader(event.headers, 'x-publish-key'));

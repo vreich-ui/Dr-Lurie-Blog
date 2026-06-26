@@ -1,5 +1,5 @@
 /**
- * Clerk-authenticated "Ask AI" suggestion endpoint.
+ * Admin-authenticated "Ask AI" suggestion endpoint.
  * Read-only with respect to Netlify Blobs – does not acquire a lock,
  * does not write back. Returns a suggestion the human can Accept or Discard.
  *

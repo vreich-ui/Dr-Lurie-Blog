@@ -173,19 +173,19 @@ export type AskAiOptions = {
   nodeId: string;
   selectedText?: string;
   instruction: string;
-  clerkToken: string;
+  token: string;
 };
 
 export type AskAiResult = { ok: true; suggestion: Partial<ArticleBodyNode['public']> } | { ok: false; error: string };
 
 export async function askAiForNode(options: AskAiOptions): Promise<AskAiResult> {
-  const { requestId, nodeId, selectedText, instruction, clerkToken } = options;
+  const { requestId, nodeId, selectedText, instruction, token } = options;
   try {
     const res = await fetch(AI_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${clerkToken}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ requestId, nodeId, selectedText, instruction }),
     });

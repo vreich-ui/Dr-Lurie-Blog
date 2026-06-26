@@ -9,10 +9,9 @@ import { z } from 'zod';
  * Netlify environment required by this server-side Agent SDK runner:
  * - OPENAI_API_KEY: used by the OpenAI Agents SDK.
  * - NETLIFY_PUBLISH_ENDPOINT: absolute URL for /.netlify/functions/publish-article.
- * - NETLIFY_PUBLISH_SECRET: server-only key sent as x-publish-key to publish-article.
- *
- * Keep NETLIFY_PUBLISH_SECRET separate from publish-article's PUBLISH_SECRET name in
- * code. In Netlify, both values should be configured to the same secret string.
+ * - PUBLISH_SECRET (or NETLIFY_PUBLISH_SECRET): server-only key sent as x-publish-key
+ *   to publish-article and accepted as x-publish-key on this function itself.
+ *   Set one of these; PUBLISH_SECRET takes priority.
  */
 
 type LambdaEvent = {
@@ -32,7 +31,6 @@ type PublisherRequest = {
   markdown?: unknown;
   overwrite?: unknown;
   publishedDate?: unknown;
-  publishSecret?: unknown;
   slug?: unknown;
   title?: unknown;
 };
@@ -153,15 +151,13 @@ const verifyAdminSession = async (event: LambdaEvent, context?: LambdaContext) =
   return undefined;
 };
 
-const verifyRequestAuthorization = async (event: LambdaEvent, context?: LambdaContext, input?: PublisherRequest) => {
+const verifyRequestAuthorization = async (event: LambdaEvent, context?: LambdaContext) => {
   const publishKey = getHeader(event.headers, 'x-publish-key').trim();
-  const publishSecretFromBody = toStringValue(input?.publishSecret) ?? '';
-  const providedSecret = publishKey || publishSecretFromBody;
 
-  if (providedSecret) {
-    const publishSecret = process.env.PUBLISH_SECRET;
+  if (publishKey) {
+    const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
 
-    if (publishSecret && providedSecret === publishSecret) {
+    if (publishSecret && publishKey === publishSecret) {
       return undefined;
     }
 
@@ -210,7 +206,7 @@ const parseBody = (event: LambdaEvent): PublisherRequest | undefined => {
 const validateEnvironment = () => {
   const openaiApiKey = process.env.OPENAI_API_KEY;
   const endpoint = process.env.NETLIFY_PUBLISH_ENDPOINT;
-  const publishSecret = process.env.NETLIFY_PUBLISH_SECRET;
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
   if (!openaiApiKey || !endpoint || !publishSecret) {
     throw new RunnerError(500, 'Server-side publisher agent is not configured.');
   }
@@ -435,7 +431,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       });
     }
 
-    const authError = await verifyRequestAuthorization(event, context, body);
+    const authError = await verifyRequestAuthorization(event, context);
 
     if (authError) {
       return authError;

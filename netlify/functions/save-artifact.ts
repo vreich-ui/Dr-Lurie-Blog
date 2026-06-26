@@ -162,7 +162,7 @@ const secretsMatch = (provided: string, expected: string) => {
 
 const verifyPublishKey = (event: LambdaEvent) => {
   const provided = getHeader(event.headers, 'x-publish-key');
-  const expected = process.env.NETLIFY_PUBLISH_SECRET || process.env.PUBLISH_SECRET || '';
+  const expected = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET || '';
 
   if (!provided || !expected || !secretsMatch(provided, expected)) {
     return jsonResponse(401, { error: 'Unauthorized' });

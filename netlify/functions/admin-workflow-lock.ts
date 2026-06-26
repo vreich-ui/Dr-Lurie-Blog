@@ -1,7 +1,7 @@
 /**
- * Clerk-authenticated wrapper around the workflow lock operations.
+ * Netlify Identity-authenticated wrapper around the workflow lock operations.
  * Agents use save-json-blob directly (x-publish-key). Human editors use this
- * endpoint (Clerk session token) so the frontend never sees the publish secret.
+ * endpoint (Netlify Identity token) so the frontend never sees the publish secret.
  *
  * Supported actions:
  *   checkout   – acquire lock; 423 if already held by agent
