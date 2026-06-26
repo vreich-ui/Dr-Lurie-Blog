@@ -18,7 +18,7 @@ const { variant = 'desktop' } = Astro.props;
         aria-haspopup="menu"
         aria-expanded="false"
       >
-        <span data-auth-trigger-label>Login</span>
+        <span data-auth-trigger-label>Sign in</span>
         <span class="hidden flex items-center" data-auth-trigger-chevron aria-hidden="true">
           <svg
             class="h-4 w-4"
@@ -76,7 +76,7 @@ const { variant = 'desktop' } = Astro.props;
         aria-haspopup="menu"
         aria-expanded="false"
       >
-        <span data-auth-trigger-label>Login</span>
+        <span data-auth-trigger-label>Sign in</span>
         <svg
           class="ml-0.5 hidden h-3.5 w-3.5 transition-transform rtl:ml-0 rtl:mr-0.5"
           data-auth-trigger-chevron
@@ -216,9 +216,9 @@ const { variant = 'desktop' } = Astro.props;
 
     const adminMenuItems = [
       { href: '/admin', text: 'Admin Dashboard' },
-      { href: '/admin/library', text: 'Library' },
       { href: '/admin/publish', text: 'Publish' },
       { href: '/admin/drafts', text: 'Drafts' },
+      { href: '/admin/library', text: 'Library' },
       { href: '/admin/agent-admin', text: 'AI Publisher' },
       { href: '/admin/blobs', text: 'Blob Store' },
     ];
@@ -227,9 +227,17 @@ const { variant = 'desktop' } = Astro.props;
       container.hidden = !isAdmin;
       container.replaceChildren();
       if (!isAdmin) return;
+
+      // Divider + Admin label
       const divider = document.createElement('div');
       divider.className = 'my-1 border-t border-gray-200/70 dark:border-slate-700/70';
       container.append(divider);
+
+      const adminLabel = document.createElement('p');
+      adminLabel.className = 'px-2.5 pt-1 pb-0.5 text-xs font-bold uppercase tracking-widest text-muted';
+      adminLabel.textContent = 'Admin';
+      container.append(adminLabel);
+
       adminMenuItems.forEach((item) => {
         const link = document.createElement('a');
         link.className =
@@ -259,10 +267,13 @@ const { variant = 'desktop' } = Astro.props;
         root.dataset.authSignedIn = String(signedIn);
         root.dataset.authAdmin = String(Boolean(adminState.isAdmin));
 
-        if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Login';
+        if (triggerLabel) triggerLabel.textContent = signedIn ? 'Account' : 'Sign in';
+        // Chevron only makes sense when signed in (dropdown is available)
         if (triggerChevron) {
-          triggerChevron.classList.toggle('hidden', false);
-          triggerChevron.classList.toggle('rotate-180', trigger?.getAttribute('aria-expanded') === 'true');
+          triggerChevron.classList.toggle('hidden', !signedIn);
+          if (signedIn) {
+            triggerChevron.classList.toggle('rotate-180', trigger?.getAttribute('aria-expanded') === 'true');
+          }
         }
         if (!signedIn) setMenuOpen(root, false);
         const email = adminState?.email || user?.email || '';
@@ -350,6 +361,15 @@ const { variant = 'desktop' } = Astro.props;
         if (trigger && root) {
           event.preventDefault();
           event.stopPropagation();
+          const isSignedIn = root.dataset.authSignedIn === 'true';
+
+          // Signed-out: trigger is a direct sign-in action — no dropdown
+          if (!isSignedIn) {
+            openSignIn();
+            return;
+          }
+
+          // Signed-in: toggle the account dropdown
           if (root.hasAttribute('data-mobile-auth-menu') && window.matchMedia('(max-width: 767px)').matches) {
             const willOpen = trigger.getAttribute('aria-expanded') !== 'true';
             closeAllMenus();
@@ -395,6 +415,8 @@ const { variant = 'desktop' } = Astro.props;
         const trigger = target?.closest('[data-auth-trigger]');
         const menu = target?.closest('[data-auth-menu]');
         if (!root || (!trigger && !menu)) return;
+        // Only hover-open when signed in — signed-out trigger is a direct button
+        if (root.dataset.authSignedIn !== 'true') return;
         clearAuthMenuCloseTimer();
         setMenuOpen(root, true);
       };
