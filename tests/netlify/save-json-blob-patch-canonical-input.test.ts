@@ -601,3 +601,293 @@ describe('patchCanonicalInput — lock and version safety', () => {
     );
   });
 });
+
+// ===========================================================================
+// Tighter validation — replace_image_asset_register
+// ===========================================================================
+
+describe('patchCanonicalInput — replace_image_asset_register tighter validation', () => {
+  it('rejects register entries with untrusted Major Key artifact ref in url', async () => {
+    const store = createMemoryStore();
+    const requestId = `register-untrusted-url-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // Valid Major Key format but NOT in agent_outputs for this record
+    const untrustedRef = `image/${requestId}/${'b'.repeat(64)}.png`;
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      replace_image_asset_register: [{ asset_id: 'x', url: untrustedRef }],
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+  });
+
+  it('rejects register entries with arbitrary remote URL in url', async () => {
+    const store = createMemoryStore();
+    const requestId = `register-remote-url-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      replace_image_asset_register: [
+        { asset_id: 'asset_bad', url: 'https://cdn.example.com/image.jpg' },
+      ],
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /arbitrary remote url|remote url/i);
+  });
+
+  it('accepts trusted Major Key artifact ref in url', async () => {
+    const store = createMemoryStore();
+    const requestId = `register-trusted-url-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      replace_image_asset_register: [
+        { asset_id: 'asset_mk', url: FEATURED_ARTIFACT, alt: 'Hero', status: 'ready' },
+      ],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    assert.equal(parseBody(resp).record?.input.media?.image_asset_register?.[0].url, FEATURED_ARTIFACT);
+  });
+});
+
+// ===========================================================================
+// Tighter validation — promote_publish_payload image-bearing fields
+// ===========================================================================
+
+describe('patchCanonicalInput — promote_publish_payload image validation', () => {
+  it('rejects promote_publish_payload.featuredImage with arbitrary remote URL', async () => {
+    const store = createMemoryStore();
+    const requestId = `payload-featured-remote-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      promote_publish_payload: {
+        slug: 'retinol-explained-simply',
+        title: 'Retinol Explained Simply',
+        featuredImage: 'https://cdn.example.com/hero.jpg',
+      },
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /arbitrary remote url|remote url/i);
+  });
+
+  it('rejects promote_publish_payload.featuredImage with untrusted artifact ref', async () => {
+    const store = createMemoryStore();
+    const requestId = `payload-featured-untrusted-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      promote_publish_payload: {
+        slug: 'retinol-explained-simply',
+        title: 'Retinol Explained Simply',
+        featuredImage: `image/${requestId}/${'c'.repeat(64)}.png`,
+      },
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+  });
+
+  it('rejects promote_publish_payload.artifactReferences[].blobKey with guessed (untrusted) ref', async () => {
+    const store = createMemoryStore();
+    const requestId = `payload-blobkey-guessed-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      promote_publish_payload: {
+        slug: 'retinol-explained-simply',
+        title: 'Retinol Explained Simply',
+        artifactReferences: [
+          {
+            blobKey: `image/${requestId}/${'d'.repeat(64)}.png`,
+            sha256: 'd'.repeat(64),
+            contentType: 'image/png',
+            sizeBytes: 1000,
+            createdAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+  });
+
+  it('accepts promote_publish_payload with trusted artifact ref in featuredImage and artifactReferences', async () => {
+    const store = createMemoryStore();
+    const requestId = `payload-trusted-refs-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      promote_publish_payload: {
+        slug: 'retinol-explained-simply',
+        title: 'Retinol Explained Simply',
+        featuredImage: FEATURED_ARTIFACT,
+        artifactReferences: [
+          {
+            blobKey: INLINE_ARTIFACT,
+            sha256: '655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f',
+            contentType: 'image/png',
+            sizeBytes: 180000,
+            createdAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const storedPayload = saved.input.publication?.publish_payload as Record<string, unknown> | undefined;
+    assert.equal(storedPayload?.featuredImage, FEATURED_ARTIFACT);
+  });
+});
+
+// ===========================================================================
+// Status repair — clear stale failure state
+// ===========================================================================
+
+describe('patchCanonicalInput — clear stale failure state', () => {
+  it('clears last_error, failed_agents, and needs_review in one call with audit trail', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-clear-all-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // Simulate a failed record with stale failure state
+    const failedRecord: WorkflowRecord = {
+      ...record,
+      workflow_status: 'failed',
+      last_error: 'publish failed: 422 Invalid image reference.',
+      failed_agents: ['final_article'],
+      needs_review: true,
+    };
+    await store.setJSON(`workflows/by-id/${requestId}.json`, failedRecord);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: failedRecord.version,
+      repair_workflow_status: 'pending',
+      clear_last_error: true,
+      clear_failed_agents: true,
+      reset_needs_review: true,
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+
+    assert.equal(saved.workflow_status, 'pending');
+    assert.equal(saved.last_error, null, 'last_error must be cleared');
+    assert.deepEqual(saved.failed_agents, [], 'failed_agents must be cleared');
+    assert.equal(saved.needs_review, false, 'needs_review must be reset');
+
+    const histEntry = saved.history.at(-1)!;
+    assert.equal(histEntry.action, 'patch_canonical_input');
+    assert.ok(histEntry.details?.workflow_status_changed, 'audit must record status transition');
+    assert.ok(histEntry.details?.last_error_cleared, 'audit must record last_error clear');
+    assert.ok(histEntry.details?.failed_agents_cleared, 'audit must record failed_agents clear');
+    assert.ok(histEntry.details?.needs_review_reset, 'audit must record needs_review reset');
+
+    const statusChange = histEntry.details?.workflow_status_changed as { from: string; to: string };
+    assert.equal(statusChange.from, 'failed');
+    assert.equal(statusChange.to, 'pending');
+
+    const failedAgentsCleared = histEntry.details?.failed_agents_cleared as { from: string[] };
+    assert.deepEqual(failedAgentsCleared.from, ['final_article']);
+  });
+
+  it('does not audit clear_last_error when last_error was already null', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-clear-noop-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // Record already has null last_error (default from setupRecord)
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      clear_last_error: true,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: FEATURED_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const histEntry = parseBody(resp).record!.history.at(-1)!;
+    assert.equal(histEntry.details?.last_error_cleared, undefined, 'last_error_cleared must be absent when already null');
+  });
+
+  it('clears failed_agents alone without requiring repair_workflow_status', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-clear-agents-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // Simulate a record with failed_agents but not failed workflow_status
+    const stuckRecord: WorkflowRecord = {
+      ...record,
+      failed_agents: ['draft'],
+    };
+    await store.setJSON(`workflows/by-id/${requestId}.json`, stuckRecord);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: stuckRecord.version,
+      clear_failed_agents: true,
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    assert.deepEqual(saved.failed_agents, [], 'failed_agents must be cleared');
+  });
+
+  it('returns 400 when only clear_last_error: false is given (no effective patch)', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-false-flag-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      // clear_last_error: false is falsy so doesn't count
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /at least one/i);
+  });
+});

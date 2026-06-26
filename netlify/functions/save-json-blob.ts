@@ -173,6 +173,9 @@ const requestSchema = z
     replace_image_asset_register: z.array(z.unknown()).optional(),
     promote_publish_payload: z.unknown().optional(),
     repair_workflow_status: z.string().min(1).optional(),
+    clear_last_error: z.boolean().optional(),
+    clear_failed_agents: z.boolean().optional(),
+    reset_needs_review: z.boolean().optional(),
   })
   .strict();
 
@@ -1467,6 +1470,8 @@ const MAJOR_KEY_ARTIFACT_REF_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 /** Reject data URIs (base64/raw bytes embedded in strings). */
 const BASE64_DATA_URI_RE = /^data:/i;
+/** Reject arbitrary remote URLs — image refs must be Major Key artifact references. */
+const REMOTE_URL_RE = /^https?:\/\//i;
 
 type CanonicalInputAuditPatch = {
   path: string;
@@ -1505,6 +1510,39 @@ const rejectUnsafeStringValue = (action: WorkflowAction, path: string, value: st
       error: `${path} is a legacy repo path (src/assets/...). Provide a Major Key artifact reference instead.`,
     });
   }
+  if (REMOTE_URL_RE.test(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`,
+    });
+  }
+  return undefined;
+};
+
+/** Validate a string as a trusted Major Key artifact reference in one step. */
+const validateTrustedArtifactRef = (
+  action: WorkflowAction,
+  path: string,
+  value: string,
+  trustedRefs: Set<string>
+): JsonResponse | undefined => {
+  const unsafeErr = rejectUnsafeStringValue(action, path, value);
+  if (unsafeErr) return unsafeErr;
+
+  if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} must be a Major Key artifact reference (image/{id}/{sha256}.{ext}).`,
+    });
+  }
+
+  if (!trustedRefs.has(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} "${value}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
+    });
+  }
+
   return undefined;
 };
 
@@ -1674,6 +1712,83 @@ const validateImageAssetRegisterEntries = (
   return { ok: true, records };
 };
 
+/** Inside the retry loop: verify every Major Key artifact ref in the register is actually trusted. */
+const requireRegisterTrustedRefs = (
+  action: WorkflowAction,
+  records: ImageAssetRecord[],
+  trustedRefs: Set<string>
+): JsonResponse | undefined => {
+  for (let i = 0; i < records.length; i += 1) {
+    const entry = records[i];
+    for (const field of ['url', 'repoPath'] as const) {
+      const value = entry[field];
+      if (!value || !MAJOR_KEY_ARTIFACT_REF_RE.test(value)) continue;
+      if (!trustedRefs.has(value)) {
+        return jsonResponse(400, {
+          action,
+          error: `replace_image_asset_register[${i}].${field} "${value}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
+        });
+      }
+    }
+  }
+  return undefined;
+};
+
+/** Inside the retry loop: validate all image-bearing fields in a promote_publish_payload. */
+const validatePublishPayloadImageRefs = (
+  action: WorkflowAction,
+  payload: NonNullable<WorkflowRequest['promote_publish_payload']>,
+  trustedRefs: Set<string>
+): JsonResponse | undefined => {
+  if (!isRecord(payload)) return undefined;
+
+  for (const field of ['featuredImage', 'existingFeaturedImagePath'] as const) {
+    const value = payload[field];
+    if (typeof value !== 'string' || !value) continue;
+    const err = validateTrustedArtifactRef(action, `promote_publish_payload.${field}`, value, trustedRefs);
+    if (err) return err;
+  }
+
+  for (const arrayField of ['images', 'mediaEntries'] as const) {
+    const items = payload[arrayField];
+    if (!Array.isArray(items)) continue;
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      if (!isRecord(item)) continue;
+      for (const subField of ['src', 'url', 'blobKey'] as const) {
+        const value = item[subField];
+        if (typeof value !== 'string' || !value) continue;
+        const err = validateTrustedArtifactRef(
+          action,
+          `promote_publish_payload.${arrayField}[${i}].${subField}`,
+          value,
+          trustedRefs
+        );
+        if (err) return err;
+      }
+    }
+  }
+
+  const artifactRefs = payload['artifactReferences'];
+  if (Array.isArray(artifactRefs)) {
+    for (let i = 0; i < artifactRefs.length; i += 1) {
+      const item = artifactRefs[i];
+      if (!isRecord(item)) continue;
+      const blobKey = item['blobKey'];
+      if (typeof blobKey !== 'string' || !blobKey) continue;
+      const err = validateTrustedArtifactRef(
+        action,
+        `promote_publish_payload.artifactReferences[${i}].blobKey`,
+        blobKey,
+        trustedRefs
+      );
+      if (err) return err;
+    }
+  }
+
+  return undefined;
+};
+
 export const patchCanonicalInput = async (store: WorkflowBlobStore, body: WorkflowRequest): Promise<JsonResponse> => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
@@ -1686,12 +1801,23 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
   const hasImageRegisterReplacement = body.replace_image_asset_register !== undefined;
   const hasPublishPayload = body.promote_publish_payload !== undefined;
   const hasStatusRepair = body.repair_workflow_status !== undefined;
+  const hasClearLastError = body.clear_last_error === true;
+  const hasClearFailedAgents = body.clear_failed_agents === true;
+  const hasResetNeedsReview = body.reset_needs_review === true;
 
-  if (!hasNodePatches && !hasImageRegisterReplacement && !hasPublishPayload && !hasStatusRepair) {
+  if (
+    !hasNodePatches &&
+    !hasImageRegisterReplacement &&
+    !hasPublishPayload &&
+    !hasStatusRepair &&
+    !hasClearLastError &&
+    !hasClearFailedAgents &&
+    !hasResetNeedsReview
+  ) {
     return jsonResponse(400, {
       action: body.action,
       error:
-        'patch_canonical_input requires at least one of: node_patches, replace_image_asset_register, promote_publish_payload, repair_workflow_status.',
+        'patch_canonical_input requires at least one of: node_patches, replace_image_asset_register, promote_publish_payload, repair_workflow_status, clear_last_error, clear_failed_agents, reset_needs_review.',
     });
   }
 
@@ -1706,7 +1832,8 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
     return jsonResponse(400, { action: body.action, error: 'Invalid repair_workflow_status.' });
   }
 
-  // Validate promote_publish_payload up-front
+  // Validate promote_publish_payload schema up-front (trusted-ref checks happen inside the loop)
+  let validatedPublishPayload: NonNullable<WorkflowRequest['promote_publish_payload']> | undefined;
   if (hasPublishPayload) {
     const parsed = publishPayloadSchema.safeParse(body.promote_publish_payload);
     if (!parsed.success) {
@@ -1716,9 +1843,10 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
         issues: parsed.error.issues,
       });
     }
+    validatedPublishPayload = parsed.data;
   }
 
-  // Validate replace_image_asset_register up-front
+  // Validate replace_image_asset_register schema/format up-front (trusted-ref checks happen inside loop)
   let validatedImageRegister: ImageAssetRecord[] | undefined;
   if (hasImageRegisterReplacement) {
     const entries = body.replace_image_asset_register as unknown[];
@@ -1743,6 +1871,17 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
     }
 
     const trustedRefs = gatherTrustedArtifactRefs(previousRecord);
+
+    // Trusted-ref checks for register and publish payload (require the loaded record)
+    if (hasImageRegisterReplacement && validatedImageRegister !== undefined) {
+      const regErr = requireRegisterTrustedRefs(body.action, validatedImageRegister, trustedRefs);
+      if (regErr) return regErr;
+    }
+    if (hasPublishPayload && validatedPublishPayload !== undefined) {
+      const payloadErr = validatePublishPayloadImageRefs(body.action, validatedPublishPayload, trustedRefs);
+      if (payloadErr) return payloadErr;
+    }
+
     const auditPatches: CanonicalInputAuditPatch[] = [];
     let nextInput: ContentSourceV1 = { ...previousRecord.input };
 
@@ -1825,18 +1964,31 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
       });
     }
 
+    const nextWorkflowStatus = nextWorkflowStatusResult.value ?? previousRecord.workflow_status;
+    const nextLastError = hasClearLastError ? null : previousRecord.last_error;
+    const nextFailedAgents = hasClearFailedAgents ? [] : previousRecord.failed_agents;
+    const nextNeedsReview = hasResetNeedsReview ? false : previousRecord.needs_review;
+
     const auditDetails: Record<string, unknown> = {
       owner_id: previousRecord.lock?.owner_id,
       owner_label: previousRecord.lock?.owner_label,
       patches: auditPatches,
     };
 
-    const nextWorkflowStatus = nextWorkflowStatusResult.value ?? previousRecord.workflow_status;
     if (nextWorkflowStatus !== previousRecord.workflow_status) {
       auditDetails.workflow_status_changed = {
         from: previousRecord.workflow_status,
         to: nextWorkflowStatus,
       };
+    }
+    if (hasClearLastError && previousRecord.last_error !== null) {
+      auditDetails.last_error_cleared = { from: previousRecord.last_error };
+    }
+    if (hasClearFailedAgents && previousRecord.failed_agents.length > 0) {
+      auditDetails.failed_agents_cleared = { from: [...previousRecord.failed_agents] };
+    }
+    if (hasResetNeedsReview && previousRecord.needs_review) {
+      auditDetails.needs_review_reset = { from: true, to: false };
     }
 
     const timestamp = nowIso();
@@ -1846,6 +1998,9 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
         updated_at: timestamp,
         input: nextInput,
         workflow_status: nextWorkflowStatus,
+        last_error: nextLastError,
+        failed_agents: nextFailedAgents,
+        needs_review: nextNeedsReview,
         history: [
           ...previousRecord.history,
           {
