@@ -30,8 +30,14 @@ import {
   type AllowedAgentName,
   type WorkflowStatus,
 } from '../../src/schema/workflow-contract.js';
-import { parseContentSourceV1, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
-import { type ArticleBodyV1 } from '../../src/schema/article-content-v1.js';
+import {
+  parseContentSourceV1,
+  publishPayloadSchema,
+  imageAssetSchema,
+  type ContentSourceV1,
+  type ImageAssetRecord,
+} from '../../src/schema/schema-v1.js';
+import { type ArticleBodyNode, type ArticleBodyV1 } from '../../src/schema/article-content-v1.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -117,6 +123,7 @@ const requestSchema = z
       'checkin_request',
       'force_unlock',
       'set_published_time',
+      'patch_canonical_input',
     ]),
     request_id: z.string().min(1).optional(),
     input: z.unknown().optional(),
@@ -151,6 +158,24 @@ const requestSchema = z
     published_time: z.string().min(1).nullable().optional(),
     publish_receipt: z.record(z.string(), z.unknown()).optional(),
     article_body: z.unknown().optional(),
+    node_patches: z
+      .array(
+        z
+          .object({
+            node_id: z.string().min(1),
+            public_media_src: z.string().nullable().optional(),
+            public_media_alt: z.string().nullable().optional(),
+            public_media_caption: z.string().nullable().optional(),
+          })
+          .strict()
+      )
+      .optional(),
+    replace_image_asset_register: z.array(z.unknown()).optional(),
+    promote_publish_payload: z.unknown().optional(),
+    repair_workflow_status: z.string().min(1).optional(),
+    clear_last_error: z.boolean().optional(),
+    clear_failed_agents: z.boolean().optional(),
+    reset_needs_review: z.boolean().optional(),
   })
   .strict();
 
@@ -1435,6 +1460,570 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
   return jsonResponse(409, { action: body.action, conflict: true });
 };
 
+// ---------------------------------------------------------------------------
+// patch_canonical_input helpers
+// ---------------------------------------------------------------------------
+
+/** Matches a Major Key artifact reference: image/{id}/{sha256-64-hex}.{ext} */
+const MAJOR_KEY_ARTIFACT_REF_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+/** Reject legacy local repo paths that the article publisher cannot resolve. */
+const LEGACY_REPO_PATH_RE = /^src\/assets\//;
+/** Reject data URIs (base64/raw bytes embedded in strings). */
+const BASE64_DATA_URI_RE = /^data:/i;
+/** Reject arbitrary remote URLs — image refs must be Major Key artifact references. */
+const REMOTE_URL_RE = /^https?:\/\//i;
+
+type CanonicalInputAuditPatch = {
+  path: string;
+  old_value_summary: string;
+  new_value_summary: string;
+};
+
+/** Collect every blobKey from every agent_output.artifactReferences array. */
+const gatherTrustedArtifactRefs = (record: WorkflowRecord): Set<string> => {
+  const refs = new Set<string>();
+
+  for (const agentOutput of Object.values(record.agent_outputs)) {
+    if (!agentOutput) continue;
+    const out = agentOutput.output;
+    if (!isRecord(out)) continue;
+    const artifactRefs = out.artifactReferences;
+    if (!Array.isArray(artifactRefs)) continue;
+
+    for (const ref of artifactRefs) {
+      if (isRecord(ref) && typeof ref.blobKey === 'string' && MAJOR_KEY_ARTIFACT_REF_RE.test(ref.blobKey)) {
+        refs.add(ref.blobKey);
+      }
+    }
+  }
+
+  return refs;
+};
+
+const rejectUnsafeStringValue = (action: WorkflowAction, path: string, value: string) => {
+  if (BASE64_DATA_URI_RE.test(value)) {
+    return jsonResponse(400, { action, error: `${path} must not be a data URI or base64-encoded value.` });
+  }
+  if (LEGACY_REPO_PATH_RE.test(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} is a legacy repo path (src/assets/...). Provide a Major Key artifact reference instead.`,
+    });
+  }
+  if (REMOTE_URL_RE.test(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`,
+    });
+  }
+  return undefined;
+};
+
+/** Validate a string as a trusted Major Key artifact reference in one step. */
+const validateTrustedArtifactRef = (
+  action: WorkflowAction,
+  path: string,
+  value: string,
+  trustedRefs: Set<string>
+): JsonResponse | undefined => {
+  const unsafeErr = rejectUnsafeStringValue(action, path, value);
+  if (unsafeErr) return unsafeErr;
+
+  if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} must be a Major Key artifact reference (image/{id}/{sha256}.{ext}).`,
+    });
+  }
+
+  if (!trustedRefs.has(value)) {
+    return jsonResponse(400, {
+      action,
+      error: `${path} "${value}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
+    });
+  }
+
+  return undefined;
+};
+
+type NodePatch = NonNullable<WorkflowRequest['node_patches']>[number];
+
+const applyNodePatch = (
+  action: WorkflowAction,
+  node: ArticleBodyNode,
+  patch: NodePatch,
+  trustedRefs: Set<string>
+):
+  | { ok: true; node: ArticleBodyNode; auditEntries: CanonicalInputAuditPatch[] }
+  | { ok: false; error: JsonResponse } => {
+  const auditEntries: CanonicalInputAuditPatch[] = [];
+  let patchedPublic = { ...node.public };
+
+  if (patch.public_media_src !== undefined) {
+    const newSrc = patch.public_media_src;
+    const oldSrc = node.public?.media?.src ?? null;
+
+    if (newSrc !== null) {
+      const unsafeErr = rejectUnsafeStringValue(action, `node_patches[${patch.node_id}].public_media_src`, newSrc);
+      if (unsafeErr) return { ok: false, error: unsafeErr };
+
+      if (!MAJOR_KEY_ARTIFACT_REF_RE.test(newSrc)) {
+        return {
+          ok: false,
+          error: jsonResponse(400, {
+            action,
+            error: `node_patches[${patch.node_id}].public_media_src must be a Major Key artifact reference (image/{id}/{sha256}.{ext}).`,
+          }),
+        };
+      }
+
+      if (!trustedRefs.has(newSrc)) {
+        return {
+          ok: false,
+          error: jsonResponse(400, {
+            action,
+            error: `node_patches[${patch.node_id}].public_media_src "${newSrc}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
+          }),
+        };
+      }
+
+      const existingMedia = patchedPublic.media;
+      const newAlt =
+        patch.public_media_alt !== undefined && patch.public_media_alt !== null
+          ? patch.public_media_alt
+          : existingMedia?.alt;
+      const newCaption =
+        patch.public_media_caption !== undefined && patch.public_media_caption !== null
+          ? patch.public_media_caption
+          : existingMedia?.caption;
+
+      patchedPublic = {
+        ...patchedPublic,
+        media: {
+          type: existingMedia?.type ?? 'image',
+          src: newSrc,
+          ...(newAlt !== undefined ? { alt: newAlt } : {}),
+          ...(newCaption !== undefined ? { caption: newCaption } : {}),
+        },
+      };
+    } else {
+      // null => remove media entirely (src is required in the media sub-object)
+      const { media: _removed, ...publicWithoutMedia } = patchedPublic;
+      patchedPublic = publicWithoutMedia as typeof patchedPublic;
+    }
+
+    auditEntries.push({
+      path: `input.content.article_body.nodes[${patch.node_id}].public.media.src`,
+      old_value_summary: oldSrc ?? '(none)',
+      new_value_summary: newSrc ?? '(removed)',
+    });
+  }
+
+  // alt-only or caption-only patches (when src was not also changed)
+  if (patch.public_media_src === undefined) {
+    if (patch.public_media_alt !== undefined) {
+      const existingMedia = patchedPublic.media;
+      if (!existingMedia) {
+        return {
+          ok: false,
+          error: jsonResponse(409, {
+            action,
+            error: `node_patches[${patch.node_id}].public_media_alt cannot be set: node has no existing media object.`,
+          }),
+        };
+      }
+      const newAlt = patch.public_media_alt;
+      const oldAlt = existingMedia.alt ?? null;
+      const { alt: _oldAlt, ...mediaWithoutAlt } = existingMedia;
+      patchedPublic = {
+        ...patchedPublic,
+        media: newAlt !== null ? { ...mediaWithoutAlt, alt: newAlt } : mediaWithoutAlt,
+      };
+      auditEntries.push({
+        path: `input.content.article_body.nodes[${patch.node_id}].public.media.alt`,
+        old_value_summary: oldAlt ?? '(none)',
+        new_value_summary: newAlt ?? '(removed)',
+      });
+    }
+
+    if (patch.public_media_caption !== undefined) {
+      const existingMedia = patchedPublic.media;
+      if (!existingMedia) {
+        return {
+          ok: false,
+          error: jsonResponse(409, {
+            action,
+            error: `node_patches[${patch.node_id}].public_media_caption cannot be set: node has no existing media object.`,
+          }),
+        };
+      }
+      const newCaption = patch.public_media_caption;
+      const oldCaption = existingMedia.caption ?? null;
+      const { caption: _oldCaption, ...mediaWithoutCaption } = existingMedia;
+      patchedPublic = {
+        ...patchedPublic,
+        media: newCaption !== null ? { ...mediaWithoutCaption, caption: newCaption } : mediaWithoutCaption,
+      };
+      auditEntries.push({
+        path: `input.content.article_body.nodes[${patch.node_id}].public.media.caption`,
+        old_value_summary: oldCaption ?? '(none)',
+        new_value_summary: newCaption ?? '(removed)',
+      });
+    }
+  }
+
+  return { ok: true, node: { ...node, public: patchedPublic }, auditEntries };
+};
+
+const validateImageAssetRegisterEntries = (
+  action: WorkflowAction,
+  entries: unknown[]
+): { ok: true; records: ImageAssetRecord[] } | { ok: false; error: JsonResponse } => {
+  const records: ImageAssetRecord[] = [];
+
+  for (let i = 0; i < entries.length; i += 1) {
+    const parsed = imageAssetSchema.safeParse(entries[i]);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: jsonResponse(400, {
+          action,
+          error: `replace_image_asset_register[${i}] is not a valid ImageAssetRecord.`,
+          issues: parsed.error.issues,
+        }),
+      };
+    }
+
+    const entry = parsed.data;
+
+    if (entry.repoPath) {
+      const err = rejectUnsafeStringValue(action, `replace_image_asset_register[${i}].repoPath`, entry.repoPath);
+      if (err) return { ok: false, error: err };
+    }
+
+    if (entry.url) {
+      const err = rejectUnsafeStringValue(action, `replace_image_asset_register[${i}].url`, entry.url);
+      if (err) return { ok: false, error: err };
+    }
+
+    records.push(entry);
+  }
+
+  return { ok: true, records };
+};
+
+/** Inside the retry loop: verify every Major Key artifact ref in the register is actually trusted. */
+const requireRegisterTrustedRefs = (
+  action: WorkflowAction,
+  records: ImageAssetRecord[],
+  trustedRefs: Set<string>
+): JsonResponse | undefined => {
+  for (let i = 0; i < records.length; i += 1) {
+    const entry = records[i];
+    for (const field of ['url', 'repoPath'] as const) {
+      const value = entry[field];
+      if (!value) continue;
+      const err = validateTrustedArtifactRef(
+        action,
+        `replace_image_asset_register[${i}].${field}`,
+        value,
+        trustedRefs
+      );
+      if (err) return err;
+    }
+  }
+  return undefined;
+};
+
+/** Inside the retry loop: validate all image-bearing fields in a promote_publish_payload. */
+const validatePublishPayloadImageRefs = (
+  action: WorkflowAction,
+  payload: NonNullable<WorkflowRequest['promote_publish_payload']>,
+  trustedRefs: Set<string>
+): JsonResponse | undefined => {
+  if (!isRecord(payload)) return undefined;
+
+  for (const field of ['featuredImage', 'existingFeaturedImagePath'] as const) {
+    const value = payload[field];
+    if (typeof value !== 'string' || !value) continue;
+    const err = validateTrustedArtifactRef(action, `promote_publish_payload.${field}`, value, trustedRefs);
+    if (err) return err;
+  }
+
+  for (const arrayField of ['images', 'mediaEntries'] as const) {
+    const items = payload[arrayField];
+    if (!Array.isArray(items)) continue;
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i];
+      if (!isRecord(item)) continue;
+      for (const subField of ['src', 'url', 'blobKey'] as const) {
+        const value = item[subField];
+        if (typeof value !== 'string' || !value) continue;
+        const err = validateTrustedArtifactRef(
+          action,
+          `promote_publish_payload.${arrayField}[${i}].${subField}`,
+          value,
+          trustedRefs
+        );
+        if (err) return err;
+      }
+    }
+  }
+
+  const artifactRefs = payload['artifactReferences'];
+  if (Array.isArray(artifactRefs)) {
+    for (let i = 0; i < artifactRefs.length; i += 1) {
+      const item = artifactRefs[i];
+      if (!isRecord(item)) continue;
+      const blobKey = item['blobKey'];
+      if (typeof blobKey !== 'string' || !blobKey) continue;
+      const err = validateTrustedArtifactRef(
+        action,
+        `promote_publish_payload.artifactReferences[${i}].blobKey`,
+        blobKey,
+        trustedRefs
+      );
+      if (err) return err;
+    }
+  }
+
+  return undefined;
+};
+
+export const patchCanonicalInput = async (store: WorkflowBlobStore, body: WorkflowRequest): Promise<JsonResponse> => {
+  const missingRequestId = requireRequestId(body);
+  if (missingRequestId) return missingRequestId;
+
+  if (body.expected_record_version === undefined) {
+    return jsonResponse(400, { action: body.action, error: 'expected_record_version is required.' });
+  }
+
+  const hasNodePatches = Array.isArray(body.node_patches) && body.node_patches.length > 0;
+  const hasImageRegisterReplacement = body.replace_image_asset_register !== undefined;
+  const hasPublishPayload = body.promote_publish_payload !== undefined;
+  const hasStatusRepair = body.repair_workflow_status !== undefined;
+  const hasClearLastError = body.clear_last_error === true;
+  const hasClearFailedAgents = body.clear_failed_agents === true;
+  const hasResetNeedsReview = body.reset_needs_review === true;
+
+  if (
+    !hasNodePatches &&
+    !hasImageRegisterReplacement &&
+    !hasPublishPayload &&
+    !hasStatusRepair &&
+    !hasClearLastError &&
+    !hasClearFailedAgents &&
+    !hasResetNeedsReview
+  ) {
+    return jsonResponse(400, {
+      action: body.action,
+      error:
+        'patch_canonical_input requires at least one of: node_patches, replace_image_asset_register, promote_publish_payload, repair_workflow_status, clear_last_error, clear_failed_agents, reset_needs_review.',
+    });
+  }
+
+  // Validate repair_workflow_status up-front (cheap check before loading the record)
+  const nextWorkflowStatusResult = (() => {
+    if (!hasStatusRepair) return { ok: true as const, value: undefined };
+    const parsed = parseWorkflowStatus(body.repair_workflow_status);
+    if (!parsed) return { ok: false as const };
+    return { ok: true as const, value: parsed };
+  })();
+  if (!nextWorkflowStatusResult.ok) {
+    return jsonResponse(400, { action: body.action, error: 'Invalid repair_workflow_status.' });
+  }
+
+  // Validate promote_publish_payload schema up-front (trusted-ref checks happen inside the loop)
+  let validatedPublishPayload: NonNullable<WorkflowRequest['promote_publish_payload']> | undefined;
+  if (hasPublishPayload) {
+    const parsed = publishPayloadSchema.safeParse(body.promote_publish_payload);
+    if (!parsed.success) {
+      return jsonResponse(400, {
+        action: body.action,
+        error: 'promote_publish_payload is not a valid PublishPayload.',
+        issues: parsed.error.issues,
+      });
+    }
+    validatedPublishPayload = parsed.data;
+  }
+
+  // Validate replace_image_asset_register schema/format up-front (trusted-ref checks happen inside loop)
+  let validatedImageRegister: ImageAssetRecord[] | undefined;
+  if (hasImageRegisterReplacement) {
+    const entries = body.replace_image_asset_register as unknown[];
+    const validation = validateImageAssetRegisterEntries(body.action, entries);
+    if (!validation.ok) return validation.error;
+    validatedImageRegister = validation.records;
+  }
+
+  const requestId = body.request_id as string;
+
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const previousRecord = body.lock_token
+      ? (await loadRecordForLockToken(store, requestId, body.lock_token)).record
+      : await loadRecord(store, requestId);
+    if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
+
+    const lockFailure = validateMutationLock(previousRecord, body);
+    if (lockFailure) return lockFailure;
+
+    if (previousRecord.version !== body.expected_record_version) {
+      return jsonResponse(409, { action: body.action, conflict: true });
+    }
+
+    const trustedRefs = gatherTrustedArtifactRefs(previousRecord);
+
+    // Trusted-ref checks for register and publish payload (require the loaded record)
+    if (hasImageRegisterReplacement && validatedImageRegister !== undefined) {
+      const regErr = requireRegisterTrustedRefs(body.action, validatedImageRegister, trustedRefs);
+      if (regErr) return regErr;
+    }
+    if (hasPublishPayload && validatedPublishPayload !== undefined) {
+      const payloadErr = validatePublishPayloadImageRefs(body.action, validatedPublishPayload, trustedRefs);
+      if (payloadErr) return payloadErr;
+    }
+
+    const auditPatches: CanonicalInputAuditPatch[] = [];
+    let nextInput: ContentSourceV1 = { ...previousRecord.input };
+
+    // 1. Article body node patches
+    if (hasNodePatches) {
+      const nodes = nextInput.content?.article_body?.nodes;
+      if (!nodes) {
+        return jsonResponse(409, {
+          action: body.action,
+          error: 'node_patches requires input.content.article_body.nodes to be present.',
+        });
+      }
+
+      const patchedNodes = [...nodes];
+
+      for (const patch of body.node_patches as NodePatch[]) {
+        const nodeIndex = patchedNodes.findIndex((n) => n.id === patch.node_id);
+        if (nodeIndex < 0) {
+          return jsonResponse(409, {
+            action: body.action,
+            error: `node_patches: node "${patch.node_id}" not found in input.content.article_body.nodes.`,
+          });
+        }
+
+        const result = applyNodePatch(body.action, patchedNodes[nodeIndex], patch, trustedRefs);
+        if (!result.ok) return result.error;
+
+        patchedNodes[nodeIndex] = result.node;
+        auditPatches.push(...result.auditEntries);
+      }
+
+      nextInput = {
+        ...nextInput,
+        content: {
+          ...nextInput.content,
+          article_body: {
+            ...(nextInput.content?.article_body ?? { schema_version: 'article_body.v1' as const }),
+            nodes: patchedNodes,
+          },
+        },
+      };
+    }
+
+    // 2. Replace image_asset_register
+    if (hasImageRegisterReplacement && validatedImageRegister !== undefined) {
+      const oldCount = nextInput.media?.image_asset_register?.length ?? 0;
+      nextInput = {
+        ...nextInput,
+        media: {
+          ...(nextInput.media ?? {}),
+          image_asset_register: validatedImageRegister,
+        },
+      };
+      auditPatches.push({
+        path: 'input.media.image_asset_register',
+        old_value_summary: `${oldCount} entries`,
+        new_value_summary: `${validatedImageRegister.length} entries`,
+      });
+    }
+
+    // 3. Promote publish_payload into input.publication
+    if (hasPublishPayload) {
+      const oldPayload = nextInput.publication?.publish_payload;
+      nextInput = {
+        ...nextInput,
+        publication: {
+          ...(nextInput.publication ?? {}),
+          schema_version: 'publication.v2',
+          publish_payload: body.promote_publish_payload as ContentSourceV1['publication'] extends
+            | { publish_payload?: infer P }
+            | undefined
+            ? P
+            : never,
+        },
+      };
+      auditPatches.push({
+        path: 'input.publication.publish_payload',
+        old_value_summary: oldPayload !== undefined ? 'set' : '(none)',
+        new_value_summary: 'set',
+      });
+    }
+
+    const nextWorkflowStatus = nextWorkflowStatusResult.value ?? previousRecord.workflow_status;
+    const nextLastError = hasClearLastError ? null : previousRecord.last_error;
+    const nextFailedAgents = hasClearFailedAgents ? [] : previousRecord.failed_agents;
+    const nextNeedsReview = hasResetNeedsReview ? false : previousRecord.needs_review;
+
+    const auditDetails: Record<string, unknown> = {
+      owner_id: previousRecord.lock?.owner_id,
+      owner_label: previousRecord.lock?.owner_label,
+      patches: auditPatches,
+    };
+
+    if (nextWorkflowStatus !== previousRecord.workflow_status) {
+      auditDetails.workflow_status_changed = {
+        from: previousRecord.workflow_status,
+        to: nextWorkflowStatus,
+      };
+    }
+    if (hasClearLastError && previousRecord.last_error !== null) {
+      auditDetails.last_error_cleared = { from: previousRecord.last_error };
+    }
+    if (hasClearFailedAgents && previousRecord.failed_agents.length > 0) {
+      auditDetails.failed_agents_cleared = { from: [...previousRecord.failed_agents] };
+    }
+    if (hasResetNeedsReview && previousRecord.needs_review) {
+      auditDetails.needs_review_reset = { from: true, to: false };
+    }
+
+    const timestamp = nowIso();
+    const nextRecord: WorkflowRecord = preserveAgentOutputs(
+      {
+        ...previousRecord,
+        updated_at: timestamp,
+        input: nextInput,
+        workflow_status: nextWorkflowStatus,
+        last_error: nextLastError,
+        failed_agents: nextFailedAgents,
+        needs_review: nextNeedsReview,
+        history: [
+          ...previousRecord.history,
+          {
+            at: timestamp,
+            action: body.action,
+            details: auditDetails,
+          },
+        ],
+        version: previousRecord.version + 1,
+      },
+      previousRecord
+    );
+
+    const saveResult = await saveRecordIfVersionUnchanged(store, previousRecord, nextRecord);
+
+    if (saveResult.saved) return jsonResponse(200, { action: body.action, record: saveResult.record });
+    if ('notFound' in saveResult) return jsonResponse(404, { action: body.action, not_found: true });
+  }
+
+  return jsonResponse(409, { action: body.action, conflict: true });
+};
+
 const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   switch (body.action) {
     case 'create_request':
@@ -1457,6 +2046,8 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
       return forceUnlock(store, body);
     case 'set_published_time':
       return setPublishedTime(store, body);
+    case 'patch_canonical_input':
+      return patchCanonicalInput(store, body);
   }
 };
 

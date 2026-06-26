@@ -882,6 +882,92 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'save_json_blob_patch_canonical_input',
+    description: [
+      'Repair canonical input fields on an existing workflow record in place, under the normal checkout/lock/version discipline.',
+      'Use this BEFORE save_json_blob_publish_by_time when publish_by_time fails with 422 due to invalid image paths or missing publication fields.',
+      'Sequence: checkout_request → save_json_blob_patch_canonical_input → save_json_blob_publish_by_time → checkin_request.',
+      '',
+      'Supported repairs (at least one required):',
+      '  node_patches: replace or remove public.media.src/alt/caption on specific article_body nodes by node_id.',
+      '    public_media_src MUST be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs.',
+      '    Legacy repo paths (src/assets/...), remote URLs (https://...), and data URIs are always rejected.',
+      '  replace_image_asset_register: replace input.media.image_asset_register[] wholesale.',
+      '    Entries must pass ImageAssetRecord schema; url/repoPath that are Major Key refs must be in agent_outputs.',
+      '    Legacy paths, remote URLs, and data URIs are rejected.',
+      '  promote_publish_payload: set input.publication.publish_payload from a complete PublishPayload object.',
+      '    Image-bearing fields (featuredImage, existingFeaturedImagePath, images[].src/url/blobKey,',
+      '    mediaEntries[].src/url/blobKey, artifactReferences[].blobKey) must be trusted Major Key artifact refs.',
+      '  repair_workflow_status: reset workflow_status (e.g. "failed" → "pending" or "in_progress").',
+      '  clear_last_error: when true, clears last_error to null. Audited only if last_error was non-null.',
+      '  clear_failed_agents: when true, clears failed_agents to []. Audited only if list was non-empty.',
+      '  reset_needs_review: when true, sets needs_review to false. Audited only if it was true.',
+      '',
+      'All changes are recorded in workflow history with old/new value summaries.',
+      workflowLockInstruction,
+    ].join('\n'),
+    inputSchema: objectSchema(
+      {
+        request_id: stringSchema(),
+        lock_token: lockTokenSchema,
+        expected_record_version: intSchema(
+          'Record version the caller read. Rejected with 409 if the record has since advanced.'
+        ),
+        node_patches: arraySchema(
+          objectSchema(
+            {
+              node_id: stringSchema(
+                'Stable node ID (e.g. n_r1a2b3). Must already exist in input.content.article_body.nodes.'
+              ),
+              public_media_src: {
+                anyOf: [
+                  {
+                    type: 'string',
+                    minLength: 1,
+                    description:
+                      'New src — must be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs.',
+                  },
+                  { type: 'null', description: 'Null removes the media object entirely.' },
+                ],
+              },
+              public_media_alt: nullableStringSchema('New alt text, or null to remove.'),
+              public_media_caption: nullableStringSchema('New caption text, or null to remove.'),
+            },
+            ['node_id']
+          ),
+          'Patches to apply to specific nodes in input.content.article_body.nodes[].'
+        ),
+        replace_image_asset_register: arraySchema(
+          imageAssetJsonSchema,
+          'Full replacement for input.media.image_asset_register[]. Each entry must be a valid ImageAssetRecord. Major Key artifact refs in url/repoPath must be in agent_outputs.'
+        ),
+        promote_publish_payload: {
+          type: 'object',
+          description:
+            'Complete PublishPayload object (with slug and title) to set at input.publication.publish_payload. Image-bearing fields must reference trusted Major Key artifact refs.',
+          properties: {},
+          additionalProperties: true,
+        },
+        repair_workflow_status: workflowStatusJsonSchema(
+          'Reset workflow_status to this value (e.g. "pending" or "in_progress") after canonical repair.'
+        ),
+        clear_last_error: {
+          type: 'boolean',
+          description: 'When true, clears last_error to null. Useful when moving a failed record back to a retryable state.',
+        },
+        clear_failed_agents: {
+          type: 'boolean',
+          description: 'When true, clears failed_agents to []. Useful when retrying after a repaired canonical input.',
+        },
+        reset_needs_review: {
+          type: 'boolean',
+          description: 'When true, sets needs_review to false. Useful after resolving the issue that triggered review.',
+        },
+      },
+      ['request_id', 'lock_token', 'expected_record_version']
+    ),
+  },
+  {
     name: 'deploy_status',
     description: 'Read-only Netlify deploy receipt lookup by commit or deploy id.',
     inputSchema: objectSchema({
@@ -2870,6 +2956,24 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       );
     case 'save_json_blob_publish_by_time':
       return callPublishByTime(event, input);
+    case 'save_json_blob_patch_canonical_input':
+      return callAction(
+        event,
+        {
+          action: 'patch_canonical_input',
+          request_id: input.request_id,
+          lock_token: input.lock_token,
+          expected_record_version: input.expected_record_version,
+          node_patches: input.node_patches,
+          replace_image_asset_register: input.replace_image_asset_register,
+          promote_publish_payload: input.promote_publish_payload,
+          repair_workflow_status: input.repair_workflow_status,
+          clear_last_error: input.clear_last_error,
+          clear_failed_agents: input.clear_failed_agents,
+          reset_needs_review: input.reset_needs_review,
+        },
+        'record'
+      );
     case 'deploy_status':
       return callDeployStatus(event, input);
     case 'verify_article_images':

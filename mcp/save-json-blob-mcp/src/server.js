@@ -421,6 +421,107 @@ export const createServer = () => {
       callAction({ action: 'set_published_time', request_id, lock_token, published_time }, 'record')
   );
 
+  server.registerTool(
+    'save_json_blob_patch_canonical_input',
+    {
+      description: [
+        'Repair canonical input fields on an existing workflow record in place, under the normal checkout/lock/version discipline.',
+        'Use this BEFORE save_json_blob_publish_by_time when publish_by_time fails with 422 due to invalid image paths or missing publication fields.',
+        'Sequence: checkout_request → save_json_blob_patch_canonical_input → save_json_blob_publish_by_time → checkin_request.',
+        '',
+        'Supported repairs (at least one required):',
+        '  node_patches: replace or remove public.media.src/alt/caption on specific article_body nodes by node_id.',
+        '    public_media_src MUST be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs.',
+        '    Legacy repo paths (src/assets/...) and data URIs are always rejected.',
+        '  replace_image_asset_register: replace input.media.image_asset_register[] wholesale.',
+        '    Entries must pass ImageAssetRecord schema; legacy repo paths in repoPath/url are rejected.',
+        '  promote_publish_payload: set input.publication.publish_payload from a complete PublishPayload object.',
+        '  repair_workflow_status: reset workflow_status (e.g. "failed" → "pending" or "in_progress").',
+        '',
+        'All changes are recorded in workflow history with old/new value summaries.',
+        workflowLockInstruction,
+      ].join('\n'),
+      inputSchema: {
+        request_id: z.string().min(1),
+        lock_token: z.string().min(1),
+        expected_record_version: z.number().int().nonnegative(),
+        node_patches: z
+          .array(
+            z
+              .object({
+                node_id: z
+                  .string()
+                  .min(1)
+                  .describe(
+                    'Stable node ID (e.g. n_r1a2b3). Must already exist in input.content.article_body.nodes.'
+                  ),
+                public_media_src: z
+                  .string()
+                  .nullable()
+                  .optional()
+                  .describe(
+                    'New src value. Must be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs, or null to remove media entirely.'
+                  ),
+                public_media_alt: z
+                  .string()
+                  .nullable()
+                  .optional()
+                  .describe('New alt text, or null to remove.'),
+                public_media_caption: z
+                  .string()
+                  .nullable()
+                  .optional()
+                  .describe('New caption text, or null to remove.'),
+              })
+              .strict()
+          )
+          .optional()
+          .describe('Patches to apply to specific nodes in input.content.article_body.nodes[].'),
+        replace_image_asset_register: z
+          .array(z.any())
+          .optional()
+          .describe(
+            'Full replacement for input.media.image_asset_register[]. Each entry must be a valid ImageAssetRecord.'
+          ),
+        promote_publish_payload: z
+          .any()
+          .optional()
+          .describe(
+            'Complete PublishPayload object (with slug and title) to set at input.publication.publish_payload.'
+          ),
+        repair_workflow_status: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            'Reset workflow_status to this value (e.g. "pending" or "in_progress") after canonical repair.'
+          ),
+      },
+    },
+    async ({
+      request_id,
+      lock_token,
+      expected_record_version,
+      node_patches,
+      replace_image_asset_register,
+      promote_publish_payload,
+      repair_workflow_status,
+    }) =>
+      callAction(
+        {
+          action: 'patch_canonical_input',
+          request_id,
+          lock_token,
+          expected_record_version,
+          node_patches,
+          replace_image_asset_register,
+          promote_publish_payload,
+          repair_workflow_status,
+        },
+        'record'
+      )
+  );
+
   if (ADMIN_TOOLS_ENABLED) {
     server.registerTool(
       'save_json_blob_force_unlock',
