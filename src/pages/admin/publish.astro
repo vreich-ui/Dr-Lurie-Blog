@@ -1143,7 +1143,9 @@ const metadata = {
         const readinessLabel = getReadinessLabel(draft.readiness);
         const displayTitle = getDisplayTitle(draft.title);
         const dateStr = formatDate(draft.updatedAt || draft.savedAt);
-        const savedByStr = draft.savedBy ? `<span class="dp-sep">·</span><span>by ${escapeHtml(draft.savedBy)}</span>` : '';
+        const savedByStr = draft.savedBy
+          ? `<span class="dp-sep">·</span><span>by ${escapeHtml(draft.savedBy)}</span>`
+          : '';
 
         row.innerHTML = `
           <div class="dp-row-main">
