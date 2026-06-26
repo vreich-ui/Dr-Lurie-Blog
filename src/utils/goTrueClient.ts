@@ -171,6 +171,8 @@ export const handleOAuthCallback = async (): Promise<GoTrueUser | null> => {
   const hash = typeof window !== 'undefined' ? window.location.hash : '';
   if (!hash) return null;
   const params = new URLSearchParams(hash.slice(1));
+  // Recovery hashes are handled by handleRecoveryCallback — leave them untouched here.
+  if (params.get('type') === 'recovery') return null;
   const accessToken = params.get('access_token');
   const refreshToken = params.get('refresh_token') ?? '';
   const expiresIn = parseInt(params.get('expires_in') ?? '3600', 10);
@@ -200,4 +202,58 @@ export const getAccessToken = async (): Promise<string | null> => {
   let user = currentUser();
   if (!user) user = await refreshUser();
   return user?.token.access_token ?? null;
+};
+
+export type RecoveryCallbackResult = { recoveryToken: string };
+
+// Detect a Netlify Identity recovery hash and extract the token without persisting it.
+// Clears the hash from the URL after reading.
+export const handleRecoveryCallback = (): RecoveryCallbackResult | null => {
+  if (typeof window === 'undefined') return null;
+  const hash = window.location.hash;
+  if (!hash) return null;
+  const params = new URLSearchParams(hash.slice(1));
+  if (params.get('type') !== 'recovery') return null;
+  const accessToken = params.get('access_token');
+  if (!accessToken) return null;
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  return { recoveryToken: accessToken };
+};
+
+// Request a password-reset email. Normalises the address before sending.
+export const requestPasswordRecovery = async (email: string): Promise<void> => {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) throw new Error('Please enter your email address.');
+  const res = await fetch(`${getBase()}/recover`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: normalizedEmail }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { msg?: string; error_description?: string };
+    throw new Error(err.msg || err.error_description || 'Could not send reset email. Please try again.');
+  }
+};
+
+// Update the user's password using a recovery access token.
+// The token must come from the recovery email hash — it is never stored in localStorage.
+export const updatePasswordWithToken = async (
+  accessToken: string,
+  password: string
+): Promise<{ id: string; email: string }> => {
+  if (password.length < 8) throw new Error('Password must be at least 8 characters.');
+  const res = await fetch(`${getBase()}/user`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ password }),
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { msg?: string; error_description?: string };
+    throw new Error(err.msg || err.error_description || 'Could not update password. Please try again.');
+  }
+  const info = (await res.json()) as { id: string; email: string };
+  return { id: info.id, email: info.email };
 };

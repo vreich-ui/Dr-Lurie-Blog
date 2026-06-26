@@ -1,8 +1,9 @@
 ---
 // Cockpit-style login modal — driven entirely by client-side JS.
 // Emits CustomEvents on document:
-//   "dr-lurie:login"  → { detail: { user } }
-//   "dr-lurie:logout" → no detail
+//   "dr-lurie:login"                 → { detail: { user } }
+//   "dr-lurie:logout"                → no detail
+//   "dr-lurie:password-reset-success"→ { detail: { email } }
 ---
 
 <div
@@ -41,7 +42,7 @@
       </svg>
     </button>
 
-    <!-- Brand -->
+    <!-- Brand (title/subtitle change per mode) -->
     <div class="mb-6 flex flex-col items-center gap-3 text-center">
       <div
         class="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-lg shadow-indigo-900/40"
@@ -61,106 +62,199 @@
       </div>
       <div>
         <h2 id="login-modal-title" class="text-xl font-bold text-white">Editor login</h2>
-        <p class="mt-0.5 text-sm text-slate-400">Sign in to access publishing tools.</p>
+        <p class="mt-0.5 text-sm text-slate-400" data-modal-subtitle>Sign in to access publishing tools.</p>
       </div>
     </div>
 
-    <!-- Error banner -->
-    <div
-      class="mb-4 hidden rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400"
-      data-login-error
-      role="alert"
-      aria-live="polite"
-    >
+    <!-- Shared banner — toggled between error (red) and success (green) by JS -->
+    <div class="mb-4 hidden rounded-lg border px-3 py-2 text-sm" data-modal-banner role="alert" aria-live="polite">
     </div>
 
-    <!-- Form -->
-    <form data-login-form class="space-y-3" novalidate>
-      <div>
-        <label for="login-email" class="mb-1 block text-xs font-medium text-slate-400">Email</label>
-        <input
-          id="login-email"
-          name="email"
-          type="email"
-          autocomplete="email"
-          required
-          placeholder="you@example.com"
-          class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-        />
-      </div>
+    <!-- ── PANEL: sign-in (default) ── -->
+    <div data-modal-panel="sign-in">
+      <form data-login-form class="space-y-3" novalidate>
+        <div>
+          <label for="login-email" class="mb-1 block text-xs font-medium text-slate-400">Email</label>
+          <input
+            id="login-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            required
+            placeholder="you@example.com"
+            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
 
-      <div>
-        <label for="login-password" class="mb-1 block text-xs font-medium text-slate-400">Password</label>
-        <input
-          id="login-password"
-          name="password"
-          type="password"
-          autocomplete="current-password"
-          required
-          placeholder="••••••••"
-          class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-        />
-      </div>
+        <div>
+          <label for="login-password" class="mb-1 block text-xs font-medium text-slate-400">Password</label>
+          <input
+            id="login-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            placeholder="••••••••"
+            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
 
-      <div class="flex items-center justify-between">
-        <label class="flex cursor-pointer items-center gap-1.5">
-          <input type="checkbox" id="modal-keep-signed-in" class="h-3.5 w-3.5 rounded accent-indigo-500" />
-          <span class="text-xs text-slate-400">Keep me signed in</span>
-        </label>
-        <a
-          href="/.netlify/identity#recovery"
-          class="text-xs text-slate-400 transition hover:text-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-          target="_blank"
-          rel="noopener noreferrer">Forgot password?</a
+        <div class="flex items-center justify-between">
+          <label class="flex cursor-pointer items-center gap-1.5">
+            <input type="checkbox" id="modal-keep-signed-in" class="h-3.5 w-3.5 rounded accent-indigo-500" />
+            <span class="text-xs text-slate-400">Keep me signed in</span>
+          </label>
+          <button
+            type="button"
+            class="text-xs text-slate-400 transition hover:text-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+            data-forgot-password
+          >
+            Forgot password?
+          </button>
+        </div>
+
+        <button
+          type="submit"
+          class="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60"
+          data-submit-btn
         >
+          <span data-btn-text>Sign in →</span>
+          <svg class="hidden h-4 w-4 animate-spin" data-btn-spinner viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </button>
+      </form>
+
+      <!-- Divider -->
+      <div class="my-4 flex items-center gap-3">
+        <div class="h-px flex-1 bg-slate-700/60"></div>
+        <span class="text-xs text-slate-500">or continue with</span>
+        <div class="h-px flex-1 bg-slate-700/60"></div>
       </div>
+
+      <!-- Google -->
+      <button
+        type="button"
+        class="flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+        data-google-btn
+      >
+        <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            fill="#4285F4"
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+          ></path>
+          <path
+            fill="#34A853"
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+          ></path>
+          <path
+            fill="#FBBC05"
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+          ></path>
+          <path
+            fill="#EA4335"
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+          ></path>
+        </svg>
+        Continue with Google
+      </button>
+    </div>
+    <!-- ── END PANEL: sign-in ── -->
+
+    <!-- ── PANEL: request-reset ── -->
+    <div data-modal-panel="request-reset" hidden>
+      <!-- Inline success shown after email is sent -->
+      <div
+        hidden
+        data-reset-sent
+        class="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-3 text-sm text-green-400"
+        role="status"
+        aria-live="polite"
+      >
+      </div>
+
+      <form data-reset-form class="space-y-3" novalidate>
+        <div>
+          <label for="reset-email" class="mb-1 block text-xs font-medium text-slate-400">Email</label>
+          <input
+            id="reset-email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            required
+            placeholder="you@example.com"
+            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        <button
+          type="submit"
+          class="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60"
+          data-submit-btn
+        >
+          <span data-btn-text>Send reset link →</span>
+          <svg class="hidden h-4 w-4 animate-spin" data-btn-spinner viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </button>
+      </form>
 
       <button
-        type="submit"
-        class="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60"
-        data-submit-btn
+        type="button"
+        class="mt-4 w-full text-center text-xs text-slate-400 transition hover:text-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
+        data-back-to-signin
       >
-        <span data-btn-text>Sign in →</span>
-        <svg class="hidden h-4 w-4 animate-spin" data-btn-spinner viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-        </svg>
+        ← Back to sign in
       </button>
-    </form>
-
-    <!-- Divider -->
-    <div class="my-4 flex items-center gap-3">
-      <div class="h-px flex-1 bg-slate-700/60"></div>
-      <span class="text-xs text-slate-500">or continue with</span>
-      <div class="h-px flex-1 bg-slate-700/60"></div>
     </div>
+    <!-- ── END PANEL: request-reset ── -->
 
-    <!-- Google -->
-    <button
-      type="button"
-      class="flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
-      data-google-btn
-    >
-      <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          fill="#4285F4"
-          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-        ></path>
-        <path
-          fill="#34A853"
-          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        ></path>
-        <path
-          fill="#FBBC05"
-          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        ></path>
-        <path
-          fill="#EA4335"
-          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        ></path>
-      </svg>
-      Continue with Google
-    </button>
+    <!-- ── PANEL: set-new-password ── -->
+    <div data-modal-panel="set-new-password" hidden>
+      <form data-new-password-form class="space-y-3" novalidate>
+        <div>
+          <label for="new-password" class="mb-1 block text-xs font-medium text-slate-400">New password</label>
+          <input
+            id="new-password"
+            name="password"
+            type="password"
+            autocomplete="new-password"
+            required
+            minlength="8"
+            placeholder="At least 8 characters"
+            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        <div>
+          <label for="confirm-password" class="mb-1 block text-xs font-medium text-slate-400">Confirm password</label>
+          <input
+            id="confirm-password"
+            name="confirm-password"
+            type="password"
+            autocomplete="new-password"
+            required
+            placeholder="Repeat password"
+            class="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+
+        <button
+          type="submit"
+          class="mt-1 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:opacity-60"
+          data-submit-btn
+        >
+          <span data-btn-text>Set new password →</span>
+          <svg class="hidden h-4 w-4 animate-spin" data-btn-spinner viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </button>
+      </form>
+    </div>
+    <!-- ── END PANEL: set-new-password ── -->
 
     <p class="mt-5 text-center text-xs text-slate-500">Public articles remain available without login.</p>
   </div>
@@ -169,56 +263,140 @@
 <script>
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-nocheck
-  import { loginWithPassword, loginWithGoogle, isKeepSignedIn, setKeepSignedIn } from '~/utils/goTrueClient';
+  import {
+    loginWithPassword,
+    loginWithGoogle,
+    isKeepSignedIn,
+    setKeepSignedIn,
+    requestPasswordRecovery,
+    updatePasswordWithToken,
+  } from '~/utils/goTrueClient';
 
   (() => {
     const getModal = () => document.getElementById('dr-lurie-login-modal');
 
-    const setError = (msg) => {
-      const el = getModal()?.querySelector('[data-login-error]');
+    let currentRecoveryToken = null;
+
+    const MODES = {
+      'sign-in': { title: 'Editor login', subtitle: 'Sign in to access publishing tools.' },
+      'request-reset': { title: 'Reset password', subtitle: 'Enter your email to receive a reset link.' },
+      'set-new-password': { title: 'Set new password', subtitle: 'Choose a password 8 or more characters long.' },
+    };
+
+    // Show or hide the shared banner with error (red) or success (green) styling.
+    const setBanner = (msg, type = 'error') => {
+      const el = getModal()?.querySelector('[data-modal-banner]');
       if (!el) return;
-      if (msg) {
-        el.textContent = msg;
-        el.classList.remove('hidden');
-      } else {
+      if (!msg) {
         el.classList.add('hidden');
         el.textContent = '';
+        return;
+      }
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      el.classList.remove(
+        'border-red-500/30',
+        'bg-red-500/10',
+        'text-red-400',
+        'border-green-500/30',
+        'bg-green-500/10',
+        'text-green-400'
+      );
+      if (type === 'success') {
+        el.classList.add('border-green-500/30', 'bg-green-500/10', 'text-green-400');
+      } else {
+        el.classList.add('border-red-500/30', 'bg-red-500/10', 'text-red-400');
       }
     };
 
-    const setLoading = (loading) => {
-      const modal = getModal();
-      if (!modal) return;
-      const btn = modal.querySelector('[data-submit-btn]');
-      const text = modal.querySelector('[data-btn-text]');
-      const spinner = modal.querySelector('[data-btn-spinner]');
+    const setFormLoading = (form, loading) => {
+      const btn = form?.querySelector('[data-submit-btn]');
+      const text = form?.querySelector('[data-btn-text]');
+      const spinner = form?.querySelector('[data-btn-spinner]');
       if (btn) btn.disabled = loading;
       if (text) text.classList.toggle('hidden', loading);
       if (spinner) spinner.classList.toggle('hidden', !loading);
     };
 
+    const resetAllForms = () => {
+      const modal = getModal();
+      if (!modal) return;
+      ['[data-login-form]', '[data-reset-form]', '[data-new-password-form]'].forEach((sel) => {
+        const form = modal.querySelector(sel);
+        if (!form) return;
+        form.reset();
+        setFormLoading(form, false);
+      });
+    };
+
+    const setMode = (mode, opts = {}) => {
+      const modal = getModal();
+      if (!modal) return;
+      const modeConfig = MODES[mode] ?? MODES['sign-in'];
+
+      const titleEl = modal.querySelector('#login-modal-title');
+      const subtitleEl = modal.querySelector('[data-modal-subtitle]');
+      if (titleEl) titleEl.textContent = modeConfig.title;
+      if (subtitleEl) subtitleEl.textContent = modeConfig.subtitle;
+
+      modal.querySelectorAll('[data-modal-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.modalPanel !== mode;
+      });
+
+      setBanner('');
+
+      if (mode === 'set-new-password' && opts.recoveryToken) {
+        currentRecoveryToken = opts.recoveryToken;
+      }
+
+      // Reset the request-reset panel's sent-state when re-entering it
+      if (mode === 'request-reset') {
+        const sentEl = modal.querySelector('[data-reset-sent]');
+        const resetFormEl = modal.querySelector('[data-reset-form]');
+        if (sentEl) sentEl.hidden = true;
+        if (resetFormEl) resetFormEl.hidden = false;
+      }
+
+      // Focus the first input only when the modal is visible
+      setTimeout(() => {
+        if (modal.getAttribute('aria-hidden') !== 'false') return;
+        const panel = modal.querySelector(`[data-modal-panel="${mode}"]`);
+        panel?.querySelector('input')?.focus();
+      }, 50);
+    };
+
     const closeModal = () => {
       const modal = getModal();
       if (!modal) return;
+      currentRecoveryToken = null;
       modal.classList.add('hidden');
       modal.classList.remove('flex');
       modal.setAttribute('aria-hidden', 'true');
-      setError('');
-      setLoading(false);
-      const form = modal.querySelector('[data-login-form]');
-      if (form) form.reset();
+      setBanner('');
+      resetAllForms();
+      // Reset to sign-in state for next open (modal is hidden so no visual flicker)
+      const titleEl = modal.querySelector('#login-modal-title');
+      const subtitleEl = modal.querySelector('[data-modal-subtitle]');
+      if (titleEl) titleEl.textContent = MODES['sign-in'].title;
+      if (subtitleEl) subtitleEl.textContent = MODES['sign-in'].subtitle;
+      modal.querySelectorAll('[data-modal-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.modalPanel !== 'sign-in';
+      });
+      const sentEl = modal.querySelector('[data-reset-sent]');
+      const resetFormEl = modal.querySelector('[data-reset-form]');
+      if (sentEl) sentEl.hidden = true;
+      if (resetFormEl) resetFormEl.hidden = false;
     };
 
-    const openModal = () => {
+    const openModal = (mode = 'sign-in', opts = {}) => {
       const modal = getModal();
       if (!modal) return;
       modal.classList.remove('hidden');
       modal.classList.add('flex');
       modal.setAttribute('aria-hidden', 'false');
-      // Sync keep-signed-in checkbox to current pref
       const cb = modal.querySelector('#modal-keep-signed-in');
-      if (cb) cb.checked = isKeepSignedIn() !== false; // default true
-      setTimeout(() => modal.querySelector('#login-email')?.focus(), 50);
+      if (cb) cb.checked = isKeepSignedIn() !== false;
+      setMode(mode, opts);
     };
 
     const onLoginSuccess = (user) => {
@@ -231,26 +409,25 @@
       if (!modal || modal.dataset.loginModalInitialized === 'true') return;
       modal.dataset.loginModalInitialized = 'true';
 
-      // Close on backdrop click
+      // Global close triggers
       modal.querySelector('[data-modal-backdrop]')?.addEventListener('click', closeModal);
       modal.querySelector('[data-modal-close]')?.addEventListener('click', closeModal);
-
-      // Close on Escape
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') closeModal();
       });
 
-      // Form submit
+      // ── Sign-in form ──
       modal.querySelector('[data-login-form]')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        setError('');
-        setLoading(true);
+        setBanner('');
+        const form = e.currentTarget;
+        setFormLoading(form, true);
         const email = modal.querySelector('#login-email')?.value?.trim() ?? '';
         const password = modal.querySelector('#login-password')?.value ?? '';
         const keep = modal.querySelector('#modal-keep-signed-in')?.checked ?? true;
         if (!email || !password) {
-          setError('Please enter your email and password.');
-          setLoading(false);
+          setBanner('Please enter your email and password.');
+          setFormLoading(form, false);
           return;
         }
         try {
@@ -258,8 +435,18 @@
           const user = await loginWithPassword(email, password);
           onLoginSuccess(user);
         } catch (err) {
-          setError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
-          setLoading(false);
+          setBanner(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
+          setFormLoading(form, false);
+        }
+      });
+
+      // Forgot password → switch to request-reset and carry over any email already typed
+      modal.querySelector('[data-forgot-password]')?.addEventListener('click', () => {
+        const typed = modal.querySelector('#login-email')?.value?.trim() ?? '';
+        setMode('request-reset');
+        if (typed) {
+          const resetEmailInput = modal.querySelector('#reset-email');
+          if (resetEmailInput) resetEmailInput.value = typed;
         }
       });
 
@@ -270,18 +457,94 @@
         const redirectTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
         loginWithGoogle(redirectTo);
       });
+
+      // ── Request-reset form ──
+      modal.querySelector('[data-reset-form]')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setBanner('');
+        const form = e.currentTarget;
+        setFormLoading(form, true);
+        const email = modal.querySelector('#reset-email')?.value?.trim() ?? '';
+        if (!email) {
+          setBanner('Please enter your email address.');
+          setFormLoading(form, false);
+          return;
+        }
+        try {
+          await requestPasswordRecovery(email);
+          // Show inline success and hide the form
+          const sentEl = modal.querySelector('[data-reset-sent]');
+          if (sentEl) {
+            sentEl.textContent = `Check your inbox — we sent a reset link to ${email}.`;
+            sentEl.hidden = false;
+          }
+          form.hidden = true;
+        } catch (err) {
+          setBanner(err instanceof Error ? err.message : 'Could not send reset email. Please try again.');
+          setFormLoading(form, false);
+        }
+      });
+
+      // Back to sign in
+      modal.querySelector('[data-back-to-signin]')?.addEventListener('click', () => {
+        setMode('sign-in');
+      });
+
+      // ── Set-new-password form ──
+      modal.querySelector('[data-new-password-form]')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setBanner('');
+        const form = e.currentTarget;
+        const newPwd = modal.querySelector('#new-password')?.value ?? '';
+        const confirmPwd = modal.querySelector('#confirm-password')?.value ?? '';
+
+        if (newPwd.length < 8) {
+          setBanner('Password must be at least 8 characters.');
+          return;
+        }
+        if (newPwd !== confirmPwd) {
+          setBanner('Passwords do not match.');
+          return;
+        }
+        if (!currentRecoveryToken) {
+          setBanner('Recovery session expired. Please request a new reset link.');
+          return;
+        }
+
+        setFormLoading(form, true);
+        const token = currentRecoveryToken;
+        try {
+          const userInfo = await updatePasswordWithToken(token, newPwd);
+          currentRecoveryToken = null;
+          // Switch to sign-in with a success banner and the email pre-filled
+          setMode('sign-in');
+          setBanner('Password updated — please sign in with your new password.', 'success');
+          const emailInput = modal.querySelector('#login-email');
+          if (emailInput) emailInput.value = userInfo.email;
+          document.dispatchEvent(
+            new CustomEvent('dr-lurie:password-reset-success', { detail: { email: userInfo.email } })
+          );
+        } catch (err) {
+          setBanner(err instanceof Error ? err.message : 'Could not update password. Please try again.');
+          setFormLoading(form, false);
+        }
+      });
     };
 
-    // Expose open/close on window for HeaderAuthButton to call
+    // Expose on window so HeaderAuthButton (and any admin page) can control the modal.
     window.__drLurieLoginModal = {
       open: () => {
         initModal();
         openModal();
       },
       close: closeModal,
+      // Called by HeaderAuthButton when a recovery hash is detected on page load.
+      openForRecovery: (recoveryToken) => {
+        initModal();
+        openModal('set-new-password', { recoveryToken });
+      },
     };
 
-    // Init on each page load (Astro view transitions)
     const setup = () => initModal();
     document.addEventListener('astro:page-load', setup);
     setup();
