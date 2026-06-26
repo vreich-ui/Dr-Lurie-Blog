@@ -216,8 +216,11 @@ const { variant = 'desktop' } = Astro.props;
 
     const adminMenuItems = [
       { href: '/admin', text: 'Admin Dashboard' },
-      { href: '/admin/publish', text: 'Publish Article' },
+      { href: '/admin/library', text: 'Library' },
+      { href: '/admin/publish', text: 'Publish' },
+      { href: '/admin/drafts', text: 'Drafts' },
       { href: '/admin/agent-admin', text: 'AI Publisher' },
+      { href: '/admin/blobs', text: 'Blob Store' },
     ];
 
     const renderAdminLinks = (container, isAdmin) => {
