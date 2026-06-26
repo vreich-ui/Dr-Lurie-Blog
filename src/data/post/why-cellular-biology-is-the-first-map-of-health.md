@@ -1,17 +1,18 @@
 ---
 publishDate: 2026-06-26T15:52:41.137Z
 published_time: 2026-06-26T15:52:41.137Z
-title: "Why Cellular Biology Is the First Map of Health"
-excerpt: "A plain-language guide to why cells are the smallest practical level for understanding health, resilience, and disease risk."
+title: 'Why Cellular Biology Is the First Map of Health'
+excerpt: 'A plain-language guide to why cells are the smallest practical level for understanding health, resilience, and disease risk.'
 tags:
-  - "cellular biology"
-  - "health science"
-  - "mitochondria"
-  - "cells"
-  - "science blog"
+  - 'cellular biology'
+  - 'health science'
+  - 'mitochondria'
+  - 'cells'
+  - 'science blog'
 metadata:
-  description: "A clear explanation of why cells, energy, signaling, repair, and immune coordination are the first practical map for understanding health."
+  description: 'A clear explanation of why cells, energy, signaling, repair, and immune coordination are the first practical map for understanding health.'
 ---
+
 ### Health starts smaller than symptoms
 
 When people think about health, they often think in large categories: the heart, the brain, the gut, the immune system, the skin. Those categories matter. But they are built from something smaller and more basic: cells.

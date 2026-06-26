@@ -208,7 +208,11 @@ describe('patchCanonicalInput — node_patches', () => {
     const textNode = nodes.find((n) => n.id === 'n_r3x4y5');
     assert.ok(textNode, 'n_r3x4y5 must exist');
     assert.equal(textNode.public?.media, undefined, 'text-only node must have no media');
-    assert.deepEqual(textNode.private, { strategy: 'explanation', agentNotes: 'Internal note.' }, 'private must be preserved');
+    assert.deepEqual(
+      textNode.private,
+      { strategy: 'explanation', agentNotes: 'Internal note.' },
+      'private must be preserved'
+    );
   });
 
   it('removes media object when public_media_src is null', async () => {
@@ -637,9 +641,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
       request_id: requestId,
       lock_token: lockToken,
       expected_record_version: record.version,
-      replace_image_asset_register: [
-        { asset_id: 'asset_bad', url: 'https://cdn.example.com/image.jpg' },
-      ],
+      replace_image_asset_register: [{ asset_id: 'asset_bad', url: 'https://cdn.example.com/image.jpg' }],
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
@@ -707,9 +709,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
       request_id: requestId,
       lock_token: lockToken,
       expected_record_version: record.version,
-      replace_image_asset_register: [
-        { asset_id: 'asset_mk', url: FEATURED_ARTIFACT, alt: 'Hero', status: 'ready' },
-      ],
+      replace_image_asset_register: [{ asset_id: 'asset_mk', url: FEATURED_ARTIFACT, alt: 'Hero', status: 'ready' }],
     });
 
     assert.equal(resp.statusCode, 200, resp.body);
@@ -897,7 +897,11 @@ describe('patchCanonicalInput — clear stale failure state', () => {
 
     assert.equal(resp.statusCode, 200, resp.body);
     const histEntry = parseBody(resp).record!.history.at(-1)!;
-    assert.equal(histEntry.details?.last_error_cleared, undefined, 'last_error_cleared must be absent when already null');
+    assert.equal(
+      histEntry.details?.last_error_cleared,
+      undefined,
+      'last_error_cleared must be absent when already null'
+    );
   });
 
   it('clears failed_agents alone without requiring repair_workflow_status', async () => {

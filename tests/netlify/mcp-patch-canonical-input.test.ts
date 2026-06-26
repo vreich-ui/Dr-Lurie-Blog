@@ -22,8 +22,7 @@ const mcpPost = async (body: unknown) => {
   return { resp, rpc: JSON.parse(resp.body) as Record<string, unknown> };
 };
 
-const toolsListCall = () =>
-  mcpPost({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+const toolsListCall = () => mcpPost({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
 
 const toolCallRpc = (name: string, args: Record<string, unknown>) =>
   mcpPost({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } });
@@ -48,7 +47,8 @@ describe('save_json_blob_patch_canonical_input MCP tool registration', () => {
 
   it('input schema requires request_id, lock_token, expected_record_version', async () => {
     const { rpc } = await toolsListCall();
-    const tools = (rpc.result as { tools?: { name: string; inputSchema: Record<string, unknown> }[] } | undefined)?.tools ?? [];
+    const tools =
+      (rpc.result as { tools?: { name: string; inputSchema: Record<string, unknown> }[] } | undefined)?.tools ?? [];
     const tool = tools.find((t) => t.name === 'save_json_blob_patch_canonical_input');
     assert.ok(tool, 'tool must be present');
 
@@ -60,7 +60,8 @@ describe('save_json_blob_patch_canonical_input MCP tool registration', () => {
 
   it('input schema includes optional repair fields', async () => {
     const { rpc } = await toolsListCall();
-    const tools = (rpc.result as { tools?: { name: string; inputSchema: Record<string, unknown> }[] } | undefined)?.tools ?? [];
+    const tools =
+      (rpc.result as { tools?: { name: string; inputSchema: Record<string, unknown> }[] } | undefined)?.tools ?? [];
     const tool = tools.find((t) => t.name === 'save_json_blob_patch_canonical_input');
     assert.ok(tool, 'tool must be present');
 
