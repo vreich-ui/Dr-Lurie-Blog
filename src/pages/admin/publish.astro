@@ -878,7 +878,8 @@ const metadata = {
 
     (async () => {
       try {
-        await handleOAuthCallback().catch(() => {});
+        const oauthUser = await handleOAuthCallback();
+        if (oauthUser) window.__drLurieLoginModal?.close();
         const user = currentUser();
         if (!user) {
           authState('signed-out');

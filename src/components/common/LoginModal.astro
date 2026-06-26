@@ -263,11 +263,12 @@
         }
       });
 
-      // Google
+      // Google — strip any stale hash fragment before handing the URL to GoTrue
       modal.querySelector('[data-google-btn]')?.addEventListener('click', () => {
         const keep = modal.querySelector('#modal-keep-signed-in')?.checked ?? true;
         setKeepSignedIn(keep);
-        loginWithGoogle(window.location.href);
+        const redirectTo = `${window.location.origin}${window.location.pathname}${window.location.search}`;
+        loginWithGoogle(redirectTo);
       });
     };
 

@@ -315,7 +315,11 @@ const metadata = {
         setAuthState('checking');
 
         try {
-          await handleOAuthCallback().catch(() => {});
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) {
+            // OAuth redirect landed on this page — close modal if somehow open
+            window.__drLurieLoginModal?.close();
+          }
           await renderAuthState();
 
           document.addEventListener('dr-lurie:login', () => {

@@ -290,7 +290,21 @@ const { variant = 'desktop' } = Astro.props;
 
     const initializeHeaderAuthState = async () => {
       // Handle Google OAuth redirect (URL hash has #access_token=...)
-      await handleOAuthCallback().catch(() => {});
+      try {
+        const oauthUser = await handleOAuthCallback();
+        if (oauthUser) {
+          // Close the modal if it was somehow left open, then broadcast the login
+          window.__drLurieLoginModal?.close();
+          document.dispatchEvent(new CustomEvent('dr-lurie:login', { detail: { user: oauthUser } }));
+        }
+      } catch (error) {
+        console.error('OAuth callback processing failed.', error);
+        document.dispatchEvent(
+          new CustomEvent('dr-lurie:auth-error', {
+            detail: { message: error instanceof Error ? error.message : 'Authentication failed.' },
+          })
+        );
+      }
       await renderAuthState().catch((error) => {
         console.error('Header authentication initialization failed.', error);
       });
