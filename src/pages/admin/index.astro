@@ -13,67 +13,83 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14" data-admin-shell hidden>
+  <section class="admin-dashboard mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14">
     <header class="dashboard-header">
       <div>
         <p class="dashboard-kicker">Admin workspace</p>
         <h1>{pageTitle}</h1>
-        <p class="dashboard-intro">A private command center for Dr. Lurié publishing and workflow tools.</p>
+        <p class="dashboard-intro">Publishing and workflow tools for Dr. Lurié.</p>
       </div>
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
 
-    <AdminNav />
+    <!-- Shown when signed out -->
+    <div data-admin-signin-prompt hidden class="admin-gate-panel">
+      <p class="admin-gate-message">
+        Sign in with your editor account to access publishing tools. Public articles remain available without login.
+      </p>
+      <button type="button" class="btn-primary admin-gate-btn" data-admin-open-login> Sign in to editor </button>
+    </div>
 
-    <section class="dashboard-grid" data-auth-gated hidden>
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">Publishing</p>
-        <h2>Library</h2>
-        <p>Manage published articles, review unpublished GitHub drafts, and toggle public visibility.</p>
-        <a class="btn-primary" href="/admin/library">Open library</a>
-      </article>
+    <!-- Shown when signed in but not an admin -->
+    <div data-admin-forbidden-prompt hidden class="admin-gate-panel">
+      <p class="admin-gate-message">Your account does not have editor permissions.</p>
+    </div>
 
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">Editor</p>
-        <h2>Publish Article</h2>
-        <p>Create or update Markdown articles, upload imagery, and queue the GitHub-backed publish flow.</p>
-        <a class="btn-secondary" href="/admin/publish">Open publisher</a>
-      </article>
+    <!-- Shown when signed-in admin -->
+    <div data-admin-shell hidden>
+      <AdminNav />
 
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">Draft review</p>
-        <h2>Drafts</h2>
-        <p>Open saved JSON workflow drafts and route them through the gated review workspace.</p>
-        <a class="btn-secondary" href="/admin/drafts">Review drafts</a>
-      </article>
+      <section class="dashboard-grid" data-auth-gated hidden>
+        <article class="dashboard-card">
+          <p class="dashboard-kicker">Publishing</p>
+          <h2>Library</h2>
+          <p>Manage published articles, review unpublished GitHub drafts, and toggle public visibility.</p>
+          <a class="btn-primary" href="/admin/library">Open library</a>
+        </article>
 
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">AI workflow</p>
-        <h2>AI Publisher</h2>
-        <p>
-          Use the ChatKit-powered assistant to prepare approved article payloads and run the server publisher agent.
-        </p>
-        <a class="btn-secondary" href="/admin/agent-admin">Open AI publisher</a>
-      </article>
+        <article class="dashboard-card">
+          <p class="dashboard-kicker">Editor</p>
+          <h2>Publish Article</h2>
+          <p>Create or update Markdown articles, upload imagery, and queue the GitHub-backed publish flow.</p>
+          <a class="btn-secondary" href="/admin/publish">Open publisher</a>
+        </article>
 
-      <article class="dashboard-card">
-        <p class="dashboard-kicker">Storage</p>
-        <h2>Blob Store</h2>
-        <p>Search, inspect, edit, duplicate, rename, and delete Netlify Blobs objects, or wipe stores entirely.</p>
-        <a class="btn-secondary" href="/admin/blobs">Manage blobs</a>
-      </article>
+        <article class="dashboard-card">
+          <p class="dashboard-kicker">Draft review</p>
+          <h2>Drafts</h2>
+          <p>Open saved JSON workflow drafts and route them through the gated review workspace.</p>
+          <a class="btn-secondary" href="/admin/drafts">Review drafts</a>
+        </article>
 
-      <article class="dashboard-card dashboard-card-wide">
-        <p class="dashboard-kicker">Coming soon</p>
-        <h2>Dashboard roadmap</h2>
-        <ul>
-          <li>Review recent publishing activity and deploy status.</li>
-          <li>Manage draft queues and research note handoffs.</li>
-          <li>Monitor admin-only workflow health checks.</li>
-        </ul>
-      </article>
-    </section>
+        <article class="dashboard-card">
+          <p class="dashboard-kicker">AI workflow</p>
+          <h2>AI Publisher</h2>
+          <p>
+            Use the ChatKit-powered assistant to prepare approved article payloads and run the server publisher agent.
+          </p>
+          <a class="btn-secondary" href="/admin/agent-admin">Open AI publisher</a>
+        </article>
+
+        <article class="dashboard-card">
+          <p class="dashboard-kicker">Storage</p>
+          <h2>Blob Store</h2>
+          <p>Search, inspect, edit, duplicate, rename, and delete Netlify Blobs objects, or wipe stores entirely.</p>
+          <a class="btn-secondary" href="/admin/blobs">Manage blobs</a>
+        </article>
+
+        <article class="dashboard-card dashboard-card-wide">
+          <p class="dashboard-kicker">Coming soon</p>
+          <h2>Dashboard roadmap</h2>
+          <ul>
+            <li>Review recent publishing activity and deploy status.</li>
+            <li>Manage draft queues and research note handoffs.</li>
+            <li>Monitor admin-only workflow health checks.</li>
+          </ul>
+        </article>
+      </section>
+    </div>
   </section>
 </Layout>
 
@@ -143,6 +159,25 @@ const metadata = {
     gap: 1rem;
   }
 
+  .admin-gate-panel {
+    padding: 2.5rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+  }
+
+  .admin-gate-message {
+    max-width: 36rem;
+    color: var(--aw-color-text-muted, #64748b);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .admin-gate-btn {
+    min-width: 10rem;
+  }
+
   .dashboard-card {
     border: 1px solid rgb(229 231 235);
     border-radius: 1.5rem;
@@ -198,6 +233,8 @@ const metadata = {
       const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
       const adminShell = document.querySelector('[data-admin-shell]');
       const authStatus = document.querySelector('[data-auth-status]');
+      const signinPrompt = document.querySelector('[data-admin-signin-prompt]');
+      const forbiddenPrompt = document.querySelector('[data-admin-forbidden-prompt]');
 
       const setGatedContentVisible = (visible) => {
         gatedContent.forEach((element) => {
@@ -209,15 +246,11 @@ const metadata = {
         if (adminShell) adminShell.hidden = !visible;
       };
 
-      const redirectToHome = () => {
-        window.location.replace('/');
-      };
-
       const authStatusMessages = {
-        checking: 'Checking admin access…',
-        'signed-out': 'Sign in to view admin tools.',
-        forbidden: 'Access denied (not an admin).',
-        error: 'Admin auth failed. Please refresh or contact support.',
+        checking: 'Checking editor access…',
+        'signed-out': '',
+        forbidden: '',
+        error: 'Something went wrong. Please refresh or try again.',
         'signed-in': '',
       };
 
@@ -227,12 +260,20 @@ const metadata = {
 
       const setAuthState = (state) => {
         const isSignedIn = state === 'signed-in';
-        setAuthStatus(authStatusMessages[state] || '');
+        const isSignedOut = state === 'signed-out';
+        const isForbidden = state === 'forbidden';
+
+        setAuthStatus(authStatusMessages[state] ?? '');
         setAdminShellVisible(isSignedIn);
         setGatedContentVisible(isSignedIn);
-
-        if (!isSignedIn && state !== 'checking') redirectToHome();
+        if (signinPrompt) signinPrompt.hidden = !isSignedOut;
+        if (forbiddenPrompt) forbiddenPrompt.hidden = !isForbidden;
       };
+
+      // Wire up the Sign In button inside the gate panel
+      document.querySelector('[data-admin-open-login]')?.addEventListener('click', () => {
+        window.__drLurieLoginModal?.open();
+      });
 
       const getAdminStateForUser = async (_user) => {
         const token = await getAccessToken();
