@@ -301,5 +301,10 @@ declare global {
     publishArticleFromPayload?: (
       payload: import('./lib/publishArticleFromPayload').PublishArticlePayload
     ) => Promise<import('./lib/publishArticleFromPayload').PublishArticleResult>;
+    __drLurieLoginModal?: {
+      open: () => void;
+      close: () => void;
+      openForRecovery: (token: string) => void;
+    };
   }
 }
