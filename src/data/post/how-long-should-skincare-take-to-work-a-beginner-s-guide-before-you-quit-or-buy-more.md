@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-06-26T16:06:50Z
-published_time: 2026-06-26T16:06:50Z
+publishDate: 2026-06-26T16:08:55Z
+published_time: 2026-06-26T16:08:55Z
 title: "How Long Should Skincare Take to Work? A Beginner's Guide Before You Quit or Buy More"
 excerpt: "A practical way to judge skincare results without giving up too early, pushing through irritation, or buying the next promise too soon."
 tags:
