@@ -1686,7 +1686,6 @@ const metadata = {
           request_id: currentRequestId,
           lock_token: lockToken,
           published_time: new Date().toISOString(),
-          article_body: currentNodes.length ? { schema_version: 'article_body.v1', nodes: currentNodes } : undefined,
         };
 
         const res = await fetch(PATCH_WORKFLOW_ENDPOINT, {

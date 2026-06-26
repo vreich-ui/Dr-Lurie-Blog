@@ -157,7 +157,7 @@ const lockErrorResponse = (action: string, record: WorkflowRecord, kind: 'lock_e
 
 // ─── action handlers ──────────────────────────────────────────────────────────
 
-const handlePatchCanonicalInput = async (store: Store, body: AdminPatchBody) => {
+export const handlePatchCanonicalInput = async (store: Store, body: AdminPatchBody) => {
   if (!body.promote_publish_payload) {
     return jsonResponse(400, {
       action: body.action,
@@ -224,7 +224,7 @@ const handlePatchCanonicalInput = async (store: Store, body: AdminPatchBody) => 
   return jsonResponse(200, { action: body.action, record: { version: nextRecord.version } });
 };
 
-const handleSetPublishedTime = async (store: Store, body: AdminPatchBody) => {
+export const handleSetPublishedTime = async (store: Store, body: AdminPatchBody) => {
   if (
     body.published_time !== null &&
     body.published_time !== undefined &&
@@ -251,6 +251,7 @@ const handleSetPublishedTime = async (store: Store, body: AdminPatchBody) => {
     input: {
       ...record.input,
       publication: {
+        ...(record.input.publication ?? {}),
         schema_version: 'publication.v2',
         published_time: body.published_time ?? null,
       },
