@@ -94,7 +94,7 @@ const metadata = {
   </section>
 
   <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
-  <div id="draft-picker-modal" class="modal-backdrop" aria-hidden="true" hidden>
+  <div id="draft-picker-modal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-picker-title">
       <div class="modal-header">
         <h2 id="draft-picker-title" class="modal-title">Open JSON draft</h2>
@@ -436,15 +436,18 @@ const metadata = {
 
   /* ── Draft picker modal ────────────────────────────────────────────────── */
   .modal-backdrop {
+    display: none;
     position: fixed;
     inset: 0;
     z-index: 100;
-    display: flex;
     align-items: flex-start;
     justify-content: center;
     padding: 1.5rem;
     background: rgb(15 23 42 / 55%);
     overflow-y: auto;
+  }
+  .modal-backdrop.is-open {
+    display: flex;
   }
   :global(.dark) .modal-backdrop {
     background: rgb(0 0 0 / 70%);
@@ -1116,14 +1119,14 @@ const metadata = {
         .trim() || 'Untitled draft';
 
     const openModal = () => {
-      els.modal.hidden = false;
+      els.modal.classList.add('is-open');
       els.modal.setAttribute('aria-hidden', 'false');
       const firstFocusable = els.modal.querySelector<HTMLElement>('button, input, [tabindex="0"]');
       firstFocusable?.focus();
     };
 
     const closeModal = () => {
-      els.modal.hidden = true;
+      els.modal.classList.remove('is-open');
       els.modal.setAttribute('aria-hidden', 'true');
     };
 
@@ -1143,17 +1146,19 @@ const metadata = {
         const readinessLabel = getReadinessLabel(draft.readiness);
         const displayTitle = getDisplayTitle(draft.title);
         const dateStr = formatDate(draft.updatedAt || draft.savedAt);
+        const statusLabel = draft.lifecycleStatus || draft.recordStatus || 'draft';
         const savedByStr = draft.savedBy
           ? `<span class="dp-sep">·</span><span>by ${escapeHtml(draft.savedBy)}</span>`
           : '';
+        const shortId = draft.id.length > 8 ? draft.id.slice(0, 8) + '…' : draft.id;
 
         row.innerHTML = `
           <div class="dp-row-main">
             <span class="dp-title">${escapeHtml(displayTitle)}</span>
             <span class="dp-meta">
-              <span class="dp-slug">${escapeHtml(draft.slug || '—')}</span>
+              <span class="dp-slug">${escapeHtml(shortId)}</span>
               <span class="dp-sep">·</span>
-              <span>${escapeHtml(draft.author || '—')}</span>
+              <span>${escapeHtml(statusLabel)}</span>
               <span class="dp-sep">·</span>
               <span>${escapeHtml(dateStr)}</span>
               ${savedByStr}
@@ -1247,7 +1252,7 @@ const metadata = {
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !els.modal.hidden) closeModal();
+      if (e.key === 'Escape' && els.modal.classList.contains('is-open')) closeModal();
     });
 
     // ── Publish ───────────────────────────────────────────────────────────────
