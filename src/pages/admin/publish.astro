@@ -44,7 +44,6 @@ const metadata = {
       <!-- ── Main editor column ───────────────────────────────── -->
       <main class="publish-main" aria-label="Article editor">
         <form id="publish-form" class="admin-form">
-
           <!-- ── Article Details card ──────────────────────── -->
           <section class="admin-card article-details-card" aria-labelledby="details-heading">
             <div class="card-section-header">
@@ -70,8 +69,7 @@ const metadata = {
                 name="excerpt"
                 rows="3"
                 maxlength="300"
-                placeholder="A brief summary shown on listing cards and search results…"
-              ></textarea>
+                placeholder="A brief summary shown on listing cards and search results…"></textarea>
             </div>
 
             <div class="field-grid">
@@ -110,7 +108,9 @@ const metadata = {
               <button class="btn-tertiary btn-xs quick-add" data-template="prose_section" type="button">+ Text</button>
               <button class="btn-tertiary btn-xs quick-add" data-template="image" type="button">+ Image</button>
               <button class="btn-tertiary btn-xs quick-add" data-template="soft_action" type="button">+ CTA</button>
-              <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button">+ Offer</button>
+              <button class="btn-tertiary btn-xs quick-add" data-template="contextual_offer" type="button"
+                >+ Offer</button
+              >
               <button class="btn-tertiary btn-xs quick-add" data-template="callout" type="button">+ Callout</button>
               <button class="btn-tertiary btn-xs quick-add" data-template="summary" type="button">+ Summary</button>
               <button class="btn-tertiary btn-xs quick-add" data-template="faq" type="button">+ FAQ</button>
@@ -138,12 +138,7 @@ const metadata = {
                     <p class="sidebar-kicker">Block Library</p>
                     <h3 id="block-library-heading">Choose a block type</h3>
                   </div>
-                  <button
-                    id="block-library-close"
-                    class="module-icon-button"
-                    type="button"
-                    aria-label="Close library"
-                  >
+                  <button id="block-library-close" class="module-icon-button" type="button" aria-label="Close library">
                     <Icon name="tabler:x" class="module-action-icon" aria-hidden="true" />
                   </button>
                 </div>
@@ -194,12 +189,7 @@ const metadata = {
 
               <div class="field">
                 <label for="sources">Sources</label>
-                <textarea
-                  id="sources"
-                  name="sources"
-                  class="sources-input"
-                  rows="3"
-                  placeholder="One source per line…"
+                <textarea id="sources" name="sources" class="sources-input" rows="3" placeholder="One source per line…"
                 ></textarea>
               </div>
 
@@ -377,7 +367,6 @@ const metadata = {
               </div>
             </div>
           </details>
-
         </form>
 
         <!-- Inline preview runtime (hidden) -->
@@ -398,11 +387,7 @@ const metadata = {
           <p class="sidebar-kicker">Readiness & Status</p>
           <h2 id="publish-output-heading" class="sidebar-heading">Publish Settings</h2>
 
-          <div
-            id="article-status-card"
-            class="article-status-card article-status-card--draft"
-            aria-live="polite"
-          >
+          <div id="article-status-card" class="article-status-card article-status-card--draft" aria-live="polite">
             <h3 class="article-status-label">Article Status</h3>
             <div class="article-status-summary">
               <span id="article-status-icon" class="article-status-icon" aria-hidden="true">○</span>
@@ -521,13 +506,7 @@ const metadata = {
               >
                 Publish Article
               </button>
-              <p
-                id="publish-blocked-message"
-                class="publish-blocked-message"
-                role="status"
-                aria-live="polite"
-                hidden
-              >
+              <p id="publish-blocked-message" class="publish-blocked-message" role="status" aria-live="polite" hidden>
                 Complete required fields before publishing.
               </p>
             </div>
@@ -662,7 +641,9 @@ const metadata = {
     border: 1px solid rgb(229 231 235);
     border-radius: 1.5rem;
     background: rgb(255 255 255 / 84%);
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    box-shadow:
+      0 10px 25px -5px rgba(0, 0, 0, 0.05),
+      0 8px 10px -6px rgba(0, 0, 0, 0.05);
     padding: 2rem;
   }
 
@@ -2887,7 +2868,9 @@ const metadata = {
         if (fields.overwritePublishControl) fields.overwritePublishControl.hidden = !hasPublishedArticle;
         if (!hasPublishedArticle) fields.overwrite.checked = false;
 
-        const ariaDescribedBy = hasPublishedArticle ? 'overwrite-slug publish-blocked-message' : 'publish-blocked-message';
+        const ariaDescribedBy = hasPublishedArticle
+          ? 'overwrite-slug publish-blocked-message'
+          : 'publish-blocked-message';
         fields.publish.setAttribute('aria-describedby', ariaDescribedBy);
         if (fields.topPublish) fields.topPublish.setAttribute('aria-describedby', ariaDescribedBy);
 
@@ -3001,7 +2984,8 @@ const metadata = {
         fields.downloadJsonBackup.disabled = !canPublish;
         fields.backupPanel.classList.toggle('is-disabled', !canPublish);
         fields.publish.classList.toggle('is-validation-blocked', !hasRequiredValidationFields);
-        if (fields.topPublish) fields.topPublish.classList.toggle('is-validation-blocked', !hasRequiredValidationFields);
+        if (fields.topPublish)
+          fields.topPublish.classList.toggle('is-validation-blocked', !hasRequiredValidationFields);
 
         if (fields.publishBlockedMessage) {
           if (articleStatus.published && hasRequiredValidationFields && !fields.overwrite.checked) {
@@ -3078,16 +3062,25 @@ const metadata = {
             const oauthUser = await handleOAuthCallback();
             if (oauthUser) window.__drLurieLoginModal?.close();
             const user = currentUser();
-            if (!user) { setAuthState('signed-out'); return; }
+            if (!user) {
+              setAuthState('signed-out');
+              return;
+            }
 
             const authToken = await getAccessToken();
-            if (!authToken) { setAuthState('error'); return; }
+            if (!authToken) {
+              setAuthState('error');
+              return;
+            }
 
             const stateRes = await fetch('/.netlify/functions/admin-auth-state', {
               headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
             }).catch(() => null);
             const stateJson = await stateRes?.json().catch(() => null);
-            if (!stateJson?.isAdmin) { setAuthState('forbidden'); return; }
+            if (!stateJson?.isAdmin) {
+              setAuthState('forbidden');
+              return;
+            }
 
             setAuthState('signed-in');
             const loadedDraft = await loadDraftFromBlobs();
@@ -3096,7 +3089,10 @@ const metadata = {
             document.addEventListener('dr-lurie:logout', () => setAuthState('signed-out'));
             document.addEventListener('dr-lurie:login', async () => {
               const t = await getAccessToken();
-              if (!t) { setAuthState('error'); return; }
+              if (!t) {
+                setAuthState('error');
+                return;
+              }
               setAuthState('signed-in');
             });
           } catch {
@@ -3937,19 +3933,28 @@ const metadata = {
             activeTemplateId.replaceAll('_', ' ');
 
           const titleLabel =
-            activeTemplateId === 'summary' ? 'Summary Heading' :
-            activeTemplateId === 'faq' ? 'FAQ Heading' :
-            activeTemplateId === 'chat_invite' ? 'Invite Heading' :
-            activeTemplateId === 'commerce_offer' ? 'Offer Title' :
-            activeTemplateId === 'callout' ? 'Callout Heading' :
-            'Section Heading';
+            activeTemplateId === 'summary'
+              ? 'Summary Heading'
+              : activeTemplateId === 'faq'
+                ? 'FAQ Heading'
+                : activeTemplateId === 'chat_invite'
+                  ? 'Invite Heading'
+                  : activeTemplateId === 'commerce_offer'
+                    ? 'Offer Title'
+                    : activeTemplateId === 'callout'
+                      ? 'Callout Heading'
+                      : 'Section Heading';
 
           const bodyLabel =
-            activeTemplateId === 'image' ? 'Caption Text' :
-            activeTemplateId === 'chat_invite' ? 'Invite Message' :
-            activeTemplateId === 'product_mention' ? 'Description' :
-            ['soft_action', 'contextual_offer', 'commerce_offer'].includes(activeTemplateId) ? 'Context Text' :
-            'Content';
+            activeTemplateId === 'image'
+              ? 'Caption Text'
+              : activeTemplateId === 'chat_invite'
+                ? 'Invite Message'
+                : activeTemplateId === 'product_mention'
+                  ? 'Description'
+                  : ['soft_action', 'contextual_offer', 'commerce_offer'].includes(activeTemplateId)
+                    ? 'Context Text'
+                    : 'Content';
 
           const itemsLabel = activeTemplateId === 'faq' ? 'Q&A Items (one per line)' : 'List Items (one per line)';
 
@@ -3974,22 +3979,36 @@ const metadata = {
                 </div>
               </div>
               <div class="piece-form">
-                ${showTitle ? `
+                ${
+                  showTitle
+                    ? `
                 <div class="field">
                   <label>${titleLabel}</label>
                   <input type="text" class="piece-title" value="${window.escapeHtml(node.public?.title || '')}" placeholder="Enter heading…" />
-                </div>` : ''}
-                ${showBody ? `
+                </div>`
+                    : ''
+                }
+                ${
+                  showBody
+                    ? `
                 <div class="field">
                   <label>${bodyLabel}</label>
                   <textarea class="piece-body" rows="6" placeholder="Write your content here… Markdown is supported.">${window.escapeHtml(node.public?.body || '')}</textarea>
-                </div>` : ''}
-                ${showItems ? `
+                </div>`
+                    : ''
+                }
+                ${
+                  showItems
+                    ? `
                 <div class="field">
                   <label>${itemsLabel}</label>
                   <textarea class="piece-items" rows="4" placeholder="One item per line…">${window.escapeHtml((node.public?.items || []).join('\n'))}</textarea>
-                </div>` : ''}
-                ${showMedia ? `
+                </div>`
+                    : ''
+                }
+                ${
+                  showMedia
+                    ? `
                 <div class="field">
                   <label>Image URL</label>
                   <input type="text" class="piece-media" value="${window.escapeHtml(mediaSrc)}" placeholder="artifact-id or https://…" />
@@ -4003,8 +4022,12 @@ const metadata = {
                     <label>Caption</label>
                     <input type="text" class="piece-media-caption" value="${window.escapeHtml(mediaCaption)}" placeholder="Optional caption…" />
                   </div>
-                </div>` : ''}
-                ${showCta ? `
+                </div>`
+                    : ''
+                }
+                ${
+                  showCta
+                    ? `
                 <div class="field-grid">
                   <div class="field">
                     <label>Button Text</label>
@@ -4014,8 +4037,12 @@ const metadata = {
                     <label>Button URL</label>
                     <input type="url" class="piece-cta-link" value="${window.escapeHtml(node.public?.ctaLink || '')}" placeholder="https://…" />
                   </div>
-                </div>` : ''}
-                ${showChat ? `
+                </div>`
+                    : ''
+                }
+                ${
+                  showChat
+                    ? `
                 <div class="field-grid">
                   <div class="field">
                     <label>Invite Text</label>
@@ -4025,12 +4052,18 @@ const metadata = {
                     <label>Suggested Question</label>
                     <input type="text" class="piece-chat-query" value="${window.escapeHtml(node.chat?.suggestedQuery || '')}" placeholder="What should readers ask?" />
                   </div>
-                </div>` : ''}
-                ${showLabel ? `
+                </div>`
+                    : ''
+                }
+                ${
+                  showLabel
+                    ? `
                 <div class="field">
                   <label>Display Label</label>
                   <input type="text" class="piece-label" value="${window.escapeHtml(node.public?.label || '')}" placeholder="Advertisement" />
-                </div>` : ''}
+                </div>`
+                    : ''
+                }
                 <details class="piece-advanced">
                   <summary>Advanced</summary>
                   <div class="piece-advanced-content">
@@ -4049,22 +4082,32 @@ const metadata = {
                         <option value="hidden" ${node.visibility === 'hidden' ? 'selected' : ''}>Hidden</option>
                       </select>
                     </div>
-                    ${showMedia ? `
+                    ${
+                      showMedia
+                        ? `
                     <div class="field">
                       <label>Media Type</label>
                       <select class="piece-media-type">
                         ${['image', 'video', 'audio', 'embed'].map((t) => `<option value="${t}" ${mediaType === t ? 'selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`).join('')}
                       </select>
-                    </div>` : ''}
-                    ${showAddControls ? `
+                    </div>`
+                        : ''
+                    }
+                    ${
+                      showAddControls
+                        ? `
                     <div class="piece-add-controls">
                       ${!showCta ? '<button class="btn-tertiary btn-xs add-cta" type="button">+ Add CTA Button</button>' : ''}
                       ${!showCommercial ? '<button class="btn-tertiary btn-xs add-commercial" type="button">+ Add Commercial Info</button>' : ''}
                       ${!showChat ? '<button class="btn-tertiary btn-xs add-chat" type="button">+ Add Chat Invite</button>' : ''}
                       ${!showMedia ? '<button class="btn-tertiary btn-xs add-media" type="button">+ Add Image</button>' : ''}
                       ${!showDisclosure ? '<button class="btn-tertiary btn-xs add-disclosure" type="button">+ Add Disclosure</button>' : ''}
-                    </div>` : ''}
-                    ${showCommercial ? `
+                    </div>`
+                        : ''
+                    }
+                    ${
+                      showCommercial
+                        ? `
                     <div class="field-grid">
                       <div class="field">
                         <label>Commercial Type</label>
@@ -4074,8 +4117,12 @@ const metadata = {
                         <label>Sponsor</label>
                         <input type="text" class="piece-commercial-sponsor" value="${window.escapeHtml(node.commercial?.sponsorName || node.commercial?.merchantName || node.commercial?.advertiserName || '')}" placeholder="Optional sponsor" />
                       </div>
-                    </div>` : ''}
-                    ${showDisclosure ? `
+                    </div>`
+                        : ''
+                    }
+                    ${
+                      showDisclosure
+                        ? `
                     <div class="field checkbox-field">
                       <input type="checkbox" class="piece-disclosure" ${node.commercial?.disclosure?.required ? 'checked' : ''} />
                       <label>Show sponsored label</label>
@@ -4083,7 +4130,9 @@ const metadata = {
                     <div class="field">
                       <label>Disclosure Label</label>
                       <input type="text" class="piece-disclosure-label" value="${window.escapeHtml(node.commercial?.disclosure?.label || '')}" placeholder="Sponsored" />
-                    </div>` : ''}
+                    </div>`
+                        : ''
+                    }
                     <div class="field">
                       <label>Raw Node JSON</label>
                       <textarea class="piece-raw-json" rows="8" spellcheck="false">${window.escapeHtml(JSON.stringify(node, null, 2))}</textarea>
@@ -4953,11 +5002,7 @@ const metadata = {
         } before publishing.`;
       };
 
-      const checkReadableArtifactReferences = async (
-        artifactReferences,
-        token,
-        { logContext = 'artifact' } = {}
-      ) => {
+      const checkReadableArtifactReferences = async (artifactReferences, token, { logContext = 'artifact' } = {}) => {
         if (!artifactReferences.length) return { readableReferences: [], failedReferences: [] };
 
         const results = await Promise.all(
