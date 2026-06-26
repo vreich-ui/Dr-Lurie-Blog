@@ -115,7 +115,7 @@ type ImageGenerationRun = {
   metadata?: MetadataBag;
 };
 
-type ImageAssetRecord = {
+export type ImageAssetRecord = {
   asset_id: string;
   source?: string;
   url?: string;
@@ -273,6 +273,7 @@ export type ContentSourceV1 = {
   publication?: {
     schema_version?: 'publication.v2';
     published_time?: string | null;
+    publish_payload?: PublishPayload;
   };
 
   workflow?: {
@@ -409,7 +410,7 @@ const imageGenerationRunSchema = z
   })
   .strict();
 
-const imageAssetSchema = z
+export const imageAssetSchema = z
   .object({
     asset_id: z.string(),
     source: z.string().optional(),
@@ -622,6 +623,7 @@ export const contentSourceV1Schema = z
       .object({
         schema_version: z.literal('publication.v2').optional(),
         published_time: z.string().nullable().optional(),
+        publish_payload: publishPayloadSchema.optional(),
       })
       .strict()
       .optional(),
