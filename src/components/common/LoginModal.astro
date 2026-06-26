@@ -9,9 +9,9 @@
   id="dr-lurie-login-modal"
   role="dialog"
   aria-modal="true"
+  aria-hidden="true"
   aria-labelledby="login-modal-title"
-  class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-  hidden
+  class="fixed inset-0 z-[9999] hidden items-center justify-center p-4"
 >
   <!-- Backdrop -->
   <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-modal-backdrop></div>
@@ -200,7 +200,9 @@
     const closeModal = () => {
       const modal = getModal();
       if (!modal) return;
-      modal.hidden = true;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      modal.setAttribute('aria-hidden', 'true');
       setError('');
       setLoading(false);
       const form = modal.querySelector('[data-login-form]');
@@ -210,7 +212,9 @@
     const openModal = () => {
       const modal = getModal();
       if (!modal) return;
-      modal.hidden = false;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      modal.setAttribute('aria-hidden', 'false');
       // Sync keep-signed-in checkbox to current pref
       const cb = modal.querySelector('#modal-keep-signed-in');
       if (cb) cb.checked = isKeepSignedIn() !== false; // default true
@@ -233,7 +237,7 @@
 
       // Close on Escape
       document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !modal.hidden) closeModal();
+        if (e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') closeModal();
       });
 
       // Form submit
