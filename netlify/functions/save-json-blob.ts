@@ -1722,13 +1722,14 @@ const requireRegisterTrustedRefs = (
     const entry = records[i];
     for (const field of ['url', 'repoPath'] as const) {
       const value = entry[field];
-      if (!value || !MAJOR_KEY_ARTIFACT_REF_RE.test(value)) continue;
-      if (!trustedRefs.has(value)) {
-        return jsonResponse(400, {
-          action,
-          error: `replace_image_asset_register[${i}].${field} "${value}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
-        });
-      }
+      if (!value) continue;
+      const err = validateTrustedArtifactRef(
+        action,
+        `replace_image_asset_register[${i}].${field}`,
+        value,
+        trustedRefs
+      );
+      if (err) return err;
     }
   }
   return undefined;

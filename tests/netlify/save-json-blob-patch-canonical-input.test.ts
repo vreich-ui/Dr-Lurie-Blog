@@ -646,6 +646,57 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
     assert.match(parseBody(resp).error ?? '', /arbitrary remote url|remote url/i);
   });
 
+  it('rejects register entries with arbitrary local absolute path in url', async () => {
+    const store = createMemoryStore();
+    const requestId = `register-local-abs-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      replace_image_asset_register: [{ asset_id: 'asset_lp', url: '/images/foo.png' }],
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /major key artifact reference/i);
+  });
+
+  it('rejects register entries with relative upload path in url', async () => {
+    const store = createMemoryStore();
+    const requestId = `register-rel-upload-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      replace_image_asset_register: [{ asset_id: 'asset_ru', url: 'uploads/foo.webp' }],
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /major key artifact reference/i);
+  });
+
+  it('rejects register entries with bare filename in url', async () => {
+    const store = createMemoryStore();
+    const requestId = `register-bare-file-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      replace_image_asset_register: [{ asset_id: 'asset_bf', url: 'old-image.webp' }],
+    });
+
+    assert.equal(resp.statusCode, 400, resp.body);
+    assert.match(parseBody(resp).error ?? '', /major key artifact reference/i);
+  });
+
   it('accepts trusted Major Key artifact ref in url', async () => {
     const store = createMemoryStore();
     const requestId = `register-trusted-url-${Date.now()}`;
