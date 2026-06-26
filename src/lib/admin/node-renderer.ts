@@ -150,7 +150,9 @@ function renderSection(node: ArticleBodyNode): HTMLElement {
     );
   }
 
-  if (node.public.body) section.append(textToParagraphs(node.public.body));
+  // Source sections render only items (as titled links). Skip body to avoid
+  // emitting raw URLs as plain text — source content belongs in items.
+  if (!isSrc && node.public.body) section.append(textToParagraphs(node.public.body));
 
   if (node.public.items?.length) {
     if (isSrc) {

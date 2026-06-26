@@ -153,10 +153,10 @@ describe('evaluateReadiness', () => {
     assert.strictEqual(editorial.criteria.find((c) => c.id === 'editorial_placeholder')!.status, 'warning');
   });
 
-  it('shows lock warning when lock not held', () => {
+  it('shows lock as missing (blocking) when lock not held', () => {
     const groups = evaluateReadiness({ lockHeld: false });
     const safety = groups.find((g) => g.id === 'safety')!;
-    assert.strictEqual(safety.criteria.find((c) => c.id === 'safety_lock')!.status, 'warning');
+    assert.strictEqual(safety.criteria.find((c) => c.id === 'safety_lock')!.status, 'missing');
   });
 
   it('shows lock complete when lock held', () => {

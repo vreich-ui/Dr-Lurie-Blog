@@ -332,7 +332,7 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessGroup[] {
     criteria.push({
       id: 'safety_lock',
       label: 'Editor lock held',
-      status: lockHeld ? 'complete' : 'warning',
+      status: lockHeld ? 'complete' : 'missing',
       message: lockHeld ? '' : 'Acquire the edit lock before publishing.',
       weight: 8,
     });
