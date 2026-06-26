@@ -118,7 +118,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
     const draft = await toDraftPreview(record);
 
-    return jsonResponse(200, { draft, input: record.input });
+    return jsonResponse(200, { draft, input: record.input, recordVersion: record.version });
   } catch (error) {
     console.error('Failed to load admin JSON draft.', error);
 

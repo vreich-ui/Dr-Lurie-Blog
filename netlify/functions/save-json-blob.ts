@@ -1723,12 +1723,7 @@ const requireRegisterTrustedRefs = (
     for (const field of ['url', 'repoPath'] as const) {
       const value = entry[field];
       if (!value) continue;
-      const err = validateTrustedArtifactRef(
-        action,
-        `replace_image_asset_register[${i}].${field}`,
-        value,
-        trustedRefs
-      );
+      const err = validateTrustedArtifactRef(action, `replace_image_asset_register[${i}].${field}`, value, trustedRefs);
       if (err) return err;
     }
   }

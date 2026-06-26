@@ -18,7 +18,6 @@ const metadata = {
       </div>
       <div class="top-bar-actions">
         <button id="btn-all-drafts" class="btn-secondary btn-sm" type="button">All drafts</button>
-        <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Publish</button>
       </div>
     </header>
 
@@ -45,51 +44,90 @@ const metadata = {
       <!-- ── Loading state ──────────────────────────────────── -->
       <p id="load-status" class="load-status" aria-live="polite" hidden></p>
 
-      <!-- ── Article view ───────────────────────────────────── -->
-      <article id="article-view" class="article-view" hidden>
-        <header class="article-meta-header">
-          <h1 id="article-title" class="article-preview-title"></h1>
-          <p id="article-excerpt" class="article-preview-excerpt"></p>
-        </header>
-        <div id="nodes-container" class="nodes-container editorial-prose"></div>
-      </article>
-
-      <!-- ── Publish settings panel ─────────────────────────── -->
-      <aside id="publish-panel" class="admin-card publish-panel" hidden>
-        <h2 class="card-section-title">Publish settings</h2>
-
-        <div class="field">
-          <label for="pub-title">Title</label>
-          <input id="pub-title" name="title" type="text" class="title-input" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label for="pub-excerpt">Excerpt</label>
-          <textarea id="pub-excerpt" name="excerpt" rows="3" maxlength="300"></textarea>
-        </div>
-        <div class="field-grid">
+      <!-- ── Article workspace (shown once a draft is loaded) ── -->
+      <div id="article-workspace" hidden>
+        <!-- ── Metadata editor ──────────────────────────────── -->
+        <section id="meta-editor" class="admin-card meta-editor" aria-label="Article metadata">
+          <!-- Title -->
           <div class="field">
-            <label for="pub-category">Category</label>
-            <input id="pub-category" name="category" type="text" autocomplete="off" />
+            <label for="pub-title" class="field-label">Title</label>
+            <input
+              id="pub-title"
+              name="title"
+              type="text"
+              class="article-title-input"
+              placeholder="Article title…"
+              autocomplete="off"
+            />
+            <p class="field-error" id="err-title" role="alert" hidden></p>
           </div>
-          <div class="field">
-            <label for="pub-tags">Tags</label>
-            <input id="pub-tags" name="tags" type="text" autocomplete="off" placeholder="comma-separated" />
-          </div>
-        </div>
-        <div class="field">
-          <label for="pub-seo">SEO description</label>
-          <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label for="pub-slug">Slug</label>
-          <input id="pub-slug" name="slug" type="text" autocomplete="off" />
-        </div>
 
-        <div class="publish-actions mt-4">
-          <button id="btn-publish-confirm" class="btn-primary w-full" type="button">Publish to site</button>
+          <!-- Excerpt -->
+          <div class="field">
+            <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
+            <textarea
+              id="pub-excerpt"
+              name="excerpt"
+              rows="2"
+              maxlength="300"
+              class="article-excerpt-input"
+              placeholder="Short excerpt shown in listings…"></textarea>
+            <p class="field-error" id="err-excerpt" role="alert" hidden></p>
+          </div>
+
+          <!-- Compact metadata grid -->
+          <div class="meta-grid">
+            <div class="field">
+              <label for="pub-slug" class="field-label">Slug</label>
+              <input
+                id="pub-slug"
+                name="slug"
+                type="text"
+                autocomplete="off"
+                placeholder="article-slug"
+                spellcheck="false"
+              />
+              <p class="field-error" id="err-slug" role="alert" hidden></p>
+            </div>
+            <div class="field">
+              <label for="pub-category" class="field-label">Category</label>
+              <input id="pub-category" name="category" type="text" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="pub-tags" class="field-label">Tags</label>
+              <input id="pub-tags" name="tags" type="text" autocomplete="off" placeholder="comma-separated" />
+            </div>
+            <div class="field">
+              <label for="pub-seo" class="field-label"
+                >SEO description <span class="char-counter" id="seo-char-count"></span></label
+              >
+              <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
+            </div>
+          </div>
+
+          <!-- Save metadata actions -->
+          <div class="meta-actions">
+            <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
+            <p id="meta-status" class="meta-status" aria-live="polite"></p>
+          </div>
+        </section>
+
+        <!-- ── Publish readiness panel ───────────────────────── -->
+        <section id="readiness-panel" class="admin-card readiness-panel" aria-label="Publish readiness">
+          <div class="readiness-header">
+            <h2 class="readiness-title">Publish readiness</h2>
+            <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
+            <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Mark as published</button>
+          </div>
+          <div id="readiness-groups" class="readiness-groups"></div>
           <p id="publish-status" class="publish-status" aria-live="polite"></p>
-        </div>
-      </aside>
+        </section>
+
+        <!-- ── Article body (read mode + per-block editing) ──── -->
+        <article id="article-view" class="article-view">
+          <div id="nodes-container" class="nodes-container editorial-prose"></div>
+        </article>
+      </div><!-- /article-workspace -->
     </div>
   </section>
 
@@ -212,30 +250,291 @@ const metadata = {
     font-weight: 700;
   }
 
-  /* Article view */
+  /* Admin card */
+  .admin-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: rgb(255 255 255 / 0.9);
+    padding: 1.5rem;
+    box-shadow: 0 1px 4px rgb(15 23 42 / 4%);
+  }
+  :global(.dark) .admin-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.7);
+  }
+
+  /* ── Metadata editor ──────────────────────────────────────────────────────── */
+  .meta-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .field-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .char-counter {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: var(--aw-color-text-muted);
+    letter-spacing: 0;
+    text-transform: none;
+    float: right;
+  }
+
+  .field-error {
+    margin: 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: rgb(239 68 68);
+  }
+  :global(.dark) .field-error {
+    color: rgb(252 165 165);
+  }
+
+  /* Title styled as article title visually */
+  .article-title-input {
+    font-family: var(--aw-font-heading, inherit);
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--aw-color-text-heading);
+    padding: 0.15rem 0;
+    width: 100%;
+  }
+  .article-title-input:focus {
+    outline: none;
+    border-bottom-color: var(--aw-color-accent);
+  }
+  .article-title-input::placeholder {
+    color: var(--aw-color-text-muted);
+    font-weight: 400;
+    font-size: 1.5rem;
+  }
+
+  /* Excerpt styled as article excerpt */
+  .article-excerpt-input {
+    font-size: 0.95rem;
+    font-style: italic;
+    color: var(--aw-color-text-muted);
+    border: none;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    padding: 0.15rem 0;
+    width: 100%;
+    resize: none;
+    line-height: 1.5;
+  }
+  .article-excerpt-input:focus {
+    outline: none;
+    border-bottom-color: var(--aw-color-accent);
+  }
+  .article-excerpt-input::placeholder {
+    color: var(--aw-color-text-muted);
+    opacity: 0.6;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+  @media (max-width: 600px) {
+    .meta-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .meta-editor input:not(.article-title-input),
+  .meta-editor textarea:not(.article-excerpt-input) {
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.88rem;
+    background: white;
+    color: inherit;
+    width: 100%;
+  }
+  :global(.dark) .meta-editor input:not(.article-title-input),
+  :global(.dark) .meta-editor textarea:not(.article-excerpt-input) {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42 / 0.5);
+  }
+
+  .meta-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .meta-status {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+    min-height: 1.2em;
+  }
+  .meta-status.is-error {
+    color: rgb(239 68 68);
+  }
+  .meta-status.is-ok {
+    color: rgb(22 163 74);
+  }
+
+  /* ── Readiness panel ──────────────────────────────────────────────────────── */
+  .readiness-panel {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .readiness-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .readiness-title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    margin: 0;
+    flex: none;
+  }
+
+  .readiness-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.15rem 0.65rem;
+    font-size: 0.73rem;
+    font-weight: 900;
+    flex: 1;
+  }
+  .readiness-pill.is-missing {
+    background: rgb(239 68 68 / 10%);
+    color: rgb(185 28 28);
+  }
+  :global(.dark) .readiness-pill.is-missing {
+    color: rgb(252 165 165);
+  }
+  .readiness-pill.is-warning {
+    background: rgb(245 158 11 / 12%);
+    color: rgb(146 64 14);
+  }
+  :global(.dark) .readiness-pill.is-warning {
+    color: rgb(253 230 138);
+  }
+  .readiness-pill.is-ready {
+    background: rgb(34 197 94 / 12%);
+    color: rgb(22 101 52);
+  }
+  :global(.dark) .readiness-pill.is-ready {
+    color: rgb(187 247 208);
+  }
+
+  .readiness-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  :global(.readiness-group) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  :global(.readiness-group-label) {
+    font-size: 0.73rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--aw-color-text-muted);
+    margin: 0;
+  }
+
+  :global(.readiness-criteria-list) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  :global(.readiness-criterion) {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  :global(.criterion-pill) {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 900;
+    width: 1.1em;
+    text-align: center;
+  }
+  :global(.criterion-pill.complete) {
+    color: rgb(22 163 74);
+  }
+  :global(.criterion-pill.warning) {
+    color: rgb(217 119 6);
+  }
+  :global(.criterion-pill.missing) {
+    color: rgb(220 38 38);
+  }
+  :global(.criterion-pill.optional) {
+    color: var(--aw-color-text-muted);
+  }
+
+  :global(.criterion-text) {
+    font-weight: 600;
+  }
+  :global(.criterion-message) {
+    color: var(--aw-color-text-muted);
+    font-size: 0.78rem;
+  }
+  :global(.criterion-message::before) {
+    content: '— ';
+  }
+
+  .publish-status {
+    min-height: 1.4em;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
+  }
+  .publish-status.is-error {
+    color: rgb(220 38 38);
+  }
+  .publish-status.is-ok {
+    color: rgb(22 163 74);
+  }
+
+  /* ── Article body ─────────────────────────────────────────────────────────── */
   .article-view {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
   }
-  .article-meta-header {
-    margin-bottom: 0.5rem;
-  }
-  .article-preview-title {
-    font-family: var(--aw-font-heading, inherit);
-    font-size: clamp(1.8rem, 5vw, 2.6rem);
-    font-weight: 800;
-    margin: 0 0 0.5rem;
-    line-height: 1.1;
-  }
-  .article-preview-excerpt {
-    color: var(--aw-color-text-muted);
-    font-size: 0.95rem;
-    font-style: italic;
-    margin: 0;
-  }
 
-  /* Nodes container */
   .nodes-container {
     display: flex;
     flex-direction: column;
@@ -324,64 +623,6 @@ const metadata = {
     color: var(--aw-color-accent);
   }
 
-  /* Admin card */
-  .admin-card {
-    border: 1px solid rgb(229 231 235);
-    border-radius: 1.25rem;
-    background: rgb(255 255 255 / 0.9);
-    padding: 1.5rem;
-    box-shadow: 0 1px 4px rgb(15 23 42 / 4%);
-  }
-  :global(.dark) .admin-card {
-    border-color: rgb(30 41 59);
-    background: rgb(15 23 42 / 0.7);
-  }
-  .card-section-title {
-    font-size: 1rem;
-    font-weight: 800;
-    margin: 0 0 1rem;
-  }
-
-  /* Publish panel */
-  .publish-panel .field {
-    margin-bottom: 0.75rem;
-  }
-  .publish-panel label {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 700;
-    margin-bottom: 0.25rem;
-  }
-  .publish-panel input,
-  .publish-panel textarea {
-    width: 100%;
-    border: 1px solid rgb(209 213 219);
-    border-radius: 0.5rem;
-    padding: 0.45rem 0.65rem;
-    font-size: 0.9rem;
-    background: white;
-    color: inherit;
-  }
-  :global(.dark) .publish-panel input,
-  :global(.dark) .publish-panel textarea {
-    border-color: rgb(51 65 85);
-    background: rgb(15 23 42 / 0.5);
-  }
-  .publish-panel .field-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-  .publish-status {
-    min-height: 1.4em;
-    font-size: 0.85rem;
-    font-weight: 700;
-    margin-top: 0.5rem;
-  }
-  .publish-status.is-error {
-    color: var(--aw-color-accent);
-  }
-
   /* Buttons */
   .btn-primary,
   .btn-secondary,
@@ -427,11 +668,30 @@ const metadata = {
     opacity: 0.45;
     cursor: not-allowed;
   }
-  .w-full {
-    width: 100%;
+  .text-center {
+    text-align: center;
   }
-  .mt-4 {
-    margin-top: 1rem;
+  .py-10 {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+  .text-lg {
+    font-size: 1.125rem;
+  }
+  .font-bold {
+    font-weight: 700;
+  }
+  .mb-2 {
+    margin-bottom: 0.5rem;
+  }
+  .text-sm {
+    font-size: 0.875rem;
+  }
+  .text-muted {
+    color: var(--aw-color-text-muted);
+  }
+  .mb-6 {
+    margin-bottom: 1.5rem;
   }
 
   /* ── Draft picker modal ────────────────────────────────────────────────── */
@@ -638,12 +898,15 @@ const metadata = {
   import { renderNode, wrapNode } from '~/lib/admin/node-renderer';
   import { NodeEditor } from '~/lib/admin/node-editor';
   import { askAiForNode, renderSuggestionOverlay, showInstructionPopover } from '~/lib/admin/ai-suggestion';
+  import { evaluateReadiness, readinessLevel, isValidSlug } from '~/lib/admin/readiness-criteria';
   import type { ArticleBodyNode } from '~/schema/article-content-v1';
+  import type { ReadinessGroup } from '~/lib/admin/readiness-criteria';
 
   // ─── constants ──────────────────────────────────────────────────────────────
   const DRAFT_ENDPOINT = '/.netlify/functions/admin-get-json-draft';
   const UPDATE_NODE_ENDPOINT = '/.netlify/functions/admin-update-node';
   const LIST_DRAFTS_ENDPOINT = '/.netlify/functions/admin-list-json-drafts';
+  const PATCH_WORKFLOW_ENDPOINT = '/.netlify/functions/admin-patch-workflow';
 
   // ─── page init ──────────────────────────────────────────────────────────────
   const init = () => {
@@ -678,20 +941,26 @@ const metadata = {
       btnDoneEditing: document.querySelector<HTMLButtonElement>('#btn-done-editing')!,
       noDraft: document.querySelector<HTMLElement>('#no-draft')!,
       loadStatus: document.querySelector<HTMLElement>('#load-status')!,
-      articleView: document.querySelector<HTMLElement>('#article-view')!,
-      articleTitle: document.querySelector<HTMLElement>('#article-title')!,
-      articleExcerpt: document.querySelector<HTMLElement>('#article-excerpt')!,
+      articleWorkspace: document.querySelector<HTMLElement>('#article-workspace')!,
       nodesContainer: document.querySelector<HTMLElement>('#nodes-container')!,
-      publishPanel: document.querySelector<HTMLElement>('#publish-panel')!,
-      btnPublish: document.querySelector<HTMLButtonElement>('#btn-publish')!,
-      btnPublishConfirm: document.querySelector<HTMLButtonElement>('#btn-publish-confirm')!,
-      publishStatus: document.querySelector<HTMLElement>('#publish-status')!,
+      // Metadata fields
       pubTitle: document.querySelector<HTMLInputElement>('#pub-title')!,
       pubExcerpt: document.querySelector<HTMLTextAreaElement>('#pub-excerpt')!,
+      pubSlug: document.querySelector<HTMLInputElement>('#pub-slug')!,
       pubCategory: document.querySelector<HTMLInputElement>('#pub-category')!,
       pubTags: document.querySelector<HTMLInputElement>('#pub-tags')!,
       pubSeo: document.querySelector<HTMLInputElement>('#pub-seo')!,
-      pubSlug: document.querySelector<HTMLInputElement>('#pub-slug')!,
+      seoCharCount: document.querySelector<HTMLElement>('#seo-char-count')!,
+      errTitle: document.querySelector<HTMLElement>('#err-title')!,
+      errExcerpt: document.querySelector<HTMLElement>('#err-excerpt')!,
+      errSlug: document.querySelector<HTMLElement>('#err-slug')!,
+      btnSaveMeta: document.querySelector<HTMLButtonElement>('#btn-save-meta')!,
+      metaStatus: document.querySelector<HTMLElement>('#meta-status')!,
+      // Readiness panel
+      readinessLabel: document.querySelector<HTMLElement>('#readiness-label')!,
+      readinessGroups: document.querySelector<HTMLElement>('#readiness-groups')!,
+      btnPublish: document.querySelector<HTMLButtonElement>('#btn-publish')!,
+      publishStatus: document.querySelector<HTMLElement>('#publish-status')!,
       // Modal
       modal: document.querySelector<HTMLElement>('#draft-picker-modal')!,
       btnModalClose: document.querySelector<HTMLButtonElement>('#btn-modal-close')!,
@@ -710,6 +979,8 @@ const metadata = {
     let activeNodeWrapper: HTMLElement | null = null;
     let currentNodes: ArticleBodyNode[] = [];
     let currentRequestId = initialDraftId;
+    let currentRecordVersion = 0;
+    let metadataSaved = false;
     let modalDraftsCache: DraftSummary[] | null = null;
     let allDraftRows: DraftSummary[] = [];
 
@@ -776,6 +1047,9 @@ const metadata = {
         els.btnDoneEditing.hidden = true;
         els.btnForceRelease.hidden = true;
       }
+
+      // Re-evaluate readiness when lock state changes
+      updateReadinessPanel(Boolean(state.agentLock));
     };
 
     const resetLockBar = () => {
@@ -805,6 +1079,232 @@ const metadata = {
       if (!confirm('Force-release the agent lock? The agent may be mid-edit.')) return;
       await lockManager.forceRelease();
     });
+
+    // ── Readiness panel ───────────────────────────────────────────────────────
+    const updateReadinessPanel = (agentLockPresent = false) => {
+      const tags = els.pubTags.value
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const groups = evaluateReadiness({
+        title: els.pubTitle.value.trim(),
+        excerpt: els.pubExcerpt.value.trim(),
+        slug: els.pubSlug.value.trim(),
+        seoDescription: els.pubSeo.value.trim(),
+        category: els.pubCategory.value.trim(),
+        tags,
+        nodes: currentNodes,
+        lockHeld: Boolean(lockManager?.currentToken),
+        canonicalSaved: metadataSaved,
+        agentLockPresent,
+      });
+
+      renderReadinessGroups(groups);
+
+      const level = readinessLevel(groups);
+      const levelMap = {
+        missing: { label: 'Review needed', cls: 'is-missing' },
+        warning: { label: 'Nearly ready', cls: 'is-warning' },
+        ready: { label: 'Ready to publish', cls: 'is-ready' },
+      };
+      const { label, cls } = levelMap[level];
+      els.readinessLabel.textContent = label;
+      els.readinessLabel.className = `readiness-pill ${cls}`;
+
+      // Enable publish only when nothing is required and missing
+      const missingCount = groups.flatMap((g) => g.criteria).filter((c) => c.status === 'missing').length;
+      els.btnPublish.disabled = missingCount > 0;
+    };
+
+    const renderReadinessGroups = (groups: ReadinessGroup[]) => {
+      els.readinessGroups.innerHTML = '';
+
+      for (const group of groups) {
+        const groupEl = document.createElement('div');
+        groupEl.className = 'readiness-group';
+
+        const groupLabel = document.createElement('p');
+        groupLabel.className = 'readiness-group-label';
+        groupLabel.textContent = group.label;
+        groupEl.append(groupLabel);
+
+        const ul = document.createElement('ul');
+        ul.className = 'readiness-criteria-list';
+
+        for (const criterion of group.criteria) {
+          const li = document.createElement('li');
+          li.className = 'readiness-criterion';
+
+          const icons: Record<string, string> = { complete: '✓', warning: '⚠', missing: '✗', optional: '○' };
+          const pill = document.createElement('span');
+          pill.className = `criterion-pill ${criterion.status}`;
+          pill.textContent = icons[criterion.status] ?? '○';
+          pill.setAttribute('aria-label', criterion.status);
+
+          const text = document.createElement('span');
+          text.className = 'criterion-text';
+          text.textContent = criterion.label;
+
+          li.append(pill, text);
+
+          if (criterion.message) {
+            const msg = document.createElement('span');
+            msg.className = 'criterion-message';
+            msg.textContent = criterion.message;
+            li.append(msg);
+          }
+
+          ul.append(li);
+        }
+
+        groupEl.append(ul);
+        els.readinessGroups.append(groupEl);
+      }
+    };
+
+    // ── Field validation helpers ──────────────────────────────────────────────
+    const showFieldError = (el: HTMLElement, msg: string) => {
+      el.textContent = msg;
+      el.hidden = false;
+    };
+    const clearFieldError = (el: HTMLElement) => {
+      el.textContent = '';
+      el.hidden = true;
+    };
+
+    const setMetaStatus = (msg: string, kind: '' | 'is-error' | 'is-ok' = '') => {
+      els.metaStatus.textContent = msg;
+      els.metaStatus.className = `meta-status${kind ? ' ' + kind : ''}`;
+    };
+
+    // SEO character counter
+    const updateSeoCharCount = () => {
+      const len = els.pubSeo.value.length;
+      els.seoCharCount.textContent = `${len}/180`;
+    };
+    els.pubSeo.addEventListener('input', updateSeoCharCount);
+
+    // Live readiness re-evaluation on metadata input change
+    const metaFields = [els.pubTitle, els.pubExcerpt, els.pubSlug, els.pubCategory, els.pubTags, els.pubSeo];
+    for (const field of metaFields) {
+      field.addEventListener('input', () => {
+        // Clear field errors on re-type
+        if (field === els.pubTitle) clearFieldError(els.errTitle);
+        if (field === els.pubExcerpt) clearFieldError(els.errExcerpt);
+        if (field === els.pubSlug) clearFieldError(els.errSlug);
+        // Reset saved state when metadata changes
+        if (metadataSaved) {
+          metadataSaved = false;
+          setMetaStatus('Unsaved changes');
+        }
+        updateReadinessPanel();
+      });
+    }
+
+    // ── Save metadata ─────────────────────────────────────────────────────────
+    const saveMetadata = async () => {
+      clearFieldError(els.errTitle);
+      clearFieldError(els.errExcerpt);
+      clearFieldError(els.errSlug);
+
+      const title = els.pubTitle.value.trim();
+      const excerpt = els.pubExcerpt.value.trim();
+      const slug = els.pubSlug.value.trim();
+
+      let hasErrors = false;
+      if (!title) {
+        showFieldError(els.errTitle, 'Title is required before saving.');
+        hasErrors = true;
+      }
+      if (!slug) {
+        showFieldError(els.errSlug, 'Slug is required before saving.');
+        hasErrors = true;
+      } else if (!isValidSlug(slug)) {
+        showFieldError(els.errSlug, 'Slug must be lowercase letters, numbers, and hyphens only.');
+        hasErrors = true;
+      }
+      if (hasErrors) return;
+
+      // Acquire lock if not already held
+      if (!lockManager?.currentToken) {
+        const acquired = await acquireLock();
+        if (!acquired) {
+          setMetaStatus('Could not acquire edit lock.', 'is-error');
+          return;
+        }
+      }
+
+      const lockToken = lockManager?.currentToken;
+      if (!lockToken) {
+        setMetaStatus('Edit lock not held.', 'is-error');
+        return;
+      }
+
+      let token: string;
+      try {
+        token = await getToken();
+      } catch {
+        setMetaStatus('Authentication error.', 'is-error');
+        return;
+      }
+
+      els.btnSaveMeta.disabled = true;
+      setMetaStatus('Saving…');
+
+      const tags = els.pubTags.value
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const publishPayload: Record<string, unknown> = { slug, title };
+      if (excerpt) publishPayload.excerpt = excerpt;
+      const seoDesc = els.pubSeo.value.trim();
+      if (seoDesc) publishPayload.seoDescription = seoDesc;
+      const category = els.pubCategory.value.trim();
+      if (category) publishPayload.category = category;
+      if (tags.length) publishPayload.tags = tags;
+
+      try {
+        const res = await fetch(PATCH_WORKFLOW_ENDPOINT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            action: 'patch_canonical_input',
+            request_id: currentRequestId,
+            lock_token: lockToken,
+            expected_record_version: currentRecordVersion,
+            promote_publish_payload: publishPayload,
+          }),
+        });
+
+        const json = (await res.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
+        if (!res.ok || !json.ok) {
+          const errMsg = typeof json.error === 'string' ? json.error : `HTTP ${res.status}`;
+          setMetaStatus(`Save failed: ${errMsg}`, 'is-error');
+          return;
+        }
+
+        // Update local record version from response
+        const record = json.record as Record<string, unknown> | undefined;
+        if (typeof record?.version === 'number') {
+          currentRecordVersion = record.version as number;
+        }
+
+        metadataSaved = true;
+        setMetaStatus('✓ Metadata saved', 'is-ok');
+        updateReadinessPanel();
+      } catch (err) {
+        setMetaStatus(err instanceof Error ? err.message : 'Save failed.', 'is-error');
+      } finally {
+        els.btnSaveMeta.disabled = false;
+      }
+    };
+
+    els.btnSaveMeta.addEventListener('click', saveMetadata);
 
     // ── Node rendering ────────────────────────────────────────────────────────
     const renderArticle = (nodes: ArticleBodyNode[]) => {
@@ -978,9 +1478,9 @@ const metadata = {
         body: JSON.stringify({ requestId: currentRequestId, lockToken, nodeId, updatedPublicFields: updatedFields }),
       });
 
-      const json = await res.json().catch(() => ({ ok: false, error: 'Parse error' }));
+      const json = (await res.json().catch(() => ({ ok: false, error: 'Parse error' }))) as Record<string, unknown>;
       if (!res.ok || !json.ok) {
-        alert(`Save failed: ${json.error ?? 'Unknown error'}`);
+        alert(`Save failed: ${typeof json.error === 'string' ? json.error : 'Unknown error'}`);
         return;
       }
 
@@ -989,13 +1489,16 @@ const metadata = {
       if (nodeIndex !== -1) currentNodes[nodeIndex] = updatedNode;
 
       const newRendered = renderNode(updatedNode);
-      const toolbar = wrapper.querySelector('.dl-node-toolbar');
+      const existingToolbar = wrapper.querySelector('.dl-node-toolbar');
       wrapper.innerHTML = '';
       wrapper.append(newRendered);
-      if (toolbar) wrapper.append(toolbar);
+      if (existingToolbar) wrapper.append(existingToolbar);
+
+      // After saving a node, readiness may have changed
+      updateReadinessPanel();
     };
 
-    // ── Reset draft view (before loading a new draft) ─────────────────────────
+    // ── Reset draft view ──────────────────────────────────────────────────────
     const resetDraftView = async () => {
       closeActiveEditor(false);
 
@@ -1007,14 +1510,19 @@ const metadata = {
       }
 
       resetLockBar();
-      els.articleView.hidden = true;
+      els.articleWorkspace.hidden = true;
       els.nodesContainer.innerHTML = '';
-      els.publishPanel.hidden = true;
       els.btnPublish.disabled = true;
       els.loadStatus.hidden = true;
       els.loadStatus.textContent = '';
       els.noDraft.hidden = true;
       currentNodes = [];
+      currentRecordVersion = 0;
+      metadataSaved = false;
+      els.readinessGroups.innerHTML = '';
+      els.readinessLabel.textContent = '';
+      els.readinessLabel.className = 'readiness-pill';
+      els.publishStatus.textContent = '';
     };
 
     // ── Load draft ────────────────────────────────────────────────────────────
@@ -1047,36 +1555,60 @@ const metadata = {
         const res = await fetch(`${DRAFT_ENDPOINT}?draftId=${encodeURIComponent(requestId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const json = await res.json().catch(() => ({ ok: false }));
+        const json = (await res.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
         if (!res.ok || !json.ok) {
-          els.loadStatus.textContent = json.error ?? `Load failed (${res.status})`;
+          els.loadStatus.textContent = typeof json.error === 'string' ? json.error : `Load failed (${res.status})`;
           return;
         }
 
-        const input = json.input as Record<string, unknown>;
+        // Record version from new endpoint field
+        if (typeof json.recordVersion === 'number') {
+          currentRecordVersion = json.recordVersion as number;
+        }
+
+        const input = (json.input ?? {}) as Record<string, unknown>;
         const content = (input.content ?? {}) as Record<string, unknown>;
+        const publication = (input.publication ?? {}) as Record<string, unknown>;
+        const publishPayload = (publication.publish_payload ?? {}) as Record<string, unknown>;
+        const taxonomy = (input.taxonomy ?? {}) as Record<string, unknown>;
+        const seo = (input.seo ?? {}) as Record<string, unknown>;
+        const ids = (input.ids ?? {}) as Record<string, unknown>;
 
-        const title = String(content.title ?? json.draft?.title ?? 'Untitled');
-        const excerpt = String((content.deck ?? json.draft?.excerpt ?? '') as string);
+        // Metadata: prefer publish_payload (editor's saved values) over raw input fields
+        const title = String(
+          publishPayload.title ??
+            content.title ??
+            (json.draft && (json.draft as Record<string, unknown>).title) ??
+            'Untitled'
+        );
+        const excerpt = String(publishPayload.excerpt ?? content.deck ?? '');
+        const slug = String(publishPayload.slug ?? ids.content_id ?? input.slug ?? '');
+        const category = String(publishPayload.category ?? taxonomy.category ?? '');
+        const tagsArr = Array.isArray(publishPayload.tags)
+          ? (publishPayload.tags as string[])
+          : Array.isArray(taxonomy.tags)
+            ? (taxonomy.tags as string[])
+            : [];
+        const seoDesc = String(publishPayload.seoDescription ?? seo.meta_description ?? '');
 
-        els.articleTitle.textContent = title;
-        els.articleExcerpt.textContent = excerpt;
         els.pubTitle.value = title;
         els.pubExcerpt.value = excerpt;
-        const taxonomy = (input.taxonomy ?? {}) as Record<string, unknown>;
-        els.pubTags.value = Array.isArray(taxonomy.tags) ? taxonomy.tags.join(', ') : '';
-        const seo = (input.seo ?? {}) as Record<string, unknown>;
-        els.pubSeo.value = String(seo.meta_description ?? '');
-        const ids = (input.ids ?? {}) as Record<string, unknown>;
-        const slug = String(ids.content_id ?? (input as Record<string, unknown>).slug ?? '');
         els.pubSlug.value = slug;
+        els.pubCategory.value = category;
+        els.pubTags.value = tagsArr.join(', ');
+        els.pubSeo.value = seoDesc;
+        updateSeoCharCount();
+
+        // If a publish_payload exists, consider metadata already saved
+        if (publishPayload.slug && publishPayload.title) {
+          metadataSaved = true;
+          setMetaStatus('Metadata loaded from saved record', 'is-ok');
+        }
 
         const articleBody = content.article_body as { nodes?: ArticleBodyNode[] } | undefined;
         if (articleBody?.nodes?.length) {
           renderArticle(articleBody.nodes);
-          els.articleView.hidden = false;
-          els.publishPanel.hidden = false;
-          els.btnPublish.disabled = false;
+          els.articleWorkspace.hidden = false;
         } else {
           els.loadStatus.textContent = 'This draft has no article body nodes yet.';
           els.loadStatus.hidden = false;
@@ -1095,6 +1627,88 @@ const metadata = {
         els.loadStatus.textContent = err instanceof Error ? err.message : 'Failed to load draft.';
       }
     };
+
+    // ── Publish ───────────────────────────────────────────────────────────────
+    els.btnPublish.addEventListener('click', async () => {
+      if (!currentRequestId) return;
+
+      // Validation
+      const title = els.pubTitle.value.trim();
+      const slug = els.pubSlug.value.trim();
+
+      if (!title) {
+        showFieldError(els.errTitle, 'Title is required.');
+        els.pubTitle.focus();
+        return;
+      }
+      if (!slug) {
+        showFieldError(els.errSlug, 'Slug is required.');
+        els.pubSlug.focus();
+        return;
+      }
+      if (!isValidSlug(slug)) {
+        showFieldError(els.errSlug, 'Slug must be lowercase letters, numbers, and hyphens only.');
+        els.pubSlug.focus();
+        return;
+      }
+      if (!currentNodes.length) {
+        els.publishStatus.textContent = 'No article body to publish.';
+        els.publishStatus.className = 'publish-status is-error';
+        return;
+      }
+
+      if (
+        !confirm(
+          `Mark "${title}" as published?\n\nThis records the publication timestamp on the workflow record. Trigger a site deploy separately to make the article live.`
+        )
+      )
+        return;
+
+      els.btnPublish.disabled = true;
+      els.publishStatus.textContent = 'Publishing…';
+      els.publishStatus.className = 'publish-status';
+
+      let token: string;
+      try {
+        token = await getToken();
+      } catch {
+        els.publishStatus.textContent = 'Auth error';
+        els.publishStatus.className = 'publish-status is-error';
+        els.btnPublish.disabled = false;
+        return;
+      }
+
+      const lockToken = lockManager?.currentToken;
+
+      try {
+        const body: Record<string, unknown> = {
+          action: 'set_published_time',
+          request_id: currentRequestId,
+          lock_token: lockToken,
+          published_time: new Date().toISOString(),
+        };
+
+        const res = await fetch(PATCH_WORKFLOW_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          throw new Error(typeof j.error === 'string' ? j.error : `HTTP ${res.status}`);
+        }
+
+        if (lockManager) await lockManager.checkin();
+        els.publishStatus.textContent = '✓ Publication timestamp recorded. Trigger a site deploy to go live.';
+        els.publishStatus.className = 'publish-status is-ok';
+        els.btnPublish.disabled = false;
+      } catch (err) {
+        els.publishStatus.textContent = err instanceof Error ? err.message : 'Publish failed.';
+        els.publishStatus.className = 'publish-status is-error';
+        els.btnPublish.disabled = false;
+      }
+    });
 
     // ── Draft picker modal ────────────────────────────────────────────────────
     const escapeHtml = (value: unknown) =>
@@ -1210,9 +1824,10 @@ const metadata = {
         const res = await fetch(LIST_DRAFTS_ENDPOINT, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        const json = await res.json().catch(() => ({ ok: false }));
+        const json = (await res.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
         if (!res.ok || !json.ok) {
-          els.modalStatus.textContent = json.error ?? `Could not load drafts (${res.status})`;
+          els.modalStatus.textContent =
+            typeof json.error === 'string' ? json.error : `Could not load drafts (${res.status})`;
           return;
         }
         allDraftRows = Array.isArray(json.drafts) ? (json.drafts as DraftSummary[]) : [];
@@ -1253,61 +1868,6 @@ const metadata = {
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && els.modal.classList.contains('is-open')) closeModal();
-    });
-
-    // ── Publish ───────────────────────────────────────────────────────────────
-    const showPublishPanel = () => {
-      els.publishPanel.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    els.btnPublish.addEventListener('click', showPublishPanel);
-
-    els.btnPublishConfirm.addEventListener('click', async () => {
-      if (!currentRequestId) return;
-      els.btnPublishConfirm.disabled = true;
-      els.publishStatus.textContent = 'Publishing…';
-      els.publishStatus.className = 'publish-status';
-
-      let token: string;
-      try {
-        token = await getToken();
-      } catch {
-        els.publishStatus.textContent = 'Auth error';
-        els.publishStatus.className = 'publish-status is-error';
-        els.btnPublishConfirm.disabled = false;
-        return;
-      }
-
-      const lockToken = lockManager?.currentToken;
-
-      try {
-        const body = {
-          action: 'set_published_time',
-          request_id: currentRequestId,
-          lock_token: lockToken,
-          published_time: new Date().toISOString(),
-          article_body: currentNodes.length ? { schema_version: 'article_body.v1', nodes: currentNodes } : undefined,
-        };
-
-        const res = await fetch('/.netlify/functions/save-json-blob', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-publish-key': '', Authorization: `Bearer ${token}` },
-          body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}));
-          throw new Error(j.error ?? `HTTP ${res.status}`);
-        }
-
-        if (lockManager) await lockManager.checkin();
-        els.publishStatus.textContent = '✓ Publish recorded. Trigger a deploy to go live.';
-        els.btnPublishConfirm.disabled = false;
-      } catch (err) {
-        els.publishStatus.textContent = err instanceof Error ? err.message : 'Publish failed.';
-        els.publishStatus.className = 'publish-status is-error';
-        els.btnPublishConfirm.disabled = false;
-      }
     });
 
     // ── Auth bootstrap ────────────────────────────────────────────────────────

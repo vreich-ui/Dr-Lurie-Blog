@@ -59,19 +59,121 @@ const listOnlyExtensions = () => [
   }),
 ];
 
+// ─── link popover ─────────────────────────────────────────────────────────────
+
+/**
+ * In-app link popover: URL input + Apply / Remove / Cancel.
+ * Anchors below the toolbar; closes on outside click or Escape.
+ */
+function buildLinkPopover(editor: Editor, anchor: HTMLElement): HTMLElement {
+  const existing = anchor.parentElement?.querySelector<HTMLElement>('.dl-link-popover');
+  if (existing) {
+    existing.remove();
+    return existing;
+  }
+
+  const currentHref = editor.getAttributes('link').href as string | undefined;
+
+  const pop = document.createElement('div');
+  pop.className =
+    'dl-link-popover absolute left-0 top-full mt-1 z-50 flex flex-col gap-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl p-3';
+  pop.style.minWidth = '16rem';
+
+  const urlInput = document.createElement('input');
+  urlInput.type = 'url';
+  urlInput.value = currentHref ?? '';
+  urlInput.placeholder = 'https://…';
+  urlInput.className =
+    'border border-gray-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-slate-800 w-full focus:outline-none focus:ring-2 focus:ring-accent';
+
+  const row = document.createElement('div');
+  row.className = 'flex gap-1.5';
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.textContent = 'Apply';
+  applyBtn.className =
+    'flex-1 rounded-full bg-accent text-white text-xs font-bold py-1.5 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.textContent = 'Remove';
+  removeBtn.className =
+    'rounded-full border border-gray-300 dark:border-slate-600 text-xs font-bold py-1.5 px-2.5 hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+  removeBtn.disabled = !currentHref;
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.className =
+    'rounded-full border border-gray-300 dark:border-slate-600 text-xs font-bold py-1.5 px-2.5 hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+
+  const apply = () => {
+    const url = urlInput.value.trim();
+    if (url) {
+      editor.chain().focus().setLink({ href: url }).run();
+    } else {
+      editor.chain().focus().unsetLink().run();
+    }
+    pop.remove();
+  };
+
+  applyBtn.addEventListener('click', apply);
+  removeBtn.addEventListener('click', () => {
+    editor.chain().focus().unsetLink().run();
+    pop.remove();
+  });
+  cancelBtn.addEventListener('click', () => pop.remove());
+
+  urlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      apply();
+    }
+    if (e.key === 'Escape') {
+      pop.remove();
+    }
+  });
+
+  row.append(applyBtn, removeBtn, cancelBtn);
+  pop.append(urlInput, row);
+
+  // Close on outside mousedown
+  const onOutside = (e: MouseEvent) => {
+    if (!pop.contains(e.target as Node)) {
+      pop.remove();
+      document.removeEventListener('mousedown', onOutside, true);
+    }
+  };
+  // Delay to avoid the triggering click registering as "outside"
+  requestAnimationFrame(() => document.addEventListener('mousedown', onOutside, true));
+
+  // Escape from anywhere closes it
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      pop.remove();
+      document.removeEventListener('keydown', onKey, true);
+    }
+  };
+  document.addEventListener('keydown', onKey, true);
+
+  return pop;
+}
+
 // ─── toolbar ─────────────────────────────────────────────────────────────────
 
 function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void, onCancel: () => void): HTMLElement {
   const bar = document.createElement('div');
   bar.className =
-    'dl-editor-toolbar flex flex-wrap items-center gap-1 p-2 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-xs font-semibold';
+    'dl-editor-toolbar relative flex flex-wrap items-center gap-1 p-2 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-xs font-semibold';
 
   const btn = (label: string, title: string, action: () => void, isActive?: () => boolean) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = label;
     b.title = title;
-    b.className = 'px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700';
+    b.className =
+      'px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
     b.addEventListener('click', (e) => {
       e.preventDefault();
       action();
@@ -112,22 +214,22 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
         'Heading 3',
         () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
         () => editor.isActive('heading', { level: 3 })
-      ),
-      btn(
-        '🔗',
-        'Link',
-        () => {
-          const url = window.prompt('URL', editor.getAttributes('link').href ?? '');
-          if (url === null) return;
-          if (url === '') {
-            editor.chain().focus().unsetLink().run();
-            return;
-          }
-          editor.chain().focus().setLink({ href: url }).run();
-        },
-        () => editor.isActive('link')
       )
     );
+
+    // Link button — opens in-app popover
+    const linkBtn = btn(
+      '🔗',
+      'Link',
+      () => {
+        const pop = buildLinkPopover(editor, bar);
+        bar.style.position = 'relative';
+        bar.append(pop);
+        requestAnimationFrame(() => pop.querySelector('input')?.focus());
+      },
+      () => editor.isActive('link')
+    );
+    bar.append(linkBtn);
   }
 
   // Spacer
@@ -138,7 +240,8 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
   const saveBtn = document.createElement('button');
   saveBtn.type = 'button';
   saveBtn.textContent = 'Save';
-  saveBtn.className = 'px-3 py-0.5 rounded-full bg-accent text-white font-bold hover:opacity-90';
+  saveBtn.className =
+    'px-3 py-0.5 rounded-full bg-accent text-white font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
   saveBtn.addEventListener('click', onSave);
   bar.append(saveBtn);
 
@@ -146,14 +249,9 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.className =
-    'px-3 py-0.5 rounded-full border border-gray-300 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700';
+    'px-3 py-0.5 rounded-full border border-gray-300 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
   cancelBtn.addEventListener('click', onCancel);
   bar.append(cancelBtn);
-
-  // Sync active state on editor transactions
-  editor.on('transaction', () => {
-    // Individual buttons update themselves via their own refreshActive closure
-  });
 
   return bar;
 }

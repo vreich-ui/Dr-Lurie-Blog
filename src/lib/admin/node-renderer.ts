@@ -40,29 +40,131 @@ const textToParagraphs = (text: string): HTMLElement => {
   return wrapper;
 };
 
+// External link icon (inline SVG for accessibility)
+const externalLinkIcon = (): SVGElement => {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('width', '12');
+  svg.setAttribute('height', '12');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'dl-ext-icon inline-block ml-0.5 opacity-60 align-middle');
+  const path1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path1.setAttribute('d', 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6');
+  const path2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path2.setAttribute('d', 'M15 3h6v6');
+  const path3 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path3.setAttribute('d', 'M10 14 21 3');
+  svg.append(path1, path2, path3);
+  return svg;
+};
+
+// ─── source item helpers ──────────────────────────────────────────────────────
+
+const SECTION_IS_SOURCE_RE = /\b(source|further reading)\b/i;
+
+function isSourceSection(node: ArticleBodyNode): boolean {
+  return SECTION_IS_SOURCE_RE.test(node.public.title ?? '') || SECTION_IS_SOURCE_RE.test(node.public.eyebrow ?? '');
+}
+
+type ParsedSourceItem = { title: string; url: string | null };
+
+function parseSourceItem(item: string): ParsedSourceItem {
+  // "Title — https://..." or "Title - https://..." or "Title: https://..."
+  const withSep = item.match(/^(.+?)\s*[-–—:|]\s*(https?:\/\/\S+)$/);
+  if (withSep) return { title: withSep[1].trim(), url: withSep[2].trim() };
+  // Bare URL
+  if (/^https?:\/\//.test(item.trim())) {
+    try {
+      return { title: new URL(item.trim()).hostname, url: item.trim() };
+    } catch {
+      return { title: item, url: null };
+    }
+  }
+  return { title: item, url: null };
+}
+
+function renderSourceItem(item: string): HTMLElement {
+  const { title, url } = parseSourceItem(item);
+  const li = el('li', {});
+  if (url) {
+    const a = el('a', {
+      href: url,
+      target: '_blank',
+      rel: 'noopener noreferrer',
+      class: 'dl-source-link text-accent hover:underline',
+      'aria-label': `${title} (opens in new tab)`,
+    });
+    a.append(document.createTextNode(title));
+    a.append(externalLinkIcon());
+    li.append(a);
+  } else {
+    li.append(document.createTextNode(title));
+  }
+  return li;
+}
+
+// ─── image placeholder ────────────────────────────────────────────────────────
+
+function renderImagePlaceholder(label: string, note?: string): HTMLElement {
+  const wrap = el('div', {
+    class:
+      'dl-node-img-placeholder w-full rounded-md aspect-video bg-gray-100 dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 flex flex-col items-center justify-center gap-2',
+    role: 'img',
+    'aria-label': label || 'Image placeholder',
+  });
+  const icon = el('span', { class: 'text-2xl opacity-30', 'aria-hidden': 'true' });
+  icon.innerHTML = '&#128444;'; // 🖼 picture frame
+  const text = el('span', { class: 'text-xs text-muted opacity-60 text-center px-4' }, label || 'Image placeholder');
+  wrap.append(icon, text);
+  if (note) {
+    const noteEl = el('span', { class: 'text-xs text-red-500 dark:text-red-400 opacity-80' }, note);
+    wrap.append(noteEl);
+  }
+  return wrap;
+}
+
 // ─── per-presentation renderers ───────────────────────────────────────────────
 
 function renderSection(node: ArticleBodyNode): HTMLElement {
-  const section = el('section', { class: 'dl-node dl-node-section' });
-  if (node.public.eyebrow) {
+  const isSrc = isSourceSection(node);
+  const section = el('section', { class: `dl-node dl-node-section${isSrc ? ' dl-node-sources' : ''}` });
+
+  // Eyebrow
+  const eyebrowText = isSrc ? 'Sources' : (node.public.eyebrow ?? '');
+  if (eyebrowText) {
     section.append(
-      el(
-        'p',
-        { class: 'dl-node-eyebrow text-xs font-bold uppercase tracking-widest text-accent mb-1' },
-        node.public.eyebrow
-      )
+      el('p', { class: 'dl-node-eyebrow text-xs font-bold uppercase tracking-widest text-accent mb-1' }, eyebrowText)
     );
   }
+
+  // Title — rename "Further reading" to "Sources"
   if (node.public.title) {
+    const displayTitle = isSrc ? node.public.title.replace(/further reading/gi, 'Sources') : node.public.title;
     section.append(
-      el('h2', { class: 'dl-node-title font-heading text-2xl font-bold leading-tight mb-3' }, node.public.title)
+      el('h2', { class: 'dl-node-title font-heading text-2xl font-bold leading-tight mb-3' }, displayTitle)
     );
   }
-  if (node.public.body) section.append(textToParagraphs(node.public.body));
+
+  // Source sections render only items (as titled links). Skip body to avoid
+  // emitting raw URLs as plain text — source content belongs in items.
+  if (!isSrc && node.public.body) section.append(textToParagraphs(node.public.body));
+
   if (node.public.items?.length) {
-    const ul = el('ul', { class: 'dl-node-items list-disc pl-5 space-y-1' });
-    for (const item of node.public.items) ul.append(el('li', {}, item));
-    section.append(ul);
+    if (isSrc) {
+      // Source items: render as accessible links
+      const ul = el('ul', { class: 'dl-source-list list-none pl-0 space-y-1.5' });
+      for (const item of node.public.items) ul.append(renderSourceItem(item));
+      section.append(ul);
+    } else {
+      const ul = el('ul', { class: 'dl-node-items list-disc pl-5 space-y-1' });
+      for (const item of node.public.items) ul.append(el('li', {}, item));
+      section.append(ul);
+    }
   }
   return section;
 }
@@ -86,13 +188,26 @@ function renderCallout(node: ArticleBodyNode): HTMLElement {
 
 function renderImage(node: ArticleBodyNode): HTMLElement {
   const figure = el('figure', { class: 'dl-node dl-node-image my-2' });
-  if (node.public.media) {
-    const media = node.public.media;
+  const media = node.public.media;
+
+  // Determine if the src is usable
+  const srcRaw = media?.src ?? '';
+  const hasSrc = Boolean(srcRaw.trim()) && !srcRaw.startsWith('data:') && srcRaw !== 'null' && srcRaw !== 'undefined';
+
+  if (media && hasSrc) {
     const img = el('img', {
       class: 'w-full rounded-md aspect-video object-cover bg-gray-200 dark:bg-slate-700',
-      src: media.src || '',
+      src: srcRaw,
       alt: media.alt || node.public.title || '',
       loading: 'lazy',
+    });
+    // Swap to placeholder if the image actually fails to load
+    img.addEventListener('error', () => {
+      const placeholder = renderImagePlaceholder(
+        media.alt || node.public.title || 'Image unavailable',
+        'Image failed to load'
+      );
+      img.replaceWith(placeholder);
     });
     figure.append(img);
     if (media.caption || node.public.body) {
@@ -100,17 +215,17 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
         el('figcaption', { class: 'text-sm text-muted mt-2 text-center' }, media.caption || node.public.body || '')
       );
     }
-  } else if (node.public.title) {
-    const placeholder = el(
-      'div',
-      {
-        class:
-          'w-full rounded-md aspect-video bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-muted text-sm',
-      },
-      node.public.title
-    );
-    figure.append(placeholder);
+  } else {
+    // No src, missing, or invalid: show clean site-style placeholder
+    const placeholderLabel = media?.alt || node.public.title || 'Image placeholder';
+    figure.append(renderImagePlaceholder(placeholderLabel));
+    if (media?.caption || node.public.body) {
+      figure.append(
+        el('figcaption', { class: 'text-sm text-muted mt-2 text-center' }, media?.caption || node.public.body || '')
+      );
+    }
   }
+
   return figure;
 }
 

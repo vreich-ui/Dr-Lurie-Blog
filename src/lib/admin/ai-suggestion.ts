@@ -7,6 +7,10 @@
  *   - Prose body: word-level diff so only changed spans are highlighted,
  *     not the entire paragraph.
  *   - items[]: each item diffed independently at word level.
+ *
+ * Instruction popover:
+ *   - Desktop: fixed side panel (right edge), does not cover the selected block.
+ *   - Mobile: fixed bottom sheet with backdrop.
  */
 
 import { diffWords, type Change } from 'diff';
@@ -136,13 +140,13 @@ export function renderSuggestionOverlay(
   acceptBtn.type = 'button';
   acceptBtn.textContent = 'Accept';
   acceptBtn.className =
-    'flex-1 rounded-full bg-accent text-white font-bold py-2 text-sm hover:opacity-90 disabled:opacity-50';
+    'flex-1 rounded-full bg-accent text-white font-bold py-2 text-sm hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
 
   const discardBtn = document.createElement('button');
   discardBtn.type = 'button';
   discardBtn.textContent = 'Discard';
   discardBtn.className =
-    'flex-1 rounded-full border border-gray-300 dark:border-slate-600 font-bold py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700';
+    'flex-1 rounded-full border border-gray-300 dark:border-slate-600 font-bold py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
 
   acceptBtn.addEventListener('click', async () => {
     acceptBtn.disabled = true;
@@ -205,18 +209,74 @@ export async function askAiForNode(options: AskAiOptions): Promise<AskAiResult> 
 // ─── instruction popover ──────────────────────────────────────────────────────
 
 /**
- * Small popover that collects the user's instruction before calling the AI.
- * Anchors to the nodeWrapper and dismisses on Escape or outside click.
+ * Contextual AI instruction input.
+ * Desktop: fixed side panel at right edge — never covers the selected block.
+ * Mobile: fixed bottom sheet with backdrop.
  */
 export function showInstructionPopover(
-  nodeWrapper: HTMLElement,
+  _nodeWrapper: HTMLElement,
   selectedText: string | undefined,
   onSubmit: (instruction: string) => void,
   onDismiss: () => void
 ): HTMLElement {
+  const isMobile = window.matchMedia('(max-width: 767px)').matches;
+
+  // Backdrop (mobile only)
+  let backdrop: HTMLElement | null = null;
+  if (isMobile) {
+    backdrop = document.createElement('div');
+    backdrop.className = 'fixed inset-0 z-40 bg-black/30';
+    backdrop.addEventListener('click', () => {
+      popover.remove();
+      backdrop!.remove();
+      onDismiss();
+    });
+    document.body.append(backdrop);
+  }
+
   const popover = document.createElement('div');
-  popover.className =
-    'dl-instruction-popover absolute z-30 left-0 right-0 top-0 bg-white dark:bg-slate-900 border border-accent rounded-xl shadow-xl p-4 flex flex-col gap-3';
+  popover.className = 'dl-instruction-popover flex flex-col gap-3';
+
+  if (isMobile) {
+    // Bottom sheet
+    Object.assign(popover.style, {
+      position: 'fixed',
+      left: '0',
+      right: '0',
+      bottom: '0',
+      top: 'auto',
+      zIndex: '50',
+      width: '100%',
+      maxHeight: '50vh',
+      overflowY: 'auto',
+      borderRadius: '1.25rem 1.25rem 0 0',
+      padding: '1.25rem',
+      background: 'var(--tw-bg, white)',
+      borderTop: '1px solid rgb(229 231 235)',
+      boxShadow: '0 -4px 24px rgb(15 23 42 / 18%)',
+    });
+  } else {
+    // Desktop: side panel anchored to the right viewport edge
+    Object.assign(popover.style, {
+      position: 'fixed',
+      right: '1rem',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: '50',
+      width: 'min(22rem, calc(100vw - 2rem))',
+      maxHeight: 'min(28rem, 70vh)',
+      overflowY: 'auto',
+      borderRadius: '1rem',
+      padding: '1rem',
+      background: 'var(--tw-bg, white)',
+      border: '1px solid rgb(229 231 235)',
+      boxShadow: '0 8px 32px rgb(15 23 42 / 18%)',
+    });
+  }
+
+  // Dark mode background
+  popover.style.background = '';
+  popover.classList.add('bg-white', 'dark:bg-slate-900', 'border', 'border-accent/60', 'shadow-xl');
 
   const titleEl = document.createElement('p');
   titleEl.className = 'text-sm font-bold';
@@ -229,7 +289,7 @@ export function showInstructionPopover(
   textarea.rows = 3;
   textarea.placeholder = 'e.g. "Make this more conversational" or "Shorten to one sentence"';
   textarea.className =
-    'w-full rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm resize-none';
+    'w-full rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent';
   popover.append(textarea);
 
   const row = document.createElement('div');
@@ -239,52 +299,51 @@ export function showInstructionPopover(
   submitBtn.type = 'button';
   submitBtn.textContent = 'Ask AI';
   submitBtn.className =
-    'rounded-full bg-accent text-white font-bold px-4 py-1.5 text-sm hover:opacity-90 disabled:opacity-50';
+    'rounded-full bg-accent text-white font-bold px-4 py-1.5 text-sm hover:opacity-90 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.className =
-    'rounded-full border border-gray-300 dark:border-slate-600 font-bold px-4 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-slate-700';
+    'rounded-full border border-gray-300 dark:border-slate-600 font-bold px-4 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+
+  const cleanUp = () => {
+    popover.remove();
+    backdrop?.remove();
+    document.removeEventListener('keydown', onEscape, true);
+  };
 
   const submit = () => {
     const instruction = textarea.value.trim();
     if (!instruction) return;
     submitBtn.disabled = true;
     submitBtn.textContent = 'Asking…';
-    popover.remove();
+    cleanUp();
     onSubmit(instruction);
+  };
+
+  const onEscape = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      cleanUp();
+      onDismiss();
+    }
   };
 
   submitBtn.addEventListener('click', submit);
   textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
-    if (e.key === 'Escape') {
-      popover.remove();
-      onDismiss();
-    }
   });
   cancelBtn.addEventListener('click', () => {
-    popover.remove();
+    cleanUp();
     onDismiss();
   });
+  document.addEventListener('keydown', onEscape, true);
 
   row.append(cancelBtn, submitBtn);
   popover.append(row);
 
-  nodeWrapper.style.position = 'relative';
-  nodeWrapper.prepend(popover);
+  document.body.append(popover);
   setTimeout(() => textarea.focus(), 50);
-
-  // Dismiss on outside click
-  const outside = (e: MouseEvent) => {
-    if (!popover.contains(e.target as Node)) {
-      popover.remove();
-      onDismiss();
-      document.removeEventListener('click', outside, true);
-    }
-  };
-  document.addEventListener('click', outside, true);
 
   return popover;
 }

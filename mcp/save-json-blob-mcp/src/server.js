@@ -452,9 +452,7 @@ export const createServer = () => {
                 node_id: z
                   .string()
                   .min(1)
-                  .describe(
-                    'Stable node ID (e.g. n_r1a2b3). Must already exist in input.content.article_body.nodes.'
-                  ),
+                  .describe('Stable node ID (e.g. n_r1a2b3). Must already exist in input.content.article_body.nodes.'),
                 public_media_src: z
                   .string()
                   .nullable()
@@ -462,16 +460,8 @@ export const createServer = () => {
                   .describe(
                     'New src value. Must be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs, or null to remove media entirely.'
                   ),
-                public_media_alt: z
-                  .string()
-                  .nullable()
-                  .optional()
-                  .describe('New alt text, or null to remove.'),
-                public_media_caption: z
-                  .string()
-                  .nullable()
-                  .optional()
-                  .describe('New caption text, or null to remove.'),
+                public_media_alt: z.string().nullable().optional().describe('New alt text, or null to remove.'),
+                public_media_caption: z.string().nullable().optional().describe('New caption text, or null to remove.'),
               })
               .strict()
           )
@@ -493,9 +483,7 @@ export const createServer = () => {
           .string()
           .min(1)
           .optional()
-          .describe(
-            'Reset workflow_status to this value (e.g. "pending" or "in_progress") after canonical repair.'
-          ),
+          .describe('Reset workflow_status to this value (e.g. "pending" or "in_progress") after canonical repair.'),
       },
     },
     async ({

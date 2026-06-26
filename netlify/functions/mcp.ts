@@ -953,7 +953,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         ),
         clear_last_error: {
           type: 'boolean',
-          description: 'When true, clears last_error to null. Useful when moving a failed record back to a retryable state.',
+          description:
+            'When true, clears last_error to null. Useful when moving a failed record back to a retryable state.',
         },
         clear_failed_agents: {
           type: 'boolean',
