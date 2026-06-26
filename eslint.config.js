@@ -47,6 +47,7 @@ export default [
         'error',
         {
           argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
           destructuredArrayIgnorePattern: '^_',
         },
       ],
