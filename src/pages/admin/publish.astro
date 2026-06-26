@@ -17,7 +17,7 @@ const metadata = {
         <h1 class="admin-top-bar-title">{pageTitle}</h1>
       </div>
       <div class="top-bar-actions">
-        <a class="btn-secondary btn-sm" href="/admin/drafts">All drafts</a>
+        <button id="btn-all-drafts" class="btn-secondary btn-sm" type="button">All drafts</button>
         <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Publish</button>
       </div>
     </header>
@@ -39,7 +39,7 @@ const metadata = {
       <div id="no-draft" class="admin-card text-center py-10" hidden>
         <p class="text-lg font-bold mb-2">No draft selected</p>
         <p class="text-sm text-muted mb-6">Open a draft from the list to start editing.</p>
-        <a class="btn-primary" href="/admin/drafts">Open draft list</a>
+        <button id="btn-open-draft-list" class="btn-primary" type="button">Open draft list</button>
       </div>
 
       <!-- ── Loading state ──────────────────────────────────── -->
@@ -47,13 +47,10 @@ const metadata = {
 
       <!-- ── Article view ───────────────────────────────────── -->
       <article id="article-view" class="article-view" hidden>
-        <!-- Article metadata (display-only; editable at publish time) -->
         <header class="article-meta-header">
           <h1 id="article-title" class="article-preview-title"></h1>
           <p id="article-excerpt" class="article-preview-excerpt"></p>
         </header>
-
-        <!-- Rendered nodes -->
         <div id="nodes-container" class="nodes-container editorial-prose"></div>
       </article>
 
@@ -95,6 +92,32 @@ const metadata = {
       </aside>
     </div>
   </section>
+
+  <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
+  <div id="draft-picker-modal" class="modal-backdrop" aria-hidden="true" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="draft-picker-title">
+      <div class="modal-header">
+        <h2 id="draft-picker-title" class="modal-title">Open JSON draft</h2>
+        <button id="btn-modal-close" class="modal-close-btn" type="button" aria-label="Close draft picker">✕</button>
+      </div>
+      <p class="modal-helper">Choose a JSON workflow record from Netlify Blobs.</p>
+      <div class="modal-toolbar">
+        <input
+          id="draft-picker-search"
+          type="search"
+          class="modal-search"
+          placeholder="Filter by title, slug, author, or ID…"
+          autocomplete="off"
+        />
+        <button id="btn-modal-refresh" class="btn-secondary btn-sm" type="button">Refresh</button>
+      </div>
+      <p id="modal-status" class="modal-status" aria-live="polite" role="status"></p>
+      <div id="draft-picker-list" class="draft-picker-list"></div>
+      <div id="draft-picker-empty" class="draft-picker-empty" hidden>
+        <p>No JSON drafts found.</p>
+      </div>
+    </div>
+  </div>
 </Layout>
 
 <style>
@@ -219,7 +242,7 @@ const metadata = {
     gap: 2rem;
   }
 
-  /* Node wrapper — node action toolbar appears on hover */
+  /* Node wrapper */
   :global(.dl-node-wrapper) {
     position: relative;
     border-radius: 0.75rem;
@@ -232,7 +255,7 @@ const metadata = {
     box-shadow: 0 0 0 2px var(--aw-color-accent);
   }
 
-  /* Node toolbar (pen + AI buttons) */
+  /* Node toolbar */
   :global(.dl-node-toolbar) {
     position: absolute;
     top: 0.5rem;
@@ -410,6 +433,200 @@ const metadata = {
   .mt-4 {
     margin-top: 1rem;
   }
+
+  /* ── Draft picker modal ────────────────────────────────────────────────── */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgb(15 23 42 / 55%);
+    overflow-y: auto;
+  }
+  :global(.dark) .modal-backdrop {
+    background: rgb(0 0 0 / 70%);
+  }
+
+  .modal-dialog {
+    position: relative;
+    width: 100%;
+    max-width: 720px;
+    margin-top: 2rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 1.25rem;
+    background: rgb(255 255 255);
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgb(15 23 42 / 18%);
+  }
+  :global(.dark) .modal-dialog {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42);
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+
+  .modal-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin: 0;
+  }
+
+  .modal-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .modal-close-btn:hover {
+    background: rgb(229 231 235);
+  }
+  :global(.dark) .modal-close-btn:hover {
+    background: rgb(30 41 59);
+  }
+
+  .modal-helper {
+    margin: 0 0 1rem;
+    color: var(--aw-color-text-muted);
+    font-size: 0.88rem;
+  }
+
+  .modal-toolbar {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .modal-search {
+    flex: 1;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.9rem;
+    background: white;
+    color: inherit;
+  }
+  :global(.dark) .modal-search {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42 / 0.5);
+  }
+
+  .modal-status {
+    margin: 0 0 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+    min-height: 1.4em;
+  }
+
+  .draft-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  :global(.dp-row) {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    background: rgb(249 250 251);
+  }
+  :global(.dark) :global(.dp-row) {
+    border-color: rgb(30 41 59);
+    background: rgb(30 41 59 / 0.5);
+  }
+  :global(.dp-row:hover) {
+    border-color: rgb(94 140 138 / 40%);
+  }
+
+  :global(.dp-row-main) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  :global(.dp-title) {
+    font-weight: 700;
+    font-size: 0.9rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  :global(.dp-meta) {
+    color: var(--aw-color-text-muted);
+    font-size: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem;
+    align-items: center;
+  }
+
+  :global(.dp-slug) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  :global(.dp-sep) {
+    opacity: 0.4;
+  }
+
+  :global(.dp-badge) {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.73rem;
+    font-weight: 900;
+    align-self: flex-start;
+    margin-top: 0.15rem;
+  }
+  :global(.dp-badge.is-ready) {
+    background: rgb(34 197 94 / 12%);
+    color: rgb(22 101 52);
+  }
+  :global(.dp-badge.is-draft) {
+    background: rgb(245 158 11 / 14%);
+    color: rgb(146 64 14);
+  }
+  :global(.dark .dp-badge.is-ready) {
+    color: rgb(187 247 208);
+  }
+  :global(.dark .dp-badge.is-draft) {
+    color: rgb(253 230 138);
+  }
+
+  :global(.dp-load-btn) {
+    flex-shrink: 0;
+  }
+
+  .draft-picker-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--aw-color-text-muted);
+    font-size: 0.9rem;
+  }
 </style>
 
 <script>
@@ -423,6 +640,7 @@ const metadata = {
   // ─── constants ──────────────────────────────────────────────────────────────
   const DRAFT_ENDPOINT = '/.netlify/functions/admin-get-json-draft';
   const UPDATE_NODE_ENDPOINT = '/.netlify/functions/admin-update-node';
+  const LIST_DRAFTS_ENDPOINT = '/.netlify/functions/admin-list-json-drafts';
 
   // ─── page init ──────────────────────────────────────────────────────────────
   const init = () => {
@@ -431,7 +649,20 @@ const metadata = {
     page.dataset.publishInitialized = 'true';
 
     const params = new URLSearchParams(window.location.search);
-    const draftId = params.get('draftId') ?? params.get('requestId') ?? '';
+    const initialDraftId = params.get('draftId') ?? params.get('requestId') ?? '';
+
+    type DraftSummary = {
+      id: string;
+      title: string;
+      slug: string;
+      author: string;
+      updatedAt: string;
+      savedAt: string;
+      savedBy: string;
+      recordStatus: string;
+      lifecycleStatus?: string;
+      readiness: { isReady: boolean; missing: string[]; ready: number; total: number };
+    };
 
     // DOM refs
     const els = {
@@ -458,6 +689,16 @@ const metadata = {
       pubTags: document.querySelector<HTMLInputElement>('#pub-tags')!,
       pubSeo: document.querySelector<HTMLInputElement>('#pub-seo')!,
       pubSlug: document.querySelector<HTMLInputElement>('#pub-slug')!,
+      // Modal
+      modal: document.querySelector<HTMLElement>('#draft-picker-modal')!,
+      btnModalClose: document.querySelector<HTMLButtonElement>('#btn-modal-close')!,
+      btnModalRefresh: document.querySelector<HTMLButtonElement>('#btn-modal-refresh')!,
+      modalStatus: document.querySelector<HTMLElement>('#modal-status')!,
+      modalSearch: document.querySelector<HTMLInputElement>('#draft-picker-search')!,
+      draftPickerList: document.querySelector<HTMLElement>('#draft-picker-list')!,
+      draftPickerEmpty: document.querySelector<HTMLElement>('#draft-picker-empty')!,
+      btnAllDrafts: document.querySelector<HTMLButtonElement>('#btn-all-drafts')!,
+      btnOpenDraftList: document.querySelector<HTMLButtonElement>('#btn-open-draft-list')!,
     };
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -465,7 +706,9 @@ const metadata = {
     let activeEditor: NodeEditor | null = null;
     let activeNodeWrapper: HTMLElement | null = null;
     let currentNodes: ArticleBodyNode[] = [];
-    const currentRequestId = draftId;
+    let currentRequestId = initialDraftId;
+    let modalDraftsCache: DraftSummary[] | null = null;
+    let allDraftRows: DraftSummary[] = [];
 
     const getToken = async (): Promise<string> => {
       const token = await getAccessToken();
@@ -473,7 +716,7 @@ const metadata = {
       return token;
     };
 
-    // ── Auth shell (same pattern as existing admin pages) ─────────────────────
+    // ── Auth shell ────────────────────────────────────────────────────────────
     const setAuthStatus = (msg: string) => {
       if (els.authStatus) els.authStatus.textContent = msg;
     };
@@ -532,6 +775,16 @@ const metadata = {
       }
     };
 
+    const resetLockBar = () => {
+      els.lockBar.hidden = true;
+      delete els.lockBar.dataset.held;
+      delete els.lockBar.dataset.lockedByAgent;
+      els.lockIcon.textContent = '';
+      els.lockLabel.textContent = '';
+      els.btnDoneEditing.hidden = true;
+      els.btnForceRelease.hidden = true;
+    };
+
     // ── Lock actions ──────────────────────────────────────────────────────────
     const acquireLock = async (): Promise<boolean> => {
       if (!lockManager) return false;
@@ -561,7 +814,6 @@ const metadata = {
         const rendered = renderNode(node);
         const wrapper = wrapNode(node, rendered);
 
-        // Toolbar overlay
         const toolbar = document.createElement('div');
         toolbar.className = 'dl-node-toolbar';
 
@@ -580,7 +832,6 @@ const metadata = {
         toolbar.append(editBtn, aiBtn);
         wrapper.append(toolbar);
 
-        // Selection detection on read-only node (not during edit)
         wrapper.addEventListener('mouseup', () => {
           if (wrapper.dataset.editing) return;
           const sel = window.getSelection();
@@ -605,20 +856,13 @@ const metadata = {
     };
 
     const onEditClick = async (node: ArticleBodyNode, wrapper: HTMLElement) => {
-      // If already editing this node, ignore
       if (wrapper.dataset.editing) return;
-
-      // Close any other open editor (without save)
       closeActiveEditor(false);
 
-      // Ensure we hold the lock before entering edit mode
       if (!lockManager?.currentToken) {
-        updateLockBar({ held: false }); // show status before attempt
+        updateLockBar({ held: false });
         const acquired = await acquireLock();
-        if (!acquired) {
-          // Lock is held by agent; lock bar already updated via onStateChange
-          return;
-        }
+        if (!acquired) return;
       }
 
       wrapper.dataset.editing = 'true';
@@ -638,7 +882,6 @@ const metadata = {
     const onAskAiClick = (node: ArticleBodyNode, wrapper: HTMLElement) => {
       if (!currentRequestId) return;
 
-      // Capture selection from either TipTap (if in edit mode) or the browser selection
       let selectedText: string | undefined;
       if (wrapper.dataset.editing && activeEditor) {
         const sel = activeEditor.getSelectionText();
@@ -689,7 +932,6 @@ const metadata = {
             node.public,
             result.suggestion,
             async (fields) => {
-              // Accept: acquire lock if needed, then save
               if (!lockManager?.currentToken) {
                 const acquired = await acquireLock();
                 if (!acquired) {
@@ -699,7 +941,7 @@ const metadata = {
               }
               await saveNodeUpdate(node.id, fields, wrapper, node);
             },
-            () => {} // Discard — do nothing
+            () => {}
           );
         },
         () => {}
@@ -739,31 +981,67 @@ const metadata = {
         return;
       }
 
-      // Refresh the rendered node in-place
       const updatedNode: ArticleBodyNode = { ...originalNode, public: { ...originalNode.public, ...updatedFields } };
       const nodeIndex = currentNodes.findIndex((n) => n.id === nodeId);
       if (nodeIndex !== -1) currentNodes[nodeIndex] = updatedNode;
 
       const newRendered = renderNode(updatedNode);
-      // Replace content inside wrapper (keep toolbar)
       const toolbar = wrapper.querySelector('.dl-node-toolbar');
       wrapper.innerHTML = '';
       wrapper.append(newRendered);
       if (toolbar) wrapper.append(toolbar);
     };
 
+    // ── Reset draft view (before loading a new draft) ─────────────────────────
+    const resetDraftView = async () => {
+      closeActiveEditor(false);
+
+      if (lockManager) {
+        if (lockManager.currentToken) {
+          await lockManager.checkin().catch(() => {});
+        }
+        lockManager = null;
+      }
+
+      resetLockBar();
+      els.articleView.hidden = true;
+      els.nodesContainer.innerHTML = '';
+      els.publishPanel.hidden = true;
+      els.btnPublish.disabled = true;
+      els.loadStatus.hidden = true;
+      els.loadStatus.textContent = '';
+      els.noDraft.hidden = true;
+      currentNodes = [];
+    };
+
     // ── Load draft ────────────────────────────────────────────────────────────
-    const loadDraft = async (token: string) => {
-      if (!draftId) {
+    const loadDraft = async (requestId: string, token: string) => {
+      if (!requestId) {
         els.noDraft.hidden = false;
         return;
+      }
+
+      await resetDraftView();
+
+      currentRequestId = requestId;
+
+      // Update URL without navigation
+      const currentParams = new URLSearchParams(window.location.search);
+      const urlDraftId = currentParams.get('draftId') ?? currentParams.get('requestId') ?? '';
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('draftId', requestId);
+      newUrl.searchParams.delete('requestId');
+      if (urlDraftId !== requestId) {
+        history.pushState({}, '', newUrl.toString());
+      } else {
+        history.replaceState({}, '', newUrl.toString());
       }
 
       els.loadStatus.hidden = false;
       els.loadStatus.textContent = 'Loading article…';
 
       try {
-        const res = await fetch(`${DRAFT_ENDPOINT}?draftId=${encodeURIComponent(draftId)}`, {
+        const res = await fetch(`${DRAFT_ENDPOINT}?draftId=${encodeURIComponent(requestId)}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const json = await res.json().catch(() => ({ ok: false }));
@@ -778,7 +1056,6 @@ const metadata = {
         const title = String(content.title ?? json.draft?.title ?? 'Untitled');
         const excerpt = String((content.deck ?? json.draft?.excerpt ?? '') as string);
 
-        // Populate metadata fields
         els.articleTitle.textContent = title;
         els.articleExcerpt.textContent = excerpt;
         els.pubTitle.value = title;
@@ -803,12 +1080,10 @@ const metadata = {
           return;
         }
 
-        // Init lock manager
         lockManager = new LockManager(currentRequestId, getToken);
         lockManager.setOnStateChange((state) => updateLockBar(state as Parameters<typeof updateLockBar>[0]));
         lockManager.attachUnloadHandler();
 
-        // Check initial lock state (no-op if unlocked)
         const lockStatus = await lockManager.status();
         updateLockBar(lockStatus as Parameters<typeof updateLockBar>[0]);
 
@@ -817,6 +1092,161 @@ const metadata = {
         els.loadStatus.textContent = err instanceof Error ? err.message : 'Failed to load draft.';
       }
     };
+
+    // ── Draft picker modal ────────────────────────────────────────────────────
+    const escapeHtml = (value: unknown) =>
+      String(value || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const formatDate = (value: string) => {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'Unknown';
+      return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+    };
+
+    const getReadinessLabel = (r: DraftSummary['readiness']) => `${r?.ready ?? 0}/${r?.total ?? 4} ready`;
+
+    const getDisplayTitle = (title: string) =>
+      String(title || 'Untitled draft')
+        .replace(/\s+admin-draft-[a-f0-9-]{12,}$/i, '')
+        .trim() || 'Untitled draft';
+
+    const openModal = () => {
+      els.modal.hidden = false;
+      els.modal.setAttribute('aria-hidden', 'false');
+      const firstFocusable = els.modal.querySelector<HTMLElement>('button, input, [tabindex="0"]');
+      firstFocusable?.focus();
+    };
+
+    const closeModal = () => {
+      els.modal.hidden = true;
+      els.modal.setAttribute('aria-hidden', 'true');
+    };
+
+    const renderDraftPickerRows = (drafts: DraftSummary[]) => {
+      els.draftPickerList.innerHTML = '';
+      if (drafts.length === 0) {
+        els.draftPickerEmpty.hidden = false;
+        return;
+      }
+      els.draftPickerEmpty.hidden = true;
+
+      for (const draft of drafts) {
+        const row = document.createElement('div');
+        row.className = 'dp-row';
+
+        const readinessClass = draft.readiness?.isReady ? 'is-ready' : 'is-draft';
+        const readinessLabel = getReadinessLabel(draft.readiness);
+        const displayTitle = getDisplayTitle(draft.title);
+        const dateStr = formatDate(draft.updatedAt || draft.savedAt);
+        const savedByStr = draft.savedBy ? `<span class="dp-sep">·</span><span>by ${escapeHtml(draft.savedBy)}</span>` : '';
+
+        row.innerHTML = `
+          <div class="dp-row-main">
+            <span class="dp-title">${escapeHtml(displayTitle)}</span>
+            <span class="dp-meta">
+              <span class="dp-slug">${escapeHtml(draft.slug || '—')}</span>
+              <span class="dp-sep">·</span>
+              <span>${escapeHtml(draft.author || '—')}</span>
+              <span class="dp-sep">·</span>
+              <span>${escapeHtml(dateStr)}</span>
+              ${savedByStr}
+            </span>
+            <span class="dp-badge ${readinessClass}">${escapeHtml(readinessLabel)}</span>
+          </div>
+          <button class="btn-secondary btn-sm dp-load-btn" type="button" data-draft-id="${escapeHtml(draft.id)}">Load</button>
+        `;
+
+        row.querySelector<HTMLButtonElement>('.dp-load-btn')!.addEventListener('click', async () => {
+          closeModal();
+          const token = await getAccessToken();
+          if (!token) return;
+          await loadDraft(draft.id, token);
+        });
+
+        els.draftPickerList.append(row);
+      }
+    };
+
+    const filterDraftRows = () => {
+      const q = els.modalSearch.value.toLowerCase().trim();
+      if (!q) {
+        renderDraftPickerRows(allDraftRows);
+        return;
+      }
+      const filtered = allDraftRows.filter(
+        (d) =>
+          d.title?.toLowerCase().includes(q) ||
+          d.slug?.toLowerCase().includes(q) ||
+          d.id?.toLowerCase().includes(q) ||
+          d.author?.toLowerCase().includes(q)
+      );
+      renderDraftPickerRows(filtered);
+    };
+
+    const fetchDraftList = async () => {
+      els.modalStatus.textContent = 'Loading JSON drafts…';
+      els.draftPickerList.innerHTML = '';
+      els.draftPickerEmpty.hidden = true;
+      els.btnModalRefresh.disabled = true;
+
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          els.modalStatus.textContent = 'Not authenticated.';
+          return;
+        }
+        const res = await fetch(LIST_DRAFTS_ENDPOINT, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json().catch(() => ({ ok: false }));
+        if (!res.ok || !json.ok) {
+          els.modalStatus.textContent = json.error ?? `Could not load drafts (${res.status})`;
+          return;
+        }
+        allDraftRows = Array.isArray(json.drafts) ? (json.drafts as DraftSummary[]) : [];
+        modalDraftsCache = allDraftRows;
+        els.modalStatus.textContent = `${allDraftRows.length} draft${allDraftRows.length === 1 ? '' : 's'} loaded.`;
+        filterDraftRows();
+      } catch (err) {
+        els.modalStatus.textContent = err instanceof Error ? err.message : 'Failed to load drafts.';
+      } finally {
+        els.btnModalRefresh.disabled = false;
+      }
+    };
+
+    const openDraftPicker = () => {
+      openModal();
+      if (modalDraftsCache === null) {
+        fetchDraftList();
+      } else {
+        allDraftRows = modalDraftsCache;
+        filterDraftRows();
+      }
+    };
+
+    els.btnAllDrafts.addEventListener('click', openDraftPicker);
+    els.btnOpenDraftList.addEventListener('click', openDraftPicker);
+    els.btnModalClose.addEventListener('click', closeModal);
+
+    els.btnModalRefresh.addEventListener('click', () => {
+      modalDraftsCache = null;
+      fetchDraftList();
+    });
+
+    els.modalSearch.addEventListener('input', filterDraftRows);
+
+    els.modal.addEventListener('click', (e) => {
+      if (e.target === els.modal) closeModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !els.modal.hidden) closeModal();
+    });
 
     // ── Publish ───────────────────────────────────────────────────────────────
     const showPublishPanel = () => {
@@ -902,7 +1332,7 @@ const metadata = {
         }
 
         authState('signed-in');
-        await loadDraft(authToken);
+        await loadDraft(initialDraftId, authToken);
 
         document.addEventListener('dr-lurie:logout', () => authState('signed-out'));
         document.addEventListener('dr-lurie:login', async () => {
