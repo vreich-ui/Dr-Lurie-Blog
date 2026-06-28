@@ -22,8 +22,6 @@ const el = <K extends keyof HTMLElementTagNameMap>(
 };
 
 // Simple plain-text → paragraph set; newlines become <br> inside a <p>.
-// We intentionally do NOT parse markdown here — body text is rendered as
-// pre-formatted prose in read mode. TipTap handles rich parsing in edit mode.
 const textToParagraphs = (text: string): HTMLElement => {
   const wrapper = el('div', { class: 'dl-node-body prose dark:prose-invert max-w-none' });
   const paragraphs = text.split(/\n{2,}/);
@@ -39,6 +37,63 @@ const textToParagraphs = (text: string): HTMLElement => {
   }
   return wrapper;
 };
+
+// ─── safe HTML renderer for TipTap-saved body content ─────────────────────────
+// Only allows the tags TipTap can produce; strips everything else (keeps children).
+// Links: only http/https href, forced target+rel.
+
+const TIPTAP_ALLOWED = new Set(['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h2', 'h3']);
+const SAFE_HREF_RE = /^https?:\/\//i;
+
+function sanitizeChildren(src: ParentNode, dst: Element | DocumentFragment): void {
+  for (const child of Array.from(src.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      dst.append(child.cloneNode(false));
+      continue;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) continue;
+    const srcEl = child as Element;
+    const tag = srcEl.tagName.toLowerCase();
+    if (TIPTAP_ALLOWED.has(tag)) {
+      const out = document.createElement(tag);
+      if (tag === 'a') {
+        const href = srcEl.getAttribute('href') ?? '';
+        if (SAFE_HREF_RE.test(href)) {
+          out.setAttribute('href', href);
+          out.setAttribute('target', '_blank');
+          out.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+      sanitizeChildren(srcEl, out);
+      dst.append(out);
+    } else {
+      // Unknown tag: drop it but recurse into its children
+      sanitizeChildren(srcEl, dst);
+    }
+  }
+}
+
+function sanitizeHtmlBody(html: string): HTMLElement {
+  const wrapper = el('div', { class: 'dl-node-body prose dark:prose-invert max-w-none' });
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  sanitizeChildren(tpl.content, wrapper);
+  return wrapper;
+}
+
+// Detect TipTap HTML output (starts with a tag) vs stored plain text.
+const LOOKS_LIKE_HTML_RE = /^\s*</;
+
+function renderBody(body: string): HTMLElement {
+  return LOOKS_LIKE_HTML_RE.test(body) ? sanitizeHtmlBody(body) : textToParagraphs(body);
+}
+
+// ─── artifact-ref detection ───────────────────────────────────────────────────
+// Major Key artifact references (image/{id}/{sha256}.{ext}) cannot be resolved
+// to a real URL in the browser — show a descriptive placeholder instead.
+const ARTIFACT_REF_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+
+const isArtifactRef = (src: string) => ARTIFACT_REF_RE.test(src.trim());
 
 // External link icon (inline SVG for accessibility)
 const externalLinkIcon = (): SVGElement => {
@@ -122,7 +177,7 @@ function renderImagePlaceholder(label: string, note?: string): HTMLElement {
   const text = el('span', { class: 'text-xs text-muted opacity-60 text-center px-4' }, label || 'Image placeholder');
   wrap.append(icon, text);
   if (note) {
-    const noteEl = el('span', { class: 'text-xs text-red-500 dark:text-red-400 opacity-80' }, note);
+    const noteEl = el('span', { class: 'text-xs text-orange-500 dark:text-orange-400 opacity-80 text-center px-4' }, note);
     wrap.append(noteEl);
   }
   return wrap;
@@ -152,7 +207,7 @@ function renderSection(node: ArticleBodyNode): HTMLElement {
 
   // Source sections render only items (as titled links). Skip body to avoid
   // emitting raw URLs as plain text — source content belongs in items.
-  if (!isSrc && node.public.body) section.append(textToParagraphs(node.public.body));
+  if (!isSrc && node.public.body) section.append(renderBody(node.public.body));
 
   if (node.public.items?.length) {
     if (isSrc) {
@@ -171,7 +226,7 @@ function renderSection(node: ArticleBodyNode): HTMLElement {
 
 function renderPlain(node: ArticleBodyNode): HTMLElement {
   const div = el('div', { class: 'dl-node dl-node-plain' });
-  if (node.public.body) div.append(textToParagraphs(node.public.body));
+  if (node.public.body) div.append(renderBody(node.public.body));
   return div;
 }
 
@@ -182,7 +237,7 @@ function renderCallout(node: ArticleBodyNode): HTMLElement {
   if (node.public.title) {
     aside.append(el('p', { class: 'font-bold mb-1' }, node.public.title));
   }
-  if (node.public.body) aside.append(textToParagraphs(node.public.body));
+  if (node.public.body) aside.append(renderBody(node.public.body));
   return aside;
 }
 
@@ -190,8 +245,23 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
   const figure = el('figure', { class: 'dl-node dl-node-image my-2' });
   const media = node.public.media;
 
-  // Determine if the src is usable
   const srcRaw = media?.src ?? '';
+  const isArtifact = isArtifactRef(srcRaw);
+
+  // Artifact references cannot be resolved to a browser URL in admin mode
+  if (isArtifact) {
+    const label = media?.alt || node.public.title || 'Image';
+    figure.append(
+      renderImagePlaceholder(label, `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`)
+    );
+    if (media?.caption || node.public.body) {
+      figure.append(
+        el('figcaption', { class: 'text-sm text-muted mt-2 text-center' }, media?.caption || node.public.body || '')
+      );
+    }
+    return figure;
+  }
+
   const hasSrc = Boolean(srcRaw.trim()) && !srcRaw.startsWith('data:') && srcRaw !== 'null' && srcRaw !== 'undefined';
 
   if (media && hasSrc) {
@@ -216,7 +286,6 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
       );
     }
   } else {
-    // No src, missing, or invalid: show clean site-style placeholder
     const placeholderLabel = media?.alt || node.public.title || 'Image placeholder';
     figure.append(renderImagePlaceholder(placeholderLabel));
     if (media?.caption || node.public.body) {
@@ -231,7 +300,7 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
 
 function renderSoftAction(node: ArticleBodyNode): HTMLElement {
   const div = el('div', { class: 'dl-node dl-node-cta flex flex-col items-start gap-3 py-2' });
-  if (node.public.body) div.append(textToParagraphs(node.public.body));
+  if (node.public.body) div.append(renderBody(node.public.body));
   if (node.public.ctaText) {
     const link = el(
       'a',
@@ -252,7 +321,7 @@ function renderOfferInline(node: ArticleBodyNode): HTMLElement {
   const div = el('div', {
     class: 'dl-node dl-node-offer-inline rounded-xl border border-accent/30 bg-accent/5 px-5 py-4 my-2',
   });
-  if (node.public.body) div.append(textToParagraphs(node.public.body));
+  if (node.public.body) div.append(renderBody(node.public.body));
   if (node.public.ctaText) {
     const link = el(
       'a',
@@ -277,7 +346,7 @@ function renderOfferCard(node: ArticleBodyNode): HTMLElement {
   if (node.public.title) {
     card.append(el('h3', { class: 'font-heading text-xl font-bold mb-2' }, node.public.title));
   }
-  if (node.public.body) card.append(textToParagraphs(node.public.body));
+  if (node.public.body) card.append(renderBody(node.public.body));
   if (node.public.ctaText) {
     const link = el(
       'a',
@@ -307,7 +376,7 @@ function renderSummary(node: ArticleBodyNode): HTMLElement {
     for (const item of node.public.items) ul.append(el('li', {}, item));
     section.append(ul);
   }
-  if (node.public.body) section.append(textToParagraphs(node.public.body));
+  if (node.public.body) section.append(renderBody(node.public.body));
   return section;
 }
 
@@ -327,7 +396,7 @@ function renderFaq(node: ArticleBodyNode): HTMLElement {
     }
   }
   section.append(dl);
-  if (node.public.body) section.append(textToParagraphs(node.public.body));
+  if (node.public.body) section.append(renderBody(node.public.body));
   return section;
 }
 

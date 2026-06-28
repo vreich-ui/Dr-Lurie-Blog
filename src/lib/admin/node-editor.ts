@@ -13,11 +13,21 @@ type EditorConfig = {
   /** Resolved after save; receives fields that actually changed (subset of public). */
   onSave: (updatedFields: Partial<ArticleBodyNode['public']>) => Promise<void>;
   onCancel: () => void;
+  /** Called instead of onSave when no content changed — editor closes silently. */
+  onNoChange?: () => void;
+};
+
+// ─── icon helper ─────────────────────────────────────────────────────────────
+
+const cloneIcon = (name: string, fallback = ''): Node => {
+  const tmpl = document.querySelector<HTMLElement>(`[data-icon="${name}"]`);
+  if (tmpl) return tmpl.cloneNode(true);
+  return document.createTextNode(fallback);
 };
 
 // ─── extension sets by node kind ─────────────────────────────────────────────
 
-// Prose / callout / summary → rich text with headings, bold, italic, link
+// Prose / callout → rich text with headings, bold, italic, link, lists
 const richTextExtensions = () => [
   StarterKit.configure({
     heading: { levels: [2, 3] },
@@ -61,10 +71,6 @@ const listOnlyExtensions = () => [
 
 // ─── link popover ─────────────────────────────────────────────────────────────
 
-/**
- * In-app link popover: URL input + Apply / Remove / Cancel.
- * Anchors below the toolbar; closes on outside click or Escape.
- */
 function buildLinkPopover(editor: Editor, anchor: HTMLElement): HTMLElement {
   const existing = anchor.parentElement?.querySelector<HTMLElement>('.dl-link-popover');
   if (existing) {
@@ -138,17 +144,14 @@ function buildLinkPopover(editor: Editor, anchor: HTMLElement): HTMLElement {
   row.append(applyBtn, removeBtn, cancelBtn);
   pop.append(urlInput, row);
 
-  // Close on outside mousedown
   const onOutside = (e: MouseEvent) => {
     if (!pop.contains(e.target as Node)) {
       pop.remove();
       document.removeEventListener('mousedown', onOutside, true);
     }
   };
-  // Delay to avoid the triggering click registering as "outside"
   requestAnimationFrame(() => document.addEventListener('mousedown', onOutside, true));
 
-  // Escape from anywhere closes it
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       pop.remove();
@@ -162,80 +165,122 @@ function buildLinkPopover(editor: Editor, anchor: HTMLElement): HTMLElement {
 
 // ─── toolbar ─────────────────────────────────────────────────────────────────
 
-function buildToolbar(editor: Editor, node: ArticleBodyNode): HTMLElement {
+function buildToolbar(editor: Editor, isAction: boolean, isList: boolean): HTMLElement {
   const bar = document.createElement('div');
   bar.className =
-    'dl-editor-toolbar relative flex flex-wrap items-center gap-1 p-2 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-xs font-semibold';
+    'dl-editor-toolbar relative flex flex-wrap items-center gap-0.5 p-1.5 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800';
 
-  const btn = (label: string, title: string, action: () => void, isActive?: () => boolean) => {
+  const btn = (iconName: string, title: string, action: () => void, isActive?: () => boolean) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = label;
     b.title = title;
+    b.setAttribute('aria-label', title);
     b.className =
-      'px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+      'w-7 h-7 flex items-center justify-center rounded text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent transition-colors';
+    b.append(cloneIcon(iconName, title.slice(0, 2)));
+    const refreshActive = () => {
+      const active = isActive?.() ?? false;
+      b.setAttribute('aria-pressed', String(active));
+      b.classList.toggle('is-active', active);
+    };
+    refreshActive();
+    editor.on('selectionUpdate', refreshActive);
+    editor.on('transaction', refreshActive);
     b.addEventListener('click', (e) => {
       e.preventDefault();
       action();
-      refreshActive();
     });
-    const refreshActive = () => {
-      b.setAttribute('aria-pressed', String(isActive?.() ?? false));
-    };
-    refreshActive();
     return b;
   };
 
-  const presentation = node.rendering?.presentation;
-  const isRichText = !['inline', 'offerInline', 'offerCard', 'faq', 'summary'].includes(presentation ?? '');
+  const sep = () => {
+    const s = document.createElement('span');
+    s.className = 'w-px h-4 bg-gray-200 dark:bg-slate-600 mx-0.5 self-center';
+    s.setAttribute('aria-hidden', 'true');
+    return s;
+  };
 
-  if (isRichText) {
+  if (isAction) {
+    const hint = document.createElement('span');
+    hint.className = 'text-gray-500 dark:text-gray-400 opacity-70 pl-1 text-xs font-semibold';
+    hint.textContent = 'Plain text';
+    bar.append(hint);
+  } else if (isList) {
     bar.append(
       btn(
-        'B',
-        'Bold',
-        () => editor.chain().focus().toggleBold().run(),
-        () => editor.isActive('bold')
+        'list',
+        'Bullet list',
+        () => editor.chain().focus().toggleBulletList().run(),
+        () => editor.isActive('bulletList')
       ),
       btn(
-        'I',
-        'Italic',
-        () => editor.chain().focus().toggleItalic().run(),
-        () => editor.isActive('italic')
+        'list-numbers',
+        'Ordered list',
+        () => editor.chain().focus().toggleOrderedList().run(),
+        () => editor.isActive('orderedList')
       ),
-      btn(
-        'H2',
-        'Heading 2',
-        () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-        () => editor.isActive('heading', { level: 2 })
-      ),
-      btn(
-        'H3',
-        'Heading 3',
-        () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-        () => editor.isActive('heading', { level: 3 })
-      )
+      sep(),
+      btn('arrow-back-up', 'Undo', () => editor.chain().focus().undo().run()),
+      btn('arrow-forward-up', 'Redo', () => editor.chain().focus().redo().run())
     );
-
-    // Link button — opens in-app popover
+  } else {
+    // Full rich text
     const linkBtn = btn(
-      '🔗',
+      'link',
       'Link',
       () => {
         const pop = buildLinkPopover(editor, bar);
-        bar.style.position = 'relative';
         bar.append(pop);
         requestAnimationFrame(() => pop.querySelector('input')?.focus());
       },
       () => editor.isActive('link')
     );
-    bar.append(linkBtn);
-  } else {
-    // Minimal label when no rich-text controls apply
-    const hint = document.createElement('span');
-    hint.className = 'text-muted opacity-60 pl-1';
-    hint.textContent = 'Plain text';
-    bar.append(hint);
+
+    bar.append(
+      btn(
+        'bold',
+        'Bold',
+        () => editor.chain().focus().toggleBold().run(),
+        () => editor.isActive('bold')
+      ),
+      btn(
+        'italic',
+        'Italic',
+        () => editor.chain().focus().toggleItalic().run(),
+        () => editor.isActive('italic')
+      ),
+      sep(),
+      btn(
+        'h-2',
+        'Heading 2',
+        () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+        () => editor.isActive('heading', { level: 2 })
+      ),
+      btn(
+        'h-3',
+        'Heading 3',
+        () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+        () => editor.isActive('heading', { level: 3 })
+      ),
+      sep(),
+      btn(
+        'list',
+        'Bullet list',
+        () => editor.chain().focus().toggleBulletList().run(),
+        () => editor.isActive('bulletList')
+      ),
+      btn(
+        'list-numbers',
+        'Ordered list',
+        () => editor.chain().focus().toggleOrderedList().run(),
+        () => editor.isActive('orderedList')
+      ),
+      sep(),
+      linkBtn,
+      sep(),
+      btn('arrow-back-up', 'Undo', () => editor.chain().focus().undo().run()),
+      btn('arrow-forward-up', 'Redo', () => editor.chain().focus().redo().run())
+    );
   }
 
   return bar;
@@ -301,6 +346,18 @@ export class NodeEditor {
   private ctaFields: ReturnType<typeof buildCtaFields> | null = null;
   private hiddenPreview: HTMLElement | null = null;
   private hiddenPreviewDisplay = '';
+  private titleInput: HTMLInputElement | null = null;
+  private _dirty = false;
+  private _initialHtml = '';
+  private _doSave: (() => Promise<void>) | null = null;
+
+  isDirty(): boolean {
+    return this._dirty;
+  }
+
+  triggerSave(): void {
+    void this._doSave?.();
+  }
 
   mount(node: ArticleBodyNode, wrapper: HTMLElement, config: EditorConfig): void {
     if (this.editor) this.unmount();
@@ -314,10 +371,33 @@ export class NodeEditor {
     this.container = document.createElement('div');
     this.container.className = 'dl-node-editor border border-accent rounded-xl overflow-hidden';
 
+    // Title input: shown when node has both title and body (so neither is lost)
+    const hasSeparateTitle = node.public.title !== undefined && node.public.body !== undefined && !isAction;
+    if (hasSeparateTitle) {
+      const titleWrap = document.createElement('div');
+      titleWrap.className =
+        'dl-editor-title-field px-3 pt-3 pb-2 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900';
+      const titleLabel = document.createElement('label');
+      titleLabel.className = 'block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1';
+      titleLabel.textContent = 'Section title';
+      this.titleInput = document.createElement('input');
+      this.titleInput.type = 'text';
+      this.titleInput.value = node.public.title ?? '';
+      this.titleInput.placeholder = 'Section title…';
+      this.titleInput.className =
+        'w-full border border-gray-200 dark:border-slate-700 rounded-lg px-2 py-1.5 text-sm bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-accent';
+      this.titleInput.addEventListener('input', () => {
+        this._dirty = true;
+      });
+      titleLabel.append(this.titleInput);
+      titleWrap.append(titleLabel);
+      this.container.append(titleWrap);
+    }
+
     this.editorEl = document.createElement('div');
     this.editorEl.className = 'dl-editor-content p-4 min-h-[6rem] bg-white dark:bg-slate-900 outline-none';
 
-    // Initial content: prefer body text; fall back to title
+    // Initial content: body if available, else title
     const initialContent = node.public.body || node.public.title || '';
 
     const extensions = isAction ? plainTextExtensions() : isList ? listOnlyExtensions() : richTextExtensions();
@@ -328,20 +408,31 @@ export class NodeEditor {
       content: initialContent,
     });
 
+    this._initialHtml = this.editor.getHTML();
+    this._dirty = false;
+    this.editor.on('update', () => {
+      this._dirty = true;
+    });
+
     const doSave = async () => {
       if (!this.editor) return;
-      const text = this.editor.getText();
       const html = this.editor.getHTML();
+
+      // Detect no-change before doing any network work
+      const bodyChanged = html !== this._initialHtml;
+      const titleChanged = this.titleInput ? this.titleInput.value.trim() !== (node.public.title ?? '') : false;
+      const ctaTextChanged = this.ctaFields ? this.ctaFields.getText() !== (node.public.ctaText ?? '') : false;
+      const ctaLinkChanged = this.ctaFields ? this.ctaFields.getUrl() !== (node.public.ctaLink ?? '') : false;
+
+      if (!bodyChanged && !titleChanged && !ctaTextChanged && !ctaLinkChanged) {
+        config.onNoChange?.();
+        return;
+      }
 
       const fields: Partial<ArticleBodyNode['public']> = {};
 
-      if (node.public.body !== undefined || node.public.title !== undefined) {
-        // Prefer updating body; if node only had title, update title
-        if (node.public.body !== undefined) {
-          fields.body = html;
-        } else {
-          fields.title = text;
-        }
+      if (hasSeparateTitle && this.titleInput) {
+        fields.title = this.titleInput.value.trim();
       }
 
       if (isAction && this.ctaFields) {
@@ -350,12 +441,21 @@ export class NodeEditor {
         if (ctaText) fields.ctaText = ctaText;
         if (ctaLink) fields.ctaLink = ctaLink;
         fields.body = html;
+      } else if (node.public.body !== undefined || node.public.title !== undefined) {
+        if (node.public.body !== undefined) {
+          fields.body = html;
+        } else {
+          // Node had only title
+          fields.title = this.editor.getText();
+        }
       }
 
       await config.onSave(fields);
     };
 
-    const toolbar = buildToolbar(this.editor, node);
+    this._doSave = doSave;
+
+    const toolbar = buildToolbar(this.editor, isAction, isList);
     const footer = buildEditorFooter(doSave, config.onCancel);
     this.container.append(toolbar, this.editorEl);
 
@@ -383,7 +483,7 @@ export class NodeEditor {
   unmount(): void {
     // Restore preview only when it's still in the DOM (cancel path).
     // On the save path, saveNodeUpdate replaces wrapper.innerHTML first,
-    // which detaches the preview — so isConnected will be false and we skip.
+    // which detaches the preview — isConnected is false and we skip.
     if (this.hiddenPreview?.isConnected) {
       this.hiddenPreview.style.display = this.hiddenPreviewDisplay;
     }
@@ -396,6 +496,10 @@ export class NodeEditor {
     this.container = null;
     this.editorEl = null;
     this.ctaFields = null;
+    this.titleInput = null;
+    this._doSave = null;
+    this._dirty = false;
+    this._initialHtml = '';
   }
 
   getSelectionText(): string {
