@@ -46,7 +46,6 @@ const metadata = {
 
       <!-- ── Article workspace (shown once a draft is loaded) ── -->
       <div id="article-workspace" hidden>
-
         <!-- ── 1. Admin setup module ─────────────────────────── -->
         <section id="meta-editor" class="admin-setup-module" aria-label="Article setup">
           <p class="setup-module-label">Article setup</p>
@@ -80,7 +79,9 @@ const metadata = {
             </div>
             <!-- Generated article path (read-only, full width) -->
             <div class="field field-full">
-              <label for="pub-article-path" class="field-label">Article path <span class="field-label-hint">— generated, read-only</span></label>
+              <label for="pub-article-path" class="field-label"
+                >Article path <span class="field-label-hint">— generated, read-only</span></label
+              >
               <input
                 id="pub-article-path"
                 name="articlePath"
@@ -128,8 +129,7 @@ const metadata = {
               class="article-title-input"
               placeholder="Article title…"
               autocomplete="off"
-              spellcheck="true"
-            ></textarea>
+              spellcheck="true"></textarea>
             <p class="field-error" id="err-title" role="alert" hidden></p>
           </div>
 
@@ -151,7 +151,6 @@ const metadata = {
         <article id="article-view" class="article-view">
           <div id="nodes-container" class="nodes-container editorial-prose"></div>
         </article>
-
       </div><!-- /article-workspace -->
     </div>
   </section>
@@ -374,7 +373,7 @@ const metadata = {
 
   /* Setup module inputs — consistent compact style */
   .admin-setup-module input:not(.article-path-field),
-  .admin-setup-module input[type="date"] {
+  .admin-setup-module input[type='date'] {
     border: 1px solid rgb(209 213 219);
     border-radius: 0.4rem;
     padding: 0.35rem 0.55rem;
@@ -390,7 +389,7 @@ const metadata = {
     box-shadow: 0 0 0 2px rgb(94 140 138 / 15%);
   }
   :global(.dark) .admin-setup-module input:not(.article-path-field),
-  :global(.dark) .admin-setup-module input[type="date"] {
+  :global(.dark) .admin-setup-module input[type='date'] {
     border-color: rgb(51 65 85);
     background: rgb(15 23 42 / 0.5);
   }
@@ -1425,9 +1424,7 @@ const metadata = {
         .filter(Boolean);
 
       // Derive the slug from the generated path for backward compatibility
-      const derivedSlug = articlePath
-        ? articlePath.replace('src/data/post/', '').replace('.md', '')
-        : '';
+      const derivedSlug = articlePath ? articlePath.replace('src/data/post/', '').replace('.md', '') : '';
 
       const publishPayload: Record<string, unknown> = { title };
       if (derivedSlug) publishPayload.slug = derivedSlug;
@@ -1999,9 +1996,7 @@ const metadata = {
       }
       const filtered = allDraftRows.filter(
         (d) =>
-          d.title?.toLowerCase().includes(q) ||
-          d.id?.toLowerCase().includes(q) ||
-          d.author?.toLowerCase().includes(q)
+          d.title?.toLowerCase().includes(q) || d.id?.toLowerCase().includes(q) || d.author?.toLowerCase().includes(q)
       );
       renderDraftPickerRows(filtered);
     };

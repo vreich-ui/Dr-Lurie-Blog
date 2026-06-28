@@ -13,7 +13,7 @@ describe('slugifyTitle', () => {
     assert.strictEqual(slugifyTitle('Dr. Lurie! The Expert.'), 'dr-lurie-the-expert');
   });
 
-  it("strips apostrophes without inserting a gap", () => {
+  it('strips apostrophes without inserting a gap', () => {
     assert.strictEqual(slugifyTitle("Lurie's Guide"), 'luries-guide');
   });
 
@@ -61,17 +61,11 @@ describe('shortIdFromRequestId', () => {
 
 describe('generateArticlePath', () => {
   it('generates a clean path from the title', () => {
-    assert.strictEqual(
-      generateArticlePath('My Article'),
-      'src/data/post/my-article.md'
-    );
+    assert.strictEqual(generateArticlePath('My Article'), 'src/data/post/my-article.md');
   });
 
   it('does not include ID by default', () => {
-    assert.strictEqual(
-      generateArticlePath('My Article', 'abc-def-123'),
-      'src/data/post/my-article.md'
-    );
+    assert.strictEqual(generateArticlePath('My Article', 'abc-def-123'), 'src/data/post/my-article.md');
   });
 
   it('includes short ID when forceId is true', () => {
@@ -80,10 +74,7 @@ describe('generateArticlePath', () => {
   });
 
   it('skips ID suffix when requestId is empty and forceId is true', () => {
-    assert.strictEqual(
-      generateArticlePath('My Article', '', true),
-      'src/data/post/my-article.md'
-    );
+    assert.strictEqual(generateArticlePath('My Article', '', true), 'src/data/post/my-article.md');
   });
 
   it('handles a complex title correctly', () => {

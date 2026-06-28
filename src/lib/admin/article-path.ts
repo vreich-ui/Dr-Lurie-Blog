@@ -22,7 +22,10 @@ export function slugifyTitle(title: string): string {
 }
 
 export function shortIdFromRequestId(requestId: string): string {
-  return requestId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toLowerCase();
+  return requestId
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 8)
+    .toLowerCase();
 }
 
 /**
@@ -30,11 +33,7 @@ export function shortIdFromRequestId(requestId: string): string {
  * Pass `forceId = true` when the admin detects a slug collision to append
  * the request ID and guarantee uniqueness.
  */
-export function generateArticlePath(
-  title: string,
-  requestId = '',
-  forceId = false
-): string {
+export function generateArticlePath(title: string, requestId = '', forceId = false): string {
   const slug = slugifyTitle(title.trim());
   if (forceId && requestId) {
     const id = shortIdFromRequestId(requestId);
