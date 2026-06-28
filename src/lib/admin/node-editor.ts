@@ -162,7 +162,7 @@ function buildLinkPopover(editor: Editor, anchor: HTMLElement): HTMLElement {
 
 // ─── toolbar ─────────────────────────────────────────────────────────────────
 
-function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void, onCancel: () => void): HTMLElement {
+function buildToolbar(editor: Editor, node: ArticleBodyNode): HTMLElement {
   const bar = document.createElement('div');
   bar.className =
     'dl-editor-toolbar relative flex flex-wrap items-center gap-1 p-2 rounded-t-xl border border-b-0 border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-xs font-semibold';
@@ -230,30 +230,38 @@ function buildToolbar(editor: Editor, node: ArticleBodyNode, onSave: () => void,
       () => editor.isActive('link')
     );
     bar.append(linkBtn);
+  } else {
+    // Minimal label when no rich-text controls apply
+    const hint = document.createElement('span');
+    hint.className = 'text-muted opacity-60 pl-1';
+    hint.textContent = 'Plain text';
+    bar.append(hint);
   }
 
-  // Spacer
-  const spacer = document.createElement('span');
-  spacer.className = 'flex-1';
-  bar.append(spacer);
+  return bar;
+}
 
-  const saveBtn = document.createElement('button');
-  saveBtn.type = 'button';
-  saveBtn.textContent = 'Save';
-  saveBtn.className =
-    'px-3 py-0.5 rounded-full bg-accent text-white font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
-  saveBtn.addEventListener('click', onSave);
-  bar.append(saveBtn);
+function buildEditorFooter(onSave: () => void, onCancel: () => void): HTMLElement {
+  const footer = document.createElement('div');
+  footer.className =
+    'dl-editor-footer flex items-center justify-end gap-2 px-3 py-2 border border-t-0 rounded-b-xl border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800';
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.className =
-    'px-3 py-0.5 rounded-full border border-gray-300 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+    'px-3 py-1 rounded-full border border-gray-300 dark:border-slate-600 text-xs font-bold hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
   cancelBtn.addEventListener('click', onCancel);
-  bar.append(cancelBtn);
 
-  return bar;
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.textContent = 'Save block';
+  saveBtn.className =
+    'px-3 py-1 rounded-full bg-accent text-white text-xs font-bold hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
+  saveBtn.addEventListener('click', onSave);
+
+  footer.append(cancelBtn, saveBtn);
+  return footer;
 }
 
 // ─── extra inputs for action/CTA nodes ───────────────────────────────────────
@@ -345,13 +353,16 @@ export class NodeEditor {
       await config.onSave(fields);
     };
 
-    const toolbar = buildToolbar(this.editor, node, doSave, config.onCancel);
+    const toolbar = buildToolbar(this.editor, node);
+    const footer = buildEditorFooter(doSave, config.onCancel);
     this.container.append(toolbar, this.editorEl);
 
     if (isAction) {
       this.ctaFields = buildCtaFields(node);
       this.container.append(this.ctaFields.el);
     }
+
+    this.container.append(footer);
 
     // Hide the rendered preview and show the editor
     const renderedPreview = wrapper.querySelector(

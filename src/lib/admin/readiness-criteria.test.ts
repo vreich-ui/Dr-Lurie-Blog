@@ -17,7 +17,18 @@ const sourceNode = (items: string[] = []): ArticleBodyNode =>
     public: { title: 'Sources', items },
   });
 
-// ─── isValidSlug ──────────────────────────────────────────────────────────────
+const fullMetaInput = {
+  title: 'My Article',
+  excerpt: 'A short excerpt.',
+  author: 'Dr. Lurie',
+  publishDate: '2024-01-15',
+  articlePath: 'src/data/post/my-article.md',
+  seoDescription: 'SEO text here.',
+  category: 'Health',
+  tags: ['skin', 'care'],
+};
+
+// ─── isValidSlug (still exported for internal use) ────────────────────────────
 
 describe('isValidSlug', () => {
   it('accepts valid slugs', () => {
@@ -51,38 +62,77 @@ describe('evaluateReadiness', () => {
     assert.ok(ids.includes('safety'));
   });
 
-  it('marks title, excerpt, slug, and canonical record as missing when empty', () => {
-    const groups = evaluateReadiness({ title: '', excerpt: '', slug: '', canonicalSaved: false });
+  it('marks title, excerpt, author, date, path, and canonical record as missing when empty', () => {
+    const groups = evaluateReadiness({
+      title: '',
+      excerpt: '',
+      author: '',
+      publishDate: '',
+      articlePath: '',
+      canonicalSaved: false,
+    });
     const meta = groups.find((g) => g.id === 'metadata')!;
     assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_title')!.status, 'missing');
     assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_excerpt')!.status, 'missing');
-    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_slug')!.status, 'missing');
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_author')!.status, 'missing');
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_publish_date')!.status, 'missing');
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_article_path')!.status, 'missing');
 
     const safety = groups.find((g) => g.id === 'safety')!;
     assert.strictEqual(safety.criteria.find((c) => c.id === 'safety_saved')!.status, 'missing');
   });
 
-  it('marks all metadata complete when filled in', () => {
-    const groups = evaluateReadiness({
-      title: 'My Article',
-      excerpt: 'A short excerpt.',
-      slug: 'my-article',
-      seoDescription: 'SEO text here.',
-      category: 'Health',
-      tags: ['skin', 'care'],
-    });
+  it('marks all metadata complete when fully filled in', () => {
+    const groups = evaluateReadiness(fullMetaInput);
     const meta = groups.find((g) => g.id === 'metadata')!;
     for (const c of meta.criteria) {
       assert.ok(['complete', 'optional'].includes(c.status), `${c.id} should be complete/optional`);
     }
   });
 
-  it('warns on invalid slug format', () => {
-    const groups = evaluateReadiness({ slug: 'My Bad Slug' });
+  // ── author ────────────────────────────────────────────────────────────────
+
+  it('marks author as missing when not provided', () => {
+    const groups = evaluateReadiness({ author: '' });
     const meta = groups.find((g) => g.id === 'metadata')!;
-    const slugCriterion = meta.criteria.find((c) => c.id === 'meta_slug')!;
-    assert.strictEqual(slugCriterion.status, 'warning');
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_author')!.status, 'missing');
   });
+
+  it('marks author as complete when provided', () => {
+    const groups = evaluateReadiness({ author: 'Dr. Lurie' });
+    const meta = groups.find((g) => g.id === 'metadata')!;
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_author')!.status, 'complete');
+  });
+
+  // ── publish date ──────────────────────────────────────────────────────────
+
+  it('marks publish date as missing when not provided', () => {
+    const groups = evaluateReadiness({ publishDate: '' });
+    const meta = groups.find((g) => g.id === 'metadata')!;
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_publish_date')!.status, 'missing');
+  });
+
+  it('marks publish date as complete when provided', () => {
+    const groups = evaluateReadiness({ publishDate: '2024-01-15' });
+    const meta = groups.find((g) => g.id === 'metadata')!;
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_publish_date')!.status, 'complete');
+  });
+
+  // ── article path ──────────────────────────────────────────────────────────
+
+  it('marks article path as missing when not set', () => {
+    const groups = evaluateReadiness({ articlePath: '' });
+    const meta = groups.find((g) => g.id === 'metadata')!;
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_article_path')!.status, 'missing');
+  });
+
+  it('marks article path as complete when a path is present', () => {
+    const groups = evaluateReadiness({ articlePath: 'src/data/post/my-article.md' });
+    const meta = groups.find((g) => g.id === 'metadata')!;
+    assert.strictEqual(meta.criteria.find((c) => c.id === 'meta_article_path')!.status, 'complete');
+  });
+
+  // ── content ───────────────────────────────────────────────────────────────
 
   it('marks content body as missing when no nodes', () => {
     const groups = evaluateReadiness({ nodes: [] });
@@ -95,6 +145,8 @@ describe('evaluateReadiness', () => {
     const content = groups.find((g) => g.id === 'content')!;
     assert.strictEqual(content.criteria.find((c) => c.id === 'content_body')!.status, 'complete');
   });
+
+  // ── sources ───────────────────────────────────────────────────────────────
 
   it('detects source section', () => {
     const groups = evaluateReadiness({ nodes: [node('n_1'), sourceNode()] });
@@ -123,6 +175,8 @@ describe('evaluateReadiness', () => {
     }
   });
 
+  // ── media ─────────────────────────────────────────────────────────────────
+
   it('detects missing image alt text', () => {
     const imgNode = node('n_img', { public: { media: { type: 'image', src: 'image/abc/def.jpg', alt: '' } } });
     const groups = evaluateReadiness({ nodes: [node('n_1'), imgNode] });
@@ -139,6 +193,8 @@ describe('evaluateReadiness', () => {
     assert.strictEqual(media.criteria.find((c) => c.id === 'media_alt')!.status, 'complete');
   });
 
+  // ── editorial ─────────────────────────────────────────────────────────────
+
   it('warns on empty blocks', () => {
     const emptyNode = node('n_empty', { public: {} });
     const groups = evaluateReadiness({ nodes: [node('n_1'), emptyNode] });
@@ -152,6 +208,8 @@ describe('evaluateReadiness', () => {
     const editorial = groups.find((g) => g.id === 'editorial')!;
     assert.strictEqual(editorial.criteria.find((c) => c.id === 'editorial_placeholder')!.status, 'warning');
   });
+
+  // ── safety ────────────────────────────────────────────────────────────────
 
   it('shows lock as missing (blocking) when lock not held', () => {
     const groups = evaluateReadiness({ lockHeld: false });
@@ -176,15 +234,13 @@ describe('evaluateReadiness', () => {
 
 describe('readinessLevel', () => {
   it('returns missing when any criterion is missing', () => {
-    const groups = evaluateReadiness({ title: '', slug: '' });
+    const groups = evaluateReadiness({ title: '', excerpt: '' });
     assert.strictEqual(readinessLevel(groups), 'missing');
   });
 
   it('returns warning when all required but some warnings', () => {
     const groups = evaluateReadiness({
-      title: 'Title',
-      excerpt: 'Excerpt',
-      slug: 'my-slug',
+      ...fullMetaInput,
       lockHeld: true,
       canonicalSaved: true,
       nodes: [node('n_1')],
@@ -198,10 +254,7 @@ describe('readinessLevel', () => {
       public: { title: 'Section', body: 'This is the intro paragraph.' },
     });
     const groups = evaluateReadiness({
-      title: 'My Article',
-      excerpt: 'Short excerpt.',
-      slug: 'my-article',
-      seoDescription: 'SEO text.',
+      ...fullMetaInput,
       nodes: [readyNode],
       lockHeld: true,
       canonicalSaved: true,

@@ -25,7 +25,9 @@ export type ReadinessGroup = {
 export type ReadinessInput = {
   title?: string;
   excerpt?: string;
-  slug?: string;
+  author?: string;
+  publishDate?: string;
+  articlePath?: string;
   seoDescription?: string;
   category?: string;
   tags?: string[];
@@ -138,7 +140,9 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessGroup[] {
   const {
     title = '',
     excerpt = '',
-    slug = '',
+    author = '',
+    publishDate = '',
+    articlePath = '',
     seoDescription = '',
     category = '',
     tags = [],
@@ -170,18 +174,27 @@ export function evaluateReadiness(input: ReadinessInput): ReadinessGroup[] {
       weight: 8,
     });
 
-    const slugTrimmed = slug.trim();
-    const slugStatus: CriterionStatus = !slugTrimmed ? 'missing' : !isValidSlug(slugTrimmed) ? 'warning' : 'complete';
     criteria.push({
-      id: 'meta_slug',
-      label: 'Slug',
-      status: slugStatus,
-      message:
-        slugStatus === 'missing'
-          ? 'Slug is required before publishing.'
-          : slugStatus === 'warning'
-            ? 'Slug should be lowercase letters, numbers, and hyphens only.'
-            : '',
+      id: 'meta_author',
+      label: 'Author',
+      status: author.trim() ? 'complete' : 'missing',
+      message: author.trim() ? '' : 'Author is required before publishing.',
+      weight: 6,
+    });
+
+    criteria.push({
+      id: 'meta_publish_date',
+      label: 'Publish date',
+      status: publishDate.trim() ? 'complete' : 'missing',
+      message: publishDate.trim() ? '' : 'Publish date is required before publishing.',
+      weight: 6,
+    });
+
+    criteria.push({
+      id: 'meta_article_path',
+      label: 'Article path',
+      status: articlePath.trim() ? 'complete' : 'missing',
+      message: articlePath.trim() ? '' : 'Article path must be generated (enter a title first).',
       weight: 10,
     });
 
