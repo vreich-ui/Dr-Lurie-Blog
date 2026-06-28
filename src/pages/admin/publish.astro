@@ -42,7 +42,12 @@ const metadata = {
           <p id="load-status" class="load-status" aria-live="polite" hidden></p>
 
           <!-- ── Article header (title + excerpt) — hidden until draft loaded ── -->
-          <section id="article-header-card" class="admin-card article-header-card" aria-label="Article title and excerpt" hidden>
+          <section
+            id="article-header-card"
+            class="admin-card article-header-card"
+            aria-label="Article title and excerpt"
+            hidden
+          >
             <button
               id="btn-header-history"
               class="dl-icon-btn is-history article-header-history-btn"
@@ -88,7 +93,9 @@ const metadata = {
           <!-- ── Empty state (no draft loaded) ────────────── -->
           <div id="inspector-empty" class="inspector-empty-card">
             <p class="inspector-empty-label">No draft selected</p>
-            <button id="btn-open-draft-list-inspector" class="btn-secondary btn-xs" type="button">Open draft list</button>
+            <button id="btn-open-draft-list-inspector" class="btn-secondary btn-xs" type="button"
+              >Open draft list</button
+            >
           </div>
 
           <!-- ── Active content (shown once a draft loads) ──── -->
@@ -154,7 +161,8 @@ const metadata = {
                         hidden
                         role="listbox"
                         aria-label="Category suggestions"
-                      ></div>
+                      >
+                      </div>
                     </div>
                   </div>
                   <div class="field field-full">
@@ -174,7 +182,8 @@ const metadata = {
                         hidden
                         role="listbox"
                         aria-label="Tag suggestions"
-                      ></div>
+                      >
+                      </div>
                     </div>
                   </div>
                   <div class="field field-full">
@@ -217,8 +226,8 @@ const metadata = {
                     class="btn-link meta-undo-btn"
                     type="button"
                     hidden
-                    aria-label="Undo last metadata save"
-                  >Undo</button>
+                    aria-label="Undo last metadata save">Undo</button
+                  >
                 </div>
               </div>
             </section>
