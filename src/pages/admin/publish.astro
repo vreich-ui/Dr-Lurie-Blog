@@ -617,6 +617,8 @@ const metadata = {
     resize: none;
     overflow: hidden;
     display: block;
+    /* Ensure at least one line is visible before JS auto-resize runs */
+    min-height: 3rem;
   }
   .article-title-input:focus {
     outline: none;
@@ -1167,6 +1169,8 @@ const metadata = {
       el.style.height = 'auto';
       el.style.height = `${el.scrollHeight}px`;
     };
+    // Size on first paint (handles any pre-filled value; min-height CSS handles empty state)
+    autoResize(els.pubTitle);
 
     // ── Lock bar ──────────────────────────────────────────────────────────────
     const updateLockBar = (state: {
