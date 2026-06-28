@@ -212,8 +212,8 @@ export const handlePatchCanonicalInput = async (store: Store, body: AdminPatchBo
         action: 'patch_canonical_input',
         details: {
           path: 'input.publication.publish_payload',
-          old_value_summary: record.input.publication?.publish_payload !== undefined ? 'set' : '(none)',
-          new_value_summary: 'set',
+          previousPayload: record.input.publication?.publish_payload ?? null,
+          nextPayload: validatedPayload,
         },
       },
     ],

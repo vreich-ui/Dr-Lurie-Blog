@@ -210,11 +210,11 @@ export async function askAiForNode(options: AskAiOptions): Promise<AskAiResult> 
 
 /**
  * Contextual AI instruction input.
- * Desktop: fixed side panel at right edge — never covers the selected block.
+ * Desktop: fixed panel anchored to the right side of the target block.
  * Mobile: fixed bottom sheet with backdrop.
  */
 export function showInstructionPopover(
-  _nodeWrapper: HTMLElement,
+  nodeWrapper: HTMLElement,
   selectedText: string | undefined,
   onSubmit: (instruction: string) => void,
   onDismiss: () => void
@@ -256,22 +256,42 @@ export function showInstructionPopover(
       boxShadow: '0 -4px 24px rgb(15 23 42 / 18%)',
     });
   } else {
-    // Desktop: side panel anchored to the right viewport edge
+    // Desktop: panel anchored to the left of the target block, with the
+    // popover's bottom-right corner aligning to the block's top-left.
+    // Falls back gracefully when space is limited.
     Object.assign(popover.style, {
       position: 'fixed',
-      right: '1rem',
-      top: '50%',
-      transform: 'translateY(-50%)',
       zIndex: '50',
       width: 'min(22rem, calc(100vw - 2rem))',
       maxHeight: 'min(28rem, 70vh)',
       overflowY: 'auto',
       borderRadius: '1rem',
       padding: '1rem',
-      background: 'var(--tw-bg, white)',
-      border: '1px solid rgb(229 231 235)',
-      boxShadow: '0 8px 32px rgb(15 23 42 / 18%)',
     });
+
+    const reposition = () => {
+      const rect = nodeWrapper.getBoundingClientRect();
+      const panelW = Math.min(352, window.innerWidth - 16);
+      const panelH = Math.min(448, window.innerHeight * 0.7);
+
+      // Prefer left of the block (bottom-right of panel → top-left of block)
+      const idealLeft = rect.left - panelW - 12;
+      const idealTop = rect.top - panelH;
+
+      // Clamp so the panel stays within the viewport
+      const clampedLeft = Math.max(8, Math.min(idealLeft, window.innerWidth - panelW - 8));
+      const clampedTop = Math.max(8, Math.min(idealTop, window.innerHeight - panelH - 8));
+
+      popover.style.left = `${clampedLeft}px`;
+      popover.style.top = `${clampedTop}px`;
+    };
+
+    reposition();
+    window.addEventListener('scroll', reposition, { passive: true });
+    window.addEventListener('resize', reposition, { passive: true });
+
+    // Store so cleanUp can remove them
+    (popover as HTMLElement & { _reposition?: () => void })._reposition = reposition;
   }
 
   // Dark mode background
@@ -308,6 +328,11 @@ export function showInstructionPopover(
     'rounded-full border border-gray-300 dark:border-slate-600 font-bold px-4 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent';
 
   const cleanUp = () => {
+    const reposition = (popover as HTMLElement & { _reposition?: () => void })._reposition;
+    if (reposition) {
+      window.removeEventListener('scroll', reposition);
+      window.removeEventListener('resize', reposition);
+    }
     popover.remove();
     backdrop?.remove();
     document.removeEventListener('keydown', onEscape, true);

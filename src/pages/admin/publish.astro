@@ -1,4 +1,5 @@
 ---
+import { Icon } from 'astro-icon/components';
 import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
@@ -10,7 +11,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section class="admin-page mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-12" data-admin-shell hidden>
+  <section class="admin-page mx-auto max-w-[1280px] px-4 py-8 sm:px-6 sm:py-12" data-admin-shell hidden>
     <header class="admin-top-bar">
       <div>
         <p class="admin-kicker">Article Editor</p>
@@ -26,110 +27,270 @@ const metadata = {
     <div class="publish-workspace" data-auth-gated>
       <AdminNav activePath="/admin/publish" />
 
-      <!-- ── Lock status bar ─────────────────────────────────── -->
-      <div id="lock-bar" class="lock-bar" hidden>
-        <span id="lock-icon" aria-hidden="true"></span>
-        <span id="lock-label" class="lock-label"></span>
-        <button id="btn-force-release" class="btn-tertiary btn-xs" type="button" hidden>Force release</button>
-        <button id="btn-done-editing" class="btn-secondary btn-xs" type="button" hidden>Done editing</button>
-      </div>
-
-      <!-- ── No-draft state ──────────────────────────────────── -->
-      <div id="no-draft" class="admin-card text-center py-10" hidden>
-        <p class="text-lg font-bold mb-2">No draft selected</p>
-        <p class="text-sm text-muted mb-6">Open a draft from the list to start editing.</p>
-        <button id="btn-open-draft-list" class="btn-primary" type="button">Open draft list</button>
-      </div>
-
-      <!-- ── Loading state ──────────────────────────────────── -->
-      <p id="load-status" class="load-status" aria-live="polite" hidden></p>
-
-      <!-- ── Article workspace (shown once a draft is loaded) ── -->
-      <div id="article-workspace" hidden>
-        <!-- ── Metadata editor ──────────────────────────────── -->
-        <section id="meta-editor" class="admin-card meta-editor" aria-label="Article metadata">
-          <!-- Title -->
-          <div class="field">
-            <label for="pub-title" class="field-label">Title</label>
-            <input
-              id="pub-title"
-              name="title"
-              type="text"
-              class="article-title-input"
-              placeholder="Article title…"
-              autocomplete="off"
-            />
-            <p class="field-error" id="err-title" role="alert" hidden></p>
+      <!-- ── Article workspace — always rendered, children toggled by JS ── -->
+      <div id="article-workspace" class="publish-layout">
+        <!-- ── Left column: article content ──────────────────── -->
+        <div class="publish-main">
+          <!-- ── No-draft placeholder (visible until a draft is loaded) ──── -->
+          <div id="no-draft" class="no-draft-placeholder">
+            <p class="no-draft-heading">No draft selected</p>
+            <p class="no-draft-sub">Open a draft from the list to begin editing.</p>
+            <button id="btn-open-draft-list" class="btn-secondary btn-sm" type="button">Open draft list</button>
           </div>
 
-          <!-- Excerpt -->
-          <div class="field">
-            <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
-            <textarea
-              id="pub-excerpt"
-              name="excerpt"
-              rows="2"
-              maxlength="300"
-              class="article-excerpt-input"
-              placeholder="Short excerpt shown in listings…"></textarea>
-            <p class="field-error" id="err-excerpt" role="alert" hidden></p>
-          </div>
+          <!-- ── Loading state ────────────────────────────────── -->
+          <p id="load-status" class="load-status" aria-live="polite" hidden></p>
 
-          <!-- Compact metadata grid -->
-          <div class="meta-grid">
+          <!-- ── Article header (title + excerpt) — hidden until draft loaded ── -->
+          <section
+            id="article-header-card"
+            class="admin-card article-header-card"
+            aria-label="Article title and excerpt"
+            hidden
+          >
+            <button
+              id="btn-header-history"
+              class="dl-icon-btn is-history article-header-history-btn"
+              type="button"
+              aria-label="View title/excerpt save history"
+              title="Title & excerpt history"
+            >
+              <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+            </button>
             <div class="field">
-              <label for="pub-slug" class="field-label">Slug</label>
-              <input
-                id="pub-slug"
-                name="slug"
-                type="text"
+              <label for="pub-title" class="field-label">Title</label>
+              <textarea
+                id="pub-title"
+                name="title"
+                rows="2"
+                class="article-title-input"
+                placeholder="Article title…"
                 autocomplete="off"
-                placeholder="article-slug"
-                spellcheck="false"
-              />
-              <p class="field-error" id="err-slug" role="alert" hidden></p>
+                spellcheck="true"></textarea>
+              <p class="field-error" id="err-title" role="alert" hidden></p>
             </div>
             <div class="field">
-              <label for="pub-category" class="field-label">Category</label>
-              <input id="pub-category" name="category" type="text" autocomplete="off" />
+              <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
+              <textarea
+                id="pub-excerpt"
+                name="excerpt"
+                rows="2"
+                maxlength="300"
+                class="article-excerpt-input"
+                placeholder="Short excerpt shown in listings…"></textarea>
+              <p class="field-error" id="err-excerpt" role="alert" hidden></p>
             </div>
-            <div class="field">
-              <label for="pub-tags" class="field-label">Tags</label>
-              <input id="pub-tags" name="tags" type="text" autocomplete="off" placeholder="comma-separated" />
+          </section>
+
+          <!-- ── Article body (read mode + per-block editing) — hidden until draft loaded ── -->
+          <article id="article-view" class="article-view" hidden>
+            <div id="nodes-container" class="nodes-container editorial-prose"></div>
+          </article>
+        </div>
+
+        <!-- ── Right column: sticky inspector panel ─────────── -->
+        <aside id="inspector-panel" class="inspector-panel" aria-label="Article settings">
+          <!-- ── Empty state (no draft loaded) ────────────── -->
+          <div id="inspector-empty" class="inspector-empty-card">
+            <p class="inspector-empty-label">No draft selected</p>
+            <button id="btn-open-draft-list-inspector" class="btn-secondary btn-xs" type="button"
+              >Open draft list</button
+            >
+          </div>
+
+          <!-- ── Active content (shown once a draft loads) ──── -->
+          <div id="inspector-content" hidden>
+            <!-- ── Lock row ─────────────────────────────────── -->
+            <div id="lock-bar" class="lock-row" hidden>
+              <span id="lock-icon" class="lock-row-icon" aria-hidden="true"></span>
+              <span id="lock-label" class="lock-label"></span>
+              <button id="btn-force-release" class="btn-ghost-xs" type="button" hidden>Force release</button>
+              <button id="btn-done-editing" class="btn-ghost-xs" type="button" hidden>Done editing</button>
             </div>
-            <div class="field">
-              <label for="pub-seo" class="field-label"
-                >SEO description <span class="char-counter" id="seo-char-count"></span></label
+
+            <!-- ── General section (Author, Date, Category) ─── -->
+            <section id="general-editor" class="inspector-section" aria-label="General settings">
+              <div class="inspector-section-head">
+                <span class="inspector-section-title">
+                  General
+                  <span id="general-dirty-dot" class="dirty-indicator" hidden></span>
+                </span>
+                <div class="inspector-section-actions">
+                  <button id="btn-general-toggle" class="btn-ghost-xs" type="button">Edit</button>
+                </div>
+              </div>
+              <p id="general-summary" class="section-summary-text"></p>
+              <div id="general-form" class="meta-form" hidden>
+                <div class="setup-grid">
+                  <div class="field">
+                    <label for="pub-author" class="field-label">Author</label>
+                    <input id="pub-author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurie" />
+                  </div>
+                  <div class="field">
+                    <label for="pub-date" class="field-label">Publish date</label>
+                    <input id="pub-date" name="publishDate" type="date" />
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-category-input" class="field-label">Category</label>
+                    <div id="pub-category-container" class="tag-input-container is-single">
+                      <div id="pub-category-chips" class="tag-pills"></div>
+                      <input
+                        id="pub-category-input"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="Select or create…"
+                        class="tag-text-input"
+                      />
+                      <div
+                        id="pub-category-suggestions"
+                        class="tag-suggestions"
+                        hidden
+                        role="listbox"
+                        aria-label="Category suggestions"
+                      >
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── Metadata section (Tags, SEO, Path) ─────────── -->
+            <section id="meta-editor" class="inspector-section" aria-label="Metadata">
+              <div class="inspector-section-head">
+                <span class="inspector-section-title">
+                  Metadata
+                  <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
+                </span>
+                <div class="inspector-section-actions">
+                  <button id="btn-meta-toggle" class="btn-ghost-xs" type="button">Edit</button>
+                  <button
+                    id="btn-meta-history"
+                    class="btn-icon-xs dl-icon-btn is-history"
+                    type="button"
+                    aria-label="View metadata save history"
+                    title="Metadata history"
+                  >
+                    <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <p id="meta-summary" class="section-summary-text"></p>
+              <div id="meta-form" class="meta-form" hidden>
+                <div class="setup-grid">
+                  <div class="field field-full">
+                    <label for="pub-tags-input" class="field-label">Tags</label>
+                    <div id="pub-tags-container" class="tag-input-container">
+                      <div id="pub-tags-pills" class="tag-pills"></div>
+                      <input
+                        id="pub-tags-input"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="Add tag…"
+                        class="tag-text-input"
+                      />
+                      <div
+                        id="pub-tags-suggestions"
+                        class="tag-suggestions"
+                        hidden
+                        role="listbox"
+                        aria-label="Tag suggestions"
+                      >
+                      </div>
+                    </div>
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-seo" class="field-label">
+                      SEO description <span class="char-counter" id="seo-char-count"></span>
+                    </label>
+                    <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-article-path" class="field-label"
+                      >Article path <span class="field-label-hint">— generated</span></label
+                    >
+                    <div class="article-path-row">
+                      <input
+                        id="pub-article-path"
+                        name="articlePath"
+                        type="text"
+                        readonly
+                        class="article-path-field"
+                        tabindex="-1"
+                        aria-readonly="true"
+                        placeholder="Enter a title to generate path…"
+                      />
+                      <button
+                        id="btn-copy-path"
+                        class="btn-icon-xs"
+                        type="button"
+                        aria-label="Copy article path"
+                        title="Copy article path"
+                      >
+                        <Icon name="tabler:copy" class="icon-sm" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── Shared save row ────────────────────────────── -->
+            <div class="meta-save-row">
+              <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
+              <button
+                id="btn-meta-undo"
+                class="btn-link meta-undo-btn"
+                type="button"
+                hidden
+                aria-label="Undo last metadata save">Undo</button
               >
-              <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
+              <p id="meta-status" class="meta-status-inline" aria-live="polite"></p>
             </div>
-          </div>
 
-          <!-- Save metadata actions -->
-          <div class="meta-actions">
-            <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
-            <p id="meta-status" class="meta-status" aria-live="polite"></p>
-          </div>
-        </section>
-
-        <!-- ── Publish readiness panel ───────────────────────── -->
-        <section id="readiness-panel" class="admin-card readiness-panel" aria-label="Publish readiness">
-          <div class="readiness-header">
-            <h2 class="readiness-title">Publish readiness</h2>
-            <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
-            <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Mark as published</button>
-          </div>
-          <div id="readiness-groups" class="readiness-groups"></div>
-          <p id="publish-status" class="publish-status" aria-live="polite"></p>
-        </section>
-
-        <!-- ── Article body (read mode + per-block editing) ──── -->
-        <article id="article-view" class="article-view">
-          <div id="nodes-container" class="nodes-container editorial-prose"></div>
-        </article>
+            <!-- ── Readiness + publish ───────────────────────── -->
+            <div id="readiness-strip" class="readiness-strip">
+              <div class="readiness-strip-main">
+                <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
+                <button id="readiness-toggle" class="readiness-toggle btn-link" type="button" aria-expanded="false">
+                  Details
+                </button>
+              </div>
+              <div id="readiness-chips" class="readiness-chips"></div>
+              <div id="readiness-audit" class="readiness-audit" hidden>
+                <div id="readiness-groups" class="readiness-groups"></div>
+              </div>
+              <div class="inspector-publish-row">
+                <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Publish</button>
+                <p id="publish-status" class="publish-status" aria-live="polite"></p>
+              </div>
+            </div>
+          </div><!-- /inspector-content -->
+        </aside>
       </div><!-- /article-workspace -->
     </div>
   </section>
+
+  <!-- ── Icon templates (pre-rendered at build time, cloned by JS at runtime) ── -->
+  <div id="icon-templates" aria-hidden="true" style="display:none">
+    <span data-icon="pencil"><Icon name="tabler:pencil" aria-hidden="true" /></span>
+    <span data-icon="sparkles"><Icon name="tabler:sparkles" aria-hidden="true" /></span>
+    <span data-icon="history"><Icon name="tabler:history" aria-hidden="true" /></span>
+    <span data-icon="bold"><Icon name="tabler:bold" aria-hidden="true" /></span>
+    <span data-icon="italic"><Icon name="tabler:italic" aria-hidden="true" /></span>
+    <span data-icon="h-2"><Icon name="tabler:h-2" aria-hidden="true" /></span>
+    <span data-icon="h-3"><Icon name="tabler:h-3" aria-hidden="true" /></span>
+    <span data-icon="link"><Icon name="tabler:link" aria-hidden="true" /></span>
+    <span data-icon="list"><Icon name="tabler:list" aria-hidden="true" /></span>
+    <span data-icon="list-numbers"><Icon name="tabler:list-numbers" aria-hidden="true" /></span>
+    <span data-icon="arrow-back-up"><Icon name="tabler:arrow-back-up" aria-hidden="true" /></span>
+    <span data-icon="arrow-forward-up"><Icon name="tabler:arrow-forward-up" aria-hidden="true" /></span>
+    <span data-icon="rotate-clockwise"><Icon name="tabler:rotate-clockwise" aria-hidden="true" /></span>
+    <span data-icon="x"><Icon name="tabler:x" aria-hidden="true" /></span>
+    <span data-icon="copy"><Icon name="tabler:copy" aria-hidden="true" /></span>
+    <span data-icon="lock"><Icon name="tabler:lock" aria-hidden="true" /></span>
+    <span data-icon="lock-open"><Icon name="tabler:lock-open" aria-hidden="true" /></span>
+  </div>
 
   <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
   <div id="draft-picker-modal" class="modal-backdrop" aria-hidden="true">
@@ -144,7 +305,7 @@ const metadata = {
           id="draft-picker-search"
           type="search"
           class="modal-search"
-          placeholder="Filter by title, slug, author, or ID…"
+          placeholder="Filter by title, author, or ID…"
           autocomplete="off"
         />
         <button id="btn-modal-refresh" class="btn-secondary btn-sm" type="button">Refresh</button>
@@ -207,39 +368,87 @@ const metadata = {
   .publish-workspace {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
   }
 
-  /* Lock bar */
-  .lock-bar {
+  /* Inspector content — flex column so children stack with gaps */
+  #inspector-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  /* Section summary — single-line compact text */
+  .section-summary-text {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--aw-color-text-default);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  .section-summary-text.is-empty {
+    color: var(--aw-color-text-muted);
+    font-style: italic;
+  }
+
+  /* Shared save row below both inspector sections */
+  .meta-save-row {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.75rem;
-    background: rgb(245 158 11 / 8%);
-    border: 1px solid rgb(245 158 11 / 30%);
-    font-size: 0.85rem;
-    font-weight: 700;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
-  .lock-bar[data-locked-by-agent] {
-    background: rgb(239 68 68 / 6%);
+
+  /* Lock row — slim one-liner */
+  .lock-row {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(229 231 235);
+    background: transparent;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--aw-color-text-muted);
+  }
+  :global(.dark) .lock-row {
+    border-color: rgb(51 65 85);
+  }
+  .lock-row[data-locked-by-agent] {
     border-color: rgb(239 68 68 / 30%);
     color: rgb(185 28 28);
+    background: rgb(239 68 68 / 4%);
   }
-  :global(.dark) .lock-bar[data-locked-by-agent] {
+  :global(.dark) .lock-row[data-locked-by-agent] {
     color: rgb(252 165 165);
   }
-  .lock-bar[data-held] {
-    background: rgb(16 185 129 / 6%);
-    border-color: rgb(16 185 129 / 30%);
+  .lock-row[data-held] {
+    border-color: rgb(16 185 129 / 35%);
     color: rgb(6 95 70);
+    background: rgb(16 185 129 / 4%);
   }
-  :global(.dark) .lock-bar[data-held] {
+  :global(.dark) .lock-row[data-held] {
     color: rgb(110 231 183);
+  }
+  .lock-row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    opacity: 0.75;
   }
   .lock-label {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Load status */
@@ -250,7 +459,7 @@ const metadata = {
     font-weight: 700;
   }
 
-  /* Admin card */
+  /* ── Admin card base ────────────────────────────────────────────────────────── */
   .admin-card {
     border: 1px solid rgb(229 231 235);
     border-radius: 1.25rem;
@@ -263,29 +472,265 @@ const metadata = {
     background: rgb(15 23 42 / 0.7);
   }
 
-  /* ── Metadata editor ──────────────────────────────────────────────────────── */
-  .meta-editor {
+  /* ── Inspector section (replaces admin-setup-module for the inspector panel) ── */
+  .inspector-section {
+    border: 1px solid rgb(229 231 235 / 80%);
+    border-radius: 0.75rem;
+    background: rgb(249 250 251 / 0.7);
+    padding: 0.6rem 0.7rem 0.7rem;
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: 0.5rem;
+  }
+  :global(.dark) .inspector-section {
+    border-color: rgb(30 41 59 / 70%);
+    background: rgb(15 23 42 / 0.35);
   }
 
+  .inspector-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    min-height: 1.6rem;
+  }
+
+  .inspector-section-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--aw-color-text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .inspector-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  /* Collapsed form wrapper */
+  .meta-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Inline status next to section title actions */
+  .meta-status-inline {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--aw-color-text-muted);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 6rem;
+  }
+  .meta-status-inline.is-error {
+    color: rgb(239 68 68);
+  }
+  .meta-status-inline.is-ok {
+    color: rgb(22 163 74);
+  }
+
+  /* Dirty-state dot */
+  .dirty-indicator {
+    display: inline-block;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: rgb(245 158 11);
+    flex-shrink: 0;
+  }
+
+  /* ── Small button variants for inspector actions ───────────────────────────── */
+  .btn-ghost-xs {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+  .btn-ghost-xs:hover {
+    background: rgb(229 231 235 / 50%);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dark) .btn-ghost-xs {
+    border-color: rgb(51 65 85);
+  }
+  :global(.dark) .btn-ghost-xs:hover {
+    background: rgb(51 65 85 / 50%);
+  }
+
+  .btn-icon-xs {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .btn-icon-xs:hover {
+    background: rgb(209 213 219 / 40%);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dark) .btn-icon-xs {
+    border-color: rgb(51 65 85);
+  }
+  :global(.dark) .btn-icon-xs:hover {
+    background: rgb(51 65 85 / 50%);
+  }
+
+  /* ── No-draft placeholder (left column) ────────────────────────────────────── */
+  .no-draft-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 35vh;
+    text-align: center;
+    gap: 0.4rem;
+    padding: 2rem;
+  }
+  .no-draft-heading {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+  }
+  .no-draft-sub {
+    font-size: 0.85rem;
+    color: var(--aw-color-text-muted);
+    margin: 0 0 0.75rem;
+  }
+
+  /* ── Inspector empty state card ─────────────────────────────────────────────── */
+  .inspector-empty-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    background: rgb(249 250 251 / 0.7);
+    padding: 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    text-align: center;
+  }
+  :global(.dark) .inspector-empty-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.35);
+  }
+  .inspector-empty-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--aw-color-text-muted);
+    margin: 0;
+  }
+
+  /* ── Article path row (field + copy button) ─────────────────────────────────── */
+  .article-path-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .article-path-row .article-path-field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Admin setup module (kept for any other uses) ──────────────────────────── */
+  .admin-setup-module {
+    border: 1px solid rgb(229 231 235 / 80%);
+    border-radius: 1rem;
+    background: rgb(249 250 251 / 0.7);
+    padding: 0.9rem 1.1rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+  :global(.dark) .admin-setup-module {
+    border-color: rgb(30 41 59 / 70%);
+    background: rgb(15 23 42 / 0.35);
+  }
+
+  .setup-module-label {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--aw-color-text-muted);
+    opacity: 0.7;
+  }
+
+  .setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem 0.75rem;
+  }
+  .field-full {
+    grid-column: 1 / -1;
+  }
+  /* Inspector is always narrow — collapse to 1-col within it */
+  .inspector-section .setup-grid,
+  .inspector-panel .setup-grid {
+    grid-template-columns: 1fr;
+  }
+  .inspector-section .field-full,
+  .inspector-panel .field-full {
+    grid-column: 1;
+  }
+  @media (max-width: 540px) {
+    .setup-grid {
+      grid-template-columns: 1fr;
+    }
+    .field-full {
+      grid-column: 1;
+    }
+  }
+
+  /* ── Fields ─────────────────────────────────────────────────────────────────── */
   .field {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .field-label {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     font-weight: 700;
     color: var(--aw-color-text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
 
+  .field-label-hint {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.68rem;
+    opacity: 0.7;
+  }
+
   .char-counter {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 400;
     color: var(--aw-color-text-muted);
     letter-spacing: 0;
@@ -303,87 +748,63 @@ const metadata = {
     color: rgb(252 165 165);
   }
 
-  /* Title styled as article title visually */
-  .article-title-input {
-    font-family: var(--aw-font-heading, inherit);
-    font-size: clamp(1.5rem, 4vw, 2.2rem);
-    font-weight: 800;
-    line-height: 1.1;
-    border: none;
-    border-bottom: 2px solid transparent;
-    background: transparent;
-    color: var(--aw-color-text-heading);
-    padding: 0.15rem 0;
-    width: 100%;
-  }
-  .article-title-input:focus {
-    outline: none;
-    border-bottom-color: var(--aw-color-accent);
-  }
-  .article-title-input::placeholder {
-    color: var(--aw-color-text-muted);
-    font-weight: 400;
-    font-size: 1.5rem;
-  }
-
-  /* Excerpt styled as article excerpt */
-  .article-excerpt-input {
-    font-size: 0.95rem;
-    font-style: italic;
-    color: var(--aw-color-text-muted);
-    border: none;
-    border-bottom: 1px solid transparent;
-    background: transparent;
-    padding: 0.15rem 0;
-    width: 100%;
-    resize: none;
-    line-height: 1.5;
-  }
-  .article-excerpt-input:focus {
-    outline: none;
-    border-bottom-color: var(--aw-color-accent);
-  }
-  .article-excerpt-input::placeholder {
-    color: var(--aw-color-text-muted);
-    opacity: 0.6;
-  }
-
-  .meta-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-  }
-  @media (max-width: 600px) {
-    .meta-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .meta-editor input:not(.article-title-input),
-  .meta-editor textarea:not(.article-excerpt-input) {
+  /* Setup module inputs — consistent compact style */
+  .admin-setup-module input:not(.article-path-field),
+  .admin-setup-module input[type='date'],
+  .inspector-section input:not(.article-path-field),
+  .inspector-section input[type='date'] {
     border: 1px solid rgb(209 213 219);
-    border-radius: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    font-size: 0.88rem;
+    border-radius: 0.4rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.82rem;
     background: white;
     color: inherit;
     width: 100%;
+    line-height: 1.4;
   }
-  :global(.dark) .meta-editor input:not(.article-title-input),
-  :global(.dark) .meta-editor textarea:not(.article-excerpt-input) {
+  .admin-setup-module input:focus,
+  .inspector-section input:focus {
+    outline: none;
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 2px rgb(94 140 138 / 15%);
+  }
+  :global(.dark) .admin-setup-module input:not(.article-path-field),
+  :global(.dark) .admin-setup-module input[type='date'],
+  :global(.dark) .inspector-section input:not(.article-path-field),
+  :global(.dark) .inspector-section input[type='date'] {
     border-color: rgb(51 65 85);
     background: rgb(15 23 42 / 0.5);
+  }
+
+  /* Generated article path — read-only, monospace, greyed */
+  .article-path-field {
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.4rem;
+    padding: 0.35rem 0.55rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    background: rgb(248 250 252);
+    color: var(--aw-color-text-muted);
+    cursor: default;
+    width: 100%;
+    user-select: all;
+  }
+  :global(.dark) .article-path-field {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.3);
+    color: rgb(100 116 139);
   }
 
   .meta-actions {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
+    margin-top: 0.1rem;
   }
 
   .meta-status {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     font-weight: 700;
     color: var(--aw-color-text-muted);
     min-height: 1.2em;
@@ -395,24 +816,70 @@ const metadata = {
     color: rgb(22 163 74);
   }
 
-  /* ── Readiness panel ──────────────────────────────────────────────────────── */
-  .readiness-panel {
-    padding: 1.25rem 1.5rem;
+  /* ── "+N more" chip for readiness ──────────────────────────────────────────── */
+  :global(.readiness-chip-more) {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    line-height: 1.3;
+  }
+  :global(.readiness-chip-more:hover) {
+    background: rgb(209 213 219 / 35%);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dark) :global(.readiness-chip-more) {
+    border-color: rgb(51 65 85);
   }
 
-  .readiness-header {
+  /* ── Readiness strip ─────────────────────────────────────────────────────────── */
+  .readiness-strip {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.9rem;
+    background: transparent;
+    font-size: 0.83rem;
+  }
+  :global(.dark) .readiness-strip {
+    border-color: rgb(30 41 59);
+  }
+
+  .readiness-strip-main {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: 0.6rem;
     flex-wrap: wrap;
   }
 
-  .readiness-title {
-    font-size: 0.9rem;
-    font-weight: 800;
-    margin: 0;
-    flex: none;
+  .readiness-toggle {
+    font-size: 0.73rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    line-height: 1;
+  }
+  .readiness-toggle:hover {
+    color: var(--aw-color-text-default);
+  }
+
+  .readiness-audit {
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid rgb(229 231 235);
+  }
+  :global(.dark) .readiness-audit {
+    border-top-color: rgb(30 41 59);
   }
 
   .readiness-pill {
@@ -420,9 +887,8 @@ const metadata = {
     align-items: center;
     border-radius: 999px;
     padding: 0.15rem 0.65rem;
-    font-size: 0.73rem;
+    font-size: 0.7rem;
     font-weight: 900;
-    flex: 1;
   }
   .readiness-pill.is-missing {
     background: rgb(239 68 68 / 10%);
@@ -449,17 +915,17 @@ const metadata = {
   .readiness-groups {
     display: flex;
     flex-direction: column;
-    gap: 0.65rem;
+    gap: 0.5rem;
   }
 
   :global(.readiness-group) {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
+    gap: 0.2rem;
   }
 
   :global(.readiness-group-label) {
-    font-size: 0.73rem;
+    font-size: 0.68rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -470,7 +936,7 @@ const metadata = {
   :global(.readiness-criteria-list) {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0.05rem;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -479,16 +945,16 @@ const metadata = {
   :global(.readiness-criterion) {
     display: flex;
     align-items: baseline;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    line-height: 1.5;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    line-height: 1.4;
   }
 
   :global(.criterion-pill) {
     flex-shrink: 0;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 900;
-    width: 1.1em;
+    width: 1em;
     text-align: center;
   }
   :global(.criterion-pill.complete) {
@@ -509,23 +975,83 @@ const metadata = {
   }
   :global(.criterion-message) {
     color: var(--aw-color-text-muted);
-    font-size: 0.78rem;
+    font-size: 0.73rem;
   }
   :global(.criterion-message::before) {
     content: '— ';
   }
 
   .publish-status {
-    min-height: 1.4em;
-    font-size: 0.85rem;
+    min-height: 1.2em;
+    font-size: 0.82rem;
     font-weight: 700;
-    margin-top: 0.5rem;
+    margin-top: 0.4rem;
   }
   .publish-status.is-error {
     color: rgb(220 38 38);
   }
   .publish-status.is-ok {
     color: rgb(22 163 74);
+  }
+
+  /* ── Article header card (title + excerpt) ───────────────────────────────────── */
+  .article-header-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.5rem 1.75rem;
+  }
+
+  /* Title: textarea with article-heading visual style */
+  .article-title-input {
+    font-family: var(--aw-font-heading, inherit);
+    font-size: clamp(1.5rem, 4vw, 2.2rem);
+    font-weight: 800;
+    line-height: 1.2;
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--aw-color-text-heading);
+    padding: 0.1rem 0;
+    width: 100%;
+    resize: none;
+    overflow: hidden;
+    display: block;
+    /* Ensure at least one line is visible before JS auto-resize runs */
+    min-height: 3rem;
+  }
+  .article-title-input:focus {
+    outline: none;
+    border-bottom-color: var(--aw-color-accent);
+  }
+  .article-title-input::placeholder {
+    color: var(--aw-color-text-muted);
+    font-weight: 400;
+    font-size: 1.5rem;
+    opacity: 0.55;
+  }
+
+  /* Excerpt styled as article deck */
+  .article-excerpt-input {
+    font-size: 0.95rem;
+    font-style: italic;
+    color: var(--aw-color-text-muted);
+    border: none;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    padding: 0.1rem 0;
+    width: 100%;
+    resize: none;
+    line-height: 1.55;
+  }
+  .article-excerpt-input:focus {
+    outline: none;
+    border-bottom-color: var(--aw-color-accent);
+  }
+  .article-excerpt-input::placeholder {
+    color: var(--aw-color-text-muted);
+    opacity: 0.55;
   }
 
   /* ── Article body ─────────────────────────────────────────────────────────── */
@@ -548,19 +1074,260 @@ const metadata = {
     transition: box-shadow 0.15s;
   }
   :global(.dl-node-wrapper:hover) {
-    box-shadow: 0 0 0 2px rgb(94 140 138 / 30%);
+    box-shadow: 0 0 0 2px rgb(94 140 138 / 25%);
   }
   :global(.dl-node-wrapper[data-editing]) {
-    box-shadow: 0 0 0 2px var(--aw-color-accent);
+    box-shadow: 0 0 0 2px rgb(220 38 38 / 55%);
   }
 
-  /* Node toolbar */
-  :global(.dl-node-toolbar) {
+  /* Icon helpers */
+  .icon-sm {
+    width: 1em;
+    height: 1em;
+    display: block;
+  }
+
+  /* Module label row (label + history icon) — legacy, kept for any other modules */
+  .module-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  /* Icon-only buttons (dl-icon-btn): history / future actions */
+  :global(.dl-icon-btn) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    color: var(--aw-color-text-muted, #6b7280);
+    cursor: pointer;
+    transition:
+      background 0.1s,
+      border-color 0.1s,
+      color 0.1s;
+    flex-shrink: 0;
+  }
+  :global(.dl-icon-btn:hover) {
+    background: rgb(209 213 219 / 40%);
+    border-color: rgb(156 163 175);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dl-icon-btn.is-history:hover) {
+    background: rgb(59 130 246 / 10%);
+    border-color: rgb(59 130 246 / 50%);
+    color: rgb(37 99 235);
+  }
+  :global(.dark) :global(.dl-icon-btn.is-history:hover) {
+    color: rgb(147 197 253);
+  }
+
+  /* History icon button flush to top-right of article-header-card */
+  .article-header-history-btn {
     position: absolute;
     top: 0.5rem;
     right: 0.5rem;
+  }
+
+  /* Meta undo button */
+  .meta-undo-btn {
+    font-size: 0.75rem;
+    padding: 0;
+    margin-left: 0.5rem;
+    text-decoration: underline;
+    color: var(--aw-color-text-muted, #6b7280);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .meta-undo-btn:hover {
+    color: var(--aw-color-text-heading);
+  }
+
+  /* Persistent node badge — always visible at bottom-left of each block */
+  :global(.dl-node-badge) {
+    position: absolute;
+    bottom: 0.3rem;
+    left: 0.4rem;
     display: flex;
-    gap: 0.3rem;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    color: var(--aw-color-text-muted, #6b7280);
+    opacity: 0;
+    transition: opacity 0.15s;
+    pointer-events: none;
+    z-index: 5;
+    line-height: 1;
+  }
+  :global(.dl-node-wrapper:hover .dl-node-badge),
+  :global(.dl-node-wrapper[data-editing] .dl-node-badge),
+  :global(.dl-node-badge.has-saved) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  :global(.dl-node-badge-saved) {
+    display: none;
+    color: rgb(22 163 74);
+    font-family: inherit;
+  }
+  :global(.dl-node-badge.has-saved .dl-node-badge-saved) {
+    display: inline;
+  }
+  :global(.dl-node-badge-undo) {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    padding: 0 0.1rem;
+    font-size: inherit;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--aw-color-text-muted, #6b7280);
+    width: 1.1em;
+    height: 1.1em;
+  }
+  :global(.dl-node-badge.has-saved .dl-node-badge-undo) {
+    display: inline-flex;
+  }
+  :global(.dl-node-badge-undo:hover) {
+    color: var(--aw-color-text-heading);
+  }
+
+  /* Lock state — another agent holds the lock: visually disable all edit controls */
+  :global(#article-workspace[data-lock='agent'] .dl-node-btn),
+  :global(#article-workspace[data-lock='agent'] #btn-save-meta),
+  :global(#article-workspace[data-lock='agent'] #btn-meta-undo),
+  :global(#article-workspace[data-lock='agent'] .dl-node-badge-undo),
+  :global(#article-workspace[data-lock='agent'] .dl-history-restore) {
+    pointer-events: none !important;
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+  }
+
+  /* Mutual exclusivity — manual editor open: disable AI on all blocks */
+  :global(#nodes-container[data-mode='editing'] .dl-node-btn.is-ai) {
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* Mutual exclusivity — AI open: disable edit/ai on all blocks */
+  :global(#nodes-container[data-mode='ai'] .dl-node-btn:not(.is-history)) {
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* History button disabled state */
+  :global(.dl-node-btn.is-history:disabled),
+  :global(.dl-icon-btn.is-history:disabled) {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+
+  /* History popover */
+  :global(.dl-history-popover) {
+    position: absolute;
+    z-index: 60;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    min-width: 18rem;
+    max-width: min(24rem, calc(100vw - 2rem));
+    background: rgb(255 255 255);
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.875rem;
+    box-shadow:
+      0 4px 24px rgb(0 0 0 / 10%),
+      0 1px 4px rgb(0 0 0 / 6%);
+    overflow: hidden;
+  }
+  :global(.dark) :global(.dl-history-popover) {
+    background: rgb(15 23 42);
+    border-color: rgb(30 41 59);
+  }
+  :global(.dl-history-popover-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem 0.5rem;
+    border-bottom: 1px solid rgb(229 231 235);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  :global(.dark) :global(.dl-history-popover-header) {
+    border-color: rgb(30 41 59);
+  }
+  :global(.dl-history-popover-close) {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    color: inherit;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.25rem;
+  }
+  :global(.dl-history-popover-close:hover) {
+    background: rgb(229 231 235 / 60%);
+  }
+  :global(.dl-history-entry) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgb(229 231 235 / 60%);
+    font-size: 0.75rem;
+  }
+  :global(.dark) :global(.dl-history-entry) {
+    border-color: rgb(30 41 59 / 60%);
+  }
+  :global(.dl-history-entry:last-child) {
+    border-bottom: none;
+  }
+  :global(.dl-history-time) {
+    color: var(--aw-color-text-muted, #6b7280);
+    font-size: 0.68rem;
+  }
+  :global(.dl-history-restore) {
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: var(--aw-color-accent);
+    text-align: left;
+  }
+  :global(.dl-history-restore:disabled) {
+    color: var(--aw-color-text-muted, #6b7280);
+    cursor: default;
+    opacity: 0.6;
+  }
+  :global(.dl-history-empty) {
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--aw-color-text-muted, #6b7280);
+    text-align: center;
+  }
+
+  /* Node toolbar — pill-shaped, site-styled */
+  :global(.dl-node-toolbar) {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    display: flex;
+    gap: 0.25rem;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s;
@@ -574,28 +1341,68 @@ const metadata = {
   :global(.dl-node-btn) {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
+    gap: 0.2rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
     border: 1px solid rgb(209 213 219);
-    background: rgb(255 255 255 / 0.9);
-    font-size: 0.85rem;
+    background: rgb(255 255 255 / 0.97);
+    color: var(--aw-color-text-heading);
+    font-size: 0.72rem;
+    font-weight: 700;
     cursor: pointer;
-    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
-    transition: background 0.1s;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+    transition:
+      background 0.1s,
+      border-color 0.1s,
+      color 0.1s;
+    line-height: 1.2;
+    white-space: nowrap;
   }
   :global(.dark) :global(.dl-node-btn) {
-    background: rgb(30 41 59 / 0.9);
+    background: rgb(30 41 59 / 0.97);
     border-color: rgb(51 65 85);
+    color: inherit;
   }
   :global(.dl-node-btn:hover) {
-    background: var(--aw-color-accent);
-    color: white;
-    border-color: transparent;
+    background: rgb(94 140 138 / 12%);
+    border-color: rgb(94 140 138 / 50%);
   }
-  :global(.dl-node-btn[title='Ask AI']:hover) {
-    background: rgb(124 58 237);
+  :global(.dl-node-btn.is-ai:hover) {
+    background: rgb(124 58 237 / 10%);
+    border-color: rgb(124 58 237 / 45%);
+    color: rgb(109 40 217);
+  }
+  :global(.dark) :global(.dl-node-btn.is-ai:hover) {
+    color: rgb(192 132 252);
+  }
+  :global(.dl-node-btn.is-history:hover) {
+    background: rgb(59 130 246 / 10%);
+    border-color: rgb(59 130 246 / 45%);
+    color: rgb(37 99 235);
+  }
+  :global(.dark) :global(.dl-node-btn.is-history:hover) {
+    color: rgb(147 197 253);
+  }
+  :global(.dl-node-btn.is-cancel) {
+    color: rgb(220 38 38);
+    border-color: rgb(220 38 38 / 40%);
+  }
+  :global(.dl-node-btn.is-cancel:hover) {
+    background: rgb(220 38 38 / 10%);
+    border-color: rgb(220 38 38 / 55%);
+  }
+  :global(.dark) :global(.dl-node-btn.is-cancel) {
+    color: rgb(248 113 113);
+  }
+
+  /* Active state for icon toolbar buttons */
+  :global(.dl-editor-toolbar button.is-active) {
+    background: rgb(209 213 219 / 70%);
+    color: rgb(17 24 39);
+  }
+  :global(.dark) :global(.dl-editor-toolbar button.is-active) {
+    background: rgb(51 65 85);
+    color: rgb(248 250 252);
   }
 
   /* TipTap editor chrome */
@@ -656,6 +1463,13 @@ const metadata = {
     background: transparent;
     font-size: 0.8rem;
   }
+  .btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    line-height: inherit;
+  }
   .btn-sm {
     padding: 0.45rem 0.9rem;
     font-size: 0.85rem;
@@ -692,6 +1506,209 @@ const metadata = {
   }
   .mb-6 {
     margin-bottom: 1.5rem;
+  }
+
+  /* ── Two-column workspace layout ───────────────────────────────────────── */
+  .publish-layout {
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .publish-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .inspector-panel {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    scrollbar-width: thin;
+  }
+
+  .inspector-publish-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 1023px) {
+    .publish-layout {
+      display: flex;
+      flex-direction: column-reverse;
+    }
+    .inspector-panel {
+      position: static;
+      max-height: none;
+    }
+  }
+
+  /* ── Tag / category pill inputs ─────────────────────────────────────────── */
+  .tag-input-container {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.4rem;
+    padding: 0.25rem 0.4rem;
+    background: white;
+    cursor: text;
+    min-height: 2.1rem;
+  }
+  .tag-input-container:focus-within {
+    outline: none;
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 2px rgb(94 140 138 / 15%);
+  }
+  :global(.dark) .tag-input-container {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42 / 0.5);
+  }
+
+  .tag-pills {
+    display: contents;
+  }
+
+  :global(.tag-pill) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: rgb(94 140 138 / 14%);
+    border: 1px solid rgb(94 140 138 / 28%);
+    border-radius: 999px;
+    padding: 0.1rem 0.35rem 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--aw-color-text-heading);
+    white-space: nowrap;
+  }
+  :global(.dark) :global(.tag-pill) {
+    background: rgb(94 140 138 / 18%);
+    border-color: rgb(94 140 138 / 35%);
+  }
+
+  :global(.tag-pill-remove) {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--aw-color-text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 50%;
+  }
+  :global(.tag-pill-remove:hover) {
+    color: rgb(220 38 38);
+  }
+
+  .tag-text-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.83rem;
+    flex: 1;
+    min-width: 4rem;
+    padding: 0.1rem 0.15rem;
+    color: inherit;
+  }
+  .tag-text-input::placeholder {
+    color: var(--aw-color-text-muted);
+    opacity: 0.6;
+  }
+
+  .tag-suggestions {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: white;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.4rem;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+    max-height: 11rem;
+    overflow-y: auto;
+  }
+  :global(.dark) .tag-suggestions {
+    background: rgb(15 23 42);
+    border-color: rgb(51 65 85);
+  }
+
+  :global(.tag-suggestion-item) {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  :global(.tag-suggestion-item:hover),
+  :global(.tag-suggestion-item[aria-selected='true']) {
+    background: rgb(94 140 138 / 12%);
+  }
+
+  /* ── Compact readiness chips ────────────────────────────────────────────── */
+  .readiness-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+  }
+
+  :global(.readiness-chip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: default;
+    line-height: 1.3;
+  }
+  :global(.readiness-chip.complete) {
+    background: rgb(34 197 94 / 10%);
+    color: rgb(22 101 52);
+    border-color: rgb(34 197 94 / 25%);
+  }
+  :global(.dark) :global(.readiness-chip.complete) {
+    color: rgb(187 247 208);
+  }
+  :global(.readiness-chip.missing) {
+    background: rgb(239 68 68 / 10%);
+    color: rgb(185 28 28);
+    border-color: rgb(239 68 68 / 25%);
+  }
+  :global(.dark) :global(.readiness-chip.missing) {
+    color: rgb(252 165 165);
+  }
+  :global(.readiness-chip.warning) {
+    background: rgb(245 158 11 / 10%);
+    color: rgb(146 64 14);
+    border-color: rgb(245 158 11 / 25%);
+  }
+  :global(.dark) :global(.readiness-chip.warning) {
+    color: rgb(253 230 138);
+  }
+  :global(.readiness-chip.optional) {
+    background: rgb(100 116 139 / 8%);
+    color: var(--aw-color-text-muted);
+    border-color: rgb(100 116 139 / 20%);
   }
 
   /* ── Draft picker modal ────────────────────────────────────────────────── */
@@ -898,7 +1915,8 @@ const metadata = {
   import { renderNode, wrapNode } from '~/lib/admin/node-renderer';
   import { NodeEditor } from '~/lib/admin/node-editor';
   import { askAiForNode, renderSuggestionOverlay, showInstructionPopover } from '~/lib/admin/ai-suggestion';
-  import { evaluateReadiness, readinessLevel, isValidSlug } from '~/lib/admin/readiness-criteria';
+  import { evaluateReadiness, readinessLevel } from '~/lib/admin/readiness-criteria';
+  import { generateArticlePath } from '~/lib/admin/article-path';
   import type { ArticleBodyNode } from '~/schema/article-content-v1';
   import type { ReadinessGroup } from '~/lib/admin/readiness-criteria';
 
@@ -907,6 +1925,7 @@ const metadata = {
   const UPDATE_NODE_ENDPOINT = '/.netlify/functions/admin-update-node';
   const LIST_DRAFTS_ENDPOINT = '/.netlify/functions/admin-list-json-drafts';
   const PATCH_WORKFLOW_ENDPOINT = '/.netlify/functions/admin-patch-workflow';
+  const TAXONOMY_ENDPOINT = '/.netlify/functions/admin-taxonomy';
 
   // ─── page init ──────────────────────────────────────────────────────────────
   const init = () => {
@@ -942,22 +1961,51 @@ const metadata = {
       noDraft: document.querySelector<HTMLElement>('#no-draft')!,
       loadStatus: document.querySelector<HTMLElement>('#load-status')!,
       articleWorkspace: document.querySelector<HTMLElement>('#article-workspace')!,
+      articleHeaderCard: document.querySelector<HTMLElement>('#article-header-card')!,
+      articleView: document.querySelector<HTMLElement>('#article-view')!,
+      inspectorEmpty: document.querySelector<HTMLElement>('#inspector-empty')!,
+      inspectorContent: document.querySelector<HTMLElement>('#inspector-content')!,
       nodesContainer: document.querySelector<HTMLElement>('#nodes-container')!,
-      // Metadata fields
-      pubTitle: document.querySelector<HTMLInputElement>('#pub-title')!,
-      pubExcerpt: document.querySelector<HTMLTextAreaElement>('#pub-excerpt')!,
-      pubSlug: document.querySelector<HTMLInputElement>('#pub-slug')!,
-      pubCategory: document.querySelector<HTMLInputElement>('#pub-category')!,
-      pubTags: document.querySelector<HTMLInputElement>('#pub-tags')!,
+      // Setup / metadata fields
+      pubAuthor: document.querySelector<HTMLInputElement>('#pub-author')!,
+      pubDate: document.querySelector<HTMLInputElement>('#pub-date')!,
       pubSeo: document.querySelector<HTMLInputElement>('#pub-seo')!,
+      pubArticlePath: document.querySelector<HTMLInputElement>('#pub-article-path')!,
       seoCharCount: document.querySelector<HTMLElement>('#seo-char-count')!,
-      errTitle: document.querySelector<HTMLElement>('#err-title')!,
-      errExcerpt: document.querySelector<HTMLElement>('#err-excerpt')!,
-      errSlug: document.querySelector<HTMLElement>('#err-slug')!,
       btnSaveMeta: document.querySelector<HTMLButtonElement>('#btn-save-meta')!,
       metaStatus: document.querySelector<HTMLElement>('#meta-status')!,
-      // Readiness panel
+      // General section (Author, Date, Category)
+      generalSummary: document.querySelector<HTMLElement>('#general-summary')!,
+      generalForm: document.querySelector<HTMLElement>('#general-form')!,
+      btnGeneralToggle: document.querySelector<HTMLButtonElement>('#btn-general-toggle')!,
+      generalDirtyDot: document.querySelector<HTMLElement>('#general-dirty-dot')!,
+      // Metadata section (Tags, SEO, Path)
+      metaSummary: document.querySelector<HTMLElement>('#meta-summary')!,
+      metaForm: document.querySelector<HTMLElement>('#meta-form')!,
+      btnMetaToggle: document.querySelector<HTMLButtonElement>('#btn-meta-toggle')!,
+      metaDirtyDot: document.querySelector<HTMLElement>('#meta-dirty-dot')!,
+      btnCopyPath: document.querySelector<HTMLButtonElement>('#btn-copy-path')!,
+      btnOpenDraftListInspector: document.querySelector<HTMLButtonElement>('#btn-open-draft-list-inspector')!,
+      // Tag pill picker
+      pubTagsContainer: document.querySelector<HTMLElement>('#pub-tags-container')!,
+      pubTagsPills: document.querySelector<HTMLElement>('#pub-tags-pills')!,
+      pubTagsInput: document.querySelector<HTMLInputElement>('#pub-tags-input')!,
+      pubTagsSuggestions: document.querySelector<HTMLElement>('#pub-tags-suggestions')!,
+      // Category combobox
+      pubCategoryContainer: document.querySelector<HTMLElement>('#pub-category-container')!,
+      pubCategoryChips: document.querySelector<HTMLElement>('#pub-category-chips')!,
+      pubCategoryInput: document.querySelector<HTMLInputElement>('#pub-category-input')!,
+      pubCategorySuggestions: document.querySelector<HTMLElement>('#pub-category-suggestions')!,
+      // Article header fields
+      pubTitle: document.querySelector<HTMLTextAreaElement>('#pub-title')!,
+      pubExcerpt: document.querySelector<HTMLTextAreaElement>('#pub-excerpt')!,
+      errTitle: document.querySelector<HTMLElement>('#err-title')!,
+      errExcerpt: document.querySelector<HTMLElement>('#err-excerpt')!,
+      // Readiness strip
       readinessLabel: document.querySelector<HTMLElement>('#readiness-label')!,
+      readinessToggle: document.querySelector<HTMLButtonElement>('#readiness-toggle')!,
+      readinessChips: document.querySelector<HTMLElement>('#readiness-chips')!,
+      readinessAudit: document.querySelector<HTMLElement>('#readiness-audit')!,
       readinessGroups: document.querySelector<HTMLElement>('#readiness-groups')!,
       btnPublish: document.querySelector<HTMLButtonElement>('#btn-publish')!,
       publishStatus: document.querySelector<HTMLElement>('#publish-status')!,
@@ -971,7 +2019,17 @@ const metadata = {
       draftPickerEmpty: document.querySelector<HTMLElement>('#draft-picker-empty')!,
       btnAllDrafts: document.querySelector<HTMLButtonElement>('#btn-all-drafts')!,
       btnOpenDraftList: document.querySelector<HTMLButtonElement>('#btn-open-draft-list')!,
+      // History / undo
+      btnMetaHistory: document.querySelector<HTMLButtonElement>('#btn-meta-history')!,
+      btnHeaderHistory: document.querySelector<HTMLButtonElement>('#btn-header-history')!,
+      btnMetaUndo: document.querySelector<HTMLButtonElement>('#btn-meta-undo')!,
     };
+
+    // If a draftId is in the URL, hide the no-draft placeholder immediately so
+    // it doesn't flash when the page becomes visible during the auth check.
+    if (initialDraftId) {
+      els.noDraft.hidden = true;
+    }
 
     // ── State ──────────────────────────────────────────────────────────────────
     let lockManager: LockManager | null = null;
@@ -981,8 +2039,53 @@ const metadata = {
     let currentRequestId = initialDraftId;
     let currentRecordVersion = 0;
     let metadataSaved = false;
+    let metadataDirty = false;
     let modalDraftsCache: DraftSummary[] | null = null;
     let allDraftRows: DraftSummary[] = [];
+    // History snapshots loaded from the workflow record
+    type HistoryEntry = { at: string; action: string; details?: Record<string, unknown> };
+    let draftHistory: HistoryEntry[] = [];
+    // Pending undo for metadata (set after a successful save, cleared on next save or undo)
+    let metaUndoPayload: Record<string, unknown> | null = null;
+    // History button refs per node id — used to enable/disable after saves
+    const nodeHistBtns = new Map<string, HTMLButtonElement>();
+    // Current editor-mode: used for mutual exclusivity and CSS state
+    let editMode: 'idle' | 'editing' | 'ai' = 'idle';
+    // Tag / category pill state
+    let selectedTags: string[] = [];
+    let selectedCategory: string | null = null;
+    let allTagSuggestions: string[] = [];
+    let allCategorySuggestions: string[] = [];
+    const setMode = (m: typeof editMode) => {
+      editMode = m;
+      if (m === 'idle') {
+        delete els.nodesContainer.dataset.mode;
+      } else {
+        els.nodesContainer.dataset.mode = m;
+      }
+    };
+
+    // Enable/disable history buttons based on whether any entries exist
+    const updateHistoryButtonStates = () => {
+      const hasMetaHistory = draftHistory.some((e) => e.action === 'patch_canonical_input');
+      els.btnMetaHistory.disabled = !hasMetaHistory;
+      els.btnHeaderHistory.disabled = !hasMetaHistory;
+      for (const [nodeId, btn] of nodeHistBtns) {
+        const hasNodeHistory = draftHistory.some(
+          (e) => e.action === 'admin_update_node' && e.details?.nodeId === nodeId
+        );
+        btn.disabled = !hasNodeHistory;
+      }
+    };
+
+    // ── Icon helper ───────────────────────────────────────────────────────────
+    // Clones a pre-rendered SVG icon from the hidden template container.
+    // Falls back to a text label if the template is missing (dev/test).
+    const cloneIcon = (name: string, fallback = ''): Node => {
+      const tmpl = document.querySelector<HTMLElement>(`[data-icon="${name}"]`);
+      if (tmpl) return tmpl.cloneNode(true);
+      return document.createTextNode(fallback);
+    };
 
     const getToken = async (): Promise<string> => {
       const token = await getAccessToken();
@@ -1016,6 +2119,13 @@ const metadata = {
       if (!['checking', 'signed-in'].includes(state)) window.location.replace('/');
     };
 
+    // ── Title textarea auto-resize ─────────────────────────────────────────────
+    const autoResize = (el: HTMLTextAreaElement) => {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    // Note: initial autoResize skipped — textarea is hidden until a draft loads
+
     // ── Lock bar ──────────────────────────────────────────────────────────────
     const updateLockBar = (state: {
       held: boolean;
@@ -1027,39 +2137,50 @@ const metadata = {
       delete els.lockBar.dataset.lockedByAgent;
       delete els.lockBar.dataset.held;
 
+      const agentHoldsLock = Boolean(!state.held && state.agentLock);
+
+      const setLockIcon = (iconName: string) => {
+        els.lockIcon.innerHTML = '';
+        els.lockIcon.appendChild(cloneIcon(iconName));
+      };
       if (state.held) {
         els.lockBar.dataset.held = 'true';
-        els.lockIcon.textContent = '🔓';
+        setLockIcon('lock-open');
         els.lockLabel.textContent = 'You hold the edit lock';
         els.btnDoneEditing.hidden = false;
         els.btnForceRelease.hidden = true;
       } else if (state.agentLock) {
         els.lockBar.dataset.lockedByAgent = 'true';
-        els.lockIcon.textContent = '🔒';
+        setLockIcon('lock');
         const exp = new Date(state.agentLock.expires_at);
         const expStr = Number.isFinite(exp.getTime()) ? `expires ${exp.toLocaleTimeString()}` : 'expiry unknown';
-        els.lockLabel.textContent = `Agent editing: ${state.agentLock.owner_label} (${expStr})`;
+        els.lockLabel.textContent = `Agent: ${state.agentLock.owner_label} (${expStr})`;
         els.btnDoneEditing.hidden = true;
         els.btnForceRelease.hidden = false;
       } else {
-        els.lockIcon.textContent = '✏️';
-        els.lockLabel.textContent = 'Click any block to start editing';
+        setLockIcon('pencil');
+        els.lockLabel.textContent = 'Click a block to start editing';
         els.btnDoneEditing.hidden = true;
         els.btnForceRelease.hidden = true;
       }
 
-      // Re-evaluate readiness when lock state changes
-      updateReadinessPanel(Boolean(state.agentLock));
+      // Gate all edit controls via data-lock attribute (Rule 4)
+      els.articleWorkspace.dataset.lock = agentHoldsLock ? 'agent' : state.held ? 'held' : 'free';
+      els.btnSaveMeta.disabled = agentHoldsLock;
+
+      updateReadinessPanel(agentHoldsLock);
     };
 
     const resetLockBar = () => {
       els.lockBar.hidden = true;
       delete els.lockBar.dataset.held;
       delete els.lockBar.dataset.lockedByAgent;
-      els.lockIcon.textContent = '';
+      delete els.articleWorkspace.dataset.lock;
+      els.lockIcon.innerHTML = '';
       els.lockLabel.textContent = '';
       els.btnDoneEditing.hidden = true;
       els.btnForceRelease.hidden = true;
+      els.btnSaveMeta.disabled = false;
     };
 
     // ── Lock actions ──────────────────────────────────────────────────────────
@@ -1070,6 +2191,9 @@ const metadata = {
     };
 
     els.btnDoneEditing.addEventListener('click', async () => {
+      if (activeEditor?.isDirty()) {
+        if (!window.confirm('You have unsaved edits in a block. Discard them and release the lock?')) return;
+      }
       closeActiveEditor(false);
       if (lockManager) await lockManager.checkin();
     });
@@ -1080,20 +2204,24 @@ const metadata = {
       await lockManager.forceRelease();
     });
 
-    // ── Readiness panel ───────────────────────────────────────────────────────
-    const updateReadinessPanel = (agentLockPresent = false) => {
-      const tags = els.pubTags.value
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
+    // ── Readiness strip ───────────────────────────────────────────────────────
+    els.readinessToggle.addEventListener('click', () => {
+      const expanded = els.readinessAudit.hidden === false;
+      els.readinessAudit.hidden = expanded;
+      els.readinessToggle.textContent = expanded ? 'Details' : 'Hide details';
+      els.readinessToggle.setAttribute('aria-expanded', String(!expanded));
+    });
 
+    const updateReadinessPanel = (agentLockPresent = false) => {
       const groups = evaluateReadiness({
         title: els.pubTitle.value.trim(),
         excerpt: els.pubExcerpt.value.trim(),
-        slug: els.pubSlug.value.trim(),
+        author: els.pubAuthor.value.trim(),
+        publishDate: els.pubDate.value.trim(),
+        articlePath: els.pubArticlePath.value.trim(),
         seoDescription: els.pubSeo.value.trim(),
-        category: els.pubCategory.value.trim(),
-        tags,
+        category: selectedCategory ?? '',
+        tags: selectedTags,
         nodes: currentNodes,
         lockHeld: Boolean(lockManager?.currentToken),
         canonicalSaved: metadataSaved,
@@ -1101,6 +2229,7 @@ const metadata = {
       });
 
       renderReadinessGroups(groups);
+      renderReadinessChips(groups);
 
       const level = readinessLevel(groups);
       const levelMap = {
@@ -1112,9 +2241,60 @@ const metadata = {
       els.readinessLabel.textContent = label;
       els.readinessLabel.className = `readiness-pill ${cls}`;
 
-      // Enable publish only when nothing is required and missing
       const missingCount = groups.flatMap((g) => g.criteria).filter((c) => c.status === 'missing').length;
-      els.btnPublish.disabled = missingCount > 0;
+      els.btnPublish.disabled = missingCount > 0 || metadataDirty;
+    };
+
+    const MAX_CHIPS = 3;
+    const renderReadinessChips = (groups: ReadinessGroup[]) => {
+      els.readinessChips.innerHTML = '';
+      const allCriteria = groups.flatMap((g) => g.criteria);
+      const notable = allCriteria.filter((c) => c.status === 'missing' || c.status === 'warning');
+
+      if (notable.length === 0) {
+        const chip = document.createElement('span');
+        chip.className = 'readiness-chip complete';
+        chip.textContent = 'All checks pass';
+        els.readinessChips.append(chip);
+        return;
+      }
+
+      const visible = notable.slice(0, MAX_CHIPS);
+      const extra = notable.slice(MAX_CHIPS);
+
+      for (const criterion of visible) {
+        const chip = document.createElement('span');
+        chip.className = `readiness-chip ${criterion.status}`;
+        chip.textContent = criterion.label;
+        if (criterion.message) chip.title = criterion.message;
+        els.readinessChips.append(chip);
+      }
+
+      if (extra.length > 0) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'readiness-chip-more';
+        moreBtn.textContent = `+${extra.length} more`;
+        let expanded = false;
+        moreBtn.addEventListener('click', () => {
+          expanded = !expanded;
+          if (expanded) {
+            for (const criterion of extra) {
+              const chip = document.createElement('span');
+              chip.className = `readiness-chip ${criterion.status}`;
+              chip.textContent = criterion.label;
+              if (criterion.message) chip.title = criterion.message;
+              els.readinessChips.insertBefore(chip, moreBtn);
+            }
+            moreBtn.textContent = 'Show less';
+          } else {
+            const chips = [...els.readinessChips.querySelectorAll<HTMLElement>('.readiness-chip')];
+            for (const chip of chips.slice(MAX_CHIPS)) chip.remove();
+            moreBtn.textContent = `+${extra.length} more`;
+          }
+        });
+        els.readinessChips.append(moreBtn);
+      }
     };
 
     const renderReadinessGroups = (groups: ReadinessGroup[]) => {
@@ -1175,58 +2355,459 @@ const metadata = {
 
     const setMetaStatus = (msg: string, kind: '' | 'is-error' | 'is-ok' = '') => {
       els.metaStatus.textContent = msg;
-      els.metaStatus.className = `meta-status${kind ? ' ' + kind : ''}`;
+      els.metaStatus.className = `meta-status-inline${kind ? ' ' + kind : ''}`;
     };
 
-    // SEO character counter
+    // ── Section summaries (one-line compact text) ─────────────────────────────
+
+    const updateGeneralSummary = () => {
+      const author = els.pubAuthor.value.trim();
+      const date = (() => {
+        const d = els.pubDate.value.trim();
+        if (!d) return '';
+        try {
+          const parsed = new Date(d);
+          if (Number.isFinite(parsed.getTime())) {
+            return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          }
+        } catch {
+          return d;
+        }
+        return d;
+      })();
+      const category = selectedCategory ?? '';
+      const parts = [author, date, category].filter(Boolean);
+      els.generalSummary.textContent = parts.length > 0 ? parts.join(' · ') : '—';
+      els.generalSummary.className = `section-summary-text${parts.length === 0 ? ' is-empty' : ''}`;
+    };
+
+    const updateMetaSummary = () => {
+      const tagsText =
+        selectedTags.length === 0 ? '' : `${selectedTags.length} tag${selectedTags.length === 1 ? '' : 's'}`;
+      const seoText = els.pubSeo.value.trim() ? `SEO ${els.pubSeo.value.trim().length}/180` : '';
+      const pathText = els.pubArticlePath.value.trim() ? 'path set' : '';
+      const parts = [tagsText, seoText, pathText].filter(Boolean);
+      els.metaSummary.textContent = parts.length > 0 ? parts.join(' · ') : '—';
+      els.metaSummary.className = `section-summary-text${parts.length === 0 ? ' is-empty' : ''}`;
+    };
+
+    const toggleGeneralForm = (forceOpen?: boolean) => {
+      const isOpen = !els.generalForm.hidden;
+      const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (!open && isOpen) updateGeneralSummary();
+      els.generalForm.hidden = !open;
+      els.generalSummary.hidden = open;
+      els.btnGeneralToggle.textContent = open ? 'Done' : 'Edit';
+    };
+
+    const toggleMetaForm = (forceOpen?: boolean) => {
+      const isOpen = !els.metaForm.hidden;
+      const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (!open && isOpen) updateMetaSummary();
+      els.metaForm.hidden = !open;
+      els.metaSummary.hidden = open;
+      els.btnMetaToggle.textContent = open ? 'Done' : 'Edit';
+    };
+
+    // ── History popover ───────────────────────────────────────────────────────
+    let openPopover: HTMLElement | null = null;
+    const closeOpenPopover = () => {
+      openPopover?.remove();
+      openPopover = null;
+    };
+
+    const formatRelativeTime = (isoString: string): string => {
+      const diff = Date.now() - Date.parse(isoString);
+      if (diff < 60_000) return 'just now';
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+      return new Date(isoString).toLocaleDateString();
+    };
+
+    const showHistoryPopover = (
+      anchor: HTMLElement,
+      nodeId: string | 'metadata',
+      onRestore?: (entry: HistoryEntry) => void
+    ) => {
+      closeOpenPopover();
+
+      const entries =
+        nodeId === 'metadata'
+          ? draftHistory
+              .filter((e) => e.action === 'patch_canonical_input')
+              .slice(-8)
+              .reverse()
+          : draftHistory
+              .filter((e) => e.action === 'admin_update_node' && e.details?.nodeId === nodeId)
+              .slice(-8)
+              .reverse();
+
+      const pop = document.createElement('div');
+      pop.className = 'dl-history-popover';
+      pop.style.position = 'absolute';
+
+      const header = document.createElement('div');
+      header.className = 'dl-history-popover-header';
+      const title = document.createElement('span');
+      title.textContent = nodeId === 'metadata' ? 'Metadata history' : 'Block history';
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'dl-history-popover-close';
+      closeBtn.type = 'button';
+      closeBtn.setAttribute('aria-label', 'Close history');
+      closeBtn.textContent = '✕';
+      closeBtn.addEventListener('click', closeOpenPopover);
+      header.append(title, closeBtn);
+      pop.append(header);
+
+      if (entries.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'dl-history-empty';
+        empty.textContent = 'No saved history yet.';
+        pop.append(empty);
+      } else {
+        for (const entry of entries) {
+          const row = document.createElement('div');
+          row.className = 'dl-history-entry';
+
+          const time = document.createElement('span');
+          time.className = 'dl-history-time';
+          time.textContent = formatRelativeTime(entry.at);
+          time.title = new Date(entry.at).toLocaleString();
+          row.append(time);
+
+          if (nodeId === 'metadata' && entry.details?.previousPayload) {
+            const prev = entry.details.previousPayload as Record<string, unknown>;
+            const desc = document.createElement('span');
+            desc.textContent = `Title: "${String(prev.title ?? '').slice(0, 40) || '(none)'}"`;
+            row.append(desc);
+          } else if (nodeId !== 'metadata' && entry.details?.previousPublic) {
+            const prev = entry.details.previousPublic as Record<string, unknown>;
+            const bodySnippet = String(prev.body ?? prev.title ?? '(empty)')
+              .replace(/<[^>]+>/g, '')
+              .slice(0, 60);
+            const desc = document.createElement('span');
+            desc.textContent = bodySnippet || '(empty block)';
+            row.append(desc);
+          }
+
+          const restoreBtn = document.createElement('button');
+          restoreBtn.className = 'dl-history-restore';
+          restoreBtn.type = 'button';
+          const hasSnapshot =
+            nodeId === 'metadata' ? !!entry.details?.previousPayload : !!entry.details?.previousPublic;
+          restoreBtn.disabled = !hasSnapshot || !onRestore;
+          restoreBtn.textContent = hasSnapshot && onRestore ? 'Restore this version' : 'Restore (not available)';
+          if (hasSnapshot && onRestore) {
+            restoreBtn.addEventListener('click', () => {
+              onRestore(entry);
+              closeOpenPopover();
+            });
+          }
+          row.append(restoreBtn);
+          pop.append(row);
+        }
+      }
+
+      // Anchor popover to the button's parent (must be positioned)
+      const anchorParent = anchor.closest<HTMLElement>('.admin-setup-module, .article-header-card, .dl-node-wrapper');
+      if (anchorParent) {
+        if (!anchorParent.style.position || anchorParent.style.position === 'static') {
+          anchorParent.style.position = 'relative';
+        }
+        anchorParent.append(pop);
+      } else {
+        anchor.parentElement?.append(pop);
+      }
+      openPopover = pop;
+
+      // Close on outside click
+      const onOutside = (e: MouseEvent) => {
+        if (!pop.contains(e.target as Node) && e.target !== anchor) {
+          closeOpenPopover();
+          document.removeEventListener('mousedown', onOutside, true);
+        }
+      };
+      requestAnimationFrame(() => document.addEventListener('mousedown', onOutside, true));
+    };
+
+    // ── SEO character counter
     const updateSeoCharCount = () => {
       const len = els.pubSeo.value.length;
       els.seoCharCount.textContent = `${len}/180`;
     };
     els.pubSeo.addEventListener('input', updateSeoCharCount);
 
-    // Live readiness re-evaluation on metadata input change
-    const metaFields = [els.pubTitle, els.pubExcerpt, els.pubSlug, els.pubCategory, els.pubTags, els.pubSeo];
-    for (const field of metaFields) {
+    // Article path: regenerated live from title + requestId
+    const refreshArticlePath = () => {
+      const title = els.pubTitle.value.trim();
+      els.pubArticlePath.value = title ? generateArticlePath(title, currentRequestId) : '';
+    };
+
+    const markGeneralDirty = () => {
+      metadataDirty = true;
+      els.generalDirtyDot.hidden = false;
+      if (metadataSaved) {
+        metadataSaved = false;
+        setMetaStatus('Unsaved changes');
+      }
+      updateReadinessPanel();
+    };
+
+    const markMetaDirty = () => {
+      metadataDirty = true;
+      els.metaDirtyDot.hidden = false;
+      if (metadataSaved) {
+        metadataSaved = false;
+        setMetaStatus('Unsaved changes');
+      }
+      updateReadinessPanel();
+    };
+
+    // Live readiness re-evaluation on any metadata change
+    const setupFields: (HTMLInputElement | HTMLTextAreaElement)[] = [
+      els.pubTitle,
+      els.pubExcerpt,
+      els.pubAuthor,
+      els.pubDate,
+      els.pubSeo,
+    ];
+    for (const field of setupFields) {
       field.addEventListener('input', () => {
-        // Clear field errors on re-type
-        if (field === els.pubTitle) clearFieldError(els.errTitle);
-        if (field === els.pubExcerpt) clearFieldError(els.errExcerpt);
-        if (field === els.pubSlug) clearFieldError(els.errSlug);
-        // Reset saved state when metadata changes
-        if (metadataSaved) {
-          metadataSaved = false;
-          setMetaStatus('Unsaved changes');
+        if (field === els.pubTitle) {
+          clearFieldError(els.errTitle);
+          autoResize(els.pubTitle);
+          refreshArticlePath();
         }
-        updateReadinessPanel();
+        if (field === els.pubExcerpt) {
+          clearFieldError(els.errExcerpt);
+        }
+        // Author/Date belong to the General section; SEO to the Metadata section
+        if (field === els.pubAuthor || field === els.pubDate) {
+          markGeneralDirty();
+        } else {
+          markMetaDirty();
+        }
       });
     }
 
+    // ── Taxonomy loading ──────────────────────────────────────────────────────
+    const loadTaxonomy = async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(TAXONOMY_ENDPOINT, { headers: { Authorization: `Bearer ${token}` } });
+        const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (json.ok) {
+          allTagSuggestions = Array.isArray(json.tags) ? (json.tags as string[]) : [];
+          allCategorySuggestions = Array.isArray(json.categories) ? (json.categories as string[]) : [];
+        }
+      } catch {
+        // non-critical: suggestions will just be empty
+      }
+    };
+
+    // ── Tag pill picker ───────────────────────────────────────────────────────
+    const renderTagPills = () => {
+      els.pubTagsPills.innerHTML = '';
+      for (const tag of selectedTags) {
+        const pill = document.createElement('span');
+        pill.className = 'tag-pill';
+        const text = document.createElement('span');
+        text.textContent = tag;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'tag-pill-remove';
+        removeBtn.setAttribute('aria-label', `Remove tag ${tag}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          selectedTags = selectedTags.filter((t) => t !== tag);
+          renderTagPills();
+          markMetaDirty();
+        });
+        pill.append(text, removeBtn);
+        els.pubTagsPills.append(pill);
+      }
+    };
+
+    const showTagSuggestions = (filter: string) => {
+      const input = filter.toLowerCase().trim();
+      const existing = new Set(selectedTags.map((t) => t.toLowerCase()));
+      const matches = allTagSuggestions.filter((t) => (!input || t.includes(input)) && !existing.has(t));
+
+      els.pubTagsSuggestions.innerHTML = '';
+
+      if (input && !matches.find((t) => t.toLowerCase() === input)) {
+        const createItem = document.createElement('div');
+        createItem.className = 'tag-suggestion-item';
+        createItem.textContent = `Create "${filter.trim()}"`;
+        createItem.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          addTag(filter.trim());
+        });
+        els.pubTagsSuggestions.append(createItem);
+      }
+
+      for (const match of matches.slice(0, 10)) {
+        const item = document.createElement('div');
+        item.className = 'tag-suggestion-item';
+        item.textContent = match;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          addTag(match);
+        });
+        els.pubTagsSuggestions.append(item);
+      }
+
+      els.pubTagsSuggestions.hidden = els.pubTagsSuggestions.children.length === 0;
+    };
+
+    const addTag = (tag: string) => {
+      const normalized = tag.toLowerCase().trim();
+      if (!normalized || selectedTags.some((t) => t.toLowerCase() === normalized)) return;
+      selectedTags = [...selectedTags, normalized];
+      els.pubTagsInput.value = '';
+      els.pubTagsSuggestions.hidden = true;
+      renderTagPills();
+      markMetaDirty();
+    };
+
+    els.pubTagsInput.addEventListener('input', () => showTagSuggestions(els.pubTagsInput.value));
+    els.pubTagsInput.addEventListener('focus', () => showTagSuggestions(els.pubTagsInput.value));
+    els.pubTagsInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        els.pubTagsSuggestions.hidden = true;
+      }, 150);
+    });
+    els.pubTagsInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = els.pubTagsInput.value.trim();
+        if (val) addTag(val);
+      } else if (e.key === 'Backspace' && !els.pubTagsInput.value && selectedTags.length) {
+        selectedTags = selectedTags.slice(0, -1);
+        renderTagPills();
+        markMetaDirty();
+      }
+    });
+    els.pubTagsContainer.addEventListener('click', () => els.pubTagsInput.focus());
+
+    // ── Category combobox ─────────────────────────────────────────────────────
+    const renderCategoryChip = () => {
+      els.pubCategoryChips.innerHTML = '';
+      if (selectedCategory) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-pill';
+        const text = document.createElement('span');
+        text.textContent = selectedCategory;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'tag-pill-remove';
+        removeBtn.setAttribute('aria-label', `Remove category ${selectedCategory}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          selectedCategory = null;
+          renderCategoryChip();
+          markGeneralDirty();
+        });
+        chip.append(text, removeBtn);
+        els.pubCategoryChips.append(chip);
+        els.pubCategoryInput.placeholder = '';
+      } else {
+        els.pubCategoryInput.placeholder = 'Select or create…';
+      }
+    };
+
+    const showCategorySuggestions = (filter: string) => {
+      const input = filter.toLowerCase().trim();
+      const matches = allCategorySuggestions.filter((c) => !input || c.includes(input));
+
+      els.pubCategorySuggestions.innerHTML = '';
+
+      if (input && !matches.find((c) => c.toLowerCase() === input)) {
+        const createItem = document.createElement('div');
+        createItem.className = 'tag-suggestion-item';
+        createItem.textContent = `Create "${filter.trim()}"`;
+        createItem.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectCategory(filter.trim());
+        });
+        els.pubCategorySuggestions.append(createItem);
+      }
+
+      for (const match of matches.slice(0, 8)) {
+        const item = document.createElement('div');
+        item.className = 'tag-suggestion-item';
+        item.textContent = match;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectCategory(match);
+        });
+        els.pubCategorySuggestions.append(item);
+      }
+
+      els.pubCategorySuggestions.hidden = els.pubCategorySuggestions.children.length === 0;
+    };
+
+    const selectCategory = (category: string) => {
+      selectedCategory = category.toLowerCase().trim() || null;
+      els.pubCategoryInput.value = '';
+      els.pubCategorySuggestions.hidden = true;
+      renderCategoryChip();
+      markGeneralDirty();
+    };
+
+    els.pubCategoryInput.addEventListener('input', () => showCategorySuggestions(els.pubCategoryInput.value));
+    els.pubCategoryInput.addEventListener('focus', () => showCategorySuggestions(els.pubCategoryInput.value));
+    els.pubCategoryInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        els.pubCategorySuggestions.hidden = true;
+      }, 150);
+    });
+    els.pubCategoryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = els.pubCategoryInput.value.trim();
+        if (val) selectCategory(val);
+      }
+    });
+    els.pubCategoryContainer.addEventListener('click', () => els.pubCategoryInput.focus());
+
     // ── Save metadata ─────────────────────────────────────────────────────────
-    const saveMetadata = async () => {
+    const applyMetaPayloadToForm = (payload: Record<string, unknown>) => {
+      els.pubTitle.value = String(payload.title ?? '');
+      els.pubExcerpt.value = String(payload.excerpt ?? '');
+      els.pubAuthor.value = String(payload.author ?? '');
+      els.pubDate.value = String(payload.publishDate ?? '');
+      els.pubSeo.value = String(payload.seoDescription ?? '');
+      const ap = String(payload.articlePath ?? '');
+      els.pubArticlePath.value = ap || generateArticlePath(els.pubTitle.value, currentRequestId);
+      // Tags and category via pill components
+      selectedTags = Array.isArray(payload.tags)
+        ? (payload.tags as string[]).map((t) => String(t).trim()).filter(Boolean)
+        : [];
+      const rawCat = String(payload.category ?? '').trim();
+      selectedCategory = rawCat || null;
+      renderTagPills();
+      renderCategoryChip();
+      autoResize(els.pubTitle);
+      updateSeoCharCount();
+      updateGeneralSummary();
+      updateMetaSummary();
+    };
+
+    const saveMetadata = async (payloadOverride?: Record<string, unknown>) => {
       clearFieldError(els.errTitle);
       clearFieldError(els.errExcerpt);
-      clearFieldError(els.errSlug);
 
-      const title = els.pubTitle.value.trim();
-      const excerpt = els.pubExcerpt.value.trim();
-      const slug = els.pubSlug.value.trim();
+      const title = payloadOverride ? String(payloadOverride.title ?? '') : els.pubTitle.value.trim();
+      const articlePath = payloadOverride ? String(payloadOverride.articlePath ?? '') : els.pubArticlePath.value.trim();
 
       let hasErrors = false;
       if (!title) {
         showFieldError(els.errTitle, 'Title is required before saving.');
         hasErrors = true;
       }
-      if (!slug) {
-        showFieldError(els.errSlug, 'Slug is required before saving.');
-        hasErrors = true;
-      } else if (!isValidSlug(slug)) {
-        showFieldError(els.errSlug, 'Slug must be lowercase letters, numbers, and hyphens only.');
-        hasErrors = true;
-      }
       if (hasErrors) return;
 
-      // Acquire lock if not already held
       if (!lockManager?.currentToken) {
         const acquired = await acquireLock();
         if (!acquired) {
@@ -1250,20 +2831,49 @@ const metadata = {
       }
 
       els.btnSaveMeta.disabled = true;
+      els.btnMetaUndo.hidden = true;
       setMetaStatus('Saving…');
 
-      const tags = els.pubTags.value
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
+      let publishPayload: Record<string, unknown>;
 
-      const publishPayload: Record<string, unknown> = { slug, title };
-      if (excerpt) publishPayload.excerpt = excerpt;
-      const seoDesc = els.pubSeo.value.trim();
-      if (seoDesc) publishPayload.seoDescription = seoDesc;
-      const category = els.pubCategory.value.trim();
-      if (category) publishPayload.category = category;
-      if (tags.length) publishPayload.tags = tags;
+      if (payloadOverride) {
+        publishPayload = payloadOverride;
+      } else {
+        // Derive the slug from the generated path for backward compatibility
+        const derivedSlug = articlePath ? articlePath.replace('src/data/post/', '').replace('.md', '') : '';
+
+        publishPayload = { title };
+        if (derivedSlug) publishPayload.slug = derivedSlug;
+        if (articlePath) publishPayload.articlePath = articlePath;
+
+        const excerpt = els.pubExcerpt.value.trim();
+        if (excerpt) publishPayload.excerpt = excerpt;
+
+        const author = els.pubAuthor.value.trim();
+        if (author) publishPayload.author = author;
+
+        const publishDate = els.pubDate.value.trim();
+        if (publishDate) publishPayload.publishDate = publishDate;
+
+        const seoDesc = els.pubSeo.value.trim();
+        if (seoDesc) publishPayload.seoDescription = seoDesc;
+
+        if (selectedCategory) publishPayload.category = selectedCategory;
+        if (selectedTags.length) publishPayload.tags = [...selectedTags];
+      }
+
+      // Capture current payload for undo before overwriting
+      const previousPayloadForUndo = metaUndoPayload ?? null;
+      const currentPayloadForUndo: Record<string, unknown> = {
+        title: els.pubTitle.value.trim(),
+        excerpt: els.pubExcerpt.value.trim(),
+        author: els.pubAuthor.value.trim(),
+        publishDate: els.pubDate.value.trim(),
+        category: selectedCategory ?? '',
+        tags: [...selectedTags],
+        seoDescription: els.pubSeo.value.trim(),
+        articlePath: els.pubArticlePath.value.trim(),
+      };
 
       try {
         const res = await fetch(PATCH_WORKFLOW_ENDPOINT, {
@@ -1283,19 +2893,66 @@ const metadata = {
 
         const json = (await res.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
         if (!res.ok || !json.ok) {
+          if (res.status === 409) {
+            // Version conflict: another save (node or AI) advanced the record version.
+            // Re-fetch to sync currentRecordVersion, then restore the user's form values.
+            setMetaStatus('Draft changed since this panel loaded. Refreshing…');
+            try {
+              const freshToken = await getToken();
+              const refreshRes = await fetch(`${DRAFT_ENDPOINT}?draftId=${encodeURIComponent(currentRequestId)}`, {
+                headers: { Authorization: `Bearer ${freshToken}` },
+              });
+              const freshJson = (await refreshRes.json().catch(() => ({}))) as Record<string, unknown>;
+              if (typeof freshJson.recordVersion === 'number') {
+                currentRecordVersion = freshJson.recordVersion as number;
+              }
+              // Restore the user's unsaved edits to the form so they can retry
+              applyMetaPayloadToForm(currentPayloadForUndo);
+            } catch {
+              // ignore secondary fetch errors; user still sees retry prompt
+            }
+            setMetaStatus('Draft refreshed — try Save again.', 'is-error');
+            return;
+          }
           const errMsg = typeof json.error === 'string' ? json.error : `HTTP ${res.status}`;
           setMetaStatus(`Save failed: ${errMsg}`, 'is-error');
           return;
         }
 
-        // Update local record version from response
         const record = json.record as Record<string, unknown> | undefined;
         if (typeof record?.version === 'number') {
           currentRecordVersion = record.version as number;
         }
 
+        // Update local history snapshot so the popover reflects this save
+        draftHistory.push({
+          at: new Date().toISOString(),
+          action: 'patch_canonical_input',
+          details: { previousPayload: currentPayloadForUndo, nextPayload: publishPayload },
+        });
+        updateHistoryButtonStates();
+
+        // If restoring a previous payload, apply its values to the form
+        if (payloadOverride) applyMetaPayloadToForm(payloadOverride);
+
+        // Set undo target: one-step undo goes back to what the form showed before this save
+        metaUndoPayload = payloadOverride ? null : currentPayloadForUndo;
+        void previousPayloadForUndo; // not used for multi-step undo chain
+
         metadataSaved = true;
-        setMetaStatus('✓ Metadata saved', 'is-ok');
+        metadataDirty = false;
+        els.generalDirtyDot.hidden = true;
+        els.metaDirtyDot.hidden = true;
+        setMetaStatus('Saved', 'is-ok');
+        updateGeneralSummary();
+        updateMetaSummary();
+        toggleGeneralForm(false);
+        toggleMetaForm(false);
+
+        if (metaUndoPayload) {
+          els.btnMetaUndo.hidden = false;
+        }
+
         updateReadinessPanel();
       } catch (err) {
         setMetaStatus(err instanceof Error ? err.message : 'Save failed.', 'is-error');
@@ -1304,12 +2961,53 @@ const metadata = {
       }
     };
 
-    els.btnSaveMeta.addEventListener('click', saveMetadata);
+    els.btnGeneralToggle.addEventListener('click', () => toggleGeneralForm());
+    els.btnMetaToggle.addEventListener('click', () => toggleMetaForm());
+
+    els.btnCopyPath.addEventListener('click', async () => {
+      const path = els.pubArticlePath.value.trim();
+      if (!path) return;
+      try {
+        await navigator.clipboard.writeText(path);
+        const orig = els.btnCopyPath.title;
+        els.btnCopyPath.title = 'Copied!';
+        setTimeout(() => {
+          els.btnCopyPath.title = orig;
+        }, 1500);
+      } catch {
+        // clipboard not available — silently ignore
+      }
+    });
+
+    els.btnSaveMeta.addEventListener('click', () => saveMetadata());
+
+    els.btnMetaUndo.addEventListener('click', async () => {
+      if (!metaUndoPayload) return;
+      const target = metaUndoPayload;
+      metaUndoPayload = null;
+      els.btnMetaUndo.hidden = true;
+      await saveMetadata(target);
+    });
+
+    els.btnMetaHistory.addEventListener('click', () => {
+      showHistoryPopover(els.btnMetaHistory, 'metadata', (entry) => {
+        const prev = entry.details?.previousPayload as Record<string, unknown> | undefined;
+        if (prev) void saveMetadata(prev);
+      });
+    });
+
+    els.btnHeaderHistory.addEventListener('click', () => {
+      showHistoryPopover(els.btnHeaderHistory, 'metadata', (entry) => {
+        const prev = entry.details?.previousPayload as Record<string, unknown> | undefined;
+        if (prev) void saveMetadata(prev);
+      });
+    });
 
     // ── Node rendering ────────────────────────────────────────────────────────
     const renderArticle = (nodes: ArticleBodyNode[]) => {
       currentNodes = nodes;
       els.nodesContainer.innerHTML = '';
+      nodeHistBtns.clear();
 
       for (const node of nodes) {
         if (node.visibility && node.visibility !== 'public') continue;
@@ -1321,27 +3019,76 @@ const metadata = {
         toolbar.className = 'dl-node-toolbar';
 
         const editBtn = document.createElement('button');
-        editBtn.className = 'dl-node-btn';
-        editBtn.title = 'Edit';
-        editBtn.textContent = '✏️';
-        editBtn.addEventListener('click', () => onEditClick(node, wrapper));
+        editBtn.className = 'dl-node-btn is-edit';
+        editBtn.setAttribute('aria-label', 'Edit this block');
+        editBtn.title = 'Edit this block';
+        editBtn.append(cloneIcon('pencil', 'Edit'));
+        editBtn.addEventListener('click', () => {
+          if (wrapper.dataset.editing) {
+            // Cancel flow: guard unsaved changes
+            if (!activeEditor?.isDirty()) {
+              closeActiveEditor(false);
+            } else if (window.confirm('Discard unsaved changes in this block?')) {
+              closeActiveEditor(false);
+            }
+          } else {
+            void onEditClick(node, wrapper);
+          }
+        });
 
         const aiBtn = document.createElement('button');
-        aiBtn.className = 'dl-node-btn';
-        aiBtn.title = 'Ask AI';
-        aiBtn.textContent = '✨';
+        aiBtn.className = 'dl-node-btn is-ai';
+        aiBtn.setAttribute('aria-label', 'Ask AI to revise this block');
+        aiBtn.title = 'Ask AI to revise this block';
+        aiBtn.append(cloneIcon('sparkles', 'AI'));
         aiBtn.addEventListener('click', () => onAskAiClick(node, wrapper));
 
-        toolbar.append(editBtn, aiBtn);
+        const histBtn = document.createElement('button');
+        histBtn.className = 'dl-node-btn is-history';
+        histBtn.setAttribute('aria-label', 'View block edit history');
+        histBtn.title = 'Block history';
+        histBtn.append(cloneIcon('history', 'History'));
+        histBtn.addEventListener('click', () => showHistoryPopover(histBtn, node.id));
+        // Disable initially if no history entries for this node (Rule 3)
+        const hasNodeHistory = draftHistory.some(
+          (e) => e.action === 'admin_update_node' && e.details?.nodeId === node.id
+        );
+        histBtn.disabled = !hasNodeHistory;
+        nodeHistBtns.set(node.id, histBtn);
+
+        toolbar.append(editBtn, aiBtn, histBtn);
         wrapper.append(toolbar);
+
+        // Persistent node badge: always at bottom-left, shows node ID + saved/undo state
+        const badge = document.createElement('div');
+        badge.className = 'dl-node-badge';
+        badge.setAttribute('aria-hidden', 'true');
+
+        const badgeId = document.createElement('span');
+        badgeId.className = 'dl-node-badge-id';
+        badgeId.textContent = node.id;
+
+        const badgeSaved = document.createElement('span');
+        badgeSaved.className = 'dl-node-badge-saved';
+        badgeSaved.textContent = '· Saved';
+
+        const badgeUndo = document.createElement('button');
+        badgeUndo.type = 'button';
+        badgeUndo.className = 'dl-node-badge-undo';
+        badgeUndo.title = 'Undo last save';
+        badgeUndo.setAttribute('aria-label', 'Undo last save');
+        badgeUndo.append(cloneIcon('arrow-back-up', '↩'));
+
+        badge.append(badgeId, badgeSaved, badgeUndo);
+        wrapper.append(badge);
 
         wrapper.addEventListener('mouseup', () => {
           if (wrapper.dataset.editing) return;
           const sel = window.getSelection();
           if (sel && sel.rangeCount > 0 && !sel.isCollapsed && wrapper.contains(sel.anchorNode)) {
-            aiBtn.classList.add('ring-2', 'ring-purple-400');
+            aiBtn.classList.add('ai-has-selection');
           } else {
-            aiBtn.classList.remove('ring-2', 'ring-purple-400');
+            aiBtn.classList.remove('ai-has-selection');
           }
         });
 
@@ -1353,13 +3100,64 @@ const metadata = {
     const closeActiveEditor = (save: boolean) => {
       if (!activeEditor || !activeNodeWrapper) return;
       if (!save) activeEditor.unmount();
+      // Restore the block's edit button from cancel (X) back to pencil
+      const eBtn = activeNodeWrapper.querySelector<HTMLButtonElement>('.dl-node-btn.is-edit');
+      if (eBtn) {
+        eBtn.innerHTML = '';
+        eBtn.append(cloneIcon('pencil', 'Edit'));
+        eBtn.setAttribute('aria-label', 'Edit this block');
+        eBtn.title = 'Edit this block';
+        eBtn.classList.remove('is-cancel');
+      }
       activeNodeWrapper.removeAttribute('data-editing');
       activeEditor = null;
       activeNodeWrapper = null;
+      setMode('idle');
+    };
+
+    // Update the persistent badge after a block save: show "Saved · Undo" until next save or undo.
+    const updateNodeBadge = (
+      wrapper: HTMLElement,
+      nodeId: string,
+      previousPublic: Partial<ArticleBodyNode['public']>
+    ) => {
+      const badge = wrapper.querySelector<HTMLElement>('.dl-node-badge');
+      if (!badge) return;
+
+      badge.classList.add('has-saved');
+
+      const undoBtn = badge.querySelector<HTMLButtonElement>('.dl-node-badge-undo');
+      if (!undoBtn) return;
+
+      // Replace previous listener by cloning the button
+      const fresh = undoBtn.cloneNode(true) as HTMLButtonElement;
+      undoBtn.replaceWith(fresh);
+
+      fresh.addEventListener('click', async () => {
+        badge.classList.remove('has-saved');
+        const currentNode = currentNodes.find((n) => n.id === nodeId);
+        if (!currentNode) return;
+        const saved = await saveNodeUpdate(nodeId, previousPublic, wrapper, currentNode);
+        if (saved) {
+          draftHistory.push({
+            at: new Date().toISOString(),
+            action: 'admin_update_node',
+            details: { nodeId, previousPublic: currentNode.public, nextPublic: previousPublic },
+          });
+        }
+      });
     };
 
     const onEditClick = async (node: ArticleBodyNode, wrapper: HTMLElement) => {
       if (wrapper.dataset.editing) return;
+      if (editMode === 'ai') return;
+
+      // Dirty-check: if switching away from an unsaved editor, confirm first
+      if (activeEditor?.isDirty() && activeNodeWrapper && activeNodeWrapper !== wrapper) {
+        const keep = !window.confirm('You have unsaved changes in this block. Discard them and edit another block?');
+        if (keep) return;
+      }
+
       closeActiveEditor(false);
 
       if (!lockManager?.currentToken) {
@@ -1368,22 +3166,48 @@ const metadata = {
         if (!acquired) return;
       }
 
+      // Snapshot public fields before editing for Cancel and one-step undo
+      const previousPublic = { ...node.public } as Partial<ArticleBodyNode['public']>;
+
       wrapper.dataset.editing = 'true';
       activeNodeWrapper = wrapper;
       activeEditor = new NodeEditor();
+      setMode('editing');
+
+      // Transform pencil button to cancel (X) while this block is in edit mode
+      const eBtn = wrapper.querySelector<HTMLButtonElement>('.dl-node-btn.is-edit');
+      if (eBtn) {
+        eBtn.innerHTML = '';
+        eBtn.append(cloneIcon('x', '✕'));
+        eBtn.setAttribute('aria-label', 'Cancel editing this block');
+        eBtn.title = 'Cancel editing this block';
+        eBtn.classList.add('is-cancel');
+      }
 
       activeEditor.mount(node, wrapper, {
         onSave: async (updatedFields) => {
-          await saveNodeUpdate(node.id, updatedFields, wrapper, node);
-          closeActiveEditor(false);
+          const saved = await saveNodeUpdate(node.id, updatedFields, wrapper, node);
+          if (saved) {
+            draftHistory.push({
+              at: new Date().toISOString(),
+              action: 'admin_update_node',
+              details: { nodeId: node.id, previousPublic, nextPublic: updatedFields },
+            });
+            const hBtn = nodeHistBtns.get(node.id);
+            if (hBtn) hBtn.disabled = false;
+            closeActiveEditor(false);
+            updateNodeBadge(wrapper, node.id, previousPublic);
+          }
         },
         onCancel: () => closeActiveEditor(false),
+        onNoChange: () => closeActiveEditor(false),
       });
     };
 
     // ── AI ask flow ───────────────────────────────────────────────────────────
     const onAskAiClick = (node: ArticleBodyNode, wrapper: HTMLElement) => {
       if (!currentRequestId) return;
+      if (editMode === 'editing') return;
 
       let selectedText: string | undefined;
       if (wrapper.dataset.editing && activeEditor) {
@@ -1396,6 +3220,7 @@ const metadata = {
         }
       }
 
+      setMode('ai');
       showInstructionPopover(
         wrapper,
         selectedText,
@@ -1413,6 +3238,7 @@ const metadata = {
             token = await getToken();
           } catch {
             spinnerEl.remove();
+            setMode('idle');
             return;
           }
 
@@ -1427,6 +3253,7 @@ const metadata = {
 
           if (!result.ok) {
             alert(`AI request failed: ${result.error}`);
+            setMode('idle');
             return;
           }
 
@@ -1439,15 +3266,21 @@ const metadata = {
                 const acquired = await acquireLock();
                 if (!acquired) {
                   alert('Could not acquire edit lock to apply suggestion.');
+                  setMode('idle');
                   return;
                 }
               }
               await saveNodeUpdate(node.id, fields, wrapper, node);
+              setMode('idle');
             },
-            () => {}
+            () => {
+              setMode('idle');
+            }
           );
         },
-        () => {}
+        () => {
+          setMode('idle');
+        }
       );
     };
 
@@ -1457,11 +3290,11 @@ const metadata = {
       updatedFields: Partial<ArticleBodyNode['public']>,
       wrapper: HTMLElement,
       originalNode: ArticleBodyNode
-    ) => {
+    ): Promise<boolean> => {
       const lockToken = lockManager?.currentToken;
       if (!lockToken) {
         alert('Edit lock not held. Please retry.');
-        return;
+        return false;
       }
 
       let token: string;
@@ -1469,7 +3302,7 @@ const metadata = {
         token = await getToken();
       } catch {
         alert('Authentication error. Please refresh.');
-        return;
+        return false;
       }
 
       const res = await fetch(UPDATE_NODE_ENDPOINT, {
@@ -1481,7 +3314,12 @@ const metadata = {
       const json = (await res.json().catch(() => ({ ok: false, error: 'Parse error' }))) as Record<string, unknown>;
       if (!res.ok || !json.ok) {
         alert(`Save failed: ${typeof json.error === 'string' ? json.error : 'Unknown error'}`);
-        return;
+        return false;
+      }
+
+      // Node save increments the record version — keep our local copy in sync
+      if (typeof json.version === 'number') {
+        currentRecordVersion = json.version as number;
       }
 
       const updatedNode: ArticleBodyNode = { ...originalNode, public: { ...originalNode.public, ...updatedFields } };
@@ -1490,12 +3328,14 @@ const metadata = {
 
       const newRendered = renderNode(updatedNode);
       const existingToolbar = wrapper.querySelector('.dl-node-toolbar');
+      const existingBadge = wrapper.querySelector('.dl-node-badge');
       wrapper.innerHTML = '';
       wrapper.append(newRendered);
       if (existingToolbar) wrapper.append(existingToolbar);
+      if (existingBadge) wrapper.append(existingBadge);
 
-      // After saving a node, readiness may have changed
       updateReadinessPanel();
+      return true;
     };
 
     // ── Reset draft view ──────────────────────────────────────────────────────
@@ -1510,33 +3350,68 @@ const metadata = {
       }
 
       resetLockBar();
-      els.articleWorkspace.hidden = true;
+      // Show placeholder states; hide active content
+      els.noDraft.hidden = false;
+      els.articleHeaderCard.hidden = true;
+      els.articleView.hidden = true;
+      els.inspectorEmpty.hidden = false;
+      els.inspectorContent.hidden = true;
       els.nodesContainer.innerHTML = '';
       els.btnPublish.disabled = true;
       els.loadStatus.hidden = true;
       els.loadStatus.textContent = '';
-      els.noDraft.hidden = true;
       currentNodes = [];
       currentRecordVersion = 0;
       metadataSaved = false;
+      metadataDirty = false;
+      draftHistory = [];
+      metaUndoPayload = null;
+      els.btnMetaUndo.hidden = true;
+      els.generalDirtyDot.hidden = true;
+      els.metaDirtyDot.hidden = true;
+      closeOpenPopover();
       els.readinessGroups.innerHTML = '';
+      els.readinessChips.innerHTML = '';
       els.readinessLabel.textContent = '';
       els.readinessLabel.className = 'readiness-pill';
       els.publishStatus.textContent = '';
+      els.readinessAudit.hidden = true;
+      els.readinessToggle.textContent = 'Details';
+      els.readinessToggle.setAttribute('aria-expanded', 'false');
+      // Reset both sections to compact summary view
+      toggleGeneralForm(false);
+      els.generalSummary.textContent = '';
+      els.generalDirtyDot.hidden = true;
+      toggleMetaForm(false);
+      els.metaSummary.textContent = '';
+      setMetaStatus('');
+      // Reset tag/category pickers
+      selectedTags = [];
+      selectedCategory = null;
+      els.pubTagsPills.innerHTML = '';
+      els.pubTagsInput.value = '';
+      els.pubCategoryChips.innerHTML = '';
+      els.pubCategoryInput.value = '';
+      els.pubCategoryInput.placeholder = 'Select or create…';
     };
 
     // ── Load draft ────────────────────────────────────────────────────────────
     const loadDraft = async (requestId: string, token: string) => {
       if (!requestId) {
+        // No draft — ensure placeholder state is shown (resetDraftView handles this,
+        // but if called without a prior reset, guarantee the right state here)
         els.noDraft.hidden = false;
+        els.inspectorEmpty.hidden = false;
+        els.inspectorContent.hidden = true;
         return;
       }
 
       await resetDraftView();
+      // Hide the no-draft placeholder while loading
+      els.noDraft.hidden = true;
 
       currentRequestId = requestId;
 
-      // Update URL without navigation
       const currentParams = new URLSearchParams(window.location.search);
       const urlDraftId = currentParams.get('draftId') ?? currentParams.get('requestId') ?? '';
       const newUrl = new URL(window.location.href);
@@ -1561,10 +3436,14 @@ const metadata = {
           return;
         }
 
-        // Record version from new endpoint field
         if (typeof json.recordVersion === 'number') {
           currentRecordVersion = json.recordVersion as number;
         }
+
+        // Load history snapshots for this draft
+        draftHistory = Array.isArray(json.history) ? (json.history as HistoryEntry[]) : [];
+        metaUndoPayload = null;
+        els.btnMetaUndo.hidden = true;
 
         const input = (json.input ?? {}) as Record<string, unknown>;
         const content = (input.content ?? {}) as Record<string, unknown>;
@@ -1572,9 +3451,8 @@ const metadata = {
         const publishPayload = (publication.publish_payload ?? {}) as Record<string, unknown>;
         const taxonomy = (input.taxonomy ?? {}) as Record<string, unknown>;
         const seo = (input.seo ?? {}) as Record<string, unknown>;
-        const ids = (input.ids ?? {}) as Record<string, unknown>;
 
-        // Metadata: prefer publish_payload (editor's saved values) over raw input fields
+        // Prefer publish_payload (editor's saved values) over raw input fields
         const title = String(
           publishPayload.title ??
             content.title ??
@@ -1582,7 +3460,7 @@ const metadata = {
             'Untitled'
         );
         const excerpt = String(publishPayload.excerpt ?? content.deck ?? '');
-        const slug = String(publishPayload.slug ?? ids.content_id ?? input.slug ?? '');
+        const author = String(publishPayload.author ?? content.author ?? '');
         const category = String(publishPayload.category ?? taxonomy.category ?? '');
         const tagsArr = Array.isArray(publishPayload.tags)
           ? (publishPayload.tags as string[])
@@ -1591,24 +3469,58 @@ const metadata = {
             : [];
         const seoDesc = String(publishPayload.seoDescription ?? seo.meta_description ?? '');
 
+        // Publish date: prefer saved, fall back to publication.publish_date, then default to today
+        const savedPublishDate = String(publishPayload.publishDate ?? publication.publish_date ?? '');
+        let publishDateValue = '';
+        if (savedPublishDate) {
+          try {
+            const d = new Date(savedPublishDate);
+            if (Number.isFinite(d.getTime())) {
+              publishDateValue = d.toISOString().slice(0, 10);
+            }
+          } catch {
+            publishDateValue = '';
+          }
+        }
+        if (!publishDateValue) {
+          publishDateValue = new Date().toISOString().slice(0, 10);
+        }
+
+        // Article path: use saved or generate from title
+        const savedArticlePath = String(publishPayload.articlePath ?? '');
+        const articlePath = savedArticlePath || generateArticlePath(title, requestId);
+
         els.pubTitle.value = title;
         els.pubExcerpt.value = excerpt;
-        els.pubSlug.value = slug;
-        els.pubCategory.value = category;
-        els.pubTags.value = tagsArr.join(', ');
+        els.pubAuthor.value = author;
+        els.pubDate.value = publishDateValue;
         els.pubSeo.value = seoDesc;
+        els.pubArticlePath.value = articlePath;
+        // Load tags and category into pill components
+        selectedTags = tagsArr.map((t) => String(t).trim()).filter(Boolean);
+        selectedCategory = category.trim() || null;
+        renderTagPills();
+        renderCategoryChip();
         updateSeoCharCount();
+        autoResize(els.pubTitle);
+        updateGeneralSummary();
+        updateMetaSummary();
 
-        // If a publish_payload exists, consider metadata already saved
-        if (publishPayload.slug && publishPayload.title) {
+        // Consider metadata saved if a publish_payload with title exists
+        if (publishPayload.title) {
           metadataSaved = true;
-          setMetaStatus('Metadata loaded from saved record', 'is-ok');
+          setMetaStatus('Loaded', 'is-ok');
         }
 
         const articleBody = content.article_body as { nodes?: ArticleBodyNode[] } | undefined;
         if (articleBody?.nodes?.length) {
           renderArticle(articleBody.nodes);
-          els.articleWorkspace.hidden = false;
+          updateHistoryButtonStates();
+          // Show article content and inspector
+          els.articleHeaderCard.hidden = false;
+          els.articleView.hidden = false;
+          els.inspectorEmpty.hidden = true;
+          els.inspectorContent.hidden = false;
         } else {
           els.loadStatus.textContent = 'This draft has no article body nodes yet.';
           els.loadStatus.hidden = false;
@@ -1623,6 +3535,9 @@ const metadata = {
         updateLockBar(lockStatus as Parameters<typeof updateLockBar>[0]);
 
         els.loadStatus.hidden = true;
+
+        // Load taxonomy suggestions in the background (non-blocking)
+        void loadTaxonomy();
       } catch (err) {
         els.loadStatus.textContent = err instanceof Error ? err.message : 'Failed to load draft.';
       }
@@ -1632,23 +3547,17 @@ const metadata = {
     els.btnPublish.addEventListener('click', async () => {
       if (!currentRequestId) return;
 
-      // Validation
       const title = els.pubTitle.value.trim();
-      const slug = els.pubSlug.value.trim();
+      const articlePath = els.pubArticlePath.value.trim();
 
       if (!title) {
         showFieldError(els.errTitle, 'Title is required.');
         els.pubTitle.focus();
         return;
       }
-      if (!slug) {
-        showFieldError(els.errSlug, 'Slug is required.');
-        els.pubSlug.focus();
-        return;
-      }
-      if (!isValidSlug(slug)) {
-        showFieldError(els.errSlug, 'Slug must be lowercase letters, numbers, and hyphens only.');
-        els.pubSlug.focus();
+      if (!articlePath) {
+        els.publishStatus.textContent = 'Article path not generated. Enter a title first.';
+        els.publishStatus.className = 'publish-status is-error';
         return;
       }
       if (!currentNodes.length) {
@@ -1801,10 +3710,7 @@ const metadata = {
       }
       const filtered = allDraftRows.filter(
         (d) =>
-          d.title?.toLowerCase().includes(q) ||
-          d.slug?.toLowerCase().includes(q) ||
-          d.id?.toLowerCase().includes(q) ||
-          d.author?.toLowerCase().includes(q)
+          d.title?.toLowerCase().includes(q) || d.id?.toLowerCase().includes(q) || d.author?.toLowerCase().includes(q)
       );
       renderDraftPickerRows(filtered);
     };
@@ -1853,6 +3759,7 @@ const metadata = {
 
     els.btnAllDrafts.addEventListener('click', openDraftPicker);
     els.btnOpenDraftList.addEventListener('click', openDraftPicker);
+    els.btnOpenDraftListInspector.addEventListener('click', openDraftPicker);
     els.btnModalClose.addEventListener('click', closeModal);
 
     els.btnModalRefresh.addEventListener('click', () => {
