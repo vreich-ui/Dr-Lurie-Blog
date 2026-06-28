@@ -236,6 +236,17 @@ function buildToolbar(editor: Editor, isAction: boolean, isList: boolean): HTMLE
       () => editor.isActive('link')
     );
 
+    // Disable link when nothing is selected and no link is active (Rule 2)
+    const refreshLinkDisabled = () => {
+      const off = editor.state.selection.empty && !editor.isActive('link');
+      linkBtn.disabled = off;
+      linkBtn.title = off ? 'Select text to add a link' : 'Link';
+      linkBtn.setAttribute('aria-label', off ? 'Select text to add a link' : 'Link');
+    };
+    refreshLinkDisabled();
+    editor.on('selectionUpdate', refreshLinkDisabled);
+    editor.on('transaction', refreshLinkDisabled);
+
     bar.append(
       btn(
         'bold',

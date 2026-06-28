@@ -829,21 +829,53 @@ const metadata = {
   }
   :global(.dl-node-badge-undo) {
     display: none;
+    align-items: center;
+    justify-content: center;
     background: none;
     border: none;
-    padding: 0;
+    padding: 0 0.1rem;
     font-size: inherit;
     font-family: inherit;
-    font-weight: 700;
-    text-decoration: underline;
     cursor: pointer;
     color: var(--aw-color-text-muted, #6b7280);
+    width: 1.1em;
+    height: 1.1em;
   }
   :global(.dl-node-badge.has-saved .dl-node-badge-undo) {
-    display: inline;
+    display: inline-flex;
   }
   :global(.dl-node-badge-undo:hover) {
     color: var(--aw-color-text-heading);
+  }
+
+  /* Lock state — another agent holds the lock: visually disable all edit controls */
+  :global(#article-workspace[data-lock='agent'] .dl-node-btn),
+  :global(#article-workspace[data-lock='agent'] #btn-save-meta),
+  :global(#article-workspace[data-lock='agent'] #btn-meta-undo),
+  :global(#article-workspace[data-lock='agent'] .dl-node-badge-undo),
+  :global(#article-workspace[data-lock='agent'] .dl-history-restore) {
+    pointer-events: none !important;
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+  }
+
+  /* Mutual exclusivity — manual editor open: disable AI on all blocks */
+  :global(#nodes-container[data-mode='editing'] .dl-node-btn.is-ai) {
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* Mutual exclusivity — AI open: disable edit/ai on all blocks */
+  :global(#nodes-container[data-mode='ai'] .dl-node-btn:not(.is-history)) {
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* History button disabled state */
+  :global(.dl-node-btn.is-history:disabled),
+  :global(.dl-icon-btn.is-history:disabled) {
+    opacity: 0.3;
+    pointer-events: none;
   }
 
   /* History popover */
@@ -1415,6 +1447,31 @@ const metadata = {
     let draftHistory: HistoryEntry[] = [];
     // Pending undo for metadata (set after a successful save, cleared on next save or undo)
     let metaUndoPayload: Record<string, unknown> | null = null;
+    // History button refs per node id — used to enable/disable after saves
+    const nodeHistBtns = new Map<string, HTMLButtonElement>();
+    // Current editor-mode: used for mutual exclusivity and CSS state
+    let editMode: 'idle' | 'editing' | 'ai' = 'idle';
+    const setMode = (m: typeof editMode) => {
+      editMode = m;
+      if (m === 'idle') {
+        delete els.nodesContainer.dataset.mode;
+      } else {
+        els.nodesContainer.dataset.mode = m;
+      }
+    };
+
+    // Enable/disable history buttons based on whether any entries exist
+    const updateHistoryButtonStates = () => {
+      const hasMetaHistory = draftHistory.some((e) => e.action === 'patch_canonical_input');
+      els.btnMetaHistory.disabled = !hasMetaHistory;
+      els.btnHeaderHistory.disabled = !hasMetaHistory;
+      for (const [nodeId, btn] of nodeHistBtns) {
+        const hasNodeHistory = draftHistory.some(
+          (e) => e.action === 'admin_update_node' && e.details?.nodeId === nodeId
+        );
+        btn.disabled = !hasNodeHistory;
+      }
+    };
 
     // ── Icon helper ───────────────────────────────────────────────────────────
     // Clones a pre-rendered SVG icon from the hidden template container.
@@ -1476,6 +1533,8 @@ const metadata = {
       delete els.lockBar.dataset.lockedByAgent;
       delete els.lockBar.dataset.held;
 
+      const agentHoldsLock = Boolean(!state.held && state.agentLock);
+
       if (state.held) {
         els.lockBar.dataset.held = 'true';
         els.lockIcon.textContent = '🔓';
@@ -1497,17 +1556,23 @@ const metadata = {
         els.btnForceRelease.hidden = true;
       }
 
-      updateReadinessPanel(Boolean(state.agentLock));
+      // Gate all edit controls via data-lock attribute (Rule 4)
+      els.articleWorkspace.dataset.lock = agentHoldsLock ? 'agent' : state.held ? 'held' : 'free';
+      els.btnSaveMeta.disabled = agentHoldsLock;
+
+      updateReadinessPanel(agentHoldsLock);
     };
 
     const resetLockBar = () => {
       els.lockBar.hidden = true;
       delete els.lockBar.dataset.held;
       delete els.lockBar.dataset.lockedByAgent;
+      delete els.articleWorkspace.dataset.lock;
       els.lockIcon.textContent = '';
       els.lockLabel.textContent = '';
       els.btnDoneEditing.hidden = true;
       els.btnForceRelease.hidden = true;
+      els.btnSaveMeta.disabled = false;
     };
 
     // ── Lock actions ──────────────────────────────────────────────────────────
@@ -1936,6 +2001,7 @@ const metadata = {
           action: 'patch_canonical_input',
           details: { previousPayload: currentPayloadForUndo, nextPayload: publishPayload },
         });
+        updateHistoryButtonStates();
 
         // If restoring a previous payload, apply its values to the form
         if (payloadOverride) applyMetaPayloadToForm(payloadOverride);
@@ -1987,6 +2053,7 @@ const metadata = {
     const renderArticle = (nodes: ArticleBodyNode[]) => {
       currentNodes = nodes;
       els.nodesContainer.innerHTML = '';
+      nodeHistBtns.clear();
 
       for (const node of nodes) {
         if (node.visibility && node.visibility !== 'public') continue;
@@ -2017,6 +2084,12 @@ const metadata = {
         histBtn.title = 'Block history';
         histBtn.append(cloneIcon('history', 'History'));
         histBtn.addEventListener('click', () => showHistoryPopover(histBtn, node.id));
+        // Disable initially if no history entries for this node (Rule 3)
+        const hasNodeHistory = draftHistory.some(
+          (e) => e.action === 'admin_update_node' && e.details?.nodeId === node.id
+        );
+        histBtn.disabled = !hasNodeHistory;
+        nodeHistBtns.set(node.id, histBtn);
 
         toolbar.append(editBtn, aiBtn, histBtn);
         wrapper.append(toolbar);
@@ -2037,7 +2110,9 @@ const metadata = {
         const badgeUndo = document.createElement('button');
         badgeUndo.type = 'button';
         badgeUndo.className = 'dl-node-badge-undo';
-        badgeUndo.textContent = '· Undo';
+        badgeUndo.title = 'Undo last save';
+        badgeUndo.setAttribute('aria-label', 'Undo last save');
+        badgeUndo.append(cloneIcon('arrow-back-up', '↩'));
 
         badge.append(badgeId, badgeSaved, badgeUndo);
         wrapper.append(badge);
@@ -2063,6 +2138,7 @@ const metadata = {
       activeNodeWrapper.removeAttribute('data-editing');
       activeEditor = null;
       activeNodeWrapper = null;
+      setMode('idle');
     };
 
     // Update the persistent badge after a block save: show "Saved · Undo" until next save or undo.
@@ -2100,6 +2176,7 @@ const metadata = {
 
     const onEditClick = async (node: ArticleBodyNode, wrapper: HTMLElement) => {
       if (wrapper.dataset.editing) return;
+      if (editMode === 'ai') return;
 
       // Dirty-check: if switching away from an unsaved editor, confirm first
       if (activeEditor?.isDirty() && activeNodeWrapper && activeNodeWrapper !== wrapper) {
@@ -2121,6 +2198,7 @@ const metadata = {
       wrapper.dataset.editing = 'true';
       activeNodeWrapper = wrapper;
       activeEditor = new NodeEditor();
+      setMode('editing');
 
       activeEditor.mount(node, wrapper, {
         onSave: async (updatedFields) => {
@@ -2131,6 +2209,8 @@ const metadata = {
               action: 'admin_update_node',
               details: { nodeId: node.id, previousPublic, nextPublic: updatedFields },
             });
+            const hBtn = nodeHistBtns.get(node.id);
+            if (hBtn) hBtn.disabled = false;
             closeActiveEditor(false);
             updateNodeBadge(wrapper, node.id, previousPublic);
           }
@@ -2143,6 +2223,7 @@ const metadata = {
     // ── AI ask flow ───────────────────────────────────────────────────────────
     const onAskAiClick = (node: ArticleBodyNode, wrapper: HTMLElement) => {
       if (!currentRequestId) return;
+      if (editMode === 'editing') return;
 
       let selectedText: string | undefined;
       if (wrapper.dataset.editing && activeEditor) {
@@ -2155,6 +2236,7 @@ const metadata = {
         }
       }
 
+      setMode('ai');
       showInstructionPopover(
         wrapper,
         selectedText,
@@ -2172,6 +2254,7 @@ const metadata = {
             token = await getToken();
           } catch {
             spinnerEl.remove();
+            setMode('idle');
             return;
           }
 
@@ -2186,6 +2269,7 @@ const metadata = {
 
           if (!result.ok) {
             alert(`AI request failed: ${result.error}`);
+            setMode('idle');
             return;
           }
 
@@ -2198,15 +2282,21 @@ const metadata = {
                 const acquired = await acquireLock();
                 if (!acquired) {
                   alert('Could not acquire edit lock to apply suggestion.');
+                  setMode('idle');
                   return;
                 }
               }
               await saveNodeUpdate(node.id, fields, wrapper, node);
+              setMode('idle');
             },
-            () => {}
+            () => {
+              setMode('idle');
+            }
           );
         },
-        () => {}
+        () => {
+          setMode('idle');
+        }
       );
     };
 
@@ -2249,9 +2339,11 @@ const metadata = {
 
       const newRendered = renderNode(updatedNode);
       const existingToolbar = wrapper.querySelector('.dl-node-toolbar');
+      const existingBadge = wrapper.querySelector('.dl-node-badge');
       wrapper.innerHTML = '';
       wrapper.append(newRendered);
       if (existingToolbar) wrapper.append(existingToolbar);
+      if (existingBadge) wrapper.append(existingBadge);
 
       updateReadinessPanel();
       return true;
@@ -2397,6 +2489,7 @@ const metadata = {
         const articleBody = content.article_body as { nodes?: ArticleBodyNode[] } | undefined;
         if (articleBody?.nodes?.length) {
           renderArticle(articleBody.nodes);
+          updateHistoryButtonStates();
           els.articleWorkspace.hidden = false;
         } else {
           els.loadStatus.textContent = 'This draft has no article body nodes yet.';
