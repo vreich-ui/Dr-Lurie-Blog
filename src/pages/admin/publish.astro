@@ -200,6 +200,7 @@ const metadata = {
     <span data-icon="arrow-back-up"><Icon name="tabler:arrow-back-up" aria-hidden="true" /></span>
     <span data-icon="arrow-forward-up"><Icon name="tabler:arrow-forward-up" aria-hidden="true" /></span>
     <span data-icon="rotate-clockwise"><Icon name="tabler:rotate-clockwise" aria-hidden="true" /></span>
+    <span data-icon="x"><Icon name="tabler:x" aria-hidden="true" /></span>
   </div>
 
   <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
@@ -1029,6 +1030,17 @@ const metadata = {
   }
   :global(.dark) :global(.dl-node-btn.is-history:hover) {
     color: rgb(147 197 253);
+  }
+  :global(.dl-node-btn.is-cancel) {
+    color: rgb(220 38 38);
+    border-color: rgb(220 38 38 / 40%);
+  }
+  :global(.dl-node-btn.is-cancel:hover) {
+    background: rgb(220 38 38 / 10%);
+    border-color: rgb(220 38 38 / 55%);
+  }
+  :global(.dark) :global(.dl-node-btn.is-cancel) {
+    color: rgb(248 113 113);
   }
 
   /* Active state for icon toolbar buttons */
@@ -1985,6 +1997,27 @@ const metadata = {
 
         const json = (await res.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
         if (!res.ok || !json.ok) {
+          if (res.status === 409) {
+            // Version conflict: another save (node or AI) advanced the record version.
+            // Re-fetch to sync currentRecordVersion, then restore the user's form values.
+            setMetaStatus('Draft changed since this panel loaded. Refreshing…');
+            try {
+              const freshToken = await getToken();
+              const refreshRes = await fetch(`${DRAFT_ENDPOINT}?draftId=${encodeURIComponent(currentRequestId)}`, {
+                headers: { Authorization: `Bearer ${freshToken}` },
+              });
+              const freshJson = (await refreshRes.json().catch(() => ({}))) as Record<string, unknown>;
+              if (typeof freshJson.recordVersion === 'number') {
+                currentRecordVersion = freshJson.recordVersion as number;
+              }
+              // Restore the user's unsaved edits to the form so they can retry
+              applyMetaPayloadToForm(currentPayloadForUndo);
+            } catch {
+              // ignore secondary fetch errors; user still sees retry prompt
+            }
+            setMetaStatus('Draft refreshed — try Save again.', 'is-error');
+            return;
+          }
           const errMsg = typeof json.error === 'string' ? json.error : `HTTP ${res.status}`;
           setMetaStatus(`Save failed: ${errMsg}`, 'is-error');
           return;
@@ -2065,11 +2098,22 @@ const metadata = {
         toolbar.className = 'dl-node-toolbar';
 
         const editBtn = document.createElement('button');
-        editBtn.className = 'dl-node-btn';
+        editBtn.className = 'dl-node-btn is-edit';
         editBtn.setAttribute('aria-label', 'Edit this block');
         editBtn.title = 'Edit this block';
         editBtn.append(cloneIcon('pencil', 'Edit'));
-        editBtn.addEventListener('click', () => onEditClick(node, wrapper));
+        editBtn.addEventListener('click', () => {
+          if (wrapper.dataset.editing) {
+            // Cancel flow: guard unsaved changes
+            if (!activeEditor?.isDirty()) {
+              closeActiveEditor(false);
+            } else if (window.confirm('Discard unsaved changes in this block?')) {
+              closeActiveEditor(false);
+            }
+          } else {
+            void onEditClick(node, wrapper);
+          }
+        });
 
         const aiBtn = document.createElement('button');
         aiBtn.className = 'dl-node-btn is-ai';
@@ -2135,6 +2179,15 @@ const metadata = {
     const closeActiveEditor = (save: boolean) => {
       if (!activeEditor || !activeNodeWrapper) return;
       if (!save) activeEditor.unmount();
+      // Restore the block's edit button from cancel (X) back to pencil
+      const eBtn = activeNodeWrapper.querySelector<HTMLButtonElement>('.dl-node-btn.is-edit');
+      if (eBtn) {
+        eBtn.innerHTML = '';
+        eBtn.append(cloneIcon('pencil', 'Edit'));
+        eBtn.setAttribute('aria-label', 'Edit this block');
+        eBtn.title = 'Edit this block';
+        eBtn.classList.remove('is-cancel');
+      }
       activeNodeWrapper.removeAttribute('data-editing');
       activeEditor = null;
       activeNodeWrapper = null;
@@ -2199,6 +2252,16 @@ const metadata = {
       activeNodeWrapper = wrapper;
       activeEditor = new NodeEditor();
       setMode('editing');
+
+      // Transform pencil button to cancel (X) while this block is in edit mode
+      const eBtn = wrapper.querySelector<HTMLButtonElement>('.dl-node-btn.is-edit');
+      if (eBtn) {
+        eBtn.innerHTML = '';
+        eBtn.append(cloneIcon('x', '✕'));
+        eBtn.setAttribute('aria-label', 'Cancel editing this block');
+        eBtn.title = 'Cancel editing this block';
+        eBtn.classList.add('is-cancel');
+      }
 
       activeEditor.mount(node, wrapper, {
         onSave: async (updatedFields) => {
@@ -2331,6 +2394,11 @@ const metadata = {
       if (!res.ok || !json.ok) {
         alert(`Save failed: ${typeof json.error === 'string' ? json.error : 'Unknown error'}`);
         return false;
+      }
+
+      // Node save increments the record version — keep our local copy in sync
+      if (typeof json.version === 'number') {
+        currentRecordVersion = json.version as number;
       }
 
       const updatedNode: ArticleBodyNode = { ...originalNode, public: { ...originalNode.public, ...updatedFields } };
