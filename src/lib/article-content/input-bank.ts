@@ -76,6 +76,7 @@ export const articleNodeTemplates: Record<string, ArticleNodeTemplate> = {
       },
       rendering: {
         presentation: 'section',
+        placement: 'inline',
       },
     },
   },
