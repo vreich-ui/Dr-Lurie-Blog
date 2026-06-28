@@ -117,6 +117,16 @@ export const handler = async (event: LambdaEvent) => {
     const updatedNodes = [...nodes.slice(0, nodeIndex), updated, ...nodes.slice(nodeIndex + 1)];
 
     const timestamp = new Date().toISOString();
+
+    // Snapshot: store only the fields that changed (previous and next values).
+    const changedKeys = Object.keys(updatedPublicFields) as (keyof typeof updatedPublicFields)[];
+    const previousPublic: Record<string, unknown> = {};
+    const nextPublic: Record<string, unknown> = {};
+    for (const k of changedKeys) {
+      previousPublic[k] = existing.public[k as keyof typeof existing.public];
+      nextPublic[k] = updatedPublicFields[k];
+    }
+
     const nextRecord: WorkflowRecord = {
       ...record,
       updated_at: timestamp,
@@ -135,7 +145,13 @@ export const handler = async (event: LambdaEvent) => {
         {
           at: timestamp,
           action: 'admin_update_node',
-          details: { nodeId, updated_by: adminState.userId },
+          details: {
+            nodeId,
+            updated_by: adminState.userId,
+            updated_by_email: adminState.email,
+            previousPublic,
+            nextPublic,
+          },
         },
       ],
       version: record.version + 1,

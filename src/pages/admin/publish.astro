@@ -1,4 +1,5 @@
 ---
+import { Icon } from 'astro-icon/components';
 import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
@@ -48,7 +49,18 @@ const metadata = {
       <div id="article-workspace" hidden>
         <!-- ── 1. Admin setup module ─────────────────────────── -->
         <section id="meta-editor" class="admin-setup-module" aria-label="Article setup">
-          <p class="setup-module-label">Article setup</p>
+          <div class="module-label-row">
+            <p class="setup-module-label">Article setup</p>
+            <button
+              id="btn-meta-history"
+              class="dl-icon-btn is-history"
+              type="button"
+              aria-label="View metadata save history"
+              title="Metadata history"
+            >
+              <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+            </button>
+          </div>
           <div class="setup-grid">
             <!-- Author -->
             <div class="field">
@@ -98,6 +110,15 @@ const metadata = {
           <div class="meta-actions">
             <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
             <p id="meta-status" class="meta-status" aria-live="polite"></p>
+            <button
+              id="btn-meta-undo"
+              class="btn-link meta-undo-btn"
+              type="button"
+              hidden
+              aria-label="Undo last metadata save"
+            >
+              Undo
+            </button>
           </div>
         </section>
 
@@ -119,6 +140,15 @@ const metadata = {
 
         <!-- ── 3. Article header (title + excerpt) ──────────── -->
         <section class="admin-card article-header-card" aria-label="Article title and excerpt">
+          <button
+            id="btn-header-history"
+            class="dl-icon-btn is-history article-header-history-btn"
+            type="button"
+            aria-label="View title/excerpt save history"
+            title="Title & excerpt history"
+          >
+            <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+          </button>
           <!-- Title — textarea for wrapping long titles -->
           <div class="field">
             <label for="pub-title" class="field-label">Title</label>
@@ -154,6 +184,13 @@ const metadata = {
       </div><!-- /article-workspace -->
     </div>
   </section>
+
+  <!-- ── Icon templates (pre-rendered at build time, cloned by JS at runtime) ── -->
+  <div id="icon-templates" aria-hidden="true" style="display:none">
+    <span data-icon="pencil"><Icon name="tabler:pencil" aria-hidden="true" /></span>
+    <span data-icon="sparkles"><Icon name="tabler:sparkles" aria-hidden="true" /></span>
+    <span data-icon="history"><Icon name="tabler:history" aria-hidden="true" /></span>
+  </div>
 
   <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
   <div id="draft-picker-modal" class="modal-backdrop" aria-hidden="true">
@@ -596,6 +633,7 @@ const metadata = {
 
   /* ── Article header card (title + excerpt) ───────────────────────────────────── */
   .article-header-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -679,6 +717,188 @@ const metadata = {
     box-shadow: 0 0 0 2px var(--aw-color-accent);
   }
 
+  /* Icon helpers */
+  .icon-sm {
+    width: 1em;
+    height: 1em;
+    display: block;
+  }
+
+  /* Module label row (label + history icon) */
+  .module-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  /* Icon-only buttons (dl-icon-btn): history / future actions */
+  :global(.dl-icon-btn) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 999px;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    color: var(--aw-color-text-muted, #6b7280);
+    cursor: pointer;
+    transition:
+      background 0.1s,
+      border-color 0.1s,
+      color 0.1s;
+    flex-shrink: 0;
+  }
+  :global(.dl-icon-btn:hover) {
+    background: rgb(209 213 219 / 40%);
+    border-color: rgb(156 163 175);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dl-icon-btn.is-history:hover) {
+    background: rgb(59 130 246 / 10%);
+    border-color: rgb(59 130 246 / 50%);
+    color: rgb(37 99 235);
+  }
+  :global(.dark) :global(.dl-icon-btn.is-history:hover) {
+    color: rgb(147 197 253);
+  }
+
+  /* History icon button flush to top-right of article-header-card */
+  .article-header-history-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  /* Meta undo button */
+  .meta-undo-btn {
+    font-size: 0.75rem;
+    padding: 0;
+    margin-left: 0.5rem;
+    text-decoration: underline;
+    color: var(--aw-color-text-muted, #6b7280);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .meta-undo-btn:hover {
+    color: var(--aw-color-text-heading);
+  }
+
+  /* Undo toast that appears briefly after a block save */
+  :global(.dl-node-save-toast) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    color: var(--aw-color-text-muted, #6b7280);
+    padding: 0.2rem 0.4rem 0.15rem;
+  }
+  :global(.dl-node-save-toast-undo) {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+    color: inherit;
+  }
+  :global(.dl-node-save-toast-undo:hover) {
+    color: var(--aw-color-text-heading);
+  }
+
+  /* History popover */
+  :global(.dl-history-popover) {
+    position: absolute;
+    z-index: 60;
+    right: 0;
+    top: calc(100% + 0.25rem);
+    min-width: 18rem;
+    max-width: min(24rem, calc(100vw - 2rem));
+    background: rgb(255 255 255);
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.875rem;
+    box-shadow:
+      0 4px 24px rgb(0 0 0 / 10%),
+      0 1px 4px rgb(0 0 0 / 6%);
+    overflow: hidden;
+  }
+  :global(.dark) :global(.dl-history-popover) {
+    background: rgb(15 23 42);
+    border-color: rgb(30 41 59);
+  }
+  :global(.dl-history-popover-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem 0.5rem;
+    border-bottom: 1px solid rgb(229 231 235);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  :global(.dark) :global(.dl-history-popover-header) {
+    border-color: rgb(30 41 59);
+  }
+  :global(.dl-history-popover-close) {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    color: inherit;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.25rem;
+  }
+  :global(.dl-history-popover-close:hover) {
+    background: rgb(229 231 235 / 60%);
+  }
+  :global(.dl-history-entry) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgb(229 231 235 / 60%);
+    font-size: 0.75rem;
+  }
+  :global(.dark) :global(.dl-history-entry) {
+    border-color: rgb(30 41 59 / 60%);
+  }
+  :global(.dl-history-entry:last-child) {
+    border-bottom: none;
+  }
+  :global(.dl-history-time) {
+    color: var(--aw-color-text-muted, #6b7280);
+    font-size: 0.68rem;
+  }
+  :global(.dl-history-restore) {
+    margin-top: 0.2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    color: var(--aw-color-accent);
+    text-align: left;
+  }
+  :global(.dl-history-restore:disabled) {
+    color: var(--aw-color-text-muted, #6b7280);
+    cursor: default;
+    opacity: 0.6;
+  }
+  :global(.dl-history-empty) {
+    padding: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--aw-color-text-muted, #6b7280);
+    text-align: center;
+  }
+
   /* Node toolbar — pill-shaped, site-styled */
   :global(.dl-node-toolbar) {
     position: absolute;
@@ -732,6 +952,14 @@ const metadata = {
   }
   :global(.dark) :global(.dl-node-btn.is-ai:hover) {
     color: rgb(192 132 252);
+  }
+  :global(.dl-node-btn.is-history:hover) {
+    background: rgb(59 130 246 / 10%);
+    border-color: rgb(59 130 246 / 45%);
+    color: rgb(37 99 235);
+  }
+  :global(.dark) :global(.dl-node-btn.is-history:hover) {
+    color: rgb(147 197 253);
   }
 
   /* TipTap editor chrome */
@@ -1119,6 +1347,10 @@ const metadata = {
       draftPickerEmpty: document.querySelector<HTMLElement>('#draft-picker-empty')!,
       btnAllDrafts: document.querySelector<HTMLButtonElement>('#btn-all-drafts')!,
       btnOpenDraftList: document.querySelector<HTMLButtonElement>('#btn-open-draft-list')!,
+      // History / undo
+      btnMetaHistory: document.querySelector<HTMLButtonElement>('#btn-meta-history')!,
+      btnHeaderHistory: document.querySelector<HTMLButtonElement>('#btn-header-history')!,
+      btnMetaUndo: document.querySelector<HTMLButtonElement>('#btn-meta-undo')!,
     };
 
     // ── State ──────────────────────────────────────────────────────────────────
@@ -1131,6 +1363,20 @@ const metadata = {
     let metadataSaved = false;
     let modalDraftsCache: DraftSummary[] | null = null;
     let allDraftRows: DraftSummary[] = [];
+    // History snapshots loaded from the workflow record
+    type HistoryEntry = { at: string; action: string; details?: Record<string, unknown> };
+    let draftHistory: HistoryEntry[] = [];
+    // Pending undo for metadata (set after a successful save, cleared on next save or undo)
+    let metaUndoPayload: Record<string, unknown> | null = null;
+
+    // ── Icon helper ───────────────────────────────────────────────────────────
+    // Clones a pre-rendered SVG icon from the hidden template container.
+    // Falls back to a text label if the template is missing (dev/test).
+    const cloneIcon = (name: string, fallback = ''): Node => {
+      const tmpl = document.querySelector<HTMLElement>(`[data-icon="${name}"]`);
+      if (tmpl) return tmpl.cloneNode(true);
+      return document.createTextNode(fallback);
+    };
 
     const getToken = async (): Promise<string> => {
       const token = await getAccessToken();
@@ -1341,7 +1587,128 @@ const metadata = {
       els.metaStatus.className = `meta-status${kind ? ' ' + kind : ''}`;
     };
 
-    // SEO character counter
+    // ── History popover ───────────────────────────────────────────────────────
+    let openPopover: HTMLElement | null = null;
+    const closeOpenPopover = () => {
+      openPopover?.remove();
+      openPopover = null;
+    };
+
+    const formatRelativeTime = (isoString: string): string => {
+      const diff = Date.now() - Date.parse(isoString);
+      if (diff < 60_000) return 'just now';
+      if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+      if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
+      return new Date(isoString).toLocaleDateString();
+    };
+
+    const showHistoryPopover = (
+      anchor: HTMLElement,
+      nodeId: string | 'metadata',
+      onRestore?: (entry: HistoryEntry) => void
+    ) => {
+      closeOpenPopover();
+
+      const entries =
+        nodeId === 'metadata'
+          ? draftHistory
+              .filter((e) => e.action === 'patch_canonical_input')
+              .slice(-8)
+              .reverse()
+          : draftHistory
+              .filter((e) => e.action === 'admin_update_node' && e.details?.nodeId === nodeId)
+              .slice(-8)
+              .reverse();
+
+      const pop = document.createElement('div');
+      pop.className = 'dl-history-popover';
+      pop.style.position = 'absolute';
+
+      const header = document.createElement('div');
+      header.className = 'dl-history-popover-header';
+      const title = document.createElement('span');
+      title.textContent = nodeId === 'metadata' ? 'Metadata history' : 'Block history';
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'dl-history-popover-close';
+      closeBtn.type = 'button';
+      closeBtn.setAttribute('aria-label', 'Close history');
+      closeBtn.textContent = '✕';
+      closeBtn.addEventListener('click', closeOpenPopover);
+      header.append(title, closeBtn);
+      pop.append(header);
+
+      if (entries.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'dl-history-empty';
+        empty.textContent = 'No saved history yet.';
+        pop.append(empty);
+      } else {
+        for (const entry of entries) {
+          const row = document.createElement('div');
+          row.className = 'dl-history-entry';
+
+          const time = document.createElement('span');
+          time.className = 'dl-history-time';
+          time.textContent = formatRelativeTime(entry.at);
+          time.title = new Date(entry.at).toLocaleString();
+          row.append(time);
+
+          if (nodeId === 'metadata' && entry.details?.previousPayload) {
+            const prev = entry.details.previousPayload as Record<string, unknown>;
+            const desc = document.createElement('span');
+            desc.textContent = `Title: "${String(prev.title ?? '').slice(0, 40) || '(none)'}"`;
+            row.append(desc);
+          } else if (nodeId !== 'metadata' && entry.details?.previousPublic) {
+            const prev = entry.details.previousPublic as Record<string, unknown>;
+            const bodySnippet = String(prev.body ?? prev.title ?? '(empty)')
+              .replace(/<[^>]+>/g, '')
+              .slice(0, 60);
+            const desc = document.createElement('span');
+            desc.textContent = bodySnippet || '(empty block)';
+            row.append(desc);
+          }
+
+          const restoreBtn = document.createElement('button');
+          restoreBtn.className = 'dl-history-restore';
+          restoreBtn.type = 'button';
+          const hasSnapshot =
+            nodeId === 'metadata' ? !!entry.details?.previousPayload : !!entry.details?.previousPublic;
+          restoreBtn.disabled = !hasSnapshot || !onRestore;
+          restoreBtn.textContent = hasSnapshot && onRestore ? 'Restore this version' : 'Restore (not available)';
+          if (hasSnapshot && onRestore) {
+            restoreBtn.addEventListener('click', () => {
+              onRestore(entry);
+              closeOpenPopover();
+            });
+          }
+          row.append(restoreBtn);
+          pop.append(row);
+        }
+      }
+
+      // Anchor popover to the button's parent (must be positioned)
+      const anchorParent = anchor.closest<HTMLElement>('.admin-setup-module, .article-header-card, .dl-node-wrapper');
+      if (anchorParent) {
+        if (!anchorParent.style.position || anchorParent.style.position === 'static') {
+          anchorParent.style.position = 'relative';
+        }
+        anchorParent.append(pop);
+      } else {
+        anchor.parentElement?.append(pop);
+      }
+      openPopover = pop;
+
+      // Close on outside click
+      const onOutside = (e: MouseEvent) => {
+        if (!pop.contains(e.target as Node) && e.target !== anchor) {
+          closeOpenPopover();
+          document.removeEventListener('mousedown', onOutside, true);
+        }
+      };
+      requestAnimationFrame(() => document.addEventListener('mousedown', onOutside, true));
+    };
+
+    // ── SEO character counter
     const updateSeoCharCount = () => {
       const len = els.pubSeo.value.length;
       els.seoCharCount.textContent = `${len}/180`;
@@ -1383,12 +1750,26 @@ const metadata = {
     }
 
     // ── Save metadata ─────────────────────────────────────────────────────────
-    const saveMetadata = async () => {
+    const applyMetaPayloadToForm = (payload: Record<string, unknown>) => {
+      els.pubTitle.value = String(payload.title ?? '');
+      els.pubExcerpt.value = String(payload.excerpt ?? '');
+      els.pubAuthor.value = String(payload.author ?? '');
+      els.pubDate.value = String(payload.publishDate ?? '');
+      els.pubCategory.value = String(payload.category ?? '');
+      els.pubTags.value = Array.isArray(payload.tags) ? (payload.tags as string[]).join(', ') : '';
+      els.pubSeo.value = String(payload.seoDescription ?? '');
+      const ap = String(payload.articlePath ?? '');
+      els.pubArticlePath.value = ap || generateArticlePath(els.pubTitle.value, currentRequestId);
+      autoResize(els.pubTitle);
+      updateSeoCharCount();
+    };
+
+    const saveMetadata = async (payloadOverride?: Record<string, unknown>) => {
       clearFieldError(els.errTitle);
       clearFieldError(els.errExcerpt);
 
-      const title = els.pubTitle.value.trim();
-      const articlePath = els.pubArticlePath.value.trim();
+      const title = payloadOverride ? String(payloadOverride.title ?? '') : els.pubTitle.value.trim();
+      const articlePath = payloadOverride ? String(payloadOverride.articlePath ?? '') : els.pubArticlePath.value.trim();
 
       let hasErrors = false;
       if (!title) {
@@ -1420,36 +1801,59 @@ const metadata = {
       }
 
       els.btnSaveMeta.disabled = true;
+      els.btnMetaUndo.hidden = true;
       setMetaStatus('Saving…');
 
-      const tags = els.pubTags.value
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
+      let publishPayload: Record<string, unknown>;
 
-      // Derive the slug from the generated path for backward compatibility
-      const derivedSlug = articlePath ? articlePath.replace('src/data/post/', '').replace('.md', '') : '';
+      if (payloadOverride) {
+        publishPayload = payloadOverride;
+      } else {
+        const tags = els.pubTags.value
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean);
 
-      const publishPayload: Record<string, unknown> = { title };
-      if (derivedSlug) publishPayload.slug = derivedSlug;
-      if (articlePath) publishPayload.articlePath = articlePath;
+        // Derive the slug from the generated path for backward compatibility
+        const derivedSlug = articlePath ? articlePath.replace('src/data/post/', '').replace('.md', '') : '';
 
-      const excerpt = els.pubExcerpt.value.trim();
-      if (excerpt) publishPayload.excerpt = excerpt;
+        publishPayload = { title };
+        if (derivedSlug) publishPayload.slug = derivedSlug;
+        if (articlePath) publishPayload.articlePath = articlePath;
 
-      const author = els.pubAuthor.value.trim();
-      if (author) publishPayload.author = author;
+        const excerpt = els.pubExcerpt.value.trim();
+        if (excerpt) publishPayload.excerpt = excerpt;
 
-      const publishDate = els.pubDate.value.trim();
-      if (publishDate) publishPayload.publishDate = publishDate;
+        const author = els.pubAuthor.value.trim();
+        if (author) publishPayload.author = author;
 
-      const seoDesc = els.pubSeo.value.trim();
-      if (seoDesc) publishPayload.seoDescription = seoDesc;
+        const publishDate = els.pubDate.value.trim();
+        if (publishDate) publishPayload.publishDate = publishDate;
 
-      const category = els.pubCategory.value.trim();
-      if (category) publishPayload.category = category;
+        const seoDesc = els.pubSeo.value.trim();
+        if (seoDesc) publishPayload.seoDescription = seoDesc;
 
-      if (tags.length) publishPayload.tags = tags;
+        const category = els.pubCategory.value.trim();
+        if (category) publishPayload.category = category;
+
+        if (tags.length) publishPayload.tags = tags;
+      }
+
+      // Capture current payload for undo before overwriting
+      const previousPayloadForUndo = metaUndoPayload ?? null;
+      const currentPayloadForUndo: Record<string, unknown> = {
+        title: els.pubTitle.value.trim(),
+        excerpt: els.pubExcerpt.value.trim(),
+        author: els.pubAuthor.value.trim(),
+        publishDate: els.pubDate.value.trim(),
+        category: els.pubCategory.value.trim(),
+        tags: els.pubTags.value
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+        seoDescription: els.pubSeo.value.trim(),
+        articlePath: els.pubArticlePath.value.trim(),
+      };
 
       try {
         const res = await fetch(PATCH_WORKFLOW_ENDPOINT, {
@@ -1479,8 +1883,27 @@ const metadata = {
           currentRecordVersion = record.version as number;
         }
 
+        // Update local history snapshot so the popover reflects this save
+        draftHistory.push({
+          at: new Date().toISOString(),
+          action: 'patch_canonical_input',
+          details: { previousPayload: currentPayloadForUndo, nextPayload: publishPayload },
+        });
+
+        // If restoring a previous payload, apply its values to the form
+        if (payloadOverride) applyMetaPayloadToForm(payloadOverride);
+
+        // Set undo target: one-step undo goes back to what the form showed before this save
+        metaUndoPayload = payloadOverride ? null : currentPayloadForUndo;
+        void previousPayloadForUndo; // not used for multi-step undo chain
+
         metadataSaved = true;
         setMetaStatus('✓ Metadata saved', 'is-ok');
+
+        if (metaUndoPayload) {
+          els.btnMetaUndo.hidden = false;
+        }
+
         updateReadinessPanel();
       } catch (err) {
         setMetaStatus(err instanceof Error ? err.message : 'Save failed.', 'is-error');
@@ -1489,7 +1912,29 @@ const metadata = {
       }
     };
 
-    els.btnSaveMeta.addEventListener('click', saveMetadata);
+    els.btnSaveMeta.addEventListener('click', () => saveMetadata());
+
+    els.btnMetaUndo.addEventListener('click', async () => {
+      if (!metaUndoPayload) return;
+      const target = metaUndoPayload;
+      metaUndoPayload = null;
+      els.btnMetaUndo.hidden = true;
+      await saveMetadata(target);
+    });
+
+    els.btnMetaHistory.addEventListener('click', () => {
+      showHistoryPopover(els.btnMetaHistory, 'metadata', (entry) => {
+        const prev = entry.details?.previousPayload as Record<string, unknown> | undefined;
+        if (prev) void saveMetadata(prev);
+      });
+    });
+
+    els.btnHeaderHistory.addEventListener('click', () => {
+      showHistoryPopover(els.btnHeaderHistory, 'metadata', (entry) => {
+        const prev = entry.details?.previousPayload as Record<string, unknown> | undefined;
+        if (prev) void saveMetadata(prev);
+      });
+    });
 
     // ── Node rendering ────────────────────────────────────────────────────────
     const renderArticle = (nodes: ArticleBodyNode[]) => {
@@ -1507,17 +1952,26 @@ const metadata = {
 
         const editBtn = document.createElement('button');
         editBtn.className = 'dl-node-btn';
+        editBtn.setAttribute('aria-label', 'Edit this block');
         editBtn.title = 'Edit this block';
-        editBtn.textContent = 'Edit';
+        editBtn.append(cloneIcon('pencil', 'Edit'));
         editBtn.addEventListener('click', () => onEditClick(node, wrapper));
 
         const aiBtn = document.createElement('button');
         aiBtn.className = 'dl-node-btn is-ai';
+        aiBtn.setAttribute('aria-label', 'Ask AI to revise this block');
         aiBtn.title = 'Ask AI to revise this block';
-        aiBtn.textContent = 'AI';
+        aiBtn.append(cloneIcon('sparkles', 'AI'));
         aiBtn.addEventListener('click', () => onAskAiClick(node, wrapper));
 
-        toolbar.append(editBtn, aiBtn);
+        const histBtn = document.createElement('button');
+        histBtn.className = 'dl-node-btn is-history';
+        histBtn.setAttribute('aria-label', 'View block edit history');
+        histBtn.title = 'Block history';
+        histBtn.append(cloneIcon('history', 'History'));
+        histBtn.addEventListener('click', () => showHistoryPopover(histBtn, node.id));
+
+        toolbar.append(editBtn, aiBtn, histBtn);
         wrapper.append(toolbar);
 
         wrapper.addEventListener('mouseup', () => {
@@ -1543,6 +1997,54 @@ const metadata = {
       activeNodeWrapper = null;
     };
 
+    // Show a one-step undo toast on the node toolbar after a successful block save.
+    const showNodeUndoToast = (
+      wrapper: HTMLElement,
+      nodeId: string,
+      previousPublic: Partial<ArticleBodyNode['public']>
+    ) => {
+      wrapper.querySelector('.dl-node-save-toast')?.remove();
+
+      const toast = document.createElement('div');
+      toast.className = 'dl-node-save-toast';
+
+      const msg = document.createElement('span');
+      msg.textContent = 'Saved';
+      toast.append(msg);
+
+      const undoBtn = document.createElement('button');
+      undoBtn.type = 'button';
+      undoBtn.className = 'dl-node-save-toast-undo';
+      undoBtn.textContent = '· Undo';
+      undoBtn.addEventListener('click', async () => {
+        toast.remove();
+        // Find the current node in state to pass as originalNode
+        const currentNode = currentNodes.find((n) => n.id === nodeId);
+        if (!currentNode) return;
+        const saved = await saveNodeUpdate(nodeId, previousPublic, wrapper, currentNode);
+        if (saved) {
+          // Also update local history
+          draftHistory.push({
+            at: new Date().toISOString(),
+            action: 'admin_update_node',
+            details: { nodeId, previousPublic: currentNode.public, nextPublic: previousPublic },
+          });
+        }
+      });
+      toast.append(undoBtn);
+
+      const toolbar = wrapper.querySelector('.dl-node-toolbar');
+      if (toolbar) {
+        toolbar.insertAdjacentElement('afterend', toast);
+      } else {
+        wrapper.append(toast);
+      }
+
+      // Auto-remove after 12 s if not acted on
+      const tid = setTimeout(() => toast.remove(), 12_000);
+      undoBtn.addEventListener('click', () => clearTimeout(tid), { once: true });
+    };
+
     const onEditClick = async (node: ArticleBodyNode, wrapper: HTMLElement) => {
       if (wrapper.dataset.editing) return;
       closeActiveEditor(false);
@@ -1553,6 +2055,9 @@ const metadata = {
         if (!acquired) return;
       }
 
+      // Snapshot public fields before editing for Cancel and one-step undo
+      const previousPublic = { ...node.public } as Partial<ArticleBodyNode['public']>;
+
       wrapper.dataset.editing = 'true';
       activeNodeWrapper = wrapper;
       activeEditor = new NodeEditor();
@@ -1560,7 +2065,16 @@ const metadata = {
       activeEditor.mount(node, wrapper, {
         onSave: async (updatedFields) => {
           const saved = await saveNodeUpdate(node.id, updatedFields, wrapper, node);
-          if (saved) closeActiveEditor(false);
+          if (saved) {
+            // Push local history entry so the popover reflects this save immediately
+            draftHistory.push({
+              at: new Date().toISOString(),
+              action: 'admin_update_node',
+              details: { nodeId: node.id, previousPublic, nextPublic: updatedFields },
+            });
+            closeActiveEditor(false);
+            showNodeUndoToast(wrapper, node.id, previousPublic);
+          }
         },
         onCancel: () => closeActiveEditor(false),
       });
@@ -1704,6 +2218,10 @@ const metadata = {
       currentNodes = [];
       currentRecordVersion = 0;
       metadataSaved = false;
+      draftHistory = [];
+      metaUndoPayload = null;
+      els.btnMetaUndo.hidden = true;
+      closeOpenPopover();
       els.readinessGroups.innerHTML = '';
       els.readinessLabel.textContent = '';
       els.readinessLabel.className = 'readiness-pill';
@@ -1751,6 +2269,11 @@ const metadata = {
         if (typeof json.recordVersion === 'number') {
           currentRecordVersion = json.recordVersion as number;
         }
+
+        // Load history snapshots for this draft
+        draftHistory = Array.isArray(json.history) ? (json.history as HistoryEntry[]) : [];
+        metaUndoPayload = null;
+        els.btnMetaUndo.hidden = true;
 
         const input = (json.input ?? {}) as Record<string, unknown>;
         const content = (input.content ?? {}) as Record<string, unknown>;

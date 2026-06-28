@@ -118,7 +118,12 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
     const draft = await toDraftPreview(record);
 
-    return jsonResponse(200, { draft, input: record.input, recordVersion: record.version });
+    // Return only admin-snapshot history entries to keep the payload lean.
+    const adminHistory = record.history.filter(
+      (e) => e.action === 'admin_update_node' || e.action === 'patch_canonical_input'
+    );
+
+    return jsonResponse(200, { draft, input: record.input, recordVersion: record.version, history: adminHistory });
   } catch (error) {
     console.error('Failed to load admin JSON draft.', error);
 
