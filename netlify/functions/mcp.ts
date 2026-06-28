@@ -447,7 +447,9 @@ const articleBodyNodeJsonSchema = objectSchema(
       invitationText: stringSchema('Visible chat invitation text.'),
       suggestedQuery: stringSchema('Suggested chat query.'),
     }),
-    rendering: metadataBagSchema('Optional rendering hints such as presentation, placement, or emphasis.'),
+    rendering: metadataBagSchema(
+      'Optional rendering hints such as presentation, placement, or emphasis. Set placement=inline only when public.media should render inside the article body.'
+    ),
     visibility: { type: 'string', enum: ['public', 'internal', 'hidden'] },
   },
   ['id', 'kind', 'public'],

@@ -16,8 +16,6 @@ metadata:
 
 ### Moisturizer is a category, not one promise
 
-![Moisturizer is a category, not one promise](~/assets/images/uploads/moisturizer-is-not-just-hydration-what-barrier-products-are-really-trying-to-do/moisturizer-barrier-editorial-featured.webp)
-
 Moisturizer sounds simple until you start shopping. One product says hydration, another says barrier repair, another says firming, plumping, ceramides, peptides, or anti-aging.
 
 The useful question is not which word sounds strongest. It is what your skin needs right now: less tightness, less roughness, less stinging, lighter feel, richer protection, or fewer clogged-feeling layers.

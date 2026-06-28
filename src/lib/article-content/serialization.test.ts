@@ -97,7 +97,7 @@ describe('Article Body Serialization and Safety', () => {
       assert.ok(md.includes('Sponsored offer'));
     });
 
-    it('should render media as a markdown image', () => {
+    it('should not render media as a markdown image by default', () => {
       const body: ArticleBodyV1 = {
         schema_version: 'article_body.v1',
         nodes: [
@@ -111,6 +111,29 @@ describe('Article Body Serialization and Safety', () => {
                 src: 'src/assets/images/test.jpg',
               },
             },
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(!md.includes('![Alt Text](~/assets/images/test.jpg)'));
+    });
+
+    it('should render media as a markdown image when placement is inline', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_media',
+            kind: 'content',
+            public: {
+              title: 'Node Title',
+              media: {
+                type: 'image',
+                src: 'src/assets/images/test.jpg',
+                alt: 'Alt Text',
+              },
+            },
+            rendering: { placement: 'inline' },
           },
         ],
       };

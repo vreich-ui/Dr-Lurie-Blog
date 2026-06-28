@@ -56,7 +56,9 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
   }
 
   // 2.5 Media rendering
-  if (node.public?.media) {
+  // public.media is also used to select the article featured image. Only render it
+  // inside the Markdown body when the node explicitly opts in to inline placement.
+  if (node.public?.media && node.rendering?.placement === 'inline') {
     const media = node.public.media;
     let url = '';
     if (typeof media === 'string') {
@@ -71,7 +73,9 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
     if (url) {
       // Normalize src/assets paths to ~/assets for Astro component compatibility
       const displayUrl = url.replace(/^src\/assets\//, '~/assets/');
-      parts.push(`![${node.public.title || ''}](${displayUrl})`);
+      const altText =
+        typeof media === 'object' && media !== null ? media.alt || node.public.title || '' : node.public.title || '';
+      parts.push(`![${altText}](${displayUrl})`);
     }
   }
 
