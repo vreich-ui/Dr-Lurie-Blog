@@ -177,7 +177,11 @@ function renderImagePlaceholder(label: string, note?: string): HTMLElement {
   const text = el('span', { class: 'text-xs text-muted opacity-60 text-center px-4' }, label || 'Image placeholder');
   wrap.append(icon, text);
   if (note) {
-    const noteEl = el('span', { class: 'text-xs text-orange-500 dark:text-orange-400 opacity-80 text-center px-4' }, note);
+    const noteEl = el(
+      'span',
+      { class: 'text-xs text-orange-500 dark:text-orange-400 opacity-80 text-center px-4' },
+      note
+    );
     wrap.append(noteEl);
   }
   return wrap;
