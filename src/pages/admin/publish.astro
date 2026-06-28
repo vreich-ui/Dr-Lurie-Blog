@@ -108,33 +108,19 @@ const metadata = {
               <button id="btn-done-editing" class="btn-ghost-xs" type="button" hidden>Done editing</button>
             </div>
 
-            <!-- ── Metadata section ──────────────────────────── -->
-            <section id="meta-editor" class="inspector-section" aria-label="Article setup">
+            <!-- ── General section (Author, Date, Category) ─── -->
+            <section id="general-editor" class="inspector-section" aria-label="General settings">
               <div class="inspector-section-head">
                 <span class="inspector-section-title">
-                  Metadata
-                  <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
+                  General
+                  <span id="general-dirty-dot" class="dirty-indicator" hidden></span>
                 </span>
                 <div class="inspector-section-actions">
-                  <p id="meta-status" class="meta-status-inline" aria-live="polite"></p>
-                  <button id="btn-meta-toggle" class="btn-ghost-xs" type="button">Edit</button>
-                  <button
-                    id="btn-meta-history"
-                    class="btn-icon-xs dl-icon-btn is-history"
-                    type="button"
-                    aria-label="View metadata save history"
-                    title="Metadata history"
-                  >
-                    <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
-                  </button>
+                  <button id="btn-general-toggle" class="btn-ghost-xs" type="button">Edit</button>
                 </div>
               </div>
-
-              <!-- Compact summary (visible by default) -->
-              <dl id="meta-summary" class="meta-summary-list"></dl>
-
-              <!-- Expanded form (hidden by default) -->
-              <div id="meta-form" class="meta-form" hidden>
+              <p id="general-summary" class="section-summary-text"></p>
+              <div id="general-form" class="meta-form" hidden>
                 <div class="setup-grid">
                   <div class="field">
                     <label for="pub-author" class="field-label">Author</label>
@@ -165,6 +151,33 @@ const metadata = {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── Metadata section (Tags, SEO, Path) ─────────── -->
+            <section id="meta-editor" class="inspector-section" aria-label="Metadata">
+              <div class="inspector-section-head">
+                <span class="inspector-section-title">
+                  Metadata
+                  <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
+                </span>
+                <div class="inspector-section-actions">
+                  <button id="btn-meta-toggle" class="btn-ghost-xs" type="button">Edit</button>
+                  <button
+                    id="btn-meta-history"
+                    class="btn-icon-xs dl-icon-btn is-history"
+                    type="button"
+                    aria-label="View metadata save history"
+                    title="Metadata history"
+                  >
+                    <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+              <p id="meta-summary" class="section-summary-text"></p>
+              <div id="meta-form" class="meta-form" hidden>
+                <div class="setup-grid">
                   <div class="field field-full">
                     <label for="pub-tags-input" class="field-label">Tags</label>
                     <div id="pub-tags-container" class="tag-input-container">
@@ -219,18 +232,21 @@ const metadata = {
                     </div>
                   </div>
                 </div>
-                <div class="meta-actions">
-                  <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
-                  <button
-                    id="btn-meta-undo"
-                    class="btn-link meta-undo-btn"
-                    type="button"
-                    hidden
-                    aria-label="Undo last metadata save">Undo</button
-                  >
-                </div>
               </div>
             </section>
+
+            <!-- ── Shared save row ────────────────────────────── -->
+            <div class="meta-save-row">
+              <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
+              <button
+                id="btn-meta-undo"
+                class="btn-link meta-undo-btn"
+                type="button"
+                hidden
+                aria-label="Undo last metadata save">Undo</button
+              >
+              <p id="meta-status" class="meta-status-inline" aria-live="polite"></p>
+            </div>
 
             <!-- ── Readiness + publish ───────────────────────── -->
             <div id="readiness-strip" class="readiness-strip">
@@ -355,6 +371,37 @@ const metadata = {
     gap: 1rem;
   }
 
+  /* Inspector content — flex column so children stack with gaps */
+  #inspector-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  /* Section summary — single-line compact text */
+  .section-summary-text {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--aw-color-text-default);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.4;
+  }
+  .section-summary-text.is-empty {
+    color: var(--aw-color-text-muted);
+    font-style: italic;
+  }
+
+  /* Shared save row below both inspector sections */
+  .meta-save-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
   /* Lock row — slim one-liner */
   .lock-row {
     display: flex;
@@ -464,37 +511,6 @@ const metadata = {
     align-items: center;
     gap: 0.25rem;
     flex-shrink: 0;
-  }
-
-  /* ── Compact metadata summary ──────────────────────────────────────────────── */
-  .meta-summary-list {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.12rem 0.5rem;
-    margin: 0;
-    font-size: 0.77rem;
-  }
-  .meta-summary-list dt {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--aw-color-text-muted);
-    white-space: nowrap;
-    align-self: center;
-    margin: 0;
-  }
-  .meta-summary-list dd {
-    margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--aw-color-text-default);
-    font-size: 0.78rem;
-  }
-  .meta-summary-list dd.is-empty {
-    color: var(--aw-color-text-muted);
-    font-style: italic;
   }
 
   /* Collapsed form wrapper */
@@ -1958,6 +1974,12 @@ const metadata = {
       seoCharCount: document.querySelector<HTMLElement>('#seo-char-count')!,
       btnSaveMeta: document.querySelector<HTMLButtonElement>('#btn-save-meta')!,
       metaStatus: document.querySelector<HTMLElement>('#meta-status')!,
+      // General section (Author, Date, Category)
+      generalSummary: document.querySelector<HTMLElement>('#general-summary')!,
+      generalForm: document.querySelector<HTMLElement>('#general-form')!,
+      btnGeneralToggle: document.querySelector<HTMLButtonElement>('#btn-general-toggle')!,
+      generalDirtyDot: document.querySelector<HTMLElement>('#general-dirty-dot')!,
+      // Metadata section (Tags, SEO, Path)
       metaSummary: document.querySelector<HTMLElement>('#meta-summary')!,
       metaForm: document.querySelector<HTMLElement>('#meta-form')!,
       btnMetaToggle: document.querySelector<HTMLButtonElement>('#btn-meta-toggle')!,
@@ -2002,6 +2024,12 @@ const metadata = {
       btnHeaderHistory: document.querySelector<HTMLButtonElement>('#btn-header-history')!,
       btnMetaUndo: document.querySelector<HTMLButtonElement>('#btn-meta-undo')!,
     };
+
+    // If a draftId is in the URL, hide the no-draft placeholder immediately so
+    // it doesn't flash when the page becomes visible during the auth check.
+    if (initialDraftId) {
+      els.noDraft.hidden = true;
+    }
 
     // ── State ──────────────────────────────────────────────────────────────────
     let lockManager: LockManager | null = null;
@@ -2330,52 +2358,52 @@ const metadata = {
       els.metaStatus.className = `meta-status-inline${kind ? ' ' + kind : ''}`;
     };
 
-    // ── Metadata compact summary ──────────────────────────────────────────────
-    const updateMetaSummary = () => {
-      const rows: { label: string; value: string }[] = [
-        { label: 'Author', value: els.pubAuthor.value.trim() },
-        { label: 'Date', value: els.pubDate.value.trim() },
-        { label: 'Category', value: selectedCategory ?? '' },
-        {
-          label: 'Tags',
-          value:
-            selectedTags.length === 0
-              ? ''
-              : selectedTags.slice(0, 2).join(', ') + (selectedTags.length > 2 ? ` +${selectedTags.length - 2}` : ''),
-        },
-        {
-          label: 'SEO',
-          value: els.pubSeo.value.trim() ? `${els.pubSeo.value.trim().length}/180 chars` : '',
-        },
-        {
-          label: 'Path',
-          value: (() => {
-            const p = els.pubArticlePath.value.trim();
-            if (!p) return '';
-            const parts = p.split('/');
-            return parts[parts.length - 1] || p;
-          })(),
-        },
-      ];
+    // ── Section summaries (one-line compact text) ─────────────────────────────
 
-      els.metaSummary.innerHTML = '';
-      for (const { label, value } of rows) {
-        const dt = document.createElement('dt');
-        dt.textContent = label;
-        const dd = document.createElement('dd');
-        dd.textContent = value || '—';
-        if (!value) dd.classList.add('is-empty');
-        els.metaSummary.append(dt, dd);
-      }
+    const updateGeneralSummary = () => {
+      const author = els.pubAuthor.value.trim();
+      const date = (() => {
+        const d = els.pubDate.value.trim();
+        if (!d) return '';
+        try {
+          const parsed = new Date(d);
+          if (Number.isFinite(parsed.getTime())) {
+            return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          }
+        } catch {
+          return d;
+        }
+        return d;
+      })();
+      const category = selectedCategory ?? '';
+      const parts = [author, date, category].filter(Boolean);
+      els.generalSummary.textContent = parts.length > 0 ? parts.join(' · ') : '—';
+      els.generalSummary.className = `section-summary-text${parts.length === 0 ? ' is-empty' : ''}`;
+    };
+
+    const updateMetaSummary = () => {
+      const tagsText =
+        selectedTags.length === 0 ? '' : `${selectedTags.length} tag${selectedTags.length === 1 ? '' : 's'}`;
+      const seoText = els.pubSeo.value.trim() ? `SEO ${els.pubSeo.value.trim().length}/180` : '';
+      const pathText = els.pubArticlePath.value.trim() ? 'path set' : '';
+      const parts = [tagsText, seoText, pathText].filter(Boolean);
+      els.metaSummary.textContent = parts.length > 0 ? parts.join(' · ') : '—';
+      els.metaSummary.className = `section-summary-text${parts.length === 0 ? ' is-empty' : ''}`;
+    };
+
+    const toggleGeneralForm = (forceOpen?: boolean) => {
+      const isOpen = !els.generalForm.hidden;
+      const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (!open && isOpen) updateGeneralSummary();
+      els.generalForm.hidden = !open;
+      els.generalSummary.hidden = open;
+      els.btnGeneralToggle.textContent = open ? 'Done' : 'Edit';
     };
 
     const toggleMetaForm = (forceOpen?: boolean) => {
       const isOpen = !els.metaForm.hidden;
       const open = forceOpen !== undefined ? forceOpen : !isOpen;
-      if (!open && isOpen) {
-        // Closing — refresh summary first
-        updateMetaSummary();
-      }
+      if (!open && isOpen) updateMetaSummary();
       els.metaForm.hidden = !open;
       els.metaSummary.hidden = open;
       els.btnMetaToggle.textContent = open ? 'Done' : 'Edit';
@@ -2515,6 +2543,16 @@ const metadata = {
       els.pubArticlePath.value = title ? generateArticlePath(title, currentRequestId) : '';
     };
 
+    const markGeneralDirty = () => {
+      metadataDirty = true;
+      els.generalDirtyDot.hidden = false;
+      if (metadataSaved) {
+        metadataSaved = false;
+        setMetaStatus('Unsaved changes');
+      }
+      updateReadinessPanel();
+    };
+
     const markMetaDirty = () => {
       metadataDirty = true;
       els.metaDirtyDot.hidden = false;
@@ -2543,7 +2581,12 @@ const metadata = {
         if (field === els.pubExcerpt) {
           clearFieldError(els.errExcerpt);
         }
-        markMetaDirty();
+        // Author/Date belong to the General section; SEO to the Metadata section
+        if (field === els.pubAuthor || field === els.pubDate) {
+          markGeneralDirty();
+        } else {
+          markMetaDirty();
+        }
       });
     }
 
@@ -2663,7 +2706,7 @@ const metadata = {
         removeBtn.addEventListener('click', () => {
           selectedCategory = null;
           renderCategoryChip();
-          markMetaDirty();
+          markGeneralDirty();
         });
         chip.append(text, removeBtn);
         els.pubCategoryChips.append(chip);
@@ -2709,7 +2752,7 @@ const metadata = {
       els.pubCategoryInput.value = '';
       els.pubCategorySuggestions.hidden = true;
       renderCategoryChip();
-      markMetaDirty();
+      markGeneralDirty();
     };
 
     els.pubCategoryInput.addEventListener('input', () => showCategorySuggestions(els.pubCategoryInput.value));
@@ -2747,6 +2790,7 @@ const metadata = {
       renderCategoryChip();
       autoResize(els.pubTitle);
       updateSeoCharCount();
+      updateGeneralSummary();
       updateMetaSummary();
     };
 
@@ -2897,9 +2941,12 @@ const metadata = {
 
         metadataSaved = true;
         metadataDirty = false;
+        els.generalDirtyDot.hidden = true;
         els.metaDirtyDot.hidden = true;
         setMetaStatus('Saved', 'is-ok');
+        updateGeneralSummary();
         updateMetaSummary();
+        toggleGeneralForm(false);
         toggleMetaForm(false);
 
         if (metaUndoPayload) {
@@ -2914,6 +2961,7 @@ const metadata = {
       }
     };
 
+    els.btnGeneralToggle.addEventListener('click', () => toggleGeneralForm());
     els.btnMetaToggle.addEventListener('click', () => toggleMetaForm());
 
     els.btnCopyPath.addEventListener('click', async () => {
@@ -3319,6 +3367,7 @@ const metadata = {
       draftHistory = [];
       metaUndoPayload = null;
       els.btnMetaUndo.hidden = true;
+      els.generalDirtyDot.hidden = true;
       els.metaDirtyDot.hidden = true;
       closeOpenPopover();
       els.readinessGroups.innerHTML = '';
@@ -3329,9 +3378,12 @@ const metadata = {
       els.readinessAudit.hidden = true;
       els.readinessToggle.textContent = 'Details';
       els.readinessToggle.setAttribute('aria-expanded', 'false');
-      // Reset form to compact summary view
+      // Reset both sections to compact summary view
+      toggleGeneralForm(false);
+      els.generalSummary.textContent = '';
+      els.generalDirtyDot.hidden = true;
       toggleMetaForm(false);
-      els.metaSummary.innerHTML = '';
+      els.metaSummary.textContent = '';
       setMetaStatus('');
       // Reset tag/category pickers
       selectedTags = [];
@@ -3451,6 +3503,8 @@ const metadata = {
         renderCategoryChip();
         updateSeoCharCount();
         autoResize(els.pubTitle);
+        updateGeneralSummary();
+        updateMetaSummary();
 
         // Consider metadata saved if a publish_payload with title exists
         if (publishPayload.title) {
