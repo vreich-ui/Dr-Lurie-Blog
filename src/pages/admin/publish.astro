@@ -32,7 +32,7 @@ const metadata = {
           <!-- ── Article header (title + excerpt) — hidden until draft loaded ── -->
           <section
             id="article-header-card"
-            class="admin-card article-header-card"
+            class="article-header-card"
             aria-label="Article title and excerpt"
             hidden
           >
@@ -46,7 +46,7 @@ const metadata = {
               <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
             </button>
             <div class="field">
-              <label for="pub-title" class="field-label">Title</label>
+              <label for="pub-title" class="sr-only">Title</label>
               <textarea
                 id="pub-title"
                 name="title"
@@ -58,7 +58,7 @@ const metadata = {
               <p class="field-error" id="err-title" role="alert" hidden></p>
             </div>
             <div class="field">
-              <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
+              <label for="pub-excerpt" class="sr-only">Excerpt / deck</label>
               <textarea
                 id="pub-excerpt"
                 name="excerpt"
@@ -92,8 +92,26 @@ const metadata = {
             <div id="lock-bar" class="lock-row" hidden>
               <span id="lock-icon" class="lock-row-icon" aria-hidden="true"></span>
               <span id="lock-label" class="lock-label"></span>
-              <button id="btn-force-release" class="btn-ghost-xs" type="button" hidden>Force release</button>
-              <button id="btn-done-editing" class="btn-ghost-xs" type="button" hidden>Done editing</button>
+              <button
+                id="btn-force-release"
+                class="btn-icon-lock"
+                type="button"
+                hidden
+                aria-label="Force release agent lock"
+                title="Force release agent lock"
+              >
+                <Icon name="tabler:x" class="icon-sm" aria-hidden="true" />
+              </button>
+              <button
+                id="btn-done-editing"
+                class="btn-icon-lock"
+                type="button"
+                hidden
+                aria-label="Done editing"
+                title="Done editing"
+              >
+                <Icon name="tabler:check" class="icon-sm" aria-hidden="true" />
+              </button>
             </div>
 
             <!-- ── General section (Author, Date, Category) ─── -->
@@ -151,33 +169,22 @@ const metadata = {
 
             <!-- ── Metadata section (Tags, SEO, Path) ─────────── -->
             <section id="meta-editor" class="inspector-section" aria-label="Metadata">
-              <div class="inspector-section-head-row">
-                <button
-                  id="btn-meta-toggle"
-                  class="inspector-section-head inspector-section-toggle"
-                  type="button"
-                  aria-expanded="false"
-                  aria-controls="meta-form"
-                >
-                  <div class="inspector-section-head-text">
-                    <span class="inspector-section-title">
-                      Metadata
-                      <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
-                    </span>
-                    <span id="meta-summary" class="section-summary-text"></span>
-                  </div>
-                  <Icon name="tabler:chevron-down" class="toggle-caret icon-sm" aria-hidden="true" />
-                </button>
-                <button
-                  id="btn-meta-history"
-                  class="btn-icon-xs dl-icon-btn is-history"
-                  type="button"
-                  aria-label="View metadata save history"
-                  title="Metadata history"
-                >
-                  <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
-                </button>
-              </div>
+              <button
+                id="btn-meta-toggle"
+                class="inspector-section-head inspector-section-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="meta-form"
+              >
+                <div class="inspector-section-head-text">
+                  <span class="inspector-section-title">
+                    Metadata
+                    <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
+                  </span>
+                  <span id="meta-summary" class="section-summary-text"></span>
+                </div>
+                <Icon name="tabler:chevron-down" class="toggle-caret icon-sm" aria-hidden="true" />
+              </button>
               <div id="meta-form" class="meta-form" hidden>
                 <div class="setup-grid">
                   <div class="field field-full">
@@ -374,12 +381,29 @@ const metadata = {
     gap: 1rem;
   }
 
-  /* Inspector content — flex column so children stack with gaps */
+  /* Inspector content — unified floating panel, single border/shadow */
   #inspector-content {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0;
     min-width: 0;
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.92);
+    box-shadow: 0 1px 6px rgb(15 23 42 / 5%);
+    overflow: hidden;
+  }
+  :global(.dark) #inspector-content {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.75);
+    box-shadow: none;
+  }
+  /* Hairline divider between every pair of consecutive visible children */
+  #inspector-content > :not([hidden]) + :not([hidden]) {
+    border-top: 1px solid rgb(229 231 235 / 70%);
+  }
+  :global(.dark) #inspector-content > :not([hidden]) + :not([hidden]) {
+    border-top-color: rgb(30 41 59 / 80%);
   }
 
   /* Section summary — single-line compact text, shown when section is collapsed */
@@ -404,40 +428,36 @@ const metadata = {
     align-items: center;
     gap: 0.5rem;
     flex-wrap: wrap;
+    padding: 0.45rem 0.7rem;
   }
 
-  /* Lock row — slim one-liner, always block-flow inside inspector-content */
+  /* Lock row — slim one-liner, no individual card chrome */
   .lock-row {
     display: flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 0.5rem;
-    border: 1px solid rgb(229 231 235);
-    background: transparent;
+    padding: 0.35rem 0.7rem;
     font-size: 0.76rem;
     font-weight: 600;
     color: var(--aw-color-text-muted);
     flex-shrink: 0;
-  }
-  :global(.dark) .lock-row {
-    border-color: rgb(51 65 85);
+    background: transparent;
   }
   .lock-row[data-locked-by-agent] {
-    border-color: rgb(239 68 68 / 30%);
     color: rgb(185 28 28);
-    background: rgb(239 68 68 / 4%);
+    background: rgb(239 68 68 / 5%);
   }
   :global(.dark) .lock-row[data-locked-by-agent] {
     color: rgb(252 165 165);
+    background: rgb(239 68 68 / 8%);
   }
   .lock-row[data-held] {
-    border-color: rgb(16 185 129 / 35%);
     color: rgb(6 95 70);
-    background: rgb(16 185 129 / 4%);
+    background: rgb(16 185 129 / 5%);
   }
   :global(.dark) .lock-row[data-held] {
     color: rgb(110 231 183);
+    background: rgb(16 185 129 / 8%);
   }
   .lock-row-icon {
     display: inline-flex;
@@ -477,19 +497,13 @@ const metadata = {
     background: rgb(15 23 42 / 0.7);
   }
 
-  /* ── Inspector section (replaces admin-setup-module for the inspector panel) ── */
+  /* ── Inspector section — no individual card chrome (lives inside unified panel) ── */
   .inspector-section {
-    border: 1px solid rgb(229 231 235 / 80%);
-    border-radius: 0.75rem;
-    background: rgb(249 250 251 / 0.7);
     padding: 0.6rem 0.7rem 0.7rem;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
-  :global(.dark) .inspector-section {
-    border-color: rgb(30 41 59 / 70%);
-    background: rgb(15 23 42 / 0.35);
+    background: transparent;
   }
 
   /* Row containing toggle button + optional icon buttons (e.g. Metadata + history btn) */
@@ -572,6 +586,11 @@ const metadata = {
     flex-direction: column;
     gap: 0.5rem;
   }
+  /* display:flex would override [hidden]{display:none} — both are (0,1,0) specificity.
+     Adding the attribute selector raises this rule to (0,2,0) so hidden wins. */
+  .meta-form[hidden] {
+    display: none !important;
+  }
 
   /* Inline status next to section title actions */
   .meta-status-inline {
@@ -599,6 +618,30 @@ const metadata = {
     border-radius: 50%;
     background: rgb(245 158 11);
     flex-shrink: 0;
+  }
+
+  /* ── Icon-only lock action buttons (Force release, Done editing) ──────────── */
+  .btn-icon-lock {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 0.3rem;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    opacity: 0.65;
+    transition:
+      opacity 0.1s,
+      background 0.1s;
+  }
+  .btn-icon-lock:hover {
+    opacity: 1;
+    background: rgb(209 213 219 / 40%);
   }
 
   /* ── Small button variants for inspector actions ───────────────────────────── */
@@ -869,16 +912,11 @@ const metadata = {
     border-color: rgb(51 65 85);
   }
 
-  /* ── Readiness strip ─────────────────────────────────────────────────────────── */
+  /* ── Readiness strip — no individual card chrome ─────────────────────────────── */
   .readiness-strip {
-    border: 1px solid rgb(229 231 235);
-    border-radius: 0.75rem;
-    padding: 0.55rem 0.9rem;
-    background: transparent;
+    padding: 0.55rem 0.7rem 0.7rem;
     font-size: 0.83rem;
-  }
-  :global(.dark) .readiness-strip {
-    border-color: rgb(30 41 59);
+    background: transparent;
   }
 
   .readiness-strip-main {
@@ -1025,21 +1063,53 @@ const metadata = {
     color: rgb(22 163 74);
   }
 
-  /* ── Article header card (title + excerpt) ───────────────────────────────────── */
+  /* ── Article header card (title + excerpt) ─ editorial, no card chrome ───────── */
   .article-header-card {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    padding: 1.5rem 1.75rem;
+    gap: 0.5rem;
+    padding: 0 1rem;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
   }
 
-  /* Title: textarea with article-heading visual style */
+  /* Screenreader-only utility */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  /* History button: only appears on hover of the card */
+  .article-header-history-btn {
+    position: absolute;
+    top: 0;
+    right: 0.5rem;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 2;
+  }
+  .article-header-card:hover .article-header-history-btn,
+  .article-header-card:focus-within .article-header-history-btn {
+    opacity: 1;
+  }
+
+  /* Title: textarea matching published article h1 */
   .article-title-input {
-    font-family: var(--aw-font-heading, inherit);
-    font-size: clamp(1.5rem, 4vw, 2.2rem);
-    font-weight: 800;
-    line-height: 1.2;
+    font-family: var(--aw-font-serif, Georgia, 'Times New Roman', serif);
+    font-size: clamp(1.9rem, 4.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
     border: none;
     border-bottom: 2px solid transparent;
     background: transparent;
@@ -1049,23 +1119,22 @@ const metadata = {
     resize: none;
     overflow: hidden;
     display: block;
-    /* Ensure at least one line is visible before JS auto-resize runs */
     min-height: 3rem;
   }
   .article-title-input:focus {
     outline: none;
-    border-bottom-color: var(--aw-color-accent);
+    border-bottom-color: rgb(94 140 138 / 35%);
   }
   .article-title-input::placeholder {
     color: var(--aw-color-text-muted);
     font-weight: 400;
-    font-size: 1.5rem;
-    opacity: 0.55;
+    font-size: 1.8rem;
+    opacity: 0.4;
   }
 
-  /* Excerpt styled as article deck */
+  /* Excerpt styled as article deck, matching published italic deck */
   .article-excerpt-input {
-    font-size: 0.95rem;
+    font-size: 0.8rem;
     font-style: italic;
     color: var(--aw-color-text-muted);
     border: none;
@@ -1078,11 +1147,11 @@ const metadata = {
   }
   .article-excerpt-input:focus {
     outline: none;
-    border-bottom-color: var(--aw-color-accent);
+    border-bottom-color: rgb(94 140 138 / 35%);
   }
   .article-excerpt-input::placeholder {
     color: var(--aw-color-text-muted);
-    opacity: 0.55;
+    opacity: 0.5;
   }
 
   /* ── Article body ─────────────────────────────────────────────────────────── */
@@ -1090,6 +1159,11 @@ const metadata = {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
+    padding: 0 1rem;
   }
 
   .nodes-container {
@@ -1557,12 +1631,9 @@ const metadata = {
   .inspector-panel {
     position: sticky;
     top: 1rem;
-    max-height: calc(100vh - 2rem);
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    scrollbar-width: thin;
   }
 
   .inspector-publish-row {
@@ -2048,7 +2119,6 @@ const metadata = {
       draftPickerList: document.querySelector<HTMLElement>('#draft-picker-list')!,
       draftPickerEmpty: document.querySelector<HTMLElement>('#draft-picker-empty')!,
       // History / undo
-      btnMetaHistory: document.querySelector<HTMLButtonElement>('#btn-meta-history')!,
       btnHeaderHistory: document.querySelector<HTMLButtonElement>('#btn-header-history')!,
       btnMetaUndo: document.querySelector<HTMLButtonElement>('#btn-meta-undo')!,
     };
@@ -2090,7 +2160,6 @@ const metadata = {
     // Enable/disable history buttons based on whether any entries exist
     const updateHistoryButtonStates = () => {
       const hasMetaHistory = draftHistory.some((e) => e.action === 'patch_canonical_input');
-      els.btnMetaHistory.disabled = !hasMetaHistory;
       els.btnHeaderHistory.disabled = !hasMetaHistory;
       for (const [nodeId, btn] of nodeHistBtns) {
         const hasNodeHistory = draftHistory.some(
@@ -3009,13 +3078,6 @@ const metadata = {
       metaUndoPayload = null;
       els.btnMetaUndo.hidden = true;
       await saveMetadata(target);
-    });
-
-    els.btnMetaHistory.addEventListener('click', () => {
-      showHistoryPopover(els.btnMetaHistory, 'metadata', (entry) => {
-        const prev = entry.details?.previousPayload as Record<string, unknown> | undefined;
-        if (prev) void saveMetadata(prev);
-      });
     });
 
     els.btnHeaderHistory.addEventListener('click', () => {
