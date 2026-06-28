@@ -27,22 +27,22 @@ const metadata = {
     <div class="publish-workspace" data-auth-gated>
       <AdminNav activePath="/admin/publish" />
 
-      <!-- ── No-draft state ──────────────────────────────────── -->
-      <div id="no-draft" class="admin-card text-center py-10" hidden>
-        <p class="text-lg font-bold mb-2">No draft selected</p>
-        <p class="text-sm text-muted mb-6">Open a draft from the list to start editing.</p>
-        <button id="btn-open-draft-list" class="btn-primary" type="button">Open draft list</button>
-      </div>
-
-      <!-- ── Loading state ──────────────────────────────────── -->
-      <p id="load-status" class="load-status" aria-live="polite" hidden></p>
-
-      <!-- ── Article workspace (two-column layout once a draft is loaded) ── -->
-      <div id="article-workspace" class="publish-layout" hidden>
+      <!-- ── Article workspace — always rendered, children toggled by JS ── -->
+      <div id="article-workspace" class="publish-layout">
         <!-- ── Left column: article content ──────────────────── -->
         <div class="publish-main">
-          <!-- ── Article header (title + excerpt) ──────────── -->
-          <section class="admin-card article-header-card" aria-label="Article title and excerpt">
+          <!-- ── No-draft placeholder (visible until a draft is loaded) ──── -->
+          <div id="no-draft" class="no-draft-placeholder">
+            <p class="no-draft-heading">No draft selected</p>
+            <p class="no-draft-sub">Open a draft from the list to begin editing.</p>
+            <button id="btn-open-draft-list" class="btn-secondary btn-sm" type="button">Open draft list</button>
+          </div>
+
+          <!-- ── Loading state ────────────────────────────────── -->
+          <p id="load-status" class="load-status" aria-live="polite" hidden></p>
+
+          <!-- ── Article header (title + excerpt) — hidden until draft loaded ── -->
+          <section id="article-header-card" class="admin-card article-header-card" aria-label="Article title and excerpt" hidden>
             <button
               id="btn-header-history"
               class="dl-icon-btn is-history article-header-history-btn"
@@ -52,7 +52,6 @@ const metadata = {
             >
               <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
             </button>
-            <!-- Title — textarea for wrapping long titles -->
             <div class="field">
               <label for="pub-title" class="field-label">Title</label>
               <textarea
@@ -65,8 +64,6 @@ const metadata = {
                 spellcheck="true"></textarea>
               <p class="field-error" id="err-title" role="alert" hidden></p>
             </div>
-
-            <!-- Excerpt -->
             <div class="field">
               <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
               <textarea
@@ -80,148 +77,170 @@ const metadata = {
             </div>
           </section>
 
-          <!-- ── Article body (read mode + per-block editing) ── -->
-          <article id="article-view" class="article-view">
+          <!-- ── Article body (read mode + per-block editing) — hidden until draft loaded ── -->
+          <article id="article-view" class="article-view" hidden>
             <div id="nodes-container" class="nodes-container editorial-prose"></div>
           </article>
         </div>
 
-        <!-- ── Right column: floating inspector panel ─────────── -->
+        <!-- ── Right column: sticky inspector panel ─────────── -->
         <aside id="inspector-panel" class="inspector-panel" aria-label="Article settings">
-          <!-- ── Lock status bar ───────────────────────────── -->
-          <div id="lock-bar" class="lock-bar" hidden>
-            <span id="lock-icon" aria-hidden="true"></span>
-            <span id="lock-label" class="lock-label"></span>
-            <button id="btn-force-release" class="btn-tertiary btn-xs" type="button" hidden>Force release</button>
-            <button id="btn-done-editing" class="btn-secondary btn-xs" type="button" hidden>Done editing</button>
+          <!-- ── Empty state (no draft loaded) ────────────── -->
+          <div id="inspector-empty" class="inspector-empty-card">
+            <p class="inspector-empty-label">No draft selected</p>
+            <button id="btn-open-draft-list-inspector" class="btn-secondary btn-xs" type="button">Open draft list</button>
           </div>
 
-          <!-- ── Admin setup module ────────────────────────── -->
-          <section id="meta-editor" class="admin-setup-module" aria-label="Article setup">
-            <div class="module-label-row">
-              <p class="setup-module-label">Article setup</p>
-              <button
-                id="btn-meta-history"
-                class="dl-icon-btn is-history"
-                type="button"
-                aria-label="View metadata save history"
-                title="Metadata history"
-              >
-                <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
-              </button>
+          <!-- ── Active content (shown once a draft loads) ──── -->
+          <div id="inspector-content" hidden>
+            <!-- ── Lock row ─────────────────────────────────── -->
+            <div id="lock-bar" class="lock-row" hidden>
+              <span id="lock-icon" class="lock-row-icon" aria-hidden="true"></span>
+              <span id="lock-label" class="lock-label"></span>
+              <button id="btn-force-release" class="btn-ghost-xs" type="button" hidden>Force release</button>
+              <button id="btn-done-editing" class="btn-ghost-xs" type="button" hidden>Done editing</button>
             </div>
-            <div class="setup-grid">
-              <!-- Author -->
-              <div class="field">
-                <label for="pub-author" class="field-label">Author</label>
-                <input id="pub-author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurie" />
-              </div>
-              <!-- Publish date -->
-              <div class="field">
-                <label for="pub-date" class="field-label">Publish date</label>
-                <input id="pub-date" name="publishDate" type="date" />
-              </div>
-              <!-- Category (single-select combobox) -->
-              <div class="field field-full">
-                <label for="pub-category-input" class="field-label">Category</label>
-                <div id="pub-category-container" class="tag-input-container is-single">
-                  <div id="pub-category-chips" class="tag-pills"></div>
-                  <input
-                    id="pub-category-input"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="Select or create…"
-                    class="tag-text-input"
-                  />
-                  <div
-                    id="pub-category-suggestions"
-                    class="tag-suggestions"
-                    hidden
-                    role="listbox"
-                    aria-label="Category suggestions"
-                  >
-                  </div>
-                </div>
-              </div>
-              <!-- Tags (multi-select pills) -->
-              <div class="field field-full">
-                <label for="pub-tags-input" class="field-label">Tags</label>
-                <div id="pub-tags-container" class="tag-input-container">
-                  <div id="pub-tags-pills" class="tag-pills"></div>
-                  <input
-                    id="pub-tags-input"
-                    type="text"
-                    autocomplete="off"
-                    placeholder="Add tag…"
-                    class="tag-text-input"
-                  />
-                  <div
-                    id="pub-tags-suggestions"
-                    class="tag-suggestions"
-                    hidden
-                    role="listbox"
-                    aria-label="Tag suggestions"
-                  >
-                  </div>
-                </div>
-              </div>
-              <!-- SEO description (full width) -->
-              <div class="field field-full">
-                <label for="pub-seo" class="field-label">
-                  SEO description <span class="char-counter" id="seo-char-count"></span>
-                </label>
-                <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
-              </div>
-              <!-- Generated article path (read-only, full width) -->
-              <div class="field field-full">
-                <label for="pub-article-path" class="field-label"
-                  >Article path <span class="field-label-hint">— generated, read-only</span></label
-                >
-                <input
-                  id="pub-article-path"
-                  name="articlePath"
-                  type="text"
-                  readonly
-                  class="article-path-field"
-                  tabindex="-1"
-                  aria-readonly="true"
-                  placeholder="Enter a title to generate path…"
-                />
-              </div>
-            </div>
-            <!-- Module action -->
-            <div class="meta-actions">
-              <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
-              <p id="meta-status" class="meta-status" aria-live="polite"></p>
-              <button
-                id="btn-meta-undo"
-                class="btn-link meta-undo-btn"
-                type="button"
-                hidden
-                aria-label="Undo last metadata save"
-              >
-                Undo
-              </button>
-            </div>
-          </section>
 
-          <!-- ── Readiness + publish ───────────────────────── -->
-          <div id="readiness-strip" class="readiness-strip">
-            <div class="readiness-strip-main">
-              <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
-              <button id="readiness-toggle" class="readiness-toggle btn-link" type="button" aria-expanded="false">
-                Details
-              </button>
+            <!-- ── Metadata section ──────────────────────────── -->
+            <section id="meta-editor" class="inspector-section" aria-label="Article setup">
+              <div class="inspector-section-head">
+                <span class="inspector-section-title">
+                  Metadata
+                  <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
+                </span>
+                <div class="inspector-section-actions">
+                  <p id="meta-status" class="meta-status-inline" aria-live="polite"></p>
+                  <button id="btn-meta-toggle" class="btn-ghost-xs" type="button">Edit</button>
+                  <button
+                    id="btn-meta-history"
+                    class="btn-icon-xs dl-icon-btn is-history"
+                    type="button"
+                    aria-label="View metadata save history"
+                    title="Metadata history"
+                  >
+                    <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <!-- Compact summary (visible by default) -->
+              <dl id="meta-summary" class="meta-summary-list"></dl>
+
+              <!-- Expanded form (hidden by default) -->
+              <div id="meta-form" class="meta-form" hidden>
+                <div class="setup-grid">
+                  <div class="field">
+                    <label for="pub-author" class="field-label">Author</label>
+                    <input id="pub-author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurie" />
+                  </div>
+                  <div class="field">
+                    <label for="pub-date" class="field-label">Publish date</label>
+                    <input id="pub-date" name="publishDate" type="date" />
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-category-input" class="field-label">Category</label>
+                    <div id="pub-category-container" class="tag-input-container is-single">
+                      <div id="pub-category-chips" class="tag-pills"></div>
+                      <input
+                        id="pub-category-input"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="Select or create…"
+                        class="tag-text-input"
+                      />
+                      <div
+                        id="pub-category-suggestions"
+                        class="tag-suggestions"
+                        hidden
+                        role="listbox"
+                        aria-label="Category suggestions"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-tags-input" class="field-label">Tags</label>
+                    <div id="pub-tags-container" class="tag-input-container">
+                      <div id="pub-tags-pills" class="tag-pills"></div>
+                      <input
+                        id="pub-tags-input"
+                        type="text"
+                        autocomplete="off"
+                        placeholder="Add tag…"
+                        class="tag-text-input"
+                      />
+                      <div
+                        id="pub-tags-suggestions"
+                        class="tag-suggestions"
+                        hidden
+                        role="listbox"
+                        aria-label="Tag suggestions"
+                      ></div>
+                    </div>
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-seo" class="field-label">
+                      SEO description <span class="char-counter" id="seo-char-count"></span>
+                    </label>
+                    <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
+                  </div>
+                  <div class="field field-full">
+                    <label for="pub-article-path" class="field-label"
+                      >Article path <span class="field-label-hint">— generated</span></label
+                    >
+                    <div class="article-path-row">
+                      <input
+                        id="pub-article-path"
+                        name="articlePath"
+                        type="text"
+                        readonly
+                        class="article-path-field"
+                        tabindex="-1"
+                        aria-readonly="true"
+                        placeholder="Enter a title to generate path…"
+                      />
+                      <button
+                        id="btn-copy-path"
+                        class="btn-icon-xs"
+                        type="button"
+                        aria-label="Copy article path"
+                        title="Copy article path"
+                      >
+                        <Icon name="tabler:copy" class="icon-sm" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="meta-actions">
+                  <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
+                  <button
+                    id="btn-meta-undo"
+                    class="btn-link meta-undo-btn"
+                    type="button"
+                    hidden
+                    aria-label="Undo last metadata save"
+                  >Undo</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── Readiness + publish ───────────────────────── -->
+            <div id="readiness-strip" class="readiness-strip">
+              <div class="readiness-strip-main">
+                <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
+                <button id="readiness-toggle" class="readiness-toggle btn-link" type="button" aria-expanded="false">
+                  Details
+                </button>
+              </div>
+              <div id="readiness-chips" class="readiness-chips"></div>
+              <div id="readiness-audit" class="readiness-audit" hidden>
+                <div id="readiness-groups" class="readiness-groups"></div>
+              </div>
+              <div class="inspector-publish-row">
+                <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Publish</button>
+                <p id="publish-status" class="publish-status" aria-live="polite"></p>
+              </div>
             </div>
-            <div id="readiness-chips" class="readiness-chips"></div>
-            <div id="readiness-audit" class="readiness-audit" hidden>
-              <div id="readiness-groups" class="readiness-groups"></div>
-            </div>
-            <div class="inspector-publish-row">
-              <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Mark as published</button>
-              <p id="publish-status" class="publish-status" aria-live="polite"></p>
-            </div>
-          </div>
+          </div><!-- /inspector-content -->
         </aside>
       </div><!-- /article-workspace -->
     </div>
@@ -243,6 +262,9 @@ const metadata = {
     <span data-icon="arrow-forward-up"><Icon name="tabler:arrow-forward-up" aria-hidden="true" /></span>
     <span data-icon="rotate-clockwise"><Icon name="tabler:rotate-clockwise" aria-hidden="true" /></span>
     <span data-icon="x"><Icon name="tabler:x" aria-hidden="true" /></span>
+    <span data-icon="copy"><Icon name="tabler:copy" aria-hidden="true" /></span>
+    <span data-icon="lock"><Icon name="tabler:lock" aria-hidden="true" /></span>
+    <span data-icon="lock-open"><Icon name="tabler:lock-open" aria-hidden="true" /></span>
   </div>
 
   <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
@@ -324,36 +346,53 @@ const metadata = {
     gap: 1rem;
   }
 
-  /* Lock bar */
-  .lock-bar {
+  /* Lock row — slim one-liner */
+  .lock-row {
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.75rem;
-    background: rgb(245 158 11 / 8%);
-    border: 1px solid rgb(245 158 11 / 30%);
-    font-size: 0.85rem;
-    font-weight: 700;
+    gap: 0.35rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgb(229 231 235);
+    background: transparent;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--aw-color-text-muted);
   }
-  .lock-bar[data-locked-by-agent] {
-    background: rgb(239 68 68 / 6%);
+  :global(.dark) .lock-row {
+    border-color: rgb(51 65 85);
+  }
+  .lock-row[data-locked-by-agent] {
     border-color: rgb(239 68 68 / 30%);
     color: rgb(185 28 28);
+    background: rgb(239 68 68 / 4%);
   }
-  :global(.dark) .lock-bar[data-locked-by-agent] {
+  :global(.dark) .lock-row[data-locked-by-agent] {
     color: rgb(252 165 165);
   }
-  .lock-bar[data-held] {
-    background: rgb(16 185 129 / 6%);
-    border-color: rgb(16 185 129 / 30%);
+  .lock-row[data-held] {
+    border-color: rgb(16 185 129 / 35%);
     color: rgb(6 95 70);
+    background: rgb(16 185 129 / 4%);
   }
-  :global(.dark) .lock-bar[data-held] {
+  :global(.dark) .lock-row[data-held] {
     color: rgb(110 231 183);
+  }
+  .lock-row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    opacity: 0.75;
   }
   .lock-label {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* Load status */
@@ -377,7 +416,221 @@ const metadata = {
     background: rgb(15 23 42 / 0.7);
   }
 
-  /* ── Admin setup module ─────────────────────────────────────────────────────── */
+  /* ── Inspector section (replaces admin-setup-module for the inspector panel) ── */
+  .inspector-section {
+    border: 1px solid rgb(229 231 235 / 80%);
+    border-radius: 0.75rem;
+    background: rgb(249 250 251 / 0.7);
+    padding: 0.6rem 0.7rem 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  :global(.dark) .inspector-section {
+    border-color: rgb(30 41 59 / 70%);
+    background: rgb(15 23 42 / 0.35);
+  }
+
+  .inspector-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    min-height: 1.6rem;
+  }
+
+  .inspector-section-title {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--aw-color-text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  .inspector-section-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  /* ── Compact metadata summary ──────────────────────────────────────────────── */
+  .meta-summary-list {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.12rem 0.5rem;
+    margin: 0;
+    font-size: 0.77rem;
+  }
+  .meta-summary-list dt {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--aw-color-text-muted);
+    white-space: nowrap;
+    align-self: center;
+    margin: 0;
+  }
+  .meta-summary-list dd {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--aw-color-text-default);
+    font-size: 0.78rem;
+  }
+  .meta-summary-list dd.is-empty {
+    color: var(--aw-color-text-muted);
+    font-style: italic;
+  }
+
+  /* Collapsed form wrapper */
+  .meta-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Inline status next to section title actions */
+  .meta-status-inline {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--aw-color-text-muted);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 6rem;
+  }
+  .meta-status-inline.is-error {
+    color: rgb(239 68 68);
+  }
+  .meta-status-inline.is-ok {
+    color: rgb(22 163 74);
+  }
+
+  /* Dirty-state dot */
+  .dirty-indicator {
+    display: inline-block;
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: rgb(245 158 11);
+    flex-shrink: 0;
+  }
+
+  /* ── Small button variants for inspector actions ───────────────────────────── */
+  .btn-ghost-xs {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.18rem 0.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    line-height: 1.25;
+    white-space: nowrap;
+  }
+  .btn-ghost-xs:hover {
+    background: rgb(229 231 235 / 50%);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dark) .btn-ghost-xs {
+    border-color: rgb(51 65 85);
+  }
+  :global(.dark) .btn-ghost-xs:hover {
+    background: rgb(51 65 85 / 50%);
+  }
+
+  .btn-icon-xs {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+  }
+  .btn-icon-xs:hover {
+    background: rgb(209 213 219 / 40%);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dark) .btn-icon-xs {
+    border-color: rgb(51 65 85);
+  }
+  :global(.dark) .btn-icon-xs:hover {
+    background: rgb(51 65 85 / 50%);
+  }
+
+  /* ── No-draft placeholder (left column) ────────────────────────────────────── */
+  .no-draft-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 35vh;
+    text-align: center;
+    gap: 0.4rem;
+    padding: 2rem;
+  }
+  .no-draft-heading {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+  }
+  .no-draft-sub {
+    font-size: 0.85rem;
+    color: var(--aw-color-text-muted);
+    margin: 0 0 0.75rem;
+  }
+
+  /* ── Inspector empty state card ─────────────────────────────────────────────── */
+  .inspector-empty-card {
+    border: 1px solid rgb(229 231 235);
+    border-radius: 0.75rem;
+    background: rgb(249 250 251 / 0.7);
+    padding: 1rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.65rem;
+    text-align: center;
+  }
+  :global(.dark) .inspector-empty-card {
+    border-color: rgb(30 41 59);
+    background: rgb(15 23 42 / 0.35);
+  }
+  .inspector-empty-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--aw-color-text-muted);
+    margin: 0;
+  }
+
+  /* ── Article path row (field + copy button) ─────────────────────────────────── */
+  .article-path-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .article-path-row .article-path-field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Admin setup module (kept for any other uses) ──────────────────────────── */
   .admin-setup-module {
     border: 1px solid rgb(229 231 235 / 80%);
     border-radius: 1rem;
@@ -411,9 +664,11 @@ const metadata = {
     grid-column: 1 / -1;
   }
   /* Inspector is always narrow — collapse to 1-col within it */
+  .inspector-section .setup-grid,
   .inspector-panel .setup-grid {
     grid-template-columns: 1fr;
   }
+  .inspector-section .field-full,
   .inspector-panel .field-full {
     grid-column: 1;
   }
@@ -470,23 +725,28 @@ const metadata = {
 
   /* Setup module inputs — consistent compact style */
   .admin-setup-module input:not(.article-path-field),
-  .admin-setup-module input[type='date'] {
+  .admin-setup-module input[type='date'],
+  .inspector-section input:not(.article-path-field),
+  .inspector-section input[type='date'] {
     border: 1px solid rgb(209 213 219);
     border-radius: 0.4rem;
-    padding: 0.35rem 0.55rem;
-    font-size: 0.83rem;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.82rem;
     background: white;
     color: inherit;
     width: 100%;
     line-height: 1.4;
   }
-  .admin-setup-module input:focus {
+  .admin-setup-module input:focus,
+  .inspector-section input:focus {
     outline: none;
     border-color: var(--aw-color-accent);
     box-shadow: 0 0 0 2px rgb(94 140 138 / 15%);
   }
   :global(.dark) .admin-setup-module input:not(.article-path-field),
-  :global(.dark) .admin-setup-module input[type='date'] {
+  :global(.dark) .admin-setup-module input[type='date'],
+  :global(.dark) .inspector-section input:not(.article-path-field),
+  :global(.dark) .inspector-section input[type='date'] {
     border-color: rgb(51 65 85);
     background: rgb(15 23 42 / 0.5);
   }
@@ -529,6 +789,28 @@ const metadata = {
   }
   .meta-status.is-ok {
     color: rgb(22 163 74);
+  }
+
+  /* ── "+N more" chip for readiness ──────────────────────────────────────────── */
+  :global(.readiness-chip-more) {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border: 1px solid rgb(209 213 219);
+    background: transparent;
+    color: var(--aw-color-text-muted);
+    cursor: pointer;
+    line-height: 1.3;
+  }
+  :global(.readiness-chip-more:hover) {
+    background: rgb(209 213 219 / 35%);
+    color: var(--aw-color-text-heading);
+  }
+  :global(.dark) :global(.readiness-chip-more) {
+    border-color: rgb(51 65 85);
   }
 
   /* ── Readiness strip ─────────────────────────────────────────────────────────── */
@@ -780,7 +1062,7 @@ const metadata = {
     display: block;
   }
 
-  /* Module label row (label + history icon) */
+  /* Module label row (label + history icon) — legacy, kept for any other modules */
   .module-label-row {
     display: flex;
     align-items: center;
@@ -1654,6 +1936,10 @@ const metadata = {
       noDraft: document.querySelector<HTMLElement>('#no-draft')!,
       loadStatus: document.querySelector<HTMLElement>('#load-status')!,
       articleWorkspace: document.querySelector<HTMLElement>('#article-workspace')!,
+      articleHeaderCard: document.querySelector<HTMLElement>('#article-header-card')!,
+      articleView: document.querySelector<HTMLElement>('#article-view')!,
+      inspectorEmpty: document.querySelector<HTMLElement>('#inspector-empty')!,
+      inspectorContent: document.querySelector<HTMLElement>('#inspector-content')!,
       nodesContainer: document.querySelector<HTMLElement>('#nodes-container')!,
       // Setup / metadata fields
       pubAuthor: document.querySelector<HTMLInputElement>('#pub-author')!,
@@ -1663,6 +1949,12 @@ const metadata = {
       seoCharCount: document.querySelector<HTMLElement>('#seo-char-count')!,
       btnSaveMeta: document.querySelector<HTMLButtonElement>('#btn-save-meta')!,
       metaStatus: document.querySelector<HTMLElement>('#meta-status')!,
+      metaSummary: document.querySelector<HTMLElement>('#meta-summary')!,
+      metaForm: document.querySelector<HTMLElement>('#meta-form')!,
+      btnMetaToggle: document.querySelector<HTMLButtonElement>('#btn-meta-toggle')!,
+      metaDirtyDot: document.querySelector<HTMLElement>('#meta-dirty-dot')!,
+      btnCopyPath: document.querySelector<HTMLButtonElement>('#btn-copy-path')!,
+      btnOpenDraftListInspector: document.querySelector<HTMLButtonElement>('#btn-open-draft-list-inspector')!,
       // Tag pill picker
       pubTagsContainer: document.querySelector<HTMLElement>('#pub-tags-container')!,
       pubTagsPills: document.querySelector<HTMLElement>('#pub-tags-pills')!,
@@ -1795,8 +2087,7 @@ const metadata = {
       el.style.height = 'auto';
       el.style.height = `${el.scrollHeight}px`;
     };
-    // Size on first paint (handles any pre-filled value; min-height CSS handles empty state)
-    autoResize(els.pubTitle);
+    // Note: initial autoResize skipped — textarea is hidden until a draft loads
 
     // ── Lock bar ──────────────────────────────────────────────────────────────
     const updateLockBar = (state: {
@@ -1811,23 +2102,27 @@ const metadata = {
 
       const agentHoldsLock = Boolean(!state.held && state.agentLock);
 
+      const setLockIcon = (iconName: string) => {
+        els.lockIcon.innerHTML = '';
+        els.lockIcon.appendChild(cloneIcon(iconName));
+      };
       if (state.held) {
         els.lockBar.dataset.held = 'true';
-        els.lockIcon.textContent = '🔓';
+        setLockIcon('lock-open');
         els.lockLabel.textContent = 'You hold the edit lock';
         els.btnDoneEditing.hidden = false;
         els.btnForceRelease.hidden = true;
       } else if (state.agentLock) {
         els.lockBar.dataset.lockedByAgent = 'true';
-        els.lockIcon.textContent = '🔒';
+        setLockIcon('lock');
         const exp = new Date(state.agentLock.expires_at);
         const expStr = Number.isFinite(exp.getTime()) ? `expires ${exp.toLocaleTimeString()}` : 'expiry unknown';
-        els.lockLabel.textContent = `Agent editing: ${state.agentLock.owner_label} (${expStr})`;
+        els.lockLabel.textContent = `Agent: ${state.agentLock.owner_label} (${expStr})`;
         els.btnDoneEditing.hidden = true;
         els.btnForceRelease.hidden = false;
       } else {
-        els.lockIcon.textContent = '✏️';
-        els.lockLabel.textContent = 'Click any block to start editing';
+        setLockIcon('pencil');
+        els.lockLabel.textContent = 'Click a block to start editing';
         els.btnDoneEditing.hidden = true;
         els.btnForceRelease.hidden = true;
       }
@@ -1844,7 +2139,7 @@ const metadata = {
       delete els.lockBar.dataset.held;
       delete els.lockBar.dataset.lockedByAgent;
       delete els.articleWorkspace.dataset.lock;
-      els.lockIcon.textContent = '';
+      els.lockIcon.innerHTML = '';
       els.lockLabel.textContent = '';
       els.btnDoneEditing.hidden = true;
       els.btnForceRelease.hidden = true;
@@ -1913,6 +2208,7 @@ const metadata = {
       els.btnPublish.disabled = missingCount > 0 || metadataDirty;
     };
 
+    const MAX_CHIPS = 3;
     const renderReadinessChips = (groups: ReadinessGroup[]) => {
       els.readinessChips.innerHTML = '';
       const allCriteria = groups.flatMap((g) => g.criteria);
@@ -1921,17 +2217,46 @@ const metadata = {
       if (notable.length === 0) {
         const chip = document.createElement('span');
         chip.className = 'readiness-chip complete';
-        chip.textContent = '✓ All required checks pass';
+        chip.textContent = 'All checks pass';
         els.readinessChips.append(chip);
         return;
       }
 
-      for (const criterion of notable) {
+      const visible = notable.slice(0, MAX_CHIPS);
+      const extra = notable.slice(MAX_CHIPS);
+
+      for (const criterion of visible) {
         const chip = document.createElement('span');
         chip.className = `readiness-chip ${criterion.status}`;
         chip.textContent = criterion.label;
         if (criterion.message) chip.title = criterion.message;
         els.readinessChips.append(chip);
+      }
+
+      if (extra.length > 0) {
+        const moreBtn = document.createElement('button');
+        moreBtn.type = 'button';
+        moreBtn.className = 'readiness-chip-more';
+        moreBtn.textContent = `+${extra.length} more`;
+        let expanded = false;
+        moreBtn.addEventListener('click', () => {
+          expanded = !expanded;
+          if (expanded) {
+            for (const criterion of extra) {
+              const chip = document.createElement('span');
+              chip.className = `readiness-chip ${criterion.status}`;
+              chip.textContent = criterion.label;
+              if (criterion.message) chip.title = criterion.message;
+              els.readinessChips.insertBefore(chip, moreBtn);
+            }
+            moreBtn.textContent = 'Show less';
+          } else {
+            const chips = [...els.readinessChips.querySelectorAll<HTMLElement>('.readiness-chip')];
+            for (const chip of chips.slice(MAX_CHIPS)) chip.remove();
+            moreBtn.textContent = `+${extra.length} more`;
+          }
+        });
+        els.readinessChips.append(moreBtn);
       }
     };
 
@@ -1993,7 +2318,58 @@ const metadata = {
 
     const setMetaStatus = (msg: string, kind: '' | 'is-error' | 'is-ok' = '') => {
       els.metaStatus.textContent = msg;
-      els.metaStatus.className = `meta-status${kind ? ' ' + kind : ''}`;
+      els.metaStatus.className = `meta-status-inline${kind ? ' ' + kind : ''}`;
+    };
+
+    // ── Metadata compact summary ──────────────────────────────────────────────
+    const updateMetaSummary = () => {
+      const rows: { label: string; value: string }[] = [
+        { label: 'Author', value: els.pubAuthor.value.trim() },
+        { label: 'Date', value: els.pubDate.value.trim() },
+        { label: 'Category', value: selectedCategory ?? '' },
+        {
+          label: 'Tags',
+          value:
+            selectedTags.length === 0
+              ? ''
+              : selectedTags.slice(0, 2).join(', ') + (selectedTags.length > 2 ? ` +${selectedTags.length - 2}` : ''),
+        },
+        {
+          label: 'SEO',
+          value: els.pubSeo.value.trim() ? `${els.pubSeo.value.trim().length}/180 chars` : '',
+        },
+        {
+          label: 'Path',
+          value: (() => {
+            const p = els.pubArticlePath.value.trim();
+            if (!p) return '';
+            const parts = p.split('/');
+            return parts[parts.length - 1] || p;
+          })(),
+        },
+      ];
+
+      els.metaSummary.innerHTML = '';
+      for (const { label, value } of rows) {
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        dd.textContent = value || '—';
+        if (!value) dd.classList.add('is-empty');
+        els.metaSummary.append(dt, dd);
+      }
+    };
+
+    const toggleMetaForm = (forceOpen?: boolean) => {
+      const isOpen = !els.metaForm.hidden;
+      const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (!open && isOpen) {
+        // Closing — refresh summary first
+        updateMetaSummary();
+      }
+      els.metaForm.hidden = !open;
+      els.metaSummary.hidden = open;
+      els.btnMetaToggle.textContent = open ? 'Done' : 'Edit';
     };
 
     // ── History popover ───────────────────────────────────────────────────────
@@ -2132,6 +2508,7 @@ const metadata = {
 
     const markMetaDirty = () => {
       metadataDirty = true;
+      els.metaDirtyDot.hidden = false;
       if (metadataSaved) {
         metadataSaved = false;
         setMetaStatus('Unsaved changes');
@@ -2361,6 +2738,7 @@ const metadata = {
       renderCategoryChip();
       autoResize(els.pubTitle);
       updateSeoCharCount();
+      updateMetaSummary();
     };
 
     const saveMetadata = async (payloadOverride?: Record<string, unknown>) => {
@@ -2510,7 +2888,10 @@ const metadata = {
 
         metadataSaved = true;
         metadataDirty = false;
-        setMetaStatus('✓ Metadata saved', 'is-ok');
+        els.metaDirtyDot.hidden = true;
+        setMetaStatus('Saved', 'is-ok');
+        updateMetaSummary();
+        toggleMetaForm(false);
 
         if (metaUndoPayload) {
           els.btnMetaUndo.hidden = false;
@@ -2523,6 +2904,23 @@ const metadata = {
         els.btnSaveMeta.disabled = false;
       }
     };
+
+    els.btnMetaToggle.addEventListener('click', () => toggleMetaForm());
+
+    els.btnCopyPath.addEventListener('click', async () => {
+      const path = els.pubArticlePath.value.trim();
+      if (!path) return;
+      try {
+        await navigator.clipboard.writeText(path);
+        const orig = els.btnCopyPath.title;
+        els.btnCopyPath.title = 'Copied!';
+        setTimeout(() => {
+          els.btnCopyPath.title = orig;
+        }, 1500);
+      } catch {
+        // clipboard not available — silently ignore
+      }
+    });
 
     els.btnSaveMeta.addEventListener('click', () => saveMetadata());
 
@@ -2895,12 +3293,16 @@ const metadata = {
       }
 
       resetLockBar();
-      els.articleWorkspace.hidden = true;
+      // Show placeholder states; hide active content
+      els.noDraft.hidden = false;
+      els.articleHeaderCard.hidden = true;
+      els.articleView.hidden = true;
+      els.inspectorEmpty.hidden = false;
+      els.inspectorContent.hidden = true;
       els.nodesContainer.innerHTML = '';
       els.btnPublish.disabled = true;
       els.loadStatus.hidden = true;
       els.loadStatus.textContent = '';
-      els.noDraft.hidden = true;
       currentNodes = [];
       currentRecordVersion = 0;
       metadataSaved = false;
@@ -2908,6 +3310,7 @@ const metadata = {
       draftHistory = [];
       metaUndoPayload = null;
       els.btnMetaUndo.hidden = true;
+      els.metaDirtyDot.hidden = true;
       closeOpenPopover();
       els.readinessGroups.innerHTML = '';
       els.readinessChips.innerHTML = '';
@@ -2917,6 +3320,10 @@ const metadata = {
       els.readinessAudit.hidden = true;
       els.readinessToggle.textContent = 'Details';
       els.readinessToggle.setAttribute('aria-expanded', 'false');
+      // Reset form to compact summary view
+      toggleMetaForm(false);
+      els.metaSummary.innerHTML = '';
+      setMetaStatus('');
       // Reset tag/category pickers
       selectedTags = [];
       selectedCategory = null;
@@ -2930,11 +3337,17 @@ const metadata = {
     // ── Load draft ────────────────────────────────────────────────────────────
     const loadDraft = async (requestId: string, token: string) => {
       if (!requestId) {
+        // No draft — ensure placeholder state is shown (resetDraftView handles this,
+        // but if called without a prior reset, guarantee the right state here)
         els.noDraft.hidden = false;
+        els.inspectorEmpty.hidden = false;
+        els.inspectorContent.hidden = true;
         return;
       }
 
       await resetDraftView();
+      // Hide the no-draft placeholder while loading
+      els.noDraft.hidden = true;
 
       currentRequestId = requestId;
 
@@ -3033,14 +3446,18 @@ const metadata = {
         // Consider metadata saved if a publish_payload with title exists
         if (publishPayload.title) {
           metadataSaved = true;
-          setMetaStatus('Metadata loaded from saved record', 'is-ok');
+          setMetaStatus('Loaded', 'is-ok');
         }
 
         const articleBody = content.article_body as { nodes?: ArticleBodyNode[] } | undefined;
         if (articleBody?.nodes?.length) {
           renderArticle(articleBody.nodes);
           updateHistoryButtonStates();
-          els.articleWorkspace.hidden = false;
+          // Show article content and inspector
+          els.articleHeaderCard.hidden = false;
+          els.articleView.hidden = false;
+          els.inspectorEmpty.hidden = true;
+          els.inspectorContent.hidden = false;
         } else {
           els.loadStatus.textContent = 'This draft has no article body nodes yet.';
           els.loadStatus.hidden = false;
@@ -3279,6 +3696,7 @@ const metadata = {
 
     els.btnAllDrafts.addEventListener('click', openDraftPicker);
     els.btnOpenDraftList.addEventListener('click', openDraftPicker);
+    els.btnOpenDraftListInspector.addEventListener('click', openDraftPicker);
     els.btnModalClose.addEventListener('click', closeModal);
 
     els.btnModalRefresh.addEventListener('click', () => {
