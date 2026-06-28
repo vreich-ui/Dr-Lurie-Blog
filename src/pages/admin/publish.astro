@@ -1,6 +1,5 @@
 ---
 import { Icon } from 'astro-icon/components';
-import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Dr. Lurié Science Admin';
@@ -17,27 +16,16 @@ const metadata = {
         <p class="admin-kicker">Article Editor</p>
         <h1 class="admin-top-bar-title">{pageTitle}</h1>
       </div>
-      <div class="top-bar-actions">
-        <button id="btn-all-drafts" class="btn-secondary btn-sm" type="button">All drafts</button>
-      </div>
+      <div class="top-bar-actions"></div>
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
 
     <div class="publish-workspace" data-auth-gated>
-      <AdminNav activePath="/admin/publish" />
-
       <!-- ── Article workspace — always rendered, children toggled by JS ── -->
       <div id="article-workspace" class="publish-layout">
         <!-- ── Left column: article content ──────────────────── -->
         <div class="publish-main">
-          <!-- ── No-draft placeholder (visible until a draft is loaded) ──── -->
-          <div id="no-draft" class="no-draft-placeholder">
-            <p class="no-draft-heading">No draft selected</p>
-            <p class="no-draft-sub">Open a draft from the list to begin editing.</p>
-            <button id="btn-open-draft-list" class="btn-secondary btn-sm" type="button">Open draft list</button>
-          </div>
-
           <!-- ── Loading state ────────────────────────────────── -->
           <p id="load-status" class="load-status" aria-live="polite" hidden></p>
 
@@ -110,16 +98,22 @@ const metadata = {
 
             <!-- ── General section (Author, Date, Category) ─── -->
             <section id="general-editor" class="inspector-section" aria-label="General settings">
-              <div class="inspector-section-head">
-                <span class="inspector-section-title">
-                  General
-                  <span id="general-dirty-dot" class="dirty-indicator" hidden></span>
-                </span>
-                <div class="inspector-section-actions">
-                  <button id="btn-general-toggle" class="btn-ghost-xs" type="button">Edit</button>
+              <button
+                id="btn-general-toggle"
+                class="inspector-section-head inspector-section-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="general-form"
+              >
+                <div class="inspector-section-head-text">
+                  <span class="inspector-section-title">
+                    General
+                    <span id="general-dirty-dot" class="dirty-indicator" hidden></span>
+                  </span>
+                  <span id="general-summary" class="section-summary-text"></span>
                 </div>
-              </div>
-              <p id="general-summary" class="section-summary-text"></p>
+                <Icon name="tabler:chevron-down" class="toggle-caret icon-sm" aria-hidden="true" />
+              </button>
               <div id="general-form" class="meta-form" hidden>
                 <div class="setup-grid">
                   <div class="field">
@@ -157,25 +151,33 @@ const metadata = {
 
             <!-- ── Metadata section (Tags, SEO, Path) ─────────── -->
             <section id="meta-editor" class="inspector-section" aria-label="Metadata">
-              <div class="inspector-section-head">
-                <span class="inspector-section-title">
-                  Metadata
-                  <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
-                </span>
-                <div class="inspector-section-actions">
-                  <button id="btn-meta-toggle" class="btn-ghost-xs" type="button">Edit</button>
-                  <button
-                    id="btn-meta-history"
-                    class="btn-icon-xs dl-icon-btn is-history"
-                    type="button"
-                    aria-label="View metadata save history"
-                    title="Metadata history"
-                  >
-                    <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
-                  </button>
-                </div>
+              <div class="inspector-section-head-row">
+                <button
+                  id="btn-meta-toggle"
+                  class="inspector-section-head inspector-section-toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="meta-form"
+                >
+                  <div class="inspector-section-head-text">
+                    <span class="inspector-section-title">
+                      Metadata
+                      <span id="meta-dirty-dot" class="dirty-indicator" hidden></span>
+                    </span>
+                    <span id="meta-summary" class="section-summary-text"></span>
+                  </div>
+                  <Icon name="tabler:chevron-down" class="toggle-caret icon-sm" aria-hidden="true" />
+                </button>
+                <button
+                  id="btn-meta-history"
+                  class="btn-icon-xs dl-icon-btn is-history"
+                  type="button"
+                  aria-label="View metadata save history"
+                  title="Metadata history"
+                >
+                  <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+                </button>
               </div>
-              <p id="meta-summary" class="section-summary-text"></p>
               <div id="meta-form" class="meta-form" hidden>
                 <div class="setup-grid">
                   <div class="field field-full">
@@ -290,6 +292,7 @@ const metadata = {
     <span data-icon="copy"><Icon name="tabler:copy" aria-hidden="true" /></span>
     <span data-icon="lock"><Icon name="tabler:lock" aria-hidden="true" /></span>
     <span data-icon="lock-open"><Icon name="tabler:lock-open" aria-hidden="true" /></span>
+    <span data-icon="chevron-down"><Icon name="tabler:chevron-down" aria-hidden="true" /></span>
   </div>
 
   <!-- ── Draft picker modal ────────────────────────────────────────────────── -->
@@ -379,8 +382,9 @@ const metadata = {
     min-width: 0;
   }
 
-  /* Section summary — single-line compact text */
+  /* Section summary — single-line compact text, shown when section is collapsed */
   .section-summary-text {
+    display: block;
     margin: 0;
     font-size: 0.78rem;
     color: var(--aw-color-text-default);
@@ -402,7 +406,7 @@ const metadata = {
     flex-wrap: wrap;
   }
 
-  /* Lock row — slim one-liner */
+  /* Lock row — slim one-liner, always block-flow inside inspector-content */
   .lock-row {
     display: flex;
     align-items: center;
@@ -414,6 +418,7 @@ const metadata = {
     font-size: 0.76rem;
     font-weight: 600;
     color: var(--aw-color-text-muted);
+    flex-shrink: 0;
   }
   :global(.dark) .lock-row {
     border-color: rgb(51 65 85);
@@ -487,12 +492,60 @@ const metadata = {
     background: rgb(15 23 42 / 0.35);
   }
 
+  /* Row containing toggle button + optional icon buttons (e.g. Metadata + history btn) */
+  .inspector-section-head-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  /* The clickable section header toggle — fills its row */
   .inspector-section-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.4rem;
     min-height: 1.6rem;
+  }
+
+  /* When the head IS the toggle button */
+  button.inspector-section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    min-height: 1.6rem;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+  }
+  button.inspector-section-toggle:hover .inspector-section-title {
+    color: var(--aw-color-text-default);
+  }
+
+  .inspector-section-head-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  /* Chevron caret — rotates when section is expanded */
+  .toggle-caret {
+    flex-shrink: 0;
+    color: var(--aw-color-text-muted);
+    opacity: 0.6;
+    transition: transform 0.15s ease;
+  }
+  button.inspector-section-toggle[aria-expanded='true'] .toggle-caret {
+    transform: rotate(180deg);
+    opacity: 0.85;
   }
 
   .inspector-section-title {
@@ -597,28 +650,6 @@ const metadata = {
   }
   :global(.dark) .btn-icon-xs:hover {
     background: rgb(51 65 85 / 50%);
-  }
-
-  /* ── No-draft placeholder (left column) ────────────────────────────────────── */
-  .no-draft-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 35vh;
-    text-align: center;
-    gap: 0.4rem;
-    padding: 2rem;
-  }
-  .no-draft-heading {
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin: 0 0 0.25rem;
-  }
-  .no-draft-sub {
-    font-size: 0.85rem;
-    color: var(--aw-color-text-muted);
-    margin: 0 0 0.75rem;
   }
 
   /* ── Inspector empty state card ─────────────────────────────────────────────── */
@@ -1958,7 +1989,6 @@ const metadata = {
       lockLabel: document.querySelector<HTMLElement>('#lock-label')!,
       btnForceRelease: document.querySelector<HTMLButtonElement>('#btn-force-release')!,
       btnDoneEditing: document.querySelector<HTMLButtonElement>('#btn-done-editing')!,
-      noDraft: document.querySelector<HTMLElement>('#no-draft')!,
       loadStatus: document.querySelector<HTMLElement>('#load-status')!,
       articleWorkspace: document.querySelector<HTMLElement>('#article-workspace')!,
       articleHeaderCard: document.querySelector<HTMLElement>('#article-header-card')!,
@@ -2017,19 +2047,11 @@ const metadata = {
       modalSearch: document.querySelector<HTMLInputElement>('#draft-picker-search')!,
       draftPickerList: document.querySelector<HTMLElement>('#draft-picker-list')!,
       draftPickerEmpty: document.querySelector<HTMLElement>('#draft-picker-empty')!,
-      btnAllDrafts: document.querySelector<HTMLButtonElement>('#btn-all-drafts')!,
-      btnOpenDraftList: document.querySelector<HTMLButtonElement>('#btn-open-draft-list')!,
       // History / undo
       btnMetaHistory: document.querySelector<HTMLButtonElement>('#btn-meta-history')!,
       btnHeaderHistory: document.querySelector<HTMLButtonElement>('#btn-header-history')!,
       btnMetaUndo: document.querySelector<HTMLButtonElement>('#btn-meta-undo')!,
     };
-
-    // If a draftId is in the URL, hide the no-draft placeholder immediately so
-    // it doesn't flash when the page becomes visible during the auth check.
-    if (initialDraftId) {
-      els.noDraft.hidden = true;
-    }
 
     // ── State ──────────────────────────────────────────────────────────────────
     let lockManager: LockManager | null = null;
@@ -2397,7 +2419,7 @@ const metadata = {
       if (!open && isOpen) updateGeneralSummary();
       els.generalForm.hidden = !open;
       els.generalSummary.hidden = open;
-      els.btnGeneralToggle.textContent = open ? 'Done' : 'Edit';
+      els.btnGeneralToggle.setAttribute('aria-expanded', String(open));
     };
 
     const toggleMetaForm = (forceOpen?: boolean) => {
@@ -2406,7 +2428,7 @@ const metadata = {
       if (!open && isOpen) updateMetaSummary();
       els.metaForm.hidden = !open;
       els.metaSummary.hidden = open;
-      els.btnMetaToggle.textContent = open ? 'Done' : 'Edit';
+      els.btnMetaToggle.setAttribute('aria-expanded', String(open));
     };
 
     // ── History popover ───────────────────────────────────────────────────────
@@ -3350,8 +3372,7 @@ const metadata = {
       }
 
       resetLockBar();
-      // Show placeholder states; hide active content
-      els.noDraft.hidden = false;
+      // Hide active content, show inspector empty state
       els.articleHeaderCard.hidden = true;
       els.articleView.hidden = true;
       els.inspectorEmpty.hidden = false;
@@ -3398,17 +3419,13 @@ const metadata = {
     // ── Load draft ────────────────────────────────────────────────────────────
     const loadDraft = async (requestId: string, token: string) => {
       if (!requestId) {
-        // No draft — ensure placeholder state is shown (resetDraftView handles this,
-        // but if called without a prior reset, guarantee the right state here)
-        els.noDraft.hidden = false;
+        // No draft — show compact dock empty state, nothing in left column
         els.inspectorEmpty.hidden = false;
         els.inspectorContent.hidden = true;
         return;
       }
 
       await resetDraftView();
-      // Hide the no-draft placeholder while loading
-      els.noDraft.hidden = true;
 
       currentRequestId = requestId;
 
@@ -3757,8 +3774,6 @@ const metadata = {
       }
     };
 
-    els.btnAllDrafts.addEventListener('click', openDraftPicker);
-    els.btnOpenDraftList.addEventListener('click', openDraftPicker);
     els.btnOpenDraftListInspector.addEventListener('click', openDraftPicker);
     els.btnModalClose.addEventListener('click', closeModal);
 
