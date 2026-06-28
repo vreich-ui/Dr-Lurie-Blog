@@ -11,7 +11,7 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
-  <section class="admin-page mx-auto max-w-[900px] px-4 py-8 sm:px-6 sm:py-12" data-admin-shell hidden>
+  <section class="admin-page mx-auto max-w-[1280px] px-4 py-8 sm:px-6 sm:py-12" data-admin-shell hidden>
     <header class="admin-top-bar">
       <div>
         <p class="admin-kicker">Article Editor</p>
@@ -27,14 +27,6 @@ const metadata = {
     <div class="publish-workspace" data-auth-gated>
       <AdminNav activePath="/admin/publish" />
 
-      <!-- ── Lock status bar ─────────────────────────────────── -->
-      <div id="lock-bar" class="lock-bar" hidden>
-        <span id="lock-icon" aria-hidden="true"></span>
-        <span id="lock-label" class="lock-label"></span>
-        <button id="btn-force-release" class="btn-tertiary btn-xs" type="button" hidden>Force release</button>
-        <button id="btn-done-editing" class="btn-secondary btn-xs" type="button" hidden>Done editing</button>
-      </div>
-
       <!-- ── No-draft state ──────────────────────────────────── -->
       <div id="no-draft" class="admin-card text-center py-10" hidden>
         <p class="text-lg font-bold mb-2">No draft selected</p>
@@ -45,142 +37,192 @@ const metadata = {
       <!-- ── Loading state ──────────────────────────────────── -->
       <p id="load-status" class="load-status" aria-live="polite" hidden></p>
 
-      <!-- ── Article workspace (shown once a draft is loaded) ── -->
-      <div id="article-workspace" hidden>
-        <!-- ── 1. Admin setup module ─────────────────────────── -->
-        <section id="meta-editor" class="admin-setup-module" aria-label="Article setup">
-          <div class="module-label-row">
-            <p class="setup-module-label">Article setup</p>
+      <!-- ── Article workspace (two-column layout once a draft is loaded) ── -->
+      <div id="article-workspace" class="publish-layout" hidden>
+        <!-- ── Left column: article content ──────────────────── -->
+        <div class="publish-main">
+          <!-- ── Article header (title + excerpt) ──────────── -->
+          <section class="admin-card article-header-card" aria-label="Article title and excerpt">
             <button
-              id="btn-meta-history"
-              class="dl-icon-btn is-history"
+              id="btn-header-history"
+              class="dl-icon-btn is-history article-header-history-btn"
               type="button"
-              aria-label="View metadata save history"
-              title="Metadata history"
+              aria-label="View title/excerpt save history"
+              title="Title & excerpt history"
             >
               <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
             </button>
-          </div>
-          <div class="setup-grid">
-            <!-- Author -->
+            <!-- Title — textarea for wrapping long titles -->
             <div class="field">
-              <label for="pub-author" class="field-label">Author</label>
-              <input id="pub-author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurie" />
+              <label for="pub-title" class="field-label">Title</label>
+              <textarea
+                id="pub-title"
+                name="title"
+                rows="2"
+                class="article-title-input"
+                placeholder="Article title…"
+                autocomplete="off"
+                spellcheck="true"></textarea>
+              <p class="field-error" id="err-title" role="alert" hidden></p>
             </div>
-            <!-- Publish date -->
-            <div class="field">
-              <label for="pub-date" class="field-label">Publish date</label>
-              <input id="pub-date" name="publishDate" type="date" />
-            </div>
-            <!-- Category -->
-            <div class="field">
-              <label for="pub-category" class="field-label">Category</label>
-              <input id="pub-category" name="category" type="text" autocomplete="off" />
-            </div>
-            <!-- Tags -->
-            <div class="field">
-              <label for="pub-tags" class="field-label">Tags</label>
-              <input id="pub-tags" name="tags" type="text" autocomplete="off" placeholder="comma-separated" />
-            </div>
-            <!-- SEO description (full width) -->
-            <div class="field field-full">
-              <label for="pub-seo" class="field-label">
-                SEO description <span class="char-counter" id="seo-char-count"></span>
-              </label>
-              <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
-            </div>
-            <!-- Generated article path (read-only, full width) -->
-            <div class="field field-full">
-              <label for="pub-article-path" class="field-label"
-                >Article path <span class="field-label-hint">— generated, read-only</span></label
-              >
-              <input
-                id="pub-article-path"
-                name="articlePath"
-                type="text"
-                readonly
-                class="article-path-field"
-                tabindex="-1"
-                aria-readonly="true"
-                placeholder="Enter a title to generate path…"
-              />
-            </div>
-          </div>
-          <!-- Module action -->
-          <div class="meta-actions">
-            <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
-            <p id="meta-status" class="meta-status" aria-live="polite"></p>
-            <button
-              id="btn-meta-undo"
-              class="btn-link meta-undo-btn"
-              type="button"
-              hidden
-              aria-label="Undo last metadata save"
-            >
-              Undo
-            </button>
-          </div>
-        </section>
 
-        <!-- ── 2. Readiness strip ────────────────────────────── -->
-        <div id="readiness-strip" class="readiness-strip">
-          <div class="readiness-strip-main">
-            <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
-            <button id="readiness-toggle" class="readiness-toggle btn-link" type="button" aria-expanded="false">
-              Details
-            </button>
-            <span class="strip-spacer"></span>
-            <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Mark as published</button>
-          </div>
-          <div id="readiness-audit" class="readiness-audit" hidden>
-            <div id="readiness-groups" class="readiness-groups"></div>
-          </div>
-          <p id="publish-status" class="publish-status" aria-live="polite"></p>
+            <!-- Excerpt -->
+            <div class="field">
+              <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
+              <textarea
+                id="pub-excerpt"
+                name="excerpt"
+                rows="2"
+                maxlength="300"
+                class="article-excerpt-input"
+                placeholder="Short excerpt shown in listings…"></textarea>
+              <p class="field-error" id="err-excerpt" role="alert" hidden></p>
+            </div>
+          </section>
+
+          <!-- ── Article body (read mode + per-block editing) ── -->
+          <article id="article-view" class="article-view">
+            <div id="nodes-container" class="nodes-container editorial-prose"></div>
+          </article>
         </div>
 
-        <!-- ── 3. Article header (title + excerpt) ──────────── -->
-        <section class="admin-card article-header-card" aria-label="Article title and excerpt">
-          <button
-            id="btn-header-history"
-            class="dl-icon-btn is-history article-header-history-btn"
-            type="button"
-            aria-label="View title/excerpt save history"
-            title="Title & excerpt history"
-          >
-            <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
-          </button>
-          <!-- Title — textarea for wrapping long titles -->
-          <div class="field">
-            <label for="pub-title" class="field-label">Title</label>
-            <textarea
-              id="pub-title"
-              name="title"
-              rows="2"
-              class="article-title-input"
-              placeholder="Article title…"
-              autocomplete="off"
-              spellcheck="true"></textarea>
-            <p class="field-error" id="err-title" role="alert" hidden></p>
+        <!-- ── Right column: floating inspector panel ─────────── -->
+        <aside id="inspector-panel" class="inspector-panel" aria-label="Article settings">
+          <!-- ── Lock status bar ───────────────────────────── -->
+          <div id="lock-bar" class="lock-bar" hidden>
+            <span id="lock-icon" aria-hidden="true"></span>
+            <span id="lock-label" class="lock-label"></span>
+            <button id="btn-force-release" class="btn-tertiary btn-xs" type="button" hidden>Force release</button>
+            <button id="btn-done-editing" class="btn-secondary btn-xs" type="button" hidden>Done editing</button>
           </div>
 
-          <!-- Excerpt -->
-          <div class="field">
-            <label for="pub-excerpt" class="field-label">Excerpt / deck</label>
-            <textarea
-              id="pub-excerpt"
-              name="excerpt"
-              rows="2"
-              maxlength="300"
-              class="article-excerpt-input"
-              placeholder="Short excerpt shown in listings…"></textarea>
-            <p class="field-error" id="err-excerpt" role="alert" hidden></p>
-          </div>
-        </section>
+          <!-- ── Admin setup module ────────────────────────── -->
+          <section id="meta-editor" class="admin-setup-module" aria-label="Article setup">
+            <div class="module-label-row">
+              <p class="setup-module-label">Article setup</p>
+              <button
+                id="btn-meta-history"
+                class="dl-icon-btn is-history"
+                type="button"
+                aria-label="View metadata save history"
+                title="Metadata history"
+              >
+                <Icon name="tabler:history" class="icon-sm" aria-hidden="true" />
+              </button>
+            </div>
+            <div class="setup-grid">
+              <!-- Author -->
+              <div class="field">
+                <label for="pub-author" class="field-label">Author</label>
+                <input id="pub-author" name="author" type="text" autocomplete="off" placeholder="Dr. Lurie" />
+              </div>
+              <!-- Publish date -->
+              <div class="field">
+                <label for="pub-date" class="field-label">Publish date</label>
+                <input id="pub-date" name="publishDate" type="date" />
+              </div>
+              <!-- Category (single-select combobox) -->
+              <div class="field field-full">
+                <label for="pub-category-input" class="field-label">Category</label>
+                <div id="pub-category-container" class="tag-input-container is-single">
+                  <div id="pub-category-chips" class="tag-pills"></div>
+                  <input
+                    id="pub-category-input"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Select or create…"
+                    class="tag-text-input"
+                  />
+                  <div
+                    id="pub-category-suggestions"
+                    class="tag-suggestions"
+                    hidden
+                    role="listbox"
+                    aria-label="Category suggestions"
+                  >
+                  </div>
+                </div>
+              </div>
+              <!-- Tags (multi-select pills) -->
+              <div class="field field-full">
+                <label for="pub-tags-input" class="field-label">Tags</label>
+                <div id="pub-tags-container" class="tag-input-container">
+                  <div id="pub-tags-pills" class="tag-pills"></div>
+                  <input
+                    id="pub-tags-input"
+                    type="text"
+                    autocomplete="off"
+                    placeholder="Add tag…"
+                    class="tag-text-input"
+                  />
+                  <div
+                    id="pub-tags-suggestions"
+                    class="tag-suggestions"
+                    hidden
+                    role="listbox"
+                    aria-label="Tag suggestions"
+                  >
+                  </div>
+                </div>
+              </div>
+              <!-- SEO description (full width) -->
+              <div class="field field-full">
+                <label for="pub-seo" class="field-label">
+                  SEO description <span class="char-counter" id="seo-char-count"></span>
+                </label>
+                <input id="pub-seo" name="seoDescription" type="text" maxlength="180" autocomplete="off" />
+              </div>
+              <!-- Generated article path (read-only, full width) -->
+              <div class="field field-full">
+                <label for="pub-article-path" class="field-label"
+                  >Article path <span class="field-label-hint">— generated, read-only</span></label
+                >
+                <input
+                  id="pub-article-path"
+                  name="articlePath"
+                  type="text"
+                  readonly
+                  class="article-path-field"
+                  tabindex="-1"
+                  aria-readonly="true"
+                  placeholder="Enter a title to generate path…"
+                />
+              </div>
+            </div>
+            <!-- Module action -->
+            <div class="meta-actions">
+              <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
+              <p id="meta-status" class="meta-status" aria-live="polite"></p>
+              <button
+                id="btn-meta-undo"
+                class="btn-link meta-undo-btn"
+                type="button"
+                hidden
+                aria-label="Undo last metadata save"
+              >
+                Undo
+              </button>
+            </div>
+          </section>
 
-        <!-- ── 4. Article body (read mode + per-block editing) ── -->
-        <article id="article-view" class="article-view">
-          <div id="nodes-container" class="nodes-container editorial-prose"></div>
-        </article>
+          <!-- ── Readiness + publish ───────────────────────── -->
+          <div id="readiness-strip" class="readiness-strip">
+            <div class="readiness-strip-main">
+              <span id="readiness-label" class="readiness-pill" aria-live="polite"></span>
+              <button id="readiness-toggle" class="readiness-toggle btn-link" type="button" aria-expanded="false">
+                Details
+              </button>
+            </div>
+            <div id="readiness-chips" class="readiness-chips"></div>
+            <div id="readiness-audit" class="readiness-audit" hidden>
+              <div id="readiness-groups" class="readiness-groups"></div>
+            </div>
+            <div class="inspector-publish-row">
+              <button id="btn-publish" class="btn-primary btn-sm" type="button" disabled>Mark as published</button>
+              <p id="publish-status" class="publish-status" aria-live="polite"></p>
+            </div>
+          </div>
+        </aside>
       </div><!-- /article-workspace -->
     </div>
   </section>
@@ -368,6 +410,13 @@ const metadata = {
   .field-full {
     grid-column: 1 / -1;
   }
+  /* Inspector is always narrow — collapse to 1-col within it */
+  .inspector-panel .setup-grid {
+    grid-template-columns: 1fr;
+  }
+  .inspector-panel .field-full {
+    grid-column: 1;
+  }
   @media (max-width: 540px) {
     .setup-grid {
       grid-template-columns: 1fr;
@@ -499,10 +548,6 @@ const metadata = {
     align-items: center;
     gap: 0.6rem;
     flex-wrap: wrap;
-  }
-
-  .strip-spacer {
-    flex: 1;
   }
 
   .readiness-toggle {
@@ -1156,6 +1201,209 @@ const metadata = {
     margin-bottom: 1.5rem;
   }
 
+  /* ── Two-column workspace layout ───────────────────────────────────────── */
+  .publish-layout {
+    display: grid;
+    grid-template-columns: 1fr 290px;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .publish-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .inspector-panel {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    scrollbar-width: thin;
+  }
+
+  .inspector-publish-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.65rem;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 1023px) {
+    .publish-layout {
+      display: flex;
+      flex-direction: column-reverse;
+    }
+    .inspector-panel {
+      position: static;
+      max-height: none;
+    }
+  }
+
+  /* ── Tag / category pill inputs ─────────────────────────────────────────── */
+  .tag-input-container {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    align-items: center;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.4rem;
+    padding: 0.25rem 0.4rem;
+    background: white;
+    cursor: text;
+    min-height: 2.1rem;
+  }
+  .tag-input-container:focus-within {
+    outline: none;
+    border-color: var(--aw-color-accent);
+    box-shadow: 0 0 0 2px rgb(94 140 138 / 15%);
+  }
+  :global(.dark) .tag-input-container {
+    border-color: rgb(51 65 85);
+    background: rgb(15 23 42 / 0.5);
+  }
+
+  .tag-pills {
+    display: contents;
+  }
+
+  :global(.tag-pill) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    background: rgb(94 140 138 / 14%);
+    border: 1px solid rgb(94 140 138 / 28%);
+    border-radius: 999px;
+    padding: 0.1rem 0.35rem 0.1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--aw-color-text-heading);
+    white-space: nowrap;
+  }
+  :global(.dark) :global(.tag-pill) {
+    background: rgb(94 140 138 / 18%);
+    border-color: rgb(94 140 138 / 35%);
+  }
+
+  :global(.tag-pill-remove) {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--aw-color-text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 50%;
+  }
+  :global(.tag-pill-remove:hover) {
+    color: rgb(220 38 38);
+  }
+
+  .tag-text-input {
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.83rem;
+    flex: 1;
+    min-width: 4rem;
+    padding: 0.1rem 0.15rem;
+    color: inherit;
+  }
+  .tag-text-input::placeholder {
+    color: var(--aw-color-text-muted);
+    opacity: 0.6;
+  }
+
+  .tag-suggestions {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: white;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.4rem;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+    max-height: 11rem;
+    overflow-y: auto;
+  }
+  :global(.dark) .tag-suggestions {
+    background: rgb(15 23 42);
+    border-color: rgb(51 65 85);
+  }
+
+  :global(.tag-suggestion-item) {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  :global(.tag-suggestion-item:hover),
+  :global(.tag-suggestion-item[aria-selected='true']) {
+    background: rgb(94 140 138 / 12%);
+  }
+
+  /* ── Compact readiness chips ────────────────────────────────────────────── */
+  .readiness-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+  }
+
+  :global(.readiness-chip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border: 1px solid transparent;
+    cursor: default;
+    line-height: 1.3;
+  }
+  :global(.readiness-chip.complete) {
+    background: rgb(34 197 94 / 10%);
+    color: rgb(22 101 52);
+    border-color: rgb(34 197 94 / 25%);
+  }
+  :global(.dark) :global(.readiness-chip.complete) {
+    color: rgb(187 247 208);
+  }
+  :global(.readiness-chip.missing) {
+    background: rgb(239 68 68 / 10%);
+    color: rgb(185 28 28);
+    border-color: rgb(239 68 68 / 25%);
+  }
+  :global(.dark) :global(.readiness-chip.missing) {
+    color: rgb(252 165 165);
+  }
+  :global(.readiness-chip.warning) {
+    background: rgb(245 158 11 / 10%);
+    color: rgb(146 64 14);
+    border-color: rgb(245 158 11 / 25%);
+  }
+  :global(.dark) :global(.readiness-chip.warning) {
+    color: rgb(253 230 138);
+  }
+  :global(.readiness-chip.optional) {
+    background: rgb(100 116 139 / 8%);
+    color: var(--aw-color-text-muted);
+    border-color: rgb(100 116 139 / 20%);
+  }
+
   /* ── Draft picker modal ────────────────────────────────────────────────── */
   .modal-backdrop {
     display: none;
@@ -1370,6 +1618,7 @@ const metadata = {
   const UPDATE_NODE_ENDPOINT = '/.netlify/functions/admin-update-node';
   const LIST_DRAFTS_ENDPOINT = '/.netlify/functions/admin-list-json-drafts';
   const PATCH_WORKFLOW_ENDPOINT = '/.netlify/functions/admin-patch-workflow';
+  const TAXONOMY_ENDPOINT = '/.netlify/functions/admin-taxonomy';
 
   // ─── page init ──────────────────────────────────────────────────────────────
   const init = () => {
@@ -1409,13 +1658,21 @@ const metadata = {
       // Setup / metadata fields
       pubAuthor: document.querySelector<HTMLInputElement>('#pub-author')!,
       pubDate: document.querySelector<HTMLInputElement>('#pub-date')!,
-      pubCategory: document.querySelector<HTMLInputElement>('#pub-category')!,
-      pubTags: document.querySelector<HTMLInputElement>('#pub-tags')!,
       pubSeo: document.querySelector<HTMLInputElement>('#pub-seo')!,
       pubArticlePath: document.querySelector<HTMLInputElement>('#pub-article-path')!,
       seoCharCount: document.querySelector<HTMLElement>('#seo-char-count')!,
       btnSaveMeta: document.querySelector<HTMLButtonElement>('#btn-save-meta')!,
       metaStatus: document.querySelector<HTMLElement>('#meta-status')!,
+      // Tag pill picker
+      pubTagsContainer: document.querySelector<HTMLElement>('#pub-tags-container')!,
+      pubTagsPills: document.querySelector<HTMLElement>('#pub-tags-pills')!,
+      pubTagsInput: document.querySelector<HTMLInputElement>('#pub-tags-input')!,
+      pubTagsSuggestions: document.querySelector<HTMLElement>('#pub-tags-suggestions')!,
+      // Category combobox
+      pubCategoryContainer: document.querySelector<HTMLElement>('#pub-category-container')!,
+      pubCategoryChips: document.querySelector<HTMLElement>('#pub-category-chips')!,
+      pubCategoryInput: document.querySelector<HTMLInputElement>('#pub-category-input')!,
+      pubCategorySuggestions: document.querySelector<HTMLElement>('#pub-category-suggestions')!,
       // Article header fields
       pubTitle: document.querySelector<HTMLTextAreaElement>('#pub-title')!,
       pubExcerpt: document.querySelector<HTMLTextAreaElement>('#pub-excerpt')!,
@@ -1424,6 +1681,7 @@ const metadata = {
       // Readiness strip
       readinessLabel: document.querySelector<HTMLElement>('#readiness-label')!,
       readinessToggle: document.querySelector<HTMLButtonElement>('#readiness-toggle')!,
+      readinessChips: document.querySelector<HTMLElement>('#readiness-chips')!,
       readinessAudit: document.querySelector<HTMLElement>('#readiness-audit')!,
       readinessGroups: document.querySelector<HTMLElement>('#readiness-groups')!,
       btnPublish: document.querySelector<HTMLButtonElement>('#btn-publish')!,
@@ -1452,6 +1710,7 @@ const metadata = {
     let currentRequestId = initialDraftId;
     let currentRecordVersion = 0;
     let metadataSaved = false;
+    let metadataDirty = false;
     let modalDraftsCache: DraftSummary[] | null = null;
     let allDraftRows: DraftSummary[] = [];
     // History snapshots loaded from the workflow record
@@ -1463,6 +1722,11 @@ const metadata = {
     const nodeHistBtns = new Map<string, HTMLButtonElement>();
     // Current editor-mode: used for mutual exclusivity and CSS state
     let editMode: 'idle' | 'editing' | 'ai' = 'idle';
+    // Tag / category pill state
+    let selectedTags: string[] = [];
+    let selectedCategory: string | null = null;
+    let allTagSuggestions: string[] = [];
+    let allCategorySuggestions: string[] = [];
     const setMode = (m: typeof editMode) => {
       editMode = m;
       if (m === 'idle') {
@@ -1595,6 +1859,9 @@ const metadata = {
     };
 
     els.btnDoneEditing.addEventListener('click', async () => {
+      if (activeEditor?.isDirty()) {
+        if (!window.confirm('You have unsaved edits in a block. Discard them and release the lock?')) return;
+      }
       closeActiveEditor(false);
       if (lockManager) await lockManager.checkin();
     });
@@ -1614,11 +1881,6 @@ const metadata = {
     });
 
     const updateReadinessPanel = (agentLockPresent = false) => {
-      const tags = els.pubTags.value
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
-
       const groups = evaluateReadiness({
         title: els.pubTitle.value.trim(),
         excerpt: els.pubExcerpt.value.trim(),
@@ -1626,8 +1888,8 @@ const metadata = {
         publishDate: els.pubDate.value.trim(),
         articlePath: els.pubArticlePath.value.trim(),
         seoDescription: els.pubSeo.value.trim(),
-        category: els.pubCategory.value.trim(),
-        tags,
+        category: selectedCategory ?? '',
+        tags: selectedTags,
         nodes: currentNodes,
         lockHeld: Boolean(lockManager?.currentToken),
         canonicalSaved: metadataSaved,
@@ -1635,6 +1897,7 @@ const metadata = {
       });
 
       renderReadinessGroups(groups);
+      renderReadinessChips(groups);
 
       const level = readinessLevel(groups);
       const levelMap = {
@@ -1647,7 +1910,29 @@ const metadata = {
       els.readinessLabel.className = `readiness-pill ${cls}`;
 
       const missingCount = groups.flatMap((g) => g.criteria).filter((c) => c.status === 'missing').length;
-      els.btnPublish.disabled = missingCount > 0;
+      els.btnPublish.disabled = missingCount > 0 || metadataDirty;
+    };
+
+    const renderReadinessChips = (groups: ReadinessGroup[]) => {
+      els.readinessChips.innerHTML = '';
+      const allCriteria = groups.flatMap((g) => g.criteria);
+      const notable = allCriteria.filter((c) => c.status === 'missing' || c.status === 'warning');
+
+      if (notable.length === 0) {
+        const chip = document.createElement('span');
+        chip.className = 'readiness-chip complete';
+        chip.textContent = '✓ All required checks pass';
+        els.readinessChips.append(chip);
+        return;
+      }
+
+      for (const criterion of notable) {
+        const chip = document.createElement('span');
+        chip.className = `readiness-chip ${criterion.status}`;
+        chip.textContent = criterion.label;
+        if (criterion.message) chip.title = criterion.message;
+        els.readinessChips.append(chip);
+      }
     };
 
     const renderReadinessGroups = (groups: ReadinessGroup[]) => {
@@ -1845,14 +2130,21 @@ const metadata = {
       els.pubArticlePath.value = title ? generateArticlePath(title, currentRequestId) : '';
     };
 
+    const markMetaDirty = () => {
+      metadataDirty = true;
+      if (metadataSaved) {
+        metadataSaved = false;
+        setMetaStatus('Unsaved changes');
+      }
+      updateReadinessPanel();
+    };
+
     // Live readiness re-evaluation on any metadata change
     const setupFields: (HTMLInputElement | HTMLTextAreaElement)[] = [
       els.pubTitle,
       els.pubExcerpt,
       els.pubAuthor,
       els.pubDate,
-      els.pubCategory,
-      els.pubTags,
       els.pubSeo,
     ];
     for (const field of setupFields) {
@@ -1865,13 +2157,190 @@ const metadata = {
         if (field === els.pubExcerpt) {
           clearFieldError(els.errExcerpt);
         }
-        if (metadataSaved) {
-          metadataSaved = false;
-          setMetaStatus('Unsaved changes');
-        }
-        updateReadinessPanel();
+        markMetaDirty();
       });
     }
+
+    // ── Taxonomy loading ──────────────────────────────────────────────────────
+    const loadTaxonomy = async () => {
+      try {
+        const token = await getToken();
+        const res = await fetch(TAXONOMY_ENDPOINT, { headers: { Authorization: `Bearer ${token}` } });
+        const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (json.ok) {
+          allTagSuggestions = Array.isArray(json.tags) ? (json.tags as string[]) : [];
+          allCategorySuggestions = Array.isArray(json.categories) ? (json.categories as string[]) : [];
+        }
+      } catch {
+        // non-critical: suggestions will just be empty
+      }
+    };
+
+    // ── Tag pill picker ───────────────────────────────────────────────────────
+    const renderTagPills = () => {
+      els.pubTagsPills.innerHTML = '';
+      for (const tag of selectedTags) {
+        const pill = document.createElement('span');
+        pill.className = 'tag-pill';
+        const text = document.createElement('span');
+        text.textContent = tag;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'tag-pill-remove';
+        removeBtn.setAttribute('aria-label', `Remove tag ${tag}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          selectedTags = selectedTags.filter((t) => t !== tag);
+          renderTagPills();
+          markMetaDirty();
+        });
+        pill.append(text, removeBtn);
+        els.pubTagsPills.append(pill);
+      }
+    };
+
+    const showTagSuggestions = (filter: string) => {
+      const input = filter.toLowerCase().trim();
+      const existing = new Set(selectedTags.map((t) => t.toLowerCase()));
+      const matches = allTagSuggestions.filter((t) => (!input || t.includes(input)) && !existing.has(t));
+
+      els.pubTagsSuggestions.innerHTML = '';
+
+      if (input && !matches.find((t) => t.toLowerCase() === input)) {
+        const createItem = document.createElement('div');
+        createItem.className = 'tag-suggestion-item';
+        createItem.textContent = `Create "${filter.trim()}"`;
+        createItem.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          addTag(filter.trim());
+        });
+        els.pubTagsSuggestions.append(createItem);
+      }
+
+      for (const match of matches.slice(0, 10)) {
+        const item = document.createElement('div');
+        item.className = 'tag-suggestion-item';
+        item.textContent = match;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          addTag(match);
+        });
+        els.pubTagsSuggestions.append(item);
+      }
+
+      els.pubTagsSuggestions.hidden = els.pubTagsSuggestions.children.length === 0;
+    };
+
+    const addTag = (tag: string) => {
+      const normalized = tag.toLowerCase().trim();
+      if (!normalized || selectedTags.some((t) => t.toLowerCase() === normalized)) return;
+      selectedTags = [...selectedTags, normalized];
+      els.pubTagsInput.value = '';
+      els.pubTagsSuggestions.hidden = true;
+      renderTagPills();
+      markMetaDirty();
+    };
+
+    els.pubTagsInput.addEventListener('input', () => showTagSuggestions(els.pubTagsInput.value));
+    els.pubTagsInput.addEventListener('focus', () => showTagSuggestions(els.pubTagsInput.value));
+    els.pubTagsInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        els.pubTagsSuggestions.hidden = true;
+      }, 150);
+    });
+    els.pubTagsInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = els.pubTagsInput.value.trim();
+        if (val) addTag(val);
+      } else if (e.key === 'Backspace' && !els.pubTagsInput.value && selectedTags.length) {
+        selectedTags = selectedTags.slice(0, -1);
+        renderTagPills();
+        markMetaDirty();
+      }
+    });
+    els.pubTagsContainer.addEventListener('click', () => els.pubTagsInput.focus());
+
+    // ── Category combobox ─────────────────────────────────────────────────────
+    const renderCategoryChip = () => {
+      els.pubCategoryChips.innerHTML = '';
+      if (selectedCategory) {
+        const chip = document.createElement('span');
+        chip.className = 'tag-pill';
+        const text = document.createElement('span');
+        text.textContent = selectedCategory;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'tag-pill-remove';
+        removeBtn.setAttribute('aria-label', `Remove category ${selectedCategory}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          selectedCategory = null;
+          renderCategoryChip();
+          markMetaDirty();
+        });
+        chip.append(text, removeBtn);
+        els.pubCategoryChips.append(chip);
+        els.pubCategoryInput.placeholder = '';
+      } else {
+        els.pubCategoryInput.placeholder = 'Select or create…';
+      }
+    };
+
+    const showCategorySuggestions = (filter: string) => {
+      const input = filter.toLowerCase().trim();
+      const matches = allCategorySuggestions.filter((c) => !input || c.includes(input));
+
+      els.pubCategorySuggestions.innerHTML = '';
+
+      if (input && !matches.find((c) => c.toLowerCase() === input)) {
+        const createItem = document.createElement('div');
+        createItem.className = 'tag-suggestion-item';
+        createItem.textContent = `Create "${filter.trim()}"`;
+        createItem.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectCategory(filter.trim());
+        });
+        els.pubCategorySuggestions.append(createItem);
+      }
+
+      for (const match of matches.slice(0, 8)) {
+        const item = document.createElement('div');
+        item.className = 'tag-suggestion-item';
+        item.textContent = match;
+        item.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          selectCategory(match);
+        });
+        els.pubCategorySuggestions.append(item);
+      }
+
+      els.pubCategorySuggestions.hidden = els.pubCategorySuggestions.children.length === 0;
+    };
+
+    const selectCategory = (category: string) => {
+      selectedCategory = category.toLowerCase().trim() || null;
+      els.pubCategoryInput.value = '';
+      els.pubCategorySuggestions.hidden = true;
+      renderCategoryChip();
+      markMetaDirty();
+    };
+
+    els.pubCategoryInput.addEventListener('input', () => showCategorySuggestions(els.pubCategoryInput.value));
+    els.pubCategoryInput.addEventListener('focus', () => showCategorySuggestions(els.pubCategoryInput.value));
+    els.pubCategoryInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        els.pubCategorySuggestions.hidden = true;
+      }, 150);
+    });
+    els.pubCategoryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const val = els.pubCategoryInput.value.trim();
+        if (val) selectCategory(val);
+      }
+    });
+    els.pubCategoryContainer.addEventListener('click', () => els.pubCategoryInput.focus());
 
     // ── Save metadata ─────────────────────────────────────────────────────────
     const applyMetaPayloadToForm = (payload: Record<string, unknown>) => {
@@ -1879,11 +2348,17 @@ const metadata = {
       els.pubExcerpt.value = String(payload.excerpt ?? '');
       els.pubAuthor.value = String(payload.author ?? '');
       els.pubDate.value = String(payload.publishDate ?? '');
-      els.pubCategory.value = String(payload.category ?? '');
-      els.pubTags.value = Array.isArray(payload.tags) ? (payload.tags as string[]).join(', ') : '';
       els.pubSeo.value = String(payload.seoDescription ?? '');
       const ap = String(payload.articlePath ?? '');
       els.pubArticlePath.value = ap || generateArticlePath(els.pubTitle.value, currentRequestId);
+      // Tags and category via pill components
+      selectedTags = Array.isArray(payload.tags)
+        ? (payload.tags as string[]).map((t) => String(t).trim()).filter(Boolean)
+        : [];
+      const rawCat = String(payload.category ?? '').trim();
+      selectedCategory = rawCat || null;
+      renderTagPills();
+      renderCategoryChip();
       autoResize(els.pubTitle);
       updateSeoCharCount();
     };
@@ -1933,11 +2408,6 @@ const metadata = {
       if (payloadOverride) {
         publishPayload = payloadOverride;
       } else {
-        const tags = els.pubTags.value
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean);
-
         // Derive the slug from the generated path for backward compatibility
         const derivedSlug = articlePath ? articlePath.replace('src/data/post/', '').replace('.md', '') : '';
 
@@ -1957,10 +2427,8 @@ const metadata = {
         const seoDesc = els.pubSeo.value.trim();
         if (seoDesc) publishPayload.seoDescription = seoDesc;
 
-        const category = els.pubCategory.value.trim();
-        if (category) publishPayload.category = category;
-
-        if (tags.length) publishPayload.tags = tags;
+        if (selectedCategory) publishPayload.category = selectedCategory;
+        if (selectedTags.length) publishPayload.tags = [...selectedTags];
       }
 
       // Capture current payload for undo before overwriting
@@ -1970,11 +2438,8 @@ const metadata = {
         excerpt: els.pubExcerpt.value.trim(),
         author: els.pubAuthor.value.trim(),
         publishDate: els.pubDate.value.trim(),
-        category: els.pubCategory.value.trim(),
-        tags: els.pubTags.value
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
+        category: selectedCategory ?? '',
+        tags: [...selectedTags],
         seoDescription: els.pubSeo.value.trim(),
         articlePath: els.pubArticlePath.value.trim(),
       };
@@ -2044,6 +2509,7 @@ const metadata = {
         void previousPayloadForUndo; // not used for multi-step undo chain
 
         metadataSaved = true;
+        metadataDirty = false;
         setMetaStatus('✓ Metadata saved', 'is-ok');
 
         if (metaUndoPayload) {
@@ -2438,17 +2904,27 @@ const metadata = {
       currentNodes = [];
       currentRecordVersion = 0;
       metadataSaved = false;
+      metadataDirty = false;
       draftHistory = [];
       metaUndoPayload = null;
       els.btnMetaUndo.hidden = true;
       closeOpenPopover();
       els.readinessGroups.innerHTML = '';
+      els.readinessChips.innerHTML = '';
       els.readinessLabel.textContent = '';
       els.readinessLabel.className = 'readiness-pill';
       els.publishStatus.textContent = '';
       els.readinessAudit.hidden = true;
       els.readinessToggle.textContent = 'Details';
       els.readinessToggle.setAttribute('aria-expanded', 'false');
+      // Reset tag/category pickers
+      selectedTags = [];
+      selectedCategory = null;
+      els.pubTagsPills.innerHTML = '';
+      els.pubTagsInput.value = '';
+      els.pubCategoryChips.innerHTML = '';
+      els.pubCategoryInput.value = '';
+      els.pubCategoryInput.placeholder = 'Select or create…';
     };
 
     // ── Load draft ────────────────────────────────────────────────────────────
@@ -2519,7 +2995,7 @@ const metadata = {
             : [];
         const seoDesc = String(publishPayload.seoDescription ?? seo.meta_description ?? '');
 
-        // Publish date: prefer saved, fall back to publication.publish_date
+        // Publish date: prefer saved, fall back to publication.publish_date, then default to today
         const savedPublishDate = String(publishPayload.publishDate ?? publication.publish_date ?? '');
         let publishDateValue = '';
         if (savedPublishDate) {
@@ -2532,6 +3008,9 @@ const metadata = {
             publishDateValue = '';
           }
         }
+        if (!publishDateValue) {
+          publishDateValue = new Date().toISOString().slice(0, 10);
+        }
 
         // Article path: use saved or generate from title
         const savedArticlePath = String(publishPayload.articlePath ?? '');
@@ -2541,10 +3020,13 @@ const metadata = {
         els.pubExcerpt.value = excerpt;
         els.pubAuthor.value = author;
         els.pubDate.value = publishDateValue;
-        els.pubCategory.value = category;
-        els.pubTags.value = tagsArr.join(', ');
         els.pubSeo.value = seoDesc;
         els.pubArticlePath.value = articlePath;
+        // Load tags and category into pill components
+        selectedTags = tagsArr.map((t) => String(t).trim()).filter(Boolean);
+        selectedCategory = category.trim() || null;
+        renderTagPills();
+        renderCategoryChip();
         updateSeoCharCount();
         autoResize(els.pubTitle);
 
@@ -2573,6 +3055,9 @@ const metadata = {
         updateLockBar(lockStatus as Parameters<typeof updateLockBar>[0]);
 
         els.loadStatus.hidden = true;
+
+        // Load taxonomy suggestions in the background (non-blocking)
+        void loadTaxonomy();
       } catch (err) {
         els.loadStatus.textContent = err instanceof Error ? err.message : 'Failed to load draft.';
       }

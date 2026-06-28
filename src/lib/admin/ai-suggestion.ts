@@ -256,11 +256,11 @@ export function showInstructionPopover(
       boxShadow: '0 -4px 24px rgb(15 23 42 / 18%)',
     });
   } else {
-    // Desktop: panel anchored to the right of the target block, vertically
-    // centered on it, clamped within the viewport.
+    // Desktop: panel anchored to the left of the target block, with the
+    // popover's bottom-right corner aligning to the block's top-left.
+    // Falls back gracefully when space is limited.
     Object.assign(popover.style, {
       position: 'fixed',
-      right: '1rem',
       zIndex: '50',
       width: 'min(22rem, calc(100vw - 2rem))',
       maxHeight: 'min(28rem, 70vh)',
@@ -271,9 +271,18 @@ export function showInstructionPopover(
 
     const reposition = () => {
       const rect = nodeWrapper.getBoundingClientRect();
-      const panelH = Math.min(448, window.innerHeight * 0.7); // approx max panel height
-      const idealTop = rect.top + rect.height / 2 - panelH / 2;
+      const panelW = Math.min(352, window.innerWidth - 16);
+      const panelH = Math.min(448, window.innerHeight * 0.7);
+
+      // Prefer left of the block (bottom-right of panel → top-left of block)
+      const idealLeft = rect.left - panelW - 12;
+      const idealTop = rect.top - panelH;
+
+      // Clamp so the panel stays within the viewport
+      const clampedLeft = Math.max(8, Math.min(idealLeft, window.innerWidth - panelW - 8));
       const clampedTop = Math.max(8, Math.min(idealTop, window.innerHeight - panelH - 8));
+
+      popover.style.left = `${clampedLeft}px`;
       popover.style.top = `${clampedTop}px`;
     };
 
