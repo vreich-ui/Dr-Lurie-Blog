@@ -299,6 +299,8 @@ export class NodeEditor {
   private container: HTMLElement | null = null;
   private editorEl: HTMLElement | null = null;
   private ctaFields: ReturnType<typeof buildCtaFields> | null = null;
+  private hiddenPreview: HTMLElement | null = null;
+  private hiddenPreviewDisplay = '';
 
   mount(node: ArticleBodyNode, wrapper: HTMLElement, config: EditorConfig): void {
     if (this.editor) this.unmount();
@@ -368,13 +370,26 @@ export class NodeEditor {
     const renderedPreview = wrapper.querySelector(
       '.dl-node-body, section, aside, div:not(.dl-node-wrapper)'
     ) as HTMLElement | null;
-    if (renderedPreview) renderedPreview.style.display = 'none';
+    if (renderedPreview) {
+      this.hiddenPreview = renderedPreview;
+      this.hiddenPreviewDisplay = renderedPreview.style.display;
+      renderedPreview.style.display = 'none';
+    }
     wrapper.prepend(this.container);
 
     this.editor.commands.focus('end');
   }
 
   unmount(): void {
+    // Restore preview only when it's still in the DOM (cancel path).
+    // On the save path, saveNodeUpdate replaces wrapper.innerHTML first,
+    // which detaches the preview — so isConnected will be false and we skip.
+    if (this.hiddenPreview?.isConnected) {
+      this.hiddenPreview.style.display = this.hiddenPreviewDisplay;
+    }
+    this.hiddenPreview = null;
+    this.hiddenPreviewDisplay = '';
+
     this.editor?.destroy();
     this.editor = null;
     this.container?.remove();

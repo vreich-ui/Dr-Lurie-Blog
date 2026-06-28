@@ -1559,8 +1559,8 @@ const metadata = {
 
       activeEditor.mount(node, wrapper, {
         onSave: async (updatedFields) => {
-          await saveNodeUpdate(node.id, updatedFields, wrapper, node);
-          closeActiveEditor(false);
+          const saved = await saveNodeUpdate(node.id, updatedFields, wrapper, node);
+          if (saved) closeActiveEditor(false);
         },
         onCancel: () => closeActiveEditor(false),
       });
@@ -1642,11 +1642,11 @@ const metadata = {
       updatedFields: Partial<ArticleBodyNode['public']>,
       wrapper: HTMLElement,
       originalNode: ArticleBodyNode
-    ) => {
+    ): Promise<boolean> => {
       const lockToken = lockManager?.currentToken;
       if (!lockToken) {
         alert('Edit lock not held. Please retry.');
-        return;
+        return false;
       }
 
       let token: string;
@@ -1654,7 +1654,7 @@ const metadata = {
         token = await getToken();
       } catch {
         alert('Authentication error. Please refresh.');
-        return;
+        return false;
       }
 
       const res = await fetch(UPDATE_NODE_ENDPOINT, {
@@ -1666,7 +1666,7 @@ const metadata = {
       const json = (await res.json().catch(() => ({ ok: false, error: 'Parse error' }))) as Record<string, unknown>;
       if (!res.ok || !json.ok) {
         alert(`Save failed: ${typeof json.error === 'string' ? json.error : 'Unknown error'}`);
-        return;
+        return false;
       }
 
       const updatedNode: ArticleBodyNode = { ...originalNode, public: { ...originalNode.public, ...updatedFields } };
@@ -1680,6 +1680,7 @@ const metadata = {
       if (existingToolbar) wrapper.append(existingToolbar);
 
       updateReadinessPanel();
+      return true;
     };
 
     // ── Reset draft view ──────────────────────────────────────────────────────
