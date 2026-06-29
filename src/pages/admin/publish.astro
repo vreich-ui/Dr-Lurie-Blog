@@ -2480,6 +2480,7 @@ const metadata = {
     const toggleGeneralForm = (forceOpen?: boolean) => {
       const isOpen = !els.generalForm.hidden;
       const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (open) toggleMetaForm(false);
       if (!open && isOpen) updateGeneralSummary();
       els.generalForm.hidden = !open;
       els.generalSummary.hidden = open;
@@ -2489,6 +2490,7 @@ const metadata = {
     const toggleMetaForm = (forceOpen?: boolean) => {
       const isOpen = !els.metaForm.hidden;
       const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (open) toggleGeneralForm(false);
       if (!open && isOpen) updateMetaSummary();
       els.metaForm.hidden = !open;
       els.metaSummary.hidden = open;
