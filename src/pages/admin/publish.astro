@@ -2157,6 +2157,16 @@ const metadata = {
 
     const setAttached = (id: string | null) => {
       if (id === attachedNodeId) return;
+
+      // Guard: if the currently-attached node is being edited with unsaved changes, confirm first
+      if (attachedNodeId !== null && activeNodeWrapper?.dataset.nodeId === attachedNodeId) {
+        if (activeEditor?.isDirty()) {
+          const keep = !window.confirm('You have unsaved changes in this block. Discard them and edit another block?');
+          if (keep) return;
+        }
+        closeActiveEditor(false);
+      }
+
       if (attachedNodeId) {
         document
           .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${attachedNodeId}"]`)
