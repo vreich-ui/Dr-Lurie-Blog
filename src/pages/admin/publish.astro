@@ -2109,7 +2109,6 @@ const metadata = {
       const panel = els.inspectorPanel;
       if (!panel) return;
       const { width: panelW, height: panelH } = panel.getBoundingClientRect();
-      const contentEl = document.querySelector<HTMLElement>('.publish-main');
       const contentRect = contentEl?.getBoundingClientRect();
       const idealLeft = contentRect ? contentRect.right + 24 : (window.innerWidth - panelW) / 2;
       const idealTop = (window.innerHeight - panelH) / 2;
@@ -2118,7 +2117,10 @@ const metadata = {
       panel.style.left = `${clampedLeft}px`;
       panel.style.top = `${clampedTop}px`;
     };
-    reposition();
+    const contentEl = document.querySelector<HTMLElement>('.publish-main');
+    const ro = new ResizeObserver(reposition);
+    ro.observe(els.inspectorPanel);
+    if (contentEl) ro.observe(contentEl);
     window.addEventListener('scroll', reposition, { passive: true });
     window.addEventListener('resize', reposition, { passive: true });
 
