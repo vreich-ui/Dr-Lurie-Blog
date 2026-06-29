@@ -2109,7 +2109,9 @@ const metadata = {
       const panel = els.inspectorPanel;
       if (!panel) return;
       const { width: panelW, height: panelH } = panel.getBoundingClientRect();
-      const idealLeft = (window.innerWidth - panelW) / 2;
+      const contentEl = document.querySelector<HTMLElement>('.publish-main');
+      const contentRect = contentEl?.getBoundingClientRect();
+      const idealLeft = contentRect ? contentRect.right + 24 : (window.innerWidth - panelW) / 2;
       const idealTop = (window.innerHeight - panelH) / 2;
       const clampedLeft = Math.max(8, Math.min(idealLeft, window.innerWidth - panelW - 8));
       const clampedTop = Math.max(8, Math.min(idealTop, window.innerHeight - panelH - 8));
