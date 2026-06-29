@@ -1179,6 +1179,9 @@ const metadata = {
   :global(.dl-node-wrapper[data-editing]) {
     box-shadow: 0 0 0 2px rgb(220 38 38 / 55%);
   }
+  :global(.dl-node-wrapper.is-dock-dirty) {
+    box-shadow: 0 0 0 2px rgb(217 119 6 / 40%);
+  }
 
   /* Icon helpers */
   .icon-sm {
@@ -1645,6 +1648,10 @@ const metadata = {
 
   .dock-marker.is-visible {
     opacity: 1;
+  }
+
+  .dock-marker.is-marker-dirty {
+    background: rgb(217 119 6);
   }
 
   .inspector-publish-row {
@@ -2154,6 +2161,37 @@ const metadata = {
     let attachedNodeId: string | null = null;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const dockMarker = document.querySelector<HTMLElement>('#dock-marker');
+
+    let dirtyCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+    const stopDirtyWatch = () => {
+      if (dirtyCheckInterval) {
+        clearInterval(dirtyCheckInterval);
+        dirtyCheckInterval = null;
+      }
+      document.querySelectorAll<HTMLElement>('.dl-node-wrapper.is-dock-dirty').forEach((el) => {
+        el.classList.remove('is-dock-dirty');
+      });
+      dockMarker?.classList.remove('is-marker-dirty');
+    };
+
+    const startDirtyWatch = () => {
+      if (dirtyCheckInterval) return;
+      dirtyCheckInterval = setInterval(() => {
+        if (!activeEditor) {
+          stopDirtyWatch();
+          return;
+        }
+        const nodeId = activeNodeWrapper?.dataset.nodeId ?? null;
+        const isDirty = activeEditor.isDirty();
+        if (nodeId && nodeId === attachedNodeId) {
+          document
+            .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${nodeId}"]`)
+            ?.classList.toggle('is-dock-dirty', isDirty);
+          dockMarker?.classList.toggle('is-marker-dirty', isDirty);
+        }
+      }, 100);
+    };
 
     const setAttached = (id: string | null) => {
       if (id === attachedNodeId) return;
@@ -3280,6 +3318,7 @@ const metadata = {
     // ── Editor open/close ─────────────────────────────────────────────────────
     const closeActiveEditor = (save: boolean) => {
       if (!activeEditor || !activeNodeWrapper) return;
+      stopDirtyWatch();
       if (!save) activeEditor.unmount();
       // Restore the block's edit button from cancel (X) back to pencil
       const eBtn = activeNodeWrapper.querySelector<HTMLButtonElement>('.dl-node-btn.is-edit');
@@ -3383,6 +3422,7 @@ const metadata = {
         onCancel: () => closeActiveEditor(false),
         onNoChange: () => closeActiveEditor(false),
       });
+      startDirtyWatch();
     };
 
     // ── AI ask flow ───────────────────────────────────────────────────────────
