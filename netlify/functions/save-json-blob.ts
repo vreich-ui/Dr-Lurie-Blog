@@ -24,6 +24,7 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { getArtifactReferenceIssue } from '../lib/artifacts.js';
 import {
   allowedAgentNames,
   workflowStatuses,
@@ -980,6 +981,29 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
     }
 
     return jsonResponse(409, { action: body.action, conflict: true });
+  }
+
+  if (agentName === 'final_article' && isRecord(body.output)) {
+    const outputRecord = body.output as Record<string, unknown>;
+    if (outputRecord.artifactReferences !== undefined) {
+      if (!Array.isArray(outputRecord.artifactReferences)) {
+        return jsonResponse(400, {
+          action: body.action,
+          error: 'output.artifactReferences must be an array when present.',
+          error_code: 'invalid_artifact_references',
+        });
+      }
+      for (let i = 0; i < outputRecord.artifactReferences.length; i += 1) {
+        const issue = getArtifactReferenceIssue(outputRecord.artifactReferences[i]);
+        if (issue) {
+          return jsonResponse(400, {
+            action: body.action,
+            error: `output.artifactReferences[${i}] is not a valid ArtifactReference: ${issue}.`,
+            error_code: 'invalid_artifact_reference',
+          });
+        }
+      }
+    }
   }
 
   const timestamp = nowIso();
