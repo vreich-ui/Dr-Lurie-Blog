@@ -2122,6 +2122,44 @@ const metadata = {
     window.addEventListener('scroll', reposition, { passive: true });
     window.addEventListener('resize', reposition, { passive: true });
 
+    // ── Scroll engagement-band detection ───────────────────────────────────────
+    const getEngagementBand = () => ({
+      top: window.innerHeight * 0.4,
+      bottom: window.innerHeight * 0.55,
+    });
+
+    let candidateNodeId: string | null = null;
+
+    const detectCandidate = () => {
+      const band = getEngagementBand();
+      const wrappers = document.querySelectorAll<HTMLElement>('.dl-node-wrapper');
+      let found: string | null = null;
+      for (const wrapper of wrappers) {
+        const rect = wrapper.getBoundingClientRect();
+        if (rect.bottom >= band.top && rect.top <= band.bottom) {
+          found = wrapper.dataset.nodeId ?? null;
+          break;
+        }
+      }
+      if (found !== candidateNodeId) {
+        candidateNodeId = found;
+        console.log('[dock-candidate]', candidateNodeId ?? '(gap)');
+      }
+    };
+
+    let rafPending = false;
+    const onScrollDetect = () => {
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        detectCandidate();
+        rafPending = false;
+      });
+    };
+
+    detectCandidate();
+    window.addEventListener('scroll', onScrollDetect, { passive: true });
+
     // ── State ──────────────────────────────────────────────────────────────────
     let lockManager: LockManager | null = null;
     let activeEditor: NodeEditor | null = null;
