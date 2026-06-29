@@ -73,6 +73,7 @@ const metadata = {
 
         <!-- ── Right column: sticky inspector panel ─────────── -->
         <aside id="inspector-panel" class="inspector-panel" aria-label="Article settings">
+          <div id="dock-marker" class="dock-marker" aria-hidden="true"></div>
           <!-- ── Empty state (no draft loaded) ────────────── -->
           <div id="inspector-empty" class="inspector-empty-card">
             <p class="inspector-empty-label">No draft selected</p>
@@ -1171,7 +1172,8 @@ const metadata = {
     border-radius: 0.75rem;
     transition: box-shadow 0.15s;
   }
-  :global(.dl-node-wrapper:hover) {
+  :global(.dl-node-wrapper:hover),
+  :global(.dl-node-wrapper.is-dock-attached) {
     box-shadow: 0 0 0 2px rgb(94 140 138 / 25%);
   }
   :global(.dl-node-wrapper[data-editing]) {
@@ -1625,6 +1627,24 @@ const metadata = {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .dock-marker {
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: rgb(94 140 138);
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .dock-marker.is-visible {
+    opacity: 1;
   }
 
   .inspector-publish-row {
@@ -2131,6 +2151,25 @@ const metadata = {
     });
 
     let candidateNodeId: string | null = null;
+    let attachedNodeId: string | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    const dockMarker = document.querySelector<HTMLElement>('#dock-marker');
+
+    const setAttached = (id: string | null) => {
+      if (id === attachedNodeId) return;
+      if (attachedNodeId) {
+        document
+          .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${attachedNodeId}"]`)
+          ?.classList.remove('is-dock-attached');
+      }
+      attachedNodeId = id;
+      if (attachedNodeId) {
+        document
+          .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${attachedNodeId}"]`)
+          ?.classList.add('is-dock-attached');
+      }
+      dockMarker?.classList.toggle('is-visible', attachedNodeId !== null);
+    };
 
     const detectCandidate = () => {
       const band = getEngagementBand();
@@ -2146,6 +2185,11 @@ const metadata = {
       if (found !== candidateNodeId) {
         candidateNodeId = found;
         console.log('[dock-candidate]', candidateNodeId ?? '(gap)');
+        if (settleTimer !== null) clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => {
+          settleTimer = null;
+          setAttached(candidateNodeId);
+        }, 300);
       }
     };
 
