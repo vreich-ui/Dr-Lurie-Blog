@@ -73,12 +73,11 @@ const metadata = {
 
         <!-- ── Right column: sticky inspector panel ─────────── -->
         <aside id="inspector-panel" class="inspector-panel" aria-label="Article settings">
+          <div id="dock-marker" class="dock-marker" aria-hidden="true"></div>
           <!-- ── Empty state (no draft loaded) ────────────── -->
           <div id="inspector-empty" class="inspector-empty-card">
             <p class="inspector-empty-label">No draft selected</p>
-            <button id="btn-open-draft-list-inspector" class="btn-secondary btn-xs" type="button"
-              >Open draft list</button
-            >
+            <button id="btn-open-draft-list-inspector" class="btn-secondary btn-xs" type="button">Open draft</button>
           </div>
 
           <!-- ── Active content (shown once a draft loads) ──── -->
@@ -241,7 +240,7 @@ const metadata = {
 
             <!-- ── Shared save row ────────────────────────────── -->
             <div class="meta-save-row">
-              <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save metadata</button>
+              <button id="btn-save-meta" class="btn-secondary btn-sm" type="button">Save</button>
               <button
                 id="btn-meta-undo"
                 class="btn-link meta-undo-btn"
@@ -1069,6 +1068,12 @@ const metadata = {
     margin-left: auto;
     margin-right: auto;
     width: 100%;
+    border-radius: 0.75rem;
+    transition: box-shadow 0.15s;
+  }
+
+  .article-header-card:hover {
+    box-shadow: 0 0 0 2px rgb(94 140 138 / 25%);
   }
 
   /* Screenreader-only utility */
@@ -1173,11 +1178,15 @@ const metadata = {
     border-radius: 0.75rem;
     transition: box-shadow 0.15s;
   }
-  :global(.dl-node-wrapper:hover) {
+  :global(.dl-node-wrapper:hover),
+  :global(.dl-node-wrapper.is-dock-attached) {
     box-shadow: 0 0 0 2px rgb(94 140 138 / 25%);
   }
   :global(.dl-node-wrapper[data-editing]) {
     box-shadow: 0 0 0 2px rgb(220 38 38 / 55%);
+  }
+  :global(.dl-node-wrapper.is-dock-dirty) {
+    box-shadow: 0 0 0 2px rgb(217 119 6 / 40%);
   }
 
   /* Icon helpers */
@@ -1608,12 +1617,9 @@ const metadata = {
     margin-bottom: 1.5rem;
   }
 
-  /* ── Two-column workspace layout ───────────────────────────────────────── */
+  /* ── Workspace layout (inspector is fixed-position overlay, not a grid column) */
   .publish-layout {
-    display: grid;
-    grid-template-columns: 1fr 290px;
-    gap: 1.5rem;
-    align-items: start;
+    display: block;
   }
 
   .publish-main {
@@ -1624,11 +1630,34 @@ const metadata = {
   }
 
   .inspector-panel {
-    position: sticky;
-    top: 1rem;
+    position: fixed;
+    width: 290px;
+    z-index: 50;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+  }
+
+  .dock-marker {
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: rgb(94 140 138);
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .dock-marker.is-visible {
+    opacity: 1;
+  }
+
+  .dock-marker.is-marker-dirty {
+    background: rgb(217 119 6);
   }
 
   .inspector-publish-row {
@@ -1637,17 +1666,6 @@ const metadata = {
     gap: 0.5rem;
     margin-top: 0.65rem;
     flex-wrap: wrap;
-  }
-
-  @media (max-width: 1023px) {
-    .publish-layout {
-      display: flex;
-      flex-direction: column-reverse;
-    }
-    .inspector-panel {
-      position: static;
-      max-height: none;
-    }
   }
 
   /* ── Tag / category pill inputs ─────────────────────────────────────────── */
@@ -2059,6 +2077,7 @@ const metadata = {
       articleWorkspace: document.querySelector<HTMLElement>('#article-workspace')!,
       articleHeaderCard: document.querySelector<HTMLElement>('#article-header-card')!,
       articleView: document.querySelector<HTMLElement>('#article-view')!,
+      inspectorPanel: document.querySelector<HTMLElement>('#inspector-panel')!,
       inspectorEmpty: document.querySelector<HTMLElement>('#inspector-empty')!,
       inspectorContent: document.querySelector<HTMLElement>('#inspector-content')!,
       nodesContainer: document.querySelector<HTMLElement>('#nodes-container')!,
@@ -2117,6 +2136,129 @@ const metadata = {
       btnHeaderHistory: document.querySelector<HTMLButtonElement>('#btn-header-history')!,
       btnMetaUndo: document.querySelector<HTMLButtonElement>('#btn-meta-undo')!,
     };
+
+    // ── Inspector panel positioning ────────────────────────────────────────────
+    const reposition = () => {
+      const panel = els.inspectorPanel;
+      if (!panel) return;
+      const { width: panelW, height: panelH } = panel.getBoundingClientRect();
+      const contentRect = contentEl?.getBoundingClientRect();
+      const idealLeft = contentRect ? contentRect.right + 19 : (window.innerWidth - panelW) / 2;
+      const idealTop = contentRect ? contentRect.top : (window.innerHeight - panelH) / 2;
+      const clampedLeft = Math.max(8, Math.min(idealLeft, window.innerWidth - panelW - 8));
+      const clampedTop = Math.max(8, Math.min(idealTop, window.innerHeight - panelH - 8));
+      panel.style.left = `${clampedLeft}px`;
+      panel.style.top = `${clampedTop}px`;
+    };
+    const contentEl = document.querySelector<HTMLElement>('.publish-main');
+    const ro = new ResizeObserver(reposition);
+    ro.observe(els.inspectorPanel);
+    if (contentEl) ro.observe(contentEl);
+    window.addEventListener('scroll', reposition, { passive: true });
+    window.addEventListener('resize', reposition, { passive: true });
+
+    // ── Scroll engagement-band detection ───────────────────────────────────────
+    const getEngagementBand = () => ({
+      top: window.innerHeight * 0.4,
+      bottom: window.innerHeight * 0.55,
+    });
+
+    let candidateNodeId: string | null = null;
+    let attachedNodeId: string | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+    const dockMarker = document.querySelector<HTMLElement>('#dock-marker');
+
+    let dirtyCheckInterval: ReturnType<typeof setInterval> | null = null;
+
+    const stopDirtyWatch = () => {
+      if (dirtyCheckInterval) {
+        clearInterval(dirtyCheckInterval);
+        dirtyCheckInterval = null;
+      }
+      document.querySelectorAll<HTMLElement>('.dl-node-wrapper.is-dock-dirty').forEach((el) => {
+        el.classList.remove('is-dock-dirty');
+      });
+      dockMarker?.classList.remove('is-marker-dirty');
+    };
+
+    const startDirtyWatch = () => {
+      if (dirtyCheckInterval) return;
+      dirtyCheckInterval = setInterval(() => {
+        if (!activeEditor) {
+          stopDirtyWatch();
+          return;
+        }
+        const nodeId = activeNodeWrapper?.dataset.nodeId ?? null;
+        const isDirty = activeEditor.isDirty();
+        if (nodeId && nodeId === attachedNodeId) {
+          document
+            .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${nodeId}"]`)
+            ?.classList.toggle('is-dock-dirty', isDirty);
+          dockMarker?.classList.toggle('is-marker-dirty', isDirty);
+        }
+      }, 100);
+    };
+
+    const setAttached = (id: string | null) => {
+      if (id === attachedNodeId) return;
+
+      // Guard: if the currently-attached node is being edited with unsaved changes, confirm first
+      if (attachedNodeId !== null && activeNodeWrapper?.dataset.nodeId === attachedNodeId) {
+        if (activeEditor?.isDirty()) {
+          const keep = !window.confirm('You have unsaved changes in this block. Discard them and edit another block?');
+          if (keep) return;
+        }
+        closeActiveEditor(false);
+      }
+
+      if (attachedNodeId) {
+        document
+          .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${attachedNodeId}"]`)
+          ?.classList.remove('is-dock-attached');
+      }
+      attachedNodeId = id;
+      if (attachedNodeId) {
+        document
+          .querySelector<HTMLElement>(`.dl-node-wrapper[data-node-id="${attachedNodeId}"]`)
+          ?.classList.add('is-dock-attached');
+      }
+      dockMarker?.classList.toggle('is-visible', attachedNodeId !== null);
+    };
+
+    const detectCandidate = () => {
+      const band = getEngagementBand();
+      const wrappers = document.querySelectorAll<HTMLElement>('.dl-node-wrapper');
+      let found: string | null = null;
+      for (const wrapper of wrappers) {
+        const rect = wrapper.getBoundingClientRect();
+        if (rect.bottom >= band.top && rect.top <= band.bottom) {
+          found = wrapper.dataset.nodeId ?? null;
+          break;
+        }
+      }
+      if (found !== candidateNodeId) {
+        candidateNodeId = found;
+        console.log('[dock-candidate]', candidateNodeId ?? '(gap)');
+        if (settleTimer !== null) clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => {
+          settleTimer = null;
+          setAttached(candidateNodeId);
+        }, 300);
+      }
+    };
+
+    let rafPending = false;
+    const onScrollDetect = () => {
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => {
+        detectCandidate();
+        rafPending = false;
+      });
+    };
+
+    detectCandidate();
+    window.addEventListener('scroll', onScrollDetect, { passive: true });
 
     // ── State ──────────────────────────────────────────────────────────────────
     let lockManager: LockManager | null = null;
@@ -2480,19 +2622,23 @@ const metadata = {
     const toggleGeneralForm = (forceOpen?: boolean) => {
       const isOpen = !els.generalForm.hidden;
       const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (open) toggleMetaForm(false);
       if (!open && isOpen) updateGeneralSummary();
       els.generalForm.hidden = !open;
       els.generalSummary.hidden = open;
       els.btnGeneralToggle.setAttribute('aria-expanded', String(open));
+      reposition();
     };
 
     const toggleMetaForm = (forceOpen?: boolean) => {
       const isOpen = !els.metaForm.hidden;
       const open = forceOpen !== undefined ? forceOpen : !isOpen;
+      if (open) toggleGeneralForm(false);
       if (!open && isOpen) updateMetaSummary();
       els.metaForm.hidden = !open;
       els.metaSummary.hidden = open;
       els.btnMetaToggle.setAttribute('aria-expanded', String(open));
+      reposition();
     };
 
     // ── History popover ───────────────────────────────────────────────────────
@@ -3178,6 +3324,7 @@ const metadata = {
     // ── Editor open/close ─────────────────────────────────────────────────────
     const closeActiveEditor = (save: boolean) => {
       if (!activeEditor || !activeNodeWrapper) return;
+      stopDirtyWatch();
       if (!save) activeEditor.unmount();
       // Restore the block's edit button from cancel (X) back to pencil
       const eBtn = activeNodeWrapper.querySelector<HTMLButtonElement>('.dl-node-btn.is-edit');
@@ -3281,6 +3428,7 @@ const metadata = {
         onCancel: () => closeActiveEditor(false),
         onNoChange: () => closeActiveEditor(false),
       });
+      startDirtyWatch();
     };
 
     // ── AI ask flow ───────────────────────────────────────────────────────────
