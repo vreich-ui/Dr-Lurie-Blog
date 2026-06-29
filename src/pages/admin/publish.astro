@@ -2143,14 +2143,15 @@ const metadata = {
       if (!panel) return;
       const { width: panelW, height: panelH } = panel.getBoundingClientRect();
       const contentRect = contentEl?.getBoundingClientRect();
-      const idealLeft = contentRect ? contentRect.right + 19 : (window.innerWidth - panelW) / 2;
-      const idealTop = contentRect ? contentRect.top : (window.innerHeight - panelH) / 2;
+      const hasLayout = contentRect && contentRect.width > 0;
+      const idealLeft = hasLayout ? contentRect.right + 19 : (window.innerWidth - panelW) / 2;
+      const idealTop = hasLayout ? contentRect.top : (window.innerHeight - panelH) / 2;
       const clampedLeft = Math.max(8, Math.min(idealLeft, window.innerWidth - panelW - 8));
       const clampedTop = Math.max(8, Math.min(idealTop, window.innerHeight - panelH - 8));
       panel.style.left = `${clampedLeft}px`;
       panel.style.top = `${clampedTop}px`;
     };
-    const contentEl = document.querySelector<HTMLElement>('.publish-main');
+    const contentEl = document.querySelector<HTMLElement>('.article-view');
     const ro = new ResizeObserver(reposition);
     ro.observe(els.inspectorPanel);
     if (contentEl) ro.observe(contentEl);
