@@ -183,4 +183,153 @@ describe('save_json_blob_publish_by_time media promotion', () => {
     assert.ok((shas as unknown[]).includes(sha256_ref));
     assert.ok((shas as unknown[]).includes(sha256_final));
   });
+
+  it('resolves cross-request artifact when current request has no own artifacts', async () => {
+    const currentRequestId = 'req_current_pub';
+    const otherRequestId = 'req_other_images';
+    const lockToken = 'lock_cross_456';
+    const sha256_cross = 'c'.repeat(64);
+    const crossArtifactRef = {
+      blobKey: `image/${otherRequestId}/${sha256_cross}.png`,
+      sha256: sha256_cross,
+      contentType: 'image/png',
+      sizeBytes: 512,
+      createdAtISO: new Date().toISOString(),
+      artifactKind: 'image',
+    };
+
+    const pointerPath = `image/${otherRequestId}/${sha256_cross}.png`;
+
+    const mockRecord = {
+      request_id: currentRequestId,
+      input: {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        content: {
+          title: 'Cross Request Image Test',
+          article_body: {
+            schema_version: 'article_body.v1',
+            nodes: [
+              {
+                id: 'n_cross',
+                kind: 'content',
+                public: {
+                  title: 'Article with cross-request image',
+                  media: { type: 'image', src: pointerPath },
+                },
+              },
+            ],
+          },
+        },
+        media: {
+          image_asset_register: [
+            {
+              asset_id: 'asset_cross',
+              url: pointerPath,
+            },
+          ],
+          image_sets: [],
+        },
+      },
+      agent_outputs: {},
+      lock: { token: lockToken, expires_at: new Date(Date.now() + 10000).toISOString() },
+      version: 3,
+    };
+
+    mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: Record<string, unknown>) => {
+      const body = JSON.parse(event.body as string);
+      if (body.action === 'get_request') {
+        return { statusCode: 200, body: JSON.stringify({ ok: true, record: mockRecord }) };
+      }
+      if (body.action === 'set_published_time') {
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            ok: true,
+            record: {
+              ...mockRecord,
+              input: { ...mockRecord.input, publication: { published_time: body.published_time } },
+            },
+          }),
+        };
+      }
+      return { statusCode: 500, body: 'Unexpected action' };
+    });
+
+    // Current request has no own artifacts; cross-ref lives under otherRequestId
+    mock.method(_mcpInternal, 'getArtifactIndexBlobStore', async () => ({
+      get: async (key: string) => {
+        // Direct reference lookup for the cross-request artifact
+        if (key === `request-artifacts/${otherRequestId}/${sha256_cross}.json`) {
+          return JSON.stringify(crossArtifactRef);
+        }
+        return null;
+      },
+      list: async (_options: { prefix?: string } | undefined) => ({
+        [Symbol.asyncIterator]: async function* () {
+          yield { blobs: [] };
+        },
+      }),
+      setJSON: async () => {},
+    }));
+
+    let capturedPublishPayload: Record<string, unknown> | null = null;
+    mock.method(_mcpInternal, 'publishArticleHandler', async (event: Record<string, unknown>) => {
+      capturedPublishPayload = JSON.parse(event.body as string);
+      return {
+        statusCode: 201,
+        body: JSON.stringify({
+          success: true,
+          articlePath: 'src/data/post/cross-request-image-test.md',
+          media: [`src/assets/images/uploads/cross-request-image-test/${sha256_cross}.png`],
+          commit: 'cross-commit-sha',
+        }),
+      };
+    });
+
+    const mcpEvent = {
+      httpMethod: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.MCP_HTTP_AUTH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: {
+          name: 'save_json_blob_publish_by_time',
+          arguments: {
+            request_id: currentRequestId,
+            lock_token: lockToken,
+          },
+        },
+      }),
+    };
+
+    const response = await mcpHandler(mcpEvent as Record<string, unknown>);
+    assert.equal(response.statusCode, 200);
+    const body = JSON.parse(response.body);
+    assert.ok(!body.error, `MCP Error: ${JSON.stringify(body.error)}`);
+
+    // The publish payload must include the cross-request artifact
+    assert.ok(capturedPublishPayload, 'publish-article must have been called');
+    const payload = capturedPublishPayload as unknown as Record<string, unknown>;
+
+    const artifactRefs = payload.artifactReferences as Record<string, unknown>[];
+    assert.ok(Array.isArray(artifactRefs), 'artifactReferences must be an array');
+    const crossRef = artifactRefs.find((r) => r.sha256 === sha256_cross);
+    assert.ok(crossRef, `cross-request artifact (sha256=${sha256_cross}) must be present in artifactReferences`);
+    assert.equal(crossRef.blobKey, crossArtifactRef.blobKey);
+
+    // featuredImage should resolve to the cross-request artifact path (highest-priority candidate)
+    assert.equal(payload.featuredImage, pointerPath);
+
+    // Publish result should be surfaced in the MCP response
+    const result = body.result?.content?.[0]?.text;
+    assert.ok(result, 'MCP result text must be present');
+    const parsed = JSON.parse(result as string);
+    assert.equal(parsed.status, 'published');
+    assert.equal(parsed.commit_sha, 'cross-commit-sha');
+  });
 });

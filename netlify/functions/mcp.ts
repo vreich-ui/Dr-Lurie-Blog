@@ -1613,13 +1613,20 @@ const slugifyPublishTitle = (value: string) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'article';
 
-const buildCanonicalPublishPayload = (
+const parseArtifactPointer = (value: string): { requestId: string; sha256: string; ext: string } | undefined => {
+  const match = value.match(/^image\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/);
+  if (!match) return undefined;
+  return { requestId: match[1], sha256: match[2].toLowerCase(), ext: match[3] };
+};
+
+const buildCanonicalPublishPayload = async (
   requestId: string,
   lockToken: string,
   record: WorkflowRecord,
   articleBody: Record<string, unknown>,
   publishedTime: string,
-  artifactReferences: ArtifactReference[]
+  artifactReferences: ArtifactReference[],
+  event: LambdaEvent
 ) => {
   const recordInput = getRecordValue(record.input) || {};
   const content = getRecordValue(recordInput.content);
@@ -1705,7 +1712,39 @@ const buildCanonicalPublishPayload = (
     }
   }
 
+  // Resolve cross-request artifact pointers: candidates may reference artifacts stored under a
+  // different request ID (Major Key image refs from earlier workflow steps). Fetch and include
+  // any that aren't already present in allRefs.
+  const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+  const knownSha256s = new Set(allRefs.map((r) => r.sha256));
+  for (const { path } of candidates) {
+    const parsed = parseArtifactPointer(path);
+    if (!parsed || knownSha256s.has(parsed.sha256)) continue;
+    const crossRef = await readArtifactReference(store, parsed.requestId, parsed.sha256);
+    if (crossRef && !isDeletedArtifactReference(crossRef)) {
+      allRefs.push(crossRef);
+      knownSha256s.add(parsed.sha256);
+    } else if (!crossRef) {
+      event.log?.({
+        event: 'cross_request_artifact_not_found',
+        requestId: parsed.requestId,
+        sha256: parsed.sha256,
+        candidatePath: path,
+      });
+    }
+  }
+
+  // Dedupe allRefs by sha256 (guards against duplicates from any source)
+  const dedupedRefs: ArtifactReference[] = [];
+  const dedupSeen = new Set<string>();
   for (const ref of allRefs) {
+    if (!dedupSeen.has(ref.sha256)) {
+      dedupSeen.add(ref.sha256);
+      dedupedRefs.push(ref);
+    }
+  }
+
+  for (const ref of dedupedRefs) {
     if (ref.contentType.startsWith('image/')) {
       const isHeroArtifact = isHeroAsset(ref as unknown as Record<string, unknown>);
       candidates.push({ path: ref.blobKey, priority: isHeroArtifact ? 10 : 2 });
@@ -1731,7 +1770,7 @@ const buildCanonicalPublishPayload = (
       seoDescription: toNonEmptyString(seo?.meta_description),
       tags: Array.isArray(taxonomy?.tags) ? taxonomy.tags : undefined,
       featuredImage,
-      artifactReferences: allRefs,
+      artifactReferences: dedupedRefs,
       overwrite: true,
     },
   };
@@ -1779,13 +1818,14 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
   const artifactReferences = await getArtifactReferencesForRequest(event, requestId);
 
   if (publishedTime === null) {
-    const payloadResult = buildCanonicalPublishPayload(
+    const payloadResult = await buildCanonicalPublishPayload(
       requestId,
       lockToken,
       record as unknown as WorkflowRecord,
       bodyValidation.articleBody,
       now.toISOString(),
-      artifactReferences
+      artifactReferences,
+      event
     );
     if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
 
@@ -1832,13 +1872,14 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
 
   const isFuturePublish = publishedMs > now.getTime();
 
-  const payloadResult = buildCanonicalPublishPayload(
+  const payloadResult = await buildCanonicalPublishPayload(
     requestId,
     lockToken,
     record as unknown as WorkflowRecord,
     bodyValidation.articleBody,
     publishedTime,
-    artifactReferences
+    artifactReferences,
+    event
   );
   if (!payloadResult.ok) return toolError(payloadResult.error, payloadResult);
 
