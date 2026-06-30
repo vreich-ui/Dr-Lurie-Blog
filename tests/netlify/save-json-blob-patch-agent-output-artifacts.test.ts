@@ -252,3 +252,182 @@ describe('patchAgentOutput — final_article artifactReferences contract', () =>
     assert.equal(patchResp.statusCode, 200, patchResp.body);
   });
 });
+
+describe('patchAgentOutput — final_article article_body.nodes media.src validation', () => {
+  it('rejects a final_article patch with a guessed media.src path in article_body.nodes', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-guessed-src-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              public: {
+                title: 'Hero',
+                body: 'Body.',
+                media: { src: 'invented/guessed/path.png', type: 'image' },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 400, patchResp.body);
+    const body = parseBody(patchResp);
+    assert.equal(body.error_code, 'invalid_node_media_src');
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('article_body.nodes[0]'),
+      body.error
+    );
+  });
+
+  it('accepts a final_article patch with a valid artifact-pointer media.src', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-valid-ptr-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              public: { media: { src: VALID_BLOB_KEY_A, type: 'image' } },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+  });
+
+  it('accepts a final_article patch with a src/assets/images/uploads/ media.src path', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-valid-src-path-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              public: {
+                media: { src: 'src/assets/images/uploads/some-article/hero.png', type: 'image' },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+  });
+
+  it('accepts a final_article patch with a ~/assets/images/uploads/ media.src path', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-valid-tilde-path-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              public: {
+                media: { src: '~/assets/images/uploads/some-article/hero.png', type: 'image' },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+  });
+
+  it('rejects a final_article patch with an https URL in media.src', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-https-src-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              public: { media: { src: 'https://example.com/image.png', type: 'image' } },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 400, patchResp.body);
+    const body = parseBody(patchResp);
+    assert.equal(body.error_code, 'invalid_node_media_src');
+  });
+
+  it('passes through non-final_article agents without checking article_body node media.src', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-draft-bypass-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'draft',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          nodes: [{ id: 'n1', public: { media: { src: 'invented/path.png' } } }],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+  });
+});

@@ -1004,6 +1004,38 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
         }
       }
     }
+
+    if (isRecord(outputRecord.article_body) && !Array.isArray(outputRecord.article_body)) {
+      const articleBody = outputRecord.article_body as Record<string, unknown>;
+      if (Array.isArray(articleBody.nodes)) {
+        // Pattern-only validation: no filesystem access in Netlify functions.
+        // Accepts artifact pointers (image/{reqId}/{sha256}.{ext}) and known upload prefixes.
+        const ARTIFACT_PTR_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z0-9]+$/i;
+        for (let i = 0; i < articleBody.nodes.length; i += 1) {
+          const node = articleBody.nodes[i];
+          if (!isRecord(node) || Array.isArray(node)) continue;
+          const pub = (node as Record<string, unknown>).public;
+          if (!isRecord(pub) || Array.isArray(pub)) continue;
+          const media = (pub as Record<string, unknown>).media;
+          if (!isRecord(media) || Array.isArray(media)) continue;
+          const src = (media as Record<string, unknown>).src;
+          if (src === undefined) continue;
+          if (
+            typeof src !== 'string' ||
+            src === '' ||
+            (!ARTIFACT_PTR_RE.test(src) &&
+              !src.startsWith('src/assets/images/uploads/') &&
+              !src.startsWith('~/assets/images/uploads/'))
+          ) {
+            return jsonResponse(400, {
+              action: body.action,
+              error: `article_body.nodes[${i}].public.media.src is not a valid artifact pointer or upload path: "${String(src)}".`,
+              error_code: 'invalid_node_media_src',
+            });
+          }
+        }
+      }
+    }
   }
 
   const timestamp = nowIso();

@@ -2,11 +2,13 @@ import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
 import {
+  isDeletedArtifactReference,
   normalizeArtifactBlobKey,
   reconcileArtifactReference,
   requireArtifactReferenceArray,
   type ArtifactReference,
 } from '../lib/artifacts.js';
+import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 import {
@@ -996,10 +998,45 @@ const getMediaEntries = async (
     };
   });
 
-  const artifactStore = artifactReferences.length ? await getArtifactBlobStore(event) : undefined;
-  const indexStore = artifactReferences.length ? await getArtifactIndexBlobStore(event) : undefined;
+  // Scan article_body.nodes for artifact-pointer media.src values not already in artifactReferences,
+  // and resolve them via the artifact index store (same cross-request pattern as MCP publish).
+  const NODE_ARTIFACT_PTR_RE = /^image\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/;
+  const articleBodyRaw = input.article_body as Record<string, unknown> | null | undefined;
+  const articleNodes = Array.isArray(articleBodyRaw?.nodes) ? (articleBodyRaw.nodes as unknown[]) : [];
+  const knownSha256s = new Set(artifactReferences.map((r) => r.sha256));
+  const nodePointers: Array<{ requestId: string; sha256: string }> = [];
+  for (const node of articleNodes) {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+    const pub = (node as Record<string, unknown>).public as Record<string, unknown> | undefined;
+    const media = pub?.media as Record<string, unknown> | undefined;
+    const src = media?.src;
+    if (typeof src !== 'string') continue;
+    const m = src.match(NODE_ARTIFACT_PTR_RE);
+    if (!m || knownSha256s.has(m[2].toLowerCase())) continue;
+    nodePointers.push({ requestId: m[1], sha256: m[2].toLowerCase() });
+  }
+
+  const allArtifactReferences = [...artifactReferences];
+  const indexStore =
+    artifactReferences.length || nodePointers.length ? await getArtifactIndexBlobStore(event) : undefined;
+  if (nodePointers.length && indexStore) {
+    for (const ptr of nodePointers) {
+      if (knownSha256s.has(ptr.sha256)) continue;
+      const crossRef = await readArtifactReference(
+        indexStore as unknown as ArtifactIndexStore,
+        ptr.requestId,
+        ptr.sha256
+      );
+      if (crossRef && !isDeletedArtifactReference(crossRef)) {
+        allArtifactReferences.push(crossRef);
+        knownSha256s.add(ptr.sha256);
+      }
+    }
+  }
+
+  const artifactStore = allArtifactReferences.length ? await getArtifactBlobStore(event) : undefined;
   const artifactEntries = await Promise.all(
-    artifactReferences.map(async (reference) => {
+    allArtifactReferences.map(async (reference) => {
       if (!isImageArtifactReference(reference)) {
         throw new PublishError(422, 'Only image artifactReferences can be published as article media entries.');
       }
