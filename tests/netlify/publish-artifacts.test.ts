@@ -1387,3 +1387,73 @@ test('publish-article returns 422 when article_body node artifact pointer is not
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article returns 422 when article_body node src extension differs from canonical blobKey', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  // Upload a PNG artifact; node will reference the same sha256 but with .jpg extension
+  const requestId = `node-ext-mismatch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  // Construct a pointer with the same requestId/sha256 but wrong extension
+  const wrongExtSrc = artifact.blobKey.replace(/\.[^.]+$/, '.jpg');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/node-ext-mismatch-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'node-ext-mismatch-test',
+        title: 'Node Extension Mismatch Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                media: { src: wrongExtSrc, type: 'image', alt: 'Hero image' },
+              },
+            },
+          ],
+        },
+        artifactReferences: [],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('does not match the canonical artifact blobKey'),
+      `Expected canonical blobKey mismatch error.\nGot: ${body.error}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

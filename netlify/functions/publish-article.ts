@@ -1004,7 +1004,7 @@ const getMediaEntries = async (
   const articleBodyRaw = input.article_body as Record<string, unknown> | null | undefined;
   const articleNodes = Array.isArray(articleBodyRaw?.nodes) ? (articleBodyRaw.nodes as unknown[]) : [];
   const knownSha256s = new Set(artifactReferences.map((r) => r.sha256));
-  const nodePointers: Array<{ requestId: string; sha256: string }> = [];
+  const nodePointers: Array<{ requestId: string; sha256: string; src: string }> = [];
   for (const node of articleNodes) {
     if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
     const pub = (node as Record<string, unknown>).public as Record<string, unknown> | undefined;
@@ -1013,7 +1013,7 @@ const getMediaEntries = async (
     if (typeof src !== 'string') continue;
     const m = src.match(NODE_ARTIFACT_PTR_RE);
     if (!m || knownSha256s.has(m[2].toLowerCase())) continue;
-    nodePointers.push({ requestId: m[1], sha256: m[2].toLowerCase() });
+    nodePointers.push({ requestId: m[1], sha256: m[2].toLowerCase(), src });
   }
 
   const allArtifactReferences = [...artifactReferences];
@@ -1027,7 +1027,16 @@ const getMediaEntries = async (
         ptr.requestId,
         ptr.sha256
       );
+      // Capture blobKey before type narrowing: isDeletedArtifactReference has predicate
+      // `value is ArtifactReference`, which makes TS narrow the false-branch to `never`.
+      const crossRefBlobKey = crossRef?.blobKey;
       if (crossRef && !isDeletedArtifactReference(crossRef)) {
+        if (ptr.src !== crossRefBlobKey) {
+          throw new PublishError(
+            422,
+            `article_body node media.src "${ptr.src}" does not match the canonical artifact blobKey "${crossRefBlobKey ?? '(unknown)'}". Use the exact blobKey returned by the artifact index.`
+          );
+        }
         allArtifactReferences.push(crossRef);
         knownSha256s.add(ptr.sha256);
       } else {
