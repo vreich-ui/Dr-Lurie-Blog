@@ -1,9 +1,9 @@
 ---
-publishDate: 2026-06-29T18:31:39.706Z
-published_time: 2026-06-29T18:31:39.706Z
+publishDate: 2026-06-30T16:09:22.000Z
+published_time: 2026-06-30T16:09:22.000Z
 title: "A Clearer Skincare Routine When Your Skin Feels Reactive"
 excerpt: "A compact smoke-test article for a DTC skincare journey, with canonical inline image placement and preserved image artifact references."
-image: "~/assets/images/uploads/a-clearer-skincare-routine-when-your-skin-feels-reactive/smoke-debug-hero-square.png"
+image: "~/assets/images/uploads/a-clearer-skincare-routine-when-your-skin-feels-reactive/retinol-introduction-thumbnail.png"
 tags:
   - "smoke-test"
   - "skincare"
@@ -23,7 +23,7 @@ A reactive week does not always mean your skin needs a stronger product. It may 
 
 ### Routine reset visual
 
-![Smoke-theme inline image for article body sections](~/assets/images/uploads/a-clearer-skincare-routine-when-your-skin-feels-reactive/smoke-debug-hero-square.png)
+![A skincare routine layout used as an inline visual for a simple barrier reset plan.](~/assets/images/uploads/a-clearer-skincare-routine-when-your-skin-feels-reactive/retinol-introduction-thumbnail.png)
 
 A visual checkpoint for the smoke-test body: the image below is intentionally placed inside the canonical article body, not only attached as top-level media.
 
