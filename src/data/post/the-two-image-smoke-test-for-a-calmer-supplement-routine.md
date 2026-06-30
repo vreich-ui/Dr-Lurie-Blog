@@ -28,8 +28,6 @@ Those questions do not need to slow the reader down forever. They create just en
 
 ### Map the routine before adding the product
 
-![Smoke-theme inline image for article body sections](image/f51aad35-7ff1-446b-aa99-f5fb70a9e1ed/09377719-99db-4ddb-b579-200da69bf3f1-4ec50d69406a2b2ec8ad6fdd2637b12e1e582b6aba237527589dc30ac651b137.webp)
-
 A small routine map helps readers see the context around the purchase: sleep timing, meals, medications, symptoms worth discussing, and the reason they are considering the product now. That map also makes a consultation more useful, because the conversation starts with specifics rather than a vague wish to feel better.
 
 ### A useful hesitation is not a failure
