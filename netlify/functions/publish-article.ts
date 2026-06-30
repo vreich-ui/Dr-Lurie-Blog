@@ -1120,7 +1120,7 @@ const getMediaEntries = async (
 
   const artifactStore = allArtifactReferences.length ? await getArtifactBlobStore(event) : undefined;
   const artifactEntries = await Promise.all(
-    artifactReferences.map(async (reference) => {
+    allArtifactReferences.map(async (reference) => {
       const kind = getArtifactMediaKind(reference);
 
       if (!kind) {
