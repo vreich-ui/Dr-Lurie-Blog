@@ -73,9 +73,20 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
     if (url) {
       // Normalize src/assets paths to ~/assets for Astro component compatibility
       const displayUrl = url.replace(/^src\/assets\//, '~/assets/');
-      const altText =
-        typeof media === 'object' && media !== null ? media.alt || node.public.title || '' : node.public.title || '';
-      parts.push(`![${altText}](${displayUrl})`);
+      const mediaType = typeof media === 'object' && media !== null ? media.type : undefined;
+
+      if (mediaType === 'document') {
+        const filename = displayUrl.split('/').pop() || 'document';
+        const linkText =
+          typeof media === 'object' && media !== null
+            ? media.title || node.public.title || filename
+            : node.public.title || filename;
+        parts.push(`[${linkText}](${displayUrl})`);
+      } else {
+        const altText =
+          typeof media === 'object' && media !== null ? media.alt || node.public.title || '' : node.public.title || '';
+        parts.push(`![${altText}](${displayUrl})`);
+      }
     }
   }
 

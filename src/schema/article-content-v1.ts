@@ -145,7 +145,9 @@ export const articleNodePublicSchema = z
     label: z.string().optional(),
     media: z
       .object({
-        type: z.enum(['image', 'video', 'audio', 'embed']),
+        type: z.enum(['image', 'video', 'audio', 'embed', 'document']),
+        title: z.string().optional(),
+        contentType: z.string().optional(),
         src: z.string(),
         alt: z.string().optional(),
         caption: z.string().optional(),

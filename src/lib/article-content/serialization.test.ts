@@ -140,6 +140,31 @@ describe('Article Body Serialization and Safety', () => {
       const md = articleBodyToMarkdown(body);
       assert.ok(md.includes('![Alt Text](~/assets/images/test.jpg)'));
     });
+
+    it('should render inline document media as a markdown link', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_document',
+            kind: 'content',
+            public: {
+              title: 'Node Title',
+              media: {
+                type: 'document',
+                src: 'src/assets/documents/uploads/article/reader-handout.pdf',
+                title: 'Reader handout',
+                contentType: 'application/pdf',
+              },
+            },
+            rendering: { placement: 'inline' },
+          },
+        ],
+      };
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('[Reader handout](~/assets/documents/uploads/article/reader-handout.pdf)'));
+      assert.ok(!md.includes('![Reader handout](~/assets/documents/uploads/article/reader-handout.pdf)'));
+    });
   });
 
   describe('normalizeArticleBodyFromLegacy', () => {
