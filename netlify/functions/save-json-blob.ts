@@ -1490,6 +1490,7 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
 
 /** Matches a Major Key artifact reference: {image|pdf}/{id}/{sha256-64-hex}.{ext} */
 const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+const getMediaTypeFromArtifactRef = (value: string) => (value.toLowerCase().startsWith('pdf/') ? 'document' : 'image');
 /** Reject legacy local repo paths that the article publisher cannot resolve. */
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 /** Reject data URIs (base64/raw bytes embedded in strings). */
@@ -1624,7 +1625,7 @@ const applyNodePatch = (
       patchedPublic = {
         ...patchedPublic,
         media: {
-          type: existingMedia?.type ?? 'image',
+          type: getMediaTypeFromArtifactRef(newSrc),
           src: newSrc,
           ...(newAlt !== undefined ? { alt: newAlt } : {}),
           ...(newCaption !== undefined ? { caption: newCaption } : {}),

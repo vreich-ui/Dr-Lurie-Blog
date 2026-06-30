@@ -8,6 +8,7 @@ import {
   patchCanonicalInput,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
+import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
 
 // ---------------------------------------------------------------------------
 // In-memory blob store (same shape used by all save-json-blob tests)
@@ -222,6 +223,44 @@ describe('patchCanonicalInput — node_patches', () => {
       { strategy: 'explanation', agentNotes: 'Internal note.' },
       'private must be preserved'
     );
+  });
+
+  it('sets document media type when patching a trusted PDF src onto a text-only node', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-pdf-node-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [
+        {
+          node_id: 'n_r3x4y5',
+          public_media_src: PDF_ARTIFACT,
+          public_media_caption: 'Download the reader handout.',
+        },
+      ],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const nodes = saved.input.content?.article_body?.nodes ?? [];
+    const documentNode = nodes.find((n) => n.id === 'n_r3x4y5');
+    assert.ok(documentNode, 'n_r3x4y5 must exist');
+    assert.equal(documentNode.public?.media?.src, PDF_ARTIFACT);
+    assert.equal(documentNode.public?.media?.type, 'document');
+    assert.equal(documentNode.public?.media?.caption, 'Download the reader handout.');
+
+    const articleBody = saved.input.content?.article_body;
+    assert.ok(articleBody, 'article_body must exist');
+    const markdown = articleBodyToMarkdown({
+      ...articleBody,
+      nodes: nodes.map((node) => (node.id === 'n_r3x4y5' ? { ...node, rendering: { placement: 'inline' } } : node)),
+    });
+    assert.ok(markdown.includes(`[${'e'.repeat(64)}.pdf](${PDF_ARTIFACT})`));
+    assert.ok(!markdown.includes(`![${'e'.repeat(64)}.pdf](${PDF_ARTIFACT})`));
   });
 
   it('removes media object when public_media_src is null', async () => {
