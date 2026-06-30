@@ -1328,3 +1328,62 @@ test('publish-article sets image frontmatter to first artifact entry when no exp
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article returns 422 when article_body node artifact pointer is not in the index', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `node-unresolved-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fakeSha256 = 'f'.repeat(64);
+  const fakeBlobKey = `image/${requestId}/${fakeSha256}.png`;
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/node-unresolved-ptr-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'node-unresolved-ptr-test',
+        title: 'Node Unresolved Pointer Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                media: { src: fakeBlobKey, type: 'image', alt: 'Broken image' },
+              },
+            },
+          ],
+        },
+        artifactReferences: [],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('not found in the artifact index'),
+      `Expected 'not found in the artifact index' in error.\nGot: ${body.error}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

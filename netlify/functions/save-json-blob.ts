@@ -1005,36 +1005,61 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
       }
     }
 
-    if (isRecord(outputRecord.article_body) && !Array.isArray(outputRecord.article_body)) {
-      const articleBody = outputRecord.article_body as Record<string, unknown>;
-      if (Array.isArray(articleBody.nodes)) {
-        // Pattern-only validation: no filesystem access in Netlify functions.
-        // Accepts artifact pointers (image/{reqId}/{sha256}.{ext}) and known upload prefixes.
-        const ARTIFACT_PTR_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z0-9]+$/i;
-        for (let i = 0; i < articleBody.nodes.length; i += 1) {
-          const node = articleBody.nodes[i];
-          if (!isRecord(node) || Array.isArray(node)) continue;
-          const pub = (node as Record<string, unknown>).public;
-          if (!isRecord(pub) || Array.isArray(pub)) continue;
-          const media = (pub as Record<string, unknown>).media;
-          if (!isRecord(media) || Array.isArray(media)) continue;
-          const src = (media as Record<string, unknown>).src;
-          if (src === undefined) continue;
-          if (
-            typeof src !== 'string' ||
-            src === '' ||
-            (!ARTIFACT_PTR_RE.test(src) &&
-              !src.startsWith('src/assets/images/uploads/') &&
-              !src.startsWith('~/assets/images/uploads/'))
-          ) {
-            return jsonResponse(400, {
-              action: body.action,
-              error: `article_body.nodes[${i}].public.media.src is not a valid artifact pointer or upload path: "${String(src)}".`,
-              error_code: 'invalid_node_media_src',
-            });
-          }
+    // Pattern-only validation: no filesystem access in Netlify functions.
+    // Accepts artifact pointers (image/{reqId}/{sha256}.{ext}) and known upload prefixes.
+    // Skips validation for non-image media types (video, audio, embed may use https:// URLs).
+    const ARTICLE_BODY_NODE_SRC_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z0-9]+$/i;
+    const validateArticleBodyNodes = (
+      articleBody: Record<string, unknown>,
+      pathPrefix: string
+    ): ReturnType<typeof jsonResponse> | null => {
+      if (!Array.isArray(articleBody.nodes)) return null;
+      for (let i = 0; i < articleBody.nodes.length; i += 1) {
+        const node = articleBody.nodes[i];
+        if (!isRecord(node) || Array.isArray(node)) continue;
+        const pub = (node as Record<string, unknown>).public;
+        if (!isRecord(pub) || Array.isArray(pub)) continue;
+        const media = (pub as Record<string, unknown>).media;
+        if (!isRecord(media) || Array.isArray(media)) continue;
+        const src = (media as Record<string, unknown>).src;
+        if (src === undefined) continue;
+        const mediaType = (media as Record<string, unknown>).type;
+        if (mediaType !== undefined && mediaType !== 'image') continue;
+        if (
+          typeof src !== 'string' ||
+          src === '' ||
+          (!ARTICLE_BODY_NODE_SRC_RE.test(src) &&
+            !src.startsWith('src/assets/images/uploads/') &&
+            !src.startsWith('~/assets/images/uploads/'))
+        ) {
+          return jsonResponse(400, {
+            action: body.action,
+            error: `${pathPrefix}.nodes[${i}].public.media.src is not a valid artifact pointer or upload path: "${String(src)}".`,
+            error_code: 'invalid_node_media_src',
+          });
         }
       }
+      return null;
+    };
+
+    if (isRecord(outputRecord.article_body) && !Array.isArray(outputRecord.article_body)) {
+      const err = validateArticleBodyNodes(
+        outputRecord.article_body as Record<string, unknown>,
+        'article_body'
+      );
+      if (err) return err;
+    }
+
+    const contentRecord =
+      isRecord(outputRecord.content) && !Array.isArray(outputRecord.content)
+        ? (outputRecord.content as Record<string, unknown>)
+        : undefined;
+    if (contentRecord && isRecord(contentRecord.article_body) && !Array.isArray(contentRecord.article_body)) {
+      const err = validateArticleBodyNodes(
+        contentRecord.article_body as Record<string, unknown>,
+        'content.article_body'
+      );
+      if (err) return err;
     }
   }
 

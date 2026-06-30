@@ -430,4 +430,74 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
 
     assert.equal(patchResp.statusCode, 200, patchResp.body);
   });
+
+  // Fix 1: non-image media types with https:// URLs must be accepted
+  it('accepts a final_article patch with https:// src when media.type is not image', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-video-https-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_video',
+              kind: 'content',
+              public: { media: { src: 'https://example.com/video.mp4', type: 'video' } },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+  });
+
+  // Fix 2: output.content.article_body nodes are also validated for final_article
+  it('rejects a final_article patch with a guessed media.src inside output.content.article_body', async () => {
+    const store = createMemoryStore();
+    const requestId = `node-nested-body-${Date.now()}`;
+    const lockToken = await createAndCheckout(store, requestId);
+
+    const patchResp = await patchAgentOutput(store, {
+      action: 'patch_agent_output',
+      request_id: requestId,
+      agent_name: 'final_article',
+      expected_agent_version: 0,
+      lock_token: lockToken,
+      output: {
+        content: {
+          article_body: {
+            schema_version: 'article_body.v1',
+            nodes: [
+              {
+                id: 'n_hero',
+                kind: 'content',
+                public: {
+                  title: 'Hero',
+                  body: 'Body.',
+                  media: { src: 'invented/nested/path.png', type: 'image' },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    assert.equal(patchResp.statusCode, 400, patchResp.body);
+    const body = parseBody(patchResp);
+    assert.equal(body.error_code, 'invalid_node_media_src');
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('content.article_body.nodes[0]'),
+      body.error
+    );
+  });
 });

@@ -1030,6 +1030,12 @@ const getMediaEntries = async (
       if (crossRef && !isDeletedArtifactReference(crossRef)) {
         allArtifactReferences.push(crossRef);
         knownSha256s.add(ptr.sha256);
+      } else {
+        const reason = !crossRef ? 'not found in the artifact index' : 'has been deleted';
+        throw new PublishError(
+          422,
+          `article_body node contains an artifact pointer that is ${reason}: image/${ptr.requestId}/${ptr.sha256}`
+        );
       }
     }
   }
