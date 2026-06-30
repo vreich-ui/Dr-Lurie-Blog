@@ -655,6 +655,77 @@ describe('patchCanonicalInput — lock and version safety', () => {
 });
 
 // ===========================================================================
+// node_patches — PDF src type inference
+// ===========================================================================
+
+describe('patchCanonicalInput — node_patches PDF type inference', () => {
+  it('sets media.type to document when patching a text-only node with a PDF blobKey', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-pdf-node-new-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // n_r3x4y5 has no media — patching it with a PDF blobKey must default type to 'document'
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r3x4y5', public_media_src: PDF_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const patchedNode = saved.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r3x4y5');
+    assert.ok(patchedNode, 'n_r3x4y5 must exist');
+    assert.equal(patchedNode.public?.media?.src, PDF_ARTIFACT, 'src must be set to PDF_ARTIFACT');
+    assert.equal(patchedNode.public?.media?.type, 'document', 'type must be document for a pdf/ blobKey');
+  });
+
+  it('updates media.type to document when replacing an image node with a PDF blobKey', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-pdf-node-replace-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // n_r1a2b3 has media with type:'image' — replacing src with PDF must update type to 'document'
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: PDF_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const patchedNode = saved.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3');
+    assert.ok(patchedNode, 'n_r1a2b3 must exist');
+    assert.equal(patchedNode.public?.media?.src, PDF_ARTIFACT, 'src must be updated');
+    assert.equal(patchedNode.public?.media?.type, 'document', 'type must be updated to document for a pdf/ blobKey');
+  });
+
+  it('preserves media.type:image when patching a node with an image blobKey', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-image-node-preserve-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // n_r1a2b3 has media with type:'image' — replacing src with another image must keep type:'image'
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: FEATURED_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const patchedNode = saved.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3');
+    assert.equal(patchedNode?.public?.media?.type, 'image', 'type must stay image for an image/ blobKey');
+    assert.equal(patchedNode?.public?.media?.alt, 'Retinol hero', 'alt must be preserved');
+  });
+});
+
+// ===========================================================================
 // Tighter validation — replace_image_asset_register
 // ===========================================================================
 
