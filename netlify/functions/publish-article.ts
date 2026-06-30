@@ -2,11 +2,13 @@ import { timingSafeEqual } from 'node:crypto';
 
 import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
 import {
+  isDeletedArtifactReference,
   normalizeArtifactBlobKey,
   reconcileArtifactReference,
   requireArtifactReferenceArray,
   type ArtifactReference,
 } from '../lib/artifacts.js';
+import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 import { PdfValidationError, validatePublishPdfBytes } from '../lib/pdf-validation.js';
@@ -1051,8 +1053,72 @@ const getMediaEntries = async (
     };
   });
 
-  const artifactStore = artifactReferences.length ? await getArtifactBlobStore(event) : undefined;
-  const indexStore = artifactReferences.length ? await getArtifactIndexBlobStore(event) : undefined;
+  // Scan article_body.nodes for artifact-pointer media.src values not already in artifactReferences,
+  // and resolve them via the artifact index store (same cross-request pattern as MCP publish).
+  const NODE_ARTIFACT_PTR_RE = /^image\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/;
+  const articleBodyRaw = input.article_body as Record<string, unknown> | null | undefined;
+  const articleNodes = Array.isArray(articleBodyRaw?.nodes) ? (articleBodyRaw.nodes as unknown[]) : [];
+  // Map sha256 → canonical blobKey. Seeded from top-level artifactReferences; extended as
+  // node pointers are queued for resolution. Ensures every node media.src exactly matches
+  // the canonical blobKey for its digest, even when src crosses request boundaries.
+  const blobKeyBySha256 = new Map(artifactReferences.map((r) => [r.sha256, r.blobKey]));
+  const nodePointers: Array<{ requestId: string; sha256: string; src: string }> = [];
+  for (const node of articleNodes) {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
+    const pub = (node as Record<string, unknown>).public as Record<string, unknown> | undefined;
+    const media = pub?.media as Record<string, unknown> | undefined;
+    const src = media?.src;
+    if (typeof src !== 'string') continue;
+    const m = src.match(NODE_ARTIFACT_PTR_RE);
+    if (!m) continue;
+    const sha256Lower = m[2].toLowerCase();
+    const existingBlobKey = blobKeyBySha256.get(sha256Lower);
+    if (existingBlobKey !== undefined) {
+      // sha256 already known — src must exactly match the canonical blobKey
+      if (src !== existingBlobKey) {
+        throw new PublishError(
+          422,
+          `article_body node media.src "${src}" refers to a known artifact by digest but does not match its blobKey "${existingBlobKey}". Use the exact blobKey.`
+        );
+      }
+      continue;
+    }
+    nodePointers.push({ requestId: m[1], sha256: sha256Lower, src });
+    blobKeyBySha256.set(sha256Lower, src); // prevents duplicate resolution for the same sha256
+  }
+
+  const allArtifactReferences = [...artifactReferences];
+  const indexStore =
+    artifactReferences.length || nodePointers.length ? await getArtifactIndexBlobStore(event) : undefined;
+  if (nodePointers.length && indexStore) {
+    for (const ptr of nodePointers) {
+      const crossRef = await readArtifactReference(
+        indexStore as unknown as ArtifactIndexStore,
+        ptr.requestId,
+        ptr.sha256
+      );
+      // Capture blobKey before type narrowing: isDeletedArtifactReference has predicate
+      // `value is ArtifactReference`, which makes TS narrow the false-branch to `never`.
+      const crossRefBlobKey = crossRef?.blobKey;
+      if (crossRef && !isDeletedArtifactReference(crossRef)) {
+        if (ptr.src !== crossRefBlobKey) {
+          throw new PublishError(
+            422,
+            `article_body node media.src "${ptr.src}" does not match the canonical artifact blobKey "${crossRefBlobKey ?? '(unknown)'}". Use the exact blobKey returned by the artifact index.`
+          );
+        }
+        allArtifactReferences.push(crossRef);
+      } else {
+        const reason = !crossRef ? 'not found in the artifact index' : 'has been deleted';
+        throw new PublishError(
+          422,
+          `article_body node contains an artifact pointer that is ${reason}: image/${ptr.requestId}/${ptr.sha256}`
+        );
+      }
+    }
+  }
+
+  const artifactStore = allArtifactReferences.length ? await getArtifactBlobStore(event) : undefined;
   const artifactEntries = await Promise.all(
     artifactReferences.map(async (reference) => {
       const kind = getArtifactMediaKind(reference);
@@ -1248,7 +1314,10 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const entriesToValidate = existingFeaturedImage ? [...mediaEntries, existingFeaturedImage] : mediaEntries;
     await validateMediaEntries(entriesToValidate);
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
-    const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
+    const imagePath =
+      uploadedImagePath ??
+      existingFeaturedImage?.displayPath ??
+      (mediaEntries.find((e) => e.artifactReference) ?? mediaEntries[0])?.displayPath;
 
     let resolvedMarkdown: string;
     if (article_body) {

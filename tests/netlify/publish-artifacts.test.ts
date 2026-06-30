@@ -1305,3 +1305,390 @@ test('publish-article accepts valid PNG, WebP, and JPEG media entries', async ()
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article resolves artifact pointers in article_body nodes via index lookup', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `node-artifact-resolve-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'inline-hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+    metadata: { filename: 'Inline Hero.PNG' },
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/node-artifact-resolve-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+      return Response.json({ sha: 'new-tree' });
+    }
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    // artifact blobKey is in article_body node media.src but NOT in top-level artifactReferences
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'node-artifact-resolve-test',
+        title: 'Node Artifact Resolve Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                title: 'Hero section',
+                body: 'Article body content.',
+                media: { src: artifact.blobKey, type: 'image', alt: 'Hero image' },
+              },
+            },
+          ],
+        },
+        artifactReferences: [],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdownContent = blobWrites[0]?.content ?? '';
+    assert.ok(
+      !markdownContent.includes(artifact.blobKey),
+      `Raw artifact blobKey must not appear in markdown.\nGot: ${markdownContent.slice(0, 400)}`
+    );
+    assert.ok(
+      markdownContent.includes('~/assets/images/uploads/node-artifact-resolve-test/'),
+      `Resolved upload path must appear in markdown.\nGot: ${markdownContent.slice(0, 400)}`
+    );
+    assert.ok(
+      treePaths.some((p) => p.startsWith('src/assets/images/uploads/node-artifact-resolve-test/')),
+      `Image file must be committed to the tree.\nTree: ${treePaths.join(', ')}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article sets image frontmatter to first artifact entry when no explicit featuredImage is named', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `featured-fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'article-hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+    metadata: { filename: 'Article Hero.PNG' },
+  });
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/featured-fallback-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      return Response.json({ sha: 'new-tree' });
+    }
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    // No featuredImage or existingFeaturedImagePath — image: frontmatter must fall back to the artifact
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'featured-fallback-test',
+        title: 'Featured Fallback Test',
+        markdown: '# Featured fallback test',
+        artifactReferences: [upload.artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdownContent = blobWrites[0]?.content ?? '';
+    assert.ok(markdownContent.includes('image:'), `Expected "image:" in frontmatter.\nGot: ${markdownContent.slice(0, 300)}`);
+    assert.ok(
+      markdownContent.includes('~/assets/images/uploads/featured-fallback-test/'),
+      `Expected upload path in image frontmatter.\nGot: ${markdownContent.slice(0, 300)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article returns 422 when article_body node artifact pointer is not in the index', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `node-unresolved-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fakeSha256 = 'f'.repeat(64);
+  const fakeBlobKey = `image/${requestId}/${fakeSha256}.png`;
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/node-unresolved-ptr-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'node-unresolved-ptr-test',
+        title: 'Node Unresolved Pointer Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                media: { src: fakeBlobKey, type: 'image', alt: 'Broken image' },
+              },
+            },
+          ],
+        },
+        artifactReferences: [],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('not found in the artifact index'),
+      `Expected 'not found in the artifact index' in error.\nGot: ${body.error}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article returns 422 when article_body node src extension differs from canonical blobKey', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  // Upload a PNG artifact; node will reference the same sha256 but with .jpg extension
+  const requestId = `node-ext-mismatch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  // Construct a pointer with the same requestId/sha256 but wrong extension
+  const wrongExtSrc = artifact.blobKey.replace(/\.[^.]+$/, '.jpg');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/node-ext-mismatch-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'node-ext-mismatch-test',
+        title: 'Node Extension Mismatch Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                media: { src: wrongExtSrc, type: 'image', alt: 'Hero image' },
+              },
+            },
+          ],
+        },
+        artifactReferences: [],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('does not match the canonical artifact blobKey'),
+      `Expected canonical blobKey mismatch error.\nGot: ${body.error}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article returns 422 when article_body node src uses same sha256 as a top-level artifactReference but a different blobKey', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  // Upload one artifact under requestA; then publish with the same artifact in artifactReferences
+  // but have the article_body node use a different blobKey (requestB) for the same sha256.
+  const requestId = `cross-req-sha-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  // Construct a pointer with a different requestId prefix but the same sha256/extension
+  const crossRequestSrc = artifact.blobKey.replace(requestId, 'other-request-id');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/cross-req-sha-mismatch-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'cross-req-sha-mismatch-test',
+        title: 'Cross-Request SHA Mismatch Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                // src uses a different requestId than the artifact's blobKey
+                media: { src: crossRequestSrc, type: 'image', alt: 'Hero image' },
+              },
+            },
+          ],
+        },
+        // artifactReferences carries the real blobKey; the node's src differs
+        artifactReferences: [artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('does not match its blobKey'),
+      `Expected blobKey mismatch error.\nGot: ${body.error}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
