@@ -18,6 +18,14 @@ const load = async function () {
 
 let _images: Record<string, () => Promise<unknown>> | undefined = undefined;
 
+/**
+ * Returns true when a src string points to a non-image asset (e.g. a PDF under
+ * ~/assets/documents/). Callers should check this BEFORE calling findImage() so
+ * the "no image" branch is explicit rather than discovered via a null return.
+ */
+export const isDocumentPath = (src: string): boolean =>
+  src.startsWith('~/assets/documents/') || src.startsWith('src/assets/documents/');
+
 /** */
 export const fetchLocalImages = async () => {
   _images = _images || (await load());
@@ -36,6 +44,12 @@ export const findImage = async (
   // Absolute paths
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://') || imagePath.startsWith('/')) {
     return imagePath;
+  }
+
+  // Paths under ~/assets/ that are not images (e.g. ~/assets/documents/) are
+  // not processable by getImage — return null so callers skip image rendering.
+  if (imagePath.startsWith('~/assets/') && !imagePath.startsWith('~/assets/images')) {
+    return null;
   }
 
   // Relative paths or not "~/assets/"
