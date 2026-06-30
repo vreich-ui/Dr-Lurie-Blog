@@ -57,7 +57,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 // ─── artifact-ref validation (mirrors save-json-blob rules) ───────────────────
 
-const MAJOR_KEY_ARTIFACT_REF_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 const BASE64_DATA_URI_RE = /^data:/i;
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 const REMOTE_URL_RE = /^https?:\/\//i;
@@ -85,7 +85,7 @@ const validateImageRef = (path: string, value: string, trustedRefs: Set<string>)
   if (REMOTE_URL_RE.test(value))
     return `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`;
   if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value))
-    return `${path} must be a Major Key artifact reference (image/{id}/{sha256}.{ext}).`;
+    return `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`;
   if (!trustedRefs.has(value)) return `${path} "${value}" is not in the agent artifact index for this record.`;
   return undefined;
 };

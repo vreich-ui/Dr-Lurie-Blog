@@ -202,6 +202,59 @@ describe('handlePatchCanonicalInput', () => {
     assert.equal(parseBody(res).conflict, true);
   });
 
+  it('accepts promote_publish_payload with trusted PDF artifactReference', async () => {
+    const store = createMemoryStore();
+    const pdfSha = 'e'.repeat(64);
+    const pdfArtifact = `pdf/${REQUEST_ID}/${pdfSha}.pdf`;
+    await seedRecord(
+      store,
+      makeRecord({
+        agent_outputs: {
+          final_article: {
+            version: 1,
+            updated_at: new Date().toISOString(),
+            expected_agent_version: 0,
+            output: {
+              artifactReferences: [
+                {
+                  blobKey: pdfArtifact,
+                  sha256: pdfSha,
+                  contentType: 'application/pdf',
+                  artifactKind: 'pdf',
+                  sizeBytes: 120000,
+                  createdAtISO: new Date().toISOString(),
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
+
+    const res = await handlePatchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: REQUEST_ID,
+      lock_token: LOCK_TOKEN,
+      expected_record_version: 1,
+      promote_publish_payload: {
+        slug: 'test-article',
+        title: 'Test Article',
+        artifactReferences: [
+          {
+            blobKey: pdfArtifact,
+            sha256: pdfSha,
+            contentType: 'application/pdf',
+            artifactKind: 'pdf',
+            sizeBytes: 120000,
+            createdAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    assert.equal(res.statusCode, 200, res.body);
+  });
+
   it('saves publish_payload and increments version', async () => {
     const store = createMemoryStore();
     await seedRecord(store, makeRecord());

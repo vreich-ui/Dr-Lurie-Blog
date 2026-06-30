@@ -8,6 +8,7 @@ import {
   patchCanonicalInput,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
+import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
 
 // ---------------------------------------------------------------------------
 // In-memory blob store (same shape used by all save-json-blob tests)
@@ -47,6 +48,7 @@ const parseBody = (r: { body: string }): RecordBody => JSON.parse(r.body) as Rec
 // ---------------------------------------------------------------------------
 const FEATURED_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624/94af376e6bea4d7680e75b6dcb53bf7fd4433d7c0154a5c00e61e4969350232d.png`;
 const INLINE_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624/655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f.png`;
+const PDF_ARTIFACT = `pdf/req_repair_retinol_schema_publish_v2_20260624/${'e'.repeat(64)}.pdf`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,7 +108,7 @@ const makeInput = (requestId: string) => ({
   versioning: { schema_version: 'versioning.v1', record_version: 1 },
 });
 
-/** Agent output whose artifactReferences contain both trusted refs above. */
+/** Agent output whose artifactReferences contain trusted refs above. */
 const makeFinalArticleOutput = () => ({
   artifactReferences: [
     {
@@ -121,6 +123,14 @@ const makeFinalArticleOutput = () => ({
       sha256: '655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f',
       contentType: 'image/png',
       sizeBytes: 180000,
+      createdAtISO: new Date().toISOString(),
+    },
+    {
+      blobKey: PDF_ARTIFACT,
+      sha256: 'e'.repeat(64),
+      contentType: 'application/pdf',
+      artifactKind: 'pdf',
+      sizeBytes: 120000,
       createdAtISO: new Date().toISOString(),
     },
   ],
@@ -213,6 +223,44 @@ describe('patchCanonicalInput — node_patches', () => {
       { strategy: 'explanation', agentNotes: 'Internal note.' },
       'private must be preserved'
     );
+  });
+
+  it('sets document media type when patching a trusted PDF src onto a text-only node', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-pdf-node-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [
+        {
+          node_id: 'n_r3x4y5',
+          public_media_src: PDF_ARTIFACT,
+          public_media_caption: 'Download the reader handout.',
+        },
+      ],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const nodes = saved.input.content?.article_body?.nodes ?? [];
+    const documentNode = nodes.find((n) => n.id === 'n_r3x4y5');
+    assert.ok(documentNode, 'n_r3x4y5 must exist');
+    assert.equal(documentNode.public?.media?.src, PDF_ARTIFACT);
+    assert.equal(documentNode.public?.media?.type, 'document');
+    assert.equal(documentNode.public?.media?.caption, 'Download the reader handout.');
+
+    const articleBody = saved.input.content?.article_body;
+    assert.ok(articleBody, 'article_body must exist');
+    const markdown = articleBodyToMarkdown({
+      ...articleBody,
+      nodes: nodes.map((node) => (node.id === 'n_r3x4y5' ? { ...node, rendering: { placement: 'inline' } } : node)),
+    });
+    assert.ok(markdown.includes(`[${'e'.repeat(64)}.pdf](${PDF_ARTIFACT})`));
+    assert.ok(!markdown.includes(`![${'e'.repeat(64)}.pdf](${PDF_ARTIFACT})`));
   });
 
   it('removes media object when public_media_src is null', async () => {
@@ -607,6 +655,77 @@ describe('patchCanonicalInput — lock and version safety', () => {
 });
 
 // ===========================================================================
+// node_patches — PDF src type inference
+// ===========================================================================
+
+describe('patchCanonicalInput — node_patches PDF type inference', () => {
+  it('sets media.type to document when patching a text-only node with a PDF blobKey', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-pdf-node-new-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // n_r3x4y5 has no media — patching it with a PDF blobKey must default type to 'document'
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r3x4y5', public_media_src: PDF_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const patchedNode = saved.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r3x4y5');
+    assert.ok(patchedNode, 'n_r3x4y5 must exist');
+    assert.equal(patchedNode.public?.media?.src, PDF_ARTIFACT, 'src must be set to PDF_ARTIFACT');
+    assert.equal(patchedNode.public?.media?.type, 'document', 'type must be document for a pdf/ blobKey');
+  });
+
+  it('updates media.type to document when replacing an image node with a PDF blobKey', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-pdf-node-replace-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // n_r1a2b3 has media with type:'image' — replacing src with PDF must update type to 'document'
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: PDF_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const patchedNode = saved.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3');
+    assert.ok(patchedNode, 'n_r1a2b3 must exist');
+    assert.equal(patchedNode.public?.media?.src, PDF_ARTIFACT, 'src must be updated');
+    assert.equal(patchedNode.public?.media?.type, 'document', 'type must be updated to document for a pdf/ blobKey');
+  });
+
+  it('preserves media.type:image when patching a node with an image blobKey', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-image-node-preserve-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    // n_r1a2b3 has media with type:'image' — replacing src with another image must keep type:'image'
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: FEATURED_ARTIFACT }],
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const patchedNode = saved.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3');
+    assert.equal(patchedNode?.public?.media?.type, 'image', 'type must stay image for an image/ blobKey');
+    assert.equal(patchedNode?.public?.media?.alt, 'Retinol hero', 'alt must be preserved');
+  });
+});
+
+// ===========================================================================
 // Tighter validation — replace_image_asset_register
 // ===========================================================================
 
@@ -791,6 +910,39 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 
     assert.equal(resp.statusCode, 400, resp.body);
     assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+  });
+
+  it('accepts promote_publish_payload with trusted PDF artifactReference', async () => {
+    const store = createMemoryStore();
+    const requestId = `payload-trusted-pdf-ref-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      promote_publish_payload: {
+        slug: 'retinol-explained-simply',
+        title: 'Retinol Explained Simply',
+        artifactReferences: [
+          {
+            blobKey: PDF_ARTIFACT,
+            sha256: 'e'.repeat(64),
+            contentType: 'application/pdf',
+            artifactKind: 'pdf',
+            sizeBytes: 120000,
+            createdAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const storedPayload = saved.input.publication?.publish_payload as Record<string, unknown> | undefined;
+    const artifactRefs = storedPayload?.artifactReferences as Array<Record<string, unknown>> | undefined;
+    assert.equal(artifactRefs?.[0]?.blobKey, PDF_ARTIFACT);
   });
 
   it('accepts promote_publish_payload with trusted artifact ref in featuredImage and artifactReferences', async () => {

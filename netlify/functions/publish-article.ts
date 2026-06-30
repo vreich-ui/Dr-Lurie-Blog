@@ -11,6 +11,7 @@ import {
 import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
+import { PdfValidationError, validatePublishPdfBytes } from '../lib/pdf-validation.js';
 import {
   getDeployReceiptByCommit,
   isNetlifyDeployLookupConfigured,
@@ -128,7 +129,11 @@ const jsonHeaders = {
 };
 
 const repoContentRoot = 'src/data/post';
-const uploadRoot = 'src/assets/images/uploads';
+const assetUploadRoots = {
+  image: 'src/assets/images/uploads',
+  document: 'src/assets/documents/uploads',
+} as const;
+const uploadRoot = assetUploadRoots.image;
 const githubApiRoot = 'https://api.github.com';
 
 const DEFAULT_DEPLOY_WAIT_TIMEOUT_SECONDS = 120;
@@ -198,8 +203,11 @@ class PublishError extends Error {
   }
 }
 
+type MediaKind = keyof typeof assetUploadRoots;
+
 type MediaEntry = {
   artifactReference?: ArtifactReference;
+  kind: MediaKind;
   content: string;
   contentType?: string;
   displayPath: string;
@@ -273,15 +281,21 @@ const normalizeRepoPath = (value: string) => {
 
 const isExpectedArticlePath = (path: string, slug: string) => path === `${repoContentRoot}/${slug}.md`;
 
-const isValidUploadedImagePath = (path: string) => {
-  const prefix = `${uploadRoot}/`;
+const uploadRootForKind = (kind: MediaKind) => assetUploadRoots[kind];
+
+const isValidUploadedMediaPath = (path: string, kind: MediaKind) => {
+  const root = uploadRootForKind(kind);
+  const prefix = `${root}/`;
   return path.startsWith(prefix) && path.length > prefix.length && !path.endsWith('/');
 };
 
-const isValidImagePath = (path: string, slug: string) => {
-  const prefix = `${uploadRoot}/${slug}/`;
-  return isValidUploadedImagePath(path) && path.startsWith(prefix) && path.length > prefix.length;
+const isValidMediaPath = (path: string, slug: string, kind: MediaKind) => {
+  const root = uploadRootForKind(kind);
+  const prefix = `${root}/${slug}/`;
+  return isValidUploadedMediaPath(path, kind) && path.startsWith(prefix) && path.length > prefix.length;
 };
+
+const isValidImagePath = (path: string, slug: string) => isValidMediaPath(path, slug, 'image');
 
 const toSafeLogPath = (value: string | undefined) =>
   value
@@ -332,6 +346,7 @@ const extensionForContentType = (contentType: string) => {
     'image/gif': '.gif',
     'image/webp': '.webp',
     'image/svg+xml': '.svg',
+    'application/pdf': '.pdf',
     'audio/mpeg': '.mp3',
     'audio/mp3': '.mp3',
     'audio/wav': '.wav',
@@ -352,6 +367,16 @@ const getArtifactRequestId = (reference: ArtifactReference, fallback: string) =>
 
 const isImageArtifactReference = (reference: ArtifactReference) =>
   reference.contentType.toLowerCase().startsWith('image/') || reference.blobKey.startsWith('image/');
+
+const isPdfArtifactReference = (reference: ArtifactReference) =>
+  reference.contentType.toLowerCase().split(';')[0]?.trim() === 'application/pdf' ||
+  reference.blobKey.startsWith('pdf/');
+
+const getArtifactMediaKind = (reference: ArtifactReference): MediaKind | undefined => {
+  if (isImageArtifactReference(reference)) return 'image';
+  if (isPdfArtifactReference(reference)) return 'document';
+  return undefined;
+};
 
 const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: string) => {
   const originalFilename = toStringValue(reference.originalFilename);
@@ -378,21 +403,33 @@ const getArtifactFilename = (reference: ArtifactReference, fallbackRequestId: st
 const getArtifactTargetPath = (reference: ArtifactReference) =>
   toStringValue((reference as { repoPath?: unknown }).repoPath) ?? toStringValue(reference.metadata?.repoPath);
 
-const normalizeUploadReferencePath = (value: string) => {
-  const repoPath = value.startsWith('~/assets/images/uploads/')
-    ? value.replace('~/assets/images/uploads/', `${uploadRoot}/`)
-    : value.startsWith('/src/assets/images/uploads/')
+const normalizeUploadReferencePathForKind = (value: string, kind: MediaKind) => {
+  const root = uploadRootForKind(kind);
+  const displayRoot = `~/assets/${kind === 'image' ? 'images' : 'documents'}/uploads/`;
+  const absoluteRoot = `/src/assets/${kind === 'image' ? 'images' : 'documents'}/uploads/`;
+  const repoPath = value.startsWith(displayRoot)
+    ? value.replace(displayRoot, `${root}/`)
+    : value.startsWith(absoluteRoot)
       ? value.slice(1)
-      : value.startsWith(`${uploadRoot}/`)
+      : value.startsWith(`${root}/`)
         ? value
         : undefined;
 
   const normalizedPath = repoPath ? normalizeRepoPath(repoPath) : undefined;
-  return normalizedPath && isValidUploadedImagePath(normalizedPath) ? normalizedPath : undefined;
+  return normalizedPath && isValidUploadedMediaPath(normalizedPath, kind) ? normalizedPath : undefined;
 };
 
-const getDisplayPath = (path: string) =>
-  path.startsWith(`${uploadRoot}/`) ? path.replace(`${uploadRoot}/`, '~/assets/images/uploads/') : path;
+const normalizeUploadReferencePath = (value: string) => normalizeUploadReferencePathForKind(value, 'image');
+
+const getDisplayPath = (path: string) => {
+  for (const [kind, root] of Object.entries(assetUploadRoots) as Array<[MediaKind, string]>) {
+    if (path.startsWith(`${root}/`)) {
+      return path.replace(`${root}/`, `~/assets/${kind === 'image' ? 'images' : 'documents'}/uploads/`);
+    }
+  }
+
+  return path;
+};
 
 const replaceAllLiteral = (value: string, search: string, replacement: string) =>
   search ? value.split(search).join(replacement) : value;
@@ -769,6 +806,7 @@ const resolveExistingImageReference = async (
     return {
       content: '',
       contentType: fallbackContentType ?? contentType,
+      kind: 'image' as const,
       displayPath: value,
       encoding: 'base64',
       filename,
@@ -789,6 +827,7 @@ const resolveExistingImageReference = async (
   return {
     content: '',
     contentType: fallbackContentType,
+    kind: 'image' as const,
     displayPath: getDisplayPath(path),
     encoding: 'base64',
     filename: sanitizeFilename(path),
@@ -817,12 +856,25 @@ const decodeMediaEntryBytes = (content: string, encoding: 'base64' | 'utf-8', pa
 
 const validateMediaEntries = async (mediaEntries: MediaEntry[]) => {
   for (const entry of mediaEntries) {
-    await validatePublishImageBytes({
-      bytes: entry.rawBytes,
-      contentType: entry.contentType,
-      filename: entry.filename,
-      path: entry.path,
-    });
+    if (entry.kind === 'image') {
+      await validatePublishImageBytes({
+        bytes: entry.rawBytes,
+        contentType: entry.contentType,
+        filename: entry.filename,
+        path: entry.path,
+      });
+      continue;
+    }
+
+    if (entry.kind === 'document') {
+      validatePublishPdfBytes({
+        bytes: entry.rawBytes,
+        contentType: entry.contentType,
+        expectedSizeBytes: entry.artifactReference?.sizeBytes,
+        filename: entry.filename,
+        path: entry.path,
+      });
+    }
   }
 };
 
@@ -861,6 +913,7 @@ const getMediaEntries = async (
     return {
       content: file.base64,
       contentType: file.type,
+      kind: 'image' as const,
       displayPath: `~/assets/images/uploads/${slug}/${filename}`,
       encoding: 'base64' as const,
       filename,
@@ -943,6 +996,7 @@ const getMediaEntries = async (
     agentEntries.push({
       content,
       contentType: toStringValue(image.type),
+      kind: 'image' as const,
       displayPath: getDisplayPath(path),
       encoding: toStringValue(image.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
       filename: sanitizeFilename(filename ?? path),
@@ -986,6 +1040,7 @@ const getMediaEntries = async (
     return {
       content,
       contentType: toStringValue(entry.type),
+      kind: 'image' as const,
       displayPath: getDisplayPath(path),
       encoding: toStringValue(entry.encoding) === 'utf-8' ? ('utf-8' as const) : ('base64' as const),
       filename: sanitizeFilename(filename ?? path),
@@ -1065,27 +1120,37 @@ const getMediaEntries = async (
 
   const artifactStore = allArtifactReferences.length ? await getArtifactBlobStore(event) : undefined;
   const artifactEntries = await Promise.all(
-    allArtifactReferences.map(async (reference) => {
-      if (!isImageArtifactReference(reference)) {
-        throw new PublishError(422, 'Only image artifactReferences can be published as article media entries.');
+    artifactReferences.map(async (reference) => {
+      const kind = getArtifactMediaKind(reference);
+
+      if (!kind) {
+        throw new PublishError(
+          422,
+          `Unsupported artifactReference media type: ${reference.contentType}. Supported article media artifact types are image/* and application/pdf.`
+        );
       }
 
       if (!artifactStore) {
         throw new PublishError(500, 'Artifact blob store is not available.');
       }
 
+      const root = uploadRootForKind(kind);
       const explicitTargetPath = getArtifactTargetPath(reference);
-      const normalizedTargetPath = explicitTargetPath ? normalizeUploadReferencePath(explicitTargetPath) : undefined;
-      const path = artifactTargetPaths.get(reference) ?? normalizedTargetPath;
+      const normalizedTargetPath = explicitTargetPath
+        ? normalizeUploadReferencePathForKind(explicitTargetPath, kind)
+        : undefined;
+      const path =
+        kind === 'image' ? (artifactTargetPaths.get(reference) ?? normalizedTargetPath) : normalizedTargetPath;
 
-      if (explicitTargetPath && (!path || !isValidImagePath(path, slug))) {
+      if (explicitTargetPath && (!path || !isValidMediaPath(path, slug, kind))) {
         const safeRepoPath = toSafeLogPath(path ?? explicitTargetPath);
         logPublishMedia(event, input, 'publish_media_invalid_artifact_repo_path', slug, articlePath, {
           repoPath: safeRepoPath,
+          kind,
         });
         throw new PublishError(
           403,
-          `Artifact repoPath values must be under ${uploadRoot}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
+          `Artifact repoPath values must be under ${root}/${slug}/ and include a filename. Received: ${safeRepoPath ?? '(missing)'}.`
         );
       }
 
@@ -1097,15 +1162,17 @@ const getMediaEntries = async (
       }
 
       const bytes = await readArtifactBytes(artifactStore, indexStore, reference, filename);
+      const resolvedPath = path ?? `${root}/${slug}/${filename}`;
 
       return {
         artifactReference: reference,
         content: bytes.toString('base64'),
         contentType: reference.contentType,
-        displayPath: path ? getDisplayPath(path) : `~/assets/images/uploads/${slug}/${filename}`,
+        kind,
+        displayPath: getDisplayPath(resolvedPath),
         encoding: 'base64' as const,
         filename,
-        path: path ?? `${uploadRoot}/${slug}/${filename}`,
+        path: resolvedPath,
         rawBytes: bytes,
       };
     })
@@ -1370,7 +1437,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       return jsonResponse(error.statusCode, { error: error.message });
     }
 
-    if (error instanceof ImageValidationError) {
+    if (error instanceof ImageValidationError || error instanceof PdfValidationError) {
       return jsonResponse(422, { error: error.message, path: error.path });
     }
 
