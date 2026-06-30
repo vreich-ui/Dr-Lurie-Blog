@@ -1457,3 +1457,76 @@ test('publish-article returns 422 when article_body node src extension differs f
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article returns 422 when article_body node src uses same sha256 as a top-level artifactReference but a different blobKey', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  // Upload one artifact under requestA; then publish with the same artifact in artifactReferences
+  // but have the article_body node use a different blobKey (requestB) for the same sha256.
+  const requestId = `cross-req-sha-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  // Construct a pointer with a different requestId prefix but the same sha256/extension
+  const crossRequestSrc = artifact.blobKey.replace(requestId, 'other-request-id');
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/cross-req-sha-mismatch-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'cross-req-sha-mismatch-test',
+        title: 'Cross-Request SHA Mismatch Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                // src uses a different requestId than the artifact's blobKey
+                media: { src: crossRequestSrc, type: 'image', alt: 'Hero image' },
+              },
+            },
+          ],
+        },
+        // artifactReferences carries the real blobKey; the node's src differs
+        artifactReferences: [artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.ok(
+      typeof body.error === 'string' && body.error.includes('does not match its blobKey'),
+      `Expected blobKey mismatch error.\nGot: ${body.error}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

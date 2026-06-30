@@ -1003,7 +1003,10 @@ const getMediaEntries = async (
   const NODE_ARTIFACT_PTR_RE = /^image\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/;
   const articleBodyRaw = input.article_body as Record<string, unknown> | null | undefined;
   const articleNodes = Array.isArray(articleBodyRaw?.nodes) ? (articleBodyRaw.nodes as unknown[]) : [];
-  const knownSha256s = new Set(artifactReferences.map((r) => r.sha256));
+  // Map sha256 → canonical blobKey. Seeded from top-level artifactReferences; extended as
+  // node pointers are queued for resolution. Ensures every node media.src exactly matches
+  // the canonical blobKey for its digest, even when src crosses request boundaries.
+  const blobKeyBySha256 = new Map(artifactReferences.map((r) => [r.sha256, r.blobKey]));
   const nodePointers: Array<{ requestId: string; sha256: string; src: string }> = [];
   for (const node of articleNodes) {
     if (!node || typeof node !== 'object' || Array.isArray(node)) continue;
@@ -1012,8 +1015,21 @@ const getMediaEntries = async (
     const src = media?.src;
     if (typeof src !== 'string') continue;
     const m = src.match(NODE_ARTIFACT_PTR_RE);
-    if (!m || knownSha256s.has(m[2].toLowerCase())) continue;
-    nodePointers.push({ requestId: m[1], sha256: m[2].toLowerCase(), src });
+    if (!m) continue;
+    const sha256Lower = m[2].toLowerCase();
+    const existingBlobKey = blobKeyBySha256.get(sha256Lower);
+    if (existingBlobKey !== undefined) {
+      // sha256 already known — src must exactly match the canonical blobKey
+      if (src !== existingBlobKey) {
+        throw new PublishError(
+          422,
+          `article_body node media.src "${src}" refers to a known artifact by digest but does not match its blobKey "${existingBlobKey}". Use the exact blobKey.`
+        );
+      }
+      continue;
+    }
+    nodePointers.push({ requestId: m[1], sha256: sha256Lower, src });
+    blobKeyBySha256.set(sha256Lower, src); // prevents duplicate resolution for the same sha256
   }
 
   const allArtifactReferences = [...artifactReferences];
@@ -1021,7 +1037,6 @@ const getMediaEntries = async (
     artifactReferences.length || nodePointers.length ? await getArtifactIndexBlobStore(event) : undefined;
   if (nodePointers.length && indexStore) {
     for (const ptr of nodePointers) {
-      if (knownSha256s.has(ptr.sha256)) continue;
       const crossRef = await readArtifactReference(
         indexStore as unknown as ArtifactIndexStore,
         ptr.requestId,
@@ -1038,7 +1053,6 @@ const getMediaEntries = async (
           );
         }
         allArtifactReferences.push(crossRef);
-        knownSha256s.add(ptr.sha256);
       } else {
         const reason = !crossRef ? 'not found in the artifact index' : 'has been deleted';
         throw new PublishError(
