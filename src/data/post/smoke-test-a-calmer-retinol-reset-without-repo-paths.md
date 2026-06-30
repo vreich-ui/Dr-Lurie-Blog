@@ -1,18 +1,17 @@
 ---
-publishDate: 2026-06-30T15:53:08.562Z
-published_time: 2026-06-30T15:53:08.562Z
+publishDate: 2026-06-30T16:13:46.646Z
+published_time: 2026-06-30T16:13:46.646Z
 title: "Smoke Test: A Calmer Retinol Reset Without Repo Paths"
 excerpt: "A compact DTC-style smoke article built to verify that artifact-backed featured and inline images survive pre-publish payload assembly without any repository-style image path."
-image: "~/assets/images/uploads/smoke-test-a-calmer-retinol-reset-without-repo-paths/retinol-introduction-thumbnail.png"
+image: "~/assets/images/uploads/smoke-test-a-calmer-retinol-reset-without-repo-paths/retinol-introduction-hero.png"
 tags:
   - "smoke-test"
-  - "repo-path-check"
   - "retinol"
   - "skincare"
   - "inline-image"
-  - "png"
+  - "artifact-backed"
 metadata:
-  description: "A compact smoke-test article verifying artifact-backed featured and inline image references before publish."
+  description: "A compact DTC-style smoke article verifying artifact-backed featured and inline images with the same slug and a replaced inline image."
 ---
 ### A reset should make the next step clearer
 
@@ -22,11 +21,13 @@ This smoke-test article is intentionally compact: one featured PNG artifact, one
 
 ### The simple retinol reset
 
-![A skincare routine layout used as an inline visual for a simple retinol reset plan.](~/assets/images/uploads/smoke-test-a-calmer-retinol-reset-without-repo-paths/retinol-introduction-thumbnail.png)
+![A clean skincare scene representing a gentle routine reset.](~/assets/images/uploads/smoke-test-a-calmer-retinol-reset-without-repo-paths/retinol-introduction-hero.png)
 
 - Use a gentle cleanser and avoid scrubbing while the skin feels reactive.
 - Moisturize before the skin feels tight, not only after irritation starts.
 - Wait to reintroduce retinol until the skin feels steady for several days.
+
+Keep the reset steps simple:
 
 For one week, treat consistency as the test. Keep the routine calm enough that irritation, dryness, and comfort are easier to interpret.
 
@@ -38,10 +39,10 @@ When the skin is calmer, restart slowly. Use a small amount, choose fewer nights
 
 If your routine has become hard to read, a focused consultation can help you decide what to pause, what to keep, and how to reintroduce actives with less guesswork.
 
-[Book a skin routine consultation](https://example.com/book-consultation)
+[Book a skin routine consultation](https://example.com)
 
 ### Keep the reset simple
 
 Join the list for practical notes on barrier support, product timing, and calmer skincare decisions.
 
-[Join the skin notes list](https://example.com/newsletter-signup)
+[Join the skin notes list](https://example.com)
