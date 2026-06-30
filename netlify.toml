@@ -15,6 +15,13 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+
+[[redirects]]
+  from = "/pdf/*"
+  to = "/.netlify/functions/get-public-pdf?blobKey=pdf/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/mcp"
   to = "/.netlify/functions/mcp"
