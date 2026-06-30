@@ -1314,10 +1314,13 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const entriesToValidate = existingFeaturedImage ? [...mediaEntries, existingFeaturedImage] : mediaEntries;
     await validateMediaEntries(entriesToValidate);
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
+    // Only image-kind media may populate the featured image frontmatter field.
+    // Document-kind entries (PDFs) must never become the article's image: path.
     const imagePath =
       uploadedImagePath ??
       existingFeaturedImage?.displayPath ??
-      (mediaEntries.find((e) => e.artifactReference) ?? mediaEntries[0])?.displayPath;
+      (mediaEntries.find((e) => e.artifactReference && e.kind === 'image') ??
+        mediaEntries.find((e) => e.kind === 'image'))?.displayPath;
 
     let resolvedMarkdown: string;
     if (article_body) {
