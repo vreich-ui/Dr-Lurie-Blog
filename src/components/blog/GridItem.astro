@@ -12,10 +12,7 @@ export interface Props {
 }
 
 const { post } = Astro.props;
-const image =
-  typeof post.image === 'string' && isDocumentPath(post.image)
-    ? undefined
-    : await findImage(post.image);
+const image = typeof post.image === 'string' && isDocumentPath(post.image) ? undefined : await findImage(post.image);
 
 const link = APP_BLOG?.post?.isEnabled ? getPermalink(post.permalink, 'post') : '';
 ---
