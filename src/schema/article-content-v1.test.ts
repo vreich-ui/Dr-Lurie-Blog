@@ -68,4 +68,27 @@ describe('ArticleBodyV1 Schema', () => {
     const result = articleBodyV1Schema.safeParse(invalidData);
     assert.strictEqual(result.success, false);
   });
+  it('accepts document media nodes with title and contentType', () => {
+    const result = articleBodyV1Schema.safeParse({
+      schema_version: 'article_body.v1',
+      nodes: [
+        {
+          id: 'n_document1',
+          kind: 'content',
+          public: {
+            title: 'Document',
+            media: {
+              type: 'document',
+              src: '~/assets/documents/uploads/article/reader-handout.pdf',
+              title: 'Reader handout',
+              contentType: 'application/pdf',
+              caption: 'Download the full handout.',
+            },
+          },
+        },
+      ],
+    });
+
+    assert.strictEqual(result.success, true);
+  });
 });
