@@ -38,6 +38,12 @@ export const findImage = async (
     return imagePath;
   }
 
+  // Paths under ~/assets/ that are not images (e.g. ~/assets/documents/) are
+  // not processable by getImage — return null so callers skip image rendering.
+  if (imagePath.startsWith('~/assets/') && !imagePath.startsWith('~/assets/images')) {
+    return null;
+  }
+
   // Relative paths or not "~/assets/"
   if (!imagePath.startsWith('~/assets/images')) {
     return imagePath;
