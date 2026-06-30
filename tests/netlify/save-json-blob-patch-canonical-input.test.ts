@@ -47,6 +47,7 @@ const parseBody = (r: { body: string }): RecordBody => JSON.parse(r.body) as Rec
 // ---------------------------------------------------------------------------
 const FEATURED_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624/94af376e6bea4d7680e75b6dcb53bf7fd4433d7c0154a5c00e61e4969350232d.png`;
 const INLINE_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624/655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f.png`;
+const PDF_ARTIFACT = `pdf/req_repair_retinol_schema_publish_v2_20260624/${'e'.repeat(64)}.pdf`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,7 +107,7 @@ const makeInput = (requestId: string) => ({
   versioning: { schema_version: 'versioning.v1', record_version: 1 },
 });
 
-/** Agent output whose artifactReferences contain both trusted refs above. */
+/** Agent output whose artifactReferences contain trusted refs above. */
 const makeFinalArticleOutput = () => ({
   artifactReferences: [
     {
@@ -121,6 +122,14 @@ const makeFinalArticleOutput = () => ({
       sha256: '655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f',
       contentType: 'image/png',
       sizeBytes: 180000,
+      createdAtISO: new Date().toISOString(),
+    },
+    {
+      blobKey: PDF_ARTIFACT,
+      sha256: 'e'.repeat(64),
+      contentType: 'application/pdf',
+      artifactKind: 'pdf',
+      sizeBytes: 120000,
       createdAtISO: new Date().toISOString(),
     },
   ],
@@ -791,6 +800,39 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 
     assert.equal(resp.statusCode, 400, resp.body);
     assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+  });
+
+  it('accepts promote_publish_payload with trusted PDF artifactReference', async () => {
+    const store = createMemoryStore();
+    const requestId = `payload-trusted-pdf-ref-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      promote_publish_payload: {
+        slug: 'retinol-explained-simply',
+        title: 'Retinol Explained Simply',
+        artifactReferences: [
+          {
+            blobKey: PDF_ARTIFACT,
+            sha256: 'e'.repeat(64),
+            contentType: 'application/pdf',
+            artifactKind: 'pdf',
+            sizeBytes: 120000,
+            createdAtISO: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    assert.equal(resp.statusCode, 200, resp.body);
+    const saved = parseBody(resp).record!;
+    const storedPayload = saved.input.publication?.publish_payload as Record<string, unknown> | undefined;
+    const artifactRefs = storedPayload?.artifactReferences as Array<Record<string, unknown>> | undefined;
+    assert.equal(artifactRefs?.[0]?.blobKey, PDF_ARTIFACT);
   });
 
   it('accepts promote_publish_payload with trusted artifact ref in featuredImage and artifactReferences', async () => {

@@ -1488,8 +1488,8 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
 // patch_canonical_input helpers
 // ---------------------------------------------------------------------------
 
-/** Matches a Major Key artifact reference: image/{id}/{sha256-64-hex}.{ext} */
-const MAJOR_KEY_ARTIFACT_REF_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+/** Matches a Major Key artifact reference: {image|pdf}/{id}/{sha256-64-hex}.{ext} */
+const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 /** Reject legacy local repo paths that the article publisher cannot resolve. */
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 /** Reject data URIs (base64/raw bytes embedded in strings). */
@@ -1556,7 +1556,7 @@ const validateTrustedArtifactRef = (
   if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value)) {
     return jsonResponse(400, {
       action,
-      error: `${path} must be a Major Key artifact reference (image/{id}/{sha256}.{ext}).`,
+      error: `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`,
     });
   }
 
@@ -1596,7 +1596,7 @@ const applyNodePatch = (
           ok: false,
           error: jsonResponse(400, {
             action,
-            error: `node_patches[${patch.node_id}].public_media_src must be a Major Key artifact reference (image/{id}/{sha256}.{ext}).`,
+            error: `node_patches[${patch.node_id}].public_media_src must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`,
           }),
         };
       }
