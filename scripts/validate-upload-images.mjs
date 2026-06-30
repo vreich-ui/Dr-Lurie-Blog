@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-import { readdir } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import yaml from 'js-yaml';
 import sharp from 'sharp';
 
 const defaultUploadRoot = 'src/assets/images/uploads';
+const defaultPostRoot = 'src/data/post';
+const uploadAliasPrefix = '~/assets/images/uploads/';
 const extensionFormat = new Map([
   ['.jpg', 'jpeg'],
   ['.jpeg', 'jpeg'],
@@ -46,6 +49,104 @@ export const collectUploadImageFiles = async (root = defaultUploadRoot) => {
   return files.sort((left, right) => left.localeCompare(right));
 };
 
+const collectMarkdownFiles = async (root = defaultPostRoot) => {
+  const files = [];
+
+  const visit = async (directory) => {
+    let entries;
+
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch (error) {
+      if (error?.code === 'ENOENT') return;
+      throw error;
+    }
+
+    for (const entry of entries) {
+      const entryPath = path.join(directory, entry.name);
+
+      if (entry.isDirectory()) {
+        await visit(entryPath);
+      } else if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.md') {
+        files.push(entryPath);
+      }
+    }
+  };
+
+  await visit(root);
+
+  return files.sort((left, right) => left.localeCompare(right));
+};
+
+const splitFrontmatter = (content) => {
+  if (!content.startsWith('---')) return { frontmatter: '', body: content };
+
+  const end = content.indexOf('\n---', 3);
+  if (end === -1) return { frontmatter: '', body: content };
+
+  const afterEnd = content.indexOf('\n', end + 1);
+
+  return {
+    frontmatter: content.slice(3, end).trim(),
+    body: afterEnd === -1 ? '' : content.slice(afterEnd + 1),
+  };
+};
+
+const normalizeReferencedUploadPath = (value) => {
+  if (typeof value !== 'string' || !value.startsWith(uploadAliasPrefix)) return undefined;
+
+  return value.split(/[?#]/, 1)[0];
+};
+
+export const collectMarkdownUploadImageReferences = async (postRoot = defaultPostRoot) => {
+  const markdownFiles = await collectMarkdownFiles(postRoot);
+  const references = [];
+  const inlineImagePattern = /!\[[^\]]*\]\((?<path>[^)\s]+)(?:\s+['"][^)]*['"])?\)/g;
+
+  for (const markdownFile of markdownFiles) {
+    const content = await readFile(markdownFile, 'utf8');
+    const { frontmatter, body } = splitFrontmatter(content);
+
+    if (frontmatter) {
+      const data = yaml.load(frontmatter);
+      const imagePath = normalizeReferencedUploadPath(data?.image);
+      if (imagePath) references.push({ markdownFile, imagePath, source: 'frontmatter image' });
+    }
+
+    for (const match of body.matchAll(inlineImagePattern)) {
+      const imagePath = normalizeReferencedUploadPath(match.groups?.path);
+      if (imagePath) references.push({ markdownFile, imagePath, source: 'inline image' });
+    }
+  }
+
+  return references;
+};
+
+export const validateMarkdownUploadImageReferences = async ({
+  uploadRoot = defaultUploadRoot,
+  postRoot = defaultPostRoot,
+} = {}) => {
+  const references = await collectMarkdownUploadImageReferences(postRoot);
+  const missing = [];
+
+  for (const reference of references) {
+    const relativeUploadPath = reference.imagePath.slice(uploadAliasPrefix.length);
+    const resolvedPath = path.join(uploadRoot, relativeUploadPath);
+
+    try {
+      await access(resolvedPath);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+
+      missing.push(
+        `${toPosixPath(reference.markdownFile)}: missing ${reference.source} ${reference.imagePath} (expected ${toPosixPath(resolvedPath)}).`
+      );
+    }
+  }
+
+  return { references, missing };
+};
+
 export const validateUploadImageFile = async (filePath) => {
   const expectedFormat = getExpectedFormat(filePath);
 
@@ -70,7 +171,7 @@ export const validateUploadImageFile = async (filePath) => {
   return undefined;
 };
 
-export const validateUploadImages = async (root = defaultUploadRoot) => {
+export const validateUploadImages = async (root = defaultUploadRoot, postRoot = defaultPostRoot) => {
   const files = await collectUploadImageFiles(root);
   const invalid = [];
 
@@ -79,7 +180,10 @@ export const validateUploadImages = async (root = defaultUploadRoot) => {
     if (issue) invalid.push(issue);
   }
 
-  return { files, invalid };
+  const { references, missing } = await validateMarkdownUploadImageReferences({ uploadRoot: root, postRoot });
+  invalid.push(...missing);
+
+  return { files, invalid, references };
 };
 
 const main = async () => {
