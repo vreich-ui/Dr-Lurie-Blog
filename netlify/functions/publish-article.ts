@@ -1218,7 +1218,10 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const entriesToValidate = existingFeaturedImage ? [...mediaEntries, existingFeaturedImage] : mediaEntries;
     await validateMediaEntries(entriesToValidate);
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
-    const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
+    const imagePath =
+      uploadedImagePath ??
+      existingFeaturedImage?.displayPath ??
+      (mediaEntries.find((e) => e.artifactReference) ?? mediaEntries[0])?.displayPath;
 
     let resolvedMarkdown: string;
     if (article_body) {

@@ -1248,3 +1248,83 @@ test('publish-article resolves artifact pointers in article_body nodes via index
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article sets image frontmatter to first artifact entry when no explicit featuredImage is named', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const requestId = `featured-fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const imageBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'article-hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+    metadata: { filename: 'Article Hero.PNG' },
+  });
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/featured-fallback-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      return Response.json({ sha: 'new-tree' });
+    }
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    // No featuredImage or existingFeaturedImagePath — image: frontmatter must fall back to the artifact
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'featured-fallback-test',
+        title: 'Featured Fallback Test',
+        markdown: '# Featured fallback test',
+        artifactReferences: [upload.artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdownContent = blobWrites[0]?.content ?? '';
+    assert.ok(markdownContent.includes('image:'), `Expected "image:" in frontmatter.\nGot: ${markdownContent.slice(0, 300)}`);
+    assert.ok(
+      markdownContent.includes('~/assets/images/uploads/featured-fallback-test/'),
+      `Expected upload path in image frontmatter.\nGot: ${markdownContent.slice(0, 300)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
