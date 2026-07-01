@@ -259,8 +259,8 @@ describe('patchCanonicalInput — node_patches', () => {
       ...articleBody,
       nodes: nodes.map((node) => (node.id === 'n_r3x4y5' ? { ...node, rendering: { placement: 'inline' } } : node)),
     });
-    assert.ok(markdown.includes(`[${'e'.repeat(64)}.pdf](${PDF_ARTIFACT})`));
-    assert.ok(!markdown.includes(`![${'e'.repeat(64)}.pdf](${PDF_ARTIFACT})`));
+    assert.ok(markdown.includes(`[${'e'.repeat(64)}.pdf](/${PDF_ARTIFACT})`));
+    assert.ok(!markdown.includes(`![${'e'.repeat(64)}.pdf](/${PDF_ARTIFACT})`));
   });
 
   it('removes media object when public_media_src is null', async () => {

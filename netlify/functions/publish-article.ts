@@ -20,7 +20,10 @@ import {
   type DeployStatus,
 } from '../lib/netlify-deploys.js';
 import { publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
-import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
+import {
+  articleBodyToMarkdown,
+  getPublicPdfUrlForArtifactBlobKey,
+} from '../../src/lib/article-content/to-markdown.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -431,8 +434,26 @@ const getDisplayPath = (path: string) => {
   return path;
 };
 
-const replaceAllLiteral = (value: string, search: string, replacement: string) =>
-  search ? value.split(search).join(replacement) : value;
+const replaceAllLiteral = (value: string, search: string, replacement: string) => {
+  if (!search) return value;
+
+  let result = '';
+  let index = 0;
+  while (index < value.length) {
+    const nextIndex = value.indexOf(search, index);
+    if (nextIndex === -1) {
+      result += value.slice(index);
+      break;
+    }
+
+    result += value.slice(index, nextIndex);
+    const isPublicPdfUrl = search.startsWith('pdf/') && value[nextIndex - 1] === '/';
+    result += isPublicPdfUrl ? search : replacement;
+    index = nextIndex + search.length;
+  }
+
+  return result;
+};
 
 const getArtifactReplacementValues = (reference: ArtifactReference) =>
   [
@@ -466,6 +487,90 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
       updatedMarkdown
     );
   }, markdown);
+
+
+const publicPdfUrlPattern = /^\/pdf\/([a-z0-9._-]+\/[a-f0-9]{64}\.pdf)$/i;
+const pendingPdfArtifactReferencePattern = /^\/?pending-pdf-artifact-reference$/i;
+
+const getPdfBlobKeyFromPublicUrl = (value: string) => {
+  const match = value.trim().match(publicPdfUrlPattern);
+  return match ? `pdf/${match[1]}` : undefined;
+};
+
+const getShaFromPdfBlobKey = (value: string) => value.match(/\/([a-f0-9]{64})\.pdf$/i)?.[1]?.toLowerCase();
+
+const normalizeArticleBodyPdfCtaLinks = (articleBody: unknown, artifactReferences: ArtifactReference[]) => {
+  if (!articleBody || typeof articleBody !== 'object' || Array.isArray(articleBody)) return articleBody;
+
+  const referencesByBlobKey = new Map(artifactReferences.map((reference) => [reference.blobKey, reference]));
+  const referencesBySha = new Map(artifactReferences.map((reference) => [reference.sha256.toLowerCase(), reference]));
+  const nodes = Array.isArray((articleBody as Record<string, unknown>).nodes)
+    ? ((articleBody as Record<string, unknown>).nodes as unknown[])
+    : undefined;
+
+  if (!nodes) return articleBody;
+
+  let changed = false;
+  const normalizedNodes = nodes.map((node, index) => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
+
+    const nodeRecord = node as Record<string, unknown>;
+    const publicRecord = nodeRecord.public;
+    if (!publicRecord || typeof publicRecord !== 'object' || Array.isArray(publicRecord)) return node;
+
+    const ctaLink = (publicRecord as Record<string, unknown>).ctaLink;
+    if (typeof ctaLink !== 'string' || !ctaLink.trim()) return node;
+
+    const trimmed = ctaLink.trim();
+    if (pendingPdfArtifactReferencePattern.test(trimmed)) {
+      throw new PublishError(
+        422,
+        `article_body.nodes[${index}].public.ctaLink contains a placeholder PDF link. Use the exact artifactReference.blobKey returned by artifact upload.`
+      );
+    }
+
+    const publicUrlBlobKey = getPdfBlobKeyFromPublicUrl(trimmed);
+    if (publicUrlBlobKey) {
+      const publicUrlSha = getShaFromPdfBlobKey(publicUrlBlobKey);
+      const exactReference = referencesByBlobKey.get(publicUrlBlobKey);
+      const sameShaReference = publicUrlSha ? referencesBySha.get(publicUrlSha) : undefined;
+      if (!exactReference && sameShaReference) {
+        throw new PublishError(
+          422,
+          `article_body.nodes[${index}].public.ctaLink was derived from PDF path pieces instead of the exact artifactReference.blobKey. Use "${sameShaReference.blobKey}".`
+        );
+      }
+      return node;
+    }
+
+    const publicPdfUrl = getPublicPdfUrlForArtifactBlobKey(trimmed);
+    if (!publicPdfUrl) return node;
+
+    const normalizedBlobKey = publicPdfUrl.replace(/^\//, '');
+    const exactReference = referencesByBlobKey.get(normalizedBlobKey);
+    if (artifactReferences.length && !exactReference) {
+      const sha = getShaFromPdfBlobKey(normalizedBlobKey);
+      const sameShaReference = sha ? referencesBySha.get(sha) : undefined;
+      if (sameShaReference) {
+        throw new PublishError(
+          422,
+          `article_body.nodes[${index}].public.ctaLink must use the exact PDF artifactReference.blobKey "${sameShaReference.blobKey}".`
+        );
+      }
+    }
+
+    changed = true;
+    return {
+      ...nodeRecord,
+      public: {
+        ...(publicRecord as Record<string, unknown>),
+        ctaLink: publicPdfUrl,
+      },
+    };
+  });
+
+  return changed ? { ...(articleBody as Record<string, unknown>), nodes: normalizedNodes } : articleBody;
+};
 
 const originalArtifactBlobKey = Symbol('originalArtifactBlobKey');
 
@@ -1286,6 +1391,14 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     return jsonResponse(400, { error: 'Invalid artifactReferences.' });
   }
 
+  let normalizedArticleBody: unknown;
+  try {
+    normalizedArticleBody = article_body ? normalizeArticleBodyPdfCtaLinks(article_body, artifactReferences) : undefined;
+  } catch (error) {
+    if (error instanceof PublishError) return jsonResponse(error.statusCode, { error: error.message });
+    return jsonResponse(400, { error: 'Invalid PDF CTA link.' });
+  }
+
   let publishImagePaths: string[] = [];
 
   try {
@@ -1329,7 +1442,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
         schema_version: 'content_source.v1',
         content: {
           title,
-          article_body: article_body as ContentSourceV1['content'] extends { article_body?: infer T } ? T : never,
+          article_body: normalizedArticleBody as ContentSourceV1['content'] extends { article_body?: infer T } ? T : never,
         },
       };
       resolvedMarkdown = articleBodyToMarkdown(tempContentSource.content!.article_body!);

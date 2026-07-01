@@ -256,6 +256,147 @@ test('publish-article publishes PDF artifactReferences under document uploads', 
   }
 });
 
+test('publish-article renders PDF CTA links from exact artifactReference blobKey', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestId = `artifact-pdf-cta-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const pdfBytes = Buffer.from('%PDF-1.7\nreal pdf artifact for cta link');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'cta-handout.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/pdf-cta-exact-blobkey.md')) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'pdf-cta-exact-blobkey',
+        title: 'PDF CTA Exact BlobKey',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_a1b2c3',
+              kind: 'content',
+              public: {
+                title: 'Download the handout',
+                body: 'Use the exact artifact blobKey for the download CTA.',
+                ctaText: 'Download handout',
+                ctaLink: artifact.blobKey,
+              },
+            },
+          ],
+        },
+        artifactReferences: [artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.match(blobWrites[0]?.content, new RegExp(`\\[Download handout\\]\\(/${artifact.blobKey}\\)`));
+    assert.doesNotMatch(blobWrites[0]?.content ?? '', /pending-pdf-artifact-reference/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects placeholder and derived PDF CTA links', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestId = `artifact-pdf-derived-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const pdfBytes = Buffer.from('%PDF-1.7\nreal pdf artifact for derived rejection');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'derived-handout.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  let fetchCount = 0;
+
+  globalThis.fetch = (async () => {
+    fetchCount += 1;
+    return new Response('unexpected fetch', { status: 500 });
+  }) as typeof fetch;
+
+  const publishWithCtaLink = async (ctaLink: string) =>
+    publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'pdf-cta-derived-rejected',
+        title: 'PDF CTA Derived Rejected',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_a1b2c3',
+              kind: 'content',
+              public: { body: 'PDF CTA validation.', ctaText: 'Download handout', ctaLink },
+            },
+          ],
+        },
+        artifactReferences: [artifact],
+        overwrite: true,
+      }),
+    });
+
+  try {
+    const placeholderResponse = await publishWithCtaLink('/pending-pdf-artifact-reference');
+    assert.equal(placeholderResponse.statusCode, 422, placeholderResponse.body);
+    assert.match(JSON.parse(placeholderResponse.body).error, /placeholder PDF link/);
+
+    const derivedResponse = await publishWithCtaLink(`/pdf/derived-request/${artifact.sha256}.pdf`);
+    assert.equal(derivedResponse.statusCode, 422, derivedResponse.body);
+    assert.match(JSON.parse(derivedResponse.body).error, /derived from PDF path pieces/);
+    assert.equal(fetchCount, 0, 'Invalid PDF CTA links should fail before GitHub requests.');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article rejects corrupt PDF artifact bytes before GitHub writes', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
