@@ -1,5 +1,17 @@
 import { type ArticleBodyV1, type ArticleBodyNode } from '../../schema/article-content-v1.js';
 
+const pdfArtifactBlobKeyPattern = /^(?:artifacts\/)?pdf\/[a-z0-9._-]+\/[a-f0-9]{64}\.pdf$/i;
+
+export function getPublicPdfUrlForArtifactBlobKey(value: string): string | undefined {
+  const normalized = value
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^artifacts\//, '');
+  if (!pdfArtifactBlobKeyPattern.test(normalized)) return undefined;
+
+  return `/${normalized}`;
+}
+
 /**
  * Serializes a structured article body into Markdown.
  * Excludes internal/hidden nodes and private metadata.
@@ -72,7 +84,7 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
 
     if (url) {
       // Normalize src/assets paths to ~/assets for Astro component compatibility
-      const displayUrl = url.replace(/^src\/assets\//, '~/assets/');
+      const displayUrl = getPublicPdfUrlForArtifactBlobKey(url) ?? url.replace(/^src\/assets\//, '~/assets/');
       const mediaType = typeof media === 'object' && media !== null ? media.type : undefined;
 
       if (mediaType === 'document') {
@@ -102,10 +114,13 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
   }
 
   // 5. CTA rendering
-  if (node.public?.ctaText && node.public?.ctaLink) {
-    parts.push(`[${node.public.ctaText}](${node.public.ctaLink})`);
-  } else if (node.public?.ctaLink) {
-    parts.push(`<${node.public.ctaLink}>`);
+  const ctaLink = node.public?.ctaLink
+    ? (getPublicPdfUrlForArtifactBlobKey(node.public.ctaLink) ?? node.public.ctaLink)
+    : undefined;
+  if (node.public?.ctaText && ctaLink) {
+    parts.push(`[${node.public.ctaText}](${ctaLink})`);
+  } else if (ctaLink) {
+    parts.push(`<${ctaLink}>`);
   }
 
   return parts.join('\n\n');

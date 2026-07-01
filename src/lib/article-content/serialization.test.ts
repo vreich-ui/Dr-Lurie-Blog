@@ -141,6 +141,26 @@ describe('Article Body Serialization and Safety', () => {
       assert.ok(md.includes('![Alt Text](~/assets/images/test.jpg)'));
     });
 
+    it('should render PDF artifact blob keys as public download URLs', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_pdf_cta',
+            kind: 'content',
+            public: {
+              ctaText: 'Download PDF',
+              ctaLink: `pdf/exact-request/${'a'.repeat(64)}.pdf`,
+            },
+          },
+        ],
+      };
+
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes(`[Download PDF](/pdf/exact-request/${'a'.repeat(64)}.pdf)`));
+      assert.ok(!md.includes(`](pdf/exact-request/${'a'.repeat(64)}.pdf)`));
+    });
+
     it('should render inline document media as a markdown link', () => {
       const body: ArticleBodyV1 = {
         schema_version: 'article_body.v1',
