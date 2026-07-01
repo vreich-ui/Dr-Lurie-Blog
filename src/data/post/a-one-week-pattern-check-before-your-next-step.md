@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-07-01T15:43:00.000Z
-published_time: 2026-07-01T15:43:00.000Z
+publishDate: 2026-07-01T16:00:30.000Z
+published_time: 2026-07-01T16:00:30.000Z
 title: "A One-Week Pattern Check Before Your Next Step"
 excerpt: "A fresh Dr. Lurie smoke-test article built to verify a PDF-backed CTA button on the live page."
 tags:
@@ -31,7 +31,7 @@ Seven days is short enough to finish and long enough to reveal small patterns: t
 Use the worksheet to capture a simple one-week view before your next appointment or care decision.
 
 <p class="not-prose my-7">
-  <a class="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950" href="PENDING_PDF_CTA_URL">Download the worksheet</a>
+  <a class="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950" href="/pdf/req_smoke_pdf_cta_20260701_154119/13c996eb8d1d3514a9d5e22dd957435401c0349371de21acee663dace41d50bd.pdf">Download the worksheet</a>
 </p>
 
 ### A Safety Note
