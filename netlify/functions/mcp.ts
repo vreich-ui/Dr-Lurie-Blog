@@ -38,6 +38,9 @@ import {
 import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
 import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
 
+const mediaPortabilityWarning =
+  'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';
+
 type StructuredLogPayload = {
   event: string;
   rpcMethod?: string | null;
@@ -795,12 +798,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_json_blob_get_request',
-    description: 'Fetch a save-json-blob workflow request record by request_id.',
+    description: `Fetch a save-json-blob workflow request record by request_id. ${mediaPortabilityWarning}`,
     inputSchema: objectSchema({ request_id: stringSchema() }, ['request_id']),
   },
   {
     name: 'save_json_blob_list_pending_requests',
-    description: 'List pending save-json-blob workflow request summaries, optionally filtered by stage and status.',
+    description: `List pending save-json-blob workflow request records, optionally filtered by stage and status. ${mediaPortabilityWarning}`,
     inputSchema: objectSchema({
       stage: agentNameJsonSchema(),
       status: workflowStatusJsonSchema(),
@@ -1063,8 +1066,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'list_artifacts_for_request',
-    description:
-      'List ArtifactReference metadata for a requestId. Required: requestId. Reads the request artifact index only; it does not read or write artifact bytes. Returns artifacts array.',
+    description: `List ArtifactReference metadata for a requestId. Required: requestId. Reads the request artifact index only; it does not read or write artifact bytes. Returns artifacts array. ${mediaPortabilityWarning}`,
     inputSchema: objectSchema(
       { requestId: stringSchema('Workflow request id whose artifact references should be listed.') },
       ['requestId']
