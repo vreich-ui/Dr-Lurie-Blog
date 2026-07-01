@@ -1586,7 +1586,7 @@ const promoteAgentArticleBodyIfRicher = (
   const inputContent = getRecordValue(recordInput?.content);
   const inputArticleBody = getRecordValue(inputContent?.article_body);
 
-  if (countPublicArticleBodyNodes(agentBody) <= countPublicArticleBodyNodes(inputArticleBody)) {
+  if (countPublicArticleBodyNodes(agentBody) < countPublicArticleBodyNodes(inputArticleBody)) {
     return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
   }
 
