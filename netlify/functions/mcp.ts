@@ -1629,7 +1629,7 @@ const slugifyPublishTitle = (value: string) =>
     .replace(/^-+|-+$/g, '') || 'article';
 
 const parseArtifactPointer = (value: string): { requestId: string; sha256: string; ext: string } | undefined => {
-  const match = value.match(/^image\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/);
+  const match = value.match(/^(?:image|pdf)\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/);
   if (!match) return undefined;
   return { requestId: match[1], sha256: match[2].toLowerCase(), ext: match[3] };
 };
@@ -1712,6 +1712,10 @@ const buildCanonicalPublishPayload = async (
       const rendering = getRecordValue(nodeRecord?.rendering);
       const isHeroNode = rendering?.presentation === 'hero' || nodeRecord?.id === 'n_hero';
       candidates.push({ path, priority: isHeroNode ? 10 : 3 });
+    } else if (path && nodeMedia?.type === 'document') {
+      // Include document (PDF) pointers for cross-request resolution.
+      // Priority 0 ensures PDFs never influence featured-image selection.
+      candidates.push({ path, priority: 0 });
     }
   }
 

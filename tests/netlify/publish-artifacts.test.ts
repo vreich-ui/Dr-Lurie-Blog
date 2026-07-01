@@ -2126,3 +2126,165 @@ test('publish-article returns 422 when article_body node src uses same sha256 as
     globalThis.fetch = originalFetch;
   }
 });
+
+test('publish-article resolves cross-request pdf/ node pointer alongside image artifact and commits PDF bytes', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  // Image uploaded under requestId_A, PDF under requestId_B (different request — cross-request scenario)
+  const requestIdA = 'req_smoke_imgpdf_20260701_01';
+  const requestIdB = 'req_smoke_imgpdf_20260701_02';
+  const slug = 'img-pdf-combo-test';
+
+  const imageBytes = await createImageBytes('png');
+  const imageUpload = await postArtifact({
+    requestId: requestIdA,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'combo-hero.png',
+    encoding: 'base64',
+    payload: imageBytes.toString('base64'),
+    metadata: { filename: 'Combo Hero.PNG' },
+  });
+  const imageArtifact = imageUpload.artifact as { blobKey: string; sha256: string };
+
+  const pdfBytes = Buffer.from('%PDF-1.7\ncross-request pdf for combo test');
+  const pdfUpload = await postArtifact({
+    requestId: requestIdB,
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'combo-tracker.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+    metadata: { filename: 'Combo Tracker.PDF' },
+  });
+  const pdfArtifact = pdfUpload.artifact as { blobKey: string; sha256: string };
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) {
+      return new Response('not found', { status: 404 });
+    }
+    if (url.includes('/git/ref/heads/main')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+      return Response.json({ sha: 'new-tree' });
+    }
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    // Neither artifact is in top-level artifactReferences — both are cross-request via article_body nodes
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'Image and PDF Combo Test',
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                title: 'Track Your Skin Flares',
+                body: 'Article intro content here.',
+                media: { src: imageArtifact.blobKey, type: 'image', alt: 'Hero image' },
+              },
+            },
+            {
+              id: 'n_pdfdl',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: {
+                title: 'Download the tracker',
+                body: 'Use this worksheet for your next visit.',
+                media: { src: pdfArtifact.blobKey, type: 'document', title: 'Download the PDF' },
+              },
+            },
+          ],
+        },
+        artifactReferences: [],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+
+    const markdownContent = blobWrites[0]?.content ?? '';
+
+    // image: frontmatter must point to the image, never the PDF
+    assert.ok(
+      markdownContent.includes('image:') && markdownContent.includes('~/assets/images/uploads/'),
+      `Expected image: frontmatter with image upload path.\nGot: ${markdownContent.slice(0, 400)}`
+    );
+    assert.ok(
+      !markdownContent.includes('~/assets/documents/uploads/') ||
+        !markdownContent.match(/^image:\s*~\/assets\/documents\//m),
+      `image: frontmatter must not point to a document path.\nGot: ${markdownContent.slice(0, 400)}`
+    );
+
+    // PDF file must be committed to the tree (this is what fails before the fix)
+    assert.ok(
+      treePaths.some((p) => p.startsWith(`src/assets/documents/uploads/${slug}/`)),
+      `PDF file must be committed to the tree.\nTree: ${treePaths.join(', ')}`
+    );
+
+    // Image file must also be committed
+    assert.ok(
+      treePaths.some((p) => p.startsWith(`src/assets/images/uploads/${slug}/`)),
+      `Image file must be committed to the tree.\nTree: ${treePaths.join(', ')}`
+    );
+
+    // Raw artifact blobKeys must not appear as bare link targets in the committed markdown.
+    // Image blobKey (image/...) must be fully replaced; PDF blobKey may appear as part of the
+    // public /pdf/... CDN URL which is correct, but must not appear raw (preceded by "(" in markdown).
+    assert.ok(
+      !markdownContent.includes(imageArtifact.blobKey),
+      `Raw image blobKey must not appear in markdown.\nGot: ${markdownContent.slice(0, 600)}`
+    );
+    assert.ok(
+      !markdownContent.includes(`](${pdfArtifact.blobKey})`),
+      `Raw PDF blobKey must not appear as a bare link target in markdown.\nGot: ${markdownContent.slice(0, 600)}`
+    );
+
+    // The PDF download link must be present in the body (either as repo path or public CDN URL)
+    assert.ok(
+      markdownContent.includes('/pdf/req_smoke_imgpdf_20260701_02/') ||
+        markdownContent.includes('~/assets/documents/uploads/'),
+      `PDF download link must appear in markdown body.\nGot: ${markdownContent.slice(0, 600)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
