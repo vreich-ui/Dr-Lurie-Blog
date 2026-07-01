@@ -1,4 +1,5 @@
 import { artifactKindSet, type ArtifactKind } from '../lib/artifacts.js';
+import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
 import {
   getDirectArtifactUploadMaxBytes,
   normalizeArtifactContentType,
@@ -96,6 +97,19 @@ const parseRequiredHeaders = (
   const filename = headers.get('X-Artifact-Filename')?.trim() || undefined;
   const tags = parseTags(headers.get('X-Artifact-Tags'));
 
+  const requestIdValidation = validateRequestId(requestId);
+  if (!requestIdValidation.ok) {
+    return { ok: false, response: jsonResponse(400, { ok: false, error: requestIdValidation.error }) };
+  }
+
+  const filenameValidation = filename ? validateFilename(filename) : undefined;
+  if (filename && !filenameValidation?.ok) {
+    return {
+      ok: false,
+      response: jsonResponse(400, { ok: false, error: filenameValidation?.error ?? 'Invalid filename.' }),
+    };
+  }
+
   if (!artifactKindSet.has(artifactKind as ArtifactKind)) {
     return { ok: false, response: jsonResponse(400, { ok: false, error: 'Invalid artifact kind.' }) };
   }
@@ -112,12 +126,12 @@ const parseRequiredHeaders = (
   return {
     ok: true,
     value: {
-      requestId,
+      requestId: requestIdValidation.value,
       artifactKind: artifactKind as ArtifactKind,
       contentType,
       expectedSizeBytes,
       expectedSha256,
-      ...(filename ? { filename } : {}),
+      ...(filenameValidation?.ok ? { filename: filenameValidation.value } : {}),
       ...(tags ? { tags } : {}),
     },
   };

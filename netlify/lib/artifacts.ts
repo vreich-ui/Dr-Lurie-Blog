@@ -1,5 +1,6 @@
 import { basename, extname } from 'node:path';
 import { requestArtifactReferenceKey } from './artifact-index.js';
+import { validateRequestId } from '../../src/lib/agents-naming.js';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import { sha256Hex } from './crypto.js';
 
@@ -425,7 +426,10 @@ export const createArtifactBlobKey = (input: {
     throw new Error('sha256 must be a 64-character hex digest.');
   }
 
-  const requestId = safePathSegment(input.requestId) || 'request';
+  const requestIdResult = validateRequestId(input.requestId);
+  if (!requestIdResult.ok) throw new Error(requestIdResult.error);
+
+  const requestId = requestIdResult.value;
   const extension = getArtifactExtension(input.filename);
   const blobKey = `${input.artifactKind}/${requestId}/${sha256}${extension}`;
 
@@ -477,7 +481,7 @@ export const isValidArtifactBlobKey = (blobKey: string, sha256: string): boolean
   return Boolean(
     !extra.length &&
       artifactKindSet.has(kind as ArtifactKind) &&
-      safePathSegment(requestId) === requestId &&
+      validateRequestId(requestId).ok &&
       requestId.length > 0 &&
       filename &&
       filename.startsWith(sha256) &&

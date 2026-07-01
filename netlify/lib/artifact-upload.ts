@@ -9,6 +9,7 @@ import {
   type ArtifactKind,
   type ArtifactReference,
 } from './artifacts.js';
+import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
 import { readArtifactReference, writeArtifactReferenceIndexes, type ArtifactIndexStore } from './artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from './blob-store.js';
 import { sha256Hex } from './crypto.js';
@@ -141,10 +142,15 @@ const validateTokenClaims = (value: unknown): ArtifactUploadTokenClaims | undefi
   const { requestId, artifactKind, contentType, filename, label, expectedSizeBytes, expectedSha256, expiresAt } = value;
   const tags = validateTags(value.tags);
 
-  if (typeof requestId !== 'string' || !requestId.trim()) return undefined;
+  if (typeof requestId !== 'string' || !validateRequestId(requestId).ok) return undefined;
   if (typeof artifactKind !== 'string' || !artifactKindSet.has(artifactKind as ArtifactKind)) return undefined;
   if (typeof contentType !== 'string' || !isValidContentType(contentType)) return undefined;
-  if (filename !== undefined && (typeof filename !== 'string' || !isSafeArtifactFilename(filename))) return undefined;
+  const filenameValidation = typeof filename === 'string' ? validateFilename(filename) : undefined;
+  if (
+    filename !== undefined &&
+    (typeof filename !== 'string' || !isSafeArtifactFilename(filename) || !filenameValidation?.ok)
+  )
+    return undefined;
   if (label !== undefined && (typeof label !== 'string' || !isSafeArtifactText(label, artifactReferenceLimits.label))) {
     return undefined;
   }
@@ -155,7 +161,7 @@ const validateTokenClaims = (value: unknown): ArtifactUploadTokenClaims | undefi
   if (typeof expectedSha256 !== 'string' || !isValidSha256(expectedSha256)) return undefined;
   if (typeof expiresAt !== 'number' || !Number.isInteger(expiresAt) || expiresAt <= 0) return undefined;
 
-  const normalizedFilename = typeof filename === 'string' ? filename.trim() : undefined;
+  const normalizedFilename = filenameValidation?.ok ? filenameValidation.value : undefined;
   const normalizedLabel = typeof label === 'string' ? label.trim() : undefined;
 
   return {

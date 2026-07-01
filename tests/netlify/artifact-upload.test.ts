@@ -92,7 +92,7 @@ test('artifact upload tokens validate strict signed claims and expiration', () =
   const bytes = Buffer.from('direct artifact token');
   const token = createArtifactUploadToken(
     {
-      requestId: 'direct-upload-token',
+      requestId: 'req_direct_upload_token_20260630_01',
       artifactKind: ArtifactKind.Data,
       contentType: 'application/octet-stream',
       filename: 'payload.bin',
@@ -107,7 +107,7 @@ test('artifact upload tokens validate strict signed claims and expiration', () =
 
   const valid = verifyArtifactUploadToken({ token, nowMs: 1_000, secret: 'artifact-token-secret' });
   assert.equal(valid.ok, true);
-  assert.equal(valid.ok ? valid.claims.requestId : '', 'direct-upload-token');
+  assert.equal(valid.ok ? valid.claims.requestId : '', 'req_direct_upload_token_20260630_01');
   assert.equal(valid.ok ? valid.claims.label : '', 'Direct token');
   assert.deepEqual(valid.ok ? valid.claims.tags : [], ['direct', 'signed']);
 
@@ -128,7 +128,7 @@ test('saveArtifactBytes writes final bytes and retained artifact indexes idempot
     const bytes = Buffer.from('%PDF-1.7\nminimal pdf bytes');
     const expectedSha256 = sha256Hex(bytes);
     const input = {
-      requestId: 'direct-upload-request',
+      requestId: 'req_direct_upload_request_20260630_01',
       artifactKind: ArtifactKind.Pdf,
       contentType: 'application/pdf',
       filename: 'paper.pdf',
@@ -146,29 +146,33 @@ test('saveArtifactBytes writes final bytes and retained artifact indexes idempot
 
     const artifact = result.ok ? result.artifact : undefined;
     assert.ok(artifact);
-    assert.equal(artifact.blobKey, `pdf/direct-upload-request/${expectedSha256}.pdf`);
+    assert.equal(artifact.blobKey, `pdf/req_direct_upload_request_20260630_01/${expectedSha256}.pdf`);
     assert.equal(artifact.label, 'Paper PDF');
     assert.deepEqual(artifact.metadata, { source: 'direct-test' });
     assert.equal(Buffer.isBuffer(artifactValues.get(artifact.blobKey)), true);
     assert.deepEqual(
-      JSON.parse(indexValues.get(`request-artifacts/direct-upload-request/${expectedSha256}.json`) as string),
+      JSON.parse(
+        indexValues.get(`request-artifacts/req_direct_upload_request_20260630_01/${expectedSha256}.json`) as string
+      ),
       artifact
     );
     assert.deepEqual(JSON.parse(indexValues.get(`by-kind/pdf/${expectedSha256}.json`) as string), {
-      requestId: 'direct-upload-request',
+      requestId: 'req_direct_upload_request_20260630_01',
       sha256: expectedSha256,
       artifactKind: 'pdf',
     });
     assert.deepEqual(
-      JSON.parse(indexValues.get(`by-request/direct-upload-request/pdf/${expectedSha256}.json`) as string),
+      JSON.parse(
+        indexValues.get(`by-request/req_direct_upload_request_20260630_01/pdf/${expectedSha256}.json`) as string
+      ),
       {
-        requestId: 'direct-upload-request',
+        requestId: 'req_direct_upload_request_20260630_01',
         sha256: expectedSha256,
         artifactKind: 'pdf',
       }
     );
     assert.deepEqual(JSON.parse(indexValues.get(`by-tag/paper/${expectedSha256}.json`) as string), {
-      requestId: 'direct-upload-request',
+      requestId: 'req_direct_upload_request_20260630_01',
       sha256: expectedSha256,
       artifactKind: 'pdf',
     });
@@ -184,7 +188,7 @@ test('saveArtifactBytes rejects integrity mismatches and invalid PDFs before wri
   await withBlobStores(async ({ artifactValues, indexValues }) => {
     const bytes = Buffer.from('not a pdf');
     const sizeMismatch = await saveArtifactBytes({
-      requestId: 'direct-invalid-size',
+      requestId: 'req_direct_invalid_size_20260630_01',
       artifactKind: ArtifactKind.Data,
       contentType: 'application/octet-stream',
       expectedSizeBytes: bytes.byteLength + 1,
@@ -195,7 +199,7 @@ test('saveArtifactBytes rejects integrity mismatches and invalid PDFs before wri
     assert.equal(sizeMismatch.ok ? 0 : sizeMismatch.statusCode, 400);
 
     const invalidPdf = await saveArtifactBytes({
-      requestId: 'direct-invalid-pdf',
+      requestId: 'req_direct_invalid_pdf_20260630_01',
       artifactKind: ArtifactKind.Pdf,
       contentType: 'application/pdf',
       filename: 'bad.pdf',
@@ -255,7 +259,7 @@ test('artifact-upload function accepts raw binary POSTs and returns ArtifactRefe
 
     try {
       const token = createArtifactUploadToken({
-        requestId: 'function-direct-request',
+        requestId: 'req_function_direct_request_20260630_01',
         artifactKind: ArtifactKind.Pdf,
         contentType: 'application/pdf',
         filename: 'function.pdf',
@@ -271,7 +275,7 @@ test('artifact-upload function accepts raw binary POSTs and returns ArtifactRefe
             bytes,
             token,
             headers: {
-              'x-artifact-request-id': 'function-direct-request',
+              'x-artifact-request-id': 'req_function_direct_request_20260630_01',
               'x-artifact-kind': 'pdf',
               'x-artifact-content-type': 'application/pdf',
               'x-artifact-size': String(bytes.byteLength),
@@ -287,11 +291,14 @@ test('artifact-upload function accepts raw binary POSTs and returns ArtifactRefe
       assert.equal(response.body.ok, true);
       assert.equal(response.body.deduped, false);
       const artifact = response.body.artifact as { blobKey: string; sha256: string; label?: string };
-      assert.equal(artifact.blobKey, `pdf/function-direct-request/${expectedSha256}.pdf`);
+      assert.equal(artifact.blobKey, `pdf/req_function_direct_request_20260630_01/${expectedSha256}.pdf`);
       assert.equal(artifact.sha256, expectedSha256);
       assert.equal(artifact.label, 'Function PDF');
       assert.equal(response.body.maxBytes, 5_000_000);
-      assert.equal(indexValues.has(`request-artifacts/function-direct-request/${expectedSha256}.json`), true);
+      assert.equal(
+        indexValues.has(`request-artifacts/req_function_direct_request_20260630_01/${expectedSha256}.json`),
+        true
+      );
     } finally {
       if (previousSecret === undefined) delete process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
       else process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = previousSecret;
@@ -319,7 +326,7 @@ test('create_artifact_upload_intent plus artifact-upload handler chain correctly
           params: {
             name: 'create_artifact_upload_intent',
             arguments: {
-              requestId: 'chain-request',
+              requestId: 'req_chain_request_20260630_01',
               artifactKind: 'pdf',
               contentType: 'application/pdf',
               expectedSizeBytes: bytes.byteLength,
@@ -361,7 +368,7 @@ test('create_artifact_upload_intent plus artifact-upload handler chain correctly
       const artifact = uploadResponse.body.artifact as { blobKey: string; sha256: string };
       assert.equal(artifact.sha256, expectedSha256);
       assert.equal(artifactValues.has(artifact.blobKey), true);
-      assert.equal(indexValues.has(`request-artifacts/chain-request/${expectedSha256}.json`), true);
+      assert.equal(indexValues.has(`request-artifacts/req_chain_request_20260630_01/${expectedSha256}.json`), true);
     } finally {
       if (previousSecret === undefined) delete process.env.ARTIFACT_UPLOAD_TOKEN_SECRET;
       else process.env.ARTIFACT_UPLOAD_TOKEN_SECRET = previousSecret;
@@ -378,7 +385,7 @@ test('artifact-upload function rejects missing auth, wrong transport, and scoped
 
   try {
     const token = createArtifactUploadToken({
-      requestId: 'function-scope-request',
+      requestId: 'req_function_scope_request_20260630_01',
       artifactKind: ArtifactKind.Pdf,
       contentType: 'application/pdf',
       expectedSizeBytes: bytes.byteLength,
@@ -386,7 +393,7 @@ test('artifact-upload function rejects missing auth, wrong transport, and scoped
       expiresAt: Date.now() + 60_000,
     });
     const scopedHeaders = {
-      'x-artifact-request-id': 'function-scope-request',
+      'x-artifact-request-id': 'req_function_scope_request_20260630_01',
       'x-artifact-kind': 'pdf',
       'x-artifact-content-type': 'application/pdf',
       'x-artifact-size': String(bytes.byteLength),
@@ -423,7 +430,7 @@ test('artifact-upload function rejects missing auth, wrong transport, and scoped
           makeDirectUploadRequest({
             bytes,
             token,
-            headers: { ...scopedHeaders, 'x-artifact-request-id': 'different-request' },
+            headers: { ...scopedHeaders, 'x-artifact-request-id': 'req_different_request_20260630_01' },
           })
         )
       ),
@@ -448,7 +455,7 @@ test('artifact-upload function rejects oversized payloads before saveArtifactByt
 
   try {
     const token = createArtifactUploadToken({
-      requestId: 'function-large-request',
+      requestId: 'req_function_large_request_20260630_01',
       artifactKind: ArtifactKind.Pdf,
       contentType: 'application/pdf',
       expectedSizeBytes: bytes.byteLength,
@@ -463,7 +470,7 @@ test('artifact-upload function rejects oversized payloads before saveArtifactByt
             bytes,
             token,
             headers: {
-              'x-artifact-request-id': 'function-large-request',
+              'x-artifact-request-id': 'req_function_large_request_20260630_01',
               'x-artifact-kind': 'pdf',
               'x-artifact-content-type': 'application/pdf',
               'x-artifact-size': String(bytes.byteLength),
@@ -503,7 +510,7 @@ test('artifact-upload function stores valid PNG bytes and writes all artifact in
 
     try {
       const token = createArtifactUploadToken({
-        requestId: 'function-image-request',
+        requestId: 'req_function_image_request_20260630_01',
         artifactKind: ArtifactKind.Image,
         contentType: 'image/png',
         filename: 'hero.png',
@@ -520,7 +527,7 @@ test('artifact-upload function stores valid PNG bytes and writes all artifact in
             bytes,
             token,
             headers: {
-              'x-artifact-request-id': 'function-image-request',
+              'x-artifact-request-id': 'req_function_image_request_20260630_01',
               'x-artifact-kind': 'image',
               'x-artifact-content-type': 'IMAGE/PNG; charset=utf-8',
               'x-artifact-size': String(bytes.byteLength),
@@ -541,29 +548,33 @@ test('artifact-upload function stores valid PNG bytes and writes all artifact in
         label: string;
       };
       assert.equal(artifact.artifactKind, 'image');
-      assert.equal(artifact.blobKey, `image/function-image-request/${expectedSha256}.png`);
+      assert.equal(artifact.blobKey, `image/req_function_image_request_20260630_01/${expectedSha256}.png`);
       assert.equal(artifact.contentType, 'image/png');
       assert.equal(artifact.label, 'Hero PNG');
       assert.deepEqual(artifactValues.get(artifact.blobKey), bytes);
       assert.deepEqual(
-        JSON.parse(indexValues.get(`request-artifacts/function-image-request/${expectedSha256}.json`) as string),
+        JSON.parse(
+          indexValues.get(`request-artifacts/req_function_image_request_20260630_01/${expectedSha256}.json`) as string
+        ),
         artifact
       );
       assert.deepEqual(
-        JSON.parse(indexValues.get(`by-request/function-image-request/image/${expectedSha256}.json`) as string),
+        JSON.parse(
+          indexValues.get(`by-request/req_function_image_request_20260630_01/image/${expectedSha256}.json`) as string
+        ),
         {
-          requestId: 'function-image-request',
+          requestId: 'req_function_image_request_20260630_01',
           sha256: expectedSha256,
           artifactKind: 'image',
         }
       );
       assert.deepEqual(JSON.parse(indexValues.get(`by-kind/image/${expectedSha256}.json`) as string), {
-        requestId: 'function-image-request',
+        requestId: 'req_function_image_request_20260630_01',
         sha256: expectedSha256,
         artifactKind: 'image',
       });
       assert.deepEqual(JSON.parse(indexValues.get(`by-tag/hero/${expectedSha256}.json`) as string), {
-        requestId: 'function-image-request',
+        requestId: 'req_function_image_request_20260630_01',
         sha256: expectedSha256,
         artifactKind: 'image',
       });
@@ -583,7 +594,7 @@ test('artifact-upload function rejects invalid image bytes without writing blobs
 
     try {
       const token = createArtifactUploadToken({
-        requestId: 'function-invalid-image-request',
+        requestId: 'req_function_invalid_image_request_20260630_01',
         artifactKind: ArtifactKind.Image,
         contentType: 'image/png',
         filename: 'bad.png',
@@ -598,7 +609,7 @@ test('artifact-upload function rejects invalid image bytes without writing blobs
             bytes,
             token,
             headers: {
-              'x-artifact-request-id': 'function-invalid-image-request',
+              'x-artifact-request-id': 'req_function_invalid_image_request_20260630_01',
               'x-artifact-kind': 'image',
               'x-artifact-content-type': 'image/png',
               'x-artifact-size': String(bytes.byteLength),
@@ -629,7 +640,7 @@ test('artifact-upload function returns stable JSON errors for token and integrit
 
     try {
       const validToken = createArtifactUploadToken({
-        requestId: 'function-error-request',
+        requestId: 'req_function_error_request_20260630_01',
         artifactKind: ArtifactKind.Pdf,
         contentType: 'application/pdf',
         expectedSizeBytes: bytes.byteLength,
@@ -637,7 +648,7 @@ test('artifact-upload function returns stable JSON errors for token and integrit
         expiresAt: Date.now() + 60_000,
       });
       const expiredToken = createArtifactUploadToken({
-        requestId: 'function-error-request',
+        requestId: 'req_function_error_request_20260630_01',
         artifactKind: ArtifactKind.Pdf,
         contentType: 'application/pdf',
         expectedSizeBytes: bytes.byteLength,
@@ -645,7 +656,7 @@ test('artifact-upload function returns stable JSON errors for token and integrit
         expiresAt: Date.now() - 1,
       });
       const headers = {
-        'x-artifact-request-id': 'function-error-request',
+        'x-artifact-request-id': 'req_function_error_request_20260630_01',
         'x-artifact-kind': 'pdf',
         'x-artifact-content-type': 'application/pdf',
         'x-artifact-size': String(bytes.byteLength),
@@ -689,7 +700,7 @@ test('artifact-upload function returns stable JSON errors for token and integrit
       );
 
       const wrongShaToken = createArtifactUploadToken({
-        requestId: 'function-sha-error-request',
+        requestId: 'req_function_sha_error_request_20260630_01',
         artifactKind: ArtifactKind.Pdf,
         contentType: 'application/pdf',
         expectedSizeBytes: bytes.byteLength,
@@ -703,7 +714,7 @@ test('artifact-upload function returns stable JSON errors for token and integrit
             token: wrongShaToken,
             headers: {
               ...headers,
-              'x-artifact-request-id': 'function-sha-error-request',
+              'x-artifact-request-id': 'req_function_sha_error_request_20260630_01',
               'x-artifact-sha256': 'b'.repeat(64),
             },
           })
