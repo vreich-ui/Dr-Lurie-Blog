@@ -6,6 +6,7 @@ import {
   createRequest,
   patchAgentOutput,
   patchCanonicalInput,
+  getRequest,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
 import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
@@ -46,9 +47,9 @@ const parseBody = (r: { body: string }): RecordBody => JSON.parse(r.body) as Rec
 // ---------------------------------------------------------------------------
 // Known stable artifact refs (mirroring the retinol repair request)
 // ---------------------------------------------------------------------------
-const FEATURED_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624/94af376e6bea4d7680e75b6dcb53bf7fd4433d7c0154a5c00e61e4969350232d.png`;
-const INLINE_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624/655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f.png`;
-const PDF_ARTIFACT = `pdf/req_repair_retinol_schema_publish_v2_20260624/${'e'.repeat(64)}.pdf`;
+const FEATURED_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624_01/94af376e6bea4d7680e75b6dcb53bf7fd4433d7c0154a5c00e61e4969350232d.png`;
+const INLINE_ARTIFACT = `image/req_repair_retinol_schema_publish_v2_20260624_01/655373f81c38225fed48b0bb7681c727fe450d70f87817f66de7212f79858b8f.png`;
+const PDF_ARTIFACT = `pdf/req_repair_retinol_schema_publish_v2_20260624_01/${'e'.repeat(64)}.pdf`;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -281,9 +282,9 @@ describe('patchCanonicalInput — node_patches', () => {
     assert.equal(heroNode?.public?.media, undefined, 'media must be removed when src is null');
   });
 
-  it('rejects legacy src/assets/ paths in public_media_src', async () => {
+  it('accepts same-slug repo upload paths in public_media_src', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-reject-legacy-${Date.now()}`;
+    const requestId = `repair-accept-same-slug-${Date.now()}`;
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -299,8 +300,95 @@ describe('patchCanonicalInput — node_patches', () => {
       ],
     });
 
+    assert.equal(resp.statusCode, 200, resp.body);
+    const heroNode = parseBody(resp).record?.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3');
+    assert.equal(
+      heroNode?.public?.media?.src,
+      'src/assets/images/uploads/retinol-explained-simply/retinol-hero-150kb.webp'
+    );
+  });
+
+  it('rejects cross-slug repo upload paths in public_media_src with a specific portability error', async () => {
+    const store = createMemoryStore();
+    const requestId = `repair-reject-cross-slug-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+
+    const resp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [
+        {
+          node_id: 'n_r1a2b3',
+          public_media_src:
+            'src/assets/images/uploads/why-cellular-biology-is-the-first-map-of-health/cellular-biology-inline-150kb.webp',
+        },
+      ],
+    });
+
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /legacy repo path|src\/assets/i);
+    const error = parseBody(resp).error ?? '';
+    assert.match(error, /why-cellular-biology-is-the-first-map-of-health/);
+    assert.match(error, /retinol-explained-simply/);
+    assert.match(error, /Media paths are not portable across requests/);
+  });
+
+  it('get_request annotates repo media paths with portability scope metadata', async () => {
+    const store = createMemoryStore();
+    const requestId = `scope-get-request-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+    const repoPath = 'src/assets/images/uploads/retinol-explained-simply/retinol-hero-150kb.webp';
+
+    const patchResp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: repoPath }],
+    });
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+
+    const resp = await getRequest(store, { action: 'get_request', request_id: requestId });
+    assert.equal(resp.statusCode, 200, resp.body);
+    const media = parseBody(resp).record?.input.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3')?.public
+      ?.media as Record<string, unknown> | undefined;
+    assert.equal(media?.src, repoPath);
+    assert.equal(media?.portable, false);
+    assert.equal(media?.scoped_to_slug, 'retinol-explained-simply');
+    assert.equal(media?.scoped_to_request_id, requestId);
+  });
+
+  it('list_pending_requests annotates every entry media path with scope metadata', async () => {
+    const store = createMemoryStore();
+    const requestId = `scope-list-pending-${Date.now()}`;
+    const { lockToken, record } = await setupRecord(store, requestId);
+    const repoPath = 'src/assets/images/uploads/retinol-explained-simply/retinol-hero-150kb.webp';
+
+    const patchResp = await patchCanonicalInput(store, {
+      action: 'patch_canonical_input',
+      request_id: requestId,
+      lock_token: lockToken,
+      expected_record_version: record.version,
+      node_patches: [{ node_id: 'n_r1a2b3', public_media_src: repoPath }],
+    });
+    assert.equal(patchResp.statusCode, 200, patchResp.body);
+
+    const { listPendingRequests } = await import('../../netlify/functions/save-json-blob.js');
+    const resp = await listPendingRequests(store, { action: 'list_pending_requests', status: 'pending' });
+    assert.equal(resp.statusCode, 200, resp.body);
+    const listed = (parseBody(resp) as { records?: Array<Record<string, unknown>> }).records?.find(
+      (r) => r.request_id === requestId
+    );
+    const listedInput = listed?.input as
+      | {
+          content?: { article_body?: { nodes?: Array<{ id?: string; public?: { media?: Record<string, unknown> } }> } };
+        }
+      | undefined;
+    const media = listedInput?.content?.article_body?.nodes?.find((n) => n.id === 'n_r1a2b3')?.public?.media;
+    assert.equal(media?.portable, false);
+    assert.equal(media?.scoped_to_slug, 'retinol-explained-simply');
+    assert.equal(media?.scoped_to_request_id, requestId);
   });
 
   it('rejects data URIs in public_media_src', async () => {
@@ -418,7 +506,7 @@ describe('patchCanonicalInput — replace_image_asset_register', () => {
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /legacy repo path|src\/assets/i);
+    assert.match(parseBody(resp).error ?? '', /repoPath|legacy repo path|src\/assets/i);
   });
 
   it('rejects register entries that fail ImageAssetRecord schema', async () => {

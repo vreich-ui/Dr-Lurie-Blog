@@ -39,6 +39,7 @@ import {
   type ImageAssetRecord,
 } from '../../src/schema/schema-v1.js';
 import { type ArticleBodyNode, type ArticleBodyV1 } from '../../src/schema/article-content-v1.js';
+import { normalizeSlug, validateSlug, validateRequestId } from '../../src/lib/agents-naming.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',
@@ -916,10 +917,10 @@ export const getRequest = async (store: WorkflowBlobStore, body: WorkflowRequest
 
   if (!record) return jsonResponse(404, { action: body.action, not_found: true });
 
-  return jsonResponse(200, { action: body.action, record });
+  return jsonResponse(200, { action: body.action, record: annotateRecordMediaScoping(record, true) });
 };
 
-const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+export const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const status = body.status === undefined ? 'pending' : parseWorkflowStatus(body.status);
   if (!status) return jsonResponse(400, { action: body.action, error: 'Invalid status.' });
 
@@ -935,12 +936,7 @@ const listPendingRequests = async (store: WorkflowBlobStore, body: WorkflowReque
   const summaries = records
     .filter((record): record is WorkflowRecord => Boolean(record))
     .filter((record) => record.workflow_status === status && (!stage || record.next_agent === stage))
-    .map((record) => ({
-      request_id: record.request_id,
-      workflow_status: record.workflow_status,
-      next_agent: record.next_agent,
-      updated_at: record.updated_at,
-    }))
+    .map((record) => annotateRecordMediaScoping(record, true))
     .sort(
       (left, right) =>
         right.updated_at.localeCompare(left.updated_at) || right.request_id.localeCompare(left.request_id)
@@ -1043,10 +1039,7 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
     };
 
     if (isRecord(outputRecord.article_body) && !Array.isArray(outputRecord.article_body)) {
-      const err = validateArticleBodyNodes(
-        outputRecord.article_body as Record<string, unknown>,
-        'article_body'
-      );
+      const err = validateArticleBodyNodes(outputRecord.article_body as Record<string, unknown>, 'article_body');
       if (err) return err;
     }
 
@@ -1550,6 +1543,7 @@ const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 const getMediaTypeFromArtifactRef = (value: string) => (value.toLowerCase().startsWith('pdf/') ? 'document' : 'image');
 /** Reject legacy local repo paths that the article publisher cannot resolve. */
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
+const REPO_UPLOAD_PATH_SLUG_RE = /^src\/assets\/(?:images|documents)\/uploads\/([^/]+)\//;
 /** Reject data URIs (base64/raw bytes embedded in strings). */
 const BASE64_DATA_URI_RE = /^data:/i;
 /** Reject arbitrary remote URLs — image refs must be Major Key artifact references. */
@@ -1582,11 +1576,74 @@ const gatherTrustedArtifactRefs = (record: WorkflowRecord): Set<string> => {
   return refs;
 };
 
+const getRecordSlug = (record: WorkflowRecord): string | undefined => {
+  const payload = record.input.publication?.publish_payload;
+  if (payload && typeof payload.slug === 'string') {
+    const validated = validateSlug(payload.slug);
+    if (validated.ok) return validated.value;
+  }
+  for (const agentOutput of Object.values(record.agent_outputs)) {
+    const output = agentOutput?.output;
+    if (!isRecord(output)) continue;
+    const publishPayload = output.publish_payload;
+    if (isRecord(publishPayload) && typeof publishPayload.slug === 'string') {
+      const validated = validateSlug(publishPayload.slug);
+      if (validated.ok) return validated.value;
+    }
+  }
+  return undefined;
+};
+
+const getRepoUploadPathSlug = (value: string): string | undefined => {
+  const match = REPO_UPLOAD_PATH_SLUG_RE.exec(value);
+  if (!match) return undefined;
+  const validated = validateSlug(match[1]);
+  return validated.ok ? validated.value : normalizeSlug(match[1]);
+};
+
+const annotateMediaScoping = <T>(
+  value: T,
+  options: { requestId?: string; slug?: string; annotateAll?: boolean }
+): T => {
+  if (Array.isArray(value)) return value.map((entry) => annotateMediaScoping(entry, options)) as T;
+  if (!isRecord(value)) return value;
+
+  const copy: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) copy[key] = annotateMediaScoping(entry, options);
+
+  if (typeof copy.src === 'string') {
+    const embeddedSlug = getRepoUploadPathSlug(copy.src);
+    if (embeddedSlug && (options.annotateAll || embeddedSlug !== options.slug)) {
+      copy.portable = false;
+      copy.scoped_to_slug = embeddedSlug;
+      if (options.requestId) copy.scoped_to_request_id = options.requestId;
+    }
+  }
+
+  if (typeof copy.blobKey === 'string') {
+    const match = MAJOR_KEY_ARTIFACT_REF_RE.exec(copy.blobKey);
+    const ownerRequestId = match ? copy.blobKey.split('/')[1] : undefined;
+    if (ownerRequestId && (options.annotateAll || ownerRequestId !== options.requestId)) {
+      copy.portable = false;
+      if (options.slug) copy.scoped_to_slug = options.slug;
+      const validated = validateRequestId(ownerRequestId);
+      copy.scoped_to_request_id = validated.ok ? validated.value : ownerRequestId;
+    }
+  }
+
+  return copy as T;
+};
+
+const annotateRecordMediaScoping = (record: WorkflowRecord, annotateAll = false): WorkflowRecord => {
+  const slug = getRecordSlug(record);
+  return annotateMediaScoping(record, { requestId: record.request_id, slug, annotateAll });
+};
+
 const rejectUnsafeStringValue = (action: WorkflowAction, path: string, value: string) => {
   if (BASE64_DATA_URI_RE.test(value)) {
     return jsonResponse(400, { action, error: `${path} must not be a data URI or base64-encoded value.` });
   }
-  if (LEGACY_REPO_PATH_RE.test(value)) {
+  if (LEGACY_REPO_PATH_RE.test(value) && !getRepoUploadPathSlug(value)) {
     return jsonResponse(400, {
       action,
       error: `${path} is a legacy repo path (src/assets/...). Provide a Major Key artifact reference instead.`,
@@ -1634,7 +1691,8 @@ const applyNodePatch = (
   action: WorkflowAction,
   node: ArticleBodyNode,
   patch: NodePatch,
-  trustedRefs: Set<string>
+  trustedRefs: Set<string>,
+  requestSlug?: string
 ):
   | { ok: true; node: ArticleBodyNode; auditEntries: CanonicalInputAuditPatch[] }
   | { ok: false; error: JsonResponse } => {
@@ -1649,7 +1707,18 @@ const applyNodePatch = (
       const unsafeErr = rejectUnsafeStringValue(action, `node_patches[${patch.node_id}].public_media_src`, newSrc);
       if (unsafeErr) return { ok: false, error: unsafeErr };
 
-      if (!MAJOR_KEY_ARTIFACT_REF_RE.test(newSrc)) {
+      const embeddedSlug = getRepoUploadPathSlug(newSrc);
+      if (embeddedSlug) {
+        if (requestSlug && embeddedSlug !== requestSlug) {
+          return {
+            ok: false,
+            error: jsonResponse(400, {
+              action,
+              error: `public_media_src path belongs to article '${embeddedSlug}', not '${requestSlug}'. Media paths are not portable across requests. Use a fresh artifact pointer for this request.`,
+            }),
+          };
+        }
+      } else if (!MAJOR_KEY_ARTIFACT_REF_RE.test(newSrc)) {
         return {
           ok: false,
           error: jsonResponse(400, {
@@ -1659,7 +1728,7 @@ const applyNodePatch = (
         };
       }
 
-      if (!trustedRefs.has(newSrc)) {
+      if (!embeddedSlug && !trustedRefs.has(newSrc)) {
         return {
           ok: false,
           error: jsonResponse(400, {
@@ -1682,7 +1751,7 @@ const applyNodePatch = (
       patchedPublic = {
         ...patchedPublic,
         media: {
-          type: getMediaTypeFromArtifactRef(newSrc),
+          type: embeddedSlug ? 'image' : getMediaTypeFromArtifactRef(newSrc),
           src: newSrc,
           ...(newAlt !== undefined ? { alt: newAlt } : {}),
           ...(newCaption !== undefined ? { caption: newCaption } : {}),
@@ -1949,6 +2018,7 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
     }
 
     const trustedRefs = gatherTrustedArtifactRefs(previousRecord);
+    const requestSlug = getRecordSlug(previousRecord);
 
     // Trusted-ref checks for register and publish payload (require the loaded record)
     if (hasImageRegisterReplacement && validatedImageRegister !== undefined) {
@@ -1984,7 +2054,7 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
           });
         }
 
-        const result = applyNodePatch(body.action, patchedNodes[nodeIndex], patch, trustedRefs);
+        const result = applyNodePatch(body.action, patchedNodes[nodeIndex], patch, trustedRefs, requestSlug);
         if (!result.ok) return result.error;
 
         patchedNodes[nodeIndex] = result.node;
