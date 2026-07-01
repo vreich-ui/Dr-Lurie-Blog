@@ -1273,7 +1273,8 @@ const getMediaEntries = async (
 
   // Scan article_body.nodes for artifact-pointer media.src values not already in artifactReferences,
   // and resolve them via the artifact index store (same cross-request pattern as MCP publish).
-  const NODE_ARTIFACT_PTR_RE = /^image\/([^/]+)\/([a-fA-F0-9]{64})\.([a-z0-9]+)$/;
+  // Matches both image/{reqId}/{sha64}.{ext} and pdf/{reqId}/{sha64}.pdf pointers.
+  const NODE_ARTIFACT_PTR_RE = /^(image|pdf)\/([^/]+)\/([a-fA-F0-9]{64})\.[a-z0-9]+$/;
   const articleBodyRaw = input.article_body as Record<string, unknown> | null | undefined;
   const articleNodes = Array.isArray(articleBodyRaw?.nodes) ? (articleBodyRaw.nodes as unknown[]) : [];
   // Map sha256 → canonical blobKey. Seeded from top-level artifactReferences; extended as
@@ -1289,7 +1290,7 @@ const getMediaEntries = async (
     if (typeof src !== 'string') continue;
     const m = src.match(NODE_ARTIFACT_PTR_RE);
     if (!m) continue;
-    const sha256Lower = m[2].toLowerCase();
+    const sha256Lower = m[3].toLowerCase();
     const existingBlobKey = blobKeyBySha256.get(sha256Lower);
     if (existingBlobKey !== undefined) {
       // sha256 already known — src must exactly match the canonical blobKey
@@ -1301,7 +1302,7 @@ const getMediaEntries = async (
       }
       continue;
     }
-    nodePointers.push({ requestId: m[1], sha256: sha256Lower, src });
+    nodePointers.push({ requestId: m[2], sha256: sha256Lower, src });
     blobKeyBySha256.set(sha256Lower, src); // prevents duplicate resolution for the same sha256
   }
 
@@ -1330,7 +1331,7 @@ const getMediaEntries = async (
         const reason = !crossRef ? 'not found in the artifact index' : 'has been deleted';
         throw new PublishError(
           422,
-          `article_body node contains an artifact pointer that is ${reason}: image/${ptr.requestId}/${ptr.sha256}`
+          `article_body node contains an artifact pointer that is ${reason}: ${ptr.src}`
         );
       }
     }
