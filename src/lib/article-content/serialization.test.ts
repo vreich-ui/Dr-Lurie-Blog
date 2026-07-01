@@ -141,7 +141,7 @@ describe('Article Body Serialization and Safety', () => {
       assert.ok(md.includes('![Alt Text](~/assets/images/test.jpg)'));
     });
 
-    it('should render PDF artifact blob keys as public download URLs', () => {
+    it('should render structured CTA nodes as HTML pill buttons', () => {
       const body: ArticleBodyV1 = {
         schema_version: 'article_body.v1',
         nodes: [
@@ -157,8 +157,52 @@ describe('Article Body Serialization and Safety', () => {
       };
 
       const md = articleBodyToMarkdown(body);
-      assert.ok(md.includes(`[Download PDF](/pdf/exact-request/${'a'.repeat(64)}.pdf)`));
-      assert.ok(!md.includes(`](pdf/exact-request/${'a'.repeat(64)}.pdf)`));
+      assert.ok(md.includes('class="not-prose my-7"'));
+      assert.ok(md.includes('rounded-full'));
+      assert.ok(md.includes(`href="/pdf/exact-request/${'a'.repeat(64)}.pdf"`));
+      assert.ok(md.includes('>Download PDF</a>'));
+      assert.ok(!md.includes(`[Download PDF](/pdf/exact-request/${'a'.repeat(64)}.pdf)`));
+    });
+
+    it('should render full public PDF URLs as normalized public download paths', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_pdfurl',
+            kind: 'action',
+            public: {
+              ctaText: 'Download worksheet',
+              ctaLink: `https://drluriescience.netlify.app/pdf/exact-request/${'b'.repeat(64)}.pdf`,
+            },
+          },
+        ],
+      };
+
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('rounded-full'));
+      assert.ok(md.includes(`href="/pdf/exact-request/${'b'.repeat(64)}.pdf"`));
+      assert.ok(md.includes('>Download worksheet</a>'));
+      assert.ok(!md.includes('https://drluriescience.netlify.app'));
+    });
+
+    it('should not convert Markdown links inside node body into buttons', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_bodylink',
+            kind: 'content',
+            public: {
+              body: 'Read [the article](https://example.com/article) before downloading.',
+            },
+          },
+        ],
+      };
+
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes('[the article](https://example.com/article)'));
+      assert.ok(!md.includes('rounded-full'));
     });
 
     it('should render inline document media as a markdown link', () => {

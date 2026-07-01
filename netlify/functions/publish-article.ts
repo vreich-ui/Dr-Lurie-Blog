@@ -20,10 +20,7 @@ import {
   type DeployStatus,
 } from '../lib/netlify-deploys.js';
 import { publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
-import {
-  articleBodyToMarkdown,
-  getPublicPdfUrlForArtifactBlobKey,
-} from '../../src/lib/article-content/to-markdown.js';
+import { articleBodyToMarkdown, getPublicPdfUrlForArtifactBlobKey } from '../../src/lib/article-content/to-markdown.js';
 
 type LambdaEvent = {
   body?: string | null;
@@ -488,13 +485,20 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
     );
   }, markdown);
 
-
 const publicPdfUrlPattern = /^\/pdf\/([a-z0-9._-]+\/[a-f0-9]{64}\.pdf)$/i;
 const pendingPdfArtifactReferencePattern = /^\/?pending-pdf-artifact-reference$/i;
 
 const getPdfBlobKeyFromPublicUrl = (value: string) => {
   const match = value.trim().match(publicPdfUrlPattern);
   return match ? `pdf/${match[1]}` : undefined;
+};
+
+const getPdfBlobKeyFromArtifactOrPublicUrl = (value: string) => {
+  const publicUrlBlobKey = getPdfBlobKeyFromPublicUrl(value);
+  if (publicUrlBlobKey) return publicUrlBlobKey;
+
+  const publicPdfUrl = getPublicPdfUrlForArtifactBlobKey(value);
+  return publicPdfUrl?.replace(/^\//, '');
 };
 
 const getShaFromPdfBlobKey = (value: string) => value.match(/\/([a-f0-9]{64})\.pdf$/i)?.[1]?.toLowerCase();
@@ -570,6 +574,76 @@ const normalizeArticleBodyPdfCtaLinks = (articleBody: unknown, artifactReference
   });
 
   return changed ? { ...(articleBody as Record<string, unknown>), nodes: normalizedNodes } : articleBody;
+};
+
+const hasPublicPdfCtaNode = (articleBody: unknown) => {
+  if (!articleBody || typeof articleBody !== 'object' || Array.isArray(articleBody)) return false;
+  const nodes = (articleBody as Record<string, unknown>).nodes;
+  if (!Array.isArray(nodes)) return false;
+
+  return nodes.some((node) => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return false;
+    const visibility = (node as Record<string, unknown>).visibility;
+    if (visibility && visibility !== 'public') return false;
+    const publicRecord = (node as Record<string, unknown>).public;
+    if (!publicRecord || typeof publicRecord !== 'object' || Array.isArray(publicRecord)) return false;
+    const ctaLink = (publicRecord as Record<string, unknown>).ctaLink;
+    return typeof ctaLink === 'string' && Boolean(getPublicPdfUrlForArtifactBlobKey(ctaLink));
+  });
+};
+
+const appendTopLevelPdfCtaNode = (
+  articleBody: unknown,
+  ctaLink: string | undefined,
+  ctaText: string | undefined,
+  artifactReferences: ArtifactReference[]
+) => {
+  if (!ctaLink || !articleBody || typeof articleBody !== 'object' || Array.isArray(articleBody)) return articleBody;
+
+  const normalizedBlobKey = getPdfBlobKeyFromArtifactOrPublicUrl(ctaLink);
+  if (!normalizedBlobKey) return articleBody;
+
+  if (artifactReferences.length) {
+    const referencesByBlobKey = new Map(artifactReferences.map((reference) => [reference.blobKey, reference]));
+    const exactReference = referencesByBlobKey.get(normalizedBlobKey);
+    if (!exactReference) {
+      const referencesBySha = new Map(
+        artifactReferences.map((reference) => [reference.sha256.toLowerCase(), reference])
+      );
+      const sha = getShaFromPdfBlobKey(normalizedBlobKey);
+      const sameShaReference = sha ? referencesBySha.get(sha) : undefined;
+      if (sameShaReference) {
+        throw new PublishError(
+          422,
+          `Top-level ctaLink must use the exact PDF artifactReference.blobKey "${sameShaReference.blobKey}".`
+        );
+      }
+
+      throw new PublishError(422, 'Top-level PDF ctaLink must match an exact artifactReference.blobKey.');
+    }
+  }
+
+  const publicPdfUrl = `/${normalizedBlobKey}`;
+  if (hasPublicPdfCtaNode(articleBody)) return articleBody;
+
+  const nodes = (articleBody as Record<string, unknown>).nodes;
+  if (!Array.isArray(nodes)) return articleBody;
+
+  return {
+    ...(articleBody as Record<string, unknown>),
+    nodes: [
+      ...nodes,
+      {
+        id: 'n_pdfdl01',
+        kind: 'action',
+        public: {
+          ctaText: ctaText || 'Download PDF',
+          ctaLink: publicPdfUrl,
+        },
+        visibility: 'public',
+      },
+    ],
+  };
 };
 
 const originalArtifactBlobKey = Symbol('originalArtifactBlobKey');
@@ -1393,7 +1467,17 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
   let normalizedArticleBody: unknown;
   try {
-    normalizedArticleBody = article_body ? normalizeArticleBodyPdfCtaLinks(article_body, artifactReferences) : undefined;
+    normalizedArticleBody = article_body
+      ? normalizeArticleBodyPdfCtaLinks(
+          appendTopLevelPdfCtaNode(
+            article_body,
+            toStringValue(input.ctaLink),
+            toStringValue(input.ctaText),
+            artifactReferences
+          ),
+          artifactReferences
+        )
+      : undefined;
   } catch (error) {
     if (error instanceof PublishError) return jsonResponse(error.statusCode, { error: error.message });
     return jsonResponse(400, { error: 'Invalid PDF CTA link.' });
@@ -1432,8 +1516,10 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const imagePath =
       uploadedImagePath ??
       existingFeaturedImage?.displayPath ??
-      (mediaEntries.find((e) => e.artifactReference && e.kind === 'image') ??
-        mediaEntries.find((e) => e.kind === 'image'))?.displayPath;
+      (
+        mediaEntries.find((e) => e.artifactReference && e.kind === 'image') ??
+        mediaEntries.find((e) => e.kind === 'image')
+      )?.displayPath;
 
     let resolvedMarkdown: string;
     if (article_body) {
@@ -1442,7 +1528,9 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
         schema_version: 'content_source.v1',
         content: {
           title,
-          article_body: normalizedArticleBody as ContentSourceV1['content'] extends { article_body?: infer T } ? T : never,
+          article_body: normalizedArticleBody as ContentSourceV1['content'] extends { article_body?: infer T }
+            ? T
+            : never,
         },
       };
       resolvedMarkdown = articleBodyToMarkdown(tempContentSource.content!.article_body!);
