@@ -62,6 +62,8 @@ export function normalizeArticleBodyFromLegacy(markdown: string): ArticleBodyV1 
   };
 }
 
+// TODO: Review structured article-body rendering parity for commercial.rel/sponsored affiliate links,
+// offerInline/offerCard, adSlot/chatInvite presentations, and non-inline document/PDF media behavior.
 function renderNodeToMarkdown(node: ArticleBodyNode): string {
   const parts: string[] = [];
 

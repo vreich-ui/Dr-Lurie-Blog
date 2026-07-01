@@ -488,6 +488,12 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
 const publicPdfUrlPattern = /^\/pdf\/([a-z0-9._-]+\/[a-f0-9]{64}\.pdf)$/i;
 const pendingPdfArtifactReferencePattern = /^\/?pending-pdf-artifact-reference$/i;
 
+const defaultConsultationCtaLink = 'https://example.com/book-consultation';
+const defaultConsultationCtaText = 'Book a skin consultation';
+
+const isDefaultConsultationFallbackCta = (publicValues: Record<string, unknown>) =>
+  publicValues.ctaLink === defaultConsultationCtaLink || publicValues.ctaText === defaultConsultationCtaText;
+
 const getPdfBlobKeyFromPublicUrl = (value: string) => {
   const match = value.trim().match(publicPdfUrlPattern);
   return match ? `pdf/${match[1]}` : undefined;
@@ -644,7 +650,7 @@ const appendTopLevelPdfCtaNode = (
     if (!publicRecord || typeof publicRecord !== 'object' || Array.isArray(publicRecord)) return node;
 
     const publicValues = publicRecord as Record<string, unknown>;
-    if (typeof publicValues.ctaLink !== 'string' && typeof publicValues.ctaText !== 'string') return node;
+    if (!isDefaultConsultationFallbackCta(publicValues)) return node;
 
     replacedExistingCta = true;
     return {

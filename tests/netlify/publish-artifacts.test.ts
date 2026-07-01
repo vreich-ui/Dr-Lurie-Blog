@@ -481,6 +481,21 @@ test('publish-article top-level PDF CTA overrides existing fallback article_body
               },
               visibility: 'public',
             },
+            {
+              id: 'n_partner01',
+              kind: 'action',
+              public: {
+                ctaText: 'Shop the gentle cleanser',
+                ctaLink: 'https://affiliate.example/gentle-cleanser',
+              },
+              visibility: 'public',
+              commercial: {
+                type: 'affiliateMention',
+                source: 'affiliate',
+                rel: 'sponsored',
+                disclosure: { required: true, label: 'Affiliate link' },
+              },
+            },
           ],
         },
         artifactReferences: [artifact],
@@ -492,7 +507,9 @@ test('publish-article top-level PDF CTA overrides existing fallback article_body
     const markdown = blobWrites[0]?.content ?? '';
     assert.ok(markdown.includes(`href="/${artifact.blobKey}"`));
     assert.ok(markdown.includes('>Download the PDF guide</a>'));
-    assert.doesNotMatch(markdown, /example\.com/);
+    assert.ok(markdown.includes('href="https://affiliate.example/gentle-cleanser"'));
+    assert.ok(markdown.includes('>Shop the gentle cleanser</a>'));
+    assert.doesNotMatch(markdown, /https:\/\/example\.com\/book-consultation/);
     assert.doesNotMatch(markdown, /Book a skin consultation/);
   } finally {
     globalThis.fetch = originalFetch;
