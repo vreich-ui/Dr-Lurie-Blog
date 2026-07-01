@@ -493,6 +493,14 @@ const getPdfBlobKeyFromPublicUrl = (value: string) => {
   return match ? `pdf/${match[1]}` : undefined;
 };
 
+const getPdfBlobKeyFromArtifactOrPublicUrl = (value: string) => {
+  const publicUrlBlobKey = getPdfBlobKeyFromPublicUrl(value);
+  if (publicUrlBlobKey) return publicUrlBlobKey;
+
+  const publicPdfUrl = getPublicPdfUrlForArtifactBlobKey(value);
+  return publicPdfUrl?.replace(/^\//, '');
+};
+
 const getShaFromPdfBlobKey = (value: string) => value.match(/\/([a-f0-9]{64})\.pdf$/i)?.[1]?.toLowerCase();
 
 const normalizeArticleBodyPdfCtaLinks = (articleBody: unknown, artifactReferences: ArtifactReference[]) => {
@@ -584,11 +592,39 @@ const hasPublicPdfCtaNode = (articleBody: unknown) => {
   });
 };
 
-const appendTopLevelPdfCtaNode = (articleBody: unknown, ctaLink: string | undefined, ctaText: string | undefined) => {
+const appendTopLevelPdfCtaNode = (
+  articleBody: unknown,
+  ctaLink: string | undefined,
+  ctaText: string | undefined,
+  artifactReferences: ArtifactReference[]
+) => {
   if (!ctaLink || !articleBody || typeof articleBody !== 'object' || Array.isArray(articleBody)) return articleBody;
 
-  const publicPdfUrl = getPublicPdfUrlForArtifactBlobKey(ctaLink);
-  if (!publicPdfUrl || hasPublicPdfCtaNode(articleBody)) return articleBody;
+  const normalizedBlobKey = getPdfBlobKeyFromArtifactOrPublicUrl(ctaLink);
+  if (!normalizedBlobKey) return articleBody;
+
+  if (artifactReferences.length) {
+    const referencesByBlobKey = new Map(artifactReferences.map((reference) => [reference.blobKey, reference]));
+    const exactReference = referencesByBlobKey.get(normalizedBlobKey);
+    if (!exactReference) {
+      const referencesBySha = new Map(
+        artifactReferences.map((reference) => [reference.sha256.toLowerCase(), reference])
+      );
+      const sha = getShaFromPdfBlobKey(normalizedBlobKey);
+      const sameShaReference = sha ? referencesBySha.get(sha) : undefined;
+      if (sameShaReference) {
+        throw new PublishError(
+          422,
+          `Top-level ctaLink must use the exact PDF artifactReference.blobKey "${sameShaReference.blobKey}".`
+        );
+      }
+
+      throw new PublishError(422, 'Top-level PDF ctaLink must match an exact artifactReference.blobKey.');
+    }
+  }
+
+  const publicPdfUrl = `/${normalizedBlobKey}`;
+  if (hasPublicPdfCtaNode(articleBody)) return articleBody;
 
   const nodes = (articleBody as Record<string, unknown>).nodes;
   if (!Array.isArray(nodes)) return articleBody;
@@ -1433,7 +1469,12 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   try {
     normalizedArticleBody = article_body
       ? normalizeArticleBodyPdfCtaLinks(
-          appendTopLevelPdfCtaNode(article_body, toStringValue(input.ctaLink), toStringValue(input.ctaText)),
+          appendTopLevelPdfCtaNode(
+            article_body,
+            toStringValue(input.ctaLink),
+            toStringValue(input.ctaText),
+            artifactReferences
+          ),
           artifactReferences
         )
       : undefined;

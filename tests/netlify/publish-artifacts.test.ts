@@ -266,7 +266,7 @@ test('publish-article renders PDF CTA links from exact artifactReference blobKey
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
-  const requestId = `artifact-pdf-cta-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = 'req_smoke_pdfcta_20260701_02';
   const pdfBytes = Buffer.from('%PDF-1.7\nreal pdf artifact for cta link');
   const upload = await postArtifact({
     requestId,
@@ -327,7 +327,9 @@ test('publish-article renders PDF CTA links from exact artifactReference blobKey
     });
 
     assert.equal(response.statusCode, 201, response.body);
-    assert.match(blobWrites[0]?.content, new RegExp(`\\[Download handout\\]\\(/${artifact.blobKey}\\)`));
+    assert.ok((blobWrites[0]?.content ?? '').includes('rounded-full'));
+    assert.ok((blobWrites[0]?.content ?? '').includes(`href="/${artifact.blobKey}"`));
+    assert.ok((blobWrites[0]?.content ?? '').includes('>Download handout</a>'));
     assert.doesNotMatch(blobWrites[0]?.content ?? '', /pending-pdf-artifact-reference/);
   } finally {
     globalThis.fetch = originalFetch;
@@ -402,7 +404,116 @@ test('publish-article writes markdown for a PDF-only top-level CTA article', asy
     });
 
     assert.equal(response.statusCode, 201, response.body);
-    assert.ok((blobWrites[0]?.content ?? '').includes(`[Download PDF worksheet](/${artifact.blobKey})`));
+    assert.ok((blobWrites[0]?.content ?? '').includes('rounded-full'));
+    assert.ok((blobWrites[0]?.content ?? '').includes(`href="/${artifact.blobKey}"`));
+    assert.ok((blobWrites[0]?.content ?? '').includes('>Download PDF worksheet</a>'));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects top-level PDF CTA links with the same sha but wrong request', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const pdfBytes = Buffer.from('%PDF-1.7\ntop-level wrong request');
+  const upload = await postArtifact({
+    requestId: 'req_smoke_pdfcta_20260701_04',
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'wrong-request.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  let fetchCount = 0;
+
+  globalThis.fetch = (async () => {
+    fetchCount += 1;
+    return new Response('unexpected fetch', { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'pdf-top-level-wrong-request',
+        title: 'PDF Top Level Wrong Request',
+        ctaText: 'Download PDF worksheet',
+        ctaLink: `/pdf/wrong-request/${artifact.sha256}.pdf`,
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [{ id: 'n_a1b2c3', kind: 'content', public: { body: 'Body.' } }],
+        },
+        artifactReferences: [artifact],
+        overwrite: true,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(JSON.parse(response.body).error, /exact PDF artifactReference\.blobKey/);
+    assert.equal(fetchCount, 0, 'Invalid top-level PDF CTA links should fail before GitHub requests.');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects top-level PDF CTA links without a matching artifactReference', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const pdfBytes = Buffer.from('%PDF-1.7\ntop-level no match');
+  const upload = await postArtifact({
+    requestId: 'req_smoke_pdfcta_20260701_05',
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'known.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  const missingSha = 'f'.repeat(64);
+  let fetchCount = 0;
+
+  globalThis.fetch = (async () => {
+    fetchCount += 1;
+    return new Response('unexpected fetch', { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'pdf-top-level-no-match',
+        title: 'PDF Top Level No Match',
+        ctaText: 'Download PDF worksheet',
+        ctaLink: `pdf/req_smoke_pdfcta_20260701_06/${missingSha}.pdf`,
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [{ id: 'n_a1b2c3', kind: 'content', public: { body: 'Body.' } }],
+        },
+        artifactReferences: [artifact],
+        overwrite: true,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    assert.match(JSON.parse(response.body).error, /must match an exact artifactReference\.blobKey/);
+    assert.equal(fetchCount, 0, 'Unmatched top-level PDF CTA links should fail before GitHub requests.');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -418,7 +529,7 @@ test('publish-article rejects placeholder and derived PDF CTA links', async () =
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
-  const requestId = `artifact-pdf-derived-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = 'req_smoke_pdfcta_20260701_03';
   const pdfBytes = Buffer.from('%PDF-1.7\nreal pdf artifact for derived rejection');
   const upload = await postArtifact({
     requestId,

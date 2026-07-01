@@ -2,6 +2,22 @@ import { type ArticleBodyV1, type ArticleBodyNode } from '../../schema/article-c
 
 const pdfArtifactBlobKeyPattern = /^(?:artifacts\/)?pdf\/[a-z0-9._-]+\/[a-f0-9]{64}\.pdf$/i;
 const publicPdfPathPattern = /\/pdf\/([a-z0-9._-]+\/[a-f0-9]{64}\.pdf)$/i;
+const ctaButtonClass =
+  'inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950';
+
+const htmlEscapeMap: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
+const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (character) => htmlEscapeMap[character]);
+
+function renderCtaButton(href: string, label: string): string {
+  return `<p class="not-prose my-7">\n  <a class="${ctaButtonClass}" href="${escapeHtml(href)}">${escapeHtml(label)}</a>\n</p>`;
+}
 
 export function getPublicPdfUrlForArtifactBlobKey(value: string): string | undefined {
   const trimmed = value.trim();
@@ -117,10 +133,8 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
   const ctaLink = node.public?.ctaLink
     ? (getPublicPdfUrlForArtifactBlobKey(node.public.ctaLink) ?? node.public.ctaLink)
     : undefined;
-  if (node.public?.ctaText && ctaLink) {
-    parts.push(`[${node.public.ctaText}](${ctaLink})`);
-  } else if (ctaLink) {
-    parts.push(`<${ctaLink}>`);
+  if (ctaLink) {
+    parts.push(renderCtaButton(ctaLink, node.public?.ctaText || 'Learn more'));
   }
 
   return parts.join('\n\n');
