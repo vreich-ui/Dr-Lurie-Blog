@@ -283,7 +283,8 @@ test('publish-article renders PDF CTA links from exact artifactReference blobKey
     const url = String(input);
     const method = init?.method ?? 'GET';
 
-    if (url.includes('/contents/src/data/post/pdf-cta-exact-blobkey.md')) return new Response('not found', { status: 404 });
+    if (url.includes('/contents/src/data/post/pdf-cta-exact-blobkey.md'))
+      return new Response('not found', { status: 404 });
     if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
     if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
     if (url.endsWith('/git/blobs') && method === 'POST') {
@@ -328,6 +329,80 @@ test('publish-article renders PDF CTA links from exact artifactReference blobKey
     assert.equal(response.statusCode, 201, response.body);
     assert.match(blobWrites[0]?.content, new RegExp(`\\[Download handout\\]\\(/${artifact.blobKey}\\)`));
     assert.doesNotMatch(blobWrites[0]?.content ?? '', /pending-pdf-artifact-reference/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article writes markdown for a PDF-only top-level CTA article', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestId = 'req_smoke_pdfcta_20260701_01';
+  const pdfBytes = Buffer.from('%PDF-1.7\npdf only cta article');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'pdf-only-handout.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/pdf-only-top-level-cta.md'))
+      return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'pdf-only-top-level-cta',
+        title: 'PDF Only Top Level CTA',
+        ctaText: 'Download PDF worksheet',
+        ctaLink: artifact.blobKey,
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_a1b2c3',
+              kind: 'content',
+              public: { body: 'Download the worksheet below.' },
+            },
+          ],
+        },
+        artifactReferences: [artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.ok((blobWrites[0]?.content ?? '').includes(`[Download PDF worksheet](/${artifact.blobKey})`));
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1622,7 +1697,10 @@ test('publish-article sets image frontmatter to first artifact entry when no exp
 
     assert.equal(response.statusCode, 201, response.body);
     const markdownContent = blobWrites[0]?.content ?? '';
-    assert.ok(markdownContent.includes('image:'), `Expected "image:" in frontmatter.\nGot: ${markdownContent.slice(0, 300)}`);
+    assert.ok(
+      markdownContent.includes('image:'),
+      `Expected "image:" in frontmatter.\nGot: ${markdownContent.slice(0, 300)}`
+    );
     assert.ok(
       markdownContent.includes('~/assets/images/uploads/featured-fallback-test/'),
       `Expected upload path in image frontmatter.\nGot: ${markdownContent.slice(0, 300)}`

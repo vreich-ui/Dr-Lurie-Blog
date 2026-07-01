@@ -161,6 +161,26 @@ describe('Article Body Serialization and Safety', () => {
       assert.ok(!md.includes(`](pdf/exact-request/${'a'.repeat(64)}.pdf)`));
     });
 
+    it('should render full public PDF URLs as normalized public download paths', () => {
+      const body: ArticleBodyV1 = {
+        schema_version: 'article_body.v1',
+        nodes: [
+          {
+            id: 'n_pdfurl',
+            kind: 'action',
+            public: {
+              ctaText: 'Download worksheet',
+              ctaLink: `https://drluriescience.netlify.app/pdf/exact-request/${'b'.repeat(64)}.pdf`,
+            },
+          },
+        ],
+      };
+
+      const md = articleBodyToMarkdown(body);
+      assert.ok(md.includes(`[Download worksheet](/pdf/exact-request/${'b'.repeat(64)}.pdf)`));
+      assert.ok(!md.includes('https://drluriescience.netlify.app'));
+    });
+
     it('should render inline document media as a markdown link', () => {
       const body: ArticleBodyV1 = {
         schema_version: 'article_body.v1',

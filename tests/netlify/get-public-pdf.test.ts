@@ -39,6 +39,27 @@ test('get-public-pdf streams PDF artifact without admin credentials', async () =
   assert.equal(Buffer.from(response.body, 'base64').toString(), bytes.toString());
 });
 
+test('get-public-pdf accepts clean public PDF paths', async () => {
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+
+  const requestId = `public-pdf-path-${Date.now()}`;
+  const bytes = Buffer.from('%PDF-1.4 public path pdf content');
+  const blobKey = `pdf/${requestId}/${sha256(bytes)}.pdf`;
+  await setArtifactBytes(blobKey, bytes);
+
+  const response = await handler({
+    httpMethod: 'GET',
+    path: `/${blobKey}`,
+    queryStringParameters: null,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers['Content-Type'], 'application/pdf');
+  assert.match(response.headers['Content-Disposition'], /^attachment; filename=/);
+  assert.equal(Buffer.from(response.body, 'base64').toString(), bytes.toString());
+});
+
 test('get-public-pdf accepts legacy artifacts/pdf blobKey values', async () => {
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';

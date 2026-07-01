@@ -1,15 +1,15 @@
 import { type ArticleBodyV1, type ArticleBodyNode } from '../../schema/article-content-v1.js';
 
 const pdfArtifactBlobKeyPattern = /^(?:artifacts\/)?pdf\/[a-z0-9._-]+\/[a-f0-9]{64}\.pdf$/i;
+const publicPdfPathPattern = /\/pdf\/([a-z0-9._-]+\/[a-f0-9]{64}\.pdf)$/i;
 
 export function getPublicPdfUrlForArtifactBlobKey(value: string): string | undefined {
-  const normalized = value
-    .trim()
-    .replace(/^\/+/, '')
-    .replace(/^artifacts\//, '');
-  if (!pdfArtifactBlobKeyPattern.test(normalized)) return undefined;
+  const trimmed = value.trim();
+  const normalized = trimmed.replace(/^\/+/, '').replace(/^artifacts\//, '');
+  if (pdfArtifactBlobKeyPattern.test(normalized)) return `/${normalized.replace(/^artifacts\//, '')}`;
 
-  return `/${normalized}`;
+  const publicPath = trimmed.match(publicPdfPathPattern);
+  return publicPath ? `/pdf/${publicPath[1]}` : undefined;
 }
 
 /**
