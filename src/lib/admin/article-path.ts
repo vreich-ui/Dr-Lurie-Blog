@@ -4,20 +4,14 @@
  * suffix when uniqueness cannot be guaranteed from the slug alone.
  */
 
-const SLUG_STRIP_RE = /[^a-z0-9\s_-]/g;
-const WHITESPACE_RE = /[\s_]+/g;
-const MULTI_DASH_RE = /-{2,}/g;
-const TRIM_DASH_RE = /^-|-$/g;
+import { normalizeSlug } from '../agents-naming.js';
+
 const MAX_SLUG = 80;
 
 export function slugifyTitle(title: string): string {
-  const raw = title
-    .toLowerCase()
-    .replace(SLUG_STRIP_RE, '')
-    .replace(WHITESPACE_RE, '-')
-    .replace(MULTI_DASH_RE, '-')
+  const raw = normalizeSlug(title)
     .slice(0, MAX_SLUG)
-    .replace(TRIM_DASH_RE, '');
+    .replace(/^-+|-+$/g, '');
   return raw || 'untitled';
 }
 

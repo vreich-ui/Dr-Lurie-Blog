@@ -36,6 +36,7 @@ import {
   type ArtifactIndexStore,
 } from '../lib/artifact-index.js';
 import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
+import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
 
 type StructuredLogPayload = {
   event: string;
@@ -1939,6 +1940,8 @@ const callPublishByTime = async (event: LambdaEvent, input: Record<string, unkno
 const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
   const requestId = toNonEmptyString(input.requestId);
   if (!requestId) return { ok: false as const, error: 'requestId is required.' };
+  const requestIdValidation = validateRequestId(requestId);
+  if (!requestIdValidation.ok) return { ok: false as const, error: requestIdValidation.error };
 
   const artifactKind = normalizeArtifactKindInput(input.artifactKind, true);
   if (!artifactKind.ok) return artifactKind;
@@ -1962,10 +1965,12 @@ const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
   }
 
   const filename = toNonEmptyString(input.filename);
-  if (filename && !isSafeArtifactFilename(filename)) {
+  const filenameValidation = filename ? validateFilename(filename) : undefined;
+  if (filename && (!isSafeArtifactFilename(filename) || !filenameValidation?.ok)) {
     return {
       ok: false as const,
-      error: 'filename must not contain control characters, angle brackets, or path separators.',
+      error:
+        'filename must be readable lowercase kebab-case and must not contain control characters, angle brackets, or path separators.',
     };
   }
 
@@ -1993,12 +1998,12 @@ const normalizeArtifactUploadIntentInput = (input: Record<string, unknown>) => {
   return {
     ok: true as const,
     value: {
-      requestId,
+      requestId: requestIdValidation.value,
       artifactKind: normalizedArtifactKind,
       contentType,
       expectedSizeBytes,
       expectedSha256,
-      ...(filename ? { filename } : {}),
+      ...(filenameValidation?.ok ? { filename: filenameValidation.value } : {}),
       ...(label ? { label } : {}),
       ...(tags?.length ? { tags } : {}),
     },
@@ -2442,8 +2447,10 @@ const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) =
   if (!normalizedRequestId) {
     return toolError('requestId is required.');
   }
+  const requestIdValidation = validateRequestId(normalizedRequestId);
+  if (!requestIdValidation.ok) return toolError(requestIdValidation.error);
 
-  const artifacts = await getArtifactReferencesForRequest(event, normalizedRequestId);
+  const artifacts = await getArtifactReferencesForRequest(event, requestIdValidation.value);
 
   return toolResult({
     artifacts,
@@ -2455,12 +2462,14 @@ const getArtifactMetadata = async (event: LambdaEvent, requestId: unknown, sha25
   if (!normalizedRequestId) {
     return toolError('requestId is required.');
   }
+  const requestIdValidation = validateRequestId(normalizedRequestId);
+  if (!requestIdValidation.ok) return toolError(requestIdValidation.error);
 
   const normalizedSha256 = normalizeArtifactSha256Input(sha256);
   if (!normalizedSha256.ok) return toolError(normalizedSha256.error);
 
   const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
-  const artifact = await readArtifactReference(store, normalizedRequestId, normalizedSha256.sha256);
+  const artifact = await readArtifactReference(store, requestIdValidation.value, normalizedSha256.sha256);
 
   if (!artifact) return toolError('Artifact reference was not found.');
 
