@@ -624,10 +624,46 @@ const appendTopLevelPdfCtaNode = (
   }
 
   const publicPdfUrl = `/${normalizedBlobKey}`;
-  if (hasPublicPdfCtaNode(articleBody)) return articleBody;
+  const normalizedCta = {
+    ctaText: ctaText || 'Download PDF',
+    ctaLink: publicPdfUrl,
+  };
 
   const nodes = (articleBody as Record<string, unknown>).nodes;
   if (!Array.isArray(nodes)) return articleBody;
+
+  let replacedExistingCta = false;
+  const normalizedNodes = nodes.map((node) => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return node;
+
+    const nodeRecord = node as Record<string, unknown>;
+    const visibility = nodeRecord.visibility;
+    if (visibility && visibility !== 'public') return node;
+
+    const publicRecord = nodeRecord.public;
+    if (!publicRecord || typeof publicRecord !== 'object' || Array.isArray(publicRecord)) return node;
+
+    const publicValues = publicRecord as Record<string, unknown>;
+    if (typeof publicValues.ctaLink !== 'string' && typeof publicValues.ctaText !== 'string') return node;
+
+    replacedExistingCta = true;
+    return {
+      ...nodeRecord,
+      public: {
+        ...publicValues,
+        ...normalizedCta,
+      },
+    };
+  });
+
+  if (replacedExistingCta) {
+    return {
+      ...(articleBody as Record<string, unknown>),
+      nodes: normalizedNodes,
+    };
+  }
+
+  if (hasPublicPdfCtaNode(articleBody)) return articleBody;
 
   return {
     ...(articleBody as Record<string, unknown>),
@@ -636,10 +672,7 @@ const appendTopLevelPdfCtaNode = (
       {
         id: 'n_pdfdl01',
         kind: 'action',
-        public: {
-          ctaText: ctaText || 'Download PDF',
-          ctaLink: publicPdfUrl,
-        },
+        public: normalizedCta,
         visibility: 'public',
       },
     ],

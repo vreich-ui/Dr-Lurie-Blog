@@ -412,6 +412,93 @@ test('publish-article writes markdown for a PDF-only top-level CTA article', asy
   }
 });
 
+test('publish-article top-level PDF CTA overrides existing fallback article_body CTA', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const originalFetch = globalThis.fetch;
+  const requestId = 'req_smoke_pdfcta_override_20260701_01';
+  const pdfBytes = Buffer.from('%PDF-1.7\npdf cta override article');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'pdf',
+    contentType: 'application/pdf',
+    filename: 'override-handout.pdf',
+    encoding: 'base64',
+    payload: pdfBytes.toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string; sha256: string };
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/pdf-cta-overrides-fallback.md'))
+      return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'pdf-cta-overrides-fallback',
+        title: 'PDF CTA Overrides Fallback',
+        ctaText: 'Download the PDF guide',
+        ctaLink: artifact.blobKey,
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_body01',
+              kind: 'content',
+              public: { body: 'Download the guide below.' },
+            },
+            {
+              id: 'n_fallback01',
+              kind: 'action',
+              public: {
+                ctaText: 'Book a skin consultation',
+                ctaLink: 'https://example.com/book-consultation',
+              },
+              visibility: 'public',
+            },
+          ],
+        },
+        artifactReferences: [artifact],
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+    assert.ok(markdown.includes(`href="/${artifact.blobKey}"`));
+    assert.ok(markdown.includes('>Download the PDF guide</a>'));
+    assert.doesNotMatch(markdown, /example\.com/);
+    assert.doesNotMatch(markdown, /Book a skin consultation/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article rejects top-level PDF CTA links with the same sha but wrong request', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
