@@ -1581,15 +1581,11 @@ const promoteAgentArticleBodyIfRicher = (
   recordInput: Record<string, unknown> | undefined
 ) => {
   const agentBody = extractAgentFinalArticleBody(record);
-  if (!agentBody) return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
-
-  const inputContent = getRecordValue(recordInput?.content);
-  const inputArticleBody = getRecordValue(inputContent?.article_body);
-
-  if (countPublicArticleBodyNodes(agentBody) <= countPublicArticleBodyNodes(inputArticleBody)) {
+  if (!agentBody || countPublicArticleBodyNodes(agentBody) < 1) {
     return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
   }
 
+  const inputContent = getRecordValue(recordInput?.content);
   return {
     effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: agentBody } },
     promotedArticleBody: agentBody,
