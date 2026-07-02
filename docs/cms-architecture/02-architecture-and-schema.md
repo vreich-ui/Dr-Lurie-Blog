@@ -467,6 +467,14 @@ interface ReviewState {
     at: string; by: Principal;
     decision: 'approve' | 'request_changes';
     note?: string;
+    publish_action?: {                  // M-6: the reviewed publish action, pinned with the
+      published_time: string | null | 'immediate';
+    };                                  // content. Required on approvals that authorize a
+                                        // Tier 2 agent-executed publish; the agent's
+                                        // object_publish_by_time call must match it exactly
+                                        // (matching rules in 03 §2.2). Without this field
+                                        // persisted here, the publish gate would have
+                                        // nowhere durable to read the approved action.
     content_revision: number;           // approval pins the CONTENT revision it approved
                                         // (§3.1); a later `body` write reopens review.
                                         // Deliberately NOT the record `version`: lock
