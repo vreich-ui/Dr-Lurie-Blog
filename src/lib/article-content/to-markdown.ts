@@ -88,7 +88,10 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
   // 2.5 Media rendering
   // public.media is also used to select the article featured image. Only render it
   // inside the Markdown body when the node explicitly opts in to inline placement.
-  if (node.public?.media && node.rendering?.placement === 'inline') {
+  // Nodes with id === 'n_hero' are rendered in the hero slot via frontmatter image:
+  // and must be suppressed here to avoid duplicating the image on the page.
+  const isHeroNode = node.id === 'n_hero';
+  if (node.public?.media && node.rendering?.placement === 'inline' && !isHeroNode) {
     const media = node.public.media;
     let url = '';
     if (typeof media === 'string') {
