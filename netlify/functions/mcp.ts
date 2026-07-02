@@ -1563,6 +1563,16 @@ const countPublicArticleBodyNodes = (articleBody: Record<string, unknown> | unde
   return (articleBody.nodes as unknown[]).filter(hasReaderVisibleArticleBodyNode).length;
 };
 
+const countPublicArticleBodyMedia = (articleBody: Record<string, unknown> | undefined) => {
+  if (!Array.isArray(articleBody?.nodes)) return 0;
+  return (articleBody.nodes as unknown[]).filter((n) => {
+    const node = getRecordValue(n);
+    if (!hasReaderVisibleArticleBodyNode(n)) return false;
+    const media = getRecordValue(getRecordValue(node?.public)?.media);
+    return toNonEmptyString(media?.src) !== undefined;
+  }).length;
+};
+
 const extractAgentFinalArticleBody = (record: Record<string, unknown> | undefined) => {
   const output = getRecordValue(getRecordValue(getRecordValue(record?.agent_outputs)?.final_article)?.output);
   if (!output) return undefined;
@@ -1586,8 +1596,22 @@ const promoteAgentArticleBodyIfRicher = (
   const inputContent = getRecordValue(recordInput?.content);
   const inputArticleBody = getRecordValue(inputContent?.article_body);
 
-  if (countPublicArticleBodyNodes(agentBody) < countPublicArticleBodyNodes(inputArticleBody)) {
+  const agentNodeCount = countPublicArticleBodyNodes(agentBody);
+  const inputNodeCount = countPublicArticleBodyNodes(inputArticleBody);
+
+  if (agentNodeCount < inputNodeCount) {
     return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
+  }
+
+  // Equal node count: only promote when the agent body added media (enrichment).
+  // If media counts are also equal, the canonical input may have been repaired after
+  // the agent body was produced — preserve the canonical version in that case.
+  if (agentNodeCount === inputNodeCount) {
+    const agentMediaCount = countPublicArticleBodyMedia(agentBody);
+    const inputMediaCount = countPublicArticleBodyMedia(inputArticleBody);
+    if (agentMediaCount <= inputMediaCount) {
+      return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
+    }
   }
 
   return {

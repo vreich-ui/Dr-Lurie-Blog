@@ -88,9 +88,13 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
   // 2.5 Media rendering
   // public.media is also used to select the article featured image. Only render it
   // inside the Markdown body when the node explicitly opts in to inline placement.
-  // Nodes designated as the hero/featured image are rendered in the hero slot via frontmatter
-  // image: and must be suppressed here to avoid duplicating the image on the page.
+  // Nodes designated as the hero/featured image are rendered in the hero slot via the
+  // frontmatter image: field and must be suppressed here to avoid duplicating the image.
   // Mirrors the isHeroNode predicate in buildCanonicalPublishPayload (mcp.ts).
+  // Note: this suppresses the inline embed unconditionally for hero-designated nodes. In the
+  // rare case where a higher-priority isHeroSet image wins the frontmatter slot over the hero
+  // node, the hero node's image will not appear in either place. Fixing that edge case would
+  // require passing the winning featuredImage URL into articleBodyToMarkdown.
   const isHeroNode = node.id === 'n_hero' || (node.rendering?.presentation as string | undefined) === 'hero';
   if (node.public?.media && node.rendering?.placement === 'inline' && !isHeroNode) {
     const media = node.public.media;
