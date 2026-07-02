@@ -17,7 +17,7 @@ The audit surfaced six findings that force decisions. Each is resolved here and 
 | # | Audit finding | Decision | Where |
 |---|---|---|---|
 | 1 | Node "types" are metadata combinations; three files must agree (A§1.1, A§1.9) | **Sections use a strict discriminated union** backed by a single Component Registry (one module per type owns schema + renderer + editor hints). Article nodes keep the combinatorial pattern — the two grammars are siblings under one envelope, not one generalized grammar. | §2.5, §3.5, §4.2 |
-| 2 | Three divergent publish semantics (A§1.6) | **Canonical semantics = generalized `publish_by_time`** (timestamp + materialize + commit as one operation). The admin UI button becomes a client of it; `toggle-article-publish` is deprecated as a source-of-truth violation. | §5.6 |
+| 2 | Three divergent publish semantics (A§1.6) | **Canonical semantics = generalized `publish_by_time`** as one operation: materialize + commit the export first, then stamp timestamp + receipt (§5.6 ordering). The admin UI button becomes a client of it; `toggle-article-publish` is deprecated as a source-of-truth violation. | §5.6 |
 | 3 | Taxonomy uncontrolled + drifts between blob drafts and frontmatter (A§2.11) | **One Taxonomy registry object in Blobs** is the sole vocabulary; publish-time validation resolves terms against it; the drift-y `admin-taxonomy` aggregation endpoint is replaced. **No Topic entity** — topics remain a presentation of categories (A§2.7). | §5.5 |
 | 4 | No permissions model exists — binary admin/not-admin (A§2.12) | Human Review + roles are **explicitly greenfield design**, not formalization of an existing pattern. Minimal role set, enforced server-side. | §5.7 |
 | 5 | Dual auth: Netlify Identity for humans, shared `x-publish-key` for agents (A§1.8, A§2.12) | The agent-operability contract is built **on the existing paired-endpoint pattern** (identity-auth admin endpoints + publish-key/MCP endpoints writing to the same records). No unified identity layer is assumed. Per-agent credentials are an open question (OQ-3). | §5.8 |
@@ -123,7 +123,7 @@ Menu structures as data: header groups/actions, footer groups, secondary links, 
 
 ### 2.11 Publishing Workflow
 
-The envelope-level publish machinery, with one canonical semantics (audit fork #2 resolved in §5.6): `publish(object, published_time)` = validate → stamp → materialize derived export → git commit → receipt, generalized from `publish_by_time` → `publish-article.ts` (A§1.6 mechanism 2).
+The envelope-level publish machinery, with one canonical semantics (audit fork #2 resolved in §5.6): `publish(object, published_time)` = validate → materialize derived export → git commit → **then** stamp + receipt in one write (export-first; the record can never claim a publish with no committed export), generalized from `publish_by_time` → `publish-article.ts` (A§1.6 mechanism 2).
 
 ### 2.12 Human Review
 
@@ -640,7 +640,7 @@ Per concept, "safe by construction" = no single-site assumption in schema/IDs; "
 | Page / Template / Section | Safe by construction | `site` field on envelope; opaque IDs; no site names in keys. |
 | PageType | Needs work later | Code registry shared across sites; per-site route patterns/policies would need a data layer. |
 | Component Registry / Renderer | Needs work later | One codebase, one component set; per-site theming flows through `ctx` (tokens), but per-site *components* would need registry namespacing. |
-| Content Item | Safe by construction | Already true today (records carry no site identity; `publication_context` exists in ContentSourceV1, A§1.1). |
+| Content Item | Needs work later | Articles stay in the `workflows` store under site-free `req_*` keys with `ContentSourceV1` unchanged (§1, §3.10); the adapter stamps only a *default* `site`, and `publication_context` is publication/domain metadata, not a stable Site binding (A§1.1). Multi-site content queries, taxonomy validation, and publish materialization would need the adapter/migration to stamp a real per-record `site` — required work, not free. |
 | Taxonomy | Safe by construction | Per-site record; no fixed vocabulary in code. |
 | Navigation | Safe by construction | Per-site instances bound via Site. |
 | Publishing Workflow | Needs work later | Bound to one `GITHUB_REPOSITORY`/branch per deploy (A§1.6); multi-site needs per-site repo/branch binding in Site body + credentials story. |
