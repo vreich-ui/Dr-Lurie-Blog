@@ -23,8 +23,9 @@ import { z } from 'zod';
 
 import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
-import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import { getArtifactReferenceIssue } from '../lib/artifacts.js';
+import { listArtifactReferencesForRequest, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import {
   allowedAgentNames,
   workflowStatuses,
@@ -1555,8 +1556,24 @@ type CanonicalInputAuditPatch = {
   new_value_summary: string;
 };
 
-/** Collect every blobKey from every agent_output.artifactReferences array. */
-const gatherTrustedArtifactRefs = (record: WorkflowRecord): Set<string> => {
+/**
+ * Collect every trusted blobKey for this record.
+ *
+ * Two sources, unified so the pre-publish validator trusts the same artifacts the
+ * publish-time resolver (mcp.ts `getArtifactReferencesForRequest`) will resolve:
+ *   1. `record.agent_outputs[*].output.artifactReferences` — refs the agent explicitly
+ *      wrote into the workflow record (fast path / cache; kept for backward compatibility).
+ *   2. The artifact-index store for this record's `request_id` — every non-deleted
+ *      ArtifactReference under `by-request/<requestId>/` (fallback `request-artifacts/
+ *      <requestId>/`), the same store/prefixes `list_artifacts_for_request` reads.
+ *
+ * Cross-request pointers are intentionally out of scope here (they remain publish-only /
+ * opt-in). When `indexStore` is omitted only source (1) is consulted.
+ */
+const gatherTrustedArtifactRefs = async (
+  record: WorkflowRecord,
+  indexStore?: ArtifactIndexStore
+): Promise<Set<string>> => {
   const refs = new Set<string>();
 
   for (const agentOutput of Object.values(record.agent_outputs)) {
@@ -1568,6 +1585,15 @@ const gatherTrustedArtifactRefs = (record: WorkflowRecord): Set<string> => {
 
     for (const ref of artifactRefs) {
       if (isRecord(ref) && typeof ref.blobKey === 'string' && MAJOR_KEY_ARTIFACT_REF_RE.test(ref.blobKey)) {
+        refs.add(ref.blobKey);
+      }
+    }
+  }
+
+  if (indexStore) {
+    const indexRefs = await listArtifactReferencesForRequest(indexStore, record.request_id);
+    for (const ref of indexRefs) {
+      if (typeof ref.blobKey === 'string' && MAJOR_KEY_ARTIFACT_REF_RE.test(ref.blobKey)) {
         refs.add(ref.blobKey);
       }
     }
@@ -1936,7 +1962,11 @@ const validatePublishPayloadImageRefs = (
   return undefined;
 };
 
-export const patchCanonicalInput = async (store: WorkflowBlobStore, body: WorkflowRequest): Promise<JsonResponse> => {
+export const patchCanonicalInput = async (
+  store: WorkflowBlobStore,
+  body: WorkflowRequest,
+  indexStore?: ArtifactIndexStore
+): Promise<JsonResponse> => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
 
@@ -2017,7 +2047,7 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
       return jsonResponse(409, { action: body.action, conflict: true });
     }
 
-    const trustedRefs = gatherTrustedArtifactRefs(previousRecord);
+    const trustedRefs = await gatherTrustedArtifactRefs(previousRecord, indexStore);
     const requestSlug = getRecordSlug(previousRecord);
 
     // Trusted-ref checks for register and publish payload (require the loaded record)
@@ -2171,7 +2201,7 @@ export const patchCanonicalInput = async (store: WorkflowBlobStore, body: Workfl
   return jsonResponse(409, { action: body.action, conflict: true });
 };
 
-const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
+const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest, indexStore?: ArtifactIndexStore) => {
   switch (body.action) {
     case 'create_request':
       return createRequest(store, body);
@@ -2194,7 +2224,7 @@ const handleAction = async (store: WorkflowBlobStore, body: WorkflowRequest) => 
     case 'set_published_time':
       return setPublishedTime(store, body);
     case 'patch_canonical_input':
-      return patchCanonicalInput(store, body);
+      return patchCanonicalInput(store, body, indexStore);
   }
 };
 
@@ -2219,8 +2249,12 @@ export const handler = async (event: LambdaEvent) => {
 
   try {
     const store = await getWorkflowBlobStore(event);
+    const indexStore =
+      parsedBody.data.action === 'patch_canonical_input'
+        ? ((await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore)
+        : undefined;
 
-    return await handleAction(store, parsedBody.data);
+    return await handleAction(store, parsedBody.data, indexStore);
   } catch (error) {
     console.error('Failed to save workflow JSON blob.', error);
 

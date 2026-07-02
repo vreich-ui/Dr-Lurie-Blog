@@ -1,4 +1,10 @@
-import { isArtifactReference, safePathSegment, type ArtifactKind, type ArtifactReference } from './artifacts.js';
+import {
+  isArtifactReference,
+  isDeletedArtifactReference,
+  safePathSegment,
+  type ArtifactKind,
+  type ArtifactReference,
+} from './artifacts.js';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 
 export type ArtifactIndexStore = {
@@ -115,4 +121,47 @@ export const listArtifactIndexKeys = async (indexStore: ArtifactIndexStore, pref
     .map((item) => item.key)
     .filter((key) => key.endsWith('.json'))
     .sort();
+};
+
+const parseIndexJsonBlob = async (indexStore: ArtifactIndexStore, key: string): Promise<unknown> => {
+  const text = await indexStore.get(key);
+  if (!text) return undefined;
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Resolve every non-deleted ArtifactReference stored under a request in the artifact-index
+ * store. Prefers `by-request/<requestId>/` pointers and falls back to the full
+ * `request-artifacts/<requestId>/` reference objects when no pointers exist.
+ *
+ * This is the single source of truth for "which artifacts belong to this request." It backs
+ * both the publish-time resolver (mcp.ts `getArtifactReferencesForRequest`) and the
+ * pre-publish trust check (save-json-blob.ts `gatherTrustedArtifactRefs`) so the two paths
+ * cannot diverge.
+ */
+export const listArtifactReferencesForRequest = async (
+  indexStore: ArtifactIndexStore,
+  requestId: string
+): Promise<ArtifactReference[]> => {
+  const pointerPrefix = `by-request/${encodeURIComponent(requestId)}/`;
+  const pointerKeys = await listArtifactIndexKeys(indexStore, pointerPrefix);
+
+  const artifacts = pointerKeys.length
+    ? await Promise.all(
+        pointerKeys.map(async (key) => resolveArtifactPointer(indexStore, await parseIndexJsonBlob(indexStore, key)))
+      )
+    : await Promise.all(
+        (await listArtifactIndexKeys(indexStore, `request-artifacts/${encodeURIComponent(requestId)}/`)).map((key) =>
+          parseIndexJsonBlob(indexStore, key)
+        )
+      );
+
+  return artifacts.filter(
+    (artifact): artifact is ArtifactReference => artifact !== undefined && !isDeletedArtifactReference(artifact)
+  );
 };
