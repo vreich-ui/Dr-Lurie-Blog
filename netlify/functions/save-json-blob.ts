@@ -1002,6 +1002,33 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
       }
     }
 
+    // Reject artifact references placed anywhere other than the top-level
+    // output.artifactReferences array. The publish pipeline only reads that array, so a
+    // misplaced ref would otherwise be silently dropped and publish with empty media. We
+    // only trip on artifact-reference-shaped entries (objects carrying a blobKey) so
+    // legitimate non-artifact fields — e.g. output.images entries that use src/url — are
+    // unaffected.
+    const looksLikeArtifactRef = (candidate: unknown): boolean =>
+      isRecord(candidate) && typeof candidate.blobKey === 'string' && candidate.blobKey.trim() !== '';
+    const hasArtifactRefShape = (candidate: unknown): boolean =>
+      Array.isArray(candidate) ? candidate.some(looksLikeArtifactRef) : looksLikeArtifactRef(candidate);
+
+    const metadataRecord = isRecord(outputRecord.metadata) ? outputRecord.metadata : undefined;
+    const misplacedRefLocation = hasArtifactRefShape(metadataRecord?.artifactReferences)
+      ? 'output.metadata.artifactReferences'
+      : hasArtifactRefShape(outputRecord.artifactReference)
+        ? 'output.artifactReference'
+        : hasArtifactRefShape(outputRecord.images)
+          ? 'output.images'
+          : undefined;
+    if (misplacedRefLocation) {
+      return jsonResponse(400, {
+        action: body.action,
+        error: `${misplacedRefLocation} is not read by the publish pipeline and would be dropped. Provide artifact references as a top-level output.artifactReferences array instead.`,
+        error_code: 'misplaced_artifact_references',
+      });
+    }
+
     // Pattern-only validation: no filesystem access in Netlify functions.
     // Accepts artifact pointers (image/{reqId}/{sha256}.{ext}) and known upload prefixes.
     // Skips validation for non-image media types (video, audio, embed may use https:// URLs).
@@ -1545,6 +1572,26 @@ const getMediaTypeFromArtifactRef = (value: string) => (value.toLowerCase().star
 /** Reject legacy local repo paths that the article publisher cannot resolve. */
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 const REPO_UPLOAD_PATH_SLUG_RE = /^src\/assets\/(?:images|documents)\/uploads\/([^/]+)\//;
+
+type MediaType = NonNullable<NonNullable<ArticleBodyNode['public']>['media']>['type'];
+const DOCUMENT_UPLOAD_EXT_RE = /\.pdf$/i;
+const IMAGE_UPLOAD_EXT_RE = /\.(?:png|jpe?g|webp|gif|avif|svg)$/i;
+/**
+ * Infer media.type for a legacy `src/assets/{images,documents}/uploads/<slug>/` path.
+ * Prefer the file extension; when the extension is ambiguous, preserve the node's existing
+ * media.type, then fall back to the path's media-class segment, and only assume 'image' as a
+ * last resort — rather than always assuming 'image', which would mislabel PDF/document
+ * uploads and render them as broken images.
+ */
+const getMediaTypeFromLegacyUploadPath = (value: string, existingType?: MediaType): MediaType => {
+  if (DOCUMENT_UPLOAD_EXT_RE.test(value)) return 'document';
+  if (IMAGE_UPLOAD_EXT_RE.test(value)) return 'image';
+  // Extension is ambiguous: prefer the node's existing media.type, then the path's
+  // media-class segment, and only assume 'image' as a last resort.
+  if (existingType) return existingType;
+  if (/^src\/assets\/documents\/uploads\//i.test(value)) return 'document';
+  return 'image';
+};
 /** Reject data URIs (base64/raw bytes embedded in strings). */
 const BASE64_DATA_URI_RE = /^data:/i;
 /** Reject arbitrary remote URLs — image refs must be Major Key artifact references. */
@@ -1777,7 +1824,9 @@ const applyNodePatch = (
       patchedPublic = {
         ...patchedPublic,
         media: {
-          type: embeddedSlug ? 'image' : getMediaTypeFromArtifactRef(newSrc),
+          type: embeddedSlug
+            ? getMediaTypeFromLegacyUploadPath(newSrc, existingMedia?.type)
+            : getMediaTypeFromArtifactRef(newSrc),
           src: newSrc,
           ...(newAlt !== undefined ? { alt: newAlt } : {}),
           ...(newCaption !== undefined ? { caption: newCaption } : {}),
