@@ -8,7 +8,7 @@ Date: 2026-07-02. Branch: `docs/cms-architecture-design`. Prerequisites, cited t
 
 # Part 1 — Current-site mapping
 
-Every real (non-leftover) surface the audit documented, mapped onto the D§2 concepts, using the actual content strings from the repo. Object IDs shown are illustrative but follow the D§3.1/D§5.1 rules (opaque, prefix-typed, site-free); the *content* is verbatim from source.
+Every real (non-leftover) surface the audit documented, mapped onto the D§2 concepts, using the actual content strings from the repo. Object IDs shown are illustrative but follow the D§3.1/D§5.1 rules (opaque, prefix-typed, site-free), and section-instance IDs satisfy the D§3.5 regex `/^s_[a-z0-9]+$/` (no underscores after the prefix) — this matters because the P4 plan uses these tables as the seed script's spec, so every example ID here must actually pass the validators. The *content* is verbatim from source.
 
 ## 1.0 Object inventory produced by this mapping
 
@@ -40,7 +40,7 @@ Templates: **no Template objects are produced by mapping the current site.** Eve
 |---|---|---|
 | 1 | Hero: kicker "Physician-led skin health education", h1 "Healthy Skin for Skincare Newcomers", two paragraphs ("A calmer, clearer way to begin caring for your skin — without complicated routines, product pressure, or trend-led advice." / "Dr. Lurié Skin Care helps newcomers understand the basics of healthy skin…"), buttons **Start Here** → `/start-here`, **Join Newsletter** → `/newsletter` | `{ id: 's_hero', type: 'hero', data: { kicker, heading, body (two paragraphs as RichText), actions: [{label:'Start Here', target:{kind:'page', page:'page_start_here'}, style:'primary'}, {label:'Join Newsletter', target:{kind:'page', page:'page_newsletter'}, style:'secondary'}] } }` |
 | 2 | "This is for you if…" mapping `audienceNotes`: "You are new to skincare and want a calm place to begin." / "You want to understand what your skin needs before buying more products." / "You prefer physician-led education over trend-driven routines." / "You want simple explanations that respect both science and everyday life." | `{ id: 's_audience', type: 'checklist', data: { heading: 'This is for you if…', items: [the four strings] } }` |
-| 3 | "Start here" grid: kicker "Start here", heading "Five simple places to begin.", intro "Read these in order or choose the question that feels most useful today.", 5 placeholder cards (e.g., "What Healthy Skin Means" — "A plain-language starting point for understanding comfort, resilience, and consistency in your skin.") **not linked to any real post** | `{ id: 's_start_grid', type: 'content_grid', data: { heading, source: { kind:'manual', items:[…] } … } }` — **shape maps; data does NOT.** See §1.7 item 1. |
+| 3 | "Start here" grid: kicker "Start here", heading "Five simple places to begin.", intro "Read these in order or choose the question that feels most useful today.", 5 placeholder cards (e.g., "What Healthy Skin Means" — "A plain-language starting point for understanding comfort, resilience, and consistency in your skin.") **not linked to any real post** | `{ id: 's_startgrid', type: 'content_grid', data: { heading, source: { kind:'manual', items:[…] } … } }` — **shape maps; data does NOT.** See §1.7 item 1. |
 | 4 | "Meet Dr. Lurié" bio with `trustNotes`: "Physician-led perspective on skin health education." / "MD, PhD in Biophysics with decades of pharmaceutical research and development experience." / "Clear explanations designed for people who are just beginning to care for their skin intentionally." | `{ id: 's_bio', type: 'bio', data: { heading: 'Meet Dr. Lurié', body, trustNotes: [the three strings] } }` |
 | 5 | Newsletter signup: inline Netlify form `name="newsletter"` posting to `/thank-you?form=newsletter` (the only real newsletter form on the site) | `{ id: 's_newsletter', type: 'shared_ref', data: { section: 'sec_newsletter_signup' } }` — promoted to a **shared section** (D§2.5) precisely because the audit shows other pages want it and don't have it (`newsletter.astro` has *no form*, A§2.4) |
 
@@ -79,7 +79,7 @@ actions:
 
 **Mapping-discovered schema amendment (M-1):** header dropdown items carry a `description` string (every item above has one, `navigation.ts:13,18,23,…`), but `NavItem` in D§3.8 has no such field. Amend D§3.8: `NavItem.description?: string`. This is exactly the kind of gap the mapping exercise exists to catch; recorded here rather than silently patched into 02.
 
-**Mapping-discovered schema amendment (M-5):** each top-level group is itself a link today — 'Start Here' → `/`, 'Learn' → `/learn/library`, 'Solutions' → `/solutions/shop-preview` (`navigation.ts:8,28,49`; shown as "parent target" in the block above) — but the D§3.8 group shape is only `{id, title?, items}`. Amend D§3.8: `groups[].target?: NavTarget`. Without it, migration would silently drop the clickable destinations on the three dropdown labels.
+**Mapping-discovered schema amendment (M-5):** each top-level group *carries* its own link in the data — 'Start Here' → `/`, 'Learn' → `/learn/library`, 'Solutions' → `/solutions/shop-preview` (`navigation.ts:8,28,49`; shown as "parent target" in the block above) — but the D§3.8 group shape is only `{id, title?, items}`. Amend D§3.8: `groups[].target?: NavTarget`. **Precision about what this preserves:** `Header.astro` currently renders any item with children as a `<button>` and ignores the parent `href` (`Header.astro:92-121`), so these targets are dead data in today's UI, not live links. M-5 therefore preserves the *data* faithfully (dropping fields during migration is how information silently dies), not current behavior — and the P2 cutover keeps rendering dropdown parents as buttons so the built-HTML diff stays empty. Rendering group targets as real links would be an *intentional future behavior change*, made possible by M-5 but not implied by it.
 
 Also mapped from the Header but **not** as navigation data (A§2.2): the RSS icon and theme toggle → `site.chrome.showRssFeed / showThemeToggle` (already in D§3.2); `HeaderAuthButton`/`LoginModal` → admin chrome, outside CMS data by design; the search overlay and the mobile-only newsletter CTA → §1.7 items 3 and 5.
 
@@ -171,7 +171,11 @@ object_refresh_lock   / object_checkin                                    (as to
 object_patch          { object_type, object_id, lock_token,
                         expected_record_version, ops: PatchOp[] }         → { version, content_revision,
                                                                              validation_summary }
-object_submit_review  { object_type, object_id, lock_token, note? }       → review state 'open'
+object_submit_review  { object_type, object_id, lock_token, note?,
+                        requested_publish_action? /* {published_time:
+                        ISO | null | 'immediate'} — REQUIRED when the
+                        submitter intends a Tier 2 agent-executed
+                        publish; see §2.2 M-6 */ }                         → review state 'open'
 object_publish_by_time{ object_type, object_id, lock_token,
                         published_time /* ISO | null | omitted=now */ }   → publish receipt | gate error
 ```
@@ -256,7 +260,7 @@ checkin at any point releases the lock; review state survives checkin
 **Why the publish column differs by type (the deliberate three-tier split):**
 
 - **Tier 1 — `content_item`: direct agent publish.** This is today's operating reality (`publish_by_time` is the canonical article path, A§1.6/A§1.8) and the audit's baseline of "articles are already partly agent-operable." Blast radius is one URL; safety comes from the publish-time validation stack (artifact trust, taxonomy resolution, readiness). Preserving parity here is a hard requirement — the contract must not regress the working pipeline. Review stays available but optional (policy knob, D§3.9).
-- **Tier 2 — `page` / `section` / `template`: agent may execute publish, but only with an approval pinned to the current `content_revision`** (D§3.9). Blast radius is one page (or the pages referencing one shared section — surfaced at review, §2.4). Once a human has approved exactly this content, letting the agent pull the trigger adds no risk the approval didn't already accept, and keeps agents useful for "approve now, go live at 9am" flows (schedule).
+- **Tier 2 — `page` / `section` / `template`: agent may execute publish, but only with an approval pinned to the current `content_revision` *and* to the reviewed publish action** (D§3.9, amended). A content-only pin would be a hole: the agent supplies `published_time` at call time, so with a mere content approval it could publish immediately, schedule an arbitrary time, or pass `null` to *unpublish* — none of which the reviewer saw. **Amendment M-6 to D§3.9:** `object_submit_review` carries `requested_publish_action: {published_time: ISO | null | 'immediate'}` whenever a Tier 2 agent-executed publish is intended; approval pins `{content_revision, publish_action}` together; the agent's `object_publish_by_time` call must match the pinned action exactly (`'immediate'` = the call omits `published_time`; an ISO pin must equal the supplied timestamp; a `null` pin is the only thing that authorizes an agent unpublish). Any different action requires re-approval. Humans holding a publish role are not constrained by the pin — they carry publish authority in themselves; the pin constrains delegated execution. With that in place, "approve now, go live at 9am" works because *9am was part of what was approved*.
 - **Tier 3 — `navigation` / `taxonomy` / `site`: publish is human-executed, always.** Radius is every page simultaneously (A§2.2–2.3: one nav object feeds the whole site; taxonomy drives routes and validation; site drives brand/metadata globally). Approval pins content, but *executing* a site-wide change is kept as a human act as defense in depth — an agent holding a stale-but-technically-valid approval should not be able to time a global change. Agents do everything up to and including the request; a `publisher`/`admin` executes.
 
 ## 2.3 Per-type specifics: gates, review placement, safety
@@ -337,11 +341,15 @@ object_patch      {…, lock_token:L, expected_record_version:14, ops:[
                      fields:{ body:'<p>A calmer, clearer way to begin…</p>' }}]}
                   → {version:15, content_revision:8, validation_summary: ok}
 object_validate   {object_type:'page', object_id:'page_home'}            → report: 0 missing, 0 warnings
-object_submit_review {…, note:'Tightened hero paragraph per brief'}      → review.state:'open'
+object_submit_review {…, note:'Tightened hero paragraph per brief',
+                      requested_publish_action:{published_time:'immediate'}}
+                                                                          → review.state:'open'
    … human reviews: surface 1 (word diff on body), decision approve
-     → review.state:'approved', decisions[+1].content_revision:8
+     → review.state:'approved', decisions[+1] pins {content_revision:8,
+       publish_action:{published_time:'immediate'}}   (M-6)
 object_publish_by_time {…, lock_token:L}       → gate check: type=page (Tier 2),
-     approval pinned to content_revision 8 == current 8 → allowed
+     approval pinned to content_revision 8 == current 8 ✓ AND the call's
+     omitted published_time matches the pinned 'immediate' action ✓ → allowed
      → materialize pages/page_home.json → git commit → stamp+receipt (D§5.6)
 object_checkin
 ```

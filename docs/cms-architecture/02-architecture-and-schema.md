@@ -435,7 +435,7 @@ type NavTarget =
   | { kind: 'asset';    href: string };               // e.g. /rss.xml (A§2.3)
 ```
 
-**Δ note:** promotes `navigation.ts` config objects (A§2.2–2.3) into publishable records; the shapes deliberately mirror `headerData`/`footerData` so migration is mechanical. Key deviation from today: link targets are typed references, not raw hrefs — a page rename re-materializes navigation instead of leaving dead links. Multi-site-safe by construction (instances are per-site records). **Amendments from the current-site mapping** (03 §1.2–1.3, recorded there with provenance): M-1 `NavItem.description?: string` (every header dropdown item carries one); M-2 `groups[].slot?: 'primary'|'secondary'|'social'` (footer secondary/social rows); M-5 `groups[].target?: NavTarget` (the top-level 'Start Here'/'Learn'/'Solutions' entries are themselves links, `navigation.ts:8,28,49`).
+**Δ note:** promotes `navigation.ts` config objects (A§2.2–2.3) into publishable records; the shapes deliberately mirror `headerData`/`footerData` so migration is mechanical. Key deviation from today: link targets are typed references, not raw hrefs — a page rename re-materializes navigation instead of leaving dead links. Multi-site-safe by construction (instances are per-site records). **Amendments from the current-site mapping** (03 §1.2–1.3, recorded there with provenance): M-1 `NavItem.description?: string` (every header dropdown item carries one); M-2 `groups[].slot?: 'primary'|'secondary'|'social'` (footer secondary/social rows); M-5 `groups[].target?: NavTarget` (the top-level 'Start Here'/'Learn'/'Solutions' entries carry hrefs in the data, `navigation.ts:8,28,49` — note `Header.astro:92-121` currently renders dropdown parents as buttons and ignores them; M-5 preserves the data, not a live behavior — see 03 §1.2).
 
 ### 3.9 Human Review, roles, principals (greenfield — audit fork #4)
 
@@ -459,6 +459,10 @@ interface ReviewPolicy {
 
 interface ReviewState {
   state: 'open' | 'changes_requested' | 'approved';
+  // Amendment M-6 (03 §2.2): decisions additionally pin the reviewed publish
+  // action {published_time: ISO | null | 'immediate'} for Tier 2 agent-executed
+  // publishes — a content-only pin would let an approved agent publish/schedule/
+  // unpublish at any time of its choosing. Definition and matching rules in 03.
   decisions: Array<{
     at: string; by: Principal;
     decision: 'approve' | 'request_changes';
