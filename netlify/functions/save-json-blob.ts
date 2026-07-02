@@ -765,6 +765,11 @@ const validateBodyFields = (body: WorkflowRequest) => {
 const requireRequestId = (body: WorkflowRequest) => {
   if (!body.request_id) return jsonResponse(400, { action: body.action, error: 'request_id is required.' });
 
+  const validation = validateRequestId(body.request_id);
+  if (!validation.ok) {
+    return jsonResponse(400, { action: body.action, error: validation.error });
+  }
+
   return undefined;
 };
 

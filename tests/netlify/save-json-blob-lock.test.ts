@@ -10,6 +10,15 @@ import {
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
 
+// Build a request_id that conforms to the req_<flow>_<topic>_<yyyymmdd>_<nn> naming
+// contract now enforced by requireRequestId. Each test uses an isolated store, so a
+// label-derived id is unique enough.
+const reqId = (label: string): string =>
+  `req_test_${label
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()}_20260702_01`;
+
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();
 
@@ -85,7 +94,7 @@ const checkoutWorkflow = async (store: Store, requestId: string, leaseSeconds = 
 
 test('checkout creates a workflow lock and valid lock_token permits mutation', async () => {
   const store = createMemoryStore();
-  const requestId = `lock-create-${Date.now()}`;
+  const requestId = reqId('lock-create');
   await createWorkflow(store, requestId);
   const record = await checkoutWorkflow(store, requestId);
 
@@ -104,7 +113,7 @@ test('checkout creates a workflow lock and valid lock_token permits mutation', a
 
 test('mutation rejects wrong and expired lock_token values', async () => {
   const store = createMemoryStore();
-  const requestId = `lock-reject-${Date.now()}`;
+  const requestId = reqId('lock-reject');
   await createWorkflow(store, requestId);
   const record = await checkoutWorkflow(store, requestId, 1);
 
@@ -139,7 +148,7 @@ test('mutation rejects wrong and expired lock_token values', async () => {
 
 test('refresh_lock extends the active lock and checkin_request releases it', async () => {
   const store = createMemoryStore();
-  const requestId = `lock-refresh-checkin-${Date.now()}`;
+  const requestId = reqId('lock-refresh-checkin');
   await createWorkflow(store, requestId);
   const record = await checkoutWorkflow(store, requestId, 60);
 

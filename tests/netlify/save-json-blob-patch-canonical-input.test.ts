@@ -11,6 +11,15 @@ import {
 } from '../../netlify/functions/save-json-blob.js';
 import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
 
+// Build a request_id that conforms to the req_<flow>_<topic>_<yyyymmdd>_<nn> naming
+// contract now enforced by requireRequestId. Each test uses an isolated store, so a
+// label-derived id is unique enough.
+const reqId = (label: string): string =>
+  `req_test_${label
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()}_20260702_01`;
+
 // ---------------------------------------------------------------------------
 // In-memory blob store (same shape used by all save-json-blob tests)
 // ---------------------------------------------------------------------------
@@ -187,7 +196,7 @@ const setupRecord = async (store: Store, requestId: string) => {
 describe('patchCanonicalInput — node_patches', () => {
   it('replaces legacy src/assets path with Major Key artifact ref on two nodes', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-nodes-${Date.now()}`;
+    const requestId = reqId('repair-nodes');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -228,7 +237,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('sets document media type when patching a trusted PDF src onto a text-only node', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-pdf-node-${Date.now()}`;
+    const requestId = reqId('repair-pdf-node');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -266,7 +275,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('removes media object when public_media_src is null', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-null-src-${Date.now()}`;
+    const requestId = reqId('repair-null-src');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -284,7 +293,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('accepts same-slug repo upload paths in public_media_src', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-accept-same-slug-${Date.now()}`;
+    const requestId = reqId('repair-accept-same-slug');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -310,7 +319,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('rejects cross-slug repo upload paths in public_media_src with a specific portability error', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-reject-cross-slug-${Date.now()}`;
+    const requestId = reqId('repair-reject-cross-slug');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -336,7 +345,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('get_request annotates repo media paths with portability scope metadata', async () => {
     const store = createMemoryStore();
-    const requestId = `scope-get-request-${Date.now()}`;
+    const requestId = reqId('scope-get-request');
     const { lockToken, record } = await setupRecord(store, requestId);
     const repoPath = 'src/assets/images/uploads/retinol-explained-simply/retinol-hero-150kb.webp';
 
@@ -361,7 +370,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('list_pending_requests annotates every entry media path with scope metadata', async () => {
     const store = createMemoryStore();
-    const requestId = `scope-list-pending-${Date.now()}`;
+    const requestId = reqId('scope-list-pending');
     const { lockToken, record } = await setupRecord(store, requestId);
     const repoPath = 'src/assets/images/uploads/retinol-explained-simply/retinol-hero-150kb.webp';
 
@@ -393,7 +402,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('rejects data URIs in public_media_src', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-reject-datauri-${Date.now()}`;
+    const requestId = reqId('repair-reject-datauri');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -415,7 +424,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('rejects artifact refs not present in agent_outputs', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-reject-untrusted-${Date.now()}`;
+    const requestId = reqId('repair-reject-untrusted');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const untrustedRef = `image/${requestId}/${'a'.repeat(64)}.png`;
@@ -434,7 +443,7 @@ describe('patchCanonicalInput — node_patches', () => {
 
   it('returns 409 when node_id does not exist in article_body', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-missing-node-${Date.now()}`;
+    const requestId = reqId('repair-missing-node');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -453,7 +462,7 @@ describe('patchCanonicalInput — node_patches', () => {
 describe('patchCanonicalInput — replace_image_asset_register', () => {
   it('replaces the image_asset_register with new Major Key entries', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-register-${Date.now()}`;
+    const requestId = reqId('repair-register');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const newRegister = [
@@ -489,7 +498,7 @@ describe('patchCanonicalInput — replace_image_asset_register', () => {
 
   it('rejects register entries with legacy repoPath', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-register-legacy-${Date.now()}`;
+    const requestId = reqId('repair-register-legacy');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -511,7 +520,7 @@ describe('patchCanonicalInput — replace_image_asset_register', () => {
 
   it('rejects register entries that fail ImageAssetRecord schema', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-register-invalid-${Date.now()}`;
+    const requestId = reqId('repair-register-invalid');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -530,7 +539,7 @@ describe('patchCanonicalInput — replace_image_asset_register', () => {
 describe('patchCanonicalInput — promote_publish_payload', () => {
   it('promotes a complete publish payload into input.publication.publish_payload', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-payload-${Date.now()}`;
+    const requestId = reqId('repair-payload');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const payload = {
@@ -568,7 +577,7 @@ describe('patchCanonicalInput — promote_publish_payload', () => {
 
   it('rejects promote_publish_payload missing required slug/title', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-payload-invalid-${Date.now()}`;
+    const requestId = reqId('repair-payload-invalid');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -587,7 +596,7 @@ describe('patchCanonicalInput — promote_publish_payload', () => {
 describe('patchCanonicalInput — repair_workflow_status', () => {
   it('resets workflow_status from failed to pending', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-status-${Date.now()}`;
+    const requestId = reqId('repair-status');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // Manually set status to failed in the store
@@ -622,7 +631,7 @@ describe('patchCanonicalInput — repair_workflow_status', () => {
 
   it('rejects invalid repair_workflow_status values', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-status-invalid-${Date.now()}`;
+    const requestId = reqId('repair-status-invalid');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -641,7 +650,7 @@ describe('patchCanonicalInput — repair_workflow_status', () => {
 describe('patchCanonicalInput — lock and version safety', () => {
   it('requires a lock_token', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-no-lock-${Date.now()}`;
+    const requestId = reqId('repair-no-lock');
     const { record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -657,7 +666,7 @@ describe('patchCanonicalInput — lock and version safety', () => {
 
   it('returns 409 when expected_record_version does not match', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-version-conflict-${Date.now()}`;
+    const requestId = reqId('repair-version-conflict');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -674,7 +683,7 @@ describe('patchCanonicalInput — lock and version safety', () => {
 
   it('returns 400 when no patch types are provided', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-empty-${Date.now()}`;
+    const requestId = reqId('repair-empty');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -690,7 +699,7 @@ describe('patchCanonicalInput — lock and version safety', () => {
 
   it('increments record version and appends to history', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-version-bump-${Date.now()}`;
+    const requestId = reqId('repair-version-bump');
     const { lockToken, record } = await setupRecord(store, requestId);
     const versionBefore = record.version;
     const historyLengthBefore = record.history.length;
@@ -720,7 +729,7 @@ describe('patchCanonicalInput — lock and version safety', () => {
 
   it('preserves agent_outputs unchanged', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-preserve-outputs-${Date.now()}`;
+    const requestId = reqId('repair-preserve-outputs');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -749,7 +758,7 @@ describe('patchCanonicalInput — lock and version safety', () => {
 describe('patchCanonicalInput — node_patches PDF type inference', () => {
   it('sets media.type to document when patching a text-only node with a PDF blobKey', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-pdf-node-new-${Date.now()}`;
+    const requestId = reqId('repair-pdf-node-new');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // n_r3x4y5 has no media — patching it with a PDF blobKey must default type to 'document'
@@ -771,7 +780,7 @@ describe('patchCanonicalInput — node_patches PDF type inference', () => {
 
   it('updates media.type to document when replacing an image node with a PDF blobKey', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-pdf-node-replace-${Date.now()}`;
+    const requestId = reqId('repair-pdf-node-replace');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // n_r1a2b3 has media with type:'image' — replacing src with PDF must update type to 'document'
@@ -793,7 +802,7 @@ describe('patchCanonicalInput — node_patches PDF type inference', () => {
 
   it('preserves media.type:image when patching a node with an image blobKey', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-image-node-preserve-${Date.now()}`;
+    const requestId = reqId('repair-image-node-preserve');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // n_r1a2b3 has media with type:'image' — replacing src with another image must keep type:'image'
@@ -820,7 +829,7 @@ describe('patchCanonicalInput — node_patches PDF type inference', () => {
 describe('patchCanonicalInput — replace_image_asset_register tighter validation', () => {
   it('rejects register entries with untrusted Major Key artifact ref in url', async () => {
     const store = createMemoryStore();
-    const requestId = `register-untrusted-url-${Date.now()}`;
+    const requestId = reqId('register-untrusted-url');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // Valid Major Key format but NOT in agent_outputs for this record
@@ -840,7 +849,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
 
   it('rejects register entries with arbitrary remote URL in url', async () => {
     const store = createMemoryStore();
-    const requestId = `register-remote-url-${Date.now()}`;
+    const requestId = reqId('register-remote-url');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -857,7 +866,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
 
   it('rejects register entries with arbitrary local absolute path in url', async () => {
     const store = createMemoryStore();
-    const requestId = `register-local-abs-${Date.now()}`;
+    const requestId = reqId('register-local-abs');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -874,7 +883,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
 
   it('rejects register entries with relative upload path in url', async () => {
     const store = createMemoryStore();
-    const requestId = `register-rel-upload-${Date.now()}`;
+    const requestId = reqId('register-rel-upload');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -891,7 +900,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
 
   it('rejects register entries with bare filename in url', async () => {
     const store = createMemoryStore();
-    const requestId = `register-bare-file-${Date.now()}`;
+    const requestId = reqId('register-bare-file');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -908,7 +917,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
 
   it('accepts trusted Major Key artifact ref in url', async () => {
     const store = createMemoryStore();
-    const requestId = `register-trusted-url-${Date.now()}`;
+    const requestId = reqId('register-trusted-url');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -931,7 +940,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
 describe('patchCanonicalInput — promote_publish_payload image validation', () => {
   it('rejects promote_publish_payload.featuredImage with arbitrary remote URL', async () => {
     const store = createMemoryStore();
-    const requestId = `payload-featured-remote-${Date.now()}`;
+    const requestId = reqId('payload-featured-remote');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -952,7 +961,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 
   it('rejects promote_publish_payload.featuredImage with untrusted artifact ref', async () => {
     const store = createMemoryStore();
-    const requestId = `payload-featured-untrusted-${Date.now()}`;
+    const requestId = reqId('payload-featured-untrusted');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -973,7 +982,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 
   it('rejects promote_publish_payload.artifactReferences[].blobKey with guessed (untrusted) ref', async () => {
     const store = createMemoryStore();
-    const requestId = `payload-blobkey-guessed-${Date.now()}`;
+    const requestId = reqId('payload-blobkey-guessed');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -1002,7 +1011,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 
   it('accepts promote_publish_payload with trusted PDF artifactReference', async () => {
     const store = createMemoryStore();
-    const requestId = `payload-trusted-pdf-ref-${Date.now()}`;
+    const requestId = reqId('payload-trusted-pdf-ref');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -1035,7 +1044,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 
   it('accepts promote_publish_payload with trusted artifact ref in featuredImage and artifactReferences', async () => {
     const store = createMemoryStore();
-    const requestId = `payload-trusted-refs-${Date.now()}`;
+    const requestId = reqId('payload-trusted-refs');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
@@ -1073,7 +1082,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
 describe('patchCanonicalInput — clear stale failure state', () => {
   it('clears last_error, failed_agents, and needs_review in one call with audit trail', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-clear-all-${Date.now()}`;
+    const requestId = reqId('repair-clear-all');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // Simulate a failed record with stale failure state
@@ -1122,7 +1131,7 @@ describe('patchCanonicalInput — clear stale failure state', () => {
 
   it('does not audit clear_last_error when last_error was already null', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-clear-noop-${Date.now()}`;
+    const requestId = reqId('repair-clear-noop');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // Record already has null last_error (default from setupRecord)
@@ -1146,7 +1155,7 @@ describe('patchCanonicalInput — clear stale failure state', () => {
 
   it('clears failed_agents alone without requiring repair_workflow_status', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-clear-agents-${Date.now()}`;
+    const requestId = reqId('repair-clear-agents');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     // Simulate a record with failed_agents but not failed workflow_status
@@ -1171,7 +1180,7 @@ describe('patchCanonicalInput — clear stale failure state', () => {
 
   it('returns 400 when only clear_last_error: false is given (no effective patch)', async () => {
     const store = createMemoryStore();
-    const requestId = `repair-false-flag-${Date.now()}`;
+    const requestId = reqId('repair-false-flag');
     const { lockToken, record } = await setupRecord(store, requestId);
 
     const resp = await patchCanonicalInput(store, {
