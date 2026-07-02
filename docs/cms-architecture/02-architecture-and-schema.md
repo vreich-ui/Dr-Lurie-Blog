@@ -169,12 +169,16 @@ interface ObjectRecord<TBody> {
   history: HistoryEntry[];             // same append-only pattern as WorkflowRecord.history
   version: number;                     // record-level optimistic concurrency (A§1.1);
                                        // bumped by EVERY write incl. lock ops (A§1.2)
-  content_revision: number;            // NEW: bumped ONLY by writes that mutate body or
-                                       // publication. Lock checkout/checkin/refresh and
-                                       // review bookkeeping do NOT touch it. Exists so
-                                       // review approvals can pin content state (§3.9)
-                                       // without being invalidated by the lock acquisition
-                                       // that publishing itself requires (§5.6 step 1).
+  content_revision: number;            // NEW: bumped ONLY by writes that mutate `body`.
+                                       // Lock checkout/checkin/refresh, review bookkeeping,
+                                       // and the publish operation's own publication writes
+                                       // (the §5.6 step-3 timestamp stamp and step-6
+                                       // receipt) do NOT touch it. Exists so review
+                                       // approvals can pin content state (§3.9) without
+                                       // being invalidated by the lock acquisition that
+                                       // publishing requires (§5.6 step 1) — or by the
+                                       // publish stamp itself: publishing CONSUMES an
+                                       // approval; it must never invalidate it.
 
   // Article-only extension: the five-agent pipeline fields lifted verbatim from
   // WorkflowRecord (A§1.1). Absent on all other object types.
@@ -441,12 +445,14 @@ interface ReviewState {
     decision: 'approve' | 'request_changes';
     note?: string;
     content_revision: number;           // approval pins the CONTENT revision it approved
-                                        // (§3.1); a later body/publication write reopens
-                                        // review. Deliberately NOT the record `version`:
-                                        // lock checkout/refresh/checkin bump `version`
-                                        // (A§1.2), and publish itself must take the lock
-                                        // (§5.6 step 1) — pinning `version` would let the
-                                        // act of publishing invalidate its own approval.
+                                        // (§3.1); a later `body` write reopens review.
+                                        // Deliberately NOT the record `version`: lock
+                                        // checkout/refresh/checkin bump `version` (A§1.2),
+                                        // and publish itself must take the lock (§5.6
+                                        // step 1). Publication stamps/receipts written by
+                                        // the publish operation are likewise exempt (§3.1)
+                                        // — pinning anything they move would let the act
+                                        // of publishing invalidate its own approval.
   }>;
 }
 ```
@@ -529,7 +535,7 @@ Record-level lease, unchanged semantics: same `WorkflowLockRecord` shape, same 9
 
 ### 5.3 Versioning & history
 
-Unchanged from the audit's machinery: record `version` optimistic concurrency for humans and agents alike (409/`expected_record_version` on the patch path, 423 on the lock path — both already coexist, A§1.2), append-only `history` with structured `actor`. One addition: the `content_revision` counter (§3.1), bumped only by body/publication-mutating writes. Review approvals pin `content_revision` (§3.9), which is the entire "approved-then-edited" invalidation mechanism — no snapshot store is introduced. Pinning the raw `version` would not work: lock operations bump `version` (A§1.2), and publishing requires the lock (§5.6 step 1), so an approval pinned to `version` would be invalidated by the publish flow itself. The published state is recoverable from the derived export in git (which is versioned by git itself); a separate draft-snapshot/rollback store is deliberately out of scope.
+Unchanged from the audit's machinery: record `version` optimistic concurrency for humans and agents alike (409/`expected_record_version` on the patch path, 423 on the lock path — both already coexist, A§1.2), append-only `history` with structured `actor`. One addition: the `content_revision` counter (§3.1), bumped only by `body`-mutating writes. Review approvals pin `content_revision` (§3.9), which is the entire "approved-then-edited" invalidation mechanism — no snapshot store is introduced. Pinning the raw `version` would not work: lock operations bump `version` (A§1.2), and publishing requires the lock (§5.6 step 1), so an approval pinned to `version` would be invalidated by the publish flow itself. For the same reason, the publish operation's own writes to `publication.*` (timestamp stamp, receipt) are exempt from `content_revision`: publishing consumes an approval and must not invalidate it. Changing *when* something publishes is governed by the publish gate itself (roles + approval required to execute `publish`, §3.9/§5.6), not by re-review of content. The published state is recoverable from the derived export in git (which is versioned by git itself); a separate draft-snapshot/rollback store is deliberately out of scope.
 
 ### 5.4 Navigation & the footer fork (audit fork #6)
 
@@ -572,7 +578,7 @@ Disposition of the three existing mechanisms (A§1.6):
 2. **The admin UI Publish button (mechanism 1) is folded in**: the endpoint behind the button executes the full canonical operation, not a bare `set_published_time`. Its current behavior — stamp only, then tell the human to trigger a deploy manually (A§1.6) — ceases to exist as a user-facing semantics. (`set_published_time` survives internally as step 3 and for receipt write-back, preserving the agent contract, A§1.8.)
 3. **`toggle-article-publish` (mechanism 3) is deprecated/legacy**: it rewrites derived frontmatter without touching the record (A§1.6), which under this architecture is a source-of-truth violation by definition (§1). The `/admin/library` toggle re-targets the canonical unpublish. The function is retained read-never/write-never in the end state (i.e., removed; listed here so the deprecation is explicit, not silent).
 
-Invariant added: `publication.published_time` on the envelope and (for articles) `input.publication.published_time` are written together by step 3; nothing else may write either. "Published" becomes one state with one writer — resolving the audit's "'published' is not a single state" observation (A§1.9).
+Invariant added: `publication.published_time` on the envelope and (for articles) `input.publication.published_time` are written together by step 3; nothing else may write either. "Published" becomes one state with one writer — resolving the audit's "'published' is not a single state" observation (A§1.9). Companion invariant: steps 3 and 6 bump `version` (every write does, A§1.2) but never `content_revision` (§3.1) — the operation that consumes an approval must not invalidate it.
 
 ### 5.7 Human Review (audit fork #4) & the default review mechanism
 
@@ -582,7 +588,7 @@ Mechanism (default for every object type, per the session constraint):
 
 - **In-place field diff for proposals** — the existing pattern verbatim: word-level diff for prose, side-by-side for short fields, Accept writes under lock via a node/section-scoped update endpoint, Discard writes nothing (A§1.3). Generalizes from article nodes to sections/nav items/terms because all are "small typed records with short prose fields" — the shape the diff UI was built for.
 - **Draft-vs-published structural diff at publish time** — new but continuous with the readiness panel (A§1.6): before `publish`, the editor shows per-section/per-item diffs between the draft record and the last-published materialization, using the same diff components.
-- **Approval state** on the envelope (§3.9) gates `publish` per policy. Approval pins `content_revision` (not `version` — see §3.1/§5.3); any later body/publication write reopens review, while lock activity and review bookkeeping do not.
+- **Approval state** on the envelope (§3.9) gates `publish` per policy. Approval pins `content_revision` (not `version` — see §3.1/§5.3); any later `body` write reopens review, while lock activity, review bookkeeping, and the publish operation's own publication stamps/receipts do not.
 - **Ask-AI generalizes as-is**: the endpoint pattern (read-only, no lock, forced tool schema over the editable fields of the target, A§1.4) is reused per object type — the "editable public fields" for a section are its union `data` fields, defined by the registry schema (§3.5), so the forced-tool input schema is *generated from* the registry rather than maintained by hand (today it is hand-maintained in `admin-ask-ai-node.ts:97-119`, A§1.4).
 
 Genuinely-different case (argued, per constraint): none identified that requires a different *mechanism*. What differs is *policy strictness* (site/nav/taxonomy require approval; articles keep it optional) and *blast-radius UX* (publishing navigation shows a "pages affected" list computed from references). Both are configuration of the same machinery.
