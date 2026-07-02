@@ -1574,6 +1574,42 @@ const extractPublicArticleBodyMediaSrcs = (articleBody: Record<string, unknown> 
   return srcs;
 };
 
+// Copies new media refs from agent body nodes into matching canonical body nodes by id,
+// preserving all canonical content (title, body, items, etc.). Used for equal-node-count
+// promotion so canonical repairs are not overwritten by a wholesale agent body swap.
+const mergeAgentMediaIntoCanonicalBody = (
+  canonicalBody: Record<string, unknown>,
+  agentBody: Record<string, unknown>
+): Record<string, unknown> => {
+  if (!Array.isArray(canonicalBody?.nodes) || !Array.isArray(agentBody?.nodes)) return canonicalBody;
+
+  const agentNodeById = new Map<string, Record<string, unknown>>();
+  for (const n of agentBody.nodes as unknown[]) {
+    const node = getRecordValue(n);
+    const id = toNonEmptyString(node?.id);
+    if (id && node) agentNodeById.set(id, node);
+  }
+
+  const mergedNodes = (canonicalBody.nodes as unknown[]).map((n) => {
+    const canonical = getRecordValue(n);
+    const id = toNonEmptyString(canonical?.id);
+    const agentNode = id ? agentNodeById.get(id) : undefined;
+    if (!agentNode) return n;
+
+    const canonicalPublic = getRecordValue(canonical?.public);
+    const agentMedia = getRecordValue(getRecordValue(agentNode.public)?.media);
+    const agentSrc = toNonEmptyString(agentMedia?.src);
+    const canonicalSrc = toNonEmptyString(getRecordValue(canonicalPublic?.media)?.src);
+
+    if (agentSrc && agentSrc !== canonicalSrc) {
+      return { ...canonical, public: { ...canonicalPublic, media: agentMedia } };
+    }
+    return n;
+  });
+
+  return { ...canonicalBody, nodes: mergedNodes };
+};
+
 const extractAgentFinalArticleBody = (record: Record<string, unknown> | undefined) => {
   const output = getRecordValue(getRecordValue(getRecordValue(record?.agent_outputs)?.final_article)?.output);
   if (!output) return undefined;
@@ -1615,6 +1651,16 @@ const promoteAgentArticleBodyIfRicher = (
     if (!hasNewMediaRef) {
       return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
     }
+    // Merge only the new media refs into the canonical body rather than swapping wholesale.
+    // This preserves canonical repairs (title, body, items, etc.) that were applied after the
+    // agent run while still making the new artifact pointers discoverable for publishing.
+    const mergedBody = inputArticleBody
+      ? mergeAgentMediaIntoCanonicalBody(inputArticleBody, agentBody)
+      : agentBody;
+    return {
+      effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: mergedBody } },
+      promotedArticleBody: mergedBody,
+    };
   }
 
   return {
