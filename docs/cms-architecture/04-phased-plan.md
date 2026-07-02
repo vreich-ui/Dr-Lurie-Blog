@@ -156,7 +156,7 @@ Deliberately *not* in scope: impact preview (surface 3) beyond a stub — its re
 
 **Rollback safety:** per-item, as before; Templates and search page are additive features with no cutover risk.
 
-**Exit criteria:** every object type in the C§2.2 matrix exists in production with its contract tier enforced; zero `route`-kind targets remain in any published navigation and the transitional variant is removed from the validators (Gap note 2's lifecycle closed); the transitional static-cards `content_grid` variant, if it was ever used, is retired; the Deferred register (below) is empty or re-triaged.
+**Exit criteria:** every object type in the C§2.2 matrix exists in production with its contract tier enforced; zero `route`-kind targets remain in any published object (navigation or page bodies) and the transitional variant is removed from the validators (Gap note 2's lifecycle closed); the transitional static-cards `content_grid` variant, if it was ever used, is retired; the Deferred register (below) is empty or re-triaged.
 
 ---
 
