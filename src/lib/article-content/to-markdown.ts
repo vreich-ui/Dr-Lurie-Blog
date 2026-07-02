@@ -97,9 +97,8 @@ function renderNodeToMarkdown(node: ArticleBodyNode): string {
   // over the hero node, the hero node's image will not appear in either place. Fixing that
   // edge case would require passing the winning featuredImage URL into articleBodyToMarkdown.
   const isHeroNode = node.id === 'n_hero' || (node.rendering?.presentation as string | undefined) === 'hero';
-  const mediaType = typeof node.public?.media === 'object' && node.public.media !== null
-    ? node.public.media.type
-    : undefined;
+  const mediaType =
+    typeof node.public?.media === 'object' && node.public.media !== null ? node.public.media.type : undefined;
   const suppressInlineMedia = isHeroNode && mediaType === 'image';
   if (node.public?.media && node.rendering?.placement === 'inline' && !suppressInlineMedia) {
     const media = node.public.media;
