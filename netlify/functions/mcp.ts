@@ -1563,14 +1563,15 @@ const countPublicArticleBodyNodes = (articleBody: Record<string, unknown> | unde
   return (articleBody.nodes as unknown[]).filter(hasReaderVisibleArticleBodyNode).length;
 };
 
-const countPublicArticleBodyMedia = (articleBody: Record<string, unknown> | undefined) => {
-  if (!Array.isArray(articleBody?.nodes)) return 0;
-  return (articleBody.nodes as unknown[]).filter((n) => {
-    const node = getRecordValue(n);
-    if (!hasReaderVisibleArticleBodyNode(n)) return false;
-    const media = getRecordValue(getRecordValue(node?.public)?.media);
-    return toNonEmptyString(media?.src) !== undefined;
-  }).length;
+const extractPublicArticleBodyMediaSrcs = (articleBody: Record<string, unknown> | undefined): Set<string> => {
+  const srcs = new Set<string>();
+  if (!Array.isArray(articleBody?.nodes)) return srcs;
+  for (const n of articleBody.nodes as unknown[]) {
+    if (!hasReaderVisibleArticleBodyNode(n)) continue;
+    const src = toNonEmptyString(getRecordValue(getRecordValue(getRecordValue(n)?.public)?.media)?.src);
+    if (src) srcs.add(src);
+  }
+  return srcs;
 };
 
 const extractAgentFinalArticleBody = (record: Record<string, unknown> | undefined) => {
@@ -1603,13 +1604,15 @@ const promoteAgentArticleBodyIfRicher = (
     return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
   }
 
-  // Equal node count: only promote when the agent body added media (enrichment).
-  // If media counts are also equal, the canonical input may have been repaired after
-  // the agent body was produced — preserve the canonical version in that case.
+  // Equal node count: only promote when the agent body introduces media refs not present
+  // in the canonical input — covers both "added media" and "replaced placeholder with real
+  // artifact blobKey" cases. If the agent's srcs are all already in the canonical body,
+  // the canonical input may have been repaired after the agent run and must be preserved.
   if (agentNodeCount === inputNodeCount) {
-    const agentMediaCount = countPublicArticleBodyMedia(agentBody);
-    const inputMediaCount = countPublicArticleBodyMedia(inputArticleBody);
-    if (agentMediaCount <= inputMediaCount) {
+    const agentSrcs = extractPublicArticleBodyMediaSrcs(agentBody);
+    const inputSrcs = extractPublicArticleBodyMediaSrcs(inputArticleBody);
+    const hasNewMediaRef = [...agentSrcs].some((src) => !inputSrcs.has(src));
+    if (!hasNewMediaRef) {
       return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
     }
   }

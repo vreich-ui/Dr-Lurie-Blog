@@ -73,6 +73,28 @@ describe('articleBodyToMarkdown hero-dedup', () => {
     assert.ok(md.includes(`![Inline alt](${inlineImagePath})`), `inline image must appear in body; got:\n${md}`);
   });
 
+  it('still renders a document link on a hero node (documents cannot be featured images)', () => {
+    const docPath = '/pdf/req_test_doc_20260101_01/abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234.pdf';
+    const body = {
+      schema_version: 'article_body.v1' as const,
+      nodes: [
+        {
+          id: 'n_hero',
+          kind: 'content' as const,
+          public: {
+            title: 'Download the Report',
+            media: { type: 'document' as const, src: docPath, title: 'Full Report PDF' },
+          },
+          rendering: { placement: 'inline' as const },
+        },
+      ],
+    };
+
+    const md = articleBodyToMarkdown(body);
+    assert.ok(md.includes(`[Full Report PDF](${docPath})`), `hero document must still render as a link; got:\n${md}`);
+    assert.ok(!md.includes(`![`), `hero document must not render as an image embed; got:\n${md}`);
+  });
+
   it('renders hero title but not hero image when article has both a hero node and an inline node', () => {
     const body = {
       schema_version: 'article_body.v1' as const,
