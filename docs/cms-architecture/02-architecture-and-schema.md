@@ -33,7 +33,7 @@ The audit's single most reusable asset is the `WorkflowRecord` envelope and its 
 
 Object types: `site`, `page`, `page_type` *(registry, code — see OQ-4)*, `template`, `section` *(shared/global sections only; page-local sections embed in the Page record)*, `navigation`, `taxonomy`, `content_item` *(articles today)*.
 
-**Storage.** New blob store `site-objects` (strong consistency, matching `workflows`/`artifacts`/`artifact-index`, A§1.1), keys `objects/{object_type}/by-id/{object_id}.json`, with marker-blob indexes `objects/{object_type}/index/by-status/{status}/{object_id}` mirroring the existing `workflows/index/...` convention (A§1.1). Articles physically stay in the `workflows` store under their existing keys — the envelope is compatible by construction; whether to physically migrate or permanently alias is OQ-8.
+**Storage.** New blob store `site-objects` (strong consistency, matching `workflows`/`artifacts`/`artifact-index`, A§1.1), keys `objects/{object_type}/by-id/{object_id}.json`, with marker-blob indexes `objects/{object_type}/index/by-status/{status}/{object_id}` mirroring the existing `workflows/index/...` convention (A§1.1). Articles physically stay in the `workflows` store under their existing keys. **This is NOT mechanical compatibility**: a stored `WorkflowRecord` (A§1.1) has `request_id` and `input` plus top-level pipeline fields, and lacks `object_id`, `object_type`, `site`, `body`, the envelope `publication` block, and `content_revision`. The envelope is compatible *by mapping*, not by shape — generic object verbs (§5.8) touching articles require an explicit **adapter** that translates on read/write: `request_id → object_id`, constant `object_type: 'content_item'`, default `site`, `input → body`, `input.publication.published_time ↔ publication.published_time` (kept in sync per §5.6), top-level pipeline fields → the `workflow` extension, and `content_revision` seeded on first adapted write (approvals can only pin revisions minted after adoption). Adapter-vs-one-time-migration is OQ-8; what is not optional is that one of them exists — aliasing without the adapter would make generic verbs reject every existing article.
 
 **Derived exports.** Publishing an object materializes a committed file consumed by the Astro build, exactly as articles materialize `src/data/post/{slug}.md` (A§1.6–1.7):
 
@@ -181,9 +181,9 @@ interface ObjectRecord<TBody> {
                                        // bumped by EVERY write incl. lock ops (A§1.2)
   content_revision: number;            // NEW: bumped ONLY by writes that mutate `body`.
                                        // Lock checkout/checkin/refresh, review bookkeeping,
-                                       // and the publish operation's own publication writes
-                                       // (the §5.6 step-3 timestamp stamp and step-6
-                                       // receipt) do NOT touch it. Exists so review
+                                       // and the publish operation's own publication write
+                                       // (the §5.6 step-5 stamp+receipt) do NOT touch it.
+                                       // Exists so review
                                        // approvals can pin content state (§3.9) without
                                        // being invalidated by the lock acquisition that
                                        // publishing requires (§5.6 step 1) — or by the
@@ -567,7 +567,7 @@ Resolved as one registry object (§3.7). Consequences, each grounded in the audi
 - **Source of truth:** the Taxonomy record in Blobs. The committed frontmatter strings become *outputs* validated at publish time (they remain physically in frontmatter because the public build derives routes from them, A§2.6 — but they can no longer say anything the registry doesn't).
 - **The drift engine is removed:** `admin-taxonomy.ts`'s aggregation over blob drafts (A§2.11) is replaced by reading the registry; editor autocomplete and agent tooling consume the same terms.
 - **No Topic entity** (audit: "topics == categories", A§2.7). Topic pages are a `listing` PageType over category terms; the term's `label`/`description` supply the presentation the topics index currently scrapes from post excerpts (A§2.7). If topics ever need independent curation (ordering, custom hero), that is a Page referencing a term — still not a new entity.
-- Term renames/merges use stable `term_id` + `merged_into` so published frontmatter never breaks silently (deviation from today, where a category rename would strand old posts, A§2.6). **Resolution mechanism, made explicit because `ContentSourceV1` deliberately keeps free-string taxonomy** (§3.10 — `taxonomy.tags`, `publish_payload.category/tags` remain strings to protect the agent contract, A§1.1/A§1.8): at publish time (§5.6 step 2), each string is resolved against the registry *by slug, following `merged_into` aliases* — a deprecated slug resolves to its successor term rather than failing validation; only strings resolving to no term (even via aliases) are rejected. Step 4 then materializes the resolved terms' *current canonical slugs* into frontmatter (stale strings are normalized on every republish, not preserved), and step 6 records the resolved `term_id`s in the publish receipt on the envelope. The record's free strings are thus lossy input; the receipt's term IDs are the durable binding. The alternative — storing `term_id`s inside `ContentSourceV1` — is rejected in this pass because it changes the article schema agents already validate against (A§1.8); revisitable if alias-chain resolution proves fragile in practice.
+- Term renames/merges use stable `term_id` + `merged_into` so published frontmatter never breaks silently (deviation from today, where a category rename would strand old posts, A§2.6). **Resolution mechanism, made explicit because `ContentSourceV1` deliberately keeps free-string taxonomy** (§3.10 — `taxonomy.tags`, `publish_payload.category/tags` remain strings to protect the agent contract, A§1.1/A§1.8): at publish time (§5.6 step 2), each string is resolved against the registry *by slug, following `merged_into` aliases* — a deprecated slug resolves to its successor term rather than failing validation; only strings resolving to no term (even via aliases) are rejected. Step 3 then materializes the resolved terms' *current canonical slugs* into frontmatter (stale strings are normalized on every republish, not preserved), and step 5 records the resolved `term_id`s in the publish receipt on the envelope. The record's free strings are thus lossy input; the receipt's term IDs are the durable binding. The alternative — storing `term_id`s inside `ContentSourceV1` — is rejected in this pass because it changes the article schema agents already validate against (A§1.8); revisitable if alias-chain resolution proves fragile in practice.
 - Multi-site-safe by construction (per-site record; no fixed vocabulary in code).
 
 ### 5.6 Publishing Workflow: one canonical semantics (audit fork #2)
@@ -580,24 +580,30 @@ publish(object_id, published_time /* ISO | null | omitted=now */):
   2. validate body (registry/zod) + cross-references:
        taxonomy terms active (§5.5) · page/nav targets resolve · media artifacts
        materializable (exactly publish-article's current artifact validation, A§1.6)
-  3. stamp publication.published_time on the record
-  4. materialize the derived export(s) for this object + affected dependents
-       (content_item → .md; everything else → src/data/site/*.json §1)
-  5. commit via the existing GitHub Git Data API path (blobs→tree→commit→ref,
+  3. materialize the derived export(s) for this object + affected dependents,
+       embedding the target timestamp (content_item → .md; everything else →
+       src/data/site/*.json §1). The timestamp is an INPUT decided here; it is
+       not yet recorded on the source record.
+  4. commit via the existing GitHub Git Data API path (blobs→tree→commit→ref,
        publish-article.ts:1717-1768, A§1.6) — generalized into a shared materializer
-  6. write publish_receipt (deploy id/status) back onto the record
-       (the existing receipt pattern, A§1.6)
-unpublish ≡ publish(id, null): stamps null and re-materializes (removes/neutralizes export)
+  5. only after the commit succeeds: stamp publication.published_time AND write
+       publish_receipt (deploy id/status) onto the record in a single write —
+       the same export-first-then-stamp order the canonical article path uses
+       today (publish-article executes, then set_published_time + receipt are
+       written back, A§1.6)
+unpublish ≡ publish(id, null): re-materializes (removes/neutralizes export), then stamps null
 schedule  ≡ publish(id, future) — visibility gate at build handles the rest (§4.3; OQ-2)
 ```
+
+Failure semantics of the ordering: a failure at or before step 4 leaves both the record and the repo unchanged — the record never claims a publish that didn't happen. A failure between steps 4 and 5 leaves the export committed but the record un-stamped: the residual window today's article path already has (A§1.6), and the safe direction — the source *under*-claims, and retrying is idempotent because re-publish overwrites the same export. The forbidden state (record stamped published, no committed export) cannot occur by construction.
 
 Disposition of the three existing mechanisms (A§1.6):
 
 1. **MCP `publish_by_time` (mechanism 2) is the canonical semantics**, generalized from articles to all object types. Its article-specific steps (agent-body promotion, featured-image scoring) become the `content_item` materializer's internals.
-2. **The admin UI Publish button (mechanism 1) is folded in**: the endpoint behind the button executes the full canonical operation, not a bare `set_published_time`. Its current behavior — stamp only, then tell the human to trigger a deploy manually (A§1.6) — ceases to exist as a user-facing semantics. (`set_published_time` survives internally as step 3 and for receipt write-back, preserving the agent contract, A§1.8.)
+2. **The admin UI Publish button (mechanism 1) is folded in**: the endpoint behind the button executes the full canonical operation, not a bare `set_published_time`. Its current behavior — stamp only, then tell the human to trigger a deploy manually (A§1.6) — ceases to exist as a user-facing semantics. (`set_published_time` survives internally as the step-5 stamp/receipt write-back, preserving the agent contract, A§1.8.)
 3. **`toggle-article-publish` (mechanism 3) is deprecated/legacy**: it rewrites derived frontmatter without touching the record (A§1.6), which under this architecture is a source-of-truth violation by definition (§1). The `/admin/library` toggle re-targets the canonical unpublish. The function is retained read-never/write-never in the end state (i.e., removed; listed here so the deprecation is explicit, not silent).
 
-Invariant added: `publication.published_time` on the envelope and (for articles) `input.publication.published_time` are written together by step 3; nothing else may write either. "Published" becomes one state with one writer — resolving the audit's "'published' is not a single state" observation (A§1.9). Companion invariant: steps 3 and 6 bump `version` (every write does, A§1.2) but never `content_revision` (§3.1) — the operation that consumes an approval must not invalidate it.
+Invariant added: `publication.published_time` on the envelope and (for articles) `input.publication.published_time` are written together by step 5, only after a successful export commit; nothing else may write either. "Published" becomes one state with one writer — resolving the audit's "'published' is not a single state" observation (A§1.9). Companion invariant: the step-5 stamp/receipt write bumps `version` (every write does, A§1.2) but never `content_revision` (§3.1) — the operation that consumes an approval must not invalidate it.
 
 ### 5.7 Human Review (audit fork #4) & the default review mechanism
 
