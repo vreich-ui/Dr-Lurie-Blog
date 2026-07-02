@@ -3,6 +3,15 @@ import test from 'node:test';
 
 import { checkoutRequest, createRequest, type WorkflowRecord } from '../../netlify/functions/save-json-blob.js';
 
+// Build a request_id that conforms to the req_<flow>_<topic>_<yyyymmdd>_<nn> naming
+// contract now enforced by requireRequestId. Each test uses an isolated store, so a
+// label-derived id is unique enough.
+const reqId = (label: string): string =>
+  `req_test_${label
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()}_20260702_01`;
+
 const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 
 type ResponseBody = {
@@ -73,7 +82,7 @@ const contentSourceInput = (requestId: string) => ({
 
 test('checkout_request stabilizes transient not-found reads after create before acquiring a lock', async () => {
   const store = createMemoryStore();
-  const requestId = `checkout-retry-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = reqId('checkout-retry');
 
   const createResponse = await createRequest(store, {
     action: 'create_request',
@@ -140,7 +149,7 @@ test('checkout_request stabilizes transient not-found reads after create before 
 
 test('checkout_request can recover immediately when a strong-consistency read sees the canonical record', async () => {
   const store = createMemoryStore();
-  const requestId = `checkout-strong-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = reqId('checkout-strong');
 
   const createResponse = await createRequest(store, {
     action: 'create_request',
@@ -201,7 +210,7 @@ test('checkout_request can recover immediately when a strong-consistency read se
 
 test('checkout_request returns final not_found diagnostics only after retry attempts are exhausted', async () => {
   const store = createMemoryStore();
-  const requestId = `checkout-missing-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = reqId('checkout-missing');
 
   const warnings: unknown[][] = [];
   const originalWarn = console.warn;

@@ -8,6 +8,15 @@ import {
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
 
+// Build a request_id that conforms to the req_<flow>_<topic>_<yyyymmdd>_<nn> naming
+// contract now enforced by requireRequestId. Each test uses an isolated store, so a
+// label-derived id is unique enough.
+const reqId = (label: string): string =>
+  `req_test_${label
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()}_20260702_01`;
+
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();
 
@@ -55,7 +64,7 @@ const contentSourceInput = (requestId: string) => ({
 
 test('checkin_request requires the active lock token and releases ownership', async () => {
   const store = createMemoryStore();
-  const requestId = `checkin-${Date.now()}`;
+  const requestId = reqId('checkin');
 
   const createResponse = await createRequest(store, {
     action: 'create_request',

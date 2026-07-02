@@ -8,6 +8,15 @@ import {
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
 
+// Build a request_id that conforms to the req_<flow>_<topic>_<yyyymmdd>_<nn> naming
+// contract now enforced by requireRequestId. Each test uses an isolated store, so a
+// label-derived id is unique enough.
+const reqId = (label: string): string =>
+  `req_test_${label
+    .replace(/[^a-z0-9]+/gi, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase()}_20260702_01`;
+
 // ---------------------------------------------------------------------------
 // In-memory blob store
 // ---------------------------------------------------------------------------
@@ -44,7 +53,7 @@ const parseBody = (r: { body: string }): ParsedBody => JSON.parse(r.body) as Par
 // ---------------------------------------------------------------------------
 // Known stable artifact references
 // ---------------------------------------------------------------------------
-const REQUEST_ID = 'req_patch_agent_output_artifact_test_v1';
+const REQUEST_ID = 'req_test_patch_agent_output_20260702_01';
 const VALID_SHA256_A = 'a'.repeat(64);
 const VALID_SHA256_B = 'b'.repeat(64);
 const VALID_BLOB_KEY_A = `image/${REQUEST_ID}/${VALID_SHA256_A}.png`;
@@ -105,7 +114,7 @@ const createAndCheckout = async (store: Store, requestId: string) => {
 describe('patchAgentOutput — final_article artifactReferences contract', () => {
   it('accepts valid artifactReferences and stores them verbatim so publish can read them', async () => {
     const store = createMemoryStore();
-    const requestId = `artifact-valid-${Date.now()}`;
+    const requestId = reqId('artifact-valid');
     const lockToken = await createAndCheckout(store, requestId);
 
     const refs = [validRef(VALID_SHA256_A, VALID_BLOB_KEY_A), validRef(VALID_SHA256_B, VALID_BLOB_KEY_B)];
@@ -147,7 +156,7 @@ describe('patchAgentOutput — final_article artifactReferences contract', () =>
 
   it('rejects a final_article output patch with a malformed artifactReference (missing sha256)', async () => {
     const store = createMemoryStore();
-    const requestId = `artifact-malformed-sha-${Date.now()}`;
+    const requestId = reqId('artifact-malformed-sha');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -178,7 +187,7 @@ describe('patchAgentOutput — final_article artifactReferences contract', () =>
 
   it('rejects a final_article output patch with a malformed artifactReference (invalid blobKey)', async () => {
     const store = createMemoryStore();
-    const requestId = `artifact-bad-blobkey-${Date.now()}`;
+    const requestId = reqId('artifact-bad-blobkey');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -208,7 +217,7 @@ describe('patchAgentOutput — final_article artifactReferences contract', () =>
 
   it('rejects a final_article output patch when artifactReferences is not an array', async () => {
     const store = createMemoryStore();
-    const requestId = `artifact-not-array-${Date.now()}`;
+    const requestId = reqId('artifact-not-array');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -226,15 +235,12 @@ describe('patchAgentOutput — final_article artifactReferences contract', () =>
     assert.equal(patchResp.statusCode, 400, patchResp.body);
     const body = parseBody(patchResp);
     assert.equal(body.error_code, 'invalid_artifact_references');
-    assert.ok(
-      typeof body.error === 'string' && body.error.includes('artifactReferences must be an array'),
-      body.error
-    );
+    assert.ok(typeof body.error === 'string' && body.error.includes('artifactReferences must be an array'), body.error);
   });
 
   it('passes through non-final_article agents without checking artifactReferences shape', async () => {
     const store = createMemoryStore();
-    const requestId = `artifact-draft-agent-${Date.now()}`;
+    const requestId = reqId('artifact-draft-agent');
     const lockToken = await createAndCheckout(store, requestId);
 
     // draft agent may put anything it wants in output without triggering validation
@@ -256,7 +262,7 @@ describe('patchAgentOutput — final_article artifactReferences contract', () =>
 describe('patchAgentOutput — final_article article_body.nodes media.src validation', () => {
   it('rejects a final_article patch with a guessed media.src path in article_body.nodes', async () => {
     const store = createMemoryStore();
-    const requestId = `node-guessed-src-${Date.now()}`;
+    const requestId = reqId('node-guessed-src');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -286,15 +292,12 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
     assert.equal(patchResp.statusCode, 400, patchResp.body);
     const body = parseBody(patchResp);
     assert.equal(body.error_code, 'invalid_node_media_src');
-    assert.ok(
-      typeof body.error === 'string' && body.error.includes('article_body.nodes[0]'),
-      body.error
-    );
+    assert.ok(typeof body.error === 'string' && body.error.includes('article_body.nodes[0]'), body.error);
   });
 
   it('accepts a final_article patch with a valid artifact-pointer media.src', async () => {
     const store = createMemoryStore();
-    const requestId = `node-valid-ptr-${Date.now()}`;
+    const requestId = reqId('node-valid-ptr');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -322,7 +325,7 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
 
   it('accepts a final_article patch with a src/assets/images/uploads/ media.src path', async () => {
     const store = createMemoryStore();
-    const requestId = `node-valid-src-path-${Date.now()}`;
+    const requestId = reqId('node-valid-src-path');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -352,7 +355,7 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
 
   it('accepts a final_article patch with a ~/assets/images/uploads/ media.src path', async () => {
     const store = createMemoryStore();
-    const requestId = `node-valid-tilde-path-${Date.now()}`;
+    const requestId = reqId('node-valid-tilde-path');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -382,7 +385,7 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
 
   it('rejects a final_article patch with an https URL in media.src', async () => {
     const store = createMemoryStore();
-    const requestId = `node-https-src-${Date.now()}`;
+    const requestId = reqId('node-https-src');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -412,7 +415,7 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
 
   it('passes through non-final_article agents without checking article_body node media.src', async () => {
     const store = createMemoryStore();
-    const requestId = `node-draft-bypass-${Date.now()}`;
+    const requestId = reqId('node-draft-bypass');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -434,7 +437,7 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
   // Fix 1: non-image media types with https:// URLs must be accepted
   it('accepts a final_article patch with https:// src when media.type is not image', async () => {
     const store = createMemoryStore();
-    const requestId = `node-video-https-${Date.now()}`;
+    const requestId = reqId('node-video-https');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -463,7 +466,7 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
   // Fix 2: output.content.article_body nodes are also validated for final_article
   it('rejects a final_article patch with a guessed media.src inside output.content.article_body', async () => {
     const store = createMemoryStore();
-    const requestId = `node-nested-body-${Date.now()}`;
+    const requestId = reqId('node-nested-body');
     const lockToken = await createAndCheckout(store, requestId);
 
     const patchResp = await patchAgentOutput(store, {
@@ -495,9 +498,6 @@ describe('patchAgentOutput — final_article article_body.nodes media.src valida
     assert.equal(patchResp.statusCode, 400, patchResp.body);
     const body = parseBody(patchResp);
     assert.equal(body.error_code, 'invalid_node_media_src');
-    assert.ok(
-      typeof body.error === 'string' && body.error.includes('content.article_body.nodes[0]'),
-      body.error
-    );
+    assert.ok(typeof body.error === 'string' && body.error.includes('content.article_body.nodes[0]'), body.error);
   });
 });

@@ -762,11 +762,13 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_request',
     description:
-      'Create a save-json-blob workflow request and return its record. MCP-created article drafts are validated as admin-publish drafts: use content.article_body (article_body.v1) with at least one reader-visible public node. Publication is controlled only by input.publication.published_time.',
+      'Create a save-json-blob workflow request and return its record. request_id is required and must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case (e.g. req_publish_drlurie_20260702_01); it is not auto-generated, and a non-conforming id breaks every later artifact operation for the request. MCP-created article drafts are validated as admin-publish drafts: use content.article_body (article_body.v1) with at least one reader-visible public node. Publication is controlled only by input.publication.published_time.',
     inputSchema: objectSchema(
       {
         input: contentSourceV1JsonSchema,
-        request_id: stringSchema('Optional request id. A UUID-based id is generated when omitted.'),
+        request_id: stringSchema(
+          'Required. Must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case — e.g. req_publish_drlurie_20260702_01. Agents must supply this; it is not auto-generated. Use a date matching today and a 2-digit sequence number.'
+        ),
         current_agent: agentNameJsonSchema(
           'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
         ),
@@ -782,11 +784,13 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_article_draft',
     description:
-      'Non-breaking helper for agents creating structured admin-publish drafts. Wraps save_json_blob_create_request with validation_mode: "admin_publish_draft". Use input.content.article_body.schema_version = "article_body.v1" and input.content.article_body.nodes[] with at least one public node; node.private is internal only and never visible copy.',
+      'Non-breaking helper for agents creating structured admin-publish drafts. Wraps save_json_blob_create_request with validation_mode: "admin_publish_draft". request_id is required and must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case (e.g. req_publish_drlurie_20260702_01); it is not auto-generated, and a non-conforming id breaks every later artifact operation for the request. Use input.content.article_body.schema_version = "article_body.v1" and input.content.article_body.nodes[] with at least one public node; node.private is internal only and never visible copy.',
     inputSchema: objectSchema(
       {
         input: contentSourceV1JsonSchema,
-        request_id: stringSchema('Optional request id. A UUID-based id is generated when omitted.'),
+        request_id: stringSchema(
+          'Required. Must match req_<flow>_<topic>_<yyyymmdd>_<nn> using lowercase snake_case — e.g. req_publish_drlurie_20260702_01. Agents must supply this; it is not auto-generated. Use a date matching today and a 2-digit sequence number.'
+        ),
         current_agent: agentNameJsonSchema(
           'Optional initial current agent; defaults to input.workflow.current_agent or no current stage.'
         ),
