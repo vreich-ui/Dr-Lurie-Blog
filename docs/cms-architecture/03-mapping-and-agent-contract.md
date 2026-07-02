@@ -79,6 +79,8 @@ actions:
 
 **Mapping-discovered schema amendment (M-1):** header dropdown items carry a `description` string (every item above has one, `navigation.ts:13,18,23,…`), but `NavItem` in D§3.8 has no such field. Amend D§3.8: `NavItem.description?: string`. This is exactly the kind of gap the mapping exercise exists to catch; recorded here rather than silently patched into 02.
 
+**Mapping-discovered schema amendment (M-5):** each top-level group is itself a link today — 'Start Here' → `/`, 'Learn' → `/learn/library`, 'Solutions' → `/solutions/shop-preview` (`navigation.ts:8,28,49`; shown as "parent target" in the block above) — but the D§3.8 group shape is only `{id, title?, items}`. Amend D§3.8: `groups[].target?: NavTarget`. Without it, migration would silently drop the clickable destinations on the three dropdown labels.
+
 Also mapped from the Header but **not** as navigation data (A§2.2): the RSS icon and theme toggle → `site.chrome.showRssFeed / showThemeToggle` (already in D§3.2); `HeaderAuthButton`/`LoginModal` → admin chrome, outside CMS data by design; the search overlay and the mobile-only newsletter CTA → §1.7 items 3 and 5.
 
 ## 1.3 Global footer → `nav_footer`
@@ -147,7 +149,7 @@ Taxonomy seed: `tax_drlurie` is initialized from the union of frontmatter catego
 6. **`NetlifyOptInCapture` and analytics/theme scripts.** Deliberately *not* CMS objects: they are layout infrastructure with no editorial content (A§2.4). Listed so the boundary is a decision, not an omission.
 7. **Admin surfaces and Decap.** The `/admin/*` workspace maps to nothing (it is the tool, not the content); Decap remains slated for removal (OQ-10, D§7).
 
-Mapping verdict: every editorial surface the audit found lands on an existing concept; four small schema amendments (M-1 description, M-2 group slots, M-3 `form_thank_you`, M-4 chrome search) and one new open question (OQ-11 viewport-scoped actions) fall out. Nothing required a new top-level concept — the D§2 set held.
+Mapping verdict: every editorial surface the audit found lands on an existing concept; five small schema amendments (M-1 item descriptions, M-2 group slots, M-3 `form_thank_you`, M-4 chrome search, M-5 group-level targets) and one new open question (OQ-11 viewport-scoped actions) fall out. Nothing required a new top-level concept — the D§2 set held.
 
 ---
 
@@ -320,6 +322,8 @@ The session constraint: the article diff/Accept/Discard pattern is the default; 
 2. **Structural diff (new surface, same semantics).** For `upsert/move/remove` ops on sections, nav items/groups, template slots: a before/after ordered list (tree, for nav) with added/removed/moved badges, Accept/Discard per op where ops are independent, atomic accept where they aren't (a move + a dependent visibility change). **Justification for deviating:** `diffWords` over a serialized structure is noise — the audit's diff mechanism was built for prose fields (A§1.3), and "bio moved above content_grid" has no meaningful word-level rendering. The *semantics* (agent proposes → human sees exact change → Accept writes under lock → history entry) are identical; only the rendering differs. This is the "reorder homepage sections" case named in the brief.
 3. **Impact preview (new surface, additive).** For blast-radius actions — publishing shared sections/nav/site, `deprecate_term`, slug/route changes — the review additionally shows *what will be affected* (pages referencing the object; published items whose terms resolve here; listing routes rebound). **Justification:** the approver's question for these actions is not "is this text right?" but "do I understand what this touches?" — no diff rendering answers that. It supplements, never replaces, surfaces 1–2.
 
+**Discard semantics (live-draft flow).** In this contract agents write to the live draft under lock (the audited model, A§1.3/A§1.8), so by the time a reviewer sees an op, `object_patch` has already mutated the draft — Discard cannot merely "drop" the op or the rejected change survives into the next publish. Discard is therefore a **compensating inverse write**: every patch op records `{before, after}` in its history entry (§2.0), and Discard applies the inverse op under a reviewer-held lock, authored and attributed to the reviewer — `update_section_data`/`update_item`/`update_term`/`set_site_fields` invert by restoring `before` values; `move_*` inverts to the original index; `upsert_*` inverts to `remove_*`; `remove_*` inverts to `upsert_*` with the stored payload; `add_term` inverts to term removal while unpublished. Invertibility is thus a *design requirement* on the patch grammar — any future op must define its inverse, which is precisely why ops are typed rather than raw JSON merges. Conflict rule: the inverse validates its `before` against the *current* draft; if intervening accepted ops moved the same field/section, blind revert is refused and the surface demands manual resolution (an ordinary human edit). One important consequence: a discard bumps `content_revision` (it is a body write), correctly invalidating any approval that was granted while the rejected change was still in the draft. Under OQ-6 (persisted proposals), Discard becomes trivially non-mutating — that is one of the arguments *for* OQ-6, recorded in §2.6.
+
 Ask-AI (A§1.4) generalizes across all of it unchanged: read-only suggestion endpoint per object type, forced-tool schema generated from the registry zod (D§5.7), suggestions land as surface-1 field diffs.
 
 ## 2.5 Worked examples (end-to-end, concrete)
@@ -385,7 +389,7 @@ The only human act is step 4 — deliberate (Tier 3), and the agent's article fl
 | Constraint | Where |
 |---|---|
 | Mapping uses actual audited names/content | §1.1–1.6 (verbatim strings from `index.astro`, `navigation.ts`, audit citations per row) |
-| Non-fitting findings flagged, not forced | §1.7 (7 items), amendments M-1…M-4, OQ-11 |
+| Non-fitting findings flagged, not forced | §1.7 (7 items), amendments M-1…M-5, OQ-11 |
 | Contract grounded in the mapping | §2.3 examples reference `page_home`/`s_hero`/`nav_footer_home`/`tax_drlurie`; §2.5 worked examples operate on mapped objects |
 | Greenfield honesty | Preamble, §2.0, §2.2 rationale (no existing roles/matrix, A§2.12) |
 | Dual-auth fit, no unified identity assumed | §2.0 (verbs exposed per principal class; enforcement at key/token verification, D§5.8) |

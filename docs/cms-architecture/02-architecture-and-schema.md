@@ -435,7 +435,7 @@ type NavTarget =
   | { kind: 'asset';    href: string };               // e.g. /rss.xml (A§2.3)
 ```
 
-**Δ note:** promotes `navigation.ts` config objects (A§2.2–2.3) into publishable records; the shapes deliberately mirror `headerData`/`footerData` so migration is mechanical. Key deviation from today: link targets are typed references, not raw hrefs — a page rename re-materializes navigation instead of leaving dead links. Multi-site-safe by construction (instances are per-site records).
+**Δ note:** promotes `navigation.ts` config objects (A§2.2–2.3) into publishable records; the shapes deliberately mirror `headerData`/`footerData` so migration is mechanical. Key deviation from today: link targets are typed references, not raw hrefs — a page rename re-materializes navigation instead of leaving dead links. Multi-site-safe by construction (instances are per-site records). **Amendments from the current-site mapping** (03 §1.2–1.3, recorded there with provenance): M-1 `NavItem.description?: string` (every header dropdown item carries one); M-2 `groups[].slot?: 'primary'|'secondary'|'social'` (footer secondary/social rows); M-5 `groups[].target?: NavTarget` (the top-level 'Start Here'/'Learn'/'Solutions' entries are themselves links, `navigation.ts:8,28,49`).
 
 ### 3.9 Human Review, roles, principals (greenfield — audit fork #4)
 
