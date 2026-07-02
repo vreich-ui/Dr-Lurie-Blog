@@ -1195,7 +1195,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
               '',
               'IMAGE ARTIFACT CONTRACT: Image artifacts MUST be supplied as a top-level output.artifactReferences: ArtifactReference[] array to be picked up by publish.',
               'Alternatively, wire images into article_body.nodes[].public.media.src as an image/{requestId}/{sha256}.{ext} pointer.',
-              'Any other nesting — e.g. under output.metadata.artifactReferences, a singular output.artifactReference key, or inside output.images — is silently dropped by the publish pipeline and will produce a publish with an empty media array.',
+              'Artifact references nested anywhere else — e.g. under output.metadata.artifactReferences, a singular output.artifactReference key, or inside output.images — are rejected with HTTP 400 (error_code "misplaced_artifact_references") instead of being silently dropped. Move them to the top-level output.artifactReferences array.',
               'Each entry in output.artifactReferences must be a complete ArtifactReference (blobKey, sha256, sizeBytes, contentType, createdAtISO); malformed entries are rejected with HTTP 400.',
               '',
               workflowLockInstruction,
