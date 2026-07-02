@@ -81,7 +81,7 @@ Deliberately *not* in scope: impact preview (surface 3) beyond a stub — its re
 
 **Exit criteria:** built-HTML diff of header/footers vs. pre-cutover build is empty (modulo attribute ordering); an agent `update_item` on a footer CTA label flows through structural/field review to a human-executed publish and appears on the live site; `navigation.ts` deleted; OQ-7 (merge `nav_footer_home` or keep) presented to Wolf — either answer is pure data by now, blocking nothing.
 
-**§1.7 items handled here:** #4 (duplicate 'Early Access' targets → carried faithfully, warn-not-reject, editorial cleanup offered); #5/OQ-11 (mobile-only newsletter CTA → **decision point in this phase**: default is option (a) plain action unless Wolf picks the viewport flag — the cutover cannot proceed past the Header without *some* answer, so it is scheduled, not silently defaulted... with (a) as the recorded recommendation).
+**§1.7 items handled here:** #4 (duplicate 'Early Access' targets → carried faithfully, warn-not-reject, editorial cleanup offered); #5/OQ-11 (mobile-only newsletter CTA → **decision point in this phase**, but with a diff-safe required default: the CTA **stays hardcoded in Header chrome, outside the Navigation object, until Wolf picks an option** — it renders only inside `md:hidden` mobile utilities today (`Header.astro:184-216`), so option (a) "plain action" would add it to the desktop header and violate this phase's empty built-HTML diff. Options (a)/(b)/(c) from C§1.7-5 are all intentional changes to be made *after* the byte-identical cutover, as ordinary nav/chrome edits through the new machinery).
 
 ---
 
