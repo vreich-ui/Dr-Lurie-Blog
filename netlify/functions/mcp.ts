@@ -453,7 +453,7 @@ const articleBodyNodeJsonSchema = objectSchema(
       suggestedQuery: stringSchema('Suggested chat query.'),
     }),
     rendering: metadataBagSchema(
-      'Optional rendering hints such as presentation, placement, or emphasis. Set placement=inline only when public.media should render inside the article body.'
+      "Rendering hints controlling placement and presentation. REQUIRED if this node carries public.media: set placement to 'inline' so the image/media renders inside the article body. Without an explicit placement, a node image is NOT rendered in the published article body (the publish still succeeds, but the response includes an image_not_rendered warning). Valid placement values: 'inline', 'section', 'sidebar', 'afterParagraph', 'footer' (only 'inline' renders media in the body today). For the page hero image, give the node id 'n_hero' and reference the same artifact as the publish featuredImage — the hero image is emitted to the frontmatter image field, not the body, and needs no placement."
     ),
     visibility: { type: 'string', enum: ['public', 'internal', 'hidden'] },
   },

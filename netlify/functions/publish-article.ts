@@ -472,6 +472,67 @@ const getPublishedMediaDisplayPath = (mediaEntries: MediaEntry[], requestedPath:
   })?.displayPath;
 };
 
+type PublishWarning = { code: string; node_id: string; reason: string };
+
+/**
+ * Surface image nodes that will be silently skipped by the Markdown renderer.
+ *
+ * articleBodyToMarkdown only embeds a node's public.media when rendering.placement === 'inline'
+ * (see src/lib/article-content/to-markdown.ts). A node whose image resolves to a materialized
+ * artifact but lacks inline placement — and is not the explicit featured/hero image — produces a
+ * successful publish with the image missing from the body and no other signal. We collect a
+ * non-fatal warning for each so the agent can diagnose it.
+ */
+const collectUnrenderedImageWarnings = (
+  articleBody: unknown,
+  mediaEntries: MediaEntry[],
+  featuredDisplayPath: string | undefined
+): PublishWarning[] => {
+  const nodes =
+    articleBody && typeof articleBody === 'object' && Array.isArray((articleBody as { nodes?: unknown }).nodes)
+      ? (articleBody as { nodes: unknown[] }).nodes
+      : [];
+
+  const warnings: PublishWarning[] = [];
+  for (const node of nodes) {
+    if (!node || typeof node !== 'object') continue;
+    const nodeRecord = node as Record<string, unknown>;
+
+    const pub = nodeRecord.public;
+    const media = pub && typeof pub === 'object' ? (pub as Record<string, unknown>).media : undefined;
+    if (!media || typeof media !== 'object') continue;
+    const mediaRecord = media as Record<string, unknown>;
+    if (mediaRecord.type !== 'image') continue;
+
+    const src = typeof mediaRecord.src === 'string' ? mediaRecord.src : undefined;
+    if (!src) continue;
+
+    // Only warn for images that actually resolve to a materialized artifact for this publish.
+    const nodeDisplayPath = getPublishedMediaDisplayPath(mediaEntries, src);
+    if (!nodeDisplayPath) continue;
+
+    const rendering = nodeRecord.rendering;
+    const placement =
+      rendering && typeof rendering === 'object' ? (rendering as Record<string, unknown>).placement : undefined;
+    if (placement === 'inline') continue;
+
+    // Images serving as the explicit featured/hero image render in the frontmatter, not the body.
+    if (featuredDisplayPath && nodeDisplayPath === featuredDisplayPath) continue;
+
+    const nodeId = typeof nodeRecord.id === 'string' ? nodeRecord.id : '(unknown)';
+    warnings.push({
+      code: 'image_not_rendered',
+      node_id: nodeId,
+      reason:
+        `Node "${nodeId}" has an image (${src}) but rendering.placement is ` +
+        `${placement === undefined ? 'absent' : `"${String(placement)}"`}, and it is not the featured image. ` +
+        `Set rendering.placement to 'inline' for it to appear in the published article body.`,
+    });
+  }
+
+  return warnings;
+};
+
 const replacePublishedArtifactReferences = (markdown: string, mediaEntries: MediaEntry[]) =>
   mediaEntries.reduce((updatedMarkdown, entry) => {
     const reference = entry.artifactReference;
@@ -1609,6 +1670,12 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
         mediaEntries.find((e) => e.kind === 'image')
       )?.displayPath;
 
+    // Warn about image nodes that will be skipped by the body renderer. Compare against the
+    // EXPLICIT featured image only (not the auto-selected fallback above), so a lone image with
+    // no placement and no explicit featured designation is still flagged.
+    const explicitFeaturedDisplayPath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
+    const warnings = collectUnrenderedImageWarnings(normalizedArticleBody, mediaEntries, explicitFeaturedDisplayPath);
+
     let resolvedMarkdown: string;
     if (article_body) {
       const tempContentSource: ContentSourceV1 = {
@@ -1720,6 +1787,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       media: imagePaths,
       ok: true,
       path: articlePath,
+      ...(warnings.length ? { warnings } : {}),
     });
   } catch (error) {
     console.error('Failed to publish article.', {
