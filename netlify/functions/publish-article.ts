@@ -485,6 +485,57 @@ const replacePublishedArtifactReferences = (markdown: string, mediaEntries: Medi
     );
   }, markdown);
 
+const rawImageArtifactReferencePattern = /image\/[a-z0-9._-]+\/[a-f0-9]{64}\.[a-z0-9]+/gi;
+const localUploadImageDisplayPathPattern = /~\/assets\/images\/uploads\/[^\s)\]"'<>]+/g;
+
+const extractMatches = (value: string, pattern: RegExp) => Array.from(value.matchAll(pattern), (match) => match[0]);
+
+const validateCommittedImageReferences = (
+  markdown: string,
+  imagePath: string | undefined,
+  mediaEntries: MediaEntry[],
+  requireMaterializedFrontmatterImage: boolean
+) => {
+  const imageEntries = mediaEntries.filter((entry) => entry.kind === 'image');
+  const materializedImageEntries = imageEntries.filter((entry) => entry.persist !== false);
+  const materializedDisplayPaths = new Set(materializedImageEntries.map((entry) => entry.displayPath));
+  const materializedRepoPaths = new Set(materializedImageEntries.map((entry) => entry.path));
+  const body = imagePath ? [markdown, imagePath].join('\n') : markdown;
+  const rawImageRefs = [...new Set(extractMatches(body, rawImageArtifactReferencePattern))];
+
+  if (rawImageRefs.length) {
+    throw new PublishError(
+      422,
+      `Publish output still contains raw image artifact reference(s): ${rawImageRefs.join(', ')}. Image artifacts must be materialized and rewritten before commit.`
+    );
+  }
+
+  if (
+    requireMaterializedFrontmatterImage &&
+    imagePath?.startsWith('~/assets/images/uploads/') &&
+    !materializedDisplayPaths.has(imagePath)
+  ) {
+    throw new PublishError(
+      422,
+      `Frontmatter image path "${imagePath}" does not match a materialized image media entry for this publish.`
+    );
+  }
+
+  const localImagePaths = [...new Set(extractMatches(markdown, localUploadImageDisplayPathPattern))];
+  for (const displayPath of localImagePaths) {
+    const repoPath = normalizeUploadReferencePathForKind(displayPath, 'image');
+    if (
+      imageEntries.some((entry) => entry.artifactReference && entry.displayPath === displayPath) &&
+      (!repoPath || !materializedRepoPaths.has(repoPath))
+    ) {
+      throw new PublishError(
+        422,
+        `Committed markdown references local image asset "${displayPath}" but that file is not being committed with this publish.`
+      );
+    }
+  }
+};
+
 const publicPdfUrlPattern = /^\/pdf\/([a-z0-9._-]+\/[a-f0-9]{64}\.pdf)$/i;
 const pendingPdfArtifactReferencePattern = /^\/?pending-pdf-artifact-reference$/i;
 
@@ -1329,10 +1380,7 @@ const getMediaEntries = async (
         allArtifactReferences.push(crossRef);
       } else {
         const reason = !crossRef ? 'not found in the artifact index' : 'has been deleted';
-        throw new PublishError(
-          422,
-          `article_body node contains an artifact pointer that is ${reason}: ${ptr.src}`
-        );
+        throw new PublishError(422, `article_body node contains an artifact pointer that is ${reason}: ${ptr.src}`);
       }
     }
   }
@@ -1594,6 +1642,10 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       videoLink: toStringValue(input.videoLink),
     });
     const markdown = replacePublishedArtifactReferences(rawMarkdown, mediaEntries);
+    const featuredImageRequiresMaterialization = Boolean(
+      featuredImage && extractMatches(featuredImage, rawImageArtifactReferencePattern).length
+    );
+    validateCommittedImageReferences(markdown, imagePath, mediaEntries, featuredImageRequiresMaterialization);
 
     const ref = await githubRequest<GitHubRef>(`/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
     const commit = await githubRequest<GitHubCommit>(`/repos/${repo}/git/commits/${ref.object.sha}`, token);

@@ -930,6 +930,121 @@ test('publish-article rewrites saved artifact blob keys before committing markdo
   }
 });
 
+test('publish-article materializes and rewrites one image artifact used as featured and inline body media', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'feature/featured-inline-artifact-rewrite';
+
+  const requestId = 'req_publish_featured_inline_20260702_01';
+  const artifactBytes = await createImageBytes('png');
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'shared-image.png',
+    encoding: 'base64',
+    payload: artifactBytes.toString('base64'),
+    metadata: { filename: 'Shared Hero Inline.PNG' },
+  });
+  const artifact = upload.artifact as { blobKey: string };
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+  let treePaths: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+
+    if (url.includes('/contents/src/data/post/featured-inline-artifact-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+
+    if (url.includes('/git/ref/heads/feature%2Ffeatured-inline-artifact-rewrite')) {
+      return Response.json({ object: { sha: 'base-sha' } });
+    }
+
+    if (url.endsWith('/git/commits/base-sha')) {
+      return Response.json({ tree: { sha: 'base-tree' } });
+    }
+
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { content: string; encoding: string };
+      blobWrites.push(body);
+
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+
+    if (url.endsWith('/git/trees') && method === 'POST') {
+      const body = JSON.parse(String(init?.body)) as { tree: Array<{ path: string }> };
+      treePaths = body.tree.map((entry) => entry.path);
+
+      return Response.json({ sha: 'new-tree' });
+    }
+
+    if (url.endsWith('/git/commits') && method === 'POST') {
+      return Response.json({ sha: 'new-commit' });
+    }
+
+    if (url.includes('/git/refs/heads/feature%2Ffeatured-inline-artifact-rewrite') && method === 'PATCH') {
+      return Response.json({ ok: true });
+    }
+
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'featured-inline-artifact-test',
+        title: 'Featured Inline Artifact Test',
+        publishDate: '2026-07-02T00:00:00.000Z',
+        featuredImage: artifact.blobKey,
+        artifactReferences: [upload.artifact],
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_intro',
+              kind: 'content',
+              public: {
+                title: 'Inline image section',
+                body: 'The same artifact should appear as the hero and inline image.',
+                media: {
+                  type: 'image',
+                  src: artifact.blobKey,
+                  alt: 'Shared artifact image',
+                },
+              },
+              rendering: { placement: 'inline' },
+              visibility: 'public',
+            },
+          ],
+        },
+        overwrite: false,
+      }),
+    });
+
+    const displayPath = '~/assets/images/uploads/featured-inline-artifact-test/shared-hero-inline.png';
+    const repoPath = 'src/assets/images/uploads/featured-inline-artifact-test/shared-hero-inline.png';
+
+    assert.equal(response.statusCode, 201, response.body);
+    assert.equal(blobWrites[0]?.encoding, 'utf-8');
+    assert.match(blobWrites[0]?.content ?? '', new RegExp(`image: "${displayPath}"`));
+    assert.match(blobWrites[0]?.content ?? '', new RegExp(`!\\[Shared artifact image\\]\\(${displayPath}\\)`));
+    assert.doesNotMatch(blobWrites[0]?.content ?? '', /image\/[a-z0-9._-]+\/[a-f0-9]{64}\.[a-z0-9]+/i);
+    assert.equal(blobWrites[1]?.content, artifactBytes.toString('base64'));
+    assert.deepEqual(treePaths, ['src/data/post/featured-inline-artifact-test.md', repoPath]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('publish-article normalizes stale artifact blobKeys and corrects the artifact index', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
