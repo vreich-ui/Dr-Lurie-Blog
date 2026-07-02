@@ -1,6 +1,6 @@
 ---
-publishDate: 2026-07-02T19:10:48.623Z
-published_time: 2026-07-02T19:10:48.623Z
+publishDate: 2026-07-02T19:12:16.705Z
+published_time: 2026-07-02T19:12:16.705Z
 title: "Image and CTA Publishing Smoke Test"
 excerpt: "A focused live publish-path test with a featured hero image, a distinct inline image, a PDF download CTA, and a non-PDF CTA."
 image: "~/assets/images/uploads/image-and-cta-publishing-smoke-test/smoke-3-inline.png"
