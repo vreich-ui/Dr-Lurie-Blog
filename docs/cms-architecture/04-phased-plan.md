@@ -121,7 +121,7 @@ Deliberately *not* in scope: impact preview (surface 3) beyond a stub — its re
 
 **Rollback safety:** per-page cutover commits, individually revertible; same delete-only-after-deploy-survives discipline.
 
-**Exit criteria:** every route the audit lists as "real" (A§2.13) renders from a Page object; built-HTML diffs empty per page; `MarkdownLayout` retired (privacy/terms are `prose` sections, C§1.6); zero references to leftover template files remain.
+**Exit criteria:** every **static** route the audit lists as "real" (A§2.13) — the C§1.6 static/system pages, i.e. everything except the listing routes and the article-detail route, which stay on today's build-time derivation until P6 — renders from a Page object; built-HTML diffs empty per page; `MarkdownLayout` retired (privacy/terms are `prose` sections, C§1.6); zero references to leftover template files remain.
 
 ---
 
@@ -168,7 +168,7 @@ Deliberately *not* in scope: impact preview (surface 3) beyond a stub — its re
 | 2. thank-you `?form=` map | **P4** | `form_thank_you` type (M-3) |
 | 3. Header search overlay | **P5** (config via M-4) + **P6** (optional page) | Chrome config on Site; section type only if a search page is wanted |
 | 4. 'Early Access' duplicate targets | **P2** | Seeded faithfully; warn-not-reject; editorial cleanup offered |
-| 5. Mobile-only newsletter CTA (OQ-11) | **P2** | Scheduled decision at Header cutover; recommendation = plain action |
+| 5. Mobile-only newsletter CTA (OQ-11) | **P2** | Diff-safe required default: stays hardcoded in Header chrome at cutover (it is mobile-only today); Wolf's (a)/(b)/(c) choice is an intentional post-cutover change |
 | 6. `NetlifyOptInCapture` / analytics chrome | never | Deliberately not CMS objects (C§1.7-6); no phase touches them |
 | 7. Admin surfaces / Decap | **P6** | Decap removal (OQ-10); admin workspace is tooling, not content |
 
