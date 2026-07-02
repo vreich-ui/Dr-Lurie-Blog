@@ -1593,7 +1593,24 @@ const mergeAgentMediaIntoCanonicalBody = (
     const agentSrc = toNonEmptyString(agentMedia?.src);
     if (!agentSrc) return n;
 
-    return { ...canonical, public: { ...canonicalPublic, media: agentMedia } };
+    // Also carry the agent's rendering hints when filling missing media so that
+    // articleBodyToMarkdown actually renders the media (it only emits inline media
+    // when rendering.placement === 'inline'). Only fill missing hints — if canonical
+    // already has rendering with a placement, leave it intact.
+    const canonicalRendering = getRecordValue(canonical?.rendering);
+    const agentRendering = getRecordValue(agentNode.rendering);
+    const mergedRendering =
+      agentRendering && (!canonicalRendering || (!canonicalRendering.placement && agentRendering.placement))
+        ? canonicalRendering
+          ? { ...canonicalRendering, placement: agentRendering.placement }
+          : agentRendering
+        : undefined;
+
+    return {
+      ...canonical,
+      public: { ...canonicalPublic, media: agentMedia },
+      ...(mergedRendering ? { rendering: mergedRendering } : {}),
+    };
   });
 
   return { ...canonicalBody, nodes: mergedNodes };
