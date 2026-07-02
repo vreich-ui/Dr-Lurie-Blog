@@ -1563,6 +1563,59 @@ const countPublicArticleBodyNodes = (articleBody: Record<string, unknown> | unde
   return (articleBody.nodes as unknown[]).filter(hasReaderVisibleArticleBodyNode).length;
 };
 
+// Copies agent media into canonical body nodes that currently have NO media, matching by node id.
+// Nodes that already have a canonical media src are left untouched — they may have been repaired
+// after the agent run and must not be overwritten. All other canonical content is preserved.
+const mergeAgentMediaIntoCanonicalBody = (
+  canonicalBody: Record<string, unknown>,
+  agentBody: Record<string, unknown>
+): Record<string, unknown> => {
+  if (!Array.isArray(canonicalBody?.nodes) || !Array.isArray(agentBody?.nodes)) return canonicalBody;
+
+  const agentNodeById = new Map<string, Record<string, unknown>>();
+  for (const n of agentBody.nodes as unknown[]) {
+    const node = getRecordValue(n);
+    const id = toNonEmptyString(node?.id);
+    if (id && node) agentNodeById.set(id, node);
+  }
+
+  const mergedNodes = (canonicalBody.nodes as unknown[]).map((n) => {
+    const canonical = getRecordValue(n);
+    const id = toNonEmptyString(canonical?.id);
+    const agentNode = id ? agentNodeById.get(id) : undefined;
+    if (!agentNode) return n;
+
+    const canonicalPublic = getRecordValue(canonical?.public);
+    const canonicalSrc = toNonEmptyString(getRecordValue(canonicalPublic?.media)?.src);
+    if (canonicalSrc) return n; // canonical already has media — preserve it
+
+    const agentMedia = getRecordValue(getRecordValue(agentNode.public)?.media);
+    const agentSrc = toNonEmptyString(agentMedia?.src);
+    if (!agentSrc) return n;
+
+    // Also carry the agent's rendering hints when filling missing media so that
+    // articleBodyToMarkdown actually renders the media (it only emits inline media
+    // when rendering.placement === 'inline'). Only fill missing hints — if canonical
+    // already has rendering with a placement, leave it intact.
+    const canonicalRendering = getRecordValue(canonical?.rendering);
+    const agentRendering = getRecordValue(agentNode.rendering);
+    const mergedRendering =
+      agentRendering && (!canonicalRendering || (!canonicalRendering.placement && agentRendering.placement))
+        ? canonicalRendering
+          ? { ...canonicalRendering, placement: agentRendering.placement }
+          : agentRendering
+        : undefined;
+
+    return {
+      ...canonical,
+      public: { ...canonicalPublic, media: agentMedia },
+      ...(mergedRendering ? { rendering: mergedRendering } : {}),
+    };
+  });
+
+  return { ...canonicalBody, nodes: mergedNodes };
+};
+
 const extractAgentFinalArticleBody = (record: Record<string, unknown> | undefined) => {
   const output = getRecordValue(getRecordValue(getRecordValue(record?.agent_outputs)?.final_article)?.output);
   if (!output) return undefined;
@@ -1586,8 +1639,52 @@ const promoteAgentArticleBodyIfRicher = (
   const inputContent = getRecordValue(recordInput?.content);
   const inputArticleBody = getRecordValue(inputContent?.article_body);
 
-  if (countPublicArticleBodyNodes(agentBody) <= countPublicArticleBodyNodes(inputArticleBody)) {
+  const agentNodeCount = countPublicArticleBodyNodes(agentBody);
+  const inputNodeCount = countPublicArticleBodyNodes(inputArticleBody);
+
+  if (agentNodeCount < inputNodeCount) {
     return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
+  }
+
+  // Equal node count: only promote when the agent adds media to canonical nodes that have none.
+  // Do NOT promote when the agent merely holds a different src on an already-populated node —
+  // the canonical may have been repaired to a different artifact after the agent ran, and
+  // overwriting it would revert that repair.
+  if (agentNodeCount === inputNodeCount) {
+    const canonicalNodesById = new Map<string, Record<string, unknown>>();
+    if (Array.isArray(inputArticleBody?.nodes)) {
+      for (const n of inputArticleBody.nodes as unknown[]) {
+        const node = getRecordValue(n);
+        const id = toNonEmptyString(node?.id);
+        if (id && node) canonicalNodesById.set(id, node);
+      }
+    }
+
+    const agentFillsMissingMedia =
+      Array.isArray(agentBody?.nodes) &&
+      (agentBody.nodes as unknown[]).some((n) => {
+        if (!hasReaderVisibleArticleBodyNode(n)) return false;
+        const agentNode = getRecordValue(n);
+        const agentSrc = toNonEmptyString(getRecordValue(getRecordValue(agentNode?.public)?.media)?.src);
+        if (!agentSrc) return false;
+        const id = toNonEmptyString(agentNode?.id);
+        const canonical = id ? canonicalNodesById.get(id) : undefined;
+        return !toNonEmptyString(getRecordValue(getRecordValue(canonical?.public)?.media)?.src);
+      });
+
+    if (!agentFillsMissingMedia) {
+      return { effectiveRecordInput: recordInput, promotedArticleBody: undefined };
+    }
+
+    // Merge agent media only into canonical nodes that currently have no media.
+    // Canonical title, body, items, and existing media are preserved.
+    const mergedBody = inputArticleBody
+      ? mergeAgentMediaIntoCanonicalBody(inputArticleBody, agentBody)
+      : agentBody;
+    return {
+      effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: mergedBody } },
+      promotedArticleBody: mergedBody,
+    };
   }
 
   return {
