@@ -29,6 +29,7 @@ import {
 } from '../lib/artifacts.js';
 import {
   listArtifactIndexKeys,
+  listArtifactReferencesForRequest,
   readArtifactReference,
   requestArtifactReferenceKey,
   resolveArtifactPointer,
@@ -2529,20 +2530,7 @@ const normalizeDeletedByInput = (value: unknown, fallback: string) => {
 
 const getArtifactReferencesForRequest = async (event: LambdaEvent, requestId: string): Promise<ArtifactReference[]> => {
   const store = (await _mcpInternal.getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
-  const pointerPrefix = `by-request/${encodeURIComponent(requestId)}/`;
-  const pointerKeys = await listArtifactIndexKeys(store, pointerPrefix);
-
-  const artifacts = pointerKeys.length
-    ? await Promise.all(pointerKeys.map(async (key) => resolveArtifactPointer(store, await parseJsonBlob(store, key))))
-    : await Promise.all(
-        (await listArtifactIndexKeys(store, `request-artifacts/${encodeURIComponent(requestId)}/`)).map((key) =>
-          parseJsonBlob(store, key)
-        )
-      );
-
-  return artifacts.filter(
-    (artifact): artifact is ArtifactReference => artifact !== undefined && !isDeletedArtifactReference(artifact)
-  );
+  return listArtifactReferencesForRequest(store, requestId);
 };
 
 const listArtifactsForRequest = async (event: LambdaEvent, requestId: unknown) => {
