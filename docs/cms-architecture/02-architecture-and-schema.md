@@ -87,7 +87,7 @@ A reusable, named arrangement: an ordered list of Section *blueprints* (type + d
 
 ### 2.5 Section — and the central typing decision (audit fork #1)
 
-A Section is one typed block on a page: `{ id, type, data, visibility, notes?, sharedRef? }`.
+A Section is one typed block on a page: `{ id, type, data, visibility, notes? }`.
 
 **Decision: Sections are a strict discriminated union on `type`, validated per-type by the Component Registry — they do *not* adopt the article node's combinatorial pattern.** And symmetrically: **article nodes are not migrated to the union.** Section and article-node are sibling specializations of the shared envelope/editing machinery, not one grammar.
 
@@ -99,7 +99,7 @@ Reasoning against the audit record:
 
 So: **Section is a parallel structure, deliberately — not a generalization of the article node.** What *is* generalized is everything around the blocks: envelope, IDs, locking, history, review, publishing.
 
-Sections come in two flavors: **inline** (embedded in the Page record — the default; most sections belong to one page) and **shared** (their own `section` object referenced by `sharedRef` from any page — global footer content blocks, the newsletter signup, reusable CTA banners). Shared sections have their own lock/review/publish lifecycle; this is how one newsletter block appears on N pages without N copies (the audit found exactly one real newsletter form hardcoded into the homepage, A§2.4).
+Sections come in two flavors: **inline** (embedded in the Page record — the default; most sections belong to one page) and **shared** (their own `section` object, referenced from any page through a dedicated `shared_ref` union member — global footer content blocks, the newsletter signup, reusable CTA banners). A reference is its own variant carrying only the target's ObjectId — never a shadow copy of the target's type or data — and the Renderer dereferences it to the target's current variant before validation and dispatch (§3.5), so no consumer ever special-cases references or reads stale duplicated payloads. Shared sections have their own lock/review/publish lifecycle; this is how one newsletter block appears on N pages without N copies (the audit found exactly one real newsletter form hardcoded into the homepage, A§2.4).
 
 ### 2.6 Component
 
@@ -144,7 +144,17 @@ type ObjectType =
 
 // Opaque, prefix-typed, no site name embedded (multi-site scoping note).
 // Prefixes: site_, page_, tpl_, sec_, nav_, tax_, req_ (content items keep req_* ids).
-type ObjectId = string; // /^(site|page|tpl|sec|nav|tax|req)_[a-z0-9_]+$/
+//
+// The generic shape below is a CEILING, not the validator. Every object type applies
+// its own stricter ID validator on creation, and generic creation paths (object_create
+// verbs, §5.8) MUST route through the per-type validator. In particular, content_item
+// keeps validateRequestId verbatim — req_<flow>_<topic>_<yyyymmdd>_<nn>
+// (agents-naming.ts, A§1.8) — because the artifact-upload path validates requestId with
+// that helper; a looser req_* accepted at creation would produce records that cannot
+// upload artifacts or interoperate with existing workflow tools. This is exactly the
+// autogen-mismatch bug class the audit documented (createRequestId() producing ids
+// the backend rejects, A§1.9); the design must not reintroduce it from the other side.
+type ObjectId = string; // ceiling: /^(site|page|tpl|sec|nav|tax|req)_[a-z0-9_]+$/
 
 interface ObjectRecord<TBody> {
   object_id: ObjectId;
@@ -291,8 +301,6 @@ interface SectionCommon {
                                                       // agent-notes-in-band use case
   notes?: string;                                     // editor/agent notes; never rendered
                                                       // (assert-reader-safe applies, A§1.1)
-  sharedRef?: ObjectId;                               // if set: data lives in a shared
-                                                      // 'section' object; local `data` ignored
 }
 
 type SectionVariant =
@@ -320,8 +328,19 @@ type SectionVariant =
                                                        // preview page (A§2.9)
   | { type: 'search';          data: { placeholder?: string; indexRoute: string } } // extracts
                                                        // the hardcoded Header overlay (A§2.8)
-  | { type: 'content_embed';   data: { contentItem: ObjectId } };  // explicit bridge to the
+  | { type: 'content_embed';   data: { contentItem: ObjectId } }  // explicit bridge to the
                                                        // article grammar (§2.5 tradeoff)
+  | { type: 'shared_ref';      data: { section: ObjectId } };
+                                                       // Reference to a shared 'section'
+                                                       // object — its OWN variant, carrying
+                                                       // no shadow copy of the target's
+                                                       // type/data. The Renderer (and admin
+                                                       // preview) dereference shared_ref to
+                                                       // the target's current variant BEFORE
+                                                       // validation and render dispatch, so
+                                                       // no validator, editor, or component
+                                                       // ever special-cases references or
+                                                       // sees stale duplicated payloads.
 
 interface LinkAction { label: string; target: NavTarget; style?: 'primary'|'secondary'|'link'; }
 type RichText = string;   // TipTap-produced HTML constrained to the existing sanitizer
@@ -463,7 +482,7 @@ Default policy proposal (data, adjustable): `content_item` — review optional (
 
 ### 3.10 Content Item (article) — unchanged schema, repositioned
 
-`content_item.body = ContentSourceV1` exactly as documented (A§1.1), including `article_body.v1`. No field changes. The envelope's `publication` block supersedes reading `input.publication.published_time` as the gate (the inner field remains for agent-contract compatibility; the publish operation keeps both in sync — see §5.6). **Explicitly restated:** the union decision for Sections does **not** touch article nodes (§2.5).
+`content_item.body = ContentSourceV1` exactly as documented (A§1.1), including `article_body.v1`. No field changes. The envelope's `publication` block supersedes reading `input.publication.published_time` as the gate (the inner field remains for agent-contract compatibility; the publish operation keeps both in sync — see §5.6). **Explicitly restated:** the union decision for Sections does **not** touch article nodes (§2.5). Taxonomy consequence of keeping the schema unchanged: category/tags stay free strings here, so rename/merge safety is provided *at the publish boundary*, not in the record — publish-time slug resolution follows `merged_into` aliases, canonical slugs are re-materialized into frontmatter, and resolved `term_id`s land in the publish receipt (§5.5). Content-item IDs likewise keep their stricter existing validator (`validateRequestId`, §3.1), not the generic ObjectId ceiling.
 
 ---
 
@@ -548,7 +567,7 @@ Resolved as one registry object (§3.7). Consequences, each grounded in the audi
 - **Source of truth:** the Taxonomy record in Blobs. The committed frontmatter strings become *outputs* validated at publish time (they remain physically in frontmatter because the public build derives routes from them, A§2.6 — but they can no longer say anything the registry doesn't).
 - **The drift engine is removed:** `admin-taxonomy.ts`'s aggregation over blob drafts (A§2.11) is replaced by reading the registry; editor autocomplete and agent tooling consume the same terms.
 - **No Topic entity** (audit: "topics == categories", A§2.7). Topic pages are a `listing` PageType over category terms; the term's `label`/`description` supply the presentation the topics index currently scrapes from post excerpts (A§2.7). If topics ever need independent curation (ordering, custom hero), that is a Page referencing a term — still not a new entity.
-- Term renames/merges use stable `term_id` + `merged_into` so published frontmatter never breaks silently (deviation from today, where a category rename would strand old posts, A§2.6).
+- Term renames/merges use stable `term_id` + `merged_into` so published frontmatter never breaks silently (deviation from today, where a category rename would strand old posts, A§2.6). **Resolution mechanism, made explicit because `ContentSourceV1` deliberately keeps free-string taxonomy** (§3.10 — `taxonomy.tags`, `publish_payload.category/tags` remain strings to protect the agent contract, A§1.1/A§1.8): at publish time (§5.6 step 2), each string is resolved against the registry *by slug, following `merged_into` aliases* — a deprecated slug resolves to its successor term rather than failing validation; only strings resolving to no term (even via aliases) are rejected. Step 4 then materializes the resolved terms' *current canonical slugs* into frontmatter (stale strings are normalized on every republish, not preserved), and step 6 records the resolved `term_id`s in the publish receipt on the envelope. The record's free strings are thus lossy input; the receipt's term IDs are the durable binding. The alternative — storing `term_id`s inside `ContentSourceV1` — is rejected in this pass because it changes the article schema agents already validate against (A§1.8); revisitable if alias-chain resolution proves fragile in practice.
 - Multi-site-safe by construction (per-site record; no fixed vocabulary in code).
 
 ### 5.6 Publishing Workflow: one canonical semantics (audit fork #2)
