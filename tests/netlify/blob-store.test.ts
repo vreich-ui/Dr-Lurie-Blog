@@ -6,6 +6,7 @@ import {
   getArtifactIndexBlobStore,
   getBlobStoreSourceDiagnostics,
   getCoreBlobStoreSourceDiagnostics,
+  getSiteObjectsBlobStore,
   getWorkflowBlobStore,
   setNetlifyBlobsModuleForTesting,
 } from '../../netlify/lib/blob-store.js';
@@ -248,6 +249,29 @@ test('getWorkflowBlobStore treats NETLIFY=false with blob context as Netlify run
   });
 });
 
+test('site objects store uses explicit strong API config when site ID and token are configured', async () => {
+  await withCleanWorkflowBlobEnv(async () => {
+    const store = createFakeStore();
+    const getStoreInputs: unknown[] = [];
+
+    process.env.NETLIFY_SITE_ID = 'site-with-objects';
+    process.env.NETLIFY_BLOBS_TOKEN = 'token-objects';
+
+    setNetlifyBlobsModuleForTesting({
+      connectLambda() {},
+      getStore(input) {
+        getStoreInputs.push(input);
+        return store;
+      },
+    });
+
+    assert.equal(await getSiteObjectsBlobStore({ blobs: { context: true } }), store);
+    assert.deepEqual(getStoreInputs, [
+      { consistency: 'strong', name: 'site-objects', siteID: 'site-with-objects', token: 'token-objects' },
+    ]);
+  });
+});
+
 test('artifact stores use explicit strong API config when site ID and token are configured', async () => {
   await withCleanWorkflowBlobEnv(async () => {
     const store = createFakeStore();
@@ -343,11 +367,13 @@ test('core blob store diagnostics identify Lambda context for all admin stores',
     process.env.SITE_ID = 'fallback-site-5678';
     const diagnostics = getCoreBlobStoreSourceDiagnostics({ blobs: { context: true } });
 
-    assert.deepEqual(Object.keys(diagnostics), ['workflows', 'artifactIndex', 'artifacts']);
+    assert.deepEqual(Object.keys(diagnostics), ['workflows', 'siteObjects', 'artifactIndex', 'artifacts']);
     assert.equal(diagnostics.workflows.storeName, 'workflows');
+    assert.equal(diagnostics.siteObjects.storeName, 'site-objects');
     assert.equal(diagnostics.artifactIndex.storeName, 'artifact-index');
     assert.equal(diagnostics.artifacts.storeName, 'artifacts');
     assert.equal(diagnostics.workflows.source, 'lambda-context');
+    assert.equal(diagnostics.siteObjects.source, 'lambda-context');
     assert.equal(diagnostics.artifactIndex.source, 'lambda-context');
     assert.equal(diagnostics.artifacts.source, 'lambda-context');
     assert.equal(diagnostics.workflows.explicitApiConfigUsed, false);
