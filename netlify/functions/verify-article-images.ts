@@ -20,6 +20,8 @@ type LambdaEvent = {
 type VerifiedImage = {
   expected: string;
   resolvedUrl: string;
+  matchedUrl?: string;
+  matchedBy?: 'exact' | 'filename-stem';
   present: boolean;
   status?: number;
   contentType?: string;
@@ -75,21 +77,71 @@ const extractImageSources = (html: string, pageUrl: URL) => {
   const sources = new Set<string>();
   const imgTagPattern = /<img\b[^>]*>/gi;
   const srcPattern = /\bsrc\s*=\s*(["'])(.*?)\1/i;
+  const srcsetPattern = /\bsrcset\s*=\s*(["'])(.*?)\1/i;
 
-  for (const imgTag of html.matchAll(imgTagPattern)) {
-    const srcMatch = imgTag[0].match(srcPattern);
-    const src = srcMatch?.[2]?.trim();
-
-    if (!src) continue;
-
+  const addSource = (value: string | undefined) => {
+    const candidate = value?.trim();
+    if (!candidate) return;
     try {
-      sources.add(resolveUrl(src, pageUrl));
+      sources.add(resolveUrl(candidate, pageUrl));
     } catch {
       // Ignore malformed image sources in the page being verified.
+    }
+  };
+
+  for (const imgTag of html.matchAll(imgTagPattern)) {
+    addSource(imgTag[0].match(srcPattern)?.[2]);
+
+    // Astro's Image component emits optimized variants via srcset; each entry is
+    // "<url> <descriptor>".
+    const srcset = imgTag[0].match(srcsetPattern)?.[2];
+    for (const entry of srcset?.split(',') ?? []) {
+      addSource(entry.trim().split(/\s+/)[0]);
     }
   }
 
   return sources;
+};
+
+const getUrlBasename = (value: string) => {
+  try {
+    return new URL(value).pathname.split('/').pop() ?? '';
+  } catch {
+    return value.split('/').pop() ?? '';
+  }
+};
+
+const getFilenameStem = (filename: string) => filename.replace(/\.[a-z0-9]+$/i, '');
+
+/**
+ * Match an expected image against the page's extracted <img> sources.
+ *
+ * Astro's asset pipeline rewrites committed upload paths
+ * (~/assets/images/uploads/<slug>/<file>.<ext>) to hashed build URLs
+ * (/_astro/<file>.<hash>.<ext>, possibly with a different extension after optimization), so
+ * an exact URL match is impossible for the display paths a publish response reports. Exact
+ * matching is tried first; otherwise a source whose filename starts with the expected
+ * filename's stem is accepted.
+ */
+const matchExpectedImage = (
+  resolvedUrl: string,
+  expected: string,
+  extractedSources: Set<string>
+): { matchedUrl: string; matchedBy: 'exact' | 'filename-stem' } | undefined => {
+  if (extractedSources.has(resolvedUrl)) return { matchedUrl: resolvedUrl, matchedBy: 'exact' };
+
+  const expectedFilename = getUrlBasename(expected);
+  const expectedStem = getFilenameStem(expectedFilename);
+  if (!expectedStem) return undefined;
+
+  for (const source of extractedSources) {
+    const sourceFilename = getUrlBasename(source);
+    if (sourceFilename === expectedFilename || sourceFilename.startsWith(`${expectedStem}.`)) {
+      return { matchedUrl: source, matchedBy: 'filename-stem' };
+    }
+  }
+
+  return undefined;
 };
 
 const noStoreFetchHeaders = {
@@ -112,10 +164,13 @@ const verifyImage = async (expected: string, pageUrl: URL, extractedSources: Set
     };
   }
 
-  const present = extractedSources.has(resolvedUrl);
+  const match = matchExpectedImage(resolvedUrl, expected, extractedSources);
+  const present = Boolean(match);
+  // Fetch the URL the page actually serves (the hashed build asset when stem-matched).
+  const fetchUrl = match?.matchedUrl ?? resolvedUrl;
 
   try {
-    const response = await fetch(resolvedUrl, {
+    const response = await fetch(fetchUrl, {
       cache: 'no-store',
       headers: noStoreFetchHeaders,
     });
@@ -126,11 +181,14 @@ const verifyImage = async (expected: string, pageUrl: URL, extractedSources: Set
     return {
       expected,
       resolvedUrl,
+      ...(match ? { matchedUrl: match.matchedUrl, matchedBy: match.matchedBy } : {}),
       present,
       status: response.status,
       contentType,
       ok,
-      ...(!present ? { error: 'Expected image was not found in page <img> sources.' } : {}),
+      ...(!present
+        ? { error: 'Expected image was not found in page <img> src/srcset sources (exact or filename-stem match).' }
+        : {}),
       ...(response.status !== 200 ? { error: `Expected image returned status ${response.status}.` } : {}),
       ...(response.status === 200 && !hasImageContentType
         ? { error: 'Expected image did not return an image content-type.' }
@@ -140,6 +198,7 @@ const verifyImage = async (expected: string, pageUrl: URL, extractedSources: Set
     return {
       expected,
       resolvedUrl,
+      ...(match ? { matchedUrl: match.matchedUrl, matchedBy: match.matchedBy } : {}),
       present,
       ok: false,
       error: error instanceof Error ? error.message : 'Failed to fetch expected image.',
@@ -199,18 +258,31 @@ export const handler = async (event: LambdaEvent) => {
       .filter((image) => !image.ok)
       .map((image) => `${image.expected}: ${image.error ?? 'Verification failed.'}`);
     const verified = pageResponse.status === 200 && images.every((image) => image.ok);
+    // A non-200 page usually means the deploy for the verified commit is not live yet
+    // (Netlify deploys take 30–120s) — the result is INCONCLUSIVE, not a proven defect.
+    const inconclusive = pageResponse.status !== 200;
 
     return jsonResponse(200, {
       verified,
+      inconclusive,
+      pageStatus: pageResponse.status,
       url: pageUrl.toString(),
       expectedImages,
       images,
-      ...(pageResponse.status !== 200 ? { errors: [`Page returned status ${pageResponse.status}.`, ...errors] } : {}),
+      ...(pageResponse.status !== 200
+        ? {
+            errors: [
+              `Page returned status ${pageResponse.status}. If this publish just completed, the deploy may not be live yet — poll deploy_status until deployStatus is "ready", then retry.`,
+              ...errors,
+            ],
+          }
+        : {}),
       ...(pageResponse.status === 200 && errors.length > 0 ? { errors } : {}),
     });
   } catch (error) {
     return jsonResponse(502, {
       verified: false,
+      inconclusive: true,
       url: pageUrl.toString(),
       expectedImages,
       images: [],

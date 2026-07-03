@@ -5,6 +5,16 @@
  */
 
 import type { ArticleBodyNode } from '../../schema/article-content-v1.ts';
+import type { ArtifactPreviewLoader } from './artifact-preview.ts';
+
+// Optional authenticated loader (configured by publish.astro via setArtifactPreviewLoader)
+// that resolves an image artifact blobKey to a previewable object URL through the
+// identity-gated admin-get-blob-image function.
+let artifactPreviewLoader: ArtifactPreviewLoader | undefined;
+
+export function setArtifactPreviewLoader(loader: ArtifactPreviewLoader | undefined): void {
+  artifactPreviewLoader = loader;
+}
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -245,24 +255,81 @@ function renderCallout(node: ArticleBodyNode): HTMLElement {
   return aside;
 }
 
+// Mirrors the publish pipeline: articleBodyToMarkdown only embeds media when
+// rendering.placement === 'inline', and hero-designated nodes render in the frontmatter hero
+// slot instead. Without this note the admin preview shows an image the live page will drop.
+function unrenderedPlacementNote(node: ArticleBodyNode): HTMLElement | undefined {
+  if (node.public.media?.type && node.public.media.type !== 'image') return undefined;
+
+  const isHeroNode = node.id === 'n_hero' || (node.rendering?.presentation as string | undefined) === 'hero';
+  if (isHeroNode) return undefined;
+
+  const placement = node.rendering?.placement;
+  if (placement === 'inline') return undefined;
+
+  return el(
+    'p',
+    { class: 'dl-node-placement-note text-xs text-orange-500 dark:text-orange-400 mt-1 text-center' },
+    `Not rendered in the published article body: rendering.placement is ${
+      placement ? `'${placement}'` : 'missing'
+    } — set it to 'inline' (or make this the hero/featured image).`
+  );
+}
+
 function renderImage(node: ArticleBodyNode): HTMLElement {
   const figure = el('figure', { class: 'dl-node dl-node-image my-2' });
   const media = node.public.media;
 
   const srcRaw = media?.src ?? '';
   const isArtifact = isArtifactRef(srcRaw);
+  const placementNote = unrenderedPlacementNote(node);
 
-  // Artifact references cannot be resolved to a browser URL in admin mode
+  // Artifact references are blob-store keys, not URLs. With a configured preview loader the
+  // bytes are fetched through the identity-gated admin-get-blob-image endpoint; otherwise
+  // (or when loading fails) a descriptive placeholder remains.
   if (isArtifact) {
     const label = media?.alt || node.public.title || 'Image';
-    figure.append(
-      renderImagePlaceholder(label, `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`)
+    const placeholder = renderImagePlaceholder(
+      label,
+      artifactPreviewLoader
+        ? `Loading artifact preview… (${srcRaw.slice(0, 40)}…)`
+        : `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`
     );
+    figure.append(placeholder);
+
+    if (artifactPreviewLoader) {
+      void artifactPreviewLoader(srcRaw)
+        .then((previewUrl) => {
+          if (!previewUrl) {
+            placeholder.replaceWith(
+              renderImagePlaceholder(label, `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`)
+            );
+            return;
+          }
+          const img = el('img', {
+            class: 'w-full rounded-md aspect-video object-cover bg-gray-200 dark:bg-slate-700',
+            src: previewUrl,
+            alt: media?.alt || node.public.title || '',
+            loading: 'lazy',
+          });
+          img.addEventListener('error', () => {
+            img.replaceWith(renderImagePlaceholder(label, 'Artifact preview failed to load'));
+          });
+          placeholder.replaceWith(img);
+        })
+        .catch(() => {
+          placeholder.replaceWith(
+            renderImagePlaceholder(label, `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`)
+          );
+        });
+    }
+
     if (media?.caption || node.public.body) {
       figure.append(
         el('figcaption', { class: 'text-sm text-muted mt-2 text-center' }, media?.caption || node.public.body || '')
       );
     }
+    if (placementNote) figure.append(placementNote);
     return figure;
   }
 
@@ -298,6 +365,8 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
       );
     }
   }
+
+  if (placementNote) figure.append(placementNote);
 
   return figure;
 }
