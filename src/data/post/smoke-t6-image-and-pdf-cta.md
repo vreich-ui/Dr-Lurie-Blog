@@ -1,23 +1,22 @@
 ---
-publishDate: 2026-07-03T12:43:44.743Z
-published_time: 2026-07-03T12:43:44.743Z
+publishDate: 2026-07-03T17:53:43.174Z
+published_time: 2026-07-03T17:53:43.174Z
 title: "Smoke T6 Image And PDF CTA"
-excerpt: "A compact mixed-media smoke test."
-image: "~/assets/images/uploads/smoke-t6-image-and-pdf-cta/tiny-image-pdf-hero.png"
+excerpt: "Hero image plus PDF CTA."
+image: "~/assets/images/uploads/smoke-t6-image-and-pdf-cta/smoke-t6-hero.png"
 tags:
   - "smoke-test"
   - "image-pipeline"
-metadata:
-  description: "Image and PDF CTA smoke test article."
+  - "t6"
 ---
-### Image And PDF Publish Path Check
+### Smoke T6 Image And PDF CTA
 
-This compact smoke-test article validates that a hero image and a PDF download call to action can publish together.
+This hero node should render through the featured image field.
 
-### Download The Smoke Test Guide
+### Download the checklist
 
-Use this CTA to validate PDF link materialization alongside a hero image.
+The CTA link should be rewritten to the public PDF path.
 
 <p class="not-prose my-7">
-  <a class="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950" href="/pdf/req_smoke_image_pdf_20260703_06/43b626ece9b3571d52d277f52119532b679bbf8ee36758efb2570174b424f12a.pdf">Download guide</a>
+  <a class="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950" href="/pdf/req_smoke_t6_pdf_20260703_06/5fcc619ca91b692cc160834282e445f94fafcab5ebd1e9b678998625249d5fd5.pdf">Download</a>
 </p>
