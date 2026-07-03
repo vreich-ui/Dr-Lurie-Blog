@@ -25,3 +25,6 @@ pnpm-lock.yaml
 # local test/build/blob artifacts
 .tmp/
 .netlify/
+
+# build-diff harness report output
+.build-diff-report/
