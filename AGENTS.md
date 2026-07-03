@@ -19,6 +19,49 @@
 - Include PR dependency note lines like `Depends on: #<PR_NUMBER>` when a PR depends on another PR, and clearly mention the required merge order.
 - Warn before creating parallel PRs that touch the same files, because they are likely to create sequencing conflicts or duplicate work.
 
+## CMS architecture project — mandatory context
+
+If any task touches the object store, Pages, Sections, Navigation, Taxonomy, 
+Site config, Templates, or anything under `docs/cms-architecture/`, read these 
+files in full before writing any code, in this order:
+
+1. `docs/cms-architecture/cms-architecture-consolidated.md` — master reference: 
+   the 12 concepts, standing constraints, amendment log, settled decisions, 
+   tiered agent-operability contract, and phase plan.
+2. `docs/cms-architecture/roadmap.yaml` — the task's `depends_on`, `mode`, 
+   and recommended model/effort. **Check `depends_on` before starting — if a 
+   dependency isn't built and merged yet, stop and say so.**
+3. For full schema/type detail: `docs/cms-architecture/02-architecture-and-schema.md`
+4. For permission/action rules: `docs/cms-architecture/03-mapping-and-agent-contract.md`
+5. For the specific task brief: `docs/cms-architecture/phase-0-cc-briefs/T0.X-*.md`
+
+## CMS hard constraints — every task, no exceptions
+
+- `admin-workflow-lock.ts`, `publish-article.ts`, and existing article MCP 
+  tools are **off-limits**. Do not modify, import from, or refactor them.
+- Every new file is additive. The public site must remain fully functional 
+  after every commit.
+- One task, one commit. Do not bundle cleanup or unrelated fixes.
+- Commit message must begin with the task ID, e.g. `T0.1: envelope schema module`.
+- Do not open a PR unless the task brief explicitly says to.
+- Do not push to `main`. Work on the task's integration branch.
+- `route`-kind nav targets are intentional — do not "fix" them to `page`-kind.
+- The `content_revision` counter and the `version` counter are independent — 
+  never conflate them. Lock writes bump `version` only, never `content_revision`.
+
+## CMS amendment log — bake these in, do not miss them
+
+When implementing body schemas (T0.2), all of the following must be present:
+- M-1: `NavItem.description`
+- M-2: `groups[].slot`
+- M-5: `groups[].target` (stored, not rendered as a link)
+- M-7: `NavItem.icon` and `NavItem.ariaLabel`
+- Transitional `NavTarget {kind:'route', href}` union variant (deliberate, not a placeholder)
+- `shared_ref` union member in section schema
+- Transitional `content_grid` static-cards variant
+
+M-8 (grid manual+fallback) is deliberately NOT in T0.2 — it lands in T3.3.
+
 ## Remote MCP / ChatGPT connector notes
 
 - Production ChatGPT/Atlas connects to `https://drluriescience.netlify.app/mcp` and should see the connector name `Dr_Lurie_MCP_Server`.
