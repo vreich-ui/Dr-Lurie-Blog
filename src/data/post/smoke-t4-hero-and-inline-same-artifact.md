@@ -1,21 +1,20 @@
 ---
-publishDate: 2026-07-03T12:37:43.966Z
-published_time: 2026-07-03T12:37:43.966Z
+publishDate: 2026-07-03T17:48:34.658Z
+published_time: 2026-07-03T17:48:34.658Z
 title: "Smoke T4 Hero And Inline Same Artifact"
-excerpt: "A compact same-artifact hero and inline smoke test."
-image: "~/assets/images/uploads/smoke-t4-hero-and-inline-same-artifact/tiny-same.png"
+excerpt: "Same artifact as hero and inline."
+image: "~/assets/images/uploads/smoke-t4-hero-and-inline-same-artifact/smoke-t4-same.png"
 tags:
   - "smoke-test"
   - "image-pipeline"
-metadata:
-  description: "Same artifact hero and inline smoke test."
+  - "t4"
 ---
-### Same Artifact Hero Check
+### Smoke T4 Hero And Inline Same Artifact
 
-This node is designated as the hero source and intentionally has no inline placement.
+This hero node should align with the featured image artifact.
 
-### Same Artifact Inline Check
+### Inline use of the same artifact
 
-![same image inline](~/assets/images/uploads/smoke-t4-hero-and-inline-same-artifact/tiny-same.png)
+![smoke test inline same](~/assets/images/uploads/smoke-t4-hero-and-inline-same-artifact/smoke-t4-same.png)
 
-This node reuses the same uploaded image as an inline body image.
+This section should render the same artifact once in the body while the hero uses the same materialized image.
