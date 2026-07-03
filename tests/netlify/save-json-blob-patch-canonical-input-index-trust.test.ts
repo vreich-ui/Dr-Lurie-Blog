@@ -209,7 +209,9 @@ describe('patchCanonicalInput — artifact-index trust (same-request)', () => {
     const resp = await patchHeroSrc(store, indexStore, requestId, lockToken, record.version, deletedRef.blobKey);
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs artifact indexes/);
+    // The rejection must say WHY: the artifact exists but is soft-deleted.
+    assert.match(parseBody(resp).error ?? '', /soft-deleted/);
+    assert.match(parseBody(resp).error ?? '', new RegExp(deletedRef.blobKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
 
   it('REJECTS a wrong-request pointer that does not resolve in the index', async () => {
@@ -227,7 +229,9 @@ describe('patchCanonicalInput — artifact-index trust (same-request)', () => {
     const resp = await patchHeroSrc(store, indexStore, requestId, lockToken, record.version, otherRequestRef);
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs artifact indexes/);
+    // The rejection must say WHY: the blobKey belongs to a different request.
+    assert.match(parseBody(resp).error ?? '', /belongs to request 'req_other_flow_topic_20260702_09'/);
+    assert.match(parseBody(resp).error ?? '', /Cross-request artifact references are not accepted/);
   });
 
   it('REJECTS malformed, base64 data-URI, and remote-URL values (existing behavior preserved)', async () => {
@@ -316,6 +320,6 @@ describe('patchCanonicalInput — artifact-index trust (same-request)', () => {
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs artifact indexes/);
+    assert.match(parseBody(resp).error ?? '', /not in the artifact index for request/);
   });
 });

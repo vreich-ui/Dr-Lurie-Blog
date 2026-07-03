@@ -25,7 +25,13 @@ import { getHeader } from '../lib/admin-auth.js';
 import { collectBlobListItems, type BlobListResult } from '../lib/blob-list.js';
 import { getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import { getArtifactReferenceIssue } from '../lib/artifacts.js';
-import { listArtifactReferencesForRequest, type ArtifactIndexStore } from '../lib/artifact-index.js';
+import { type ArtifactIndexStore } from '../lib/artifact-index.js';
+import {
+  MAJOR_KEY_ARTIFACT_REF_RE,
+  describeUntrustedArtifactRef,
+  gatherTrustedArtifactRefs,
+  type ArtifactTrustIndex,
+} from '../lib/artifact-trust.js';
 import {
   allowedAgentNames,
   workflowStatuses,
@@ -853,6 +859,47 @@ const getAdminPublishDraftValidationFailure = (input: ContentSourceV1, body: Wor
   });
 };
 
+// Pattern-only validation: no filesystem access in Netlify functions.
+// Accepts artifact pointers (image/{reqId}/{sha256}.{ext}) and known upload prefixes.
+// Skips validation for non-image media types (video, audio, embed may use https:// URLs).
+// Shared by patch_agent_output (final_article) and create_request (admin_publish_draft): an
+// image node whose src is a plain https:// URL or data: URI would never be materialized at
+// publish, so accepting it silently at any entry point is a data-loss trap.
+const ARTICLE_BODY_NODE_SRC_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z0-9]+$/i;
+const getInvalidArticleBodyNodeMediaSrcResponse = (
+  action: WorkflowAction,
+  articleBody: Record<string, unknown>,
+  pathPrefix: string
+): JsonResponse | null => {
+  if (!Array.isArray(articleBody.nodes)) return null;
+  for (let i = 0; i < articleBody.nodes.length; i += 1) {
+    const node = articleBody.nodes[i];
+    if (!isRecord(node) || Array.isArray(node)) continue;
+    const pub = (node as Record<string, unknown>).public;
+    if (!isRecord(pub) || Array.isArray(pub)) continue;
+    const media = (pub as Record<string, unknown>).media;
+    if (!isRecord(media) || Array.isArray(media)) continue;
+    const src = (media as Record<string, unknown>).src;
+    if (src === undefined) continue;
+    const mediaType = (media as Record<string, unknown>).type;
+    if (mediaType !== undefined && mediaType !== 'image') continue;
+    if (
+      typeof src !== 'string' ||
+      src === '' ||
+      (!ARTICLE_BODY_NODE_SRC_RE.test(src) &&
+        !src.startsWith('src/assets/images/uploads/') &&
+        !src.startsWith('~/assets/images/uploads/'))
+    ) {
+      return jsonResponse(400, {
+        action,
+        error: `${pathPrefix}.nodes[${i}].public.media.src is not a valid artifact pointer or upload path: "${String(src)}". Image media must reference an uploaded artifact (image/{requestId}/{sha256}.{ext}) — remote URLs and data URIs are never materialized at publish.`,
+        error_code: 'invalid_node_media_src',
+      });
+    }
+  }
+  return null;
+};
+
 export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
   const missingRequestId = requireRequestId(body);
   if (missingRequestId) return missingRequestId;
@@ -868,6 +915,18 @@ export const createRequest = async (store: WorkflowBlobStore, body: WorkflowRequ
 
   const adminPublishDraftValidationFailure = getAdminPublishDraftValidationFailure(parsedInput.data, body);
   if (adminPublishDraftValidationFailure) return adminPublishDraftValidationFailure;
+
+  if (body.validation_mode === 'admin_publish_draft') {
+    const articleBody = parsedInput.data.content?.article_body;
+    if (articleBody && typeof articleBody === 'object') {
+      const mediaSrcFailure = getInvalidArticleBodyNodeMediaSrcResponse(
+        body.action,
+        articleBody as unknown as Record<string, unknown>,
+        'input.content.article_body'
+      );
+      if (mediaSrcFailure) return mediaSrcFailure;
+    }
+  }
 
   const existingRecord = await loadRecord(store, body.request_id as string);
 
@@ -1034,45 +1093,12 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
       });
     }
 
-    // Pattern-only validation: no filesystem access in Netlify functions.
-    // Accepts artifact pointers (image/{reqId}/{sha256}.{ext}) and known upload prefixes.
-    // Skips validation for non-image media types (video, audio, embed may use https:// URLs).
-    const ARTICLE_BODY_NODE_SRC_RE = /^image\/[^/]+\/[0-9a-f]{64}\.[a-z0-9]+$/i;
-    const validateArticleBodyNodes = (
-      articleBody: Record<string, unknown>,
-      pathPrefix: string
-    ): ReturnType<typeof jsonResponse> | null => {
-      if (!Array.isArray(articleBody.nodes)) return null;
-      for (let i = 0; i < articleBody.nodes.length; i += 1) {
-        const node = articleBody.nodes[i];
-        if (!isRecord(node) || Array.isArray(node)) continue;
-        const pub = (node as Record<string, unknown>).public;
-        if (!isRecord(pub) || Array.isArray(pub)) continue;
-        const media = (pub as Record<string, unknown>).media;
-        if (!isRecord(media) || Array.isArray(media)) continue;
-        const src = (media as Record<string, unknown>).src;
-        if (src === undefined) continue;
-        const mediaType = (media as Record<string, unknown>).type;
-        if (mediaType !== undefined && mediaType !== 'image') continue;
-        if (
-          typeof src !== 'string' ||
-          src === '' ||
-          (!ARTICLE_BODY_NODE_SRC_RE.test(src) &&
-            !src.startsWith('src/assets/images/uploads/') &&
-            !src.startsWith('~/assets/images/uploads/'))
-        ) {
-          return jsonResponse(400, {
-            action: body.action,
-            error: `${pathPrefix}.nodes[${i}].public.media.src is not a valid artifact pointer or upload path: "${String(src)}".`,
-            error_code: 'invalid_node_media_src',
-          });
-        }
-      }
-      return null;
-    };
-
     if (isRecord(outputRecord.article_body) && !Array.isArray(outputRecord.article_body)) {
-      const err = validateArticleBodyNodes(outputRecord.article_body as Record<string, unknown>, 'article_body');
+      const err = getInvalidArticleBodyNodeMediaSrcResponse(
+        body.action,
+        outputRecord.article_body as Record<string, unknown>,
+        'article_body'
+      );
       if (err) return err;
     }
 
@@ -1081,7 +1107,8 @@ export const patchAgentOutput = async (store: WorkflowBlobStore, body: WorkflowR
         ? (outputRecord.content as Record<string, unknown>)
         : undefined;
     if (contentRecord && isRecord(contentRecord.article_body) && !Array.isArray(contentRecord.article_body)) {
-      const err = validateArticleBodyNodes(
+      const err = getInvalidArticleBodyNodeMediaSrcResponse(
+        body.action,
         contentRecord.article_body as Record<string, unknown>,
         'content.article_body'
       );
@@ -1571,8 +1598,6 @@ export const setPublishedTime = async (store: WorkflowBlobStore, body: WorkflowR
 // patch_canonical_input helpers
 // ---------------------------------------------------------------------------
 
-/** Matches a Major Key artifact reference: {image|pdf}/{id}/{sha256-64-hex}.{ext} */
-const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 const getMediaTypeFromArtifactRef = (value: string) => (value.toLowerCase().startsWith('pdf/') ? 'document' : 'image');
 /** Reject legacy local repo paths that the article publisher cannot resolve. */
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
@@ -1608,51 +1633,8 @@ type CanonicalInputAuditPatch = {
   new_value_summary: string;
 };
 
-/**
- * Collect every trusted blobKey for this record.
- *
- * Two sources, unified so the pre-publish validator trusts the same artifacts the
- * publish-time resolver (mcp.ts `getArtifactReferencesForRequest`) will resolve:
- *   1. `record.agent_outputs[*].output.artifactReferences` — refs the agent explicitly
- *      wrote into the workflow record (fast path / cache; kept for backward compatibility).
- *   2. The artifact-index store for this record's `request_id` — every non-deleted
- *      ArtifactReference under `by-request/<requestId>/` (fallback `request-artifacts/
- *      <requestId>/`), the same store/prefixes `list_artifacts_for_request` reads.
- *
- * Cross-request pointers are intentionally out of scope here (they remain publish-only /
- * opt-in). When `indexStore` is omitted only source (1) is consulted.
- */
-const gatherTrustedArtifactRefs = async (
-  record: WorkflowRecord,
-  indexStore?: ArtifactIndexStore
-): Promise<Set<string>> => {
-  const refs = new Set<string>();
-
-  for (const agentOutput of Object.values(record.agent_outputs)) {
-    if (!agentOutput) continue;
-    const out = agentOutput.output;
-    if (!isRecord(out)) continue;
-    const artifactRefs = out.artifactReferences;
-    if (!Array.isArray(artifactRefs)) continue;
-
-    for (const ref of artifactRefs) {
-      if (isRecord(ref) && typeof ref.blobKey === 'string' && MAJOR_KEY_ARTIFACT_REF_RE.test(ref.blobKey)) {
-        refs.add(ref.blobKey);
-      }
-    }
-  }
-
-  if (indexStore) {
-    const indexRefs = await listArtifactReferencesForRequest(indexStore, record.request_id);
-    for (const ref of indexRefs) {
-      if (typeof ref.blobKey === 'string' && MAJOR_KEY_ARTIFACT_REF_RE.test(ref.blobKey)) {
-        refs.add(ref.blobKey);
-      }
-    }
-  }
-
-  return refs;
-};
+// Trust gathering lives in netlify/lib/artifact-trust.ts (gatherTrustedArtifactRefs), shared
+// with admin-patch-workflow.ts so the agent path and the human admin path cannot diverge.
 
 const getRecordSlug = (record: WorkflowRecord): string | undefined => {
   const payload = record.input.publication?.publish_payload;
@@ -1741,7 +1723,7 @@ const validateTrustedArtifactRef = (
   action: WorkflowAction,
   path: string,
   value: string,
-  trustedRefs: Set<string>
+  trust: ArtifactTrustIndex
 ): JsonResponse | undefined => {
   const unsafeErr = rejectUnsafeStringValue(action, path, value);
   if (unsafeErr) return unsafeErr;
@@ -1753,11 +1735,8 @@ const validateTrustedArtifactRef = (
     });
   }
 
-  if (!trustedRefs.has(value)) {
-    return jsonResponse(400, {
-      action,
-      error: `${path} "${value}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
-    });
+  if (!trust.trusted.has(value)) {
+    return jsonResponse(400, { action, error: describeUntrustedArtifactRef(path, value, trust) });
   }
 
   return undefined;
@@ -1769,7 +1748,7 @@ const applyNodePatch = (
   action: WorkflowAction,
   node: ArticleBodyNode,
   patch: NodePatch,
-  trustedRefs: Set<string>,
+  trust: ArtifactTrustIndex,
   requestSlug?: string
 ):
   | { ok: true; node: ArticleBodyNode; auditEntries: CanonicalInputAuditPatch[] }
@@ -1806,12 +1785,12 @@ const applyNodePatch = (
         };
       }
 
-      if (!embeddedSlug && !trustedRefs.has(newSrc)) {
+      if (!embeddedSlug && !trust.trusted.has(newSrc)) {
         return {
           ok: false,
           error: jsonResponse(400, {
             action,
-            error: `node_patches[${patch.node_id}].public_media_src "${newSrc}" is not found in agent_outputs artifact indexes for this record. Only artifact references already saved in agent_outputs are accepted.`,
+            error: describeUntrustedArtifactRef(`node_patches[${patch.node_id}].public_media_src`, newSrc, trust),
           }),
         };
       }
@@ -1947,14 +1926,14 @@ const validateImageAssetRegisterEntries = (
 const requireRegisterTrustedRefs = (
   action: WorkflowAction,
   records: ImageAssetRecord[],
-  trustedRefs: Set<string>
+  trust: ArtifactTrustIndex
 ): JsonResponse | undefined => {
   for (let i = 0; i < records.length; i += 1) {
     const entry = records[i];
     for (const field of ['url', 'repoPath'] as const) {
       const value = entry[field];
       if (!value) continue;
-      const err = validateTrustedArtifactRef(action, `replace_image_asset_register[${i}].${field}`, value, trustedRefs);
+      const err = validateTrustedArtifactRef(action, `replace_image_asset_register[${i}].${field}`, value, trust);
       if (err) return err;
     }
   }
@@ -1965,14 +1944,14 @@ const requireRegisterTrustedRefs = (
 const validatePublishPayloadImageRefs = (
   action: WorkflowAction,
   payload: NonNullable<WorkflowRequest['promote_publish_payload']>,
-  trustedRefs: Set<string>
+  trust: ArtifactTrustIndex
 ): JsonResponse | undefined => {
   if (!isRecord(payload)) return undefined;
 
   for (const field of ['featuredImage', 'existingFeaturedImagePath'] as const) {
     const value = payload[field];
     if (typeof value !== 'string' || !value) continue;
-    const err = validateTrustedArtifactRef(action, `promote_publish_payload.${field}`, value, trustedRefs);
+    const err = validateTrustedArtifactRef(action, `promote_publish_payload.${field}`, value, trust);
     if (err) return err;
   }
 
@@ -1989,7 +1968,7 @@ const validatePublishPayloadImageRefs = (
           action,
           `promote_publish_payload.${arrayField}[${i}].${subField}`,
           value,
-          trustedRefs
+          trust
         );
         if (err) return err;
       }
@@ -2007,7 +1986,7 @@ const validatePublishPayloadImageRefs = (
         action,
         `promote_publish_payload.artifactReferences[${i}].blobKey`,
         blobKey,
-        trustedRefs
+        trust
       );
       if (err) return err;
     }
@@ -2101,16 +2080,16 @@ export const patchCanonicalInput = async (
       return jsonResponse(409, { action: body.action, conflict: true });
     }
 
-    const trustedRefs = await gatherTrustedArtifactRefs(previousRecord, indexStore);
+    const trust = await gatherTrustedArtifactRefs(previousRecord, indexStore);
     const requestSlug = getRecordSlug(previousRecord);
 
     // Trusted-ref checks for register and publish payload (require the loaded record)
     if (hasImageRegisterReplacement && validatedImageRegister !== undefined) {
-      const regErr = requireRegisterTrustedRefs(body.action, validatedImageRegister, trustedRefs);
+      const regErr = requireRegisterTrustedRefs(body.action, validatedImageRegister, trust);
       if (regErr) return regErr;
     }
     if (hasPublishPayload && validatedPublishPayload !== undefined) {
-      const payloadErr = validatePublishPayloadImageRefs(body.action, validatedPublishPayload, trustedRefs);
+      const payloadErr = validatePublishPayloadImageRefs(body.action, validatedPublishPayload, trust);
       if (payloadErr) return payloadErr;
     }
 
@@ -2138,7 +2117,7 @@ export const patchCanonicalInput = async (
           });
         }
 
-        const result = applyNodePatch(body.action, patchedNodes[nodeIndex], patch, trustedRefs, requestSlug);
+        const result = applyNodePatch(body.action, patchedNodes[nodeIndex], patch, trust, requestSlug);
         if (!result.ok) return result.error;
 
         patchedNodes[nodeIndex] = result.node;
