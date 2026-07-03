@@ -232,7 +232,11 @@ const normalizeOptionalAgentName = (value: unknown, fieldName: string) => {
   return normalizeAgentName(value, fieldName);
 };
 
-const createRequestId = () => `req_${randomUUID()}`;
+const missingRequestIdError = () =>
+  toolError(
+    'request_id is required and is not auto-generated. Supply a request_id matching req_<flow>_<topic>_<yyyymmdd>_<nn> (lowercase snake_case), e.g. req_publish_drlurie_20260703_01.',
+    { error_code: 'missing_request_id' }
+  );
 
 const stringSchema = (description?: string) => ({
   type: 'string',
@@ -435,8 +439,17 @@ const articleBodyNodeJsonSchema = objectSchema(
         ctaLink: stringSchema('Visible CTA URL.'),
         label: stringSchema('Visible label.'),
         media: objectSchema({
-          type: { type: 'string', enum: ['image', 'video', 'audio', 'embed'] },
-          src: stringSchema('Visible media source URL.'),
+          type: {
+            type: 'string',
+            enum: ['image', 'video', 'audio', 'embed', 'document'],
+            description:
+              "Media kind. Use 'image' for pictures and 'document' for PDFs; document media renders as a link, not an image.",
+          },
+          title: stringSchema('Visible media title; used as link text for document media.'),
+          contentType: stringSchema('Optional MIME type of the media bytes, e.g. image/png or application/pdf.'),
+          src: stringSchema(
+            'Media source. For images this MUST be an artifact pointer (image/{requestId}/{sha256}.{ext}) from an uploaded artifact — plain https:// URLs and data: URIs are rejected for image media. For documents use the PDF artifact blobKey (pdf/{requestId}/{sha256}.pdf).'
+          ),
           alt: stringSchema('Accessible visible alt text.'),
           caption: stringSchema('Visible media caption.'),
         }),
@@ -777,7 +790,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         ),
         validation_mode: adminPublishValidationModeSchema,
       },
-      ['input', 'validation_mode']
+      ['input', 'request_id', 'validation_mode']
     ),
   },
 
@@ -798,7 +811,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           'Optional initial next agent; defaults to input.workflow.next_agent or reader_insight.'
         ),
       },
-      ['input']
+      ['input', 'request_id']
     ),
   },
   {
@@ -880,7 +893,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_publish_by_time',
     description:
-      'Set input.publication.published_time. Future timestamps save only; current/past timestamps publish content.article_body through the secure article publisher and write a publish receipt. Requires checkout lock_token.',
+      'Set input.publication.published_time and run the article publisher. Omitted or current/past timestamps publish now (status "published"). A FUTURE timestamp also materializes media and commits the article file (status "time_set") — the page stays hidden by the published_time gate until that time passes and the site rebuilds. null unpublishes (status "unpublished"): the article is re-committed with published_time: null. In every mode the publisher validates and commits; a failed publish leaves published_time unchanged. Requires checkout lock_token.',
     inputSchema: objectSchema(
       {
         request_id: stringSchema(),
@@ -901,11 +914,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       '',
       'Supported repairs (at least one required):',
       '  node_patches: replace or remove public.media.src/alt/caption on specific article_body nodes by node_id.',
-      '    public_media_src MUST be a Major Key artifact reference (image/{id}/{sha256}.{ext}) already in agent_outputs.',
+      '    public_media_src MUST be a trusted Major Key artifact reference (image/{id}/{sha256}.{ext}): an artifact',
+      '    uploaded for THIS request (visible via list_artifacts_for_request) or already saved in agent_outputs.',
       '    Legacy repo paths (src/assets/...), remote URLs (https://...), and data URIs are always rejected.',
       '  replace_image_asset_register: replace input.media.image_asset_register[] wholesale.',
-      '    Entries must pass ImageAssetRecord schema; url/repoPath that are Major Key refs must be in agent_outputs.',
-      '    Legacy paths, remote URLs, and data URIs are rejected.',
+      '    Entries must pass ImageAssetRecord schema; url/repoPath that are Major Key refs must be trusted',
+      "    (uploaded for this request or in agent_outputs). Legacy paths, remote URLs, and data URIs are rejected.",
       '  promote_publish_payload: set input.publication.publish_payload from a complete PublishPayload object.',
       '    Image-bearing fields (featuredImage, existingFeaturedImagePath, images[].src/url/blobKey,',
       '    mediaEntries[].src/url/blobKey, artifactReferences[].blobKey) must be trusted Major Key artifact refs.',
@@ -1016,13 +1030,13 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'create_artifact_upload_intent',
     description:
-      'Create a short-lived scoped direct artifact upload intent. New clients should call this tool first, then upload raw bytes with HTTP POST application/octet-stream to /api/artifacts/upload using the returned requiredHeaders. Keeps binary bytes out of MCP arguments and returns no server secrets other than the scoped upload token.',
+      'Create a short-lived scoped direct artifact upload intent. New clients should call this tool first, then upload raw bytes with HTTP POST application/octet-stream to /api/artifacts/upload using the returned requiredHeaders. Keeps binary bytes out of MCP arguments and returns no server secrets other than the scoped upload token. Accepted image formats: JPEG, PNG, WebP only — the upload decodes the bytes and rejects GIF, AVIF, SVG, and anything that does not decode as the declared type. PDF uploads must start with %PDF-.',
     inputSchema: artifactUploadIntentInputSchema(),
   },
   {
     name: 'create_artifact_from_url',
     description:
-      'Fallback tool to ingest an artifact from a public HTTPS URL. Use this when the MCP client cannot perform a direct HTTP POST of binary bytes. The server fetches the URL and saves it as a request artifact.',
+      'Fallback tool to ingest an artifact from a public HTTPS URL. Use this when the MCP client cannot perform a direct HTTP POST of binary bytes. The server fetches the URL, verifies expectedSizeBytes/expectedSha256 against the fetched bytes, and saves it as a request artifact. Accepted image formats: JPEG, PNG, WebP only (GIF, AVIF, and SVG are rejected); PDF bytes must start with %PDF-.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1044,7 +1058,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'save_artifact',
-    description: `Legacy small-artifact single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Generated binary files/images should use create_artifact_upload_intent plus raw HTTP POST /api/artifacts/upload. Writes final artifact bytes and an ArtifactReference index for the request. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
+    description: `Legacy small-artifact single-shot byte upload. Required: requestId, artifactKind, contentType, payload. Store only the returned ArtifactReference; never invent blobKey values, URLs, or repo paths. Generated binary files/images should use create_artifact_upload_intent plus raw HTTP POST /api/artifacts/upload. Writes final artifact bytes and an ArtifactReference index for the request. Accepted image formats: JPEG, PNG, WebP only (GIF, AVIF, and SVG are rejected); PDF bytes must start with %PDF-. Returns artifact, complete=true, deduped; dedup is success and skips rewriting bytes.`,
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns this artifact.'),
@@ -1071,7 +1085,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'list_artifacts_for_request',
-    description: `List ArtifactReference metadata for a requestId. Required: requestId. Reads the request artifact index only; it does not read or write artifact bytes. Returns artifacts array. ${mediaPortabilityWarning}`,
+    description: `List ArtifactReference metadata for a requestId. Required: requestId. Reads the request artifact index only; it does not read or write artifact bytes. Soft-deleted artifacts are excluded — an artifact you uploaded but cannot see here has been deleted (use get_artifact_metadata to inspect it). Returns artifacts array. ${mediaPortabilityWarning}`,
     inputSchema: objectSchema(
       { requestId: stringSchema('Workflow request id whose artifact references should be listed.') },
       ['requestId']
@@ -1079,7 +1093,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'get_artifact_metadata',
-    description: 'Get full ArtifactReference metadata for a requestId and sha256. Does not read artifact bytes.',
+    description:
+      'Get full ArtifactReference metadata for a requestId and sha256. Does not read artifact bytes. Unlike list_artifacts_for_request, this also returns soft-deleted references — check for a deletedAtISO field; a reference carrying it is excluded from listing, trust checks, and publish until restored.',
     inputSchema: objectSchema(
       {
         requestId: stringSchema('Workflow request id that owns the artifact.'),
@@ -3046,12 +3061,13 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
     case 'ping':
       return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
     case 'save_json_blob_create_request':
+      if (toNonEmptyString(input.request_id) === undefined) return missingRequestIdError();
       return callAction(
         event,
         {
           action: 'create_request',
           input: input.input,
-          request_id: input.request_id ?? createRequestId(),
+          request_id: input.request_id,
           current_agent: input.current_agent,
           next_agent: input.next_agent,
           validation_mode: input.validation_mode ?? 'admin_publish_draft',
@@ -3060,12 +3076,13 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       );
 
     case 'save_json_blob_create_article_draft':
+      if (toNonEmptyString(input.request_id) === undefined) return missingRequestIdError();
       return callAction(
         event,
         {
           action: 'create_request',
           input: input.input,
-          request_id: input.request_id ?? createRequestId(),
+          request_id: input.request_id,
           current_agent: input.current_agent,
           next_agent: input.next_agent,
           validation_mode: 'admin_publish_draft',
