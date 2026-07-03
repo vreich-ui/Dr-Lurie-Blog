@@ -84,7 +84,7 @@ export const objectRecordSchema = z.object({
   body: z.unknown(),
   publication: publicationStateSchema,
   review: reviewStateSchema.optional(),
-  lock: workflowLockRecordSchema,
+  lock: workflowLockRecordSchema.optional(),
   history: z.array(historyEntrySchema),
   version: z.number(),
   content_revision: z.number(),
