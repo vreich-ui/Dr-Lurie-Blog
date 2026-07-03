@@ -69,6 +69,17 @@ Companion references: `docs/agents/artifact-upload-paths.md` (upload transport),
   body. A hero-designated node whose artifact is NOT the resolved hero-slot image appears
   nowhere and the publish response carries a `hero_image_not_rendered` warning naming the
   orphaned node — fix it by aligning `featuredImage` with the node's artifact.
+- **Missing hero/featured image is allowed by default.** The hero image resolves ONLY from an
+  explicit `featuredImage` or `existingFeaturedImagePath` — there is no fallback that guesses
+  one from the article's media. If neither is supplied, publish still succeeds (2xx) with no
+  `image:` frontmatter and a `missing_featured_image` warning; if that was intentional, no
+  action is needed, otherwise set `featuredImage` and republish.
+- **`HERO_IMAGE_REQUIRED` is an operator-level setting, not agent-controlled.** It is an
+  environment flag the site operator sets ahead of a proper per-site/per-article settings
+  system; agents cannot set or override it per request. When enabled, a publish that resolves
+  no hero/featured image is rejected with 422 `featured_image_required` before any commit —
+  even when the article has no images at all — instead of emitting the
+  `missing_featured_image` warning.
 - Document (PDF) node: `public.media = { type: 'document', title, src: pdf blobKey }` —
   renders as a link to `/pdf/{requestId}/{sha256}.pdf`. PDF CTA links (`public.ctaLink`)
   must use the exact `artifactReference.blobKey`; derived or placeholder links are rejected
@@ -107,7 +118,7 @@ Classify every publish attempt with exactly one of these statuses:
 | Status | Condition |
 |---|---|
 | **PUBLISHED** | publish returned 2xx AND (no warnings) AND `verify_article_images` ran against the live deploy with `verified: true`. |
-| **PUBLISHED_WITH_DEFECTS** | publish returned 2xx, but the response carried warnings (`image_not_rendered`, `hero_image_not_rendered`) OR verification against the LIVE deploy (`inconclusive: false`) reported missing/failed images. The article is live; something visual is wrong. Report the specific warning/image. |
+| **PUBLISHED_WITH_DEFECTS** | publish returned 2xx, but the response carried warnings (`image_not_rendered`, `hero_image_not_rendered`, `missing_featured_image`) OR verification against the LIVE deploy (`inconclusive: false`) reported missing/failed images. The article is live; something visual is wrong (or, for `missing_featured_image`, possibly nothing — confirm intent). Report the specific warning/image. |
 | **PUBLISHED_VERIFICATION_INCONCLUSIVE** | publish returned 2xx, but verification could not run conclusively: deploy never reached `"ready"` within your polling budget, or `verify_article_images` returned `inconclusive: true`. Do NOT report this as success or failure — say verification is pending and what to re-run. |
 | **PUBLISH_FAILED** | publish returned non-2xx (400/403/409/422/5xx). Nothing was committed; `published_time` is unchanged. Use the error message to self-diagnose (see §7) and repair before retrying. |
 
@@ -128,6 +139,8 @@ Never report PUBLISHED without a conclusive verification; never report PUBLISH_F
 | 422 "stale image references" | The reference JSON exists but backing bytes are missing; re-upload the image. |
 | 409 on create/patch | Record/version conflict — re-read the record and retry with the current version. |
 | 423 | Lock expired or held by someone else — checkout again. |
+| `featured_image_required` (422) | This site has `HERO_IMAGE_REQUIRED` enabled (operator-level, not agent-controlled) and no hero resolved. Nothing was committed. Set `featuredImage` to an uploaded artifact blobKey, or `existingFeaturedImagePath` to an existing committed image path, and retry. |
+| `missing_featured_image` (warning, not a rejection) | Publish succeeded with no hero/featured image because neither `featuredImage` nor `existingFeaturedImagePath` was supplied. If intentional, no action needed; otherwise set `featuredImage` and republish. |
 
 ---
 
