@@ -36,6 +36,27 @@ const postArtifact = async (body: Record<string, unknown>) => {
   return JSON.parse(response.body) as { artifact: Record<string, unknown> };
 };
 
+// HERO_IMAGE_REQUIRED is read once, at module load, mirroring the ADMIN_TOOLS_ENABLED pattern in
+// mcp.ts. `publishHandler` above was already imported (with the flag off) before any test body
+// runs, so testing the flag=true path requires a fresh module instance loaded with the env var set
+// first. A cache-busting query string forces Node's ESM loader to evaluate a new module instance.
+let heroRequiredPublishHandler: typeof publishHandler | undefined;
+const getHeroRequiredPublishHandler = async (): Promise<typeof publishHandler> => {
+  if (!heroRequiredPublishHandler) {
+    const previous = process.env.HERO_IMAGE_REQUIRED;
+    process.env.HERO_IMAGE_REQUIRED = 'true';
+    const mod = (await import(
+      '../../netlify/functions/publish-article.js' + '?heroImageRequired=true'
+    )) as {
+      handler: typeof publishHandler;
+    };
+    heroRequiredPublishHandler = mod.handler;
+    if (previous === undefined) delete process.env.HERO_IMAGE_REQUIRED;
+    else process.env.HERO_IMAGE_REQUIRED = previous;
+  }
+  return heroRequiredPublishHandler;
+};
+
 test('publish-article resolves artifactReferences into base64 media blobs', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
@@ -1957,7 +1978,7 @@ test('publish-article resolves artifact pointers in article_body nodes via index
   }
 });
 
-test('publish-article sets image frontmatter to first artifact entry when no explicit featuredImage is named', async () => {
+test('publish-article leaves image frontmatter unset and warns missing_featured_image when no explicit featuredImage is named', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY = 'false';
@@ -1966,7 +1987,7 @@ test('publish-article sets image frontmatter to first artifact entry when no exp
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
-  const requestId = `featured-fallback-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = 'req_publish_featuredfallback_20260703_01';
   const imageBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
@@ -2012,7 +2033,9 @@ test('publish-article sets image frontmatter to first artifact entry when no exp
   }) as typeof fetch;
 
   try {
-    // No featuredImage or existingFeaturedImagePath — image: frontmatter must fall back to the artifact
+    // No featuredImage or existingFeaturedImagePath, and the artifact is never referenced by any
+    // article_body node — image: frontmatter must stay unset (no auto-promoted hero) and the
+    // response must carry a missing_featured_image warning.
     const response = await publishHandler({
       httpMethod: 'POST',
       headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
@@ -2028,12 +2051,14 @@ test('publish-article sets image frontmatter to first artifact entry when no exp
     assert.equal(response.statusCode, 201, response.body);
     const markdownContent = blobWrites[0]?.content ?? '';
     assert.ok(
-      markdownContent.includes('image:'),
-      `Expected "image:" in frontmatter.\nGot: ${markdownContent.slice(0, 300)}`
+      !markdownContent.match(/^image:\s*/m),
+      `Expected no "image:" in frontmatter.\nGot: ${markdownContent.slice(0, 300)}`
     );
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
     assert.ok(
-      markdownContent.includes('~/assets/images/uploads/featured-fallback-test/'),
-      `Expected upload path in image frontmatter.\nGot: ${markdownContent.slice(0, 300)}`
+      body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -2358,15 +2383,29 @@ test('publish-article resolves cross-request pdf/ node pointer alongside image a
 
     const markdownContent = blobWrites[0]?.content ?? '';
 
-    // image: frontmatter must point to the image, never the PDF
+    // No explicit featuredImage/existingFeaturedImagePath was given, so frontmatter must NOT
+    // auto-promote either artifact. The image node is id 'n_hero', so articleBodyToMarkdown also
+    // suppresses its inline embed (hero-designated nodes render their image via the frontmatter
+    // hero slot, never inline) — with no hero slot winner, the image renders nowhere, and the
+    // pre-existing hero-suppression-collision warning (hero_image_not_rendered) fires alongside
+    // missing_featured_image.
     assert.ok(
-      markdownContent.includes('image:') && markdownContent.includes('~/assets/images/uploads/'),
-      `Expected image: frontmatter with image upload path.\nGot: ${markdownContent.slice(0, 400)}`
+      !markdownContent.match(/^image:\s*/m),
+      `Expected no image: frontmatter without an explicit featuredImage.\nGot: ${markdownContent.slice(0, 400)}`
     );
     assert.ok(
-      !markdownContent.includes('~/assets/documents/uploads/') ||
-        !markdownContent.match(/^image:\s*~\/assets\/documents\//m),
-      `image: frontmatter must not point to a document path.\nGot: ${markdownContent.slice(0, 400)}`
+      !markdownContent.includes('![Hero image]'),
+      `hero-designated node's image must not render inline (suppressed for the hero slot).\nGot: ${markdownContent.slice(0, 600)}`
+    );
+
+    const responseBody = JSON.parse(response.body) as { warnings?: Array<{ code: string; node_id: string | null }> };
+    assert.ok(
+      responseBody.warnings?.some((w) => w.code === 'hero_image_not_rendered' && w.node_id === 'n_hero'),
+      `expected hero_image_not_rendered warning naming n_hero, got: ${JSON.stringify(responseBody.warnings)}`
+    );
+    assert.ok(
+      responseBody.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(responseBody.warnings)}`
     );
 
     // PDF file must be committed to the tree (this is what fails before the fix)
@@ -2514,13 +2553,26 @@ test('publish-article renders multiple distinct inline image artifacts with no f
     assert.doesNotMatch(markdown, /image\/[a-z0-9._-]+\/[a-f0-9]{64}\.[a-z0-9]+/i);
     assert.ok(!markdown.includes(artifactOne.blobKey) && !markdown.includes(artifactTwo.blobKey));
 
-    // FINDING (documents actual, intended behavior — see the 'sets image frontmatter to first
-    // artifact entry when no explicit featuredImage is named' test): with no explicit featuredImage,
-    // the handler falls back to promoting the FIRST image into the frontmatter image: field, so the
-    // first inline image is also the page hero (og:image). The task's spec expected no image: field;
-    // suppressing this fallback is a product decision flagged in the PR, not a bug, so this test
-    // asserts the current behavior rather than an empty image: field.
-    assert.match(markdown, new RegExp(`image:\\s*"${displayRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    // With no explicit featuredImage, frontmatter must NOT auto-promote either inline image — that
+    // silent fallback is what caused the promoted image to render twice (once as hero, once inline).
+    assert.ok(
+      !markdown.match(/^image:\s*/m),
+      `Expected no image: frontmatter without an explicit featuredImage.\nGot: ${markdown.slice(0, 400)}`
+    );
+
+    // Each image's display path appears exactly once across the committed Markdown (no duplicate render).
+    const displayRootOccurrences = markdown.split(displayRoot).length - 1;
+    assert.equal(
+      displayRootOccurrences,
+      2,
+      `expected each of the two images to appear exactly once, got ${displayRootOccurrences}:\n${markdown}`
+    );
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -2646,6 +2698,696 @@ test('publish-article publishes an image featuredImage alongside a PDF CTA link'
         `raw pdf blobKey must not appear unrewritten (near ${JSON.stringify(boundary)}):\n${markdown}`
       );
     }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Missing hero/featured image handling (no silent auto-selection) + HERO_IMAGE_REQUIRED
+// ---------------------------------------------------------------------------
+
+test('publish-article publishes with no images and no featuredImage, warning missing_featured_image', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const slug = 'missing-hero-no-images-test';
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'Missing Hero No Images Test',
+        markdown: '# No images anywhere in this article\n',
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+    assert.ok(!markdown.match(/^image:\s*/m), `expected no image: frontmatter, got: ${markdown.slice(0, 300)}`);
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article renders a single inline image exactly once with no featuredImage (T3 regression)', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const requestId = 'req_test_t3_regression_20260703_01';
+  const slug = 't3-regression-single-inline-test';
+  const displayRoot = `~/assets/images/uploads/${slug}/`;
+
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'single-inline.png',
+    encoding: 'base64',
+    payload: (await createImageBytes('png')).toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string };
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'T3 Regression Single Inline Test',
+        publishDate: '2026-07-03T00:00:00.000Z',
+        artifactReferences: [artifact],
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_only',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: { title: 'Only', media: { type: 'image', src: artifact.blobKey, alt: 'Only image' } },
+            },
+          ],
+        },
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+
+    assert.ok(!markdown.match(/^image:\s*/m), `expected no image: frontmatter, got: ${markdown.slice(0, 300)}`);
+
+    const occurrences = markdown.split(displayRoot).length - 1;
+    assert.equal(occurrences, 1, `expected the image display path exactly once, got ${occurrences}:\n${markdown}`);
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article renders two inline images exactly once each with no featuredImage (T5 regression)', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const requestId = 'req_test_t5_regression_20260703_01';
+  const slug = 't5-regression-two-inline-test';
+  const displayRoot = `~/assets/images/uploads/${slug}/`;
+
+  const uploadOne = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'first.png',
+    encoding: 'base64',
+    payload: (await createImageBytes('png')).toString('base64'),
+  });
+  const uploadTwo = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/webp',
+    filename: 'second.webp',
+    encoding: 'base64',
+    payload: (await createImageBytes('webp')).toString('base64'),
+  });
+  const artifactOne = uploadOne.artifact as { blobKey: string; sha256: string };
+  const artifactTwo = uploadTwo.artifact as { blobKey: string; sha256: string };
+  assert.notEqual(artifactOne.sha256, artifactTwo.sha256, 'the two images must be distinct artifacts');
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'T5 Regression Two Inline Test',
+        publishDate: '2026-07-03T00:00:00.000Z',
+        artifactReferences: [artifactOne, artifactTwo],
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_one',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: { title: 'One', media: { type: 'image', src: artifactOne.blobKey, alt: 'First image' } },
+            },
+            {
+              id: 'n_two',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: { title: 'Two', media: { type: 'image', src: artifactTwo.blobKey, alt: 'Second image' } },
+            },
+          ],
+        },
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+
+    assert.ok(!markdown.match(/^image:\s*/m), `expected no image: frontmatter, got: ${markdown.slice(0, 300)}`);
+
+    const occurrences = markdown.split(displayRoot).length - 1;
+    assert.equal(occurrences, 2, `expected each of the two images exactly once, got ${occurrences}:\n${markdown}`);
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article with an explicit featuredImage renders the hero correctly with no missing_featured_image warning', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const requestId = 'req_test_explicit_featured_20260703_01';
+  const slug = 'explicit-featured-image-test';
+
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'hero.png',
+    encoding: 'base64',
+    payload: (await createImageBytes('png')).toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string };
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'Explicit Featured Image Test',
+        publishDate: '2026-07-03T00:00:00.000Z',
+        featuredImage: artifact.blobKey,
+        artifactReferences: [artifact],
+        markdown: '# Explicit featured image test\n',
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+    assert.match(markdown, /^image:\s*"~\/assets\/images\/uploads\/explicit-featured-image-test\//m);
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
+    assert.ok(
+      !body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `did not expect missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects a missing featured image with 422 before any GitHub write when HERO_IMAGE_REQUIRED is true', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const heroRequiredHandler = await getHeroRequiredPublishHandler();
+  const requestId = 'req_test_hero_required_with_images_20260703_01';
+  const slug = 'hero-required-with-images-test';
+
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'unused-inline.png',
+    encoding: 'base64',
+    payload: (await createImageBytes('png')).toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string };
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    requestedUrls.push(`${method} ${url}`);
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await heroRequiredHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'Hero Required With Images Test',
+        artifactReferences: [artifact],
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_one',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: { title: 'One', media: { type: 'image', src: artifact.blobKey, alt: 'Inline only' } },
+            },
+          ],
+        },
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.equal(body.error, 'featured_image_required');
+
+    assert.deepEqual(
+      requestedUrls.filter((url) => /\/git\/(blobs|trees|commits|refs)/.test(url)),
+      [],
+      `expected no GitHub write calls, got: ${JSON.stringify(requestedUrls)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article rejects a missing featured image with 422 when HERO_IMAGE_REQUIRED is true even with zero images in the article', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+
+  const heroRequiredHandler = await getHeroRequiredPublishHandler();
+  const slug = 'hero-required-no-images-test';
+
+  const originalFetch = globalThis.fetch;
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    requestedUrls.push(`${method} ${url}`);
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await heroRequiredHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'Hero Required No Images Test',
+        markdown: '# No images at all in this article body\n',
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 422, response.body);
+    const body = JSON.parse(response.body) as { error?: string };
+    assert.equal(body.error, 'featured_image_required');
+
+    assert.deepEqual(
+      requestedUrls.filter((url) => /\/git\/(blobs|trees|commits|refs)/.test(url)),
+      [],
+      `expected no GitHub write calls, got: ${JSON.stringify(requestedUrls)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article edit via existingFeaturedImagePath resolves the hero with no missing_featured_image warning', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const existingBytes = await createImageBytes('png');
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes('/contents/src/data/post/existing-hero-edit-test.md')) {
+      return new Response('not found', { status: 404 });
+    }
+    if (url.includes('/contents/src/assets/images/uploads/shared/existing-hero-edit.png')) {
+      return Response.json({ type: 'file', encoding: 'base64', content: existingBytes.toString('base64') });
+    }
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug: 'existing-hero-edit-test',
+        title: 'Existing Hero Edit Test',
+        markdown: '# Existing hero edit test\n',
+        existingFeaturedImagePath: 'src/assets/images/uploads/shared/existing-hero-edit.png',
+        images: [{ repoPath: 'src/assets/images/uploads/shared/existing-hero-edit.png' }],
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+    assert.match(markdown, /image:\s*"~\/assets\/images\/uploads\/shared\/existing-hero-edit\.png"/);
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
+    assert.ok(
+      !body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `did not expect missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article node with no placement is never auto-promoted to hero; warns image_not_rendered and missing_featured_image (T7 regression)', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const requestId = 'req_test_t7_regression_20260703_01';
+  const slug = 't7-regression-no-placement-test';
+  const displayRoot = `~/assets/images/uploads/${slug}/`;
+
+  const upload = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'no-placement.png',
+    encoding: 'base64',
+    payload: (await createImageBytes('png')).toString('base64'),
+  });
+  const artifact = upload.artifact as { blobKey: string };
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'T7 Regression No Placement Test',
+        publishDate: '2026-07-03T00:00:00.000Z',
+        artifactReferences: [artifact],
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_noplacement',
+              kind: 'content',
+              public: {
+                title: 'No Placement',
+                media: { type: 'image', src: artifact.blobKey, alt: 'No placement image' },
+              },
+            },
+          ],
+        },
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+
+    assert.ok(!markdown.match(/^image:\s*/m), `expected no image: frontmatter, got: ${markdown.slice(0, 300)}`);
+
+    const occurrences = markdown.split(displayRoot).length - 1;
+    assert.ok(
+      occurrences <= 1,
+      `image must never render more than once (never auto-promoted), got ${occurrences}:\n${markdown}`
+    );
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string; node_id: string | null }> };
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'image_not_rendered' && w.node_id === 'n_noplacement'),
+      `expected image_not_rendered warning for n_noplacement, got: ${JSON.stringify(body.warnings)}`
+    );
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publish-article resolves frontmatter hero to the explicit featuredImage over a colliding n_hero node (T8 regression)', async () => {
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  process.env.NETLIFY = 'false';
+  process.env.NETLIFY_SITE_ID = '';
+  process.env.GITHUB_CONTENT_TOKEN = 'github-test-token';
+  process.env.GITHUB_REPOSITORY = 'owner/repo';
+  process.env.GITHUB_BRANCH = 'main';
+  delete process.env.HERO_IMAGE_REQUIRED;
+
+  const requestId = 'req_test_t8_regression_20260703_01';
+  const slug = 't8-regression-hero-collision-test';
+
+  const uploadA = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/png',
+    filename: 'hero-node-image.png',
+    encoding: 'base64',
+    payload: (await createImageBytes('png')).toString('base64'),
+    metadata: { filename: 'Hero Node Image.PNG' },
+  });
+  const uploadB = await postArtifact({
+    requestId,
+    artifactKind: 'image',
+    contentType: 'image/webp',
+    filename: 'featured-image.webp',
+    encoding: 'base64',
+    payload: (await createImageBytes('webp')).toString('base64'),
+    metadata: { filename: 'Featured Image.WEBP' },
+  });
+  const artifactA = uploadA.artifact as { blobKey: string; sha256: string };
+  const artifactB = uploadB.artifact as { blobKey: string; sha256: string };
+  assert.notEqual(artifactA.sha256, artifactB.sha256, 'the two images must be distinct artifacts');
+
+  const originalFetch = globalThis.fetch;
+  const blobWrites: Array<{ content: string; encoding: string }> = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (url.includes(`/contents/src/data/post/${slug}.md`)) return new Response('not found', { status: 404 });
+    if (url.includes('/git/ref/heads/main')) return Response.json({ object: { sha: 'base-sha' } });
+    if (url.endsWith('/git/commits/base-sha')) return Response.json({ tree: { sha: 'base-tree' } });
+    if (url.endsWith('/git/blobs') && method === 'POST') {
+      blobWrites.push(JSON.parse(String(init?.body)) as { content: string; encoding: string });
+      return Response.json({ sha: `blob-${blobWrites.length}` });
+    }
+    if (url.endsWith('/git/trees') && method === 'POST') return Response.json({ sha: 'new-tree' });
+    if (url.endsWith('/git/commits') && method === 'POST') return Response.json({ sha: 'new-commit' });
+    if (url.includes('/git/refs/heads/main') && method === 'PATCH') return Response.json({ ok: true });
+    return new Response(`unexpected ${method} ${url}`, { status: 500 });
+  }) as typeof fetch;
+
+  try {
+    const response = await publishHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        slug,
+        title: 'T8 Regression Hero Collision Test',
+        publishDate: '2026-07-03T00:00:00.000Z',
+        featuredImage: artifactB.blobKey,
+        artifactReferences: [artifactA, artifactB],
+        article_body: {
+          schema_version: 'article_body.v1',
+          nodes: [
+            {
+              id: 'n_hero',
+              kind: 'content',
+              rendering: { placement: 'inline' },
+              public: { title: 'Hero', media: { type: 'image', src: artifactA.blobKey, alt: 'Hero node image' } },
+            },
+          ],
+        },
+        overwrite: false,
+      }),
+    });
+
+    assert.equal(response.statusCode, 201, response.body);
+    const markdown = blobWrites[0]?.content ?? '';
+
+    assert.match(
+      markdown,
+      /^image:\s*"~\/assets\/images\/uploads\/t8-regression-hero-collision-test\/featured-image\.webp"/m
+    );
+
+    const body = JSON.parse(response.body) as { warnings?: Array<{ code: string; node_id: string | null }> };
+    assert.ok(
+      body.warnings?.some((w) => w.code === 'hero_image_not_rendered' && w.node_id === 'n_hero'),
+      `expected hero_image_not_rendered warning naming n_hero, got: ${JSON.stringify(body.warnings)}`
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

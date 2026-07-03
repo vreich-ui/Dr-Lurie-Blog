@@ -142,6 +142,10 @@ const MAX_DEPLOY_WAIT_TIMEOUT_SECONDS = 120;
 const MIN_DEPLOY_POLL_INTERVAL_SECONDS = 1;
 const MAX_DEPLOY_POLL_INTERVAL_SECONDS = 30;
 
+// Stopgap global flag ahead of a proper per-site/per-article settings system (operator-level,
+// not agent-controlled) — mirrors the ADMIN_TOOLS_ENABLED env-var pattern in netlify/functions/mcp.ts.
+const HERO_IMAGE_REQUIRED = process.env.HERO_IMAGE_REQUIRED === 'true';
+
 const clampNumber = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const parseBoundedNumber = (value: unknown, defaultValue: number, min: number, max: number) => {
@@ -472,7 +476,7 @@ const getPublishedMediaDisplayPath = (mediaEntries: MediaEntry[], requestedPath:
   })?.displayPath;
 };
 
-type PublishWarning = { code: string; node_id: string; reason: string };
+type PublishWarning = { code: string; node_id: string | null; reason: string };
 
 /**
  * Surface image nodes that will be silently skipped by the Markdown renderer.
@@ -1687,28 +1691,53 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const entriesToValidate = existingFeaturedImage ? [...mediaEntries, existingFeaturedImage] : mediaEntries;
     await validateMediaEntries(entriesToValidate);
     publishImagePaths = entriesToValidate.map((entry) => entry.path);
-    // Only image-kind media may populate the featured image frontmatter field.
-    // Document-kind entries (PDFs) must never become the article's image: path.
-    const imagePath =
-      uploadedImagePath ??
-      existingFeaturedImage?.displayPath ??
-      (
-        mediaEntries.find((e) => e.artifactReference && e.kind === 'image') ??
-        mediaEntries.find((e) => e.kind === 'image')
-      )?.displayPath;
+    // imagePath resolves ONLY from explicit, agent-provided signals (an explicit featuredImage
+    // or existingFeaturedImagePath that resolved to a media entry). There is deliberately no
+    // fallback that guesses a featured image from mediaEntries — a silently auto-selected hero
+    // both invents behavior the agent never requested and can collide with that same image
+    // rendering inline, producing a duplicate render. See HERO_IMAGE_REQUIRED below and the
+    // missing_featured_image warning for how an unset hero is now surfaced instead.
+    const imagePath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
+
+    if (HERO_IMAGE_REQUIRED && !imagePath) {
+      return jsonResponse(422, {
+        error: 'featured_image_required',
+        message:
+          'This site requires a featured/hero image for every published article. ' +
+          'Set featuredImage to an artifact blobKey, or existingFeaturedImagePath ' +
+          'to an existing committed image path.',
+      });
+    }
 
     // Warn about image nodes that will be skipped by the body renderer. Compare against the
-    // EXPLICIT featured image only (not the auto-selected fallback above), so a lone image with
-    // no placement and no explicit featured designation is still flagged. The EFFECTIVE
-    // frontmatter imagePath (fallback included) is passed separately for the hero-suppression
-    // collision check: a hero node's inline image renders only when it IS the hero slot image.
-    const explicitFeaturedDisplayPath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
+    // EXPLICIT featured image (there is no other kind now — see imagePath above), so a lone
+    // image with no placement and no explicit featured designation is still flagged. The same
+    // value is passed as the effective image for the hero-suppression collision check: a hero
+    // node's inline image renders only when it IS the hero slot image.
+    const explicitFeaturedDisplayPath = imagePath;
     const warnings = collectUnrenderedImageWarnings(
       normalizedArticleBody,
       mediaEntries,
       explicitFeaturedDisplayPath,
       imagePath
     );
+
+    // No explicit hero/featured image was provided and HERO_IMAGE_REQUIRED does not force one —
+    // publish proceeds, but the agent gets a non-fatal signal so an unintentionally missing hero
+    // doesn't go unnoticed. Only fires when neither featuredImage nor existingFeaturedImagePath
+    // was supplied at all; an explicit reference that fails to resolve is a different error path
+    // (handled above, before this point is ever reached) and must not also emit this warning.
+    if (!HERO_IMAGE_REQUIRED && !imagePath && !featuredImage && !existingFeaturedImageInput) {
+      warnings.push({
+        code: 'missing_featured_image',
+        node_id: null,
+        reason:
+          'No featuredImage or existingFeaturedImagePath was provided. The article ' +
+          'was published with no hero/featured image. If this was intentional, no ' +
+          'action needed. Otherwise, set featuredImage to an uploaded image artifact ' +
+          'blobKey and republish.',
+      });
+    }
 
     let resolvedMarkdown: string;
     if (article_body) {

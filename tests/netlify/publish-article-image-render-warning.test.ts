@@ -104,7 +104,7 @@ const imageNode = (blobKey: string, rendering?: Record<string, unknown>) => ({
   ...(rendering ? { rendering } : {}),
 });
 
-test('inline image node publishes and appears in the committed Markdown body (no warning)', async () => {
+test('inline image node publishes and appears in the committed Markdown body (no image_not_rendered warning)', async () => {
   const { statusCode, body, markdown } = await publishArticleBody(
     'image-warn-inline',
     'req_test_imgwarn_inline_20260702_01',
@@ -114,7 +114,15 @@ test('inline image node publishes and appears in the committed Markdown body (no
   assert.equal(statusCode, 201);
   assert.ok(markdown.includes('!['), 'inline image must be embedded in the Markdown body');
   assert.ok(markdown.includes('~/assets/images/uploads/'), 'image should resolve to a published asset path');
-  assert.equal(body.warnings, undefined, 'a correctly-placed inline image must not warn');
+  assert.ok(
+    !body.warnings?.some((w) => w.code === 'image_not_rendered'),
+    'a correctly-placed inline image must not warn image_not_rendered'
+  );
+  // No featuredImage was supplied, so the publish is expected to warn missing_featured_image.
+  assert.ok(
+    body.warnings?.some((w) => w.code === 'missing_featured_image'),
+    `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+  );
 });
 
 test('image node with no placement still publishes (201) but returns an image_not_rendered warning', async () => {
