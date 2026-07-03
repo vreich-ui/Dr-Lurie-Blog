@@ -16,7 +16,14 @@
 import { z } from 'zod';
 
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import { getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import { type ArtifactIndexStore } from '../lib/artifact-index.js';
+import {
+  MAJOR_KEY_ARTIFACT_REF_RE,
+  describeUntrustedArtifactRef,
+  gatherTrustedArtifactRefs,
+  type ArtifactTrustIndex,
+} from '../lib/artifact-trust.js';
 import { publishPayloadSchema } from '../../src/schema/schema-v1.js';
 import type { WorkflowRecord } from '../../src/schema/schema-v1.js';
 
@@ -55,46 +62,32 @@ const nowIso = () => new Date().toISOString();
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
-// ─── artifact-ref validation (mirrors save-json-blob rules) ───────────────────
+// ─── artifact-ref validation (shared trust source with save-json-blob) ────────
+// gatherTrustedArtifactRefs comes from netlify/lib/artifact-trust.ts: agent_outputs refs
+// UNIONED with the request's artifact index, exactly like the agent-facing
+// patch_canonical_input path (PR #327). A duplicated agent_outputs-only implementation here
+// previously made the admin path reject index-trusted artifacts the MCP path accepts.
 
-const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 const BASE64_DATA_URI_RE = /^data:/i;
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 const REMOTE_URL_RE = /^https?:\/\//i;
 
-const gatherTrustedArtifactRefs = (record: WorkflowRecord): Set<string> => {
-  const refs = new Set<string>();
-  for (const agentOutput of Object.values(record.agent_outputs)) {
-    if (!agentOutput) continue;
-    const out = agentOutput.output;
-    if (!isRecord(out)) continue;
-    const refs_ = out.artifactReferences;
-    if (!Array.isArray(refs_)) continue;
-    for (const ref of refs_) {
-      if (isRecord(ref) && typeof ref.blobKey === 'string' && MAJOR_KEY_ARTIFACT_REF_RE.test(ref.blobKey)) {
-        refs.add(ref.blobKey);
-      }
-    }
-  }
-  return refs;
-};
-
-const validateImageRef = (path: string, value: string, trustedRefs: Set<string>): string | undefined => {
+const validateImageRef = (path: string, value: string, trust: ArtifactTrustIndex): string | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return `${path} must not be a data URI.`;
   if (LEGACY_REPO_PATH_RE.test(value)) return `${path} is a legacy repo path. Provide a Major Key artifact reference.`;
   if (REMOTE_URL_RE.test(value))
     return `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`;
   if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value))
     return `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`;
-  if (!trustedRefs.has(value)) return `${path} "${value}" is not in the agent artifact index for this record.`;
+  if (!trust.trusted.has(value)) return describeUntrustedArtifactRef(path, value, trust);
   return undefined;
 };
 
-const validatePayloadImageRefs = (payload: Record<string, unknown>, trustedRefs: Set<string>): string | undefined => {
+const validatePayloadImageRefs = (payload: Record<string, unknown>, trust: ArtifactTrustIndex): string | undefined => {
   for (const field of ['featuredImage', 'existingFeaturedImagePath']) {
     const value = payload[field];
     if (typeof value !== 'string' || !value) continue;
-    const err = validateImageRef(`promote_publish_payload.${field}`, value, trustedRefs);
+    const err = validateImageRef(`promote_publish_payload.${field}`, value, trust);
     if (err) return err;
   }
 
@@ -107,7 +100,7 @@ const validatePayloadImageRefs = (payload: Record<string, unknown>, trustedRefs:
       for (const subField of ['src', 'url', 'blobKey']) {
         const value = item[subField];
         if (typeof value !== 'string' || !value) continue;
-        const err = validateImageRef(`promote_publish_payload.${arrayField}[${i}].${subField}`, value, trustedRefs);
+        const err = validateImageRef(`promote_publish_payload.${arrayField}[${i}].${subField}`, value, trust);
         if (err) return err;
       }
     }
@@ -120,7 +113,7 @@ const validatePayloadImageRefs = (payload: Record<string, unknown>, trustedRefs:
       if (!isRecord(item)) continue;
       const blobKey = item['blobKey'];
       if (typeof blobKey !== 'string' || !blobKey) continue;
-      const err = validateImageRef(`promote_publish_payload.artifactReferences[${i}].blobKey`, blobKey, trustedRefs);
+      const err = validateImageRef(`promote_publish_payload.artifactReferences[${i}].blobKey`, blobKey, trust);
       if (err) return err;
     }
   }
@@ -157,7 +150,11 @@ const lockErrorResponse = (action: string, record: WorkflowRecord, kind: 'lock_e
 
 // ─── action handlers ──────────────────────────────────────────────────────────
 
-export const handlePatchCanonicalInput = async (store: Store, body: AdminPatchBody) => {
+export const handlePatchCanonicalInput = async (
+  store: Store,
+  body: AdminPatchBody,
+  indexStore?: ArtifactIndexStore
+) => {
   if (!body.promote_publish_payload) {
     return jsonResponse(400, {
       action: body.action,
@@ -188,8 +185,8 @@ export const handlePatchCanonicalInput = async (store: Store, body: AdminPatchBo
   }
 
   if (isRecord(validatedPayload)) {
-    const trustedRefs = gatherTrustedArtifactRefs(record);
-    const imgErr = validatePayloadImageRefs(validatedPayload as Record<string, unknown>, trustedRefs);
+    const trust = await gatherTrustedArtifactRefs(record, indexStore);
+    const imgErr = validatePayloadImageRefs(validatedPayload as Record<string, unknown>, trust);
     if (imgErr) return jsonResponse(400, { action: body.action, error: imgErr });
   }
 
@@ -296,9 +293,18 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
   try {
     const store = await getWorkflowBlobStore(event);
-    return body.action === 'patch_canonical_input'
-      ? await handlePatchCanonicalInput(store, body)
-      : await handleSetPublishedTime(store, body);
+    if (body.action !== 'patch_canonical_input') return await handleSetPublishedTime(store, body);
+
+    let indexStore: ArtifactIndexStore | undefined;
+    try {
+      indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
+    } catch (error) {
+      // Trust falls back to agent_outputs-only when the index store is unreachable, rather
+      // than failing the whole admin patch.
+      console.warn('admin-patch-workflow could not open the artifact index store.', { error });
+    }
+
+    return await handlePatchCanonicalInput(store, body, indexStore);
   } catch (error) {
     console.error('admin-patch-workflow failed', { action: body.action, error });
     return jsonResponse(500, { error: 'Workflow patch could not be completed.' });

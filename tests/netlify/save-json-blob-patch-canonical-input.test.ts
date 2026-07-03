@@ -438,7 +438,7 @@ describe('patchCanonicalInput — node_patches', () => {
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs|trusted artifact/i);
+    assert.match(parseBody(resp).error ?? '', /not in the artifact index for request|trusted artifact/i);
   });
 
   it('returns 409 when node_id does not exist in article_body', async () => {
@@ -844,7 +844,7 @@ describe('patchCanonicalInput — replace_image_asset_register tighter validatio
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+    assert.match(parseBody(resp).error ?? '', /not in the artifact index for request/i);
   });
 
   it('rejects register entries with arbitrary remote URL in url', async () => {
@@ -977,7 +977,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+    assert.match(parseBody(resp).error ?? '', /not in the artifact index for request/i);
   });
 
   it('rejects promote_publish_payload.artifactReferences[].blobKey with guessed (untrusted) ref', async () => {
@@ -1006,7 +1006,7 @@ describe('patchCanonicalInput — promote_publish_payload image validation', () 
     });
 
     assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(parseBody(resp).error ?? '', /not found in agent_outputs/i);
+    assert.match(parseBody(resp).error ?? '', /not in the artifact index for request/i);
   });
 
   it('accepts promote_publish_payload with trusted PDF artifactReference', async () => {
