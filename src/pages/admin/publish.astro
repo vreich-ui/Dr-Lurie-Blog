@@ -2027,7 +2027,8 @@ const metadata = {
 <script>
   import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
   import { LockManager } from '~/lib/admin/lock-manager';
-  import { renderNode, wrapNode } from '~/lib/admin/node-renderer';
+  import { renderNode, setArtifactPreviewLoader, wrapNode } from '~/lib/admin/node-renderer';
+  import { createAdminArtifactPreviewLoader } from '~/lib/admin/artifact-preview';
   import { NodeEditor } from '~/lib/admin/node-editor';
   import { askAiForNode, renderSuggestionOverlay, showInstructionPopover } from '~/lib/admin/ai-suggestion';
   import { evaluateReadiness, readinessLevel } from '~/lib/admin/readiness-criteria';
@@ -2321,6 +2322,10 @@ const metadata = {
       if (!token) throw new Error('Not authenticated');
       return token;
     };
+
+    // Let the node renderer resolve image artifact blobKeys to real previews through the
+    // identity-gated admin-get-blob-image endpoint instead of permanent placeholders.
+    setArtifactPreviewLoader(createAdminArtifactPreviewLoader({ getToken }));
 
     // ── Auth shell ────────────────────────────────────────────────────────────
     const setAuthStatus = (msg: string) => {

@@ -1004,14 +1004,15 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'verify_article_images',
     description:
-      'Verify that a published article page contains expected image URLs and that each expected image is fetchable as an image. Server-only publish credentials are never accepted as inputs or returned.',
+      'Verify that a published article page contains the expected images and that each is fetchable as an image. TIMING: run this only after the publish deploy is live — Netlify deploys take 30-120s, so poll deploy_status with the publish commit until deployStatus is "ready" first; an immediate check hits the previous deploy. A response with inconclusive: true (page unreachable or non-200 pageStatus) means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png). Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem; each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
     inputSchema: objectSchema(
       {
-        url: stringSchema('Published article URL to fetch and inspect for <img> sources.'),
+        url: stringSchema('Published article URL to fetch and inspect for <img> src/srcset sources.'),
         expectedImages: {
           type: 'array',
-          items: stringSchema('Expected image URL or page-relative image path.'),
-          description: 'Expected image URLs or page-relative image paths that must appear in the article HTML.',
+          items: stringSchema('Expected image URL, page-relative image path, or ~/assets display path.'),
+          description:
+            'Expected images that must appear in the article HTML. Display paths (~/assets/images/uploads/...) are matched by filename stem against Astro-hashed build URLs.',
         },
       },
       ['url', 'expectedImages']
