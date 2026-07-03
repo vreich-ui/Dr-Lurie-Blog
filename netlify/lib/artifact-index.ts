@@ -1,10 +1,4 @@
-import {
-  isArtifactReference,
-  isDeletedArtifactReference,
-  safePathSegment,
-  type ArtifactKind,
-  type ArtifactReference,
-} from './artifacts.js';
+import { isArtifactReference, safePathSegment, type ArtifactKind, type ArtifactReference } from './artifacts.js';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 
 export type ArtifactIndexStore = {
@@ -136,8 +130,10 @@ const parseIndexJsonBlob = async (indexStore: ArtifactIndexStore, key: string): 
 
 /**
  * Resolve every non-deleted ArtifactReference stored under a request in the artifact-index
- * store. Prefers `by-request/<requestId>/` pointers and falls back to the full
- * `request-artifacts/<requestId>/` reference objects when no pointers exist.
+ * store. Reads BOTH `by-request/<requestId>/` pointers and the full
+ * `request-artifacts/<requestId>/` reference objects and merges them by sha256, so an
+ * artifact whose pointer write failed (index writes are not atomic) is still returned as
+ * long as its reference JSON exists — and vice versa.
  *
  * This is the single source of truth for "which artifacts belong to this request." It backs
  * both the publish-time resolver (mcp.ts `getArtifactReferencesForRequest`) and the
@@ -149,19 +145,24 @@ export const listArtifactReferencesForRequest = async (
   requestId: string
 ): Promise<ArtifactReference[]> => {
   const pointerPrefix = `by-request/${encodeURIComponent(requestId)}/`;
-  const pointerKeys = await listArtifactIndexKeys(indexStore, pointerPrefix);
+  const [pointerKeys, referenceKeys] = await Promise.all([
+    listArtifactIndexKeys(indexStore, pointerPrefix),
+    listArtifactIndexKeys(indexStore, `request-artifacts/${encodeURIComponent(requestId)}/`),
+  ]);
 
-  const artifacts = pointerKeys.length
-    ? await Promise.all(
-        pointerKeys.map(async (key) => resolveArtifactPointer(indexStore, await parseIndexJsonBlob(indexStore, key)))
-      )
-    : await Promise.all(
-        (await listArtifactIndexKeys(indexStore, `request-artifacts/${encodeURIComponent(requestId)}/`)).map((key) =>
-          parseIndexJsonBlob(indexStore, key)
-        )
-      );
+  const artifacts = await Promise.all([
+    ...pointerKeys.map(async (key) => resolveArtifactPointer(indexStore, await parseIndexJsonBlob(indexStore, key))),
+    ...referenceKeys.map((key) => parseIndexJsonBlob(indexStore, key)),
+  ]);
 
-  return artifacts.filter(
-    (artifact): artifact is ArtifactReference => artifact !== undefined && !isDeletedArtifactReference(artifact)
-  );
+  const referencesBySha256 = new Map<string, ArtifactReference>();
+  for (const artifact of artifacts) {
+    if (artifact === undefined || !isArtifactReference(artifact)) continue;
+    // Not isDeletedArtifactReference: its `value is ArtifactReference` predicate would narrow
+    // the surviving branch to `never`.
+    if (artifact.deletedAtISO) continue;
+    if (!referencesBySha256.has(artifact.sha256)) referencesBySha256.set(artifact.sha256, artifact);
+  }
+
+  return [...referencesBySha256.values()];
 };
