@@ -45,7 +45,7 @@ export type SaveArtifactBytesInput = Omit<ArtifactUploadTokenClaims, 'expiresAt'
 };
 
 export type SaveArtifactBytesResult =
-  | { ok: true; artifact: ArtifactReference; deduped: boolean; restored?: boolean }
+  | { ok: true; artifact: ArtifactReference; deduped: boolean }
   | { ok: false; statusCode: number; error: string };
 
 type BlobStore = Awaited<ReturnType<typeof getArtifactBlobStore>>;
@@ -362,14 +362,8 @@ export const saveArtifactBytes = async (input: SaveArtifactBytesInput): Promise<
       };
     }
 
-    // Re-uploading the exact bytes restores a soft-deleted reference: a successful upload must
-    // return an artifact that list_artifacts_for_request and the trust/publish paths accept,
-    // and a reference carrying deletedAtISO is excluded from all of them.
-    const restored = Boolean(existingReference.deletedAtISO || existingReference.deletedBy);
-    const { deletedAtISO: _deletedAtISO, deletedBy: _deletedBy, ...restoredReference } = existingReference;
-
-    await writeArtifactReferenceIndexes(indexStore, input.requestId, restoredReference);
-    return { ok: true, artifact: restoredReference, deduped: true, ...(restored ? { restored } : {}) };
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, existingReference);
+    return { ok: true, artifact: existingReference, deduped: true };
   }
 
   const existingBytes = await getArrayBuffer(artifactStore, reference.blobKey);

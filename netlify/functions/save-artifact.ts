@@ -234,15 +234,8 @@ const validateArtifactIntegrity = (event: LambdaEvent, input: UploadRequest, byt
   return undefined;
 };
 
-const normalizeUploadContentType = (contentType: string) => contentType.toLowerCase().split(';')[0]?.trim() ?? '';
-
 const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
-  // Match the direct-upload path (artifact-upload.ts validateArtifactBytes): image bytes are
-  // validated whenever EITHER the declared kind or the content type says image. Keying off the
-  // kind alone let image/* payloads uploaded under e.g. kind "attachment" skip sharp validation.
-  if (input.artifactKind !== ArtifactKind.Image && !normalizeUploadContentType(input.contentType).startsWith('image/')) {
-    return undefined;
-  }
+  if (input.artifactKind !== ArtifactKind.Image) return undefined;
 
   try {
     await validatePublishImageBytes({
@@ -262,27 +255,12 @@ const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
   return undefined;
 };
 
-const validatePdfArtifact = (input: UploadRequest, bytes: Buffer) => {
-  if (input.artifactKind !== ArtifactKind.Pdf && normalizeUploadContentType(input.contentType) !== 'application/pdf') {
-    return undefined;
-  }
-
-  if (bytes.subarray(0, 5).toString('utf8') !== '%PDF-') {
-    return jsonResponse(400, { error: 'Invalid PDF artifact: bytes must start with %PDF-.' });
-  }
-
-  return undefined;
-};
-
 const validateFinalArtifact = async (event: LambdaEvent, input: UploadRequest, bytes: Buffer, uploadId?: string) => {
   const integrityError = validateArtifactIntegrity(event, input, bytes, uploadId);
 
   if (integrityError) return integrityError;
 
-  const imageError = await validateImageArtifact(input, bytes);
-  if (imageError) return imageError;
-
-  return validatePdfArtifact(input, bytes);
+  return validateImageArtifact(input, bytes);
 };
 
 const getArrayBuffer = async (store: BlobStore, key: string) => {
@@ -369,17 +347,17 @@ const mergeArtifactReferenceDisplayFields = (
   tags: existingReference.tags ?? newReference.tags,
 });
 
-/**
- * A re-upload of the exact bytes restores a soft-deleted reference. Returning the deleted
- * reference as a successful upload would leave the artifact invisible to
- * list_artifacts_for_request and untrusted by patch/publish — a success response must mean
- * the artifact is usable.
- */
-const stripSoftDeleteMarkers = (reference: ArtifactReference): { reference: ArtifactReference; restored: boolean } => {
-  if (!reference.deletedAtISO && !reference.deletedBy) return { reference, restored: false };
+const shouldSaveArtifactReference = (
+  existingReference: ArtifactReference | undefined,
+  responseReference: ArtifactReference
+) => {
+  if (!existingReference || existingReference.blobKey !== responseReference.blobKey) return true;
 
-  const { deletedAtISO: _deletedAtISO, deletedBy: _deletedBy, ...restored } = reference;
-  return { reference: restored, restored: true };
+  return (
+    existingReference.originalFilename !== responseReference.originalFilename ||
+    existingReference.label !== responseReference.label ||
+    existingReference.tags?.join('\0') !== responseReference.tags?.join('\0')
+  );
 };
 
 export const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, finalBytes: Buffer) => {
@@ -402,25 +380,26 @@ export const finalizeUpload = async (event: LambdaEvent, input: UploadRequest, f
   const existingReference = deduped
     ? await readArtifactReference(indexStore, input.requestId, reference.sha256)
     : undefined;
-  const mergedReference =
+  const responseReference =
     existingReference?.blobKey === reference.blobKey
       ? mergeArtifactReferenceDisplayFields(existingReference, reference)
       : reference;
-  const { reference: responseReference, restored } = stripSoftDeleteMarkers(mergedReference);
 
-  await writeArtifactReferenceIndexes(indexStore, input.requestId, responseReference);
+  if (shouldSaveArtifactReference(existingReference, responseReference)) {
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, responseReference);
+  } else {
+    await writeArtifactReferenceIndexes(indexStore, input.requestId, responseReference);
+  }
 
   logArtifactUpload(event, input, 'artifact_upload_finalize_completed', {
     uploadId: responseReference.blobKey,
     decodedBytes: finalBytes.length,
-    ...(restored ? { restoredSoftDeletedReference: true } : {}),
   });
 
   return jsonResponse(deduped ? 200 : 201, {
     ok: true,
     complete: true,
     deduped,
-    ...(restored ? { restored } : {}),
     artifact: responseReference,
   });
 };
