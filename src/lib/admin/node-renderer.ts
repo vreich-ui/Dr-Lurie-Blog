@@ -302,7 +302,10 @@ function renderImage(node: ArticleBodyNode): HTMLElement {
         .then((previewUrl) => {
           if (!previewUrl) {
             placeholder.replaceWith(
-              renderImagePlaceholder(label, `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`)
+              renderImagePlaceholder(
+                label,
+                `Artifact reference — admin preview not available (${srcRaw.slice(0, 40)}…)`
+              )
             );
             return;
           }
