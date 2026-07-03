@@ -99,6 +99,7 @@ export const getBlobStoreSourceDiagnostics = (storeName: string, event: unknown)
 
 export const getCoreBlobStoreSourceDiagnostics = (event: unknown) => ({
   workflows: getBlobStoreSourceDiagnostics('workflows', event),
+  siteObjects: getBlobStoreSourceDiagnostics('site-objects', event),
   artifactIndex: getBlobStoreSourceDiagnostics('artifact-index', event),
   artifacts: getBlobStoreSourceDiagnostics('artifacts', event),
 });
@@ -129,7 +130,7 @@ const loadNetlifyBlobs = async (event: unknown) => {
   if (netlifyBlobsModuleForTesting) return netlifyBlobsModuleForTesting;
 
   return import('@netlify/blobs').then(
-    (mod) => mod as BlobsModule,
+    (mod) => mod as unknown as BlobsModule,
     (error: unknown) => {
       if (isNetlifyRuntime(event)) {
         throw new Error(
@@ -175,6 +176,10 @@ export const getWorkflowBlobStore = async (event: unknown): Promise<BlobStore> =
 
 export const getOptInBlobStore = async (event: unknown): Promise<BlobStore> => {
   return getNetlifyBlobStore('opt-ins', event);
+};
+
+export const getSiteObjectsBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore({ name: 'site-objects', consistency: 'strong' }, event);
 };
 
 export const getArtifactBlobStore = async (event: unknown): Promise<BlobStore> => {
