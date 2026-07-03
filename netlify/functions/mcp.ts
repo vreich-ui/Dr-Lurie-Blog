@@ -1888,7 +1888,12 @@ const buildCanonicalPublishPayload = async (
   }
 
   candidates.sort((a, b) => b.priority - a.priority);
-  const featuredImage = candidates[0]?.path;
+  // Document (PDF) pointers enter the candidate list at priority 0 solely so their
+  // cross-request references resolve; they must never be SELECTED as the featured image.
+  // Every genuine image candidate has priority >= 2, so filtering on > 0 excludes exactly
+  // the document pointers — without it, an article whose only media is a document node
+  // would commit a PDF path into the frontmatter image: field.
+  const featuredImage = candidates.find((candidate) => candidate.priority > 0)?.path;
 
   return {
     ok: true as const,
