@@ -1,15 +1,14 @@
 ---
-publishDate: 2026-07-03T12:32:01.963Z
-published_time: 2026-07-03T12:32:01.963Z
+publishDate: 2026-07-03T17:44:13.693Z
+published_time: 2026-07-03T17:44:13.693Z
 title: "Smoke T2 Hero Image Only"
-excerpt: "A compact hero-image smoke test."
-image: "~/assets/images/uploads/smoke-t2-hero-image-only/tiny-hero.png"
+excerpt: "Hero-only smoke-test article."
+image: "~/assets/images/uploads/smoke-t2-hero-image-only/smoke-t2-hero.png"
 tags:
   - "smoke-test"
   - "image-pipeline"
-metadata:
-  description: "Hero image smoke test article."
+  - "t2"
 ---
-### Hero Image Publish Path Check
+### Smoke T2 Hero Image Only
 
-This compact smoke-test article validates that one uploaded image can be trusted, materialized, and rendered as the page hero without an inline image node.
+This smoke-test article verifies that an explicit featured image renders in the hero slot while the article body remains text-only.
