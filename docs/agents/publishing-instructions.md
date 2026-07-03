@@ -72,8 +72,11 @@ Companion references: `docs/agents/artifact-upload-paths.md` (upload transport),
 - **Missing hero/featured image is allowed by default.** The hero image resolves ONLY from an
   explicit `featuredImage` or `existingFeaturedImagePath` — there is no fallback that guesses
   one from the article's media. If neither is supplied, publish still succeeds (2xx) with no
-  `image:` frontmatter and a `missing_featured_image` warning; if that was intentional, no
-  action is needed, otherwise set `featuredImage` and republish.
+  `image:` frontmatter. A `missing_featured_image` warning is added only when the article
+  contains at least one image media entry that could have been the hero but none was
+  designated — a text-only article with no images has nothing to feature, so no warning
+  fires for it. If the warning does appear and it was intentional, no action is needed;
+  otherwise set `featuredImage` and republish.
 - **`HERO_IMAGE_REQUIRED` is an operator-level setting, not agent-controlled.** It is an
   environment flag the site operator sets ahead of a proper per-site/per-article settings
   system; agents cannot set or override it per request. When enabled, a publish that resolves
@@ -140,7 +143,7 @@ Never report PUBLISHED without a conclusive verification; never report PUBLISH_F
 | 409 on create/patch | Record/version conflict — re-read the record and retry with the current version. |
 | 423 | Lock expired or held by someone else — checkout again. |
 | `featured_image_required` (422) | This site has `HERO_IMAGE_REQUIRED` enabled (operator-level, not agent-controlled) and no hero resolved. Nothing was committed. Set `featuredImage` to an uploaded artifact blobKey, or `existingFeaturedImagePath` to an existing committed image path, and retry. |
-| `missing_featured_image` (warning, not a rejection) | Publish succeeded with no hero/featured image because neither `featuredImage` nor `existingFeaturedImagePath` was supplied. If intentional, no action needed; otherwise set `featuredImage` and republish. |
+| `missing_featured_image` (warning, not a rejection) | Publish succeeded with no hero/featured image, and the article has at least one image that could have been designated as the hero. Fires only when image media exists; a text-only article never gets this warning. If intentional, no action needed; otherwise set `featuredImage` and republish. |
 
 ---
 

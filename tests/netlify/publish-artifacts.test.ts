@@ -2707,7 +2707,7 @@ test('publish-article publishes an image featuredImage alongside a PDF CTA link'
 // Missing hero/featured image handling (no silent auto-selection) + HERO_IMAGE_REQUIRED
 // ---------------------------------------------------------------------------
 
-test('publish-article publishes with no images and no featuredImage, warning missing_featured_image', async () => {
+test('publish-article publishes with no images and no featuredImage, with no missing_featured_image warning', async () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.PUBLISH_SECRET = publishSecret;
   process.env.NETLIFY = 'false';
@@ -2755,8 +2755,8 @@ test('publish-article publishes with no images and no featuredImage, warning mis
 
     const body = JSON.parse(response.body) as { warnings?: Array<{ code: string }> };
     assert.ok(
-      body.warnings?.some((w) => w.code === 'missing_featured_image'),
-      `expected missing_featured_image warning, got: ${JSON.stringify(body.warnings)}`
+      !body.warnings?.some((w) => w.code === 'missing_featured_image'),
+      `did not expect missing_featured_image warning for a text-only article, got: ${JSON.stringify(body.warnings)}`
     );
   } finally {
     globalThis.fetch = originalFetch;
