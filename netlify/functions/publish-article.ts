@@ -486,7 +486,8 @@ type PublishWarning = { code: string; node_id: string; reason: string };
 const collectUnrenderedImageWarnings = (
   articleBody: unknown,
   mediaEntries: MediaEntry[],
-  featuredDisplayPath: string | undefined
+  featuredDisplayPath: string | undefined,
+  effectiveImagePath?: string
 ): PublishWarning[] => {
   const nodes =
     articleBody && typeof articleBody === 'object' && Array.isArray((articleBody as { nodes?: unknown }).nodes)
@@ -512,14 +513,34 @@ const collectUnrenderedImageWarnings = (
     if (!nodeDisplayPath) continue;
 
     const rendering = nodeRecord.rendering;
-    const placement =
-      rendering && typeof rendering === 'object' ? (rendering as Record<string, unknown>).placement : undefined;
-    if (placement === 'inline') continue;
+    const renderingRecord = rendering && typeof rendering === 'object' ? (rendering as Record<string, unknown>) : {};
+    const placement = renderingRecord.placement;
+    const nodeId = typeof nodeRecord.id === 'string' ? nodeRecord.id : '(unknown)';
+    const isHeroNode = nodeId === 'n_hero' || renderingRecord.presentation === 'hero';
+
+    if (placement === 'inline') {
+      // Hero-designated image nodes are suppressed from the inline body by
+      // articleBodyToMarkdown (the image is expected to render in the frontmatter hero
+      // slot instead). When a different candidate won the hero slot, this node's image
+      // appears NOWHERE — the hero-suppression collision.
+      if (isHeroNode && nodeDisplayPath !== effectiveImagePath) {
+        warnings.push({
+          code: 'hero_image_not_rendered',
+          node_id: nodeId,
+          reason:
+            `Node "${nodeId}" is hero-designated, so its inline image (${src}) is suppressed from the article ` +
+            `body in favor of the frontmatter hero slot — but the hero slot resolved to ` +
+            `${effectiveImagePath ? `"${effectiveImagePath}"` : 'no image'}, not this node's image. The image ` +
+            `appears nowhere. Reference the same artifact as the publish featuredImage, or drop the hero ` +
+            `designation (node id 'n_hero' / presentation 'hero') to render it inline.`,
+        });
+      }
+      continue;
+    }
 
     // Images serving as the explicit featured/hero image render in the frontmatter, not the body.
     if (featuredDisplayPath && nodeDisplayPath === featuredDisplayPath) continue;
 
-    const nodeId = typeof nodeRecord.id === 'string' ? nodeRecord.id : '(unknown)';
     warnings.push({
       code: 'image_not_rendered',
       node_id: nodeId,
@@ -1517,6 +1538,12 @@ const getMediaEntries = async (
   return mediaEntries;
 };
 
+/** Test-only export: direct access to internal validators without driving the full handler. */
+export const _publishInternal = {
+  collectUnrenderedImageWarnings,
+  validateCommittedImageReferences,
+};
+
 export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed' });
@@ -1672,9 +1699,16 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
     // Warn about image nodes that will be skipped by the body renderer. Compare against the
     // EXPLICIT featured image only (not the auto-selected fallback above), so a lone image with
-    // no placement and no explicit featured designation is still flagged.
+    // no placement and no explicit featured designation is still flagged. The EFFECTIVE
+    // frontmatter imagePath (fallback included) is passed separately for the hero-suppression
+    // collision check: a hero node's inline image renders only when it IS the hero slot image.
     const explicitFeaturedDisplayPath = uploadedImagePath ?? existingFeaturedImage?.displayPath;
-    const warnings = collectUnrenderedImageWarnings(normalizedArticleBody, mediaEntries, explicitFeaturedDisplayPath);
+    const warnings = collectUnrenderedImageWarnings(
+      normalizedArticleBody,
+      mediaEntries,
+      explicitFeaturedDisplayPath,
+      imagePath
+    );
 
     let resolvedMarkdown: string;
     if (article_body) {
