@@ -331,8 +331,13 @@ function renderMarkdown(summary, report) {
 }
 
 function writeReport(report, outDir, infoA, infoB) {
-  rmSync(outDir, { recursive: true, force: true });
+  // Only ever touch the specific files/subdir this script owns — never a
+  // blanket rmSync(outDir), which would be destructive if --out points at
+  // an existing directory the caller didn't intend to have wiped.
   mkdirSync(outDir, { recursive: true });
+  rmSync(path.join(outDir, 'report.json'), { force: true });
+  rmSync(path.join(outDir, 'report.md'), { force: true });
+  rmSync(path.join(outDir, 'diffs'), { recursive: true, force: true });
 
   if (report.changed.length) {
     const diffsDir = path.join(outDir, 'diffs');
