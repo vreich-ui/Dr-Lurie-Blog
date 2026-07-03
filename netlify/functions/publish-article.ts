@@ -1727,7 +1727,10 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     // doesn't go unnoticed. Only fires when neither featuredImage nor existingFeaturedImagePath
     // was supplied at all; an explicit reference that fails to resolve is a different error path
     // (handled above, before this point is ever reached) and must not also emit this warning.
-    if (!HERO_IMAGE_REQUIRED && !imagePath && !featuredImage && !existingFeaturedImageInput) {
+    // Also only fires when the article actually has image media to feature — a text-only article
+    // has nothing to designate as a hero, so the warning would be pure noise.
+    const hasImageMedia = mediaEntries.some((entry) => entry.kind === 'image');
+    if (!HERO_IMAGE_REQUIRED && !imagePath && !featuredImage && !existingFeaturedImageInput && hasImageMedia) {
       warnings.push({
         code: 'missing_featured_image',
         node_id: null,
