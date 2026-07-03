@@ -1,23 +1,22 @@
 ---
-publishDate: 2026-07-03T12:40:31.063Z
-published_time: 2026-07-03T12:40:31.063Z
+publishDate: 2026-07-03T17:50:45.651Z
+published_time: 2026-07-03T17:50:45.651Z
 title: "Smoke T5 Two Inline Images"
-excerpt: "A compact two-inline-image smoke test."
-image: "~/assets/images/uploads/smoke-t5-two-inline-images/tiny-inline-a.png"
+excerpt: "Two inline images with no hero."
+image: "~/assets/images/uploads/smoke-t5-two-inline-images/smoke-t5-a.png"
 tags:
   - "smoke-test"
   - "image-pipeline"
-metadata:
-  description: "Two inline images smoke test article."
+  - "t5"
 ---
-### First Inline Image Check
+### First inline image
 
-![first inline smoke image](~/assets/images/uploads/smoke-t5-two-inline-images/tiny-inline-a.png)
+![smoke test inline A](~/assets/images/uploads/smoke-t5-two-inline-images/smoke-t5-a.png)
 
-This node should render the first uploaded image in the article body.
+The first image should render in the body.
 
-### Second Inline Image Check
+### Second inline image
 
-![second inline smoke image](~/assets/images/uploads/smoke-t5-two-inline-images/tiny-inline-b.png)
+![smoke test inline B](~/assets/images/uploads/smoke-t5-two-inline-images/smoke-t5-b.png)
 
-This node should render a second distinct uploaded image in the article body.
+The second distinct image should also render in the body, with no hero image.
