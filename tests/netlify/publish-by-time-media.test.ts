@@ -332,4 +332,140 @@ describe('save_json_blob_publish_by_time media promotion', () => {
     assert.equal(parsed.status, 'published');
     assert.equal(parsed.commit_sha, 'cross-commit-sha');
   });
+
+  it('never selects a document (PDF) node pointer as the featuredImage', async () => {
+    const requestId = 'req_publish_pdfonly_20260703_01';
+    const lockToken = 'lock_pdf_only_789';
+    const sha256_pdf = 'd'.repeat(64);
+    const pdfPointer = `pdf/${requestId}/${sha256_pdf}.pdf`;
+    const pdfArtifactRef = {
+      blobKey: pdfPointer,
+      sha256: sha256_pdf,
+      contentType: 'application/pdf',
+      sizeBytes: 1024,
+      createdAtISO: new Date().toISOString(),
+      artifactKind: 'pdf',
+    };
+
+    const mockRecord = {
+      request_id: requestId,
+      input: {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        content: {
+          title: 'PDF Only Media Test',
+          article_body: {
+            schema_version: 'article_body.v1',
+            nodes: [
+              {
+                id: 'n_intro',
+                kind: 'content',
+                public: { body: 'Intro copy with no images at all.' },
+              },
+              {
+                id: 'n_guide',
+                kind: 'content',
+                public: {
+                  title: 'Download the guide',
+                  media: { type: 'document', title: 'The Guide', src: pdfPointer },
+                },
+                rendering: { placement: 'inline' },
+              },
+            ],
+          },
+        },
+      },
+      agent_outputs: {},
+      lock: { token: lockToken, expires_at: new Date(Date.now() + 10000).toISOString() },
+      version: 2,
+    };
+
+    mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: Record<string, unknown>) => {
+      const body = JSON.parse(event.body as string);
+      if (body.action === 'get_request') {
+        return { statusCode: 200, body: JSON.stringify({ ok: true, record: mockRecord }) };
+      }
+      if (body.action === 'set_published_time') {
+        return {
+          statusCode: 200,
+          body: JSON.stringify({
+            ok: true,
+            record: {
+              ...mockRecord,
+              input: { ...mockRecord.input, publication: { published_time: body.published_time } },
+            },
+          }),
+        };
+      }
+      return { statusCode: 500, body: 'Unexpected action' };
+    });
+
+    mock.method(_mcpInternal, 'getArtifactIndexBlobStore', async () => ({
+      get: async (key: string) => {
+        if (key === `request-artifacts/${requestId}/${sha256_pdf}.json`) {
+          return JSON.stringify(pdfArtifactRef);
+        }
+        return null;
+      },
+      list: async (_options: { prefix?: string } | undefined) => ({
+        [Symbol.asyncIterator]: async function* () {
+          yield { blobs: [] };
+        },
+      }),
+      setJSON: async () => {},
+    }));
+
+    let capturedPublishPayload: Record<string, unknown> | null = null;
+    mock.method(_mcpInternal, 'publishArticleHandler', async (event: Record<string, unknown>) => {
+      capturedPublishPayload = JSON.parse(event.body as string);
+      return {
+        statusCode: 201,
+        body: JSON.stringify({
+          success: true,
+          articlePath: 'src/data/post/pdf-only-media-test.md',
+          media: [`src/assets/documents/uploads/pdf-only-media-test/${sha256_pdf}.pdf`],
+          commit: 'pdf-only-commit-sha',
+        }),
+      };
+    });
+
+    const mcpEvent = {
+      httpMethod: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${process.env.MCP_HTTP_AUTH_TOKEN}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'save_json_blob_publish_by_time',
+          arguments: { request_id: requestId, lock_token: lockToken },
+        },
+      }),
+    };
+
+    const response = await mcpHandler(mcpEvent as Record<string, unknown>);
+    assert.equal(response.statusCode, 200);
+    const body = JSON.parse(response.body);
+    assert.ok(!body.error, `MCP Error: ${JSON.stringify(body.error)}`);
+
+    assert.ok(capturedPublishPayload, 'publish-article must have been called');
+    const payload = capturedPublishPayload as unknown as Record<string, unknown>;
+
+    // The PDF must flow through as an artifact reference (cross-request resolution keeps
+    // working)…
+    const artifactRefs = payload.artifactReferences as Record<string, unknown>[];
+    const pdfRef = artifactRefs.find((r) => r.sha256 === sha256_pdf);
+    assert.ok(pdfRef, 'the PDF artifact must be present in artifactReferences');
+
+    // …but it must NEVER be promoted to the featured image: with no image candidates the
+    // frontmatter image field stays empty instead of receiving a PDF path.
+    assert.equal(
+      payload.featuredImage,
+      undefined,
+      `featuredImage must not be a document pointer, got: ${String(payload.featuredImage)}`
+    );
+  });
 });
