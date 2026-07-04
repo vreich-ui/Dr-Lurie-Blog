@@ -33,8 +33,9 @@
  *   an optional container (`children`/`actions`) the forward upsert created.
  * - `upsert_item` carries `parent_item_id` — nav items live in a depth-≤2
  *   tree (D§3.8); removals inside a dropdown must be restorable in place.
- * - `update_term` carries `alias_term_id`/`mint_alias`/`restore_alias` for
- *   the slug-rename auto-alias rule (C§2.3-taxonomy) and its exact inverse.
+ * - `update_term` carries `alias_term_id`/`mint_alias`/`restore_alias`/
+ *   `consume_alias_expected` for the slug-rename auto-alias rule
+ *   (C§2.3-taxonomy) and its exact, guarded inverse.
  *   `mint_alias: false` is engine-gated: only honored when the rename
  *   reverts to a slug this term previously owned (evidenced by consuming its
  *   own deprecated alias), so a drift-reintroducing aliasless rename is
@@ -295,6 +296,11 @@ const updateTermSchema = z.strictObject({
   alias_term_id: z.string().regex(TERM_ID_RE).optional(),
   mint_alias: z.boolean().optional(),
   restore_alias: z.strictObject({ term: termPayloadSchema, position: positionSchema }).optional(),
+  // Exact snapshot of the alias this revert expects to consume (the forward
+  // op's minted/restored alias). The engine deep-equal-checks it before the
+  // consume — an alias edited or removed since the forward op refuses as a
+  // blind revert (C§2.4). Populated by inverse derivation.
+  consume_alias_expected: termPayloadSchema.optional(),
   ...guard,
 });
 
@@ -410,17 +416,26 @@ export const patchOpSchema = patchOpUnionSchema.superRefine((op, ctx) => {
   if (op.op === 'update_term') {
     if (
       op.fields.slug === undefined &&
-      (op.alias_term_id !== undefined || op.mint_alias !== undefined || op.restore_alias !== undefined)
+      (op.alias_term_id !== undefined ||
+        op.mint_alias !== undefined ||
+        op.restore_alias !== undefined ||
+        op.consume_alias_expected !== undefined)
     ) {
       ctx.addIssue({
         code: 'custom',
-        message: 'alias_term_id/mint_alias/restore_alias are only meaningful when fields.slug is present.',
+        message:
+          'alias_term_id/mint_alias/restore_alias/consume_alias_expected are only meaningful when fields.slug is present.',
       });
     }
     if (op.restore_alias !== undefined && op.mint_alias !== false) {
       // Minting an alias for the vacated slug AND restoring one for the same
       // slug would double-claim it; restores only travel with mint_alias: false.
       ctx.addIssue({ code: 'custom', message: 'restore_alias requires mint_alias: false.' });
+    }
+    if (op.consume_alias_expected !== undefined && op.mint_alias !== false) {
+      // Consumption expectations describe reverts; the organic (minting)
+      // path consumes without an expectation by design.
+      ctx.addIssue({ code: 'custom', message: 'consume_alias_expected requires mint_alias: false.' });
     }
   }
 });

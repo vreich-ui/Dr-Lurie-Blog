@@ -864,3 +864,132 @@ describe('apply mechanics', () => {
     );
   });
 });
+
+describe('alias consume is guarded (C§2.4 applied to the minted alias)', () => {
+  const renameThenInverse = () => {
+    const record = makeRecord('taxonomy', taxonomyBody());
+    const renamed = apply(record, [
+      { op: 'update_term', kind: 'category', term_id: 't_sleep', fields: { slug: 'infant-sleep' } },
+    ]);
+    const inverse = derivePatchInverse(renamed.applied[0].op, renamed.applied[0].capture);
+    return { renamed, inverse };
+  };
+
+  it('refuses the rename inverse when the minted alias was edited since', () => {
+    const { renamed, inverse } = renameThenInverse();
+    const tampered = apply(renamed.record, [
+      { op: 'update_term', kind: 'category', term_id: 't_sleep2', fields: { label: 'Sleep (old name)' } },
+    ]);
+    assert.throws(
+      () => apply(tampered.record, [inverse]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+
+  it('refuses the rename inverse when the minted alias was removed since', () => {
+    const { renamed, inverse } = renameThenInverse();
+    const tampered = apply(renamed.record, [{ op: 'remove_term', kind: 'category', term_id: 't_sleep2' }]);
+    assert.throws(
+      () => apply(tampered.record, [inverse]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+
+  it('still applies the rename inverse across unrelated intervening edits', () => {
+    const { renamed, inverse } = renameThenInverse();
+    const unrelated = apply(renamed.record, [
+      { op: 'add_term', kind: 'category', term: { term_id: 't_teething', slug: 'teething', label: 'Teething' } },
+    ]);
+    const reverted = apply(unrelated.record, [inverse]);
+    const body = reverted.record.body as ReturnType<typeof taxonomyBody>;
+    const terms = body.kinds.category.terms;
+    assert.strictEqual(terms.find((term) => term.term_id === 't_sleep')?.slug, 'sleep');
+    assert.ok(!terms.some((term) => term.slug === 'infant-sleep'), 'the minted alias must be consumed');
+    assert.ok(
+      terms.some((term) => term.term_id === 't_teething'),
+      'the unrelated edit must survive'
+    );
+  });
+
+  it('refuses a hand-written expectation-less revert when a consumable alias exists', () => {
+    const { renamed } = renameThenInverse();
+    assert.throws(
+      () =>
+        apply(renamed.record, [
+          { op: 'update_term', kind: 'category', term_id: 't_sleep', fields: { slug: 'sleep' }, mint_alias: false },
+        ]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+});
+
+describe('null handling: unset markers never reach the body', () => {
+  const hasNullValue = (value: unknown): boolean => {
+    if (value === null) return true;
+    if (Array.isArray(value)) return value.some(hasNullValue);
+    if (typeof value === 'object' && value !== null) return Object.values(value).some(hasNullValue);
+    return false;
+  };
+
+  it('treats nested nulls as unsets when the parent is absent', () => {
+    const bodyWithoutBrand = () => {
+      const body = navBody() as Record<string, unknown>;
+      delete body.brand;
+      return body;
+    };
+    const record = makeRecord('navigation', bodyWithoutBrand());
+    const result = apply(record, [{ op: 'set_nav_meta', fields: { brand: { text: null } } }]);
+    const body = result.record.body as Record<string, unknown>;
+    assert.deepStrictEqual(body.brand, {}, 'nested null must be treated as an unset, not stored');
+    assert.strictEqual(hasNullValue(result.record.body), false);
+
+    const inverse = derivePatchInverse(result.applied[0].op, result.applied[0].capture);
+    const reverted = apply(result.record, [inverse]);
+    assert.deepStrictEqual(reverted.record.body, bodyWithoutBrand());
+  });
+
+  it('normalizes deep replacement subtrees and round-trips exactly', () => {
+    const record = makeRecord('page', pageBody());
+    const result = apply(record, [
+      { op: 'update_section_data', section_id: 's_hero', fields: { config: { a: null, b: 'x', c: { d: null } } } },
+    ]);
+    const body = result.record.body as ReturnType<typeof pageBody>;
+    const hero = body.sections.find((section) => section.id === 's_hero') as unknown as {
+      data: Record<string, unknown>;
+    };
+    assert.deepStrictEqual(hero.data.config, { b: 'x', c: {} });
+    assert.strictEqual(hasNullValue(result.record.body), false);
+
+    const inverse = derivePatchInverse(result.applied[0].op, result.applied[0].capture);
+    const reverted = apply(result.record, [inverse]);
+    assert.deepStrictEqual(reverted.record.body, pageBody());
+  });
+
+  it('rejects null values inside element payloads', () => {
+    const page = makeRecord('page', pageBody());
+    assert.throws(
+      () => apply(page, [{ op: 'upsert_section', section: { id: 's_x', type: 'prose', data: { body: null } } }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'invalid_op'
+    );
+    const nav = makeRecord('navigation', navBody());
+    assert.throws(
+      () =>
+        apply(nav, [
+          {
+            op: 'upsert_item',
+            group_id: 'g_main',
+            item: { id: 'i_x', label: 'X', target: { kind: 'route', href: '/x' }, description: null },
+          },
+        ]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'invalid_op'
+    );
+  });
+
+  it('rejects null array elements in fields', () => {
+    const record = makeRecord('page', pageBody());
+    assert.throws(
+      () => apply(record, [{ op: 'update_section_data', section_id: 's_bio', fields: { trustNotes: ['MD', null] } }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'invalid_op'
+    );
+  });
+});

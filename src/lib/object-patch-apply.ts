@@ -30,6 +30,10 @@
  *   mechanically impossible: `mint_alias: false` is honored only when the
  *   application consumes such an alias or exactly restores the vacated
  *   slug's alias (`restore_alias`) — i.e. only when the rename is a revert.
+ *   Revert consumption is itself guarded: the inverse records the alias it
+ *   expects to consume (`consume_alias_expected`), and an alias edited,
+ *   removed, or unexpectedly present since the forward op refuses as a
+ *   blind revert rather than silently destroying the intervening change.
  *
  * The engine touches bodies through minimal structural contracts mirroring
  * D§3.2–3.8 (sections arrays, nav group/item trees, taxonomy term
@@ -224,6 +228,57 @@ const targetMissing = (op: PatchOp, what: string): PatchApplyError => {
 // a plain object); arrays and scalars replace wholesale; null deletes the
 // key. Returns before/after trees mirroring the fields shape.
 
+/**
+ * Normalize an object subtree being written wholesale into a body: null
+ * object keys mean "unset" at every depth (the grammar rule), so they are
+ * omitted rather than stored — bodies never contain null. Null array
+ * elements have no unset meaning and are rejected.
+ */
+const stripNullUnsetsDeep = (value: PatchJsonValue): PatchJsonValue => {
+  if (Array.isArray(value)) {
+    return value.map((element) => {
+      if (element === null) {
+        throw new PatchApplyError(
+          'invalid_op',
+          'null array elements are not allowed; null is only meaningful as an object-key unset marker.'
+        );
+      }
+      return stripNullUnsetsDeep(element);
+    });
+  }
+  if (isPlainObject(value)) {
+    const out: UnknownRecord = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (entry === null || entry === undefined) continue;
+      out[key] = stripNullUnsetsDeep(entry as PatchJsonValue);
+    }
+    return out as PatchJsonValue;
+  }
+  return value;
+};
+
+/**
+ * Element payloads (upsert_* bodies) replace wholesale, so null has no unset
+ * meaning there — reject it rather than writing null into a body.
+ */
+const assertNoNullValues = (value: unknown, what: string): void => {
+  if (value === null) {
+    throw new PatchApplyError(
+      'invalid_op',
+      `${what} must not contain null values; null is reserved as the fields unset marker.`
+    );
+  }
+  if (Array.isArray(value)) {
+    for (const element of value) assertNoNullValues(element, what);
+    return;
+  }
+  if (isPlainObject(value)) {
+    for (const entry of Object.values(value)) {
+      if (entry !== undefined) assertNoNullValues(entry, what);
+    }
+  }
+};
+
 const snapshotFields = (target: UnknownRecord | undefined, fields: UnknownRecord): FieldsTree => {
   const snapshot: FieldsTree = {};
   for (const [key, value] of Object.entries(fields)) {
@@ -255,8 +310,11 @@ const mergeFields = (target: UnknownRecord, fields: UnknownRecord): { before: Fi
       delete target[key];
       after[key] = null;
     } else {
-      target[key] = deepCloneJson(value);
-      after[key] = deepCloneJson(value) as PatchJsonValue;
+      // A subtree replacing a non-object target still honors the null=unset
+      // rule at every depth: null keys are omitted, never stored.
+      const normalized = stripNullUnsetsDeep(deepCloneJson(value) as PatchJsonValue);
+      target[key] = normalized;
+      after[key] = deepCloneJson(normalized);
     }
   }
   return { before, after };
@@ -444,7 +502,12 @@ const applyUpdateTerm = (op: PatchOpOfName<'update_term'>, body: UnknownRecord):
   const slugChanged = op.fields.slug !== undefined && newSlug !== oldSlug;
 
   if (!slugChanged) {
-    if (op.mint_alias !== undefined || op.alias_term_id !== undefined || op.restore_alias !== undefined) {
+    if (
+      op.mint_alias !== undefined ||
+      op.alias_term_id !== undefined ||
+      op.restore_alias !== undefined ||
+      op.consume_alias_expected !== undefined
+    ) {
       throw new PatchApplyError(
         'invalid_op',
         `update_term: alias controls were provided but the slug did not change (current slug '${oldSlug}').`
@@ -465,24 +528,57 @@ const applyUpdateTerm = (op: PatchOpOfName<'update_term'>, body: UnknownRecord):
       candidate.status === 'deprecated' &&
       candidate.merged_into === term.term_id
   );
-  if (consumeIndex !== -1) {
-    alias.consumed = { term: deepCloneJson(terms[consumeIndex]) as TermPayload, index: consumeIndex };
-    terms.splice(consumeIndex, 1);
-  }
 
   if (op.mint_alias === false) {
+    // Revert path (engine-gated). The alias about to be consumed is part of
+    // the unit the forward op touched, so consumption must be exact: an
+    // alias edited, removed, or unexpectedly present since the forward op
+    // makes this a blind revert (C§2.4).
+    const expected = op.consume_alias_expected;
+    if (expected !== undefined) {
+      if (consumeIndex === -1) {
+        throw new PatchApplyError(
+          'blind_revert_refused',
+          `Refusing update_term: the alias '${expected.term_id}' (slug '${expected.slug}') this revert expects to consume is no longer present as recorded; resolve manually.`,
+          { expected }
+        );
+      }
+      if (!deepEqualJson(terms[consumeIndex], expected)) {
+        throw new PatchApplyError(
+          'blind_revert_refused',
+          `Refusing update_term: alias '${expected.term_id}' was edited after the rename this revert undoes; resolve manually.`,
+          { expected, actual: deepCloneJson(terms[consumeIndex]) }
+        );
+      }
+    } else if (consumeIndex !== -1) {
+      throw new PatchApplyError(
+        'blind_revert_refused',
+        `Refusing update_term: an alias holding slug '${newSlug}' exists but this revert recorded none; resolve manually.`,
+        { actual: deepCloneJson(terms[consumeIndex]) }
+      );
+    }
     const restoresVacatedSlug =
       op.restore_alias !== undefined &&
       op.restore_alias.term.slug === oldSlug &&
       op.restore_alias.term.status === 'deprecated' &&
       op.restore_alias.term.merged_into === op.term_id;
-    if (alias.consumed === undefined && !restoresVacatedSlug) {
+    if (expected === undefined && !restoresVacatedSlug) {
       throw new PatchApplyError(
         'alias_required',
         `update_term: renaming '${oldSlug}' → '${newSlug}' without the auto-alias is only allowed when the rename reverts a prior rename (C§2.3-taxonomy).`
       );
     }
+    if (consumeIndex !== -1) {
+      alias.consumed = { term: deepCloneJson(terms[consumeIndex]) as TermPayload, index: consumeIndex };
+      terms.splice(consumeIndex, 1);
+    }
   } else {
+    // Organic path: a forward edit under review may consume its own prior
+    // alias without an expectation — the reviewer sees the diff.
+    if (consumeIndex !== -1) {
+      alias.consumed = { term: deepCloneJson(terms[consumeIndex]) as TermPayload, index: consumeIndex };
+      terms.splice(consumeIndex, 1);
+    }
     const aliasTermId = op.alias_term_id ?? mintAliasTermId(terms, oldSlug);
     if (terms.some((candidate) => candidate.term_id === aliasTermId)) {
       throw new PatchApplyError(
@@ -528,6 +624,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
     case 'upsert_section': {
+      assertNoNullValues(op.section, 'upsert_section payload');
       if (objectType === 'section') {
         // The wrapper holds exactly one section; upsert replaces it.
         const current = expectPlainObject(body.section, 'body.section');
@@ -579,6 +676,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
     case 'upsert_group': {
+      assertNoNullValues(op.group, 'upsert_group payload');
       const groups = getGroups(body);
       const index = groups.findIndex((group) => group.id === op.group.id);
       return applyUpsertIntoList(op, groups, index, op.group as NavGroupLike, op.position);
@@ -599,6 +697,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     }
 
     case 'upsert_item': {
+      assertNoNullValues(op.item, 'upsert_item payload');
       const groups = getGroups(body);
       const group = groups.find((candidate) => candidate.id === op.group_id);
       if (!group) throw targetMissing(op, `group '${op.group_id}'`);
@@ -682,6 +781,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     }
 
     case 'upsert_action': {
+      assertNoNullValues(op.action, 'upsert_action payload');
       const actions =
         body.actions === undefined ? undefined : expectArray<LinkActionLike>(body.actions, 'body.actions');
       const index = actions === undefined ? -1 : actions.findIndex((action) => action.label === op.action.label);
@@ -774,6 +874,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
     case 'upsert_slot': {
+      assertNoNullValues(op.slot, 'upsert_slot payload');
       const slots = getSlots(body);
       const index = slots.findIndex((slot) => slot.slotId === op.slot.slotId);
       return applyUpsertIntoList(op, slots, index, op.slot as TemplateSlotLike, op.position);
@@ -1158,11 +1259,15 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
         });
       }
       // Slug rename inverse (C§2.3-taxonomy): restoring the old slug
-      // consumes the forward-minted alias (or the forward-restored one)
-      // naturally, because that alias holds exactly the slug being restored;
-      // mint_alias:false suppresses an alias for the slug being vacated; a
-      // forward-consumed alias is re-inserted verbatim via restore_alias.
+      // consumes the alias the forward op created for its vacated slug (its
+      // mint, or its restore), because that alias holds exactly the slug
+      // being restored — and it must still match the captured snapshot
+      // (consume_alias_expected), or the alias was edited since and the
+      // revert is blind (C§2.4). mint_alias:false suppresses an alias for
+      // the slug being vacated; a forward-consumed alias is re-inserted
+      // verbatim via restore_alias.
       const consumed = fieldsCapture.alias?.consumed;
+      const vacatedSlugAlias = fieldsCapture.alias?.minted ?? fieldsCapture.alias?.restored;
       return patchOpSchema.parse({
         op: 'update_term',
         kind: op.kind,
@@ -1170,6 +1275,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
         fields: fieldsCapture.before,
         mint_alias: false,
         ...(consumed !== undefined ? { restore_alias: { term: consumed.term, position: consumed.index } } : {}),
+        ...(vacatedSlugAlias !== undefined ? { consume_alias_expected: vacatedSlugAlias.term } : {}),
         ...guardOf(fieldsCapture.after),
       });
     }
