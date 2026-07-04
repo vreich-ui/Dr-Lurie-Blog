@@ -21,7 +21,10 @@
  * - **Blind-revert refusal** (C§2.4): ops may carry `guard.expected` — the
  *   unit snapshot the draft is expected to still hold (inverse derivation
  *   sets it to the forward op's captured `after`). A mismatch, including the
- *   unit having been removed, throws `blind_revert_refused`.
+ *   unit having been removed, throws `blind_revert_refused`. Removal
+ *   inverses additionally pin the container's post-removal identity order,
+ *   so restoring at a saved index into a since-reordered list refuses
+ *   rather than silently re-shuffling intervening edits.
  * - **Slug-rename auto-alias** (C§2.3-taxonomy): an `update_term` that
  *   changes `slug` atomically mints a deprecated alias term
  *   `{slug: <old slug>, merged_into: <this term>}` so old references keep
@@ -162,6 +165,13 @@ export type PatchOpCapture =
       container_created?: boolean;
       /** The optional container was removed because the op emptied it (`prune_empty`). */
       container_pruned?: boolean;
+      /**
+       * Ordered identity list (ids/labels/slotIds/term_ids) of the container
+       * AFTER a remove_* op. The removal inverse embeds it in its guard so a
+       * restore into a since-reordered list refuses instead of silently
+       * re-shuffling intervening order (C§2.4).
+       */
+      container_after?: string[];
     }
   | { kind: 'move'; before: MoveSnapshot; after: MoveSnapshot };
 
@@ -385,6 +395,21 @@ const elementSnapshot = (value: unknown, index: number, parentItemId?: string): 
 
 const ABSENT: ElementSnapshot = { exists: false };
 
+/**
+ * Actual state for an insert-path guard check. When the guard's expectation
+ * carries a `container` order (set by removal-inverse derivation), the
+ * actual includes the container's current identity order so a restore into
+ * a since-reordered list refuses; plain `{exists: false}` guards keep
+ * element-only semantics.
+ */
+const absentGuardActual = (op: PatchOp, containerIds: () => string[]): unknown => {
+  const expected = op.guard?.expected;
+  if (isPlainObject(expected) && expected.exists === false && 'container' in expected) {
+    return { exists: false, container: containerIds() };
+  }
+  return ABSENT;
+};
+
 // ——— nav item tree addressing (depth ≤ 2 in practice, D§3.8) ———
 
 interface ItemLocation {
@@ -446,7 +471,8 @@ const applyUpsertIntoList = <T extends UnknownRecord>(
   list: T[],
   matchIndex: number,
   payload: T,
-  position: number | undefined
+  position: number | undefined,
+  idOf: (element: T) => string
 ): ElementCapture => {
   if (matchIndex !== -1) {
     const before = elementSnapshot(list[matchIndex], matchIndex);
@@ -454,16 +480,24 @@ const applyUpsertIntoList = <T extends UnknownRecord>(
     list[matchIndex] = deepCloneJson(payload);
     return { kind: 'element', before, after: elementSnapshot(list[matchIndex], matchIndex) };
   }
-  checkGuard(op, ABSENT);
+  checkGuard(
+    op,
+    absentGuardActual(op, () => list.map(idOf))
+  );
   const index = insertAt(list, position, deepCloneJson(payload));
   return { kind: 'element', before: ABSENT, after: elementSnapshot(list[index], index) };
 };
 
-const applyRemoveFromList = <T extends UnknownRecord>(op: PatchOp, list: T[], matchIndex: number): ElementCapture => {
+const applyRemoveFromList = <T extends UnknownRecord>(
+  op: PatchOp,
+  list: T[],
+  matchIndex: number,
+  idOf: (element: T) => string
+): ElementCapture => {
   const before = elementSnapshot(list[matchIndex], matchIndex);
   checkGuard(op, before);
   list.splice(matchIndex, 1);
-  return { kind: 'element', before, after: ABSENT };
+  return { kind: 'element', before, after: ABSENT, container_after: list.map(idOf) };
 };
 
 const applyMoveInList = <T extends UnknownRecord>(
@@ -635,7 +669,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       }
       const sections = getSections(body);
       const index = sections.findIndex((section) => section.id === op.section.id);
-      return applyUpsertIntoList(op, sections, index, op.section as SectionLike, op.position);
+      return applyUpsertIntoList(op, sections, index, op.section as SectionLike, op.position, (section) => section.id);
     }
 
     case 'update_section_data': {
@@ -668,7 +702,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       const sections = getSections(body);
       const index = sections.findIndex((section) => section.id === op.section_id);
       if (index === -1) throw targetMissing(op, `section '${op.section_id}'`);
-      return applyRemoveFromList(op, sections, index);
+      return applyRemoveFromList(op, sections, index, (section) => section.id);
     }
 
     // ——— navigation family ———
@@ -679,7 +713,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       assertNoNullValues(op.group, 'upsert_group payload');
       const groups = getGroups(body);
       const index = groups.findIndex((group) => group.id === op.group.id);
-      return applyUpsertIntoList(op, groups, index, op.group as NavGroupLike, op.position);
+      return applyUpsertIntoList(op, groups, index, op.group as NavGroupLike, op.position, (group) => group.id);
     }
 
     case 'move_group': {
@@ -693,7 +727,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       const groups = getGroups(body);
       const index = groups.findIndex((group) => group.id === op.group_id);
       if (index === -1) throw targetMissing(op, `group '${op.group_id}'`);
-      return applyRemoveFromList(op, groups, index);
+      return applyRemoveFromList(op, groups, index, (group) => group.id);
     }
 
     case 'upsert_item': {
@@ -715,11 +749,14 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
           after: elementSnapshot(existing.list[existing.index], existing.index, existing.owner?.id),
         };
       }
-      checkGuard(op, ABSENT);
       if (op.parent_item_id !== undefined) {
         const parentLocation = findItemLocation(items, op.parent_item_id);
         if (!parentLocation) throw targetMissing(op, `parent item '${op.parent_item_id}' in group '${op.group_id}'`);
         const parent = parentLocation.list[parentLocation.index];
+        checkGuard(
+          op,
+          absentGuardActual(op, () => (Array.isArray(parent.children) ? parent.children : []).map((item) => item.id))
+        );
         const containerCreated = !Array.isArray(parent.children);
         if (containerCreated) parent.children = [];
         const index = insertAt(parent.children as NavItemLike[], op.position, deepCloneJson(op.item) as NavItemLike);
@@ -730,6 +767,10 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
           ...(containerCreated ? { container_created: true } : {}),
         };
       }
+      checkGuard(
+        op,
+        absentGuardActual(op, () => items.map((item) => item.id))
+      );
       const index = insertAt(items, op.position, deepCloneJson(op.item) as NavItemLike);
       return { kind: 'element', before: ABSENT, after: elementSnapshot(items[index], index) };
     }
@@ -777,7 +818,13 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
         delete located.owner.children;
         containerPruned = true;
       }
-      return { kind: 'element', before, after: ABSENT, ...(containerPruned ? { container_pruned: true } : {}) };
+      return {
+        kind: 'element',
+        before,
+        after: ABSENT,
+        ...(containerPruned ? { container_pruned: true } : {}),
+        container_after: located.list.map((item) => item.id),
+      };
     }
 
     case 'upsert_action': {
@@ -786,9 +833,19 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
         body.actions === undefined ? undefined : expectArray<LinkActionLike>(body.actions, 'body.actions');
       const index = actions === undefined ? -1 : actions.findIndex((action) => action.label === op.action.label);
       if (actions !== undefined && index !== -1) {
-        return applyUpsertIntoList(op, actions, index, op.action as LinkActionLike, op.position);
+        return applyUpsertIntoList(
+          op,
+          actions,
+          index,
+          op.action as LinkActionLike,
+          op.position,
+          (action) => action.label
+        );
       }
-      checkGuard(op, ABSENT);
+      checkGuard(
+        op,
+        absentGuardActual(op, () => (actions ?? []).map((action) => action.label))
+      );
       const containerCreated = actions === undefined;
       const list = actions ?? [];
       if (containerCreated) body.actions = list;
@@ -806,7 +863,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
         body.actions === undefined ? undefined : expectArray<LinkActionLike>(body.actions, 'body.actions');
       const index = actions === undefined ? -1 : actions.findIndex((action) => action.label === op.label);
       if (actions === undefined || index === -1) throw targetMissing(op, `action '${op.label}'`);
-      const capture = applyRemoveFromList(op, actions, index);
+      const capture = applyRemoveFromList(op, actions, index, (action) => action.label);
       if (op.prune_empty === true && actions.length === 0) {
         // `actions` is optional on the navigation body (D§3.8).
         delete body.actions;
@@ -819,7 +876,10 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'add_term': {
       const terms = getTerms(body, op.kind);
       const index = terms.findIndex((term) => term.term_id === op.term.term_id);
-      const snapshot = index === -1 ? ABSENT : elementSnapshot(terms[index], index);
+      const snapshot =
+        index === -1
+          ? absentGuardActual(op, () => terms.map((term) => term.term_id))
+          : elementSnapshot(terms[index], index);
       checkGuard(op, snapshot);
       if (index !== -1) {
         throw new PatchApplyError(
@@ -862,7 +922,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       const terms = getTerms(body, op.kind);
       const index = terms.findIndex((term) => term.term_id === op.term_id);
       if (index === -1) throw targetMissing(op, `term '${op.term_id}' in kind '${op.kind}'`);
-      return applyRemoveFromList(op, terms, index);
+      return applyRemoveFromList(op, terms, index, (term) => term.term_id);
     }
 
     // ——— site family ———
@@ -877,7 +937,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       assertNoNullValues(op.slot, 'upsert_slot payload');
       const slots = getSlots(body);
       const index = slots.findIndex((slot) => slot.slotId === op.slot.slotId);
-      return applyUpsertIntoList(op, slots, index, op.slot as TemplateSlotLike, op.position);
+      return applyUpsertIntoList(op, slots, index, op.slot as TemplateSlotLike, op.position, (slot) => slot.slotId);
     }
 
     case 'move_slot': {
@@ -891,7 +951,7 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       const slots = getSlots(body);
       const index = slots.findIndex((slot) => slot.slotId === op.slot_id);
       if (index === -1) throw targetMissing(op, `slot '${op.slot_id}'`);
-      return applyRemoveFromList(op, slots, index);
+      return applyRemoveFromList(op, slots, index, (slot) => slot.slotId);
     }
   }
 };
@@ -1007,7 +1067,12 @@ const inverseOfRemove = (
   restore: (before: Extract<ElementSnapshot, { exists: true }>) => PatchOp
 ): PatchOp => {
   if (!capture.before.exists) throw new PatchApplyError('invalid_op', 'remove capture has no before element.');
-  return { ...restore(capture.before), ...guardOf(ABSENT) } as PatchOp;
+  // The guard pins the element's absence AND the container's post-removal
+  // order: restoring at a saved index into a since-reordered list would
+  // silently re-shuffle intervening edits, so it refuses instead (C§2.4).
+  const expected =
+    capture.container_after !== undefined ? { exists: false, container: capture.container_after } : ABSENT;
+  return { ...restore(capture.before), ...guardOf(expected) } as PatchOp;
 };
 
 /**
@@ -1209,7 +1274,11 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
         kind: op.kind,
         term: elementCapture.before.value,
         position: elementCapture.before.index,
-        ...guardOf(ABSENT),
+        ...guardOf(
+          elementCapture.container_after !== undefined
+            ? { exists: false, container: elementCapture.container_after }
+            : ABSENT
+        ),
       });
     }
 

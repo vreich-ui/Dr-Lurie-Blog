@@ -993,3 +993,82 @@ describe('null handling: unset markers never reach the body', () => {
     );
   });
 });
+
+describe('removal inverses pin the container order (C§2.4 applied to restores)', () => {
+  const removeThenInverse = () => {
+    const record = makeRecord('page', pageBody());
+    const removed = apply(record, [{ op: 'remove_section', section_id: 's_grid' }]);
+    const inverse = derivePatchInverse(removed.applied[0].op, removed.applied[0].capture);
+    return { removed, inverse };
+  };
+
+  it('refuses the restore when the remaining sections were reordered since', () => {
+    const { removed, inverse } = removeThenInverse();
+    const reordered = apply(removed.record, [{ op: 'move_section', section_id: 's_bio', to_index: 0 }]);
+    assert.throws(
+      () => apply(reordered.record, [inverse]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+
+  it('refuses the restore when a section was inserted since', () => {
+    const { removed, inverse } = removeThenInverse();
+    const grown = apply(removed.record, [
+      { op: 'upsert_section', section: { id: 's_faq', type: 'faq', data: { items: [] } }, position: 0 },
+    ]);
+    assert.throws(
+      () => apply(grown.record, [inverse]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+
+  it('still applies the restore across edits that do not touch the container order', () => {
+    const { removed, inverse } = removeThenInverse();
+    const edited = apply(removed.record, [
+      { op: 'update_section_data', section_id: 's_hero', fields: { heading: 'Changed meanwhile' } },
+    ]);
+    const reverted = apply(edited.record, [inverse]);
+    const body = reverted.record.body as ReturnType<typeof pageBody>;
+    assert.deepStrictEqual(
+      body.sections.map((section) => section.id),
+      ['s_hero', 's_grid', 's_bio'],
+      'the removed section must restore at its original position'
+    );
+    const hero = body.sections.find((section) => section.id === 's_hero') as unknown as {
+      data: Record<string, unknown>;
+    };
+    assert.strictEqual(hero.data.heading, 'Changed meanwhile', 'the unrelated edit must survive');
+  });
+
+  it('refuses an item restore when its sibling order changed since', () => {
+    const record = makeRecord('navigation', navBody());
+    const removed = apply(record, [{ op: 'remove_item', group_id: 'g_main', item_id: 'i_sleep' }]);
+    const inverse = derivePatchInverse(removed.applied[0].op, removed.applied[0].capture);
+    const reordered = apply(removed.record, [
+      {
+        op: 'upsert_item',
+        group_id: 'g_main',
+        item: { id: 'i_naps', label: 'Naps', target: { kind: 'route', href: '/topics/naps' } },
+        parent_item_id: 'i_learn',
+        position: 0,
+      },
+    ]);
+    assert.throws(
+      () => apply(reordered.record, [inverse]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+
+  it('refuses a term restore when the registry gained a term since', () => {
+    const record = makeRecord('taxonomy', taxonomyBody());
+    const removed = apply(record, [{ op: 'remove_term', kind: 'category', term_id: 't_colic' }]);
+    const inverse = derivePatchInverse(removed.applied[0].op, removed.applied[0].capture);
+    const grown = apply(removed.record, [
+      { op: 'add_term', kind: 'category', term: { term_id: 't_teething', slug: 'teething', label: 'Teething' } },
+    ]);
+    assert.throws(
+      () => apply(grown.record, [inverse]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
+    );
+  });
+});
