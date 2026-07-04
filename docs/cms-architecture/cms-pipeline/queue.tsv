@@ -1,0 +1,20 @@
+# queue.tsv — Phase 0 task queue for run-next-task.sh
+# Columns (tab-separated): taskID	mode	model	effort	briefPath
+# mode: auto = script may run it | notify = run interactively, script halts | checkpoint = needs Wolf's answer first
+# The runner executes the first row not yet marked 'done' in state.tsv.
+# It refuses to auto-run any row whose mode != auto.
+#
+# NOTE: this is a template — recreate it as a real tab-separated file in the repo
+# (spaces shown here for readability will NOT work; use actual tabs).
+#
+T0.1	auto	claude-sonnet-5	medium	docs/cms-architecture/phase-0-cc-briefs/T0.1-envelope-schema.md
+T0.2	auto	claude-sonnet-5	medium	docs/cms-architecture/phase-0-cc-briefs/T0.2-body-schemas.md
+T0.3	auto	claude-sonnet-5	medium	docs/cms-architecture/phase-0-cc-briefs/T0.3-id-validators.md
+T0.4	auto	claude-sonnet-5	medium	docs/cms-architecture/phase-0-cc-briefs/T0.4-site-objects-store.md
+T0.5	notify	claude-fable-5	high	docs/cms-architecture/phase-0-cc-briefs/T0.5-lock-library.md
+T0.6	notify	claude-fable-5	xhigh	docs/cms-architecture/phase-0-cc-briefs/T0.6-patch-grammar-inverses.md
+T0.7	auto	claude-sonnet-5	high	docs/cms-architecture/phase-0-cc-briefs/T0.7-validation-engine.md
+T0.8	auto	claude-opus-4-8	high	docs/cms-architecture/phase-0-cc-briefs/T0.8-verb-endpoints.md
+T0.9	auto	claude-sonnet-5	medium	docs/cms-architecture/phase-0-cc-briefs/T0.9-mcp-exposure.md
+T0.10	auto	claude-sonnet-5	low	docs/cms-architecture/phase-0-cc-briefs/T0.10-ci-tests.md
+T0.11	notify	claude-sonnet-5	high	docs/cms-architecture/phase-0-cc-briefs/T0.11-exit-drill.md
