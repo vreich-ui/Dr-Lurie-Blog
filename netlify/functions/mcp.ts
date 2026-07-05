@@ -94,7 +94,6 @@ const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
 const PROTOCOL_VERSION = '2025-06-18';
 const ALLOWED_AGENTS = allowedAgentNames;
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
-const ADMIN_TOOLS_ENABLED = process.env.MCP_ENABLE_ADMIN_TOOLS === 'true';
 const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
 const ARTIFACT_LIST_MAX_LIMIT = 100;
 const WIPE_BLOB_CONFIRMATION = 'WIPE_BLOBS';
@@ -1046,16 +1045,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ),
     }),
   },
-  ...(ADMIN_TOOLS_ENABLED
-    ? [
-        {
-          name: 'save_json_blob_force_unlock',
-          description:
-            'Admin-only emergency tool that forcefully releases a workflow lock. Prefer checkin_request with the valid lock_token whenever possible.',
-          inputSchema: objectSchema({ request_id: stringSchema() }, ['request_id']),
-        },
-      ]
-    : []),
   {
     name: 'create_artifact_upload_intent',
     description:
@@ -3391,9 +3380,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callVerifyArticleImages(event, input);
     case 'trigger_netlify_build':
       return callTriggerNetlifyBuild(event, input);
-    case 'save_json_blob_force_unlock':
-      if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
-      return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
     case 'create_artifact_from_url': {

@@ -153,7 +153,7 @@ const requestSchema = z
     lock_token: z.string().min(1).optional(),
     owner_id: z.string().min(1).optional(),
     owner_label: z.string().min(1).optional(),
-    lease_seconds: z.number().int().positive().optional(),
+    lease_seconds: z.number().int().positive().max(3600).optional(),
     commit_metadata: z.record(z.string(), z.unknown()).optional(),
     commit: z.string().min(1).optional(),
     commit_sha: z.string().min(1).optional(),
@@ -339,6 +339,16 @@ const getLockTimestampDiagnostics = (lock: WorkflowLockRecord, nowMs: number) =>
 
 const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
   Boolean(lock && getLockExpirationMs(lock) > nowMs);
+
+const sanitizeLock = (lock: WorkflowLockRecord | undefined) =>
+  lock
+    ? {
+        owner_id: lock.owner_id,
+        owner_label: lock.owner_label,
+        acquired_at: lock.acquired_at,
+        expires_at: lock.expires_at,
+      }
+    : undefined;
 
 const lockExpiredResponse = (body: WorkflowRequest, lock?: WorkflowLockRecord, nowMs = Date.now()) =>
   jsonResponse(423, {
@@ -691,6 +701,32 @@ const saveCheckinIfLatestRecordUnchanged = async (
   nextRecord: WorkflowRecord
 ): Promise<SaveRecordIfVersionUnchangedResult> => {
   const latestRecord = await loadLatestRecordForCheckin(store, expectedRecord.request_id);
+
+  if (!latestRecord) return { saved: false as const, notFound: true as const };
+  if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
+
+  const recordToSave = preserveAgentOutputs(nextRecord, latestRecord);
+
+  await saveRecord(store, recordToSave);
+  await updateIndexes(store, latestRecord, recordToSave);
+
+  return { saved: true as const, record: recordToSave };
+};
+
+// Checkout's version guard. Same shape as saveRecordIfVersionUnchanged, except the
+// verification read is seeded with the record checkout already proved to exist:
+// right after create the record can be visible to strong reads only (the case
+// loadRecordForCheckout's stabilization exists for), and an unseeded eventual read
+// returning null would turn a legitimate first checkout into a 404. A newer version
+// observed here means a concurrent writer (typically a checkout that just won the
+// lock) landed between our read and this save, so the save is refused and the
+// caller must re-evaluate rather than overwrite the winner's lock.
+const saveCheckoutIfVersionUnchanged = async (
+  store: WorkflowBlobStore,
+  expectedRecord: WorkflowRecord,
+  nextRecord: WorkflowRecord
+): Promise<SaveRecordIfVersionUnchangedResult> => {
+  const latestRecord = await loadLatestRecordForAgentOutputs(store, expectedRecord.request_id, expectedRecord);
 
   if (!latestRecord) return { saved: false as const, notFound: true as const };
   if (latestRecord.version !== expectedRecord.version) return { saved: false as const, latestRecord };
@@ -1328,52 +1364,71 @@ export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRe
 
   const requestId = body.request_id as string;
   const checkoutLoad = await loadRecordForCheckout(store, requestId);
-  const previousRecord = checkoutLoad.record;
   const { diagnostics } = checkoutLoad;
 
-  if (!previousRecord) {
-    return jsonResponse(404, { action: body.action, not_found: true, diagnostics });
-  }
+  // loadRecordForCheckout's stabilization solves eventual-consistency visibility of
+  // just-created records and runs once, before this loop. Retries inside the loop
+  // exist for lock contention only: a refused version-guarded save means the record
+  // moved under us (typically a concurrent checkout that just won the lock), so
+  // re-read and re-evaluate against current state instead of writing blindly —
+  // a blind write here is the race where both callers read "unlocked" and the
+  // later write silently overwrites the earlier caller's brand-new lock.
+  for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
+    const previousRecord =
+      attempt === 0 ? checkoutLoad.record : await loadLatestRecordForCheckin(store, requestId);
 
-  const timestampMs = Date.now();
-  const timestamp = new Date(timestampMs).toISOString();
-  if (isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock, diagnostics });
-  }
+    if (!previousRecord) {
+      return jsonResponse(404, { action: body.action, not_found: true, diagnostics });
+    }
 
-  const nextRecord: WorkflowRecord = {
-    ...previousRecord,
-    updated_at: timestamp,
-    lock: {
-      token: randomUUID(),
-      owner_id: body.owner_id as string,
-      owner_label: body.owner_label as string,
-      acquired_at: timestamp,
-      expires_at: addSecondsIso(timestampMs, getLeaseSeconds(body)),
-    },
-    history: [
-      ...previousRecord.history,
-      {
-        at: timestamp,
+    const timestampMs = Date.now();
+    const timestamp = new Date(timestampMs).toISOString();
+    if (isLockActive(previousRecord.lock, timestampMs)) {
+      return jsonResponse(423, {
         action: body.action,
-        details: {
-          owner_id: body.owner_id,
-          owner_label: body.owner_label,
-          lease_seconds: getLeaseSeconds(body),
-          replaced_expired_lock: Boolean(previousRecord.lock),
-        },
+        locked: true,
+        lock: sanitizeLock(previousRecord.lock),
+        diagnostics,
+      });
+    }
+
+    const nextRecord: WorkflowRecord = {
+      ...previousRecord,
+      updated_at: timestamp,
+      lock: {
+        token: randomUUID(),
+        owner_id: body.owner_id as string,
+        owner_label: body.owner_label as string,
+        acquired_at: timestamp,
+        expires_at: addSecondsIso(timestampMs, getLeaseSeconds(body)),
       },
-    ],
-    version: previousRecord.version + 1,
-  };
+      history: [
+        ...previousRecord.history,
+        {
+          at: timestamp,
+          action: body.action,
+          details: {
+            owner_id: body.owner_id,
+            owner_label: body.owner_label,
+            lease_seconds: getLeaseSeconds(body),
+            replaced_expired_lock: Boolean(previousRecord.lock),
+          },
+        },
+      ],
+      version: previousRecord.version + 1,
+    };
 
-  const savedRecord = await saveWorkflowMutationRecord(store, previousRecord, nextRecord);
+    const saveResult = await saveCheckoutIfVersionUnchanged(store, previousRecord, nextRecord);
 
-  return jsonResponse(200, {
-    action: body.action,
-    record: savedRecord,
-    diagnostics,
-  });
+    if (saveResult.saved) {
+      return jsonResponse(200, { action: body.action, record: saveResult.record, diagnostics });
+    }
+    if ('notFound' in saveResult) {
+      return jsonResponse(404, { action: body.action, not_found: true, diagnostics });
+    }
+  }
+
+  return jsonResponse(409, { action: body.action, conflict: true });
 };
 
 export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowRequest) => {
@@ -1388,18 +1443,13 @@ export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowReques
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
   if (!previousRecord.lock) return jsonResponse(409, { action: body.action, error: 'No lock is currently held.' });
   if (previousRecord.lock.token !== body.lock_token) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+    return jsonResponse(423, { action: body.action, locked: true, lock: sanitizeLock(previousRecord.lock) });
   }
 
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
   if (!isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(409, {
-      action: body.action,
-      error: 'Lock has expired.',
-      lock: previousRecord.lock,
-      diagnostics: getLockTimestampDiagnostics(previousRecord.lock, timestampMs),
-    });
+    return lockExpiredResponse(body, previousRecord.lock, timestampMs);
   }
 
   const leaseSeconds = getLeaseSeconds(body);
@@ -1444,7 +1494,11 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
     if (!latestRecord.lock) return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
 
     if (latestRecord.lock.token !== body.lock_token) {
-      return jsonResponse(423, { action: body.action, locked: true, lock: latestRecord.lock });
+      return jsonResponse(423, { action: body.action, locked: true, lock: sanitizeLock(latestRecord.lock) });
+    }
+
+    if (!isLockActive(latestRecord.lock, Date.now())) {
+      return lockExpiredResponse(body, latestRecord.lock);
     }
 
     const timestamp = nowIso();

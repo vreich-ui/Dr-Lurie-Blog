@@ -5,6 +5,7 @@ import {
   checkoutRequest,
   checkinRequest,
   createRequest,
+  handler as saveJsonBlobHandler,
   patchAgentOutput,
   refreshLock,
   type WorkflowRecord,
@@ -47,7 +48,13 @@ const createMemoryStore = () => {
 };
 
 type Store = ReturnType<typeof createMemoryStore>;
-type RecordResponse = { error?: string; lock_expired?: boolean; locked?: boolean; record?: WorkflowRecord };
+type RecordResponse = {
+  error?: string;
+  lock_expired?: boolean;
+  locked?: boolean;
+  lock?: Record<string, unknown>;
+  record?: WorkflowRecord;
+};
 
 const parseBody = (response: { body: string }) => JSON.parse(response.body) as RecordResponse;
 
@@ -170,4 +177,97 @@ test('refresh_lock extends the active lock and checkin_request releases it', asy
   });
   assert.equal(checkinResponse.statusCode, 200, checkinResponse.body);
   assert.equal(parseBody(checkinResponse).record?.lock, undefined);
+});
+
+test('conflict and error lock responses never expose the raw lock token', async () => {
+  const store = createMemoryStore();
+  const requestId = reqId('lock-sanitize');
+  await createWorkflow(store, requestId);
+  await checkoutWorkflow(store, requestId, 300);
+
+  const checkoutConflict = await checkoutRequest(store, {
+    action: 'checkout_request',
+    request_id: requestId,
+    owner_id: 'other-agent',
+    owner_label: 'Other agent',
+  });
+  assert.equal(checkoutConflict.statusCode, 423, checkoutConflict.body);
+  const checkoutConflictBody = parseBody(checkoutConflict);
+  assert.equal(checkoutConflictBody.locked, true);
+  assert.ok(checkoutConflictBody.lock, 'checkout conflict must still describe the active lock');
+  assert.equal(checkoutConflictBody.lock?.token, undefined);
+  assert.equal(checkoutConflictBody.lock?.owner_id, 'lock-test-agent');
+
+  const refreshWrongToken = await refreshLock(store, {
+    action: 'refresh_lock',
+    request_id: requestId,
+    lock_token: 'wrong-token',
+  });
+  assert.equal(refreshWrongToken.statusCode, 423, refreshWrongToken.body);
+  const refreshWrongTokenBody = parseBody(refreshWrongToken);
+  assert.equal(refreshWrongTokenBody.locked, true);
+  assert.ok(refreshWrongTokenBody.lock, 'refresh with wrong token must still describe the active lock');
+  assert.equal(refreshWrongTokenBody.lock?.token, undefined);
+
+  const checkinWrongToken = await checkinRequest(store, {
+    action: 'checkin_request',
+    request_id: requestId,
+    lock_token: 'wrong-token',
+  });
+  assert.equal(checkinWrongToken.statusCode, 423, checkinWrongToken.body);
+  const checkinWrongTokenBody = parseBody(checkinWrongToken);
+  assert.equal(checkinWrongTokenBody.locked, true);
+  assert.ok(checkinWrongTokenBody.lock, 'checkin with wrong token must still describe the active lock');
+  assert.equal(checkinWrongTokenBody.lock?.token, undefined);
+});
+
+test('lease_seconds is capped at 3600 seconds by the request schema', async () => {
+  const oversizedLease = (action: 'checkout_request' | 'refresh_lock', label: string) =>
+    saveJsonBlobHandler({
+      httpMethod: 'POST',
+      headers: {},
+      body: JSON.stringify({
+        action,
+        request_id: reqId(label),
+        owner_id: 'lock-test-agent',
+        owner_label: 'Lock test agent',
+        lock_token: 'lock_x',
+        lease_seconds: 3601,
+      }),
+    });
+
+  const checkoutResponse = await oversizedLease('checkout_request', 'lease-cap-checkout');
+  assert.equal(checkoutResponse.statusCode, 400, checkoutResponse.body);
+  const checkoutIssues = (JSON.parse(checkoutResponse.body) as { issues?: Array<{ path: unknown[] }> }).issues;
+  assert.ok(checkoutIssues?.some((issue) => issue.path.includes('lease_seconds')));
+
+  const refreshResponse = await oversizedLease('refresh_lock', 'lease-cap-refresh');
+  assert.equal(refreshResponse.statusCode, 400, refreshResponse.body);
+  const refreshIssues = (JSON.parse(refreshResponse.body) as { issues?: Array<{ path: unknown[] }> }).issues;
+  assert.ok(refreshIssues?.some((issue) => issue.path.includes('lease_seconds')));
+});
+
+test('refresh_lock returns the lock_expired shape (423) for a matching-but-expired token', async () => {
+  const store = createMemoryStore();
+  const requestId = reqId('lock-refresh-expired');
+  await createWorkflow(store, requestId);
+  const record = await checkoutWorkflow(store, requestId, 1);
+
+  const expiredRecord = {
+    ...record,
+    lock: { ...record.lock!, expires_at: new Date(Date.now() - 1000).toISOString() },
+  };
+  await store.setJSON(`workflows/by-id/${requestId}.json`, expiredRecord);
+
+  const refreshResponse = await refreshLock(store, {
+    action: 'refresh_lock',
+    request_id: requestId,
+    lock_token: record.lock!.token,
+    lease_seconds: 600,
+  });
+  assert.equal(refreshResponse.statusCode, 423, refreshResponse.body);
+  const refreshBody = parseBody(refreshResponse);
+  assert.equal(refreshBody.error, 'lock_expired');
+  assert.equal(refreshBody.lock_expired, true);
+  assert.equal(refreshBody.lock, undefined);
 });

@@ -44,7 +44,13 @@ const createMemoryStore = () => {
 };
 
 const parseBody = (response: { body: string }) =>
-  JSON.parse(response.body) as { locked?: boolean; record?: WorkflowRecord };
+  JSON.parse(response.body) as {
+    locked?: boolean;
+    lock?: Record<string, unknown>;
+    error?: string;
+    lock_expired?: boolean;
+    record?: WorkflowRecord;
+  };
 
 const contentSourceInput = (requestId: string) => ({
   record_type: 'content_source',
@@ -89,7 +95,11 @@ test('checkin_request requires the active lock token and releases ownership', as
     lock_token: 'wrong-token',
   });
   assert.equal(badCheckin.statusCode, 423, badCheckin.body);
-  assert.equal(parseBody(badCheckin).locked, true);
+  const badCheckinBody = parseBody(badCheckin);
+  assert.equal(badCheckinBody.locked, true);
+  assert.ok(badCheckinBody.lock, 'checkin-with-wrong-token must still describe the active lock');
+  assert.equal(badCheckinBody.lock?.token, undefined);
+  assert.equal(badCheckinBody.lock?.owner_id, 'checkin-test-agent');
 
   const goodCheckin = await checkinRequest(store, {
     action: 'checkin_request',
@@ -98,4 +108,48 @@ test('checkin_request requires the active lock token and releases ownership', as
   });
   assert.equal(goodCheckin.statusCode, 200, goodCheckin.body);
   assert.equal(parseBody(goodCheckin).record?.lock, undefined);
+});
+
+test('checkin_request rejects a matching-but-expired lock token instead of silently releasing it', async () => {
+  const store = createMemoryStore();
+  const requestId = reqId('checkin-expired');
+
+  const createResponse = await createRequest(store, {
+    action: 'create_request',
+    request_id: requestId,
+    input: contentSourceInput(requestId),
+  });
+  assert.equal(createResponse.statusCode, 201, createResponse.body);
+
+  const checkoutResponse = await checkoutRequest(store, {
+    action: 'checkout_request',
+    request_id: requestId,
+    owner_id: 'checkin-test-agent',
+    owner_label: 'Checkin test agent',
+    lease_seconds: 1,
+  });
+  assert.equal(checkoutResponse.statusCode, 200, checkoutResponse.body);
+  const record = parseBody(checkoutResponse).record;
+  const token = record?.lock?.token;
+  assert.ok(token);
+
+  const expiredRecord = {
+    ...record,
+    lock: { ...record!.lock!, expires_at: new Date(Date.now() - 1000).toISOString() },
+  };
+  await store.setJSON(`workflows/by-id/${requestId}.json`, expiredRecord);
+
+  const expiredCheckin = await checkinRequest(store, {
+    action: 'checkin_request',
+    request_id: requestId,
+    lock_token: token,
+  });
+  assert.equal(expiredCheckin.statusCode, 423, expiredCheckin.body);
+  const expiredCheckinBody = parseBody(expiredCheckin);
+  assert.equal(expiredCheckinBody.error, 'lock_expired');
+  assert.equal(expiredCheckinBody.lock_expired, true);
+
+  const stillLockedRecordJson = await store.get(`workflows/by-id/${requestId}.json`);
+  const stillLockedRecord = JSON.parse(stillLockedRecordJson as string) as WorkflowRecord;
+  assert.ok(stillLockedRecord.lock, 'expired lock must not be silently released by checkin_request');
 });
