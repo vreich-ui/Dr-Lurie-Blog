@@ -123,6 +123,20 @@ test('artifact metadata tool descriptions document soft-delete visibility', asyn
   assert.match(getTool(tools, 'get_artifact_metadata').description, /deletedAtISO/);
 });
 
+test('save_json_blob_force_unlock is not exposed as an MCP tool', async () => {
+  const tools = await listTools();
+
+  assert.equal(
+    tools.some((tool) => tool.name === 'save_json_blob_force_unlock'),
+    false,
+    'save_json_blob_force_unlock must not appear in tools/list'
+  );
+
+  const result = await callTool('save_json_blob_force_unlock', { request_id: 'req_test_force_unlock_20260702_01' });
+  assert.equal(result.isError, true, 'calling the removed tool must be a tool error');
+  assert.match(String(result.structuredContent?.error), /unknown tool/i);
+});
+
 test('node media src and patch_canonical_input descriptions name the unified trust sources', async () => {
   const tools = await listTools();
   const patchTool = getTool(tools, 'save_json_blob_patch_canonical_input');
