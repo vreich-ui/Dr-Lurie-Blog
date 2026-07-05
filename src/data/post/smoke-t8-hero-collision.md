@@ -1,14 +1,18 @@
 ---
-publishDate: 2026-07-03T17:58:26.940Z
-published_time: 2026-07-03T17:58:26.940Z
+publishDate: 2026-07-05T18:39:00.210Z
+published_time: 2026-07-05T18:39:00.210Z
 title: "Smoke T8 Hero Collision"
-excerpt: "Featured image B should win over n_hero image A."
-image: "~/assets/images/uploads/smoke-t8-hero-collision/smoke-t8-a.png"
+excerpt: "A compact smoke-test article for validating hero collision behavior."
+image: "~/assets/images/uploads/smoke-t8-hero-collision/t8-a.png"
 tags:
   - "smoke-test"
-  - "image-pipeline"
   - "t8"
+  - "image-pipeline"
 ---
-### Smoke T8 Hero Collision
+### Hero collision smoke test
 
-This n_hero node points to image A, while featuredImage will point to image B.
+This hero node intentionally points at image A while the publish payload selects image B as the featured image.
+
+### Expected behavior
+
+The expected result is a hero-image collision warning naming n_hero, with image B winning the frontmatter image field.
