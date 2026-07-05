@@ -1,22 +1,26 @@
 ---
-publishDate: 2026-07-03T17:50:45.651Z
-published_time: 2026-07-03T17:50:45.651Z
+publishDate: 2026-07-05T18:35:58.281Z
+published_time: 2026-07-05T18:35:58.281Z
 title: "Smoke T5 Two Inline Images"
-excerpt: "Two inline images with no hero."
-image: "~/assets/images/uploads/smoke-t5-two-inline-images/smoke-t5-a.png"
+excerpt: "A compact smoke-test article for validating two inline body images with no featured image."
+image: "~/assets/images/uploads/smoke-t5-two-inline-images/t5-a.png"
 tags:
   - "smoke-test"
-  - "image-pipeline"
   - "t5"
+  - "image-pipeline"
 ---
-### First inline image
+### First inline image smoke test
 
-![smoke test inline A](~/assets/images/uploads/smoke-t5-two-inline-images/smoke-t5-a.png)
+![smoke test inline image A](~/assets/images/uploads/smoke-t5-two-inline-images/t5-a.png)
 
-The first image should render in the body.
+This section validates the first inline body image.
 
-### Second inline image
+### Second inline image smoke test
 
-![smoke test inline B](~/assets/images/uploads/smoke-t5-two-inline-images/smoke-t5-b.png)
+![smoke test inline image B](~/assets/images/uploads/smoke-t5-two-inline-images/t5-b.png)
 
-The second distinct image should also render in the body, with no hero image.
+This section validates a second distinct inline body image.
+
+### Expected behavior
+
+The expected result is two body images, no hero image, and a missing featured image warning.
