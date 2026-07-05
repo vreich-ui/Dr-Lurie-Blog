@@ -48,7 +48,7 @@ const bodySchema = z
     action: z.enum(['patch_canonical_input', 'set_published_time']),
     request_id: z.string().min(1),
     lock_token: z.string().min(1),
-    expected_record_version: z.number().int().nonnegative().optional(),
+    expected_record_version: z.number().int().nonnegative(),
     promote_publish_payload: z.unknown().optional(),
     published_time: z.string().nullable().optional(),
   })
@@ -180,8 +180,8 @@ export const handlePatchCanonicalInput = async (
   const lockErr = validateLock(record, body.lock_token);
   if (lockErr) return lockErrorResponse(body.action, record, lockErr);
 
-  if (body.expected_record_version !== undefined && record.version !== body.expected_record_version) {
-    return jsonResponse(409, { action: body.action, conflict: true });
+  if (record.version !== body.expected_record_version) {
+    return jsonResponse(409, { action: body.action, conflict: true, current_version: record.version });
   }
 
   if (isRecord(validatedPayload)) {
@@ -240,6 +240,10 @@ export const handleSetPublishedTime = async (store: Store, body: AdminPatchBody)
 
   const lockErr = validateLock(record, body.lock_token);
   if (lockErr) return lockErrorResponse(body.action, record, lockErr);
+
+  if (record.version !== body.expected_record_version) {
+    return jsonResponse(409, { action: body.action, conflict: true, current_version: record.version });
+  }
 
   const timestamp = nowIso();
   const nextRecord: WorkflowRecord = {

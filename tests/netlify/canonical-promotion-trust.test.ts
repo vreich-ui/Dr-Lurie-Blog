@@ -245,6 +245,7 @@ describe('admin-patch-workflow trusts the artifact index like the agent path', (
         action: 'patch_canonical_input',
         request_id: REQUEST_ID,
         lock_token: LOCK_TOKEN,
+        expected_record_version: 1,
         promote_publish_payload: { slug: 'admin-trust-test', title: 'Admin Trust Test', featuredImage: ref.blobKey },
       },
       indexStore
@@ -265,6 +266,7 @@ describe('admin-patch-workflow trusts the artifact index like the agent path', (
         action: 'patch_canonical_input',
         request_id: REQUEST_ID,
         lock_token: LOCK_TOKEN,
+        expected_record_version: 1,
         promote_publish_payload: { slug: 'admin-trust-test', title: 'Admin Trust Test', featuredImage: foreignRef },
       },
       indexStore

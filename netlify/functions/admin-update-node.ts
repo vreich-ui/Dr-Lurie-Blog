@@ -40,8 +40,13 @@ const bodySchema = z
     lockToken: z.string().min(1),
     nodeId: z.string().regex(/^n_[a-zA-Z0-9]+$/),
     updatedPublicFields: updatedPublicFieldsSchema,
+    expected_record_version: z.number().int().nonnegative(),
   })
   .strict();
+
+type UpdateNodeBody = z.infer<typeof bodySchema>;
+type UpdateNodeActor = { userId?: string; email?: string };
+type Store = Awaited<ReturnType<typeof getWorkflowBlobStore>>;
 
 type LambdaEvent = {
   blobs?: string;
@@ -58,6 +63,92 @@ const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
 });
 
 const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
+
+export const updateAdminNode = async (store: Store, body: UpdateNodeBody, actor: UpdateNodeActor) => {
+  const { requestId, lockToken, nodeId, updatedPublicFields } = body;
+
+  const raw = await store.get(recordKey(requestId));
+  if (!raw) return jsonResponse(404, { error: 'Workflow record not found', not_found: true });
+
+  const record = JSON.parse(raw) as WorkflowRecord;
+  const nowMs = Date.now();
+
+  if (!record.lock) return jsonResponse(423, { error: 'lock_expired', lock_expired: true });
+  if (record.lock.token !== lockToken)
+    return jsonResponse(423, {
+      error: 'lock_mismatch',
+      locked: true,
+      lock: {
+        owner_id: record.lock.owner_id,
+        owner_label: record.lock.owner_label,
+        expires_at: record.lock.expires_at,
+      },
+    });
+  if (Date.parse(record.lock.expires_at) <= nowMs)
+    return jsonResponse(423, { error: 'lock_expired', lock_expired: true });
+
+  if (record.version !== body.expected_record_version)
+    return jsonResponse(409, { error: 'version_conflict', conflict: true, current_version: record.version });
+
+  const nodes = record.input.content?.article_body?.nodes as ArticleBodyNode[] | undefined;
+  if (!nodes) return jsonResponse(404, { error: 'Article body not found in workflow record' });
+
+  const nodeIndex = nodes.findIndex((n) => n.id === nodeId);
+  if (nodeIndex === -1) return jsonResponse(404, { error: `Node ${nodeId} not found` });
+
+  const existing = nodes[nodeIndex];
+  const updated: ArticleBodyNode = {
+    ...existing,
+    public: { ...existing.public, ...updatedPublicFields },
+  };
+
+  const updatedNodes = [...nodes.slice(0, nodeIndex), updated, ...nodes.slice(nodeIndex + 1)];
+
+  const timestamp = new Date().toISOString();
+
+  // Snapshot: store only the fields that changed (previous and next values).
+  const changedKeys = Object.keys(updatedPublicFields) as (keyof typeof updatedPublicFields)[];
+  const previousPublic: Record<string, unknown> = {};
+  const nextPublic: Record<string, unknown> = {};
+  for (const k of changedKeys) {
+    previousPublic[k] = existing.public[k as keyof typeof existing.public];
+    nextPublic[k] = updatedPublicFields[k];
+  }
+
+  const nextRecord: WorkflowRecord = {
+    ...record,
+    updated_at: timestamp,
+    input: {
+      ...record.input,
+      content: {
+        ...record.input.content,
+        article_body: {
+          ...record.input.content!.article_body!,
+          nodes: updatedNodes,
+        },
+      },
+    },
+    history: [
+      ...record.history,
+      {
+        at: timestamp,
+        action: 'admin_update_node',
+        details: {
+          nodeId,
+          updated_by: actor.userId,
+          updated_by_email: actor.email,
+          previousPublic,
+          nextPublic,
+        },
+      },
+    ],
+    version: record.version + 1,
+  };
+
+  await store.setJSON(recordKey(requestId), nextRecord);
+
+  return jsonResponse(200, { node: updated, version: nextRecord.version });
+};
 
 export const handler = async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
@@ -78,90 +169,11 @@ export const handler = async (event: LambdaEvent) => {
   const parsed = bodySchema.safeParse(rawBody);
   if (!parsed.success) return jsonResponse(400, { error: 'Invalid request', issues: parsed.error.issues });
 
-  const { requestId, lockToken, nodeId, updatedPublicFields } = parsed.data;
-
   try {
     const store = await getWorkflowBlobStore(event);
-    const raw = await store.get(recordKey(requestId));
-    if (!raw) return jsonResponse(404, { error: 'Workflow record not found', not_found: true });
-
-    const record = JSON.parse(raw) as WorkflowRecord;
-    const nowMs = Date.now();
-
-    if (!record.lock) return jsonResponse(423, { error: 'lock_expired', lock_expired: true });
-    if (record.lock.token !== lockToken)
-      return jsonResponse(423, {
-        error: 'lock_mismatch',
-        locked: true,
-        lock: {
-          owner_id: record.lock.owner_id,
-          owner_label: record.lock.owner_label,
-          expires_at: record.lock.expires_at,
-        },
-      });
-    if (Date.parse(record.lock.expires_at) <= nowMs)
-      return jsonResponse(423, { error: 'lock_expired', lock_expired: true });
-
-    const nodes = record.input.content?.article_body?.nodes as ArticleBodyNode[] | undefined;
-    if (!nodes) return jsonResponse(404, { error: 'Article body not found in workflow record' });
-
-    const nodeIndex = nodes.findIndex((n) => n.id === nodeId);
-    if (nodeIndex === -1) return jsonResponse(404, { error: `Node ${nodeId} not found` });
-
-    const existing = nodes[nodeIndex];
-    const updated: ArticleBodyNode = {
-      ...existing,
-      public: { ...existing.public, ...updatedPublicFields },
-    };
-
-    const updatedNodes = [...nodes.slice(0, nodeIndex), updated, ...nodes.slice(nodeIndex + 1)];
-
-    const timestamp = new Date().toISOString();
-
-    // Snapshot: store only the fields that changed (previous and next values).
-    const changedKeys = Object.keys(updatedPublicFields) as (keyof typeof updatedPublicFields)[];
-    const previousPublic: Record<string, unknown> = {};
-    const nextPublic: Record<string, unknown> = {};
-    for (const k of changedKeys) {
-      previousPublic[k] = existing.public[k as keyof typeof existing.public];
-      nextPublic[k] = updatedPublicFields[k];
-    }
-
-    const nextRecord: WorkflowRecord = {
-      ...record,
-      updated_at: timestamp,
-      input: {
-        ...record.input,
-        content: {
-          ...record.input.content,
-          article_body: {
-            ...record.input.content!.article_body!,
-            nodes: updatedNodes,
-          },
-        },
-      },
-      history: [
-        ...record.history,
-        {
-          at: timestamp,
-          action: 'admin_update_node',
-          details: {
-            nodeId,
-            updated_by: adminState.userId,
-            updated_by_email: adminState.email,
-            previousPublic,
-            nextPublic,
-          },
-        },
-      ],
-      version: record.version + 1,
-    };
-
-    await store.setJSON(recordKey(requestId), nextRecord);
-
-    return jsonResponse(200, { node: updated, version: nextRecord.version });
+    return await updateAdminNode(store, parsed.data, { userId: adminState.userId, email: adminState.email });
   } catch (error) {
-    console.error('admin-update-node failed', { requestId, nodeId, error });
+    console.error('admin-update-node failed', { requestId: parsed.data.requestId, nodeId: parsed.data.nodeId, error });
     return jsonResponse(500, { error: 'Failed to update node' });
   }
 };
