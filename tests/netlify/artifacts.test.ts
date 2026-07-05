@@ -20,7 +20,7 @@ test('artifact helpers produce stable blob keys and references', () => {
   const bytes = Buffer.from('artifact bytes');
   const reference = createArtifactReference({
     input: {
-      requestId: 'Draft Request 123',
+      requestId: 'req_test_hero_20260605_01',
       artifactKind: ArtifactKind.Image,
       contentType: 'image/png',
       filename: 'Hero Preview.PNG',
@@ -32,7 +32,7 @@ test('artifact helpers produce stable blob keys and references', () => {
     createdAtISO: '2026-06-05T00:00:00.000Z',
   });
 
-  assert.equal(reference.blobKey, `image/draft-request-123/${reference.sha256}.png`);
+  assert.equal(reference.blobKey, `image/req_test_hero_20260605_01/${reference.sha256}.png`);
   assert.equal(reference.sizeBytes, bytes.byteLength);
   assert.equal(reference.contentType, 'image/png');
   assert.equal(reference.createdAtISO, '2026-06-05T00:00:00.000Z');
@@ -43,17 +43,23 @@ test('artifact helpers produce stable blob keys and references', () => {
   assert.deepEqual(reference.metadata, { source: 'test' });
 });
 
-test('artifact blob keys fall back safely when request IDs are not path-safe', () => {
+test('artifact blob keys reject request ids that are not path-safe (no silent generic fallback)', () => {
+  // '///' normalizes to the empty string (normalizeMachineSafeId strips every
+  // non [a-z0-9_] char) and MUST be rejected outright, not silently folded to
+  // a shared generic path segment — that would let unrelated uploads collide
+  // on the same blobKey. createArtifactBlobKey enforces validateRequestId
+  // (the req_<flow>_<topic>_<yyyymmdd>_<nn> contract) with no fallback.
   const digest = 'a'.repeat(64);
 
-  assert.equal(
-    createArtifactBlobKey({
-      artifactKind: ArtifactKind.Doc,
-      requestId: '///',
-      sha256: digest,
-      filename: 'notes.md',
-    }),
-    `doc/request/${digest}.md`
+  assert.throws(
+    () =>
+      createArtifactBlobKey({
+        artifactKind: ArtifactKind.Doc,
+        requestId: '///',
+        sha256: digest,
+        filename: 'notes.md',
+      }),
+    /request_id is required/
   );
 });
 
@@ -63,7 +69,7 @@ test('artifact blob keys enforce the server artifactKind whitelist and sha256 fo
     () =>
       createArtifactBlobKey({
         artifactKind: 'markdown' as ArtifactKind,
-        requestId: 'request',
+        requestId: 'req_test_generic_20260605_01',
         sha256: 'a'.repeat(64),
       }),
     /artifactKind must be one of/
@@ -72,7 +78,7 @@ test('artifact blob keys enforce the server artifactKind whitelist and sha256 fo
     () =>
       createArtifactBlobKey({
         artifactKind: ArtifactKind.Image,
-        requestId: 'request',
+        requestId: 'req_test_generic_20260605_01',
         sha256: 'abc123',
       }),
     /sha256 must be a 64-character hex digest/
@@ -83,7 +89,7 @@ test('ArtifactReference validation rejects invented media handles and incomplete
   const bytes = Buffer.from('validated artifact');
   const reference = createArtifactReference({
     input: {
-      requestId: 'validation-request',
+      requestId: 'req_test_validation_20260605_01',
       artifactKind: ArtifactKind.Image,
       contentType: 'image/png',
       filename: 'validated.png',
@@ -180,7 +186,7 @@ const makeImageReference = (requestId: string, bytes = Buffer.from('image bytes'
   });
 
 test('reconcileImageArtifactReference reads a valid reference with valid blob bytes', async () => {
-  const reference = makeImageReference('valid-reference');
+  const reference = makeImageReference('req_test_validref_20260605_01');
   const { store } = createFakeArtifactStore({ [reference.blobKey]: Buffer.from('image bytes') });
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
 
@@ -192,7 +198,7 @@ test('reconcileImageArtifactReference reads a valid reference with valid blob by
 });
 
 test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact-index JSON', async () => {
-  const reference = makeImageReference('normalized-stale-reference');
+  const reference = makeImageReference('req_test_normalizedstale_20260605_01');
   const staleReference = { ...reference, blobKey: `artifacts/${reference.blobKey}` } as ArtifactReference;
   const { store } = createFakeArtifactStore({ [reference.blobKey]: Buffer.from('normalized bytes') });
   const { values, store: indexStore } = createFakeIndexStore();
@@ -206,7 +212,7 @@ test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact
   assert.equal(result.status, 'found');
   assert.equal(result.blobKey, reference.blobKey);
   assert.equal(result.status === 'found' ? result.correctedBlobKey : '', reference.blobKey);
-  assert.deepEqual(values.get(`request-artifacts/normalized-stale-reference/${reference.sha256}.json`), {
+  assert.deepEqual(values.get(`request-artifacts/req_test_normalizedstale_20260605_01/${reference.sha256}.json`), {
     ...reference,
     blobKey: reference.blobKey,
   });
@@ -214,7 +220,7 @@ test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact
 });
 
 test('reconcileImageArtifactReference reads from stores that only support arrayBuffer binary reads', async () => {
-  const reference = makeImageReference('arraybuffer-only', Buffer.from('array buffer bytes'), 'arraybuffer.jpg');
+  const reference = makeImageReference('req_test_arraybufferonly_20260605_01', Buffer.from('array buffer bytes'), 'arraybuffer.jpg');
   const values = new Map([[reference.blobKey, Buffer.from('array buffer bytes')]]);
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
   const store: ReadableArtifactBlobStore = {
@@ -232,7 +238,7 @@ test('reconcileImageArtifactReference reads from stores that only support arrayB
   assert.equal(result.status === 'found' ? result.bytes.toString() : '', 'array buffer bytes');
 });
 test('reconcileImageArtifactReference reports valid JSON with missing blob bytes as missing', async () => {
-  const reference = makeImageReference('missing-reference');
+  const reference = makeImageReference('req_test_missingref_20260605_01');
   const { store } = createFakeArtifactStore();
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
 
@@ -243,7 +249,7 @@ test('reconcileImageArtifactReference reports valid JSON with missing blob bytes
 });
 
 test('reconcileImageArtifactReference recovers a blob stored under duplicated artifacts/image prefix', async () => {
-  const reference = makeImageReference('duplicated-prefix');
+  const reference = makeImageReference('req_test_dupprefix_20260605_01');
   const correctedKey = `artifacts/${reference.blobKey}`;
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('prefixed bytes') });
   const { values, store: indexStore } = createFakeIndexStore();
@@ -255,14 +261,14 @@ test('reconcileImageArtifactReference recovers a blob stored under duplicated ar
   assert.equal(result.blobKey, correctedKey);
   assert.equal(result.status === 'found' ? result.correctedBlobKey : '', correctedKey);
   assert.equal(
-    values.has(`request-artifacts/duplicated-prefix/${reference.sha256}.json`),
+    values.has(`request-artifacts/req_test_dupprefix_20260605_01/${reference.sha256}.json`),
     false,
     'legacy prefixed keys should not be written back as invalid ArtifactReference blobKeys'
   );
 });
 
 test('reconcileImageArtifactReference recovers a blob stored under a leading slash prefix', async () => {
-  const reference = makeImageReference('leading-slash');
+  const reference = makeImageReference('req_test_leadingslash_20260605_01');
   const correctedKey = `/${reference.blobKey}`;
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('slash bytes') });
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
@@ -274,8 +280,11 @@ test('reconcileImageArtifactReference recovers a blob stored under a leading sla
 });
 
 test('reconcileImageArtifactReference recovers a same-filename blob stored under a different request prefix', async () => {
-  const reference = makeImageReference('stale-request-prefix', Buffer.from('moved bytes'), 'hero.png');
-  const correctedKey = reference.blobKey.replace('image/stale-request-prefix/', 'image/current-request-prefix/');
+  const reference = makeImageReference('req_test_stalereq_20260605_01', Buffer.from('moved bytes'), 'hero.png');
+  const correctedKey = reference.blobKey.replace(
+    'image/req_test_stalereq_20260605_01/',
+    'image/req_test_currentreq_20260605_01/'
+  );
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('moved bytes') });
   const { values, store: indexStore } = createFakeIndexStore();
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
@@ -284,13 +293,13 @@ test('reconcileImageArtifactReference recovers a same-filename blob stored under
 
   assert.equal(result.status, 'found');
   assert.equal(result.blobKey, correctedKey);
-  assert.deepEqual(values.get(`request-artifacts/current-request-prefix/${reference.sha256}.json`), {
+  assert.deepEqual(values.get(`request-artifacts/req_test_currentreq_20260605_01/${reference.sha256}.json`), {
     ...reference,
     blobKey: correctedKey,
   });
 });
 test('reconcileImageArtifactReference falls back across jpg jpeg png webp extensions by sha basename', async () => {
-  const reference = makeImageReference('extension-fallback', Buffer.from('extension bytes'), 'hero.jpg');
+  const reference = makeImageReference('req_test_extfallback_20260605_01', Buffer.from('extension bytes'), 'hero.jpg');
   const correctedKey = reference.blobKey.replace(/\.jpg$/, '.jpeg');
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('extension bytes') });
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');

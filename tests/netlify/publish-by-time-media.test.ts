@@ -8,7 +8,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
   process.env.MCP_HTTP_AUTH_TOKEN = 'test-mcp-token';
 
   it('promotes images from article_body, image_sets, and artifactReferences to publish payload', async () => {
-    const requestId = 'req_test_media_promotion';
+    const requestId = 'req_test_mediapromotion_20260605_01';
     const lockToken = 'lock_test_123';
     const sha256_ref = 'a'.repeat(64);
     const sha256_final = 'b'.repeat(64);
@@ -185,8 +185,8 @@ describe('save_json_blob_publish_by_time media promotion', () => {
   });
 
   it('resolves cross-request artifact when current request has no own artifacts', async () => {
-    const currentRequestId = 'req_current_pub';
-    const otherRequestId = 'req_other_images';
+    const currentRequestId = 'req_test_currentpub_20260605_01';
+    const otherRequestId = 'req_test_otherimages_20260605_01';
     const lockToken = 'lock_cross_456';
     const sha256_cross = 'c'.repeat(64);
     const crossArtifactRef = {

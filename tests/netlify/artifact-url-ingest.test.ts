@@ -118,7 +118,7 @@ test('saveArtifactFromUrl successfully ingests a PDF from a valid URL', async (t
     });
 
     const result = await saveArtifactFromUrl({
-      requestId: 'ingest-request',
+      requestId: 'req_test_ingest_20260605_01',
       artifactKind: ArtifactKind.Pdf,
       contentType: 'application/pdf',
       sourceUrl,
@@ -133,7 +133,7 @@ test('saveArtifactFromUrl successfully ingests a PDF from a valid URL', async (t
 
     if (result.ok) {
       assert.equal(artifactValues.has(result.artifact.blobKey), true);
-      assert.equal(indexValues.has(`request-artifacts/ingest-request/${expectedSha256}.json`), true);
+      assert.equal(indexValues.has(`request-artifacts/req_test_ingest_20260605_01/${expectedSha256}.json`), true);
     }
   });
 });
@@ -161,7 +161,7 @@ test('saveArtifactFromUrl successfully ingests an image from a valid URL', async
     });
 
     const result = await saveArtifactFromUrl({
-      requestId: 'ingest-image-request',
+      requestId: 'req_test_ingestimage_20260605_01',
       artifactKind: ArtifactKind.Image,
       contentType: 'image/png',
       sourceUrl,
@@ -262,7 +262,7 @@ test('saveArtifactFromUrl accepts safe IPv4-mapped public IPv6', async (t) => {
   t.mock.method(_ingestInternal, 'fetch', async () => new Response(bytes, { status: 200 }));
 
   const result = await saveArtifactFromUrl({
-    requestId: 'test',
+    requestId: 'req_test_ipv6public_20260605_01',
     artifactKind: ArtifactKind.Data,
     contentType: 'application/octet-stream',
     sourceUrl: 'https://mapped-public.local/test.bin',
@@ -333,7 +333,7 @@ test('saveArtifactFromUrl follows redirects and re-validates URL safety', async 
   });
 
   const result = await saveArtifactFromUrl({
-    requestId: 'test',
+    requestId: 'req_test_redirect_20260605_01',
     artifactKind: ArtifactKind.Data,
     contentType: 'application/octet-stream',
     sourceUrl: initialUrl,
@@ -542,7 +542,7 @@ test('MCP tool create_artifact_from_url handles valid input and returns success'
           params: {
             name: 'create_artifact_from_url',
             arguments: {
-              requestId: 'mcp-ingest-request',
+              requestId: 'req_test_mcpingest_20260605_01',
               artifactKind: 'pdf',
               contentType: 'application/pdf',
               sourceUrl,

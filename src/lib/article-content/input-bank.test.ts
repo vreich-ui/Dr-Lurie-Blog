@@ -5,8 +5,8 @@ import {
   createDefaultNodeFromTemplate,
   createLegacyBodyNode,
   createOpaqueNodeId,
-} from './input-bank.ts';
-import { articleBodyNodeSchema } from '../../schema/article-content-v1.ts';
+} from './input-bank.js';
+import { articleBodyNodeSchema } from '../../schema/article-content-v1.js';
 
 describe('Article Content Input Bank', () => {
   describe('createOpaqueNodeId', () => {

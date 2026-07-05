@@ -1,4 +1,4 @@
-import { type ArticleBodyNode, articleBodyNodeSchema } from '../../schema/article-content-v1.ts';
+import { type ArticleBodyNode, articleBodyNodeSchema } from '../../schema/article-content-v1.js';
 
 /**
  * Generates an opaque, stable-looking ID for article nodes.

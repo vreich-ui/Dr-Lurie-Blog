@@ -48,6 +48,20 @@ const postArtifact = async (body: Record<string, unknown>) => {
   };
 };
 
+/**
+ * A valid, unique-per-call req_<flow>_<topic>_<yyyymmdd>_<nn> id. This suite
+ * exercises the real local blob store (no in-memory fake, no per-test reset),
+ * so ids must both pass validateRequestId AND stay distinct across runs —
+ * matching the free-form `${label}-request-${Date.now()}-${random}` ids these
+ * fixtures used before the req_* format was strictly enforced end-to-end.
+ */
+const uniqueRequestId = (label: string): string => {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const seq = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  const topic = label.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'case';
+  return `req_test_${topic}_${date}_${seq}`;
+};
+
 const makeBaseInput = (requestId: string) => ({
   requestId,
   artifactKind: 'image',
@@ -128,7 +142,7 @@ test('save-artifact retries stale final artifact readback before saving request 
   });
 
   try {
-    const requestId = `stale-final-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const requestId = uniqueRequestId('stalefinal');
     const payloadBytes = await createImageBytes('png');
     const response = await postArtifact({
       ...makeBaseInput(requestId),
@@ -238,7 +252,7 @@ test('save-artifact deletes final artifact blob when readback retries are exhaus
   });
 
   try {
-    const requestId = `unreadable-final-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const requestId = uniqueRequestId('unreadablefinal');
     const payloadBytes = await createImageBytes('png');
     const expectedSha256 = sha256(payloadBytes);
     const expectedBlobKey = `image/${requestId}/${expectedSha256}.png`;
@@ -276,7 +290,7 @@ test('save-artifact single-shot uploads dedupe by checksum', async () => {
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `artifact-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifact');
   const baseInput = makeBaseInput(requestId);
   const payload = (await createImageBytes('png')).toString('base64');
   const first = await postArtifact({ ...baseInput, encoding: 'base64', payload });
@@ -314,7 +328,7 @@ test('save-artifact accepts a valid JPEG upload with matching expected size and 
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `jpeg-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('jpegvalid');
   const response = await postArtifact({
     ...makeBaseInput(requestId),
     contentType: 'image/jpeg',
@@ -353,8 +367,8 @@ test('save-artifact accepts valid PNG and WebP uploads', async () => {
 
   const pngBytes = await createImageBytes('png');
   const webpBytes = await createImageBytes('webp');
-  const pngRequestId = `png-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const webpRequestId = `webp-valid-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const pngRequestId = uniqueRequestId('pngvalid');
+  const webpRequestId = uniqueRequestId('webpvalid');
 
   const pngResponse = await postArtifact({
     ...makeBaseInput(pngRequestId),
@@ -395,7 +409,7 @@ test('save-artifact accepts localSizeBytes and localSha256 as integrity aliases'
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `jpeg-local-alias-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('jpeglocalalias');
   const response = await postArtifact({
     ...makeBaseInput(requestId),
     contentType: 'image/jpeg',
@@ -419,7 +433,7 @@ test('save-artifact rejects a truncated JPEG without writing final artifact or i
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `jpeg-truncated-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('jpegtruncated');
   const truncatedJpegBytes = Buffer.from([0xff, 0xd8, 0x00, 0x00, 0xff, 0xd9]);
   const response = await postArtifact({
     ...makeBaseInput(requestId),
@@ -447,8 +461,8 @@ test('save-artifact rejects corrupt PNG and WebP uploads before final persistenc
   process.env.NETLIFY_SITE_ID = '';
 
   const cases = [
-    { contentType: 'image/png', filename: 'hero.png', requestId: `png-corrupt-request-${Date.now()}` },
-    { contentType: 'image/webp', filename: 'hero.webp', requestId: `webp-corrupt-request-${Date.now()}` },
+    { contentType: 'image/png', filename: 'hero.png', requestId: uniqueRequestId('pngcorrupt') },
+    { contentType: 'image/webp', filename: 'hero.webp', requestId: uniqueRequestId('webpcorrupt') },
   ];
 
   for (const testCase of cases) {
@@ -482,7 +496,8 @@ test('save-artifact rejects image content type and filename extension mismatches
 
   const pngBytes = await createImageBytes('png');
   const webpBytes = await createImageBytes('webp');
-  const requestId = `image-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('imagemismatch');
+  const contentTypeRequestId = uniqueRequestId('imagemismatchcontenttype');
 
   const extensionMismatch = await postArtifact({
     ...makeBaseInput(requestId),
@@ -494,7 +509,7 @@ test('save-artifact rejects image content type and filename extension mismatches
     payload: pngBytes.toString('base64'),
   });
   const contentTypeMismatch = await postArtifact({
-    ...makeBaseInput(`${requestId}-content-type`),
+    ...makeBaseInput(contentTypeRequestId),
     contentType: 'image/png',
     filename: 'hero.png',
     encoding: 'base64',
@@ -517,7 +532,7 @@ test('save-artifact rejects unsupported image content types', async () => {
 
   const pngBytes = await createImageBytes('png');
   const response = await postArtifact({
-    ...makeBaseInput(`unsupported-image-request-${Date.now()}-${Math.random().toString(36).slice(2)}`),
+    ...makeBaseInput(uniqueRequestId('unsupportedimage')),
     contentType: 'image/gif',
     filename: 'hero.gif',
     encoding: 'base64',
@@ -536,7 +551,7 @@ test('save-artifact rejects a valid JPEG when expectedSha256 is a valid but wron
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `jpeg-sha-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('jpegshamismatch');
   const wrongSha256 = '0'.repeat(64);
   const response = await postArtifact({
     ...makeBaseInput(requestId),
@@ -563,7 +578,7 @@ test('save-artifact rejects JPEG aliases without required SOI and EOI markers be
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `jpeg-marker-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('jpegmarker');
   const response = await postArtifact({
     ...makeBaseInput(requestId),
     contentType: 'image/jpg',
@@ -588,7 +603,7 @@ test('save-artifact rejects JPEG bytes that have markers but cannot be decoded b
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `jpeg-decode-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('jpegdecode');
   const invalidJpegBytes = Buffer.from([0xff, 0xd8, 0x00, 0x00, 0xff, 0xd9]);
   const response = await postArtifact({
     ...makeBaseInput(requestId),
@@ -614,7 +629,7 @@ test('save-artifact saves safe ArtifactReference display fields and rejects unsa
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `schema-reject-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('schemareject');
   const bytes = await createImageBytes('png');
   const validResponse = await postArtifact({
     ...makeBaseInput(requestId),
@@ -692,7 +707,7 @@ test('save-artifact rejects a single-shot upload when expected size does not mat
   process.env.NETLIFY = 'false';
   process.env.NETLIFY_SITE_ID = '';
 
-  const requestId = `size-mismatch-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('sizemismatch');
   const bytes = Buffer.from('size checked bytes');
   const response = await postArtifact({
     ...makeBaseInput(requestId),

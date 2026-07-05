@@ -9,6 +9,19 @@ import { handler as saveArtifactHandler } from '../../netlify/functions/save-art
 
 const publishSecret = 'publish-artifact-test-secret';
 
+/**
+ * A valid, unique-per-call req_<flow>_<topic>_<yyyymmdd>_<nn> id, matching the
+ * free-form `${label}-${Date.now()}-${random}` ids these fixtures used before
+ * the req_* format was strictly enforced end-to-end (createArtifactBlobKey
+ * calls validateRequestId with no lenient fallback).
+ */
+const uniqueRequestId = (label: string): string => {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const seq = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  const topic = label.toLowerCase().replace(/[^a-z0-9]+/g, '') || 'case';
+  return `req_test_${topic}_${date}_${seq}`;
+};
+
 const createImageBytes = (format: 'jpeg' | 'png' | 'webp') => {
   const image = sharp({
     create: {
@@ -67,7 +80,7 @@ test('publish-article resolves artifactReferences into base64 media blobs', asyn
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
-  const requestId = `artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactpublishrequest');
   const directBytes = await createImageBytes('png');
   const explicitBytes = await createImageBytes('png');
   const derivedBytes = await createImageBytes('jpeg');
@@ -189,7 +202,7 @@ test('publish-article publishes PDF artifactReferences under document uploads', 
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
-  const requestId = `artifact-pdf-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactpdfrequest');
   const pdfBytes = Buffer.from('%PDF-1.7\nreal pdf artifact from save-artifact');
   const upload = await postArtifact({
     requestId,
@@ -718,7 +731,7 @@ test('publish-article rejects corrupt PDF artifact bytes before GitHub writes', 
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
-  const requestId = `artifact-corrupt-pdf-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactcorruptpdfrequest');
   const pdfBytes = Buffer.from('%PDF-1.7\nvalid pdf before blob tamper');
   const upload = await postArtifact({
     requestId,
@@ -779,7 +792,7 @@ test('publish-article rejects unsupported non-image non-PDF artifactReferences w
   process.env.GITHUB_BRANCH = 'main';
 
   const originalFetch = globalThis.fetch;
-  const requestId = `artifact-data-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactdatarequest');
   const upload = await postArtifact({
     requestId,
     artifactKind: 'data',
@@ -871,7 +884,7 @@ test('publish-article rewrites saved artifact blob keys before committing markdo
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'feature/rewrite-artifact-paths';
 
-  const requestId = `artifact-rewrite-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactrewriterequest');
   const artifactBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
@@ -1075,7 +1088,7 @@ test('publish-article normalizes stale artifact blobKeys and corrects the artifa
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'feature/reconcile-artifact-paths';
 
-  const requestId = `artifact-reconcile-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactreconcilerequest');
   const artifactBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
@@ -1171,7 +1184,7 @@ test('publish-article reports stale saved image references instead of a generic 
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
-  const requestId = `stale-artifact-publish-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('staleartifactpublishrequest');
   const upload = await postArtifact({
     requestId,
     artifactKind: 'image',
@@ -1232,7 +1245,7 @@ test('publish-article ignores a stale existingFeaturedImagePath when the feature
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'feature/image-artifacts';
 
-  const requestId = `artifact-featured-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifactfeaturedrequest');
   const artifactBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
@@ -1327,7 +1340,7 @@ test('publish-article rejects corrupt artifact bytes before GitHub writes', asyn
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
-  const requestId = `corrupt-artifact-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('corruptartifactrequest');
   const corruptBytes = Buffer.from('not an image');
   const corruptSha256 = createHash('sha256').update(corruptBytes).digest('hex');
   const artifact = {
@@ -1502,7 +1515,7 @@ test('publish-article uses a saved artifact for a path-only image repoPath updat
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
-  const requestId = `artifact-target-request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('artifacttargetrequest');
   const artifactBytes = await createImageBytes('webp');
   const upload = await postArtifact({
     requestId,
@@ -1882,7 +1895,7 @@ test('publish-article resolves artifact pointers in article_body nodes via index
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
-  const requestId = `node-artifact-resolve-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('nodeartifactresolve');
   const imageBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
@@ -1943,13 +1956,17 @@ test('publish-article resolves artifact pointers in article_body nodes via index
           schema_version: 'article_body.v1',
           nodes: [
             {
-              id: 'n_hero',
+              // Deliberately NOT 'n_hero': that id is a hard-coded hero
+              // designation (to-markdown.ts/publish-article.ts) that suppresses
+              // inline image rendering unless a hero slot winner exists — this
+              // test targets plain index-lookup resolution, not hero semantics.
+              id: 'n_bodyimage',
               kind: 'content',
               rendering: { placement: 'inline' },
               public: {
-                title: 'Hero section',
+                title: 'Body section',
                 body: 'Article body content.',
-                media: { src: artifact.blobKey, type: 'image', alt: 'Hero image' },
+                media: { src: artifact.blobKey, type: 'image', alt: 'Body image' },
               },
             },
           ],
@@ -2074,7 +2091,7 @@ test('publish-article returns 422 when article_body node artifact pointer is not
   process.env.GITHUB_REPOSITORY = 'owner/repo';
   process.env.GITHUB_BRANCH = 'main';
 
-  const requestId = `node-unresolved-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('nodeunresolved');
   const fakeSha256 = 'f'.repeat(64);
   const fakeBlobKey = `image/${requestId}/${fakeSha256}.png`;
 
@@ -2134,7 +2151,7 @@ test('publish-article returns 422 when article_body node src extension differs f
   process.env.GITHUB_BRANCH = 'main';
 
   // Upload a PNG artifact; node will reference the same sha256 but with .jpg extension
-  const requestId = `node-ext-mismatch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('nodeextmismatch');
   const imageBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,
@@ -2205,7 +2222,7 @@ test('publish-article returns 422 when article_body node src uses same sha256 as
 
   // Upload one artifact under requestA; then publish with the same artifact in artifactReferences
   // but have the article_body node use a different blobKey (requestB) for the same sha256.
-  const requestId = `cross-req-sha-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const requestId = uniqueRequestId('crossreqsha');
   const imageBytes = await createImageBytes('png');
   const upload = await postArtifact({
     requestId,

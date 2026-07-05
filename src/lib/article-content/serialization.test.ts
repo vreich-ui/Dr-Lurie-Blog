@@ -1,8 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { articleBodyToMarkdown, normalizeArticleBodyFromLegacy } from './to-markdown.ts';
-import type { ArticleBodyV1 } from '../../schema/article-content-v1.ts';
-import { assertReaderSafe } from './assert-reader-safe.ts';
+import { articleBodyToMarkdown, normalizeArticleBodyFromLegacy } from './to-markdown.js';
+import type { ArticleBodyV1 } from '../../schema/article-content-v1.js';
+import { assertReaderSafe } from './assert-reader-safe.js';
 
 describe('Article Body Serialization and Safety', () => {
   describe('articleBodyToMarkdown', () => {

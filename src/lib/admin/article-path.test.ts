@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { slugifyTitle, shortIdFromRequestId, generateArticlePath } from './article-path.ts';
+import { slugifyTitle, shortIdFromRequestId, generateArticlePath } from './article-path.js';
 
 // ─── slugifyTitle ─────────────────────────────────────────────────────────────
 
@@ -13,8 +13,11 @@ describe('slugifyTitle', () => {
     assert.strictEqual(slugifyTitle('Dr. Lurie! The Expert.'), 'dr-lurie-the-expert');
   });
 
-  it('strips apostrophes without inserting a gap', () => {
-    assert.strictEqual(slugifyTitle("Lurie's Guide"), 'luries-guide');
+  it('treats an apostrophe as its own separator, like any other non-alnum run', () => {
+    // Matches normalizeSlug's established behavior (agents-naming.ts): each
+    // run of non-alphanumeric characters becomes one hyphen, so the
+    // apostrophe and the following space are two separate runs.
+    assert.strictEqual(slugifyTitle("Lurie's Guide"), 'lurie-s-guide');
   });
 
   it('collapses multiple spaces / underscores to a single hyphen', () => {
@@ -79,7 +82,7 @@ describe('generateArticlePath', () => {
 
   it('handles a complex title correctly', () => {
     const path = generateArticlePath("Dr. Lurie's Guide to Skin Care!");
-    assert.strictEqual(path, 'src/data/post/dr-luries-guide-to-skin-care.md');
+    assert.strictEqual(path, 'src/data/post/dr-lurie-s-guide-to-skin-care.md');
   });
 
   it('always starts with src/data/post/ and ends with .md', () => {

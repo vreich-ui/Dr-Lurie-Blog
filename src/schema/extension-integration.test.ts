@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { contentSourceV1Schema, type ContentSourceV1 } from './schema-v1.ts';
-import { getPreferredArticleMarkdownSource, hasStructuredArticleBody } from './article-content-helpers.ts';
+import { contentSourceV1Schema, type ContentSourceV1 } from './schema-v1.js';
+import { getPreferredArticleMarkdownSource, hasStructuredArticleBody } from './article-content-helpers.js';
 
 describe('Structured Article Extension Integration', () => {
   const structuredInput: ContentSourceV1 = {

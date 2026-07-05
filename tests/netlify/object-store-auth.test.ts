@@ -1,12 +1,32 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { handler as adminObjectHandler } from '../../netlify/functions/admin-object.js';
 import { handler as objectStoreHandler } from '../../netlify/functions/object-store.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+
+/**
+ * Repo root, anchored to this test file's own compiled location rather than
+ * `process.cwd()` — the CI test runner compiles the whole suite to a temp
+ * outDir and invokes `node --test` from there (needed for its recursive
+ * discovery), so `process.cwd()` is NOT the repo root at test time. The
+ * source-scan tests below read actual .ts SOURCE files (never emitted into
+ * outDir), so they must resolve the real repo root regardless of run cwd.
+ */
+const findRepoRoot = (startDir: string): string => {
+  let dir = startDir;
+  while (true) {
+    if (existsSync(join(dir, 'astro.config.ts'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) throw new Error('Could not locate repo root (no ancestor with astro.config.ts).');
+    dir = parent;
+  }
+};
+const REPO_ROOT = findRepoRoot(dirname(fileURLToPath(import.meta.url)));
 
 // End-to-end tests of BOTH auth entry points against the local blob fallback.
 // Neither NETLIFY runtime env is set and events carry no blob context, so
@@ -145,7 +165,7 @@ test('both paths share one store: an agent-created record is readable through th
 // ═══ security invariant: the browser path never sees the publish key ═════════
 
 test('admin-object source references the publish key nowhere (never receives/reads/forwards it)', () => {
-  const source = readFileSync(join(process.cwd(), 'netlify/functions/admin-object.ts'), 'utf8');
+  const source = readFileSync(join(REPO_ROOT, 'netlify/functions/admin-object.ts'), 'utf8');
   // Allow the doc-comment sentence that NAMES the invariant; strip comments first.
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/PUBLISH_SECRET/i.test(code), 'admin-object must not reference PUBLISH_SECRET');
@@ -156,7 +176,7 @@ test('admin-object source references the publish key nowhere (never receives/rea
 // ═══ minting is centralized in one helper, not inlined per action ════════════
 
 test('object-verbs mints only through the shared mintId helper (no inline id generation)', () => {
-  const source = readFileSync(join(process.cwd(), 'netlify/lib/object-verbs.ts'), 'utf8');
+  const source = readFileSync(join(REPO_ROOT, 'netlify/lib/object-verbs.ts'), 'utf8');
   assert.ok(/from '\.\.\/\.\.\/src\/lib\/object-ids-mint\.js'/.test(source), 'must import the shared mintId helper');
   assert.ok(/mintId\(/.test(source), 'must call mintId');
   assert.ok(!/randomUUID/.test(source), 'no inline UUID id generation');
