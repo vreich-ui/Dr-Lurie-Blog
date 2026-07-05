@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { articleBodyV1Schema } from './article-content-v1.ts';
+import { articleBodyV1Schema } from './article-content-v1.js';
 
 describe('ArticleBodyV1 Schema', () => {
   it('validates a correct article body', () => {

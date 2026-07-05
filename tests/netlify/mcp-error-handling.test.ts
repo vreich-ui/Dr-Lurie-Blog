@@ -48,7 +48,7 @@ test('MCP handler returns a server error when request handling fails after parsi
         jsonrpc: '2.0',
         id: 1,
         method: 'tools/call',
-        params: { name: 'list_artifacts_for_request', arguments: { requestId: 'request-with-store-failure' } },
+        params: { name: 'list_artifacts_for_request', arguments: { requestId: 'req_test_storefailure_20260605_01' } },
       }),
     });
     const body = JSON.parse(response.body) as { error: { code: number; message: string } };
@@ -99,7 +99,7 @@ test('migrate_artifact_indexes accepts the server publish key without Clerk auth
   const previousNetlify = process.env.NETLIFY;
   const publishSecret = 'mcp-migration-publish-secret';
   const sha256 = 'a'.repeat(64);
-  const requestId = 'secret-migrate-request';
+  const requestId = 'req_test_secretmigrate_20260605_01';
   const artifactKey = `request-artifacts/${requestId}/${sha256}.json`;
   const blobs = new Map<string, string>([
     [

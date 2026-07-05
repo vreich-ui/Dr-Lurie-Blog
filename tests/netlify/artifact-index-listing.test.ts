@@ -137,7 +137,7 @@ test('Artifact listing and metadata retrieval', async () => {
     // 1. Save an artifact via saveArtifactBytes (direct)
     const bytes1 = Buffer.from('%PDF-1.7\ndirect artifact');
     const sha1 = sha256(bytes1);
-    const requestId1 = 'req-direct';
+    const requestId1 = 'req_test_direct_20260605_01';
     await saveArtifactBytes({
       requestId: requestId1,
       artifactKind: ArtifactKind.Pdf,
@@ -152,7 +152,7 @@ test('Artifact listing and metadata retrieval', async () => {
     // 2. Save an artifact via save-artifact (legacy)
     const bytes2 = Buffer.from('%PDF-1.7\nlegacy artifact');
     const sha2 = sha256(bytes2);
-    const requestId2 = 'req-legacy';
+    const requestId2 = 'req_test_legacy_20260605_01';
     await saveArtifactLegacyHandler({
       httpMethod: 'POST',
       headers: { 'x-publish-key': 'test-secret' },
