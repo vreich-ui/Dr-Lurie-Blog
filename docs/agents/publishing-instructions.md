@@ -107,6 +107,26 @@ Call `verify_article_images` ONLY after the deploy for the publish commit is liv
 `deploy_status` until `deployStatus === "ready"` (deploys take 30–120 s; an immediate check
 hits the previous deploy).
 
+### 5a. Manually triggering a build with `trigger_netlify_build`
+
+`trigger_netlify_build` fires the site's Netlify build hook so a build runs without a new git
+commit — useful when you need to force a rebuild (e.g. after a series of `published_time`
+changes) without waiting for the normal commit-triggered pipeline. No input is required.
+
+- **It only queues the build — it does not wait for it.** After calling this tool, poll
+  `deploy_status` the same way you already do after a normal publish to know when the
+  resulting deploy is actually ready.
+- **Batch, don't spam.** Each triggered build consumes real Netlify build minutes. Do not call
+  this once per publish. If you're publishing several articles in a row, call
+  `save_json_blob_publish_by_time` for each one and call `trigger_netlify_build` once at the
+  end to batch them into a single build.
+- `reason` is optional free text recorded only in this function's own server-side logs (for
+  traceability of who triggered a build and why) — it is never sent to Netlify and never
+  returned in the tool response.
+- If the server has no build hook configured, the call fails with
+  `netlify_build_hook_not_configured` — this is an operator-level setup step
+  (`NETLIFY_BUILD_HOOK_URL`), not something an agent can fix.
+
 - Pass the display paths from the publish response
   (`~/assets/images/uploads/{slug}/{file}.png`). Astro rewrites committed assets to hashed
   build URLs (`/_astro/{file}.{hash}.{ext}`), so matching falls back from exact URL to
@@ -144,6 +164,7 @@ Never report PUBLISHED without a conclusive verification; never report PUBLISH_F
 | 423 | Lock expired or held by someone else — checkout again. |
 | `featured_image_required` (422) | This site has `HERO_IMAGE_REQUIRED` enabled (operator-level, not agent-controlled) and no hero resolved. Nothing was committed. Set `featuredImage` to an uploaded artifact blobKey, or `existingFeaturedImagePath` to an existing committed image path, and retry. |
 | `missing_featured_image` (warning, not a rejection) | Publish succeeded with no hero/featured image, and the article has at least one image that could have been designated as the hero. Fires only when image media exists; a text-only article never gets this warning. If intentional, no action needed; otherwise set `featuredImage` and republish. |
+| `netlify_build_hook_not_configured` (`trigger_netlify_build`) | The server has no `NETLIFY_BUILD_HOOK_URL` configured — an operator-level setup step, not something an agent can fix. Publishing itself already triggers a deploy; this tool is only needed to force an extra build. |
 
 ---
 
