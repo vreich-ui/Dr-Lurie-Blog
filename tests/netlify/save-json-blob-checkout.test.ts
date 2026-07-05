@@ -16,6 +16,7 @@ const recordKey = (requestId: string) => `workflows/by-id/${requestId}.json`;
 
 type ResponseBody = {
   action: string;
+  conflict?: boolean;
   diagnostics?: {
     attempts: number;
     eventual_read_exhausted: boolean;
@@ -29,6 +30,8 @@ type ResponseBody = {
     strong_read_attempts: number;
     strong_read_succeeded: boolean;
   };
+  lock?: { token?: string; owner_id?: string; owner_label?: string; acquired_at?: string; expires_at?: string };
+  locked?: boolean;
   not_found?: boolean;
   record?: WorkflowRecord;
 };
@@ -206,6 +209,52 @@ test('checkout_request can recover immediately when a strong-consistency read se
   });
   assert.equal(strongRecordGetAttempts, 1);
   assert.ok(eventualRecordGetAttempts > 0);
+});
+
+test('concurrent checkout_request calls yield exactly one lock holder', async () => {
+  const store = createMemoryStore();
+  const requestId = reqId('checkout-race');
+
+  const createResponse = await createRequest(store, {
+    action: 'create_request',
+    request_id: requestId,
+    input: contentSourceInput(requestId),
+  });
+  assert.equal(createResponse.statusCode, 201, createResponse.body);
+
+  const checkout = (ownerId: string) =>
+    checkoutRequest(store, {
+      action: 'checkout_request',
+      request_id: requestId,
+      owner_id: ownerId,
+      owner_label: `Race agent ${ownerId}`,
+      lease_seconds: 300,
+    });
+
+  const responses = await Promise.all([checkout('racer-a'), checkout('racer-b')]);
+  const parsed = responses.map((response) => ({ response, body: parseBody(response) }));
+  const bodies = responses.map((response) => response.body).join(' | ');
+
+  const winners = parsed.filter(({ response }) => response.statusCode === 200);
+  const losers = parsed.filter(({ response }) => response.statusCode === 423);
+  assert.equal(winners.length, 1, `exactly one checkout must win the lock: ${bodies}`);
+  assert.equal(losers.length, 1, `the other checkout must lose with a lock conflict: ${bodies}`);
+
+  // The winner's token must be the lock that actually persisted — not a token for a
+  // lock that a concurrent write silently overwrote.
+  const winnerLock = winners[0].body.record?.lock;
+  assert.ok(winnerLock?.token, 'winner must receive a lock token');
+  const persisted = JSON.parse(store.blobs.get(recordKey(requestId)) as string) as WorkflowRecord;
+  assert.equal(persisted.lock?.token, winnerLock.token);
+  assert.equal(persisted.lock?.owner_id, winnerLock.owner_id);
+  assert.equal(persisted.version, winners[0].body.record?.version);
+
+  // The loser sees the winner's lock, sanitized — never the raw token.
+  const loserBody = losers[0].body;
+  assert.equal(loserBody.locked, true);
+  assert.ok(loserBody.lock, 'loser must still see who holds the lock');
+  assert.equal(loserBody.lock.token, undefined);
+  assert.equal(loserBody.lock.owner_id, persisted.lock?.owner_id);
 });
 
 test('checkout_request returns final not_found diagnostics only after retry attempts are exhausted', async () => {
