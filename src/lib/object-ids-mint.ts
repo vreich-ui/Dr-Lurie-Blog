@@ -1,0 +1,130 @@
+/**
+ * Deterministic server-side ID minting for the object verbs (T0.8).
+ *
+ * The T0.6 patch engine deliberately requires every ID to be present on the
+ * op it receives — it never mints IDs, so that apply/inverse stays a pure,
+ * provably-reversible function. Minting fresh IDs is therefore the endpoint's
+ * job (C§2.5-C: taxonomy terms arrive as `{slug, label}` with the `term_id`
+ * "minted server-side" — that server side is the verb endpoint). This module
+ * is the single place that minting happens, so format and determinism rules
+ * never drift across actions.
+ *
+ * Every minted ID is DETERMINISTIC in its seed (same seed → same ID, so
+ * retries/replays are idempotent) and is verified against the real T0.3
+ * validators (`validateObjectIdForType` / `validateSectionInstanceId`) or the
+ * committed body-schema regexes before it is returned — a minted ID that would
+ * fail validation is a bug and throws rather than being handed to the engine.
+ *
+ * Uniqueness note: minting is deterministic, not globally-unique-guaranteeing.
+ * A term whose `term_id` collides is rejected downstream by the engine's
+ * `add_term` duplicate check; an omitted section/nav/slot id is seeded from the
+ * element payload (a content hash) so distinct elements get distinct ids and an
+ * identical re-submission stays idempotent. A caller that needs a specific id
+ * supplies it explicitly — minting only fills a genuinely absent id.
+ */
+import { createHash } from 'node:crypto';
+
+import { validateObjectIdForType, validateSectionInstanceId } from './object-ids.js';
+import type { ObjectType } from '../schema/object-record-v1.js';
+
+// Repeated from taxonomy-v1.ts / object-patch-ops.ts (term ids are body-internal
+// — T0.3 has no term validator to import); kept in lockstep by the self-check below.
+const TERM_ID_RE = /^t_[a-z0-9]+$/;
+// Nav item/group ids and template slot ids are opaque non-empty strings in the
+// T0.2 body schemas (no dedicated T0.3 validator); we still hold them to a
+// clean, stable shape.
+const OPAQUE_ID_RE = /^[a-z][a-z0-9_]*$/;
+
+export class MintIdError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MintIdError';
+  }
+}
+
+/** Lowercase hex (⊂ [a-z0-9]) content hash — deterministic, collision-resistant. */
+const shortHash = (seed: string, length = 12): string =>
+  createHash('sha256').update(seed).digest('hex').slice(0, length);
+
+/** Strip to bare lowercase alphanumerics (for the no-separator id shapes: t_/s_). */
+const alnum = (seed: string): string => seed.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Lowercase snake_case segments (for object ids like page_start_here). */
+const snakeSegments = (seed: string): string =>
+  seed
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+/**
+ * The mint targets. Object types mint envelope-level ids (`page_…`, `sec_…`,
+ * `tax_…`, …); the others mint the body-internal ids the patch grammar carries.
+ * `content_item` is intentionally unmintable here — it keeps `validateRequestId`
+ * and is not reachable through the generic verbs (D§1).
+ */
+export type MintTarget =
+  | { kind: 'object'; objectType: Exclude<ObjectType, 'content_item'> }
+  | { kind: 'section_instance' }
+  | { kind: 'taxonomy_term' }
+  | { kind: 'nav_item' }
+  | { kind: 'nav_group' }
+  | { kind: 'template_slot' };
+
+const OBJECT_PREFIX: Record<Exclude<ObjectType, 'content_item'>, string> = {
+  page: 'page',
+  section: 'sec',
+  navigation: 'nav',
+  taxonomy: 'tax',
+  site: 'site',
+  template: 'tpl',
+};
+
+/**
+ * Mint a deterministic, validated ID for `target` from `seed`.
+ *
+ * - `object`   → `{prefix}_{snake segments}` (validated with the T0.3 per-type
+ *                validator). Seed is a human hint (route/name/role).
+ * - `taxonomy_term` → `t_{alnum(slug)}` (C§2.5-C's `{slug,label}` case). Seed is
+ *                the slug, so the id reads `t_sunscreen` / `t_skinscience`.
+ * - `section_instance` → `s_{hash}`; nav item → `i_{hash}`; nav group →
+ *                `g_{hash}`; template slot → `slot_{hash}`. These have no external
+ *                slug, so they hash the element payload the caller passes as seed.
+ */
+export const mintId = (target: MintTarget, seed: string): string => {
+  const trimmed = (seed ?? '').trim();
+  if (!trimmed) throw new MintIdError(`Cannot mint ${target.kind} id from an empty seed.`);
+
+  switch (target.kind) {
+    case 'object': {
+      const prefix = OBJECT_PREFIX[target.objectType];
+      const suffix = snakeSegments(trimmed) || shortHash(trimmed);
+      const id = `${prefix}_${suffix}`;
+      const check = validateObjectIdForType(target.objectType, id);
+      if (!check.ok) throw new MintIdError(`Minted ${target.objectType} id "${id}" is invalid: ${check.error}`);
+      return id;
+    }
+    case 'taxonomy_term': {
+      const suffix = alnum(trimmed) || shortHash(trimmed);
+      const id = `t_${suffix}`;
+      if (!TERM_ID_RE.test(id)) throw new MintIdError(`Minted term id "${id}" is invalid.`);
+      return id;
+    }
+    case 'section_instance': {
+      const id = `s_${shortHash(trimmed)}`;
+      const check = validateSectionInstanceId(id);
+      if (!check.ok) throw new MintIdError(`Minted section instance id "${id}" is invalid: ${check.error}`);
+      return id;
+    }
+    case 'nav_item':
+      return assertOpaque(`i_${shortHash(trimmed)}`);
+    case 'nav_group':
+      return assertOpaque(`g_${shortHash(trimmed)}`);
+    case 'template_slot':
+      return assertOpaque(`slot_${shortHash(trimmed)}`);
+  }
+};
+
+const assertOpaque = (id: string): string => {
+  if (!OPAQUE_ID_RE.test(id)) throw new MintIdError(`Minted opaque id "${id}" is invalid.`);
+  return id;
+};
