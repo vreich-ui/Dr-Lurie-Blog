@@ -1,14 +1,18 @@
 ---
-publishDate: 2026-07-03T17:55:48.448Z
-published_time: 2026-07-03T17:55:48.448Z
+publishDate: 2026-07-05T18:37:22.063Z
+published_time: 2026-07-05T18:37:22.063Z
 title: "Smoke T7 Missing Placement"
-excerpt: "Image node intentionally has no placement."
-image: "~/assets/images/uploads/smoke-t7-missing-placement/smoke-t7-image.png"
+excerpt: "A compact smoke-test article for validating that missing placement does not render an inline image."
+image: "~/assets/images/uploads/smoke-t7-missing-placement/t7.png"
 tags:
   - "smoke-test"
-  - "image-pipeline"
   - "t7"
+  - "image-pipeline"
 ---
-### Smoke T7 Missing Placement
+### Missing placement smoke test
 
-This image node intentionally omits rendering placement and should not render anywhere.
+This section intentionally receives an image without an inline rendering placement.
+
+### Expected behavior
+
+The expected result is no visible image, no hero image, and warning coverage for missing placement and missing featured image.
