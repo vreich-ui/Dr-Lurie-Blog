@@ -47,7 +47,13 @@ const createMemoryStore = () => {
 };
 
 type Store = ReturnType<typeof createMemoryStore>;
-type RecordResponse = { error?: string; lock_expired?: boolean; locked?: boolean; record?: WorkflowRecord };
+type RecordResponse = {
+  error?: string;
+  lock_expired?: boolean;
+  locked?: boolean;
+  lock?: Record<string, unknown>;
+  record?: WorkflowRecord;
+};
 
 const parseBody = (response: { body: string }) => JSON.parse(response.body) as RecordResponse;
 
@@ -170,4 +176,46 @@ test('refresh_lock extends the active lock and checkin_request releases it', asy
   });
   assert.equal(checkinResponse.statusCode, 200, checkinResponse.body);
   assert.equal(parseBody(checkinResponse).record?.lock, undefined);
+});
+
+test('conflict and error lock responses never expose the raw lock token', async () => {
+  const store = createMemoryStore();
+  const requestId = reqId('lock-sanitize');
+  await createWorkflow(store, requestId);
+  const record = await checkoutWorkflow(store, requestId, 300);
+
+  const checkoutConflict = await checkoutRequest(store, {
+    action: 'checkout_request',
+    request_id: requestId,
+    owner_id: 'other-agent',
+    owner_label: 'Other agent',
+  });
+  assert.equal(checkoutConflict.statusCode, 423, checkoutConflict.body);
+  const checkoutConflictBody = parseBody(checkoutConflict);
+  assert.equal(checkoutConflictBody.locked, true);
+  assert.ok(checkoutConflictBody.lock, 'checkout conflict must still describe the active lock');
+  assert.equal(checkoutConflictBody.lock?.token, undefined);
+  assert.equal(checkoutConflictBody.lock?.owner_id, 'lock-test-agent');
+
+  const refreshWrongToken = await refreshLock(store, {
+    action: 'refresh_lock',
+    request_id: requestId,
+    lock_token: 'wrong-token',
+  });
+  assert.equal(refreshWrongToken.statusCode, 423, refreshWrongToken.body);
+  const refreshWrongTokenBody = parseBody(refreshWrongToken);
+  assert.equal(refreshWrongTokenBody.locked, true);
+  assert.ok(refreshWrongTokenBody.lock, 'refresh with wrong token must still describe the active lock');
+  assert.equal(refreshWrongTokenBody.lock?.token, undefined);
+
+  const checkinWrongToken = await checkinRequest(store, {
+    action: 'checkin_request',
+    request_id: requestId,
+    lock_token: 'wrong-token',
+  });
+  assert.equal(checkinWrongToken.statusCode, 423, checkinWrongToken.body);
+  const checkinWrongTokenBody = parseBody(checkinWrongToken);
+  assert.equal(checkinWrongTokenBody.locked, true);
+  assert.ok(checkinWrongTokenBody.lock, 'checkin with wrong token must still describe the active lock');
+  assert.equal(checkinWrongTokenBody.lock?.token, undefined);
 });

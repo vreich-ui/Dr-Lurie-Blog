@@ -340,6 +340,16 @@ const getLockTimestampDiagnostics = (lock: WorkflowLockRecord, nowMs: number) =>
 const isLockActive = (lock: WorkflowLockRecord | undefined, nowMs: number) =>
   Boolean(lock && getLockExpirationMs(lock) > nowMs);
 
+const sanitizeLock = (lock: WorkflowLockRecord | undefined) =>
+  lock
+    ? {
+        owner_id: lock.owner_id,
+        owner_label: lock.owner_label,
+        acquired_at: lock.acquired_at,
+        expires_at: lock.expires_at,
+      }
+    : undefined;
+
 const lockExpiredResponse = (body: WorkflowRequest, lock?: WorkflowLockRecord, nowMs = Date.now()) =>
   jsonResponse(423, {
     action: body.action,
@@ -1338,7 +1348,7 @@ export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRe
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
   if (isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock, diagnostics });
+    return jsonResponse(423, { action: body.action, locked: true, lock: sanitizeLock(previousRecord.lock), diagnostics });
   }
 
   const nextRecord: WorkflowRecord = {
@@ -1388,7 +1398,7 @@ export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowReques
   if (!previousRecord) return jsonResponse(404, { action: body.action, not_found: true });
   if (!previousRecord.lock) return jsonResponse(409, { action: body.action, error: 'No lock is currently held.' });
   if (previousRecord.lock.token !== body.lock_token) {
-    return jsonResponse(423, { action: body.action, locked: true, lock: previousRecord.lock });
+    return jsonResponse(423, { action: body.action, locked: true, lock: sanitizeLock(previousRecord.lock) });
   }
 
   const timestampMs = Date.now();
@@ -1397,7 +1407,7 @@ export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowReques
     return jsonResponse(409, {
       action: body.action,
       error: 'Lock has expired.',
-      lock: previousRecord.lock,
+      lock: sanitizeLock(previousRecord.lock),
       diagnostics: getLockTimestampDiagnostics(previousRecord.lock, timestampMs),
     });
   }
@@ -1444,7 +1454,7 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
     if (!latestRecord.lock) return jsonResponse(200, { action: body.action, record: latestRecord, idempotent: true });
 
     if (latestRecord.lock.token !== body.lock_token) {
-      return jsonResponse(423, { action: body.action, locked: true, lock: latestRecord.lock });
+      return jsonResponse(423, { action: body.action, locked: true, lock: sanitizeLock(latestRecord.lock) });
     }
 
     const timestamp = nowIso();

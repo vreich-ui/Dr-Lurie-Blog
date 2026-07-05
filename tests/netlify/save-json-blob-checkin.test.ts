@@ -44,7 +44,7 @@ const createMemoryStore = () => {
 };
 
 const parseBody = (response: { body: string }) =>
-  JSON.parse(response.body) as { locked?: boolean; record?: WorkflowRecord };
+  JSON.parse(response.body) as { locked?: boolean; lock?: Record<string, unknown>; record?: WorkflowRecord };
 
 const contentSourceInput = (requestId: string) => ({
   record_type: 'content_source',
@@ -89,7 +89,11 @@ test('checkin_request requires the active lock token and releases ownership', as
     lock_token: 'wrong-token',
   });
   assert.equal(badCheckin.statusCode, 423, badCheckin.body);
-  assert.equal(parseBody(badCheckin).locked, true);
+  const badCheckinBody = parseBody(badCheckin);
+  assert.equal(badCheckinBody.locked, true);
+  assert.ok(badCheckinBody.lock, 'checkin-with-wrong-token must still describe the active lock');
+  assert.equal(badCheckinBody.lock?.token, undefined);
+  assert.equal(badCheckinBody.lock?.owner_id, 'checkin-test-agent');
 
   const goodCheckin = await checkinRequest(store, {
     action: 'checkin_request',
