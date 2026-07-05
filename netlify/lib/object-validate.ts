@@ -36,17 +36,26 @@
  * canonical warn-vs-reject example therefore lands in T2.1; T0.7 demonstrates
  * the same warn-vs-reject mechanism through the publish-gated structural
  * invariant (≥1 visible section warns in draft, rejects at publish).
+ *
+ * Candidate patches: `validateObject` validates a finished body. The
+ * `object_validate {candidate_patch?}` dry-run is `validateCandidatePatch`,
+ * which applies the proposed ops through T0.6's real `applyPatchOps` engine
+ * (never a re-implementation) and validates the result — so a patch the engine
+ * would refuse fails validation with T0.6's own error code, and the op grammar
+ * has exactly one owner. T0.8 calls one or the other; this module still never
+ * touches the blob store.
  */
 import { assertReaderSafe } from '../../src/lib/article-content/assert-reader-safe.js';
 import type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
 import { validateObjectIdForType, validateSectionInstanceId } from '../../src/lib/object-ids.js';
+import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
 import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType, Principal } from '../../src/schema/object-record-v1.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE } from './artifact-trust.js';
 
 export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
@@ -55,6 +64,7 @@ export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../
 
 export type ObjectResolution = { exists: boolean; published?: boolean };
 export type TaxonomyResolution = { active: boolean };
+export type TaxonomyUsage = { inUse: boolean };
 
 export type PageTypeConstraint = {
   id?: string;
@@ -72,8 +82,24 @@ export type ObjectValidationContext = {
   resolveObject?: (objectType: ObjectType, objectId: string) => ObjectResolution | undefined;
   /** Resolve a taxonomy term_id, following merged_into aliases (D§5.5). */
   resolveTaxonomyTerm?: (kind: 'category' | 'tag', termId: string) => TaxonomyResolution | undefined;
+  /**
+   * Whether a taxonomy term has live usage on published content (frontmatter
+   * strings resolving to it). Used only to enforce "deprecating a term with
+   * live usage requires merged_into" (§2.3-taxonomy). Absent → not verified.
+   */
+  resolveTaxonomyTermUsage?: (kind: 'category' | 'tag', termId: string) => TaxonomyUsage | undefined;
   /** Effective variant type of a shared 'section' object (for structural re-check). */
   resolveSharedSectionType?: (objectId: string) => SectionType | undefined;
+  /**
+   * Whether a component type exists in the code component registry (D§3.4/OQ-4).
+   * Registry lands in P3; absent here → registry membership not verified.
+   */
+  componentTypeExists?: (type: string) => boolean;
+  /**
+   * Whether a page `route` is already taken by a DIFFERENT page (the resolver
+   * excludes the object under validation). Absent → uniqueness not verified.
+   */
+  isRouteTaken?: (route: string) => boolean;
   /** Major-Key blobKeys trusted for this object's asset refs (A§2.12). */
   trustedAssetRefs?: Set<string>;
   /** The PageType definition for a page's `pageType` (registry is code, D§3.4/OQ-4). */
@@ -305,6 +331,20 @@ export const checkReferenceIntegrity = (
       const data = node.data;
       if (node.type === 'shared_ref' && typeof data.section === 'string') {
         requireObject('section', data.section, 'shared_ref.section');
+        // Reference-chain policy (DECISION, previously left implicit — the
+        // section-v1 schema comment defers it here): a shared section must
+        // NOT itself be a `shared_ref`. The renderer dereferences shared_ref
+        // to the target's current variant in a single hop (D§3.5); chains
+        // would require multi-hop deref and admit cycles. Enforced whenever
+        // the effective target type is resolvable.
+        const targetType = context.resolveSharedSectionType?.(data.section);
+        if (targetType === 'shared_ref') {
+          checkedAnyResolvable = true;
+          sawUnresolvableResolver = true;
+          problems.push(
+            `shared_ref.section "${data.section}" points at another shared_ref — reference chains are not allowed (single-hop only).`
+          );
+        }
       }
       if (node.type === 'content_embed' && typeof data.contentItem === 'string') {
         requireObject('content_item', data.contentItem, 'content_embed.contentItem');
@@ -456,14 +496,220 @@ const effectiveSectionType = (section: SectionInstance, context: ObjectValidatio
   return section.type;
 };
 
+// ─── check 6a: taxonomy registry integrity (body-only + optional usage) ──────
+
+// The slug shape shared with the article pipeline (A§1.6) and D§3.7.
+const TAXONOMY_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Registry-level taxonomy rules the section/taxonomy-v1 schema explicitly
+ * defers here (§2.3-taxonomy): slug shape, per-kind slug uniqueness,
+ * `merged_into` targets exist + are active + form no cycle, and (when a usage
+ * resolver is supplied) a deprecated term with live usage must carry
+ * `merged_into` so references don't strand.
+ *
+ * This validates registry STATE only. It never re-derives how a *usage*
+ * resolves through aliases — that resolution stays with the injected
+ * `resolveTaxonomyTerm` resolver (D§5.5), so this engine and T0.6/T0.8 can
+ * never disagree on which aliases are live.
+ */
+export const checkTaxonomyRegistry = (body: unknown, context: ObjectValidationContext): ReadinessCriterion[] => {
+  if (!isRecord(body) || !isRecord(body.kinds)) {
+    return [
+      crit(
+        'taxonomy_registry',
+        'Taxonomy registry',
+        'optional',
+        'Taxonomy body shape not recognized (see schema check).'
+      ),
+    ];
+  }
+
+  const slugProblems: string[] = [];
+  const mergeProblems: string[] = [];
+  const usageProblems: string[] = [];
+  let usageChecked = false;
+
+  for (const kind of ['category', 'tag'] as const) {
+    const registry = (body.kinds as Record<string, unknown>)[kind];
+    const terms = isRecord(registry) && Array.isArray(registry.terms) ? registry.terms : [];
+    const byId = new Map<string, Record<string, unknown>>();
+    const slugCounts = new Map<string, number>();
+
+    for (const term of terms) {
+      if (!isRecord(term)) continue;
+      const termId = typeof term.term_id === 'string' ? term.term_id : '';
+      const slug = typeof term.slug === 'string' ? term.slug : '';
+      if (termId) byId.set(termId, term);
+      if (slug) {
+        if (!TAXONOMY_SLUG_RE.test(slug))
+          slugProblems.push(
+            `${kind} term ${termId || '(no id)'}: slug "${slug}" must match ^[a-z0-9]+(?:-[a-z0-9]+)*$.`
+          );
+        slugCounts.set(slug, (slugCounts.get(slug) ?? 0) + 1);
+      }
+    }
+    for (const [slug, count] of slugCounts) {
+      if (count > 1) slugProblems.push(`${kind}: slug "${slug}" is used by ${count} terms (must be unique per kind).`);
+    }
+
+    for (const term of terms) {
+      if (!isRecord(term)) continue;
+      const termId = typeof term.term_id === 'string' ? term.term_id : '(no id)';
+      const mergedInto = typeof term.merged_into === 'string' ? term.merged_into : undefined;
+
+      if (mergedInto !== undefined) {
+        const target = byId.get(mergedInto);
+        if (!target)
+          mergeProblems.push(`${kind} term ${termId}: merged_into "${mergedInto}" does not exist in this kind.`);
+        else if (target.status !== 'active')
+          mergeProblems.push(`${kind} term ${termId}: merged_into "${mergedInto}" is not an active term.`);
+      }
+
+      if (term.status === 'deprecated' && mergedInto === undefined && context.resolveTaxonomyTermUsage) {
+        usageChecked = true;
+        const usage = context.resolveTaxonomyTermUsage(kind, termId);
+        if (usage?.inUse)
+          usageProblems.push(
+            `${kind} term ${termId} is deprecated with live usage but has no merged_into (would strand references).`
+          );
+      } else if (context.resolveTaxonomyTermUsage) {
+        usageChecked = true;
+      }
+    }
+
+    // Cycle detection over the merged_into graph.
+    for (const term of terms) {
+      if (!isRecord(term) || typeof term.term_id !== 'string') continue;
+      const start = term.term_id;
+      const seen = new Set<string>();
+      let cursor: string | undefined = start;
+      while (cursor !== undefined) {
+        if (seen.has(cursor)) {
+          mergeProblems.push(`${kind}: merged_into chain starting at ${start} forms a cycle.`);
+          break;
+        }
+        seen.add(cursor);
+        const node = byId.get(cursor);
+        cursor = node && typeof node.merged_into === 'string' ? node.merged_into : undefined;
+      }
+    }
+  }
+
+  const criteria: ReadinessCriterion[] = [
+    slugProblems.length === 0
+      ? crit('taxonomy_slugs', 'Taxonomy slugs', 'complete', '')
+      : crit('taxonomy_slugs', 'Taxonomy slugs', 'missing', [...new Set(slugProblems)].slice(0, 5).join(' ')),
+    mergeProblems.length === 0
+      ? crit('taxonomy_merges', 'Taxonomy merge integrity', 'complete', '')
+      : crit(
+          'taxonomy_merges',
+          'Taxonomy merge integrity',
+          'missing',
+          [...new Set(mergeProblems)].slice(0, 5).join(' ')
+        ),
+  ];
+  if (usageProblems.length > 0) {
+    criteria.push(
+      crit('taxonomy_usage', 'Deprecation without stranding', 'missing', usageProblems.slice(0, 5).join(' '))
+    );
+  } else if (!usageChecked) {
+    criteria.push(
+      crit('taxonomy_usage', 'Deprecation without stranding', 'optional', 'No usage resolver — not verified here.')
+    );
+  } else {
+    criteria.push(crit('taxonomy_usage', 'Deprecation without stranding', 'complete', ''));
+  }
+  return criteria;
+};
+
+// ─── check 6b: template slot integrity ───────────────────────────────────────
+
+/**
+ * Template slot rules the template-v1 schema defers here (§2.3-template):
+ * a blueprint's type must be in its slot's `allowed` set; a required slot
+ * should carry a blueprint; and `allowed` types must exist in the component
+ * registry (code, injected via `componentTypeExists` — the registry lands in
+ * P3, so this is `optional` until wired). `appliesTo` PageType existence is
+ * already enforced by the body zod (a fixed enum), so it isn't re-checked.
+ */
+export const checkTemplate = (body: unknown, context: ObjectValidationContext): ReadinessCriterion[] => {
+  if (!isRecord(body) || !Array.isArray(body.slots)) {
+    return [
+      crit('template_slots', 'Template slots', 'optional', 'Template body shape not recognized (see schema check).'),
+    ];
+  }
+
+  const blueprintProblems: string[] = [];
+  const requiredProblems: string[] = [];
+  const registryProblems: string[] = [];
+  let registryChecked = false;
+
+  for (const slot of body.slots) {
+    if (!isRecord(slot)) continue;
+    const slotId = typeof slot.slotId === 'string' ? slot.slotId : '(no id)';
+    const allowed = Array.isArray(slot.allowed) ? slot.allowed.filter((t): t is string => typeof t === 'string') : [];
+
+    if (context.componentTypeExists) {
+      registryChecked = true;
+      for (const type of allowed) {
+        if (!context.componentTypeExists(type))
+          registryProblems.push(`slot ${slotId}: allowed type "${type}" is not a registered component.`);
+      }
+    }
+
+    if (isRecord(slot.blueprint) && typeof slot.blueprint.type === 'string') {
+      if (allowed.length > 0 && !allowed.includes(slot.blueprint.type))
+        blueprintProblems.push(
+          `slot ${slotId}: blueprint type "${slot.blueprint.type}" is not in the slot's allowed set.`
+        );
+    }
+
+    if (slot.required === true && !isRecord(slot.blueprint)) requiredProblems.push(slotId);
+  }
+
+  const criteria: ReadinessCriterion[] = [
+    blueprintProblems.length === 0
+      ? crit('template_blueprints', 'Blueprint types', 'complete', '')
+      : crit('template_blueprints', 'Blueprint types', 'missing', blueprintProblems.slice(0, 5).join(' ')),
+    // Required-without-blueprint is a warning, not a hard failure: registry
+    // defaultData may supply the section at instantiation (D§3.6) — but flag it.
+    requiredProblems.length === 0
+      ? crit('template_required', 'Required slots have blueprints', 'complete', '')
+      : crit(
+          'template_required',
+          'Required slots have blueprints',
+          'warning',
+          `Required slot(s) without a blueprint: ${requiredProblems.join(', ')}.`
+        ),
+  ];
+  if (registryProblems.length > 0) {
+    criteria.push(
+      crit('template_registry', 'Allowed types registered', 'missing', registryProblems.slice(0, 5).join(' '))
+    );
+  } else if (!registryChecked) {
+    criteria.push(
+      crit('template_registry', 'Allowed types registered', 'optional', 'No component registry supplied (lands in P3).')
+    );
+  } else {
+    criteria.push(crit('template_registry', 'Allowed types registered', 'complete', ''));
+  }
+  return criteria;
+};
+
 export const checkStructuralInvariants = (
   objectType: ObjectType,
   body: unknown,
   context: ObjectValidationContext,
   atPublish: boolean
 ): ReadinessCriterion[] => {
-  // Structural invariants apply to pages. content_item keeps its own
-  // ≥1-public-node rule on the article side (A§1.1); other types have none here.
+  // Structural invariants are type-specific. Pages carry the ≥1-visible-section
+  // + PageType rules below; taxonomy and template carry their own registry
+  // integrity (dispatched here so the pipeline keeps its single 'structure'
+  // group). content_item keeps its own ≥1-public-node rule on the article side
+  // (A§1.1); navigation layout rules are T2.1 (see the file header).
+  if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
+  if (objectType === 'template') return checkTemplate(body, context);
   if (objectType !== 'page') {
     return [crit('structure', 'Structural invariants', 'optional', 'No structural invariants for this type.')];
   }
@@ -471,6 +717,26 @@ export const checkStructuralInvariants = (
   const criteria: ReadinessCriterion[] = [];
   const sections = collectSections(body);
   const visibleCount = sections.filter((section) => section.visibility !== 'hidden').length;
+
+  // Route shape + uniqueness (§2.3-page). Shape is checked here because the
+  // body schema only pins `route` to a non-empty string; uniqueness needs the
+  // injected resolver (T0.8 supplies it, excluding this page).
+  const route = isRecord(body) && typeof body.route === 'string' ? body.route : '';
+  if (route && !route.startsWith('/')) {
+    criteria.push(crit('structure_route', 'Route shape', 'missing', `route "${route}" must start with "/".`));
+  } else if (!route) {
+    criteria.push(crit('structure_route', 'Route shape', 'missing', 'route is required.'));
+  } else if (context.isRouteTaken) {
+    criteria.push(
+      context.isRouteTaken(route)
+        ? crit('structure_route', 'Route uniqueness', 'missing', `route "${route}" is already used by another page.`)
+        : crit('structure_route', 'Route uniqueness', 'complete', '')
+    );
+  } else {
+    criteria.push(
+      crit('structure_route', 'Route uniqueness', 'optional', 'No route resolver — uniqueness not verified here.')
+    );
+  }
 
   // ≥1 visible section — the analogue of article_body's "≥1 public node"
   // (A§1.1). Publish-gated: a hard failure at publish, a warning while drafting.
@@ -583,4 +849,76 @@ export const summarizeValidation = (groups: ReadinessGroup[]): ValidationSummary
   const warnings = all.filter((criterion) => criterion.status === 'warning');
   const level: ValidationSummary['level'] = blockers.length > 0 ? 'missing' : warnings.length > 0 ? 'warning' : 'ready';
   return { level, eligible: blockers.length === 0, blockers, warnings };
+};
+
+// ─── candidate-patch dry-run (object_validate {candidate_patch?}, C§2.0) ──────
+
+// A fixed timestamp: the dry-run discards the produced record and validates
+// only its body, so the history stamp is irrelevant (and Date.now() is avoided
+// to keep validation deterministic).
+const DRY_RUN_AT = '1970-01-01T00:00:00.000Z';
+const DRY_RUN_ACTOR: Principal = { kind: 'agent', agent_name: 'object_validate', auth: 'publish_key' };
+
+export type CandidatePatchValidation = {
+  /** True only when the ops applied AND the resulting body is eligible. */
+  eligible: boolean;
+  groups: ReadinessGroup[];
+  /** Present iff T0.6's engine refused the patch (the ops never applied). */
+  applyError?: { code: PatchApplyError['code']; message: string };
+};
+
+/**
+ * The `object_validate {candidate_patch?}` dry-run (C§2.0): apply the proposed
+ * ops through **T0.6's real engine** (`applyPatchOps`) — never a hand-rolled
+ * simulation — then run the resulting body through the same six-check pipeline.
+ *
+ * A patch T0.6 refuses (an unknown/typo'd op discriminant → `invalid_op`, a
+ * blind revert → `blind_revert_refused`, a slug-rename alias conflict →
+ * `alias_required`/`alias_conflict`, etc.) surfaces LOUDLY as a hard `missing`
+ * criterion carrying T0.6's real error code — it is never silently dropped.
+ * Because the engine owns the op discriminants (its `patchOpSchema.parse`
+ * rejects any unknown `op`), this validator inherits exhaustiveness for free
+ * and cannot drift from the grammar's member names.
+ */
+export const validateCandidatePatch = (
+  record: ObjectRecord<unknown>,
+  ops: readonly unknown[],
+  context: ObjectValidationContext = {}
+): CandidatePatchValidation => {
+  let appliedBody: unknown;
+  try {
+    const result = applyPatchOps(record, ops, { actor: DRY_RUN_ACTOR, at: DRY_RUN_AT });
+    appliedBody = result.record.body;
+  } catch (error) {
+    if (error instanceof PatchApplyError) {
+      const groups: ReadinessGroup[] = [
+        {
+          id: 'patch',
+          label: 'Candidate patch',
+          criteria: [crit('patch_apply', 'Candidate patch applies', 'missing', `${error.code}: ${error.message}`)],
+        },
+      ];
+      return { eligible: false, groups, applyError: { code: error.code, message: error.message } };
+    }
+    throw error;
+  }
+
+  const bodyGroups = validateObject(
+    {
+      objectType: record.object_type,
+      objectId: record.object_id,
+      body: appliedBody,
+      published: record.publication.published_time != null,
+    },
+    context
+  );
+  const groups: ReadinessGroup[] = [
+    {
+      id: 'patch',
+      label: 'Candidate patch',
+      criteria: [crit('patch_apply', 'Candidate patch applies', 'complete', '')],
+    },
+    ...bodyGroups,
+  ];
+  return { eligible: summarizeValidation(groups).eligible, groups };
 };

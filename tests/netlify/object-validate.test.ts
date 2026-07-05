@@ -8,12 +8,16 @@ import {
   checkReferenceIntegrity,
   checkSchema,
   checkStructuralInvariants,
+  checkTaxonomyRegistry,
+  checkTemplate,
   summarizeValidation,
+  validateCandidatePatch,
   validateObject,
   type ObjectValidationContext,
   type ReadinessCriterion,
   type ReadinessGroup,
 } from '../../netlify/lib/object-validate.js';
+import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
 // ── shared helpers ───────────────────────────────────────────────────────────
 
@@ -383,4 +387,275 @@ test('pipeline: a valid taxonomy body validates clean', () => {
   };
   const groups = validateObject({ objectType: 'taxonomy', objectId: 'tax_drlurie', body }, resolvingContext());
   assert.equal(summarizeValidation(groups).eligible, true);
+});
+
+// ═══ T0.6 cross-check: candidate_patch runs through the real engine ═══════════
+
+const pageRecord = (): ObjectRecord<unknown> => ({
+  object_id: 'page_home',
+  object_type: 'page',
+  schema_version: 'page.v1',
+  site: 'site_drlurie',
+  created_at: '2026-07-01T00:00:00.000Z',
+  updated_at: '2026-07-01T00:00:00.000Z',
+  status: 'active',
+  body: validPageBody(),
+  publication: { published_time: null },
+  history: [],
+  version: 3,
+  content_revision: 2,
+});
+
+test('candidate_patch: a valid op applies via T0.6 then the resulting body validates', () => {
+  const result = validateCandidatePatch(
+    pageRecord(),
+    [{ op: 'update_section_data', section_id: 's_hero', fields: { heading: 'A calmer, clearer start' } }],
+    resolvingContext()
+  );
+  assert.equal(result.applyError, undefined);
+  assert.equal(
+    statusOf(
+      result.groups.flatMap((g) => g.criteria),
+      'patch_apply'
+    ),
+    'complete'
+  );
+  assert.equal(result.eligible, true);
+});
+
+// The acceptance-criteria test: a typo'd / renamed op discriminant must error
+// LOUDLY (T0.6's invalid_op), never fall through silently.
+test('candidate_patch: a typo’d op discriminant errors loudly (invalid_op), not silently', () => {
+  const result = validateCandidatePatch(
+    pageRecord(),
+    [{ op: 'update_sekshun_data', section_id: 's_hero', fields: { heading: 'x' } }],
+    resolvingContext()
+  );
+  assert.equal(result.eligible, false);
+  assert.equal(result.applyError?.code, 'invalid_op');
+  assert.equal(
+    statusOf(
+      result.groups.flatMap((g) => g.criteria),
+      'patch_apply'
+    ),
+    'missing'
+  );
+});
+
+test('candidate_patch: an op from the wrong family errors loudly (op_not_applicable)', () => {
+  const result = validateCandidatePatch(
+    pageRecord(),
+    [{ op: 'add_term', kind: 'tag', term: { term_id: 't_x', slug: 'x', label: 'X' } }],
+    resolvingContext()
+  );
+  assert.equal(result.applyError?.code, 'op_not_applicable');
+  assert.equal(result.eligible, false);
+});
+
+test('candidate_patch: a valid apply that produces an unsafe body fails on the body check, not the apply', () => {
+  const result = validateCandidatePatch(
+    pageRecord(),
+    [{ op: 'update_section_data', section_id: 's_bio', fields: { body: '<p>agentNotes: leak</p>' } }],
+    resolvingContext()
+  );
+  assert.equal(result.applyError, undefined); // the patch APPLIED
+  assert.equal(
+    statusOf(
+      result.groups.flatMap((g) => g.criteria),
+      'patch_apply'
+    ),
+    'complete'
+  );
+  assert.equal(result.eligible, false); // …but the resulting body is not reader-safe
+  assert.ok(summarizeValidation(result.groups).blockers.some((c) => c.id === 'reader_safety'));
+});
+
+// The acceptance-criteria test: taxonomy usage-resolution is DEFERRED to the
+// injected resolver, never re-derived. A term that only resolves through the
+// resolver's alias knowledge (no local registry available in a page validation)
+// passes purely because the resolver says active — proving T0.7 trusts it.
+test('taxonomy resolution defers to the injected resolver rather than re-deriving aliases', () => {
+  const body = validPageBody();
+  body.sections.push({
+    id: 's_grid',
+    type: 'content_grid',
+    data: { source: { kind: 'query', query: { category: 't_old_alias' } }, limit: 3 },
+  } as never);
+
+  // Resolver stands in for T0.8 following merged_into (D§5.5): the alias id is
+  // reported active. T0.7 has no taxonomy registry in a page validation, so a
+  // 'complete' here can only come from trusting the resolver.
+  const seen: string[] = [];
+  const context = resolvingContext({
+    resolveTaxonomyTerm: (kind, termId) => {
+      seen.push(`${kind}:${termId}`);
+      return { active: termId === 't_old_alias' };
+    },
+  });
+  assert.equal(statusOf(checkReferenceIntegrity('page', body, context), 'references'), 'complete');
+  assert.ok(seen.includes('category:t_old_alias'), 'the resolver was consulted for the alias');
+
+  // And when the resolver reports inactive, T0.7 rejects — it never second-guesses.
+  const rejecting = resolvingContext({ resolveTaxonomyTerm: () => ({ active: false }) });
+  assert.equal(statusOf(checkReferenceIntegrity('page', body, rejecting), 'references'), 'missing');
+});
+
+// ═══ #7 shared_ref reference-chain policy ═════════════════════════════════════
+
+test('refs: a shared_ref whose target is itself a shared_ref is rejected (no chains)', () => {
+  const body = validPageBody();
+  body.sections.push({ id: 's_ref', type: 'shared_ref', data: { section: 'sec_chain' } } as never);
+  const context = resolvingContext({ resolveSharedSectionType: () => 'shared_ref' });
+  assert.equal(statusOf(checkReferenceIntegrity('page', body, context), 'references'), 'missing');
+});
+
+test('refs: a shared_ref to a real non-ref section stays clean', () => {
+  const body = validPageBody();
+  body.sections.push({ id: 's_ref', type: 'shared_ref', data: { section: 'sec_news' } } as never);
+  const context = resolvingContext({ resolveSharedSectionType: () => 'newsletter_signup' });
+  assert.equal(statusOf(checkReferenceIntegrity('page', body, context), 'references'), 'complete');
+});
+
+// ═══ #6 route shape + uniqueness ══════════════════════════════════════════════
+
+test('structure: a route already used by another page is rejected', () => {
+  const criteria = checkStructuralInvariants('page', validPageBody(), { isRouteTaken: () => true }, false);
+  assert.equal(statusOf(criteria, 'structure_route'), 'missing');
+});
+
+test('structure: a unique route passes; a malformed route is rejected; no resolver → optional', () => {
+  assert.equal(
+    statusOf(
+      checkStructuralInvariants('page', validPageBody(), { isRouteTaken: () => false }, false),
+      'structure_route'
+    ),
+    'complete'
+  );
+  const bad = { ...validPageBody(), route: 'start-here' }; // missing leading slash
+  assert.equal(statusOf(checkStructuralInvariants('page', bad, {}, false), 'structure_route'), 'missing');
+  assert.equal(statusOf(checkStructuralInvariants('page', validPageBody(), {}, false), 'structure_route'), 'optional');
+});
+
+// ═══ #9 taxonomy registry integrity ═══════════════════════════════════════════
+
+const taxonomyBody = (categoryTerms: unknown[], tagTerms: unknown[] = []) => ({
+  kinds: { category: { terms: categoryTerms }, tag: { terms: tagTerms } },
+});
+
+test('taxonomy registry: a clean registry passes slug + merge checks', () => {
+  const body = taxonomyBody([
+    { term_id: 't_sleep', slug: 'sleep', label: 'Sleep', status: 'active' },
+    { term_id: 't_colic', slug: 'colic', label: 'Colic', status: 'deprecated', merged_into: 't_sleep' },
+  ]);
+  const criteria = checkTaxonomyRegistry(body, {});
+  assert.equal(statusOf(criteria, 'taxonomy_slugs'), 'complete');
+  assert.equal(statusOf(criteria, 'taxonomy_merges'), 'complete');
+});
+
+test('taxonomy registry REJECTION: malformed slug and duplicate slug per kind', () => {
+  const badShape = taxonomyBody([{ term_id: 't_a', slug: 'Not A Slug', label: 'A', status: 'active' }]);
+  assert.equal(statusOf(checkTaxonomyRegistry(badShape, {}), 'taxonomy_slugs'), 'missing');
+
+  const dupe = taxonomyBody([
+    { term_id: 't_a', slug: 'sleep', label: 'A', status: 'active' },
+    { term_id: 't_b', slug: 'sleep', label: 'B', status: 'active' },
+  ]);
+  assert.equal(statusOf(checkTaxonomyRegistry(dupe, {}), 'taxonomy_slugs'), 'missing');
+});
+
+test('taxonomy registry REJECTION: merged_into missing, inactive, or cyclic', () => {
+  const missing = taxonomyBody([
+    { term_id: 't_a', slug: 'a', label: 'A', status: 'deprecated', merged_into: 't_ghost' },
+  ]);
+  assert.equal(statusOf(checkTaxonomyRegistry(missing, {}), 'taxonomy_merges'), 'missing');
+
+  const inactive = taxonomyBody([
+    { term_id: 't_a', slug: 'a', label: 'A', status: 'deprecated', merged_into: 't_b' },
+    { term_id: 't_b', slug: 'b', label: 'B', status: 'deprecated', merged_into: 't_a' }, // b inactive AND cycle
+  ]);
+  assert.equal(statusOf(checkTaxonomyRegistry(inactive, {}), 'taxonomy_merges'), 'missing');
+});
+
+test('taxonomy registry: deprecation-with-usage requires merged_into (via usage resolver)', () => {
+  const body = taxonomyBody([{ term_id: 't_a', slug: 'a', label: 'A', status: 'deprecated' }]);
+  // No usage resolver → not verifiable → optional.
+  assert.equal(statusOf(checkTaxonomyRegistry(body, {}), 'taxonomy_usage'), 'optional');
+  // Usage resolver reports live usage → hard failure (would strand references).
+  const withUsage = checkTaxonomyRegistry(body, { resolveTaxonomyTermUsage: () => ({ inUse: true }) });
+  assert.equal(statusOf(withUsage, 'taxonomy_usage'), 'missing');
+  // Usage resolver reports no usage → complete.
+  const noUsage = checkTaxonomyRegistry(body, { resolveTaxonomyTermUsage: () => ({ inUse: false }) });
+  assert.equal(statusOf(noUsage, 'taxonomy_usage'), 'complete');
+});
+
+test('taxonomy registry: reached through the full pipeline for a taxonomy object', () => {
+  const groups = validateObject(
+    {
+      objectType: 'taxonomy',
+      objectId: 'tax_drlurie',
+      body: taxonomyBody([{ term_id: 't_a', slug: 'bad slug', label: 'A', status: 'active' }]),
+    },
+    {}
+  );
+  const structure = groups.find((g) => g.id === 'structure');
+  assert.ok(structure);
+  assert.equal(statusOf(structure.criteria, 'taxonomy_slugs'), 'missing');
+});
+
+// ═══ #10 template slot integrity ══════════════════════════════════════════════
+
+test('template: a well-formed template passes', () => {
+  const body = {
+    name: 'Standard',
+    appliesTo: ['standard'],
+    slots: [
+      {
+        slotId: 'main',
+        allowed: ['hero', 'prose'],
+        required: true,
+        repeatable: false,
+        blueprint: { id: 's_x', type: 'hero', data: { heading: 'H', actions: [] } },
+      },
+    ],
+  };
+  const criteria = checkTemplate(body, {});
+  assert.equal(statusOf(criteria, 'template_blueprints'), 'complete');
+  assert.equal(statusOf(criteria, 'template_required'), 'complete');
+});
+
+test('template REJECTION: a blueprint whose type is not in the slot allowed set', () => {
+  const body = {
+    name: 'Standard',
+    appliesTo: ['standard'],
+    slots: [
+      {
+        slotId: 'main',
+        allowed: ['hero'],
+        required: false,
+        repeatable: false,
+        blueprint: { id: 's_x', type: 'bio', data: { heading: 'H', body: '<p>x</p>', trustNotes: [] } },
+      },
+    ],
+  };
+  assert.equal(statusOf(checkTemplate(body, {}), 'template_blueprints'), 'missing');
+});
+
+test('template WARN: a required slot without a blueprint warns', () => {
+  const body = {
+    name: 'T',
+    appliesTo: ['standard'],
+    slots: [{ slotId: 'main', allowed: ['hero'], required: true, repeatable: false }],
+  };
+  assert.equal(statusOf(checkTemplate(body, {}), 'template_required'), 'warning');
+});
+
+test('template: component-registry membership is optional until a resolver is supplied, then enforced', () => {
+  const body = {
+    name: 'T',
+    appliesTo: ['standard'],
+    slots: [{ slotId: 'main', allowed: ['hero', 'imaginary'], required: false, repeatable: false }],
+  };
+  assert.equal(statusOf(checkTemplate(body, {}), 'template_registry'), 'optional');
+  const enforced = checkTemplate(body, { componentTypeExists: (t) => t === 'hero' });
+  assert.equal(statusOf(enforced, 'template_registry'), 'missing');
 });
