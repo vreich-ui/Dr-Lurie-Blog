@@ -1,9 +1,18 @@
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, sep } from 'node:path';
 
-const localBlobsRoot = join(process.cwd(), '.netlify', 'local-blobs');
+let localBlobsRootForTesting: string | undefined;
 
-const toPath = (storeName: string, key: string) => join(localBlobsRoot, storeName, key);
+// Test-only override so concurrently-run test files (each isolated by node:test into
+// its own process, but sharing the repo's working directory) don't race on the same
+// on-disk fallback store — mirrors setNetlifyBlobsModuleForTesting in blob-store.ts.
+export const setLocalBlobsRootForTesting = (root?: string) => {
+  localBlobsRootForTesting = root;
+};
+
+const getLocalBlobsRoot = () => localBlobsRootForTesting ?? join(process.cwd(), '.netlify', 'local-blobs');
+
+const toPath = (storeName: string, key: string) => join(getLocalBlobsRoot(), storeName, key);
 
 const toBlobKey = (storeRoot: string, filePath: string) => relative(storeRoot, filePath).split(sep).join('/');
 
@@ -47,7 +56,7 @@ const listFiles = async (current: string): Promise<string[]> => {
 };
 
 export const createLocalBlobStore = (storeName: string): LocalBlobStore => {
-  const storeRoot = join(localBlobsRoot, storeName);
+  const storeRoot = join(getLocalBlobsRoot(), storeName);
   const getBlob = async (key: string, options?: { type?: 'arrayBuffer' | 'buffer' | 'text' }) => {
     try {
       if (options?.type === 'buffer') {

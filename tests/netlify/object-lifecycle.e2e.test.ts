@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
+import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
 import { derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
 import type { PatchOp } from '../../src/schema/object-patch-ops.js';
 import type { HistoryEntry, ObjectRecord } from '../../src/schema/object-record-v1.js';
@@ -37,7 +38,13 @@ for (const key of [
 }
 process.env.PUBLISH_SECRET = 'test-publish-secret';
 
-const SITE_OBJECTS_DIR = join(process.cwd(), '.netlify', 'local-blobs', 'site-objects');
+// Isolated from the default .netlify/local-blobs root: this suite and its siblings
+// (object-store-auth.test.ts, mcp-object-tools.test.ts) all exercise the site-objects
+// local fallback store, and node:test runs separate test files concurrently, so sharing
+// one on-disk directory raced resets against reads/writes across files.
+const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'object-lifecycle-e2e');
+setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
+const SITE_OBJECTS_DIR = join(LOCAL_BLOBS_ROOT, 'site-objects');
 const reset = () => rm(SITE_OBJECTS_DIR, { recursive: true, force: true });
 
 type ToolDefinition = { name: string };
