@@ -16,6 +16,8 @@ const jsonHeaders = {
 
 const draftError = 'Title and structured article body are required to save JSON draft.';
 const missingLockTokenMessage = 'lock_token is required to update a checked-out draft.';
+const missingExpectedVersionMessage = 'expected_record_version is required when updating an existing draft.';
+const versionConflictMessage = 'The workflow record changed since it was loaded. Reload the draft and retry.';
 const lockExpiredMessage = 'The workflow lock has expired. Check out the draft again and retry.';
 const lockMismatchMessage = 'The provided lock_token does not match the active workflow lock.';
 const notFoundMessage = 'Workflow record was not found.';
@@ -44,6 +46,9 @@ const requestSchema = z
   .object({
     request_id: z.string().min(1).optional(),
     lock_token: z.string().min(1).optional(),
+    // Optional at the schema level because draft creation has no prior version to
+    // compare against; the update path (request_id present) requires it.
+    expected_record_version: z.number().int().nonnegative().optional(),
     input: z.unknown(),
   })
   .strict();
@@ -171,6 +176,22 @@ const missingLockTokenResponse = () =>
     message: missingLockTokenMessage,
   });
 
+const missingExpectedVersionResponse = () =>
+  jsonResponse(400, {
+    error: missingExpectedVersionMessage,
+    error_code: 'missing_expected_record_version',
+    message: missingExpectedVersionMessage,
+  });
+
+const versionConflictResponse = (currentVersion: number) =>
+  jsonResponse(409, {
+    error: 'version_conflict',
+    error_code: 'version_conflict',
+    message: versionConflictMessage,
+    conflict: true,
+    current_version: currentVersion,
+  });
+
 const sanitizeWorkflowLock = (lock: WorkflowRecord['lock']) => {
   if (!lock) return undefined;
 
@@ -233,12 +254,17 @@ export const saveAdminJsonDraft = async (store: WorkflowBlobStore, body: AdminDr
 
   if (body.request_id) {
     if (!body.lock_token) return missingLockTokenResponse();
+    if (body.expected_record_version === undefined) return missingExpectedVersionResponse();
 
     const previousRecord = await loadRecord(store, body.request_id);
     if (!previousRecord) return notFoundResponse();
 
     const lockFailure = validateActiveLock(previousRecord, body.lock_token);
     if (lockFailure) return lockFailure;
+
+    if (previousRecord.version !== body.expected_record_version) {
+      return versionConflictResponse(previousRecord.version);
+    }
 
     const nextRecord: WorkflowRecord = {
       ...previousRecord,

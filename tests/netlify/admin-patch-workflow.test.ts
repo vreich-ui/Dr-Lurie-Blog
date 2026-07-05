@@ -92,6 +92,7 @@ describe('handleSetPublishedTime', () => {
       action: 'set_published_time',
       request_id: REQUEST_ID,
       lock_token: LOCK_TOKEN,
+      expected_record_version: 1,
       published_time: publishedTime,
     });
 
@@ -112,6 +113,7 @@ describe('handleSetPublishedTime', () => {
       action: 'set_published_time',
       request_id: REQUEST_ID,
       lock_token: LOCK_TOKEN,
+      expected_record_version: 1,
       published_time: '2026-06-26T17:00:00.000Z',
     });
 
@@ -132,6 +134,7 @@ describe('handleSetPublishedTime', () => {
       action: 'set_published_time',
       request_id: REQUEST_ID,
       lock_token: 'wrong_token',
+      expected_record_version: 1,
       published_time: '2026-06-26T17:00:00.000Z',
     });
 
@@ -147,6 +150,7 @@ describe('handleSetPublishedTime', () => {
       action: 'set_published_time',
       request_id: REQUEST_ID,
       lock_token: LOCK_TOKEN,
+      expected_record_version: 1,
       published_time: '2026-06-26T17:00:00.000Z',
     });
 
@@ -161,10 +165,36 @@ describe('handleSetPublishedTime', () => {
       action: 'set_published_time',
       request_id: 'req_nonexistent',
       lock_token: LOCK_TOKEN,
+      expected_record_version: 1,
       published_time: '2026-06-26T17:00:00.000Z',
     });
 
     assert.equal(res.statusCode, 404);
+  });
+
+  it('returns 409 with current_version when expected_record_version is stale', async () => {
+    const store = createMemoryStore();
+    await seedRecord(store, makeRecord({ version: 3 }));
+
+    const res = await handleSetPublishedTime(store, {
+      action: 'set_published_time',
+      request_id: REQUEST_ID,
+      lock_token: LOCK_TOKEN,
+      expected_record_version: 2,
+      published_time: '2026-06-26T17:00:00.000Z',
+    });
+
+    assert.equal(res.statusCode, 409);
+    const body = parseBody(res);
+    assert.equal(body.conflict, true);
+    assert.equal(body.current_version, 3);
+
+    const saved = JSON.parse((await store.get(RECORD_KEY)) ?? '{}') as {
+      input: { publication: { published_time: string | null } };
+      version: number;
+    };
+    assert.equal(saved.version, 3, 'a stale write must not mutate the record');
+    assert.equal(saved.input.publication.published_time, null);
   });
 });
 
@@ -180,6 +210,7 @@ describe('handlePatchCanonicalInput', () => {
       action: 'patch_canonical_input',
       request_id: REQUEST_ID,
       lock_token: LOCK_TOKEN,
+      expected_record_version: 1,
     });
 
     assert.equal(res.statusCode, 400);
@@ -199,7 +230,9 @@ describe('handlePatchCanonicalInput', () => {
     });
 
     assert.equal(res.statusCode, 409);
-    assert.equal(parseBody(res).conflict, true);
+    const body = parseBody(res);
+    assert.equal(body.conflict, true);
+    assert.equal(body.current_version, 1);
   });
 
   it('accepts promote_publish_payload with trusted PDF artifactReference', async () => {
