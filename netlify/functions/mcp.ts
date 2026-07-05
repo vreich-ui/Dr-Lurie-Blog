@@ -6,6 +6,11 @@ import { handler as objectStoreHandler } from './object-store.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
+import {
+  isNetlifyBuildHookConfigured,
+  NetlifyBuildHookTriggerError,
+  triggerNetlifyBuild,
+} from '../lib/netlify-deploys.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
@@ -1031,6 +1036,16 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ['url', 'expectedImages']
     ),
   },
+  {
+    name: 'trigger_netlify_build',
+    description:
+      'Manually trigger a Netlify build via the server-side build hook, without needing a new git commit. No input is required. This QUEUES a build asynchronously — it does not wait for the build to finish, so poll deploy_status afterward (the same way you already do after a normal publish) to know when the resulting deploy is actually ready. IMPORTANT — batch, do not spam: each triggered build consumes real Netlify build minutes, so use this to batch multiple publishes into a single build rather than triggering one build per publish. For example, after publishing several articles in a row, call this once at the end instead of calling it after every individual save_json_blob_publish_by_time call. Optional reason is recorded only in this function\'s own server-side logs for traceability of who triggered a build and why — it is never sent to Netlify and never included in the response.',
+    inputSchema: objectSchema({
+      reason: stringSchema(
+        "Optional free-text reason for triggering this build, recorded only in this function's own server logs for traceability. Never sent to Netlify."
+      ),
+    }),
+  },
   ...(ADMIN_TOOLS_ENABLED
     ? [
         {
@@ -1676,6 +1691,35 @@ const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string,
   }
 
   return toolResult(body);
+};
+
+const callTriggerNetlifyBuild = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const reason = toNonEmptyString(input.reason) ?? null;
+
+  if (!isNetlifyBuildHookConfigured()) {
+    event.log?.({ event: 'netlify_build_trigger_not_configured', reason });
+    return toolError('Netlify build hook is not configured on the server.', {
+      error_code: 'netlify_build_hook_not_configured',
+    });
+  }
+
+  event.log?.({ event: 'netlify_build_trigger_requested', reason });
+
+  try {
+    const { triggeredAt } = await triggerNetlifyBuild();
+    event.log?.({ event: 'netlify_build_triggered', reason, triggeredAt });
+
+    return toolResult({ triggered: true, triggeredAt });
+  } catch (error) {
+    const statusCode = error instanceof NetlifyBuildHookTriggerError ? error.statusCode : undefined;
+    const message = error instanceof Error ? error.message : 'Netlify build hook trigger failed.';
+    event.log?.({ event: 'netlify_build_trigger_failed', reason, error: message });
+
+    return toolError(message, {
+      error_code: 'netlify_build_hook_trigger_failed',
+      ...(statusCode ? { statusCode } : {}),
+    });
+  }
 };
 
 const hasReaderVisibleArticleBodyNode = (node: unknown) => {
@@ -3345,6 +3389,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callDeployStatus(event, input);
     case 'verify_article_images':
       return callVerifyArticleImages(event, input);
+    case 'trigger_netlify_build':
+      return callTriggerNetlifyBuild(event, input);
     case 'save_json_blob_force_unlock':
       if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
       return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');

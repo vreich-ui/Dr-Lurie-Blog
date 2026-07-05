@@ -39,6 +39,39 @@ export const isNetlifyDeployLookupConfigured = () => {
   return Boolean(siteId && token);
 };
 
+const getNetlifyBuildHookUrl = () => process.env.NETLIFY_BUILD_HOOK_URL || '';
+
+export const isNetlifyBuildHookConfigured = () => Boolean(getNetlifyBuildHookUrl());
+
+export class NetlifyBuildHookTriggerError extends Error {
+  statusCode: number;
+
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = 'NetlifyBuildHookTriggerError';
+    this.statusCode = statusCode;
+  }
+}
+
+export const triggerNetlifyBuild = async (): Promise<{ triggeredAt: string }> => {
+  const hookUrl = getNetlifyBuildHookUrl();
+
+  if (!hookUrl) {
+    throw new Error('Netlify build hook is not configured.');
+  }
+
+  const response = await fetch(hookUrl, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new NetlifyBuildHookTriggerError(
+      response.status,
+      `Netlify build hook trigger failed with HTTP ${response.status}.`
+    );
+  }
+
+  return { triggeredAt: new Date().toISOString() };
+};
+
 const toStringValue = (value: unknown) => (typeof value === 'string' ? value : '');
 
 const firstStringValue = (...values: unknown[]) => {
