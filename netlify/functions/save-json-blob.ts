@@ -153,7 +153,7 @@ const requestSchema = z
     lock_token: z.string().min(1).optional(),
     owner_id: z.string().min(1).optional(),
     owner_label: z.string().min(1).optional(),
-    lease_seconds: z.number().int().positive().optional(),
+    lease_seconds: z.number().int().positive().max(3600).optional(),
     commit_metadata: z.record(z.string(), z.unknown()).optional(),
     commit: z.string().min(1).optional(),
     commit_sha: z.string().min(1).optional(),
@@ -1404,12 +1404,7 @@ export const refreshLock = async (store: WorkflowBlobStore, body: WorkflowReques
   const timestampMs = Date.now();
   const timestamp = new Date(timestampMs).toISOString();
   if (!isLockActive(previousRecord.lock, timestampMs)) {
-    return jsonResponse(409, {
-      action: body.action,
-      error: 'Lock has expired.',
-      lock: sanitizeLock(previousRecord.lock),
-      diagnostics: getLockTimestampDiagnostics(previousRecord.lock, timestampMs),
-    });
+    return lockExpiredResponse(body, previousRecord.lock, timestampMs);
   }
 
   const leaseSeconds = getLeaseSeconds(body);
@@ -1455,6 +1450,10 @@ export const checkinRequest = async (store: WorkflowBlobStore, body: WorkflowReq
 
     if (latestRecord.lock.token !== body.lock_token) {
       return jsonResponse(423, { action: body.action, locked: true, lock: sanitizeLock(latestRecord.lock) });
+    }
+
+    if (!isLockActive(latestRecord.lock, Date.now())) {
+      return lockExpiredResponse(body, latestRecord.lock);
     }
 
     const timestamp = nowIso();
