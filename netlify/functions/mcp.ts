@@ -2,6 +2,7 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
 import { handler as saveJsonBlobHandler, type WorkflowRecord } from './save-json-blob.js';
+import { handler as objectStoreHandler } from './object-store.js';
 import { handler as publishArticleHandler } from './publish-article.js';
 import { handler as deployStatusHandler } from './deploy-status.js';
 import { handler as verifyArticleImagesHandler } from './verify-article-images.js';
@@ -771,6 +772,18 @@ const contentSourceV1JsonSchema = objectSchema(
   'Structured content_source.v1 workflow input. For MCP admin-publish drafts, use content.article_body with schema_version article_body.v1 plus at least one reader-visible public node. Publication is controlled only by input.publication.published_time.'
 );
 
+// ── Object-verb tool schemas (T0.9). Additive; the article tool schemas above
+//    are untouched. ──
+const OBJECT_TYPE_VALUES = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'content_item'];
+const objectTypeEnumSchema = (description = 'CMS object type.') => ({
+  type: 'string',
+  enum: OBJECT_TYPE_VALUES,
+  description,
+});
+const anyObjectSchema = (description: string) => ({ type: 'object', additionalProperties: true, description });
+const patchOpsSchema = (description: string) =>
+  arraySchema({ type: 'object', additionalProperties: true }, description);
+
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'save_json_blob_create_request',
@@ -919,7 +932,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       '    Legacy repo paths (src/assets/...), remote URLs (https://...), and data URIs are always rejected.',
       '  replace_image_asset_register: replace input.media.image_asset_register[] wholesale.',
       '    Entries must pass ImageAssetRecord schema; url/repoPath that are Major Key refs must be trusted',
-      "    (uploaded for this request or in agent_outputs). Legacy paths, remote URLs, and data URIs are rejected.",
+      '    (uploaded for this request or in agent_outputs). Legacy paths, remote URLs, and data URIs are rejected.',
       '  promote_publish_payload: set input.publication.publish_payload from a complete PublishPayload object.',
       '    Image-bearing fields (featuredImage, existingFeaturedImagePath, images[].src/url/blobKey,',
       '    mediaEntries[].src/url/blobKey, artifactReferences[].blobKey) must be trusted Major Key artifact refs.',
@@ -1206,6 +1219,116 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: 'Diagnostic tool that confirms the MCP server is reachable.',
     inputSchema: objectSchema({}),
   },
+
+  // ── Object verbs (T0.9): the generic CMS object store. Each proxies to
+  //    netlify/functions/object-store.ts with the publish key injected
+  //    server-side (the A§1.8 pattern). Purely additive — the article tools
+  //    above are unchanged. Submit/publish/review arrive in P1. ──
+  {
+    name: 'object_get',
+    description: 'Fetch a CMS object record (current draft state) by type and id from the site-objects store.',
+    inputSchema: objectSchema(
+      { object_type: objectTypeEnumSchema(), object_id: stringSchema('The object id, e.g. page_home.') },
+      ['object_type', 'object_id']
+    ),
+  },
+  {
+    name: 'object_list',
+    description: 'List CMS object summaries for a type, optionally filtered by status (active | archived).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        status: { type: 'string', enum: ['active', 'archived'], description: 'Optional status filter.' },
+      },
+      ['object_type']
+    ),
+  },
+  {
+    name: 'object_create',
+    description:
+      'Create a CMS object from object_type, site, and the per-type body. requested_id is optional — omit it to have a valid id minted server-side. content_item is not creatable via this verb (articles keep their own tools).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        site: stringSchema('Owning site object id, e.g. site_drlurie.'),
+        body: anyObjectSchema('The per-type object body; validated server-side against the T0.2 schema.'),
+        requested_id: stringSchema('Optional explicit object id; a valid id is minted from the body when omitted.'),
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['object_type', 'site', 'body']
+    ),
+  },
+  {
+    name: 'object_checkout',
+    description:
+      'Acquire the record lease before patching. Returns lockToken and record_version (use it as expected_record_version).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lease_seconds: intSchema('Optional lease seconds (default 900, max 3600).'),
+      },
+      ['object_type', 'object_id']
+    ),
+  },
+  {
+    name: 'object_refresh_lock',
+    description: 'Extend a held record lease; requires the matching lock_token (wrong/expired → 423).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema(),
+        lease_seconds: intSchema('Optional lease seconds (default 900, max 3600).'),
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_checkin',
+    description: 'Release a held record lease; requires the matching lock_token.',
+    inputSchema: objectSchema(
+      { object_type: objectTypeEnumSchema(), object_id: stringSchema(), lock_token: stringSchema() },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_patch',
+    description:
+      'Apply typed patch ops under a held lock. Requires lock_token and expected_record_version (stale version → 409; missing/expired/wrong lock → 423). Omitted ids on add_term/upsert_* ops are minted server-side. A resulting body that fails validation rejects the op (422) without persisting.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema(),
+        expected_record_version: intSchema('The record version you last read (optimistic concurrency check).'),
+        ops: patchOpsSchema('Array of typed patch ops (the C§2.0 grammar).'),
+      },
+      ['object_type', 'object_id', 'lock_token', 'expected_record_version', 'ops']
+    ),
+  },
+  {
+    name: 'object_validate',
+    description:
+      'Dry-run validation of an object, or of a candidate_patch applied to it. Read-only: no lock, no write.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        candidate_patch: patchOpsSchema('Optional ops to dry-run through the engine before validating the result.'),
+      },
+      ['object_type', 'object_id']
+    ),
+  },
+  {
+    name: 'registry_get',
+    description:
+      'Read a code registry (component / page_type) definition. STUB: the registry is not yet populated — it lands in P3 — so this returns a not_yet_populated placeholder for now.',
+    inputSchema: objectSchema({
+      registry: { type: 'string', enum: ['component', 'page_type'], description: 'Optional registry name.' },
+    }),
+  },
+
   ...ALLOWED_AGENTS.flatMap<ToolDefinition>((agentName) => [
     {
       name: `${agentName}_update_output`,
@@ -1699,9 +1822,7 @@ const promoteAgentArticleBodyIfRicher = (
 
     // Merge agent media only into canonical nodes that currently have no media.
     // Canonical title, body, items, and existing media are preserved.
-    const mergedBody = inputArticleBody
-      ? mergeAgentMediaIntoCanonicalBody(inputArticleBody, agentBody)
-      : agentBody;
+    const mergedBody = inputArticleBody ? mergeAgentMediaIntoCanonicalBody(inputArticleBody, agentBody) : agentBody;
     return {
       effectiveRecordInput: { ...recordInput, content: { ...inputContent, article_body: mergedBody } },
       promotedArticleBody: mergedBody,
@@ -2218,6 +2339,69 @@ const callAction = async (event: LambdaEvent, payload: Record<string, unknown>, 
   if ('isError' in result) return result;
 
   return toolResult({ [resultKey]: result[resultKey] });
+};
+
+// ── Object-verb proxy (T0.9): mirror of invokeSaveJsonBlob/callAction for the
+//    generic object store. Injects the publish key server-side and forwards to
+//    netlify/functions/object-store.ts, exactly the A§1.8 proxy pattern. The
+//    article proxy above is untouched. ──
+const createObjectStoreHeaders = (event: LambdaEvent, publishSecret: string) => ({
+  ...(event.headers ?? {}),
+  ...(getHeader(event.headers, 'x-nf-site-id') ? { 'x-nf-site-id': getHeader(event.headers, 'x-nf-site-id') } : {}),
+  'x-publish-key': publishSecret,
+  'content-type': 'application/json',
+});
+
+const stripObjectEnvelope = (payload: Record<string, unknown>): Record<string, unknown> => {
+  const rest = { ...payload };
+  delete rest.ok;
+  delete rest.status;
+  return rest;
+};
+
+const invokeObjectStore = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const publishSecret = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET;
+
+  if (!publishSecret) {
+    return toolError('Server-side object storage credentials are not configured.');
+  }
+
+  const objectResponse = await _mcpInternal.objectStoreHandler({
+    httpMethod: 'POST',
+    headers: createObjectStoreHeaders(event, publishSecret),
+    body: JSON.stringify(payload),
+  });
+
+  const bodyText = objectResponse.body ?? '';
+  let parsedBody: Record<string, unknown> = {};
+
+  if (bodyText) {
+    try {
+      parsedBody = JSON.parse(bodyText) as Record<string, unknown>;
+    } catch {
+      return toolError(`HTTP ${objectResponse.statusCode}: ${bodyText}`);
+    }
+  }
+
+  if (objectResponse.statusCode < 200 || objectResponse.statusCode >= 300) {
+    // Conflicts (404 / 409 / 422 / 423) surface as tool errors carrying the
+    // status code and the endpoint's own payload (lock holder, expected/actual
+    // version, PatchApplyError code, blockers) so the agent can react.
+    return toolError(typeof parsedBody.error === 'string' ? parsedBody.error : `HTTP ${objectResponse.statusCode}`, {
+      statusCode: objectResponse.statusCode,
+      ...stripObjectEnvelope(parsedBody),
+    });
+  }
+
+  return stripObjectEnvelope(parsedBody);
+};
+
+const callObjectAction = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const result = await invokeObjectStore(event, payload);
+
+  if ('isError' in result) return result;
+
+  return toolResult(result);
 };
 
 const callNormalizedAction = async (
@@ -3290,6 +3474,69 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       );
     case 'save_json_blob_mark_agent_complete':
       return callMarkAgentComplete(event, input, normalizeAgentName(input.agent_name, 'agent_name') as string);
+
+    // ── Object verbs (T0.9) → object-store.ts (publish key injected). ──
+    case 'object_get':
+      return callObjectAction(event, { action: 'get', object_type: input.object_type, object_id: input.object_id });
+    case 'object_list':
+      return callObjectAction(event, { action: 'list', object_type: input.object_type, status: input.status });
+    case 'object_create':
+      return callObjectAction(event, {
+        action: 'create',
+        object_type: input.object_type,
+        site: input.site,
+        body: input.body,
+        requested_id: input.requested_id,
+        agent_name: input.agent_name,
+      });
+    case 'object_checkout':
+      return callObjectAction(event, {
+        action: 'checkout',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lease_seconds: input.lease_seconds,
+      });
+    case 'object_refresh_lock':
+      return callObjectAction(event, {
+        action: 'refresh_lock',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+        lease_seconds: input.lease_seconds,
+      });
+    case 'object_checkin':
+      return callObjectAction(event, {
+        action: 'checkin',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+      });
+    case 'object_patch':
+      return callObjectAction(event, {
+        action: 'patch',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+        expected_record_version: input.expected_record_version,
+        ops: input.ops,
+      });
+    case 'object_validate':
+      return callObjectAction(event, {
+        action: 'validate',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        candidate_patch: input.candidate_patch,
+      });
+    case 'registry_get':
+      // STUB until P3 populates the code registries (component / page_type).
+      return toolResult({
+        registry: toNonEmptyString(input.registry) ?? null,
+        status: 'not_yet_populated',
+        available: false,
+        message: 'The code registry is not yet populated; it is introduced in Phase 3 (T3.1/T3.2).',
+        definitions: [],
+      });
+
     default:
       break;
   }
@@ -3367,6 +3614,7 @@ export const _mcpInternal = {
   saveJsonBlobHandler,
   publishArticleHandler,
   getArtifactIndexBlobStore,
+  objectStoreHandler,
 };
 
 export const handler = async (rawEvent: LambdaEvent, _context?: LambdaContext) => {
