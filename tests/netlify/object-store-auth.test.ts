@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { handler as adminObjectHandler } from '../../netlify/functions/admin-object.js';
 import { handler as objectStoreHandler } from '../../netlify/functions/object-store.js';
+import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
 /**
@@ -38,7 +39,13 @@ const PUBLISH_SECRET = 'test-publish-secret';
 process.env.PUBLISH_SECRET = PUBLISH_SECRET;
 process.env.ADMIN_EMAILS = 'admin@drlurie.com';
 
-const SITE_OBJECTS_DIR = join(process.cwd(), '.netlify', 'local-blobs', 'site-objects');
+// Isolated from the default .netlify/local-blobs root: this suite and its siblings
+// (object-lifecycle.e2e.test.ts, mcp-object-tools.test.ts) all exercise the site-objects
+// local fallback store, and node:test runs separate test files concurrently, so sharing
+// one on-disk directory raced resets against reads/writes across files.
+const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'object-store-auth');
+setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
+const SITE_OBJECTS_DIR = join(LOCAL_BLOBS_ROOT, 'site-objects');
 const reset = () => rm(SITE_OBJECTS_DIR, { recursive: true, force: true });
 
 const validPageBody = () => ({

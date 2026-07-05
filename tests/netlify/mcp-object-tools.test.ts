@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
+import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
 
 // Object-verb MCP tools (T0.9). The tools proxy to object-store.ts with the
 // publish key injected; object-store falls back to the local file store when no
@@ -20,7 +21,13 @@ for (const key of [
 }
 process.env.PUBLISH_SECRET = 'test-publish-secret';
 
-const SITE_OBJECTS_DIR = join(process.cwd(), '.netlify', 'local-blobs', 'site-objects');
+// Isolated from the default .netlify/local-blobs root: this suite and its siblings
+// (object-lifecycle.e2e.test.ts, object-store-auth.test.ts) all exercise the site-objects
+// local fallback store, and node:test runs separate test files concurrently, so sharing
+// one on-disk directory raced resets against reads/writes across files.
+const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'mcp-object-tools');
+setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
+const SITE_OBJECTS_DIR = join(LOCAL_BLOBS_ROOT, 'site-objects');
 const reset = () => rm(SITE_OBJECTS_DIR, { recursive: true, force: true });
 
 type ToolDefinition = {
