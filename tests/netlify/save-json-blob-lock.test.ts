@@ -183,7 +183,7 @@ test('conflict and error lock responses never expose the raw lock token', async 
   const store = createMemoryStore();
   const requestId = reqId('lock-sanitize');
   await createWorkflow(store, requestId);
-  const record = await checkoutWorkflow(store, requestId, 300);
+  await checkoutWorkflow(store, requestId, 300);
 
   const checkoutConflict = await checkoutRequest(store, {
     action: 'checkout_request',
