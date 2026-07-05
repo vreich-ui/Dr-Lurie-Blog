@@ -25,15 +25,18 @@ If any task touches the object store, Pages, Sections, Navigation, Taxonomy,
 Site config, Templates, or anything under `docs/cms-architecture/`, read these 
 files in full before writing any code, in this order:
 
-1. `docs/cms-architecture/cms-architecture-consolidated.md` — master reference: 
-   the 12 concepts, standing constraints, amendment log, settled decisions, 
-   tiered agent-operability contract, and phase plan.
-2. `docs/cms-architecture/roadmap.yaml` — the task's `depends_on`, `mode`, 
-   and recommended model/effort. **Check `depends_on` before starting — if a 
-   dependency isn't built and merged yet, stop and say so.**
+1. The task's standalone brief: `docs/cms-architecture/cms-pipeline/T<phase>.<n>-*.md` 
+   — its header carries the task's `depends_on`, `mode`, and recommended 
+   model/effort. **Check `depends_on` before starting — if a dependency isn't 
+   built and merged yet, stop and say so.**
+2. `docs/cms-architecture/cms-pipeline/queue.tsv` — task ordering and per-task 
+   mode/model/effort (the runner config; see `README.md` alongside it).
 3. For full schema/type detail: `docs/cms-architecture/02-architecture-and-schema.md`
 4. For permission/action rules: `docs/cms-architecture/03-mapping-and-agent-contract.md`
-5. For the specific task brief: `docs/cms-architecture/phase-0-cc-briefs/T0.X-*.md`
+5. For the full per-task spec: `docs/cms-architecture/05-task-breakdown-and-open-questions.md`. 
+   (A consolidated master reference, `cms-architecture-consolidated.md`, is named 
+   by some briefs but has not been committed — the numbered source docs are 
+   ground truth where anything conflicts.)
 
 ## CMS hard constraints — every task, no exceptions
 
