@@ -106,6 +106,15 @@ export type PatchTaxonomyKind = z.infer<typeof taxonomyKindSchema>;
 // pinned strictly rather than passthrough. `status` defaults to 'active' at
 // apply time (C§2.0's "add_term … (status 'active')"); explicit values exist
 // so remove_term's inverse can restore a deprecated term exactly.
+//
+// `term_id` is REQUIRED here because these are *canonical* ops, not raw agent
+// input: like every other opaque id in this grammar (section `s_` ids, nav
+// item/group ids, template slot ids), it is minted by the endpoint layer
+// (T0.8) before the op reaches this schema. The documented agent request
+// (C§2.5-C) sends `term:{slug,label}` and the term_id is "minted server-side"
+// — that minting is T0.8's job (this task is apply/inverse mechanics only,
+// with no endpoint wiring), which also keeps the apply engine pure and its
+// inverse restores exact. See the T0.8 brief for the minting requirement.
 const termPayloadSchema = z.strictObject({
   term_id: z.string().regex(TERM_ID_RE, { message: 'Term ids must match t_<lowercase alphanumerics>' }),
   slug: z.string().min(1),
