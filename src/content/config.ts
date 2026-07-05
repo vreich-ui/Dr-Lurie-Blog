@@ -69,6 +69,75 @@ const postCollection = defineCollection({
   }),
 });
 
+// ─── CMS object collections (T1.7 — inert loader plumbing) ───────────────────
+//
+// Content collections over the derived-export layout (D§1): one collection per
+// object type that materializes a committed file. They exist NOW so Phase 3 can
+// build the first real page from a published Page object without also standing
+// up the loader plumbing in the same task. Nothing consumes these this phase —
+// no page or route references them; empty dirs = empty collections, build
+// unaffected (the .gitkeep files hold the otherwise-empty glob bases).
+//
+// Schema note: these deliberately DO NOT import the T0.2 body schemas
+// (src/schema/bodies/*). Those are zod v4 (the project's zod), while
+// `astro:content`'s `z` is Astro's bundled zod v3 — passing a v4 schema to
+// defineCollection would not validate correctly. The derived exports are
+// already validated against the T0.2 schemas at write time (T0.7); here we
+// only assert the T1.1 `__generated` marker every export carries and pass the
+// body through. Modeling the full bodies in a second (v3) copy would recreate
+// exactly the multi-source drift the CMS project exists to remove.
+
+const generatedMarker = z.object({
+  from: z.string(),
+  at: z.string(),
+  record_version: z.number(),
+});
+
+// The shape every derived JSON export carries: the marker plus the body fields.
+const derivedExportSchema = z.object({ __generated: generatedMarker }).passthrough();
+
+// Singletons live directly under src/data/site/ (one per site); the rest are
+// one-file-per-object directories. Specific filenames for the singletons keep
+// the singleton globs from also matching the per-type directories' contents.
+const siteObjectCollection = defineCollection({
+  loader: glob({ pattern: 'site.json', base: 'src/data/site' }),
+  schema: derivedExportSchema,
+});
+
+const taxonomyObjectCollection = defineCollection({
+  loader: glob({ pattern: 'taxonomy.json', base: 'src/data/site' }),
+  schema: derivedExportSchema,
+});
+
+const pageObjectCollection = defineCollection({
+  loader: glob({ pattern: '*.json', base: 'src/data/site/pages' }),
+  schema: derivedExportSchema,
+});
+
+const navigationObjectCollection = defineCollection({
+  loader: glob({ pattern: '*.json', base: 'src/data/site/navigation' }),
+  schema: derivedExportSchema,
+});
+
+const sectionObjectCollection = defineCollection({
+  loader: glob({ pattern: '*.json', base: 'src/data/site/sections' }),
+  schema: derivedExportSchema,
+});
+
+const templateObjectCollection = defineCollection({
+  loader: glob({ pattern: '*.json', base: 'src/data/site/templates' }),
+  schema: derivedExportSchema,
+});
+
+// Exported so Phase 3+ consumers (and tests) share one derived-export shape.
+export type DerivedExport = z.infer<typeof derivedExportSchema>;
+
 export const collections = {
   post: postCollection,
+  siteObject: siteObjectCollection,
+  taxonomyObject: taxonomyObjectCollection,
+  pageObject: pageObjectCollection,
+  navigationObject: navigationObjectCollection,
+  sectionObject: sectionObjectCollection,
+  templateObject: templateObjectCollection,
 };

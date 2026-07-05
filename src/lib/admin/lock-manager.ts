@@ -2,6 +2,13 @@
  * Client-side lock lifecycle manager.
  * Wraps /.netlify/functions/admin-workflow-lock with checkout/checkin/refresh
  * and an auto-refresh timer that keeps the lease alive while the editor is open.
+ *
+ * T1.5: the endpoint and wire request shape are pluggable via an optional
+ * 3rd constructor argument, so the SAME lifecycle/timer logic also drives
+ * the generic object lock (`admin-object.ts`'s checkout/refresh_lock/checkin
+ * actions) for the objects review surface. Omitting the argument reproduces
+ * today's exact behavior byte-for-byte — the article editor's call site is
+ * unchanged and untouched.
  */
 
 export type LockState =
@@ -17,40 +24,70 @@ type LockApiResponse = {
   checked_in?: boolean;
 };
 
+type LockAction = 'checkout' | 'checkin' | 'refresh' | 'status' | 'force_release';
+
+/** Builds the wire request body for a lock action; only `fields` present for that action are populated. */
+export type LockRequestBuilder = (
+  action: LockAction,
+  id: string,
+  fields: { lockToken?: string; leaseSeconds?: number }
+) => Record<string, unknown>;
+
+export type LockManagerConfig = {
+  endpoint: string;
+  buildRequestBody: LockRequestBuilder;
+};
+
 const LOCK_ENDPOINT = '/.netlify/functions/admin-workflow-lock';
 // Refresh when 20 % of lease time remains (lease = 900 s → refresh at ~720 s elapsed)
 const REFRESH_AT_REMAINING_FRACTION = 0.2;
 const DEFAULT_LEASE_SECONDS = 900;
 
+/** Today's article-editor wire shape, extracted verbatim — the default config, unchanged. */
+const ARTICLE_LOCK_CONFIG: LockManagerConfig = {
+  endpoint: LOCK_ENDPOINT,
+  buildRequestBody: (action, requestId, fields) => ({
+    action,
+    requestId,
+    ...(fields.lockToken !== undefined ? { lockToken: fields.lockToken } : {}),
+    ...(fields.leaseSeconds !== undefined ? { leaseSeconds: fields.leaseSeconds } : {}),
+  }),
+};
+
 export class LockManager {
   private requestId: string;
   private getToken: () => Promise<string>;
+  private config: LockManagerConfig;
   private lockToken: string | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private onStateChange: ((state: LockState) => void) | null = null;
 
-  constructor(requestId: string, getToken: () => Promise<string>) {
+  constructor(requestId: string, getToken: () => Promise<string>, config: LockManagerConfig = ARTICLE_LOCK_CONFIG) {
     this.requestId = requestId;
     this.getToken = getToken;
+    this.config = config;
   }
 
   setOnStateChange(fn: (state: LockState) => void) {
     this.onStateChange = fn;
   }
 
-  private async post(body: Record<string, unknown>): Promise<LockApiResponse> {
+  private async post(
+    action: LockAction,
+    fields: { lockToken?: string; leaseSeconds?: number } = {}
+  ): Promise<LockApiResponse> {
     const token = await this.getToken();
-    const res = await fetch(LOCK_ENDPOINT, {
+    const res = await fetch(this.config.endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
+      body: JSON.stringify(this.config.buildRequestBody(action, this.requestId, fields)),
     });
     return res.json() as Promise<LockApiResponse>;
   }
 
   /** Returns the lock token on success, or null if another party holds the lock. */
   async checkout(leaseSeconds = DEFAULT_LEASE_SECONDS): Promise<string | null> {
-    const result = await this.post({ action: 'checkout', requestId: this.requestId, leaseSeconds });
+    const result = await this.post('checkout', { leaseSeconds });
     if (result.ok && result.lockToken) {
       this.lockToken = result.lockToken;
       this.scheduleRefresh(leaseSeconds);
@@ -70,20 +107,20 @@ export class LockManager {
   async checkin(): Promise<void> {
     this.clearRefreshTimer();
     if (!this.lockToken) return;
-    await this.post({ action: 'checkin', requestId: this.requestId, lockToken: this.lockToken });
+    await this.post('checkin', { lockToken: this.lockToken });
     this.lockToken = null;
     this.onStateChange?.({ held: false });
   }
 
   async forceRelease(): Promise<void> {
     this.clearRefreshTimer();
-    await this.post({ action: 'force_release', requestId: this.requestId });
+    await this.post('force_release');
     this.lockToken = null;
     this.onStateChange?.({ held: false });
   }
 
   async status(): Promise<LockState> {
-    const result = await this.post({ action: 'status', requestId: this.requestId });
+    const result = await this.post('status');
     if (result.locked && result.lock) {
       return { held: false, agentLock: { owner_label: result.lock.owner_label, expires_at: result.lock.expires_at } };
     }
@@ -103,12 +140,7 @@ export class LockManager {
 
   private async doRefresh(leaseSeconds: number) {
     if (!this.lockToken) return;
-    const result = await this.post({
-      action: 'refresh',
-      requestId: this.requestId,
-      lockToken: this.lockToken,
-      leaseSeconds,
-    });
+    const result = await this.post('refresh', { lockToken: this.lockToken, leaseSeconds });
     if (result.ok) {
       this.scheduleRefresh(leaseSeconds);
       if (result.lock) {
@@ -134,8 +166,8 @@ export class LockManager {
       if (this.lockToken) {
         // sendBeacon is fire-and-forget; good enough for unload
         navigator.sendBeacon(
-          LOCK_ENDPOINT,
-          JSON.stringify({ action: 'checkin', requestId: this.requestId, lockToken: this.lockToken })
+          this.config.endpoint,
+          JSON.stringify(this.config.buildRequestBody('checkin', this.requestId, { lockToken: this.lockToken }))
         );
       }
     };

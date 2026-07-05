@@ -1,4 +1,5 @@
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import { resolveHumanRoles } from '../lib/roles.js';
 
 type LambdaEvent = {
   headers?: Record<string, string | undefined>;
@@ -29,5 +30,11 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     email: adminState.email,
     userId: adminState.userId,
     error: adminState.error,
+    // T1.4/T1.5: the generic objects review surface needs to know which of
+    // ROLE_EMAILS_ADMIN/PUBLISHER/EDITOR this identity holds so it can show
+    // the Approve/Request-changes/Publish controls the tier gate would
+    // actually allow. This is read-only display info — the server-side
+    // gate (tier-gate.ts) is the sole enforcement point regardless.
+    roles: adminState.authenticated && adminState.email ? resolveHumanRoles(adminState.email) : [],
   });
 };
