@@ -52,6 +52,15 @@ import {
   type ObjectType,
   type Principal,
 } from '../../src/schema/object-record-v1.js';
+import { publishObject, type PublishObjectDeps } from './object-publish.js';
+import { checkPublishGate } from './tier-gate.js';
+import { resolveRolesForPrincipal } from './roles.js';
+import {
+  decideReview,
+  discardProposal,
+  publishActionSchema,
+  submitReview,
+} from './review-state.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
 
@@ -112,6 +121,40 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     object_id: objectId,
     candidate_patch: opsField.optional(),
   }),
+  // ─── T1.4 review-state wiring ───────────────────────────────────────────
+  z.object({
+    action: z.literal('submit_review'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    lock_token: z.string().min(1),
+    note: z.string().optional(),
+    // M-6: required by contract whenever a Tier 2 agent-executed publish is
+    // intended (C§2.2); the tier gate — not this schema — enforces that.
+    requested_publish_action: publishActionSchema.optional(),
+  }),
+  z.object({
+    action: z.literal('review_decide'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    decision: z.enum(['approve', 'request_changes']),
+    note: z.string().optional(),
+    publish_action: publishActionSchema.optional(),
+  }),
+  z.object({
+    action: z.literal('discard'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    lock_token: z.string().min(1),
+    // Exactly what each rejected op's history entry stores (T0.6, C§2.4).
+    entries: z.array(z.object({ op: z.unknown(), capture: z.unknown() })).min(1),
+  }),
+  z.object({
+    action: z.literal('publish_by_time'),
+    object_type: objectTypeSchema,
+    object_id: objectId,
+    lock_token: z.string().min(1),
+    published_time: z.union([z.string(), z.null()]).optional(),
+  }),
 ]);
 
 export type ObjectVerbRequest = z.infer<typeof objectVerbRequestSchema>;
@@ -123,6 +166,8 @@ export type HandleObjectVerbOptions = {
   nowMs?: number;
   /** Injected T0.7 resolvers (references, taxonomy, pageType…). Empty until wired. */
   validationContext?: ObjectValidationContext;
+  /** Forwarded to T1.3's publishObject (committer fetch/retry injection for tests). */
+  publishDeps?: Omit<PublishObjectDeps, 'nowMs' | 'validationContext'>;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -467,6 +512,91 @@ export const handleObjectVerb = async (
         context
       );
       return ok({ validation: groups, summary: summarizeValidation(groups) });
+    }
+
+    // ─── T1.4 review-state wiring (UI wiring only; no gate/review logic
+    // lives here — everything below calls straight into the already-built
+    // T1.3/T1.4 pure functions) ────────────────────────────────────────────
+
+    case 'submit_review': {
+      const key = objectRecordKey(request.object_type, request.object_id);
+      const record = await loadRecord(store, key);
+      if (!record) return err(404, { error: 'Object record not found', not_found: true });
+      if (!record.lock || record.lock.token !== request.lock_token || !isObjectLockActive(record.lock, ts)) {
+        return err(423, { error: 'Lock required', locked: true, lock: sanitizeObjectLock(record.lock) });
+      }
+
+      const result = submitReview(record, {
+        actor: principal,
+        at: timestamp,
+        note: request.note,
+        requested_publish_action: request.requested_publish_action,
+      });
+      if (!result.ok) return err(result.status, result.body);
+
+      await store.setJSON(key, result.record);
+      return ok({ ...result.body, version: result.record.version, content_revision: result.record.content_revision });
+    }
+
+    case 'review_decide': {
+      const key = objectRecordKey(request.object_type, request.object_id);
+      const record = await loadRecord(store, key);
+      if (!record) return err(404, { error: 'Object record not found', not_found: true });
+
+      const result = decideReview(record, {
+        actor: principal,
+        actorRoles: resolveRolesForPrincipal(principal),
+        at: timestamp,
+        decision: request.decision,
+        note: request.note,
+        publish_action: request.publish_action,
+      });
+      if (!result.ok) return err(result.status, result.body);
+
+      await store.setJSON(key, result.record);
+      return ok({ ...result.body, version: result.record.version, content_revision: result.record.content_revision });
+    }
+
+    case 'discard': {
+      const key = objectRecordKey(request.object_type, request.object_id);
+      const record = await loadRecord(store, key);
+      if (!record) return err(404, { error: 'Object record not found', not_found: true });
+      if (!record.lock || record.lock.token !== request.lock_token || !isObjectLockActive(record.lock, ts)) {
+        return err(423, { error: 'Lock required', locked: true, lock: sanitizeObjectLock(record.lock) });
+      }
+
+      const result = discardProposal(record, { entries: request.entries, actor: principal, at: timestamp });
+      if (!result.ok) return err(result.status, result.body);
+
+      await store.setJSON(key, result.record);
+      return ok({ ...result.body, version: result.record.version, content_revision: result.record.content_revision });
+    }
+
+    case 'publish_by_time': {
+      const key = objectRecordKey(request.object_type, request.object_id);
+      const record = await loadRecord(store, key);
+      if (!record) return err(404, { error: 'Object record not found', not_found: true });
+
+      const gate = checkPublishGate({
+        record,
+        principal,
+        roles: resolveRolesForPrincipal(principal),
+        requested: { published_time: request.published_time },
+      });
+      if (!gate.allow) return err(gate.status, { error: gate.reason, code: gate.code, tier: gate.tier });
+
+      const result = await publishObject(
+        store,
+        {
+          object_type: request.object_type,
+          object_id: request.object_id,
+          published_time: request.published_time,
+          lock_token: request.lock_token,
+          actor: principal,
+        },
+        { nowMs: ts, validationContext: context, ...options.publishDeps }
+      );
+      return { status: result.status, body: result.body };
     }
   }
 };
