@@ -1045,16 +1045,6 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       ),
     }),
   },
-  ...(ADMIN_TOOLS_ENABLED
-    ? [
-        {
-          name: 'save_json_blob_force_unlock',
-          description:
-            'Admin-only emergency tool that forcefully releases a workflow lock. Prefer checkin_request with the valid lock_token whenever possible.',
-          inputSchema: objectSchema({ request_id: stringSchema() }, ['request_id']),
-        },
-      ]
-    : []),
   {
     name: 'create_artifact_upload_intent',
     description:
@@ -3390,9 +3380,6 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callVerifyArticleImages(event, input);
     case 'trigger_netlify_build':
       return callTriggerNetlifyBuild(event, input);
-    case 'save_json_blob_force_unlock':
-      if (!ADMIN_TOOLS_ENABLED) return toolError('Admin tools are not enabled.');
-      return callAction(event, { action: 'force_unlock', request_id: input.request_id }, 'record');
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
     case 'create_artifact_from_url': {
