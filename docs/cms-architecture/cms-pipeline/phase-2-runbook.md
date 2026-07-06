@@ -17,11 +17,11 @@ publishes it documents.
 | T2.2 seed script           | **done (offline)** — data + script committed, validated locally; **`--execute` not yet run against production** | `scripts/seed-navigation.mjs`                                                        |
 | T2.3 first Tier 3 publish  | **agent side scripted; human side is yours** — see below                                                        | `scripts/submit-navigation-review.mjs`                                               |
 | T2.4 prop adapter          | **done** — deep-equals the current literals                                                                     | `src/utils/navigation-data.ts`                                                       |
-| T2.5 cutover commit        | **code committed on the branch + rehearsed to an empty diff locally**; the real gate re-runs after your publish | this runbook §4                                                                      |
+| T2.5 cutover commit        | **done** — merged via #361; post-merge gate PASSED against the real published exports (210/210 EMPTY DIFF)      | this runbook §4                                                                      |
 | T2.6 observation + cleanup | **PARKED** — waits for your production-observation confirmation                                                 | §5                                                                                   |
-| T2.7 agent-flow drill      | scripted click-path below; needs the live Tier 3 flow + you                                                     | §6                                                                                   |
-| T2.8 S-2 newsletter CTA    | **scripted + chrome commit ready, NOT merged** — combined with T2.9 below                                       | §7                                                                                   |
-| T2.9 Solutions dedupe      | **DECIDED (Wolf, 2026-07-06)**: scripted; combined into the same patch as T2.8                                  | §7                                                                                   |
+| T2.7 agent-flow drill      | **agent side scripted** (`scripts/drill-footer-cta.mjs`, both legs, offline-verified); human clicks are yours   | §6                                                                                   |
+| T2.8 S-2 newsletter CTA    | **done** — data published (`e09e608`) + chrome merged (#362); both CTAs live on every device — see §7 record   | §7                                                                                   |
+| T2.9 Solutions dedupe      | **done** — `i_early_access` removed from the live record (same publish, record_version 20) — see §7 record     | §7                                                                                   |
 
 Environment for every script below (run from the repo root, never in a browser
 context):
@@ -201,3 +201,33 @@ Side effects to expect after step 2, both by design: `seed-navigation.mjs
 --execute` re-runs will refuse with "already exists with a DIFFERENT body"
 for `nav_header` — correct, the draft has legitimately moved past the
 migration snapshot.
+
+### §7 EXECUTED (2026-07-06) — record of what actually happened
+
+Both halves are live on `main`, but they landed in the WRONG order — recorded
+here so the near-miss isn't forgotten:
+
+1. The chrome commit merged **first** (PR #362 → `c3b2de5`), before the data
+   publish, despite the hold note — exactly the rehearsed regression ordering.
+   For the window it was live alone, the mobile menu's newsletter CTA was
+   replaced by 'Join Early Access'.
+2. Wolf then ran `patch-nav-header-t28-t29.mjs --execute` + approve + publish,
+   producing `e09e608 Publish navigation: nav_header` (record_version 20) —
+   closing the window and completing the intended end state.
+
+End state verified against real state (not reports), 2026-07-06:
+
+- `origin/main:src/data/site/navigation/nav_header.json` body deep-equals
+  `applyPatchOps(seed, NAV_HEADER_T28_T29_OPS)` exactly — the published data
+  IS the reviewed patch, nothing more.
+- Actions `['Join Early Access', 'Join Newsletter']`; Solutions items
+  `['i_shop_preview', 'i_join_early_access']` (`i_early_access` gone).
+- `main` builds green (210 HTML files); rendered pages carry both the
+  `data-desktop-header-actions` and `data-mobile-header-actions` containers
+  with `data-newsletter-cta` on the newsletter button in each.
+- Phase 1 exit drill (publish-review-lifecycle, 5 scenarios) and Phase 0
+  drill (object-lifecycle, incl. HTTP↔MCP conflict parity) both pass.
+
+The only remaining 'Early Access' label anywhere in the chrome is the
+`nav_footer` g_next_steps link — untouched by design; it is the very item
+T2.7's drill edits (§6).
