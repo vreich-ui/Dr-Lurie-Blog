@@ -1,0 +1,113 @@
+{
+  "__generated": {
+    "at": "2026-07-06T10:02:39.748Z",
+    "from": "objects/navigation/by-id/nav_footer_home.json",
+    "record_version": 8
+  },
+  "brand": {
+    "descriptor": "Healthy Skin for Skincare Newcomers",
+    "text": "Dr. Lurié Skin Care"
+  },
+  "footNote": "\n    Educational content only — not medical advice. © Dr. Lurié.\n  ",
+  "groups": [
+    {
+      "id": "g_start_learning",
+      "items": [
+        {
+          "id": "i_start_here",
+          "label": "Start Here",
+          "target": {
+            "href": "/start-here",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_library",
+          "label": "Library",
+          "target": {
+            "kind": "listing",
+            "list": "content_index"
+          }
+        },
+        {
+          "id": "i_topics",
+          "label": "Topics",
+          "target": {
+            "href": "/learn/topics",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_free_guide",
+          "label": "Free Guide",
+          "target": {
+            "href": "/guides/free-guide",
+            "kind": "route"
+          }
+        }
+      ],
+      "title": "Start learning"
+    },
+    {
+      "id": "g_connect",
+      "items": [
+        {
+          "id": "i_about",
+          "label": "About",
+          "target": {
+            "href": "/about",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_newsletter",
+          "label": "Newsletter",
+          "target": {
+            "href": "/newsletter",
+            "kind": "route"
+          }
+        }
+      ],
+      "title": "Connect"
+    },
+    {
+      "id": "g_secondary",
+      "items": [
+        {
+          "id": "i_terms",
+          "label": "Terms",
+          "target": {
+            "href": "/terms",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_privacy",
+          "label": "Privacy",
+          "target": {
+            "href": "/privacy",
+            "kind": "route"
+          }
+        }
+      ],
+      "slot": "secondary"
+    },
+    {
+      "id": "g_social",
+      "items": [
+        {
+          "ariaLabel": "RSS",
+          "icon": "tabler:rss",
+          "id": "i_rss",
+          "label": "RSS",
+          "target": {
+            "href": "/rss.xml",
+            "kind": "asset"
+          }
+        }
+      ],
+      "slot": "social"
+    }
+  ],
+  "role": "footer"
+}
