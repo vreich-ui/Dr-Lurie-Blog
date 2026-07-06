@@ -18,9 +18,9 @@
  * render the audited placeholder copy byte-identically. Deprecated-on-arrival;
  * retired by the post-cutover switch task.
  *
- * Deliberately ABSENT: M-8 (content_grid manual-primary + query fallback,
- * i.e. `fallback` on the manual source). That refinement is T3.3 and lands
- * with the homepage work — do not add it here.
+ * M-8 (content_grid manual-primary + query fallback) landed at T3.3: the
+ * manual source carries an optional `fallback` query; resolution semantics
+ * live in src/lib/renderer/resolve-content-grid.ts.
  *
  * Reference integrity (shared_ref targets exist and are sections, manual grid
  * items resolve, query terms exist — C§2.0/C§2.3) is the validation pipeline's
@@ -77,8 +77,21 @@ const sectionVariant = <TType extends string, TData extends z.ZodRawShape>(type:
 
 export const contentGridSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('query'), query: contentQuerySchema }).strict(),
-  // NOTE: no `fallback` here — that is amendment M-8, deliberately deferred to T3.3.
-  z.object({ kind: z.literal('manual'), items: z.array(z.string().min(1)) }).strict(),
+  // M-8 (settled S-1, applied at T3.3): manual-primary with optional query
+  // fallback. Resolution order (src/lib/renderer/resolve-content-grid.ts):
+  // manual refs first — each MUST resolve to a published content item — then
+  // fallback-query backfill up to `limit`, de-duplicated against the manual
+  // picks. An empty manual list with a fallback is pure-fallback by design.
+  z
+    .object({
+      kind: z.literal('manual'),
+      items: z.array(z.string().min(1)),
+      fallback: z
+        .object({ kind: z.literal('query'), query: contentQuerySchema })
+        .strict()
+        .optional(),
+    })
+    .strict(),
   // Transitional (P3 cutover): renders placeholder copy verbatim; deprecated-on-arrival.
   z
     .object({

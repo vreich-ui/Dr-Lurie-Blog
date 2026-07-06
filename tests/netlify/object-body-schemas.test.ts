@@ -306,7 +306,7 @@ test('sections: unknown types, bad ids, and shadow-copy shared_refs are rejected
   );
 });
 
-test('content_grid: query, manual, and transitional static sources parse; M-8 fallback is NOT yet legal', () => {
+test('content_grid: query, manual (with M-8 fallback), and transitional static sources parse', () => {
   assert.equal(contentGridSourceSchema.safeParse({ kind: 'query', query: {} }).success, true);
   assert.equal(
     contentGridSourceSchema.safeParse({ kind: 'manual', items: ['req_smoke_pdf_cta_20260630_01'] }).success,
@@ -323,15 +323,25 @@ test('content_grid: query, manual, and transitional static sources parse; M-8 fa
     }).success,
     true
   );
-  // M-8 (manual-primary + query fallback) is T3.3 — deliberately absent here.
+  // M-8 (manual-primary + query fallback), landed at T3.3: an empty manual
+  // list with a fallback is the legal pure-fallback configuration.
   assert.equal(
     contentGridSourceSchema.safeParse({
       kind: 'manual',
       items: [],
       fallback: { kind: 'query', query: {} },
     }).success,
+    true,
+    'M-8 fallback is legal as of T3.3'
+  );
+  assert.equal(
+    contentGridSourceSchema.safeParse({
+      kind: 'manual',
+      items: [],
+      fallback: { kind: 'manual', items: [] },
+    }).success,
     false,
-    'M-8 fallback must not parse until T3.3 lands it'
+    'a fallback can only be a query — manual-in-manual is meaningless'
   );
   assert.equal(contentGridSourceSchema.safeParse({ kind: 'auto' }).success, false);
 });
