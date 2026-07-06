@@ -113,12 +113,28 @@ test('object tool input schemas declare the right required fields', async () => 
 
 // ═══ registry_get stub ═══════════════════════════════════════════════════════
 
-test('registry_get returns the not_yet_populated stub', async () => {
+test('registry_get returns the not_yet_populated stub for the component registry', async () => {
   const res = await callTool('registry_get', { registry: 'component' });
   assert.ok(!res.isError);
   assert.equal(res.structuredContent?.status, 'not_yet_populated');
   assert.equal(res.structuredContent?.available, false);
   assert.deepEqual(res.structuredContent?.definitions, []);
+});
+
+test("registry_get('page_type') serves the T3.1 definitions with the JSON-schema rendering", async () => {
+  const res = await callTool('registry_get', { registry: 'page_type' });
+  assert.ok(!res.isError);
+  assert.equal(res.structuredContent?.status, 'ok');
+  assert.equal(res.structuredContent?.available, true);
+  const definitions = res.structuredContent?.definitions as Array<{ id: string; reviewPolicy: { required: boolean } }>;
+  assert.deepEqual(
+    definitions.map((definition) => definition.id),
+    ['home', 'standard', 'system']
+  );
+  assert.ok(definitions.every((definition) => definition.reviewPolicy.required === true));
+  assert.deepEqual(res.structuredContent?.not_yet_implemented, ['listing', 'content_detail']);
+  const schema = res.structuredContent?.definition_schema as { type?: string };
+  assert.equal(schema.type, 'object');
 });
 
 // ═══ end-to-end proxy: create → get, and conflict surfacing ══════════════════

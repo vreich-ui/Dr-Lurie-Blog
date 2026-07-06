@@ -44,6 +44,11 @@ import {
 } from '../lib/artifact-index.js';
 import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
 import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
+import {
+  listPageTypeDefinitions,
+  pageTypeDefinitionJsonSchema,
+  unimplementedPageTypeIds,
+} from '../../src/lib/registry/page-types.js';
 
 const mediaPortabilityWarning =
   'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';
@@ -1347,7 +1352,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'registry_get',
     description:
-      'Read a code registry (component / page_type) definition. STUB: the registry is not yet populated — it lands in P3 — so this returns a not_yet_populated placeholder for now.',
+      "Read a code registry. registry: 'page_type' returns the T3.1 PageType definitions (route pattern, allowed/required sections, review policy) plus a JSON-schema rendering of the definition shape; 'component' is not yet populated (arrives with T3.2).",
     inputSchema: objectSchema({
       registry: { type: 'string', enum: ['component', 'page_type'], description: 'Optional registry name.' },
     }),
@@ -3589,15 +3594,35 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         review_state: input.review_state,
         pending_changes: input.pending_changes,
       });
-    case 'registry_get':
-      // STUB until P3 populates the code registries (component / page_type).
+    case 'registry_get': {
+      const registry = toNonEmptyString(input.registry) ?? null;
+      // T3.1: page_type is served from the code registry. component stays the
+      // T0.9 stub until T3.2 lands the per-section-type modules.
+      if (registry === 'page_type') {
+        return toolResult({
+          registry,
+          status: 'ok',
+          available: true,
+          definitions: listPageTypeDefinitions(),
+          not_yet_implemented: unimplementedPageTypeIds(),
+          definition_schema: pageTypeDefinitionJsonSchema(),
+        });
+      }
+      if (registry === null) {
+        return toolResult({
+          registries: ['page_type', 'component'],
+          available: ['page_type'],
+          message: "Pass registry: 'page_type' for definitions; 'component' is not yet populated (T3.2).",
+        });
+      }
       return toolResult({
-        registry: toNonEmptyString(input.registry) ?? null,
+        registry,
         status: 'not_yet_populated',
         available: false,
-        message: 'The code registry is not yet populated; it is introduced in Phase 3 (T3.1/T3.2).',
+        message: 'The component registry is not yet populated; it arrives with T3.2.',
         definitions: [],
       });
+    }
 
     default:
       break;
