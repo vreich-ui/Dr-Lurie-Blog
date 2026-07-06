@@ -100,27 +100,46 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     body: richTextSchema,
   }),
   // "This is for you if…" (A§2.1)
+  // M-9 (T3.2, 2026-07-06): optional `kicker` (the small uppercase lead-in
+  // line every audited homepage section renders) and `anchor` (the public
+  // DOM id, e.g. "audience" — content, not layout: it is URL-addressable)
+  // added to the four homepage variants. Without them the C§1.1 record
+  // cannot reproduce the audited markup and the T3.6 byte-identical
+  // cutover gate is unreachable. All additive-optional; no records of
+  // these types exist in production yet.
   sectionVariant('checklist', {
+    kicker: z.string().optional(),
     heading: z.string().optional(),
     items: z.array(z.string()),
+    anchor: z.string().optional(),
   }),
   sectionVariant('bio', {
+    kicker: z.string().optional(),
     heading: z.string().min(1),
     portraitAssetRef: z.string().optional(),
     body: richTextSchema,
     trustNotes: z.array(z.string()),
+    // M-9: the audited "Educational content only. Not medical advice." line.
+    disclaimer: z.string().optional(),
+    anchor: z.string().optional(),
   }),
   // Replaces the placeholder grid (A§2.1).
   sectionVariant('content_grid', {
+    kicker: z.string().optional(),
     heading: z.string().optional(),
+    // M-9: the audited intro paragraph under the grid heading.
+    body: richTextSchema.optional(),
     source: contentGridSourceSchema,
     limit: z.number().int().positive(),
+    anchor: z.string().optional(),
   }),
   sectionVariant('newsletter_signup', {
+    kicker: z.string().optional(),
     heading: z.string().min(1),
     body: richTextSchema.optional(),
     formName: z.string().min(1),
     consentText: z.string().optional(),
+    anchor: z.string().optional(),
   }),
   sectionVariant('contact_form', {
     formName: z.string().min(1),
