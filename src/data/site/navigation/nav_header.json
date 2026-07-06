@@ -1,0 +1,131 @@
+{
+  "__generated": {
+    "at": "2026-07-06T09:54:09.676Z",
+    "from": "objects/navigation/by-id/nav_header.json",
+    "record_version": 8
+  },
+  "actions": [
+    {
+      "label": "Join Early Access",
+      "style": "primary",
+      "target": {
+        "href": "/solutions/early-access",
+        "kind": "route"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "id": "g_start_here",
+      "items": [
+        {
+          "description": "A science-first overview of what changes in skin after 60.",
+          "id": "i_home",
+          "label": "Home",
+          "target": {
+            "href": "/",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Meet the biophysicist behind the age-aware approach.",
+          "id": "i_about",
+          "label": "About Dr. Lurié",
+          "target": {
+            "href": "/about",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Begin with the simplest path through Dr. Lurié skin health education.",
+          "id": "i_start_here_guide",
+          "label": "Start Here guide",
+          "target": {
+            "href": "/start-here",
+            "kind": "route"
+          }
+        }
+      ],
+      "target": {
+        "href": "/",
+        "kind": "route"
+      },
+      "title": "Start Here"
+    },
+    {
+      "id": "g_learn",
+      "items": [
+        {
+          "description": "Browse all skin science articles and practical explainers.",
+          "id": "i_library",
+          "label": "Education Library",
+          "target": {
+            "kind": "listing",
+            "list": "content_index"
+          }
+        },
+        {
+          "description": "Explore articles grouped by their category frontmatter topics.",
+          "id": "i_topics",
+          "label": "Topics",
+          "target": {
+            "href": "/learn/topics",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Get the structured guide to aging skin and body odor changes.",
+          "id": "i_free_guide",
+          "label": "Free Guide",
+          "target": {
+            "href": "/guides/free-guide",
+            "kind": "route"
+          }
+        }
+      ],
+      "target": {
+        "kind": "listing",
+        "list": "content_index"
+      },
+      "title": "Learn"
+    },
+    {
+      "id": "g_solutions",
+      "items": [
+        {
+          "description": "See the upcoming age-aware skincare product direction.",
+          "id": "i_shop_preview",
+          "label": "Shop Preview",
+          "target": {
+            "href": "/solutions/shop-preview",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Join updates as research-led solutions become available.",
+          "id": "i_early_access",
+          "label": "Early Access",
+          "target": {
+            "href": "/solutions/early-access",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Request launch notes, previews, and member-only product updates.",
+          "id": "i_join_early_access",
+          "label": "Join Early Access",
+          "target": {
+            "href": "/solutions/early-access",
+            "kind": "route"
+          }
+        }
+      ],
+      "target": {
+        "href": "/solutions/shop-preview",
+        "kind": "route"
+      },
+      "title": "Solutions"
+    }
+  ],
+  "role": "header"
+}
