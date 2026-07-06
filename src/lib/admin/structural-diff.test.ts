@@ -21,9 +21,7 @@ const navRecord = (): ObjectRecord => ({
     groups: [
       {
         id: 'g_primary',
-        items: [
-          { id: 'n_privacy', label: 'Privacy', target: { kind: 'external', href: 'https://drlurie.com/privacy' } },
-        ],
+        items: [{ id: 'n_privacy', label: 'Privacy', target: { kind: 'external', href: 'https://drlurie.com/privacy' } }],
       },
     ],
   },
@@ -89,10 +87,7 @@ describe('computeStructuralDiff', () => {
 
   it('classifies remove_section as removed', () => {
     const record = pageRecord();
-    const { record: applied } = applyPatchOps(record, [{ op: 'remove_section', section_id: 's_hero1' }], {
-      actor,
-      at: AT,
-    });
+    const { record: applied } = applyPatchOps(record, [{ op: 'remove_section', section_id: 's_hero1' }], { actor, at: AT });
 
     const diff = computeStructuralDiff(applied.history);
     assert.equal(diff.length, 1);
@@ -123,23 +118,13 @@ describe('computeStructuralDiff', () => {
     const record = navRecord();
     const withItem = applyPatchOps(
       record,
-      [
-        {
-          op: 'upsert_item',
-          group_id: 'g_primary',
-          item: { id: 'n_terms', label: 'Terms', target: { kind: 'external', href: 'https://drlurie.com/terms' } },
-        },
-      ],
+      [{ op: 'upsert_item', group_id: 'g_primary', item: { id: 'n_terms', label: 'Terms', target: { kind: 'external', href: 'https://drlurie.com/terms' } } }],
       { actor, at: AT }
     ).record;
-    const { record: removed } = applyPatchOps(
-      withItem,
-      [{ op: 'remove_item', group_id: 'g_primary', item_id: 'n_privacy' }],
-      {
-        actor,
-        at: AT,
-      }
-    );
+    const { record: removed } = applyPatchOps(withItem, [{ op: 'remove_item', group_id: 'g_primary', item_id: 'n_privacy' }], {
+      actor,
+      at: AT,
+    });
 
     const diff = computeStructuralDiff(removed.history);
     assert.equal(diff.length, 2);
@@ -159,13 +144,7 @@ describe('computeStructuralDiff', () => {
     };
     const { record: applied } = applyPatchOps(
       record,
-      [
-        {
-          op: 'add_term',
-          kind: 'category',
-          term: { term_id: 't_skincare', slug: 'skincare', label: 'Skincare', status: 'active' },
-        },
-      ],
+      [{ op: 'add_term', kind: 'category', term: { term_id: 't_skincare', slug: 'skincare', label: 'Skincare', status: 'active' } }],
       { actor, at: AT }
     );
 
@@ -189,12 +168,7 @@ describe('computeStructuralDiff', () => {
       object_id: 'tax_drlurie',
       object_type: 'taxonomy',
       schema_version: 'taxonomy.v1',
-      body: {
-        kinds: {
-          category: { terms: [{ term_id: 't_skincare', slug: 'skincare', label: 'Skincare', status: 'active' }] },
-          tag: { terms: [] },
-        },
-      },
+      body: { kinds: { category: { terms: [{ term_id: 't_skincare', slug: 'skincare', label: 'Skincare', status: 'active' }] }, tag: { terms: [] } } },
     };
     const { record: deprecated } = applyPatchOps(
       taxonomy,
@@ -234,10 +208,7 @@ describe('computeStructuralDiff', () => {
 
   it('each entry.entry carries exactly the {op, capture} the history stores, ready for the discard verb', () => {
     const record = pageRecord();
-    const { record: applied } = applyPatchOps(record, [{ op: 'remove_section', section_id: 's_hero1' }], {
-      actor,
-      at: AT,
-    });
+    const { record: applied } = applyPatchOps(record, [{ op: 'remove_section', section_id: 's_hero1' }], { actor, at: AT });
 
     const diff = computeStructuralDiff(applied.history);
     const stored = applied.history[applied.history.length - 1].details as { op: unknown; capture: unknown };

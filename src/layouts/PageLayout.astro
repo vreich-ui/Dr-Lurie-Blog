@@ -2,14 +2,7 @@
 import Layout from '~/layouts/Layout.astro';
 import Header from '~/components/widgets/Header.astro';
 import Footer from '~/components/widgets/Footer.astro';
-import { getEntry } from 'astro:content';
-import {
-  createNavTargetResolver,
-  navigationToFooterProps,
-  navigationToHeaderProps,
-  parseNavigationExport,
-} from '~/utils/navigation-data';
-import { getBlogPermalink } from '~/utils/permalinks';
+import { headerData, footerData } from '~/navigation';
 
 import type { MetaData } from '~/types';
 
@@ -18,25 +11,6 @@ export interface Props {
 }
 
 const { metadata } = Astro.props;
-
-// T2.5 cutover: header/footer render from the published navigation exports
-// (src/data/site/navigation/*.json, committed by the Tier 3 publish) through
-// the T2.4 prop adapter — same Header/Footer markup, new feed. There is
-// deliberately NO fallback to a hardcoded source: a missing export must fail
-// the build loudly, not half-feed the site (04 Part 2, "never leaves a
-// surface half-fed").
-const headerEntry = await getEntry('navigationObject', 'nav_header');
-const footerEntry = await getEntry('navigationObject', 'nav_footer');
-if (!headerEntry || !footerEntry) {
-  throw new Error(
-    'PageLayout: published navigation exports are missing (src/data/site/navigation/nav_header.json / ' +
-      'nav_footer.json). The T2.3 Tier 3 publish must land on this branch before the T2.5 cutover builds — ' +
-      'see docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4.'
-  );
-}
-const resolveNavTarget = createNavTargetResolver({ blogPermalink: getBlogPermalink() });
-const headerData = navigationToHeaderProps(parseNavigationExport(headerEntry.data), resolveNavTarget);
-const footerData = navigationToFooterProps(parseNavigationExport(footerEntry.data), resolveNavTarget);
 ---
 
 <Layout metadata={metadata}>

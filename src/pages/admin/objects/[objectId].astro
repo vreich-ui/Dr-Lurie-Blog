@@ -27,8 +27,8 @@ const metadata = {
         <p class="objects-kicker">Admin workspace</p>
         <h1 id="objects-title">{pageTitle}</h1>
         <p class="objects-intro">
-          See what an agent (or another editor) changed, approve or request changes, and — where you hold a publish role
-          — publish.
+          See what an agent (or another editor) changed, approve or request changes, and — where you hold a
+          publish role — publish.
         </p>
       </div>
     </header>
@@ -357,18 +357,12 @@ const metadata = {
       let lockState = { held: false };
 
       const setGatedContentVisible = (visible) => gatedContent.forEach((node) => (node.hidden = !visible));
-      const setAdminShellVisible = (visible) => {
-        if (adminShell) adminShell.hidden = !visible;
-      };
-      const setAuthStatus = (message) => {
-        if (authStatus) authStatus.textContent = message;
-      };
+      const setAdminShellVisible = (visible) => { if (adminShell) adminShell.hidden = !visible; };
+      const setAuthStatus = (message) => { if (authStatus) authStatus.textContent = message; };
 
       const setAuthState = (state) => {
         const isSignedIn = state === 'signed-in';
-        setAuthStatus(
-          state === 'checking' ? 'Checking editor access…' : state === 'error' ? 'Something went wrong.' : ''
-        );
+        setAuthStatus(state === 'checking' ? 'Checking editor access…' : state === 'error' ? 'Something went wrong.' : '');
         setAdminShellVisible(isSignedIn);
         setGatedContentVisible(isSignedIn);
         if (signinPrompt) signinPrompt.hidden = state !== 'signed-out';
@@ -416,8 +410,7 @@ const metadata = {
           return;
         }
         if (!inferred) {
-          el('not-found-message').textContent =
-            `Could not infer an object type from id "${segment}". Use the lookup form.`;
+          el('not-found-message').textContent = `Could not infer an object type from id "${segment}". Use the lookup form.`;
           showOnly(['lookup-panel', 'not-found-panel']);
           return;
         }
@@ -604,9 +597,7 @@ const metadata = {
       };
 
       const renderReviewStatus = () => {
-        el('review-state-text').textContent = record.review
-          ? `State: ${record.review.state}`
-          : 'Not yet submitted for review.';
+        el('review-state-text').textContent = record.review ? `State: ${record.review.state}` : 'Not yet submitted for review.';
         const decisionsList = el('decisions-list');
         decisionsList.innerHTML = '';
         for (const decision of record.review?.decisions ?? []) {
@@ -658,23 +649,13 @@ const metadata = {
       });
 
       el('approve-btn')?.addEventListener('click', async () => {
-        const result = await callObject({
-          action: 'review_decide',
-          object_type: objectType,
-          object_id: objectId,
-          decision: 'approve',
-        });
+        const result = await callObject({ action: 'review_decide', object_type: objectType, object_id: objectId, decision: 'approve' });
         setActionStatus(result.status === 200 ? 'Approved.' : result.body.error || 'Approve failed.');
         if (result.status === 200) await loadObject();
       });
 
       el('request-changes-btn')?.addEventListener('click', async () => {
-        const result = await callObject({
-          action: 'review_decide',
-          object_type: objectType,
-          object_id: objectId,
-          decision: 'request_changes',
-        });
+        const result = await callObject({ action: 'review_decide', object_type: objectType, object_id: objectId, decision: 'request_changes' });
         setActionStatus(result.status === 200 ? 'Changes requested.' : result.body.error || 'Request failed.');
         if (result.status === 200) await loadObject();
       });

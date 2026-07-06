@@ -56,6 +56,7 @@ const createStore = () => {
     },
   };
 };
+type Store = ReturnType<typeof createStore>;
 
 /** A fake Anthropic that records the tool it was handed and returns a fixed forced-tool suggestion. */
 const anthropicMock = (suggestion: Record<string, unknown>) => {

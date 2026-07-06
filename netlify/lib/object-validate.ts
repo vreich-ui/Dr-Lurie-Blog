@@ -29,10 +29,13 @@
  * dependent check is reported `optional` (not verifiable here) rather than
  * `missing` — T0.8 wires real resolvers; unit tests inject fakes.
  *
- * Nav *layout* rules (duplicate-target warnings, empty groups, depth ≤ 2,
- * nav-link-to-unpublished-page) were deliberately left out of T0.7 and land
- * here with T2.1 as `checkNavigationStructure`, dispatched through the same
- * structural-invariants group the page/taxonomy/template rules use.
+ * Scope boundary: nav *layout* rules (duplicate-target warnings, empty groups,
+ * depth ≤ 2, nav-link-to-unpublished-page) are deliberately NOT here — they are
+ * T2.1, which extends this pipeline. This file implements only the six global
+ * checks. The duplicate-nav-target warn-only case the brief cites as the
+ * canonical warn-vs-reject example therefore lands in T2.1; T0.7 demonstrates
+ * the same warn-vs-reject mechanism through the publish-gated structural
+ * invariant (≥1 visible section warns in draft, rejects at publish).
  *
  * Candidate patches: `validateObject` validates a finished body. The
  * `object_validate {candidate_patch?}` dry-run is `validateCandidatePatch`,
@@ -694,137 +697,6 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
   return criteria;
 };
 
-// ─── check 6c: navigation layout rules (T2.1, C§2.3-Navigation) ──────────────
-
-/** Canonical identity of a NavTarget for duplicate detection (key-order-free). */
-const targetKey = (target: Record<string, unknown>): string =>
-  JSON.stringify(
-    Object.keys(target)
-      .sort()
-      .map((key) => [key, target[key]])
-  );
-
-type NavItemish = Record<string, unknown>;
-
-const navItems = (value: unknown): NavItemish[] => (Array.isArray(value) ? value.filter(isRecord) : []);
-
-/**
- * Navigation structural rules (C§2.3-Navigation, finalized by T2.1):
- *
- * - empty groups rejected;
- * - depth ≤ 2 (a top-level item may carry children — one dropdown level, the
- *   only depth Header.astro renders, A§2.2 — but children may not nest);
- * - duplicate item targets *within a group* warn, never reject: the audited
- *   real nav ships 'Early Access' + 'Join Early Access' → the same route
- *   (C§1.7-4) and the contract must not declare the current site invalid.
- *   Deliberately scoped to item targets: an M-5 group target mirroring one of
- *   its own items is the audited dropdown-parent pattern ('Start Here' → '/'
- *   with item 'Home' → '/', C§1.2), and the action↔item duplication is the
- *   editorial T2.9 checkpoint — flagging either here would bury the one
- *   warning the seed verification pins ("exactly one warning class").
- * - `page`-kind targets must point at *published* pages at publish time (a
- *   nav link to an unpublished page 404s — hard failure), warn-only while
- *   drafting. Existence itself is check 3's job; `route`-kind passes through
- *   (Gap Note 2). Without a resolver the criterion reports `optional`.
- */
-export const checkNavigationStructure = (
-  body: unknown,
-  context: ObjectValidationContext,
-  atPublish: boolean
-): ReadinessCriterion[] => {
-  if (!isRecord(body) || !Array.isArray(body.groups)) {
-    return [
-      crit(
-        'nav_structure',
-        'Navigation structure',
-        'optional',
-        'Navigation body shape not recognized (see schema check).'
-      ),
-    ];
-  }
-
-  const emptyGroups: string[] = [];
-  const depthProblems: string[] = [];
-  const duplicateWarnings: string[] = [];
-
-  for (const group of body.groups) {
-    if (!isRecord(group)) continue;
-    const groupLabel = typeof group.title === 'string' && group.title ? group.title : String(group.id ?? '(no id)');
-    const items = navItems(group.items);
-
-    if (items.length === 0) emptyGroups.push(groupLabel);
-
-    // Depth: group → item (1) → children (2); a child with children is depth 3.
-    for (const item of items) {
-      for (const child of navItems(item.children)) {
-        if (navItems(child.children).length > 0) {
-          depthProblems.push(`group "${groupLabel}" item "${String(item.label ?? item.id)}" nests beyond depth 2.`);
-        }
-      }
-    }
-
-    // Duplicate item targets within this group (items + their children).
-    const seenTargets = new Map<string, string[]>();
-    const collect = (item: NavItemish) => {
-      if (isRecord(item.target)) {
-        const key = targetKey(item.target);
-        seenTargets.set(key, [...(seenTargets.get(key) ?? []), String(item.label ?? item.id ?? '(item)')]);
-      }
-      for (const child of navItems(item.children)) collect(child);
-    };
-    for (const item of items) collect(item);
-    for (const labels of seenTargets.values()) {
-      if (labels.length > 1) {
-        duplicateWarnings.push(
-          `group "${groupLabel}": ${labels.map((label) => `"${label}"`).join(' and ')} share one target.`
-        );
-      }
-    }
-  }
-
-  const criteria: ReadinessCriterion[] = [
-    emptyGroups.length === 0
-      ? crit('nav_groups', 'No empty groups', 'complete', '')
-      : crit('nav_groups', 'No empty groups', 'missing', `Empty group(s): ${emptyGroups.join(', ')}.`),
-    depthProblems.length === 0
-      ? crit('nav_depth', 'Depth ≤ 2', 'complete', '')
-      : crit('nav_depth', 'Depth ≤ 2', 'missing', depthProblems.slice(0, 5).join(' ')),
-    duplicateWarnings.length === 0
-      ? crit('nav_duplicates', 'Duplicate targets within a group', 'complete', '')
-      : crit('nav_duplicates', 'Duplicate targets within a group', 'warning', duplicateWarnings.slice(0, 5).join(' ')),
-  ];
-
-  // Published-page requirement for page-kind targets (anywhere in the body:
-  // items, children, M-5 group targets, actions).
-  if (!context.resolveObject) {
-    criteria.push(
-      crit('nav_published_targets', 'Page targets published', 'optional', 'No object resolver — not verified here.')
-    );
-    return criteria;
-  }
-  const unpublished: string[] = [];
-  walkObjects(body, (node) => {
-    if (node.kind === 'page' && typeof node.page === 'string') {
-      const resolution = context.resolveObject?.('page', node.page);
-      // Non-existence is check 3's hard failure; only "exists but unpublished" is ours.
-      if (resolution?.exists && !resolution.published) unpublished.push(node.page);
-    }
-  });
-  if (unpublished.length === 0) {
-    criteria.push(crit('nav_published_targets', 'Page targets published', 'complete', ''));
-  } else {
-    criteria.push(
-      crit(
-        'nav_published_targets',
-        'Page targets published',
-        atPublish ? 'missing' : 'warning',
-        `Nav links target unpublished page(s): ${[...new Set(unpublished)].join(', ')} — a published nav must not 404.`
-      )
-    );
-  }
-  return criteria;
-};
-
 export const checkStructuralInvariants = (
   objectType: ObjectType,
   body: unknown,
@@ -832,12 +704,12 @@ export const checkStructuralInvariants = (
   atPublish: boolean
 ): ReadinessCriterion[] => {
   // Structural invariants are type-specific. Pages carry the ≥1-visible-section
-  // + PageType rules below; taxonomy, template, and navigation carry their own
-  // rules (dispatched here so the pipeline keeps its single 'structure' group).
-  // content_item keeps its own ≥1-public-node rule on the article side (A§1.1).
+  // + PageType rules below; taxonomy and template carry their own registry
+  // integrity (dispatched here so the pipeline keeps its single 'structure'
+  // group). content_item keeps its own ≥1-public-node rule on the article side
+  // (A§1.1); navigation layout rules are T2.1 (see the file header).
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
   if (objectType === 'template') return checkTemplate(body, context);
-  if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
   if (objectType !== 'page') {
     return [crit('structure', 'Structural invariants', 'optional', 'No structural invariants for this type.')];
   }
