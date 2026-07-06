@@ -72,6 +72,7 @@ const OBJECT_TOOLS = [
   'object_checkin',
   'object_patch',
   'object_validate',
+  'object_inventory',
 ];
 
 const validPageBody = () => ({
@@ -142,6 +143,34 @@ test('object_create then object_get round-trips through the proxy to object-stor
   const got = await callTool('object_get', { object_type: 'page', object_id: 'page_home' });
   assert.ok(!got.isError);
   assert.equal((got.structuredContent?.record as { object_id: string }).object_id, 'page_home');
+});
+
+test('object_inventory proxies both the sweep and the single-object detail view', async () => {
+  await reset();
+  await callTool('object_create', {
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+
+  const sweep = await callTool('object_inventory', {});
+  assert.ok(!sweep.isError, JSON.stringify(sweep.structuredContent));
+  const rows = sweep.structuredContent?.objects as Array<{
+    object_id: string;
+    tier: number;
+    unpublished_changes: boolean;
+  }>;
+  assert.deepEqual(
+    rows.map((row) => [row.object_id, row.tier, row.unpublished_changes]),
+    [['page_home', 2, true]]
+  );
+
+  const detail = await callTool('object_inventory', { object_type: 'page', object_id: 'page_home' });
+  assert.ok(!detail.isError, JSON.stringify(detail.structuredContent));
+  const object = detail.structuredContent?.object as { site: string; history_length: number };
+  assert.equal(object.site, 'site_drlurie');
+  assert.equal(object.history_length, 1);
 });
 
 test('a not-found get surfaces as a tool error carrying the 404 status', async () => {

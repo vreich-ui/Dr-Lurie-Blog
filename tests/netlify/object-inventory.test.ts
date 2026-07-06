@@ -1,0 +1,336 @@
+/**
+ * Object inventory (Part 2): the read-only `inventory` verb and its pure
+ * derivation helpers. Everything is computed from what the existing verbs
+ * already persist — these tests pin the derivation rules:
+ *
+ *   - unpublished_changes: never published → true; published with the
+ *     receipt's content_revision equal to the record's → false; record
+ *     revision ahead of the receipt → true; receipt without a numeric
+ *     revision → true (conservative).
+ *   - lock: held only while the lease is active (an expired lock reports
+ *     free), holder identified WITHOUT the lock token.
+ *   - review_state 'none' distinguishes never-reviewed from an open review.
+ */
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  inventoryDetailFromRecord,
+  inventoryRowFromRecord,
+  matchesInventoryFilters,
+} from '../../netlify/lib/object-inventory.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
+import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+
+const NOW = Date.parse('2026-07-06T12:00:00.000Z');
+const AGENT: Principal = { kind: 'agent', agent_name: 'inventory-agent', auth: 'publish_key' };
+
+const createMemoryStore = () => {
+  const blobs = new Map<string, string>();
+  return {
+    blobs,
+    async get(key: string) {
+      return blobs.get(key) ?? null;
+    },
+    async setJSON(key: string, value: unknown) {
+      blobs.set(key, JSON.stringify(value));
+    },
+    async list({ prefix }: { prefix: string }) {
+      return { blobs: [...blobs.keys()].filter((key) => key.startsWith(prefix)).map((key) => ({ key })) };
+    },
+  };
+};
+type Store = ReturnType<typeof createMemoryStore>;
+
+const call = (store: Store, request: ObjectVerbRequest, principal: Principal = AGENT, nowMs = NOW) =>
+  handleObjectVerb(store as unknown as ObjectVerbStore, request, principal, { nowMs });
+
+const validPageBody = (title = 'Dr. Lurié') => ({
+  route: '/',
+  pageType: 'home',
+  title,
+  seo: { description: 'Science-first skincare.' },
+  sections: [{ id: 's_hero', type: 'hero', data: { heading: 'Hi', actions: [] } }],
+});
+
+const emptyTaxonomyBody = () => ({ kinds: { category: { terms: [] }, tag: { terms: [] } } });
+
+const baseRecord = (overrides: Partial<ObjectRecord> = {}): ObjectRecord => ({
+  object_id: 'page_sample',
+  object_type: 'page',
+  schema_version: 'page.v1',
+  site: 'site_drlurie',
+  created_at: '2026-07-01T00:00:00.000Z',
+  updated_at: '2026-07-01T00:00:00.000Z',
+  status: 'active',
+  body: {},
+  publication: { published_time: null },
+  history: [],
+  version: 3,
+  content_revision: 2,
+  ...overrides,
+});
+
+// ═══ derivation rules (pure) ══════════════════════════════════════════════════
+
+test('a never-published draft reports unpublished_changes with no receipt revision', () => {
+  const row = inventoryRowFromRecord(baseRecord(), NOW);
+  assert.equal(row.unpublished_changes, true);
+  assert.equal(row.published_time, null);
+  assert.equal(row.published_content_revision, null);
+  assert.equal(row.review_state, 'none');
+  assert.deepEqual(row.lock, { held: false });
+});
+
+test('tier derives from object_type: content_item 1, page 2, navigation 3', () => {
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW).tier, 1);
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW).tier, 2);
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW).tier, 3);
+});
+
+test('a published record with the receipt at the current revision reports no pending changes', () => {
+  const row = inventoryRowFromRecord(
+    baseRecord({
+      publication: {
+        published_time: '2026-07-05T00:00:00.000Z',
+        publish_receipt: { kind: 'object_export_commit', content_revision: 2 },
+      },
+    }),
+    NOW
+  );
+  assert.equal(row.unpublished_changes, false);
+  assert.equal(row.published_content_revision, 2);
+});
+
+test('a record edited after its last publish reports pending changes', () => {
+  const row = inventoryRowFromRecord(
+    baseRecord({
+      content_revision: 5,
+      publication: {
+        published_time: '2026-07-05T00:00:00.000Z',
+        publish_receipt: { kind: 'object_export_commit', content_revision: 2 },
+      },
+    }),
+    NOW
+  );
+  assert.equal(row.unpublished_changes, true);
+  assert.equal(row.published_content_revision, 2);
+});
+
+test('a published record whose receipt lacks a numeric revision reports pending changes (conservative)', () => {
+  const row = inventoryRowFromRecord(
+    baseRecord({ publication: { published_time: '2026-07-05T00:00:00.000Z', publish_receipt: { kind: 'legacy' } } }),
+    NOW
+  );
+  assert.equal(row.unpublished_changes, true);
+  assert.equal(row.published_content_revision, null);
+});
+
+test('lock state: active lease → held with holder and expiry but never the token; expired lease → free', () => {
+  const lock = {
+    token: 'secret-token',
+    owner_id: 'editor-1',
+    owner_label: 'editor@example.com',
+    acquired_at: '2026-07-06T11:50:00.000Z',
+    expires_at: '2026-07-06T12:05:00.000Z',
+  };
+  const held = inventoryRowFromRecord(baseRecord({ lock }), NOW);
+  assert.deepEqual(held.lock, {
+    held: true,
+    owner_id: 'editor-1',
+    owner_label: 'editor@example.com',
+    acquired_at: '2026-07-06T11:50:00.000Z',
+    expires_at: '2026-07-06T12:05:00.000Z',
+  });
+  assert.ok(!JSON.stringify(held.lock).includes('secret-token'), 'the lock token must never appear');
+
+  const expired = inventoryRowFromRecord(
+    baseRecord({ lock: { ...lock, expires_at: '2026-07-06T11:59:59.000Z' } }),
+    NOW
+  );
+  assert.deepEqual(expired.lock, { held: false });
+});
+
+test('matchesInventoryFilters composes tier, review_state, pending_changes, and status', () => {
+  const row = inventoryRowFromRecord(baseRecord(), NOW); // page: tier 2, review none, pending true, active
+  assert.equal(matchesInventoryFilters(row, {}), true);
+  assert.equal(matchesInventoryFilters(row, { tier: 2, review_state: 'none', pending_changes: true }), true);
+  assert.equal(matchesInventoryFilters(row, { tier: 3 }), false);
+  assert.equal(matchesInventoryFilters(row, { review_state: 'open' }), false);
+  assert.equal(matchesInventoryFilters(row, { pending_changes: false }), false);
+  assert.equal(matchesInventoryFilters(row, { status: 'archived' }), false);
+});
+
+test('the detail view adds envelope metadata without leaking the lock token', () => {
+  const detail = inventoryDetailFromRecord(
+    baseRecord({
+      review: { state: 'approved', decisions: [] },
+      history: [
+        { at: '2026-07-01T00:00:00.000Z', action: 'create', actor: AGENT },
+        { at: '2026-07-02T00:00:00.000Z', action: 'patch', actor: AGENT },
+      ] as unknown as ObjectRecord['history'],
+    }),
+    NOW
+  );
+  assert.equal(detail.site, 'site_drlurie');
+  assert.equal(detail.schema_version, 'page.v1');
+  assert.equal(detail.history_length, 2);
+  assert.equal(detail.review?.state, 'approved');
+  assert.equal(detail.publish_receipt, null);
+});
+
+// ═══ the inventory verb over the real store paths ═════════════════════════════
+
+test('inventory sweeps every type when object_type is omitted, sorted and filterable', async () => {
+  const store = createMemoryStore();
+  const pageA = await call(store, {
+    action: 'create',
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody('A'),
+  });
+  assert.equal(pageA.status, 200, JSON.stringify(pageA.body));
+  const taxonomy = await call(store, {
+    action: 'create',
+    object_type: 'taxonomy',
+    site: 'site_drlurie',
+    body: emptyTaxonomyBody(),
+  });
+  assert.equal(taxonomy.status, 200, JSON.stringify(taxonomy.body));
+
+  const sweep = await call(store, { action: 'inventory' });
+  assert.equal(sweep.status, 200);
+  const rows = sweep.body.objects as Array<Record<string, unknown>>;
+  assert.equal(rows.length, 2);
+  // Canonical type order: page before taxonomy.
+  assert.deepEqual(
+    rows.map((row) => row.object_type),
+    ['page', 'taxonomy']
+  );
+  assert.ok(typeof sweep.body.generated_at === 'string');
+
+  const tier3 = await call(store, { action: 'inventory', tier: 3 });
+  assert.deepEqual(
+    (tier3.body.objects as Array<Record<string, unknown>>).map((row) => row.object_type),
+    ['taxonomy']
+  );
+
+  const pending = await call(store, { action: 'inventory', pending_changes: true });
+  assert.equal((pending.body.objects as unknown[]).length, 2, 'nothing is published yet');
+  const published = await call(store, { action: 'inventory', pending_changes: false });
+  assert.equal((published.body.objects as unknown[]).length, 0);
+});
+
+test('inventory reflects live lock and review state through the real verbs', async () => {
+  const store = createMemoryStore();
+  const created = await call(store, {
+    action: 'create',
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+  });
+  const objectId = (created.body.record as ObjectRecord).object_id;
+
+  const checkout = await call(store, { action: 'checkout', object_type: 'page', object_id: objectId });
+  assert.equal(checkout.status, 200);
+  const lockToken = checkout.body.lockToken as string;
+
+  const locked = await call(store, { action: 'inventory', object_type: 'page' });
+  const lockedRow = (locked.body.objects as Array<Record<string, unknown>>)[0];
+  assert.deepEqual(
+    {
+      held: (lockedRow.lock as Record<string, unknown>).held,
+      owner: (lockedRow.lock as Record<string, unknown>).owner_id,
+    },
+    { held: true, owner: 'inventory-agent' }
+  );
+  assert.ok(!JSON.stringify(lockedRow).includes(lockToken), 'the lock token must never appear in inventory output');
+
+  const submitted = await call(store, {
+    action: 'submit_review',
+    object_type: 'page',
+    object_id: objectId,
+    lock_token: lockToken,
+    requested_publish_action: { published_time: 'immediate' },
+  });
+  assert.equal(submitted.status, 200, JSON.stringify(submitted.body));
+
+  const open = await call(store, { action: 'inventory', review_state: 'open' });
+  assert.deepEqual(
+    (open.body.objects as Array<Record<string, unknown>>).map((row) => row.object_id),
+    [objectId]
+  );
+
+  await call(store, { action: 'checkin', object_type: 'page', object_id: objectId, lock_token: lockToken });
+  const released = await call(store, { action: 'inventory', object_type: 'page' });
+  assert.deepEqual((released.body.objects as Array<Record<string, unknown>>)[0].lock, { held: false });
+});
+
+test('inventory pending_changes flips as a record is published and then edited past its receipt', async () => {
+  const store = createMemoryStore();
+  const created = await call(store, {
+    action: 'create',
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+  });
+  const record = created.body.record as ObjectRecord;
+
+  // Simulate T1.3's post-commit stamp: published_time + receipt at the
+  // current content_revision (the publish pipeline itself is covered by
+  // object-publish.test.ts; the inventory only reads the stamp).
+  const key = objectRecordKey('page', record.object_id);
+  const stored = JSON.parse(store.blobs.get(key)!) as ObjectRecord;
+  stored.publication = {
+    published_time: '2026-07-06T00:00:00.000Z',
+    publish_receipt: { kind: 'object_export_commit', content_revision: stored.content_revision },
+  };
+  store.blobs.set(key, JSON.stringify(stored));
+
+  const clean = await call(store, { action: 'inventory', object_type: 'page' });
+  assert.equal((clean.body.objects as Array<Record<string, unknown>>)[0].unpublished_changes, false);
+
+  const checkout = await call(store, { action: 'checkout', object_type: 'page', object_id: record.object_id });
+  const patched = await call(store, {
+    action: 'patch',
+    object_type: 'page',
+    object_id: record.object_id,
+    lock_token: checkout.body.lockToken as string,
+    expected_record_version: checkout.body.record_version as number,
+    ops: [{ op: 'set_page_meta', fields: { title: 'Dr. Lurié — updated' } }],
+  });
+  assert.equal(patched.status, 200, JSON.stringify(patched.body));
+
+  const dirty = await call(store, { action: 'inventory', object_type: 'page', pending_changes: true });
+  assert.deepEqual(
+    (dirty.body.objects as Array<Record<string, unknown>>).map((row) => row.object_id),
+    [record.object_id]
+  );
+});
+
+test('inventory single-object detail requires the type, 404s on a missing id, and returns envelope detail', async () => {
+  const store = createMemoryStore();
+  const created = await call(store, {
+    action: 'create',
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+  });
+  const objectId = (created.body.record as ObjectRecord).object_id;
+
+  const missingType = await call(store, { action: 'inventory', object_id: objectId });
+  assert.equal(missingType.status, 400);
+
+  const missing = await call(store, { action: 'inventory', object_type: 'page', object_id: 'page_ghost' });
+  assert.equal(missing.status, 404);
+
+  const detail = await call(store, { action: 'inventory', object_type: 'page', object_id: objectId });
+  assert.equal(detail.status, 200);
+  const object = detail.body.object as Record<string, unknown>;
+  assert.equal(object.object_id, objectId);
+  assert.equal(object.tier, 2);
+  assert.equal(object.site, 'site_drlurie');
+  assert.equal(object.history_length, 1);
+  assert.equal(object.unpublished_changes, true);
+});

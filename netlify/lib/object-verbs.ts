@@ -47,20 +47,24 @@ import { validateObjectIdForType } from '../../src/lib/object-ids.js';
 import { mintId, MintIdError } from '../../src/lib/object-ids-mint.js';
 import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
 import {
+  objectTypes,
   objectTypeSchema,
   type ObjectRecord,
   type ObjectType,
   type Principal,
 } from '../../src/schema/object-record-v1.js';
+import {
+  compareInventoryRows,
+  inventoryDetailFromRecord,
+  inventoryRowFromRecord,
+  matchesInventoryFilters,
+  type InventoryFilters,
+  type InventoryRow,
+} from './object-inventory.js';
 import { publishObject, type PublishObjectDeps } from './object-publish.js';
 import { checkPublishGate } from './tier-gate.js';
 import { resolveRolesForPrincipal } from './roles.js';
-import {
-  decideReview,
-  discardProposal,
-  publishActionSchema,
-  submitReview,
-} from './review-state.js';
+import { decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
 
@@ -80,6 +84,18 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     action: z.literal('list'),
     object_type: objectTypeSchema,
     status: z.enum(['active', 'archived']).optional(),
+  }),
+  z.object({
+    action: z.literal('inventory'),
+    // All filters optional: omit object_type to sweep every type. With
+    // object_id set (single-object detail), object_type is required — the
+    // handler enforces that pairing since zod unions can't express it here.
+    object_type: objectTypeSchema.optional(),
+    object_id: objectId.optional(),
+    status: z.enum(['active', 'archived']).optional(),
+    tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    review_state: z.enum(['none', 'open', 'changes_requested', 'approved']).optional(),
+    pending_changes: z.boolean().optional(),
   }),
   z.object({
     action: z.literal('create'),
@@ -310,6 +326,43 @@ export const handleObjectVerb = async (
         });
       }
       return ok({ objects });
+    }
+
+    case 'inventory': {
+      // Single-object detail view.
+      if (request.object_id) {
+        if (!request.object_type) {
+          return err(400, { error: 'inventory with object_id requires object_type.' });
+        }
+        const record = await loadRecord(store, objectRecordKey(request.object_type, request.object_id));
+        if (!record) return err(404, { error: 'Object record not found', not_found: true });
+        return ok({ object: inventoryDetailFromRecord(record, ts), generated_at: timestamp });
+      }
+
+      const filters: InventoryFilters = {
+        status: request.status,
+        tier: request.tier,
+        review_state: request.review_state,
+        pending_changes: request.pending_changes,
+      };
+      const types = request.object_type ? [request.object_type] : objectTypes;
+      const rows: InventoryRow[] = [];
+      for (const objectType of types) {
+        const listResult = await store.list({
+          prefix: `objects/${objectType}/by-id/`,
+          directories: false,
+          paginate: true,
+        });
+        const items = await collectBlobListItems(listResult);
+        for (const item of items) {
+          const record = await loadRecord(store, item.key);
+          if (!record) continue;
+          const row = inventoryRowFromRecord(record, ts);
+          if (matchesInventoryFilters(row, filters)) rows.push(row);
+        }
+      }
+      rows.sort(compareInventoryRows(objectTypes));
+      return ok({ objects: rows, generated_at: timestamp });
     }
 
     case 'create': {
