@@ -71,9 +71,22 @@ const run = (command, commandArgs, cwd) =>
 
 const log = (message) => console.log(`[build-diff] ${message}`);
 
+// Thrown instead of process.exit(2) inside the worktree-holding flow so the
+// finally-cleanup always runs; the bottom-level wrapper maps it to exit 2.
+class BuildDiffError extends Error {}
+
 const buildSite = (dir, label) => {
   log(`building ${label} …`);
   const startedAt = Date.now();
+  // Astro 5's content-layer data store persists in node_modules/.astro —
+  // which every worktree SHARES through the node_modules symlink, and the
+  // glob loader does not purge store entries whose files vanished. Without
+  // this reset, one side's synced content bleeds into the other side's build
+  // (e.g. a file deleted on one ref still renders from the stale store) and
+  // the diff silently under-reports. The store is purged before every build
+  // so each side syncs exactly what is on its own disk; the sibling assets/
+  // cache is content-addressed and safe to keep (it only speeds up images).
+  fs.rmSync(path.join(repoRoot, 'node_modules', '.astro', 'data-store.json'), { force: true });
   try {
     execSync('npm run build', {
       cwd: dir,
@@ -95,7 +108,7 @@ const buildSite = (dir, label) => {
         .slice(-30)
         .join('\n')
     );
-    process.exit(2);
+    throw new BuildDiffError(`build failed for ${label}`);
   }
   log(`built ${label} in ${Math.round((Date.now() - startedAt) / 1000)}s`);
 };
@@ -104,8 +117,7 @@ const buildSite = (dir, label) => {
 const snapshotDist = (dir) => {
   const distDir = path.join(dir, 'dist');
   if (!fs.existsSync(distDir)) {
-    console.error(`[build-diff] no dist/ found under ${dir}`);
-    process.exit(2);
+    throw new BuildDiffError(`no dist/ found under ${dir}`);
   }
   const pages = new Map();
   const walk = (current) => {
@@ -240,8 +252,7 @@ const runSelfTest = () => {
   const target = path.join(wt, SELF_TEST_FILE);
   const source = fs.readFileSync(target, 'utf8');
   if (!source.includes(SELF_TEST_NEEDLE)) {
-    console.error(`[build-diff] self-test needle not found in ${SELF_TEST_FILE}; update SELF_TEST_NEEDLE.`);
-    process.exit(2);
+    throw new BuildDiffError(`self-test needle not found in ${SELF_TEST_FILE}; update SELF_TEST_NEEDLE.`);
   }
   fs.writeFileSync(target, source.replace(SELF_TEST_NEEDLE, SELF_TEST_MUTATION));
   buildSite(wt, 'self-test build #3 (mutated copy)');
@@ -264,10 +275,13 @@ const runSelfTest = () => {
 
 // ─── main ─────────────────────────────────────────────────────────────────────
 
-try {
-  if (selfTest) {
-    process.exit(runSelfTest() ? 0 : 1);
-  }
+// process.exit() skips `finally`, so the main flow sets process.exitCode and
+// returns instead — otherwise every run leaks its temp worktrees (observed:
+// one stale `git worktree` entry per run before this guard existed). A prune
+// on startup self-heals any entries a crashed run left behind.
+
+const main = () => {
+  if (selfTest) return runSelfTest() ? 0 : 1;
 
   const baseDir = addWorktree(baseRef, 'base');
   let headDir = repoRoot;
@@ -285,7 +299,20 @@ try {
   const result = comparePages(basePages, headPages);
   writeReport(result, basePages, headPages, { base: baseRef, head: headLabel });
   const clean = printSummary(result);
-  process.exit(clean ? 0 : 1);
+  return clean ? 0 : 1;
+};
+
+try {
+  run('git', ['worktree', 'prune'], repoRoot);
+} catch {
+  /* best effort */
+}
+try {
+  process.exitCode = main();
+} catch (error) {
+  if (!(error instanceof BuildDiffError)) throw error;
+  console.error(`[build-diff] ${error.message}`);
+  process.exitCode = 2;
 } finally {
   removeWorktrees();
 }
