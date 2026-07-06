@@ -72,6 +72,7 @@ const OBJECT_TOOLS = [
   'object_checkin',
   'object_patch',
   'object_validate',
+  'object_inventory',
 ];
 
 const validPageBody = () => ({
@@ -112,12 +113,28 @@ test('object tool input schemas declare the right required fields', async () => 
 
 // ═══ registry_get stub ═══════════════════════════════════════════════════════
 
-test('registry_get returns the not_yet_populated stub', async () => {
+test('registry_get returns the not_yet_populated stub for the component registry', async () => {
   const res = await callTool('registry_get', { registry: 'component' });
   assert.ok(!res.isError);
   assert.equal(res.structuredContent?.status, 'not_yet_populated');
   assert.equal(res.structuredContent?.available, false);
   assert.deepEqual(res.structuredContent?.definitions, []);
+});
+
+test("registry_get('page_type') serves the T3.1 definitions with the JSON-schema rendering", async () => {
+  const res = await callTool('registry_get', { registry: 'page_type' });
+  assert.ok(!res.isError);
+  assert.equal(res.structuredContent?.status, 'ok');
+  assert.equal(res.structuredContent?.available, true);
+  const definitions = res.structuredContent?.definitions as Array<{ id: string; reviewPolicy: { required: boolean } }>;
+  assert.deepEqual(
+    definitions.map((definition) => definition.id),
+    ['home', 'standard', 'system']
+  );
+  assert.ok(definitions.every((definition) => definition.reviewPolicy.required === true));
+  assert.deepEqual(res.structuredContent?.not_yet_implemented, ['listing', 'content_detail']);
+  const schema = res.structuredContent?.definition_schema as { type?: string };
+  assert.equal(schema.type, 'object');
 });
 
 // ═══ end-to-end proxy: create → get, and conflict surfacing ══════════════════
@@ -142,6 +159,34 @@ test('object_create then object_get round-trips through the proxy to object-stor
   const got = await callTool('object_get', { object_type: 'page', object_id: 'page_home' });
   assert.ok(!got.isError);
   assert.equal((got.structuredContent?.record as { object_id: string }).object_id, 'page_home');
+});
+
+test('object_inventory proxies both the sweep and the single-object detail view', async () => {
+  await reset();
+  await callTool('object_create', {
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+
+  const sweep = await callTool('object_inventory', {});
+  assert.ok(!sweep.isError, JSON.stringify(sweep.structuredContent));
+  const rows = sweep.structuredContent?.objects as Array<{
+    object_id: string;
+    tier: number;
+    unpublished_changes: boolean;
+  }>;
+  assert.deepEqual(
+    rows.map((row) => [row.object_id, row.tier, row.unpublished_changes]),
+    [['page_home', 2, true]]
+  );
+
+  const detail = await callTool('object_inventory', { object_type: 'page', object_id: 'page_home' });
+  assert.ok(!detail.isError, JSON.stringify(detail.structuredContent));
+  const object = detail.structuredContent?.object as { site: string; history_length: number };
+  assert.equal(object.site, 'site_drlurie');
+  assert.equal(object.history_length, 1);
 });
 
 test('a not-found get surfaces as a tool error carrying the 404 status', async () => {

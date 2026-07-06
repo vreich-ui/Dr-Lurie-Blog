@@ -17,11 +17,11 @@ publishes it documents.
 | T2.2 seed script           | **done (offline)** — data + script committed, validated locally; **`--execute` not yet run against production** | `scripts/seed-navigation.mjs`                                                        |
 | T2.3 first Tier 3 publish  | **agent side scripted; human side is yours** — see below                                                        | `scripts/submit-navigation-review.mjs`                                               |
 | T2.4 prop adapter          | **done** — deep-equals the current literals                                                                     | `src/utils/navigation-data.ts`                                                       |
-| T2.5 cutover commit        | **code committed on the branch + rehearsed to an empty diff locally**; the real gate re-runs after your publish | this runbook §4                                                                      |
+| T2.5 cutover commit        | **done** — merged via #361; post-merge gate PASSED against the real published exports (210/210 EMPTY DIFF)      | this runbook §4                                                                      |
 | T2.6 observation + cleanup | **PARKED** — waits for your production-observation confirmation                                                 | §5                                                                                   |
-| T2.7 agent-flow drill      | scripted click-path below; needs the live Tier 3 flow + you                                                     | §6                                                                                   |
-| T2.8 S-2 newsletter CTA    | **scripted + chrome commit ready, NOT merged** — combined with T2.9 below                                       | §7                                                                                   |
-| T2.9 Solutions dedupe      | **DECIDED (Wolf, 2026-07-06)**: scripted; combined into the same patch as T2.8                                  | §7                                                                                   |
+| T2.7 agent-flow drill      | **agent side scripted** (`scripts/drill-footer-cta.mjs`, both legs, offline-verified); human clicks are yours   | §6                                                                                   |
+| T2.8 S-2 newsletter CTA    | **done** — data published (`e09e608`) + chrome merged (#362); both CTAs live on every device — see §7 record    | §7                                                                                   |
+| T2.9 Solutions dedupe      | **done** — `i_early_access` removed from the live record (same publish, record_version 20) — see §7 record      | §7                                                                                   |
 
 Environment for every script below (run from the repo root, never in a browser
 context):
@@ -133,20 +133,41 @@ dist change, listed here so it is never mistaken for a regression).
 
 ## 6. T2.7 — acceptance drill: "update the footer CTA"
 
-Needs the live flow (post-T2.5) and your review clicks. Agent side (curl-level
-calls against `object-store`; an MCP agent uses the same-named `object_*`
-tools for everything except submit/publish, which are HTTP actions):
+The drill proves the full agent-edit workflow on the live Tier 3 flow with a
+deliberately trivial change: the `nav_footer` 'Early Access' link
+(`g_next_steps` / `i_early_access`) becomes 'Get Early Access', goes through
+your review + publish, and is then reverted through the exact same cycle.
+Both records' history entries (checkout → patch → submit → approve →
+publish, with actors) are the acceptance evidence.
 
-1. `{action:'checkout', object_type:'navigation', object_id:'nav_footer'}` → `lockToken`, `record_version`
-2. `{action:'patch', …, lock_token, expected_record_version, ops:[{op:'update_item', group_id:'g_next_steps', item_id:'i_early_access', fields:{label:'Get Early Access'}}]}`
-3. `{action:'validate', object_type:'navigation', object_id:'nav_footer'}` → eligible, same single-warning profile
-4. `{action:'submit_review', …, note:'T2.7 drill: footer CTA label'}` → checkin
-5. **You:** field diff at `/admin/objects/nav_footer` shows exactly the label
-   word-diff → approve → publish → the live footer shows "Get Early Access".
-6. Revert the same way (`fields:{label:'Early Access'}`), through the same
-   review + publish. Attach both records' history (checkout → patch →
-   submit → approve → publish, with actors) to the task notes — that history
-   _is_ the acceptance evidence.
+Agent side is fully scripted — `scripts/drill-footer-cta.mjs`, same
+pre-flight discipline as the T2.8+T2.9 patch script (each leg refuses to run
+unless the live record is in that leg's expected starting shape, so reruns
+are safe). Both legs are offline-verified against the real T0.6/T0.7 engine
+in `tests/netlify/nav-footer-t27-drill.test.ts`, including that the revert
+restores the seed body byte-exactly. Expect **zero warnings** at every step —
+a label-only change cannot introduce a duplicate target (the earlier
+"single-warning profile" note in this section referred to `nav_header`;
+`nav_footer`'s profile is and stays empty).
+
+Ordered checklist — agent steps are safe to run any time; steps marked
+**YOU** are yours alone:
+
+1. Agent (or you): `node scripts/drill-footer-cta.mjs --verify` — expect
+   `BASELINE — label 'Early Access'`.
+2. Agent: `node scripts/drill-footer-cta.mjs --execute-forward` — checkout →
+   patch → Tier 3 refusal check (403 required) → submit_review → checkin.
+3. **YOU:** at `/admin/objects/nav_footer` the field diff shows exactly the
+   one-word label diff → approve → publish. The live footer (every page
+   except the homepage, which uses `nav_footer_home`) shows "Get Early
+   Access".
+4. Agent: `node scripts/drill-footer-cta.mjs --execute-revert` — same cycle,
+   label back to 'Early Access'.
+5. **YOU:** review + approve + publish again. The footer is back to
+   "Early Access" and `nav_footer`'s export on `main` should be byte-identical
+   to its pre-drill state.
+6. Attach both records' history entries to the task notes — that history
+   _is_ the acceptance evidence. T2.7 is then done.
 
 ## 7. T2.8 + T2.9 — combined nav_header patch (both decided, both scripted)
 
@@ -201,3 +222,33 @@ Side effects to expect after step 2, both by design: `seed-navigation.mjs
 --execute` re-runs will refuse with "already exists with a DIFFERENT body"
 for `nav_header` — correct, the draft has legitimately moved past the
 migration snapshot.
+
+### §7 EXECUTED (2026-07-06) — record of what actually happened
+
+Both halves are live on `main`, but they landed in the WRONG order — recorded
+here so the near-miss isn't forgotten:
+
+1. The chrome commit merged **first** (PR #362 → `c3b2de5`), before the data
+   publish, despite the hold note — exactly the rehearsed regression ordering.
+   For the window it was live alone, the mobile menu's newsletter CTA was
+   replaced by 'Join Early Access'.
+2. Wolf then ran `patch-nav-header-t28-t29.mjs --execute` + approve + publish,
+   producing `e09e608 Publish navigation: nav_header` (record_version 20) —
+   closing the window and completing the intended end state.
+
+End state verified against real state (not reports), 2026-07-06:
+
+- `origin/main:src/data/site/navigation/nav_header.json` body deep-equals
+  `applyPatchOps(seed, NAV_HEADER_T28_T29_OPS)` exactly — the published data
+  IS the reviewed patch, nothing more.
+- Actions `['Join Early Access', 'Join Newsletter']`; Solutions items
+  `['i_shop_preview', 'i_join_early_access']` (`i_early_access` gone).
+- `main` builds green (210 HTML files); rendered pages carry both the
+  `data-desktop-header-actions` and `data-mobile-header-actions` containers
+  with `data-newsletter-cta` on the newsletter button in each.
+- Phase 1 exit drill (publish-review-lifecycle, 5 scenarios) and Phase 0
+  drill (object-lifecycle, incl. HTTP↔MCP conflict parity) both pass.
+
+The only remaining 'Early Access' label anywhere in the chrome is the
+`nav_footer` g_next_steps link — untouched by design; it is the very item
+T2.7's drill edits (§6).

@@ -43,7 +43,26 @@ export const reviewStateSchema = z.object({
 });
 export type ReviewState = z.infer<typeof reviewStateSchema>;
 
-export const publishReceiptSchema = z.record(z.string(), z.unknown());
+// The exact shape T1.3's buildReceipt (netlify/lib/object-publish.ts) writes —
+// tightened from a loose z.record (Wolf-approved, 2026-07-06) so consumers
+// like the object inventory can rely on `content_revision`. Non-strict on
+// purpose: unknown extra fields from future writers parse fine (and are
+// stripped only if something actually round-trips a parse, which no
+// production read path does today).
+export const publishReceiptSchema = z.object({
+  kind: z.literal('object_export_commit'),
+  branch: z.string(),
+  commit_sha: z.string(),
+  tree_sha: z.string(),
+  no_op: z.boolean(),
+  attempts: z.number().int().positive(),
+  files: z.array(z.string()),
+  /** The content_revision this export was materialized from. */
+  content_revision: z.number(),
+  /** The __generated marker's `at` — the effective published_time. */
+  exported_at: z.string(),
+});
+export type PublishReceipt = z.infer<typeof publishReceiptSchema>;
 
 export const publicationStateSchema = z.object({
   published_time: z.string().nullable(),

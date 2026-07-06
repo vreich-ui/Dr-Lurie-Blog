@@ -1,0 +1,42 @@
+---
+/**
+ * `bio` section component (T3.2) — markup verbatim from the audited
+ * "Meet Dr. Lurié" homepage section (index.astro, A§2.1). The lead paragraph
+ * class belongs to this component (first body paragraph renders large);
+ * trust notes render as accent-bordered lines; the disclaimer is data (M-9).
+ * `portraitAssetRef` is schema-legal but unrendered until a design uses it.
+ */
+import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
+import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'bio'>;
+  resolved: EmptyResolved;
+  ctx: RenderCtx;
+};
+
+const { data } = Astro.props;
+const paragraphs = splitRichTextParagraphs(data.body);
+---
+
+<section id={data.anchor} class="mx-auto max-w-5xl border-t border-gray-200 px-4 py-14 sm:px-6 dark:border-gray-800">
+  <div class="grid grid-cols-1 gap-8 md:grid-cols-[0.9fr_1.1fr]">
+    <div>
+      {data.kicker && <p class="text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+      <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">{data.heading}</h2>
+    </div>
+    <div>
+      {paragraphs.map((paragraph) => <p class="text-lg leading-8 text-default" set:html={paragraph} />)}
+      {
+        data.trustNotes.length > 0 && (
+          <ul class="mt-6 space-y-3 text-muted">
+            {data.trustNotes.map((note) => (
+              <li class="border-l-2 border-accent/40 pl-4">{note}</li>
+            ))}
+          </ul>
+        )
+      }
+      {data.disclaimer && <p class="mt-6 text-sm text-muted">{data.disclaimer}</p>}
+    </div>
+  </div>
+</section>

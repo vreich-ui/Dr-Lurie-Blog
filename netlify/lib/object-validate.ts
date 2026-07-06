@@ -348,20 +348,23 @@ export const checkReferenceIntegrity = (
       }
       if (node.type === 'content_grid' && isRecord(data.source)) {
         const source = data.source;
+        const requireQueryTerms = (query: unknown, label: string) => {
+          if (!isRecord(query)) return;
+          if (typeof query.category === 'string') requireTerm('category', query.category, `${label}.category`);
+          if (Array.isArray(query.tags)) {
+            for (const tag of query.tags) if (typeof tag === 'string') requireTerm('tag', tag, `${label}.tags`);
+          }
+        };
         if (source.kind === 'manual' && Array.isArray(source.items)) {
           for (const item of source.items) {
             if (typeof item === 'string') requireObject('content_item', item, 'content_grid manual item');
           }
+          // M-8: the fallback query's terms are validated exactly like a
+          // primary query's — an unknown term in the backfill is as wrong
+          // as one in the main source.
+          if (isRecord(source.fallback)) requireQueryTerms(source.fallback.query, 'content_grid fallback query');
         }
-        if (source.kind === 'query' && isRecord(source.query)) {
-          const query = source.query;
-          if (typeof query.category === 'string')
-            requireTerm('category', query.category, 'content_grid query.category');
-          if (Array.isArray(query.tags)) {
-            for (const tag of query.tags)
-              if (typeof tag === 'string') requireTerm('tag', tag, 'content_grid query.tags');
-          }
-        }
+        if (source.kind === 'query') requireQueryTerms(source.query, 'content_grid query');
       }
     }
   });

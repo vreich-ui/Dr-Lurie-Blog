@@ -44,6 +44,11 @@ import {
 } from '../lib/artifact-index.js';
 import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
 import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
+import {
+  listPageTypeDefinitions,
+  pageTypeDefinitionJsonSchema,
+  unimplementedPageTypeIds,
+} from '../../src/lib/registry/page-types.js';
 
 const mediaPortabilityWarning =
   'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';
@@ -1038,7 +1043,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'trigger_netlify_build',
     description:
-      'Manually trigger a Netlify build via the server-side build hook, without needing a new git commit. No input is required. This QUEUES a build asynchronously — it does not wait for the build to finish, so poll deploy_status afterward (the same way you already do after a normal publish) to know when the resulting deploy is actually ready. IMPORTANT — batch, do not spam: each triggered build consumes real Netlify build minutes, so use this to batch multiple publishes into a single build rather than triggering one build per publish. For example, after publishing several articles in a row, call this once at the end instead of calling it after every individual save_json_blob_publish_by_time call. Optional reason is recorded only in this function\'s own server-side logs for traceability of who triggered a build and why — it is never sent to Netlify and never included in the response.',
+      "Manually trigger a Netlify build via the server-side build hook, without needing a new git commit. No input is required. This QUEUES a build asynchronously — it does not wait for the build to finish, so poll deploy_status afterward (the same way you already do after a normal publish) to know when the resulting deploy is actually ready. IMPORTANT — batch, do not spam: each triggered build consumes real Netlify build minutes, so use this to batch multiple publishes into a single build rather than triggering one build per publish. For example, after publishing several articles in a row, call this once at the end instead of calling it after every individual save_json_blob_publish_by_time call. Optional reason is recorded only in this function's own server-side logs for traceability of who triggered a build and why — it is never sent to Netlify and never included in the response.",
     inputSchema: objectSchema({
       reason: stringSchema(
         "Optional free-text reason for triggering this build, recorded only in this function's own server logs for traceability. Never sent to Netlify."
@@ -1325,9 +1330,29 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'object_inventory',
+    description:
+      'Read-only inventory of CMS objects: per object — id, type, status, tier (1 agent-publish / 2 approval-gated / 3 human-publish-only), lock state (held/free, holder, expiry), review state, version, content_revision, last-published time, and an unpublished_changes flag (current content_revision vs the publish receipt). Omit object_type to sweep every type; pass object_type + object_id for a single-object detail view (adds site, timestamps, full review decisions, publish receipt, history length). Filters: status, tier, review_state (none | open | changes_requested | approved), pending_changes.',
+    inputSchema: objectSchema({
+      object_type: objectTypeEnumSchema(),
+      object_id: stringSchema('With object_type: return the single-object detail view instead of a list.'),
+      status: { type: 'string', enum: ['active', 'archived'], description: 'Optional status filter.' },
+      tier: { type: 'integer', enum: [1, 2, 3], description: 'Optional tier filter.' },
+      review_state: {
+        type: 'string',
+        enum: ['none', 'open', 'changes_requested', 'approved'],
+        description: 'Optional review-state filter (none = no review has ever been opened).',
+      },
+      pending_changes: {
+        type: 'boolean',
+        description: 'Optional: true → only objects the live site has not seen; false → only fully published ones.',
+      },
+    }),
+  },
+  {
     name: 'registry_get',
     description:
-      'Read a code registry (component / page_type) definition. STUB: the registry is not yet populated — it lands in P3 — so this returns a not_yet_populated placeholder for now.',
+      "Read a code registry. registry: 'page_type' returns the T3.1 PageType definitions (route pattern, allowed/required sections, review policy) plus a JSON-schema rendering of the definition shape; 'component' is not yet populated (arrives with T3.2).",
     inputSchema: objectSchema({
       registry: { type: 'string', enum: ['component', 'page_type'], description: 'Optional registry name.' },
     }),
@@ -3559,15 +3584,45 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         object_id: input.object_id,
         candidate_patch: input.candidate_patch,
       });
-    case 'registry_get':
-      // STUB until P3 populates the code registries (component / page_type).
+    case 'object_inventory':
+      return callObjectAction(event, {
+        action: 'inventory',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        status: input.status,
+        tier: input.tier,
+        review_state: input.review_state,
+        pending_changes: input.pending_changes,
+      });
+    case 'registry_get': {
+      const registry = toNonEmptyString(input.registry) ?? null;
+      // T3.1: page_type is served from the code registry. component stays the
+      // T0.9 stub until T3.2 lands the per-section-type modules.
+      if (registry === 'page_type') {
+        return toolResult({
+          registry,
+          status: 'ok',
+          available: true,
+          definitions: listPageTypeDefinitions(),
+          not_yet_implemented: unimplementedPageTypeIds(),
+          definition_schema: pageTypeDefinitionJsonSchema(),
+        });
+      }
+      if (registry === null) {
+        return toolResult({
+          registries: ['page_type', 'component'],
+          available: ['page_type'],
+          message: "Pass registry: 'page_type' for definitions; 'component' is not yet populated (T3.2).",
+        });
+      }
       return toolResult({
-        registry: toNonEmptyString(input.registry) ?? null,
+        registry,
         status: 'not_yet_populated',
         available: false,
-        message: 'The code registry is not yet populated; it is introduced in Phase 3 (T3.1/T3.2).',
+        message: 'The component registry is not yet populated; it arrives with T3.2.',
         definitions: [],
       });
+    }
 
     default:
       break;
