@@ -90,13 +90,14 @@ const buildElementEntry = (
   op: PatchOp,
   capture: Extract<PatchOpCapture, { kind: 'element' }>
 ): StructuralDiffEntry | undefined => {
-  const kind: StructuralDiffKind | undefined = !capture.before.exists && capture.after.exists
-    ? 'added'
-    : capture.before.exists && !capture.after.exists
-      ? 'removed'
-      : capture.before.exists && capture.after.exists
-        ? 'replaced'
-        : undefined;
+  const kind: StructuralDiffKind | undefined =
+    !capture.before.exists && capture.after.exists
+      ? 'added'
+      : capture.before.exists && !capture.after.exists
+        ? 'removed'
+        : capture.before.exists && capture.after.exists
+          ? 'replaced'
+          : undefined;
   if (kind === undefined) return undefined; // neither before nor after existed: not a real change
 
   const target = describeTarget(op);
