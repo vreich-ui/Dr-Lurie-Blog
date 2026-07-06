@@ -1,0 +1,125 @@
+{
+  "__generated": {
+    "at": "2026-07-06T10:01:50.573Z",
+    "from": "objects/navigation/by-id/nav_footer.json",
+    "record_version": 8
+  },
+  "footNote": "\n    Educational content only — not medical advice. © Dr. Lurié.\n  ",
+  "groups": [
+    {
+      "id": "g_explore",
+      "items": [
+        {
+          "id": "i_home",
+          "label": "Home",
+          "target": {
+            "href": "/",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_about",
+          "label": "About",
+          "target": {
+            "href": "/about",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_education",
+          "label": "Education",
+          "target": {
+            "kind": "listing",
+            "list": "content_index"
+          }
+        },
+        {
+          "id": "i_topics",
+          "label": "Topics",
+          "target": {
+            "href": "/learn/topics",
+            "kind": "route"
+          }
+        }
+      ],
+      "title": "Explore"
+    },
+    {
+      "id": "g_next_steps",
+      "items": [
+        {
+          "id": "i_free_guide",
+          "label": "Free Guide",
+          "target": {
+            "href": "/guides/free-guide",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_shop_preview",
+          "label": "Shop Preview",
+          "target": {
+            "href": "/solutions/shop-preview",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_early_access",
+          "label": "Early Access",
+          "target": {
+            "href": "/solutions/early-access",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_contact",
+          "label": "Contact",
+          "target": {
+            "href": "/contact",
+            "kind": "route"
+          }
+        }
+      ],
+      "title": "Next steps"
+    },
+    {
+      "id": "g_secondary",
+      "items": [
+        {
+          "id": "i_terms",
+          "label": "Terms",
+          "target": {
+            "href": "/terms",
+            "kind": "route"
+          }
+        },
+        {
+          "id": "i_privacy",
+          "label": "Privacy Policy",
+          "target": {
+            "href": "/privacy",
+            "kind": "route"
+          }
+        }
+      ],
+      "slot": "secondary"
+    },
+    {
+      "id": "g_social",
+      "items": [
+        {
+          "ariaLabel": "RSS",
+          "icon": "tabler:rss",
+          "id": "i_rss",
+          "label": "RSS",
+          "target": {
+            "href": "/rss.xml",
+            "kind": "asset"
+          }
+        }
+      ],
+      "slot": "social"
+    }
+  ],
+  "role": "footer"
+}
