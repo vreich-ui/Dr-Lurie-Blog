@@ -283,8 +283,12 @@ test('check6 structure: shared_ref effective type is resolved for allowed-sectio
   assert.equal(statusOf(checkStructuralInvariants('page', body, context, false), 'structure_allowed'), 'missing');
 });
 
-test('check6 structure: non-page types have no structural invariants here', () => {
-  assert.equal(statusOf(checkStructuralInvariants('navigation', {}, {}, true), 'structure'), 'optional');
+test('check6 structure: types without their own structural rules report optional', () => {
+  // navigation gained its own rules with T2.1 (an unrecognized body reports
+  // nav_structure optional; the real rules are tested in
+  // object-validate-navigation.test.ts); site remains rule-free here.
+  assert.equal(statusOf(checkStructuralInvariants('navigation', {}, {}, true), 'nav_structure'), 'optional');
+  assert.equal(statusOf(checkStructuralInvariants('site', {}, {}, true), 'structure'), 'optional');
 });
 
 // ═══ pipeline composition + summary ══════════════════════════════════════════
