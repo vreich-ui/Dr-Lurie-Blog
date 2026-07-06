@@ -7,6 +7,36 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Standing state (after session 2026-07-06 C)
+
+| Area                   | State                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T2.7                   | **STILL WAITING ON WOLF** — commands + clicks both run on his side (agent sandbox has no PUBLISH_SECRET and no egress to production); runbook §6  |
+| T2.6                   | PARKED — Wolf alone                                                                                                                               |
+| publishReceiptSchema   | **Approved + landed** (`df5e631`) — typed to the real buildReceipt shape; ObjectPublishReceipt derives from it                                    |
+| T3.2 (M-9 + registry)  | **Done** (`57f878f` + `c292f7e`) — five components render 5/5 IDENTICAL to the live homepage via `scripts/verify-section-components.mjs`          |
+| T3.3 (M-8)             | **Done** (`41bbc80`) — manual+fallback schema, validation, pure resolution helper for T3.6                                                        |
+| Next (T3.4/T3.5)       | Reference-count validation (archive refused while referenced) + seed-page-home script (assembles from `home-fixture-data.ts` — one transcription) |
+| T3.6+ homepage cutover | FORBIDDEN until Wolf's T2.7 clicks close Part 1                                                                                                   |
+
+## Session 2026-07-06 C
+
+Wolf's directives: receipt tightening approved (landed, `df5e631`); T2.7
+"run the drill clicks" — **cannot run from an agent session**: no
+`PUBLISH_SECRET` in the environment and the sandbox proxy blocks egress to
+the production domain (verified empirically this session), and the
+approve/publish clicks are architecturally human-only regardless (Tier 3 —
+the drill exists to prove exactly that). The full command+click sequence
+stays in runbook §6; every agent-side command is safe to run from Wolf's
+machine as-is. Continued into Phase 3: T3.2 (with amendment M-9) and T3.3
+(M-8) landed; T3.2's render gate compares component output against the live
+homepage from the same build — the strongest available oracle — and passed
+5/5. `index.astro` remains untouched (T3.6 is the cutover).
+
+New gotcha for the log: Astro silently excludes underscore-prefixed files
+in `src/pages` from routing — the render-gate fixture had to be named
+without the `__` prefix.
+
 ## Standing state (after session 2026-07-06 B)
 
 | Area                        | State                                                                                                                                                                     |
