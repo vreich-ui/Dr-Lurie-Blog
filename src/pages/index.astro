@@ -1,38 +1,26 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
 import Footer from '~/components/widgets/Footer.astro';
-import { getAsset, getBlogPermalink, getPermalink } from '~/utils/permalinks';
+import { getEntry } from 'astro:content';
+import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
+import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
 
-const homeFooterData = {
-  brand: 'Dr. Lurié Skin Care',
-  descriptor: 'Healthy Skin for Skincare Newcomers',
-  links: [
-    {
-      title: 'Start learning',
-      links: [
-        { text: 'Start Here', href: getPermalink('/start-here') },
-        { text: 'Library', href: getBlogPermalink() },
-        { text: 'Topics', href: getPermalink('/learn/topics') },
-        { text: 'Free Guide', href: getPermalink('/guides/free-guide') },
-      ],
-    },
-    {
-      title: 'Connect',
-      links: [
-        { text: 'About', href: getPermalink('/about') },
-        { text: 'Newsletter', href: getPermalink('/newsletter') },
-      ],
-    },
-  ],
-  secondaryLinks: [
-    { text: 'Terms', href: getPermalink('/terms') },
-    { text: 'Privacy', href: getPermalink('/privacy') },
-  ],
-  socialLinks: [{ ariaLabel: 'RSS', icon: 'tabler:rss', href: getAsset('/rss.xml') }],
-  footNote: `
-    Educational content only — not medical advice. © Dr. Lurié.
-  `,
-};
+// T2.5 cutover — INTERIM BRIDGE (remove in T3.5): the homepage footer variant
+// renders the published nav_footer_home export, referenced directly here
+// until page_home exists and carries it as navigationOverrides.footer
+// (C§1.4, 04 §P2 interim note). Data-only variation; the <Fragment
+// slot="footer"> mechanism itself is unchanged this phase.
+const footerHomeEntry = await getEntry('navigationObject', 'nav_footer_home');
+if (!footerHomeEntry) {
+  throw new Error(
+    'index: the published nav_footer_home export is missing (src/data/site/navigation/nav_footer_home.json). ' +
+      'The T2.3 Tier 3 publish must land before the T2.5 cutover builds — see phase-2-runbook.md §4.'
+  );
+}
+const homeFooterData = navigationToFooterProps(
+  parseNavigationExport(footerHomeEntry.data),
+  createNavTargetResolver({ blogPermalink: getBlogPermalink() })
+);
 
 const metadata = {
   title: 'Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers',
@@ -201,6 +189,6 @@ const trustNotes = [
   </section>
 
   <Fragment slot="footer">
-    <Footer {...homeFooterData} descriptor="Healthy Skin for Skincare Newcomers" />
+    <Footer {...homeFooterData} />
   </Fragment>
 </Layout>
