@@ -14,11 +14,24 @@
  * Usage:
  *   node scripts/seed-navigation.mjs                # dry run: print payloads
  *   node scripts/seed-navigation.mjs --execute      # create + validate
+ *   node scripts/seed-navigation.mjs --verify       # READ-ONLY: fetch each
+ *       draft from the store and byte-compare its body against the seed;
+ *       prints version/content_revision/review/lock state. Run this any time
+ *       you need to know exactly what is in the drafts (e.g. before
+ *       approving a review).
  *
- * Env (for --execute):
+ * Env (for --execute/--verify):
  *   PUBLISH_SECRET             the shared x-publish-key (server-side only)
  *   OBJECT_STORE_BASE_URL      deployment base URL
  *                              (default http://localhost:8888 for netlify dev)
+ *
+ * Validator-vintage note (learned from the first production run): the
+ * duplicate-target warning on nav_header is produced by T2.1 code, which
+ * only reaches production when the Phase 2 branch merges and deploys. When
+ * the deployed validator predates T2.1 (no nav_* criteria in the report),
+ * the warning check is SKIPPED WITH A NOTE instead of failing — zero
+ * warnings there means the validator can't see duplicates, not that the
+ * data lacks them. Hard failures (blockers) fail the run regardless.
  *
  * Idempotency: an existing record (409) is re-fetched and compared to the
  * seed body — identical → OK (re-run safe); different → loud failure, because
@@ -29,15 +42,16 @@
  * the Tier 3 publish (T2.3), which is human-executed by design (C§2.2).
  */
 import { NAVIGATION_SEEDS, NAVIGATION_SEED_SITE } from './lib/navigation-seed-data.mjs';
+import { checkValidationAgainstSeed, createObjectStoreClient, sameBody } from './lib/object-store-client.mjs';
 
 const AGENT_NAME = 'phase-2-navigation-seed';
 
 const args = new Set(process.argv.slice(2));
 const execute = args.has('--execute');
-const baseUrl = (process.env.OBJECT_STORE_BASE_URL || 'http://localhost:8888').replace(/\/$/, '');
-const endpoint = `${baseUrl}/.netlify/functions/object-store`;
+const verify = args.has('--verify');
+const baseUrl = process.env.OBJECT_STORE_BASE_URL || 'http://localhost:8888';
 
-if (!execute) {
+if (!execute && !verify) {
   console.info('[seed-navigation] Dry run. Records that --execute would create:');
   for (const seed of NAVIGATION_SEEDS) {
     console.info(`\n─── ${seed.objectId} ` + '─'.repeat(Math.max(0, 60 - seed.objectId.length)));
@@ -55,56 +69,58 @@ if (!execute) {
       )
     );
   }
-  console.info('\n[seed-navigation] Re-run with --execute (PUBLISH_SECRET + OBJECT_STORE_BASE_URL set) to create.');
+  console.info('\n[seed-navigation] Re-run with --execute (PUBLISH_SECRET + OBJECT_STORE_BASE_URL set) to create,');
+  console.info('[seed-navigation] or --verify to read-only compare the store against the seed data.');
   process.exit(0);
 }
 
 const publishSecret = process.env.PUBLISH_SECRET;
 if (!publishSecret) {
-  console.error('[seed-navigation] PUBLISH_SECRET is required with --execute. Keep it server-side only.');
+  console.error('[seed-navigation] PUBLISH_SECRET is required with --execute/--verify. Keep it server-side only.');
   process.exit(2);
 }
 
-const call = async (payload) => {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-publish-key': publishSecret },
-    body: JSON.stringify({ agent_name: AGENT_NAME, ...payload }),
-  });
-  const text = await response.text();
-  let body;
-  try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = { raw: text };
-  }
-  return { status: response.status, body };
-};
-
-const stable = (value) => {
-  if (Array.isArray(value)) return value.map(stable);
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, stable(value[key])])
-    );
-  return value;
-};
-const sameBody = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
-
-const warningIds = (validation) =>
-  (validation ?? [])
-    .flatMap((group) => group.criteria ?? [])
-    .filter((criterion) => criterion.status === 'warning')
-    .map((criterion) => criterion.id);
-const blockerMessages = (validation) =>
-  (validation ?? [])
-    .flatMap((group) => group.criteria ?? [])
-    .filter((criterion) => criterion.status === 'missing')
-    .map((criterion) => `${criterion.id}: ${criterion.message}`);
+const call = createObjectStoreClient({ baseUrl, publishSecret, agentName: AGENT_NAME });
 
 let failed = false;
+
+// ─── --verify: read-only comparison of store vs seed ─────────────────────────
+
+if (verify) {
+  for (const seed of NAVIGATION_SEEDS) {
+    const label = `[verify] ${seed.objectId}`;
+    const existing = await call({ action: 'get', object_type: 'navigation', object_id: seed.objectId });
+    if (existing.status === 404) {
+      console.error(`${label}: NOT FOUND — not seeded yet.`);
+      failed = true;
+      continue;
+    }
+    if (existing.status !== 200) {
+      console.error(`${label}: get failed (${existing.status}): ${JSON.stringify(existing.body)}`);
+      failed = true;
+      continue;
+    }
+    const record = existing.body.record ?? {};
+    const identical = sameBody(record.body, seed.body);
+    const state = `version ${record.version}, content_revision ${record.content_revision}, review ${record.review?.state ?? 'none'}, lock ${record.lock ? 'HELD' : 'free'}`;
+    if (identical) {
+      console.info(`${label}: body is BYTE-IDENTICAL to the seed (${state}).`);
+    } else {
+      console.error(`${label}: body DIFFERS from the seed (${state}). Do not approve/publish until reconciled.`);
+      console.error(`${label}: stored body follows for inspection:`);
+      console.error(JSON.stringify(record.body, null, 2));
+      failed = true;
+    }
+  }
+  if (failed) {
+    console.error('[verify] MISMATCHES FOUND — see above.');
+    process.exit(1);
+  }
+  console.info('[verify] All drafts match the seed data exactly.');
+  process.exit(0);
+}
+
+// ─── --execute: create + validate ────────────────────────────────────────────
 
 for (const seed of NAVIGATION_SEEDS) {
   const label = `[seed-navigation] ${seed.objectId}`;
@@ -144,27 +160,20 @@ for (const seed of NAVIGATION_SEEDS) {
     failed = true;
     continue;
   }
-  const blockers = blockerMessages(validated.body.validation);
-  const warnings = warningIds(validated.body.validation);
-  const expected = JSON.stringify([...seed.expectedWarningIds].sort());
-  if (blockers.length > 0) {
-    console.error(`${label}: unexpected hard failures: ${blockers.join(' | ')}`);
-    failed = true;
-  } else if (JSON.stringify([...warnings].sort()) !== expected) {
-    console.error(
-      `${label}: warning set mismatch — expected ${expected}, got ${JSON.stringify(warnings.sort())}. ` +
-        '(nav_header must carry exactly the duplicate-target warning; the footers none.)'
-    );
-    failed = true;
+  const outcome = checkValidationAgainstSeed(validated.body.validation, seed.expectedWarningIds);
+  if (outcome.ok) {
+    console.info(`${label}: ${outcome.note}`);
   } else {
-    console.info(
-      `${label}: validates clean${warnings.length ? ` with the expected warning (${warnings.join(', ')})` : ' with zero warnings'}.`
-    );
+    console.error(`${label}: ${outcome.note}`);
+    failed = true;
   }
 }
 
 if (failed) {
   console.error('[seed-navigation] FAILED — see above. Nothing was published; drafts may need reconciling.');
+  console.error(
+    '[seed-navigation] Do NOT run submit-navigation-review until this passes (it re-checks, but fix first).'
+  );
   process.exit(1);
 }
 console.info('[seed-navigation] All three navigation drafts are in place and validate as expected.');

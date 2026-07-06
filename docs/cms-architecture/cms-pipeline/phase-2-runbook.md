@@ -38,10 +38,19 @@ node scripts/seed-navigation.mjs --execute
 ```
 
 Expected: `nav_header` / `nav_footer` / `nav_footer_home` created (drafts,
-nothing published), each validating with zero hard failures; `nav_header`
-carries exactly one warning — the duplicate-target class for the audited
-'Early Access' + 'Join Early Access' pair. Idempotent on re-run; refuses to
-touch a draft that has been edited since.
+nothing published), each validating with zero hard failures. **Warning-set
+note (learned in the first production run):** the duplicate-target warning on
+`nav_header` comes from T2.1 validator code, which reaches production only
+when this PR merges and deploys — before that, the deployed validator has no
+nav rules and the script says so instead of failing. Idempotent on re-run;
+refuses to touch a draft that has been edited since.
+
+To inspect exactly what the drafts contain at any time (read-only,
+byte-compares store vs seed, prints version/review/lock state):
+
+```
+node scripts/seed-navigation.mjs --verify
+```
 
 ## 2. Submit for review (T2.3, agent side)
 
@@ -49,9 +58,13 @@ touch a draft that has been edited since.
 node scripts/submit-navigation-review.mjs --execute
 ```
 
-Per record: checkout → **agent publish attempt, which must be refused
+Per record: **pre-flight** (draft exists + body byte-identical to the seed +
+zero validation blockers — a failing record is NOT submitted and the run
+exits non-zero) → checkout → **agent publish attempt, which must be refused
 (403, Tier 3)** → submit_review → checkin. A non-403 on the publish attempt is
-a tier-gate regression: stop and investigate before any human publish.
+a tier-gate regression: stop and investigate before any human publish. The
+pre-flight is intrinsic to this script — it does not rely on the seed step's
+exit code, so running the two commands separately is safe.
 
 ## 3. Approve + publish (T2.3, human side — Wolf)
 
@@ -61,8 +74,10 @@ For each of `nav_header`, `nav_footer`, `nav_footer_home` at
 1. Open the review. The structural surface shows the seeded tree; the impact
    preview is the honest P2 stub ("affects all pages" — computed lists arrive
    in P3, per the 04 §P1 scope note). `nav_header`'s readiness report shows
-   the one expected duplicate-target warning; it is warn-by-design (C§1.7-4),
-   not a blocker.
+   the expected duplicate-target warning **only once the Phase 2 code is
+   deployed** — with the pre-merge validator the warning is absent because
+   the rule doesn't exist yet, not because the data changed. Either way it is
+   warn-by-design (C§1.7-4), never a blocker.
 2. **Approve.**
 3. After approving all three, run the stronger tier check once:
    `node scripts/submit-navigation-review.mjs --verify-tier3`
