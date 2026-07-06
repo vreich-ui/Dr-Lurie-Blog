@@ -56,6 +56,19 @@ const validPageBody = (title = 'Dr. Lurié') => ({
 
 const emptyTaxonomyBody = () => ({ kinds: { category: { terms: [] }, tag: { terms: [] } } });
 
+// The full receipt shape buildReceipt writes (pinned by publishReceiptSchema).
+const fullReceipt = (contentRevision: number) => ({
+  kind: 'object_export_commit' as const,
+  branch: 'main',
+  commit_sha: 'abc123',
+  tree_sha: 'def456',
+  no_op: false,
+  attempts: 1,
+  files: ['src/data/site/pages/page_sample.json'],
+  content_revision: contentRevision,
+  exported_at: '2026-07-05T00:00:00.000Z',
+});
+
 const baseRecord = (overrides: Partial<ObjectRecord> = {}): ObjectRecord => ({
   object_id: 'page_sample',
   object_type: 'page',
@@ -94,7 +107,7 @@ test('a published record with the receipt at the current revision reports no pen
     baseRecord({
       publication: {
         published_time: '2026-07-05T00:00:00.000Z',
-        publish_receipt: { kind: 'object_export_commit', content_revision: 2 },
+        publish_receipt: fullReceipt(2),
       },
     }),
     NOW
@@ -109,7 +122,7 @@ test('a record edited after its last publish reports pending changes', () => {
       content_revision: 5,
       publication: {
         published_time: '2026-07-05T00:00:00.000Z',
-        publish_receipt: { kind: 'object_export_commit', content_revision: 2 },
+        publish_receipt: fullReceipt(2),
       },
     }),
     NOW
@@ -119,10 +132,14 @@ test('a record edited after its last publish reports pending changes', () => {
 });
 
 test('a published record whose receipt lacks a numeric revision reports pending changes (conservative)', () => {
-  const row = inventoryRowFromRecord(
-    baseRecord({ publication: { published_time: '2026-07-05T00:00:00.000Z', publish_receipt: { kind: 'legacy' } } }),
-    NOW
-  );
+  // Deliberately violates publishReceiptSchema: stored blobs are not
+  // schema-validated on read, so the inventory must stay defensive against
+  // hand-written or legacy receipts.
+  const legacyPublication = {
+    published_time: '2026-07-05T00:00:00.000Z',
+    publish_receipt: { kind: 'legacy' },
+  } as unknown as ObjectRecord['publication'];
+  const row = inventoryRowFromRecord(baseRecord({ publication: legacyPublication }), NOW);
   assert.equal(row.unpublished_changes, true);
   assert.equal(row.published_content_revision, null);
 });
@@ -284,7 +301,7 @@ test('inventory pending_changes flips as a record is published and then edited p
   const stored = JSON.parse(store.blobs.get(key)!) as ObjectRecord;
   stored.publication = {
     published_time: '2026-07-06T00:00:00.000Z',
-    publish_receipt: { kind: 'object_export_commit', content_revision: stored.content_revision },
+    publish_receipt: fullReceipt(stored.content_revision),
   };
   store.blobs.set(key, JSON.stringify(stored));
 

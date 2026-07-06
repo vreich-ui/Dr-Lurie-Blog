@@ -62,7 +62,7 @@ import {
 import { isObjectLockActive, sanitizeObjectLock, type ObjectLockStore } from './object-lock.js';
 import { objectRecordKey } from './object-store-keys.js';
 import { summarizeValidation, validateObject, type ObjectValidationContext } from './object-validate.js';
-import type { ObjectRecord, ObjectType, Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType, Principal, PublishReceipt } from '../../src/schema/object-record-v1.js';
 
 /** Tolerance for caller-computed "now" timestamps before a time counts as future. */
 const SCHEDULING_SKEW_MS = 30_000;
@@ -109,19 +109,10 @@ export type PublishFailureCode =
 
 export type ObjectPublishResult = { status: number; body: Record<string, unknown> };
 
-export type ObjectPublishReceipt = {
-  kind: 'object_export_commit';
-  branch: string;
-  commit_sha: string;
-  tree_sha: string;
-  no_op: boolean;
-  attempts: number;
-  files: string[];
-  /** The content_revision this export was materialized from. */
-  content_revision: number;
-  /** The __generated marker's `at` — the effective published_time. */
-  exported_at: string;
-};
+// The receipt shape is owned by publishReceiptSchema (object-record-v1.ts),
+// which mirrors exactly what buildReceipt below writes — one source of truth
+// since the schema tightening (2026-07-06).
+export type ObjectPublishReceipt = PublishReceipt;
 
 const ok = (body: Record<string, unknown>): ObjectPublishResult => ({ status: 200, body });
 const err = (status: number, code: PublishFailureCode, body: Record<string, unknown>): ObjectPublishResult => ({
@@ -164,7 +155,8 @@ export const publishObject = async (
   // materializer for articles, so failing loudly beats a broken publish.
   if (input.object_type === 'content_item') {
     return err(400, 'unsupported_object_type', {
-      error: 'content_item publishes through the existing article pipeline; the generic operation has no materializer for it (OQ-8).',
+      error:
+        'content_item publishes through the existing article pipeline; the generic operation has no materializer for it (OQ-8).',
     });
   }
   const objectType = input.object_type as MaterializableObjectType;

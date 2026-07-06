@@ -4,7 +4,13 @@ import test from 'node:test';
 import { checkinObjectLock, checkoutObjectLock } from '../../netlify/lib/object-lock.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
 import { checkPublishGate, tierForObjectType, type PublishGateResult } from '../../netlify/lib/tier-gate.js';
-import { canDecideReview, canExecutePublish, resolveHumanRoles, resolveRolesForPrincipal, type Role } from '../../netlify/lib/roles.js';
+import {
+  canDecideReview,
+  canExecutePublish,
+  resolveHumanRoles,
+  resolveRolesForPrincipal,
+  type Role,
+} from '../../netlify/lib/roles.js';
 import { applyPatchOps } from '../../src/lib/object-patch-apply.js';
 import type { ObjectRecord, ObjectType, Principal, ReviewState } from '../../src/schema/object-record-v1.js';
 
@@ -220,14 +226,24 @@ test('tier mapping: page/section/template are Tier 2; navigation/taxonomy/site a
 
 for (const objectType of ['section', 'template'] as const) {
   test(`agent publish of approved ${objectType} (Tier 2) is allowed with a matching pin`, () => {
-    const result = runCell(objectType, objectType === 'section' ? 'sec_cta' : 'tpl_home', 'agent', 'approved_current_pin_match');
+    const result = runCell(
+      objectType,
+      objectType === 'section' ? 'sec_cta' : 'tpl_home',
+      'agent',
+      'approved_current_pin_match'
+    );
     assert.equal(result.allow, true, JSON.stringify(result));
   });
 }
 
 for (const objectType of ['taxonomy', 'site'] as const) {
   test(`agent publish of approved ${objectType} (Tier 3) is always human_execution_required`, () => {
-    const result = runCell(objectType, objectType === 'taxonomy' ? 'tax_drlurie' : 'site_drlurie', 'agent', 'approved_current_pin_match');
+    const result = runCell(
+      objectType,
+      objectType === 'taxonomy' ? 'tax_drlurie' : 'site_drlurie',
+      'agent',
+      'approved_current_pin_match'
+    );
     assert.equal(result.allow, false);
     assert.equal(result.allow === false && result.code, 'human_execution_required');
   });
@@ -352,7 +368,17 @@ test('the publish stamp itself does NOT invalidate the approval (T1.3 writes ver
     updated_at: AT,
     publication: {
       published_time: AT,
-      publish_receipt: { kind: 'object_export_commit', commit_sha: 'commit1' },
+      publish_receipt: {
+        kind: 'object_export_commit',
+        branch: 'main',
+        commit_sha: 'commit1',
+        tree_sha: 'tree1',
+        no_op: false,
+        attempts: 1,
+        files: ['src/data/site/pages/page_x.json'],
+        content_revision: record.content_revision,
+        exported_at: AT,
+      },
     },
     history: [...record.history, { at: AT, action: 'publish', actor: humanActor }],
     version: record.version + 1,

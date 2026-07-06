@@ -5,7 +5,7 @@ import test from 'node:test';
 import { materialize } from '../../netlify/lib/materialize.js';
 import { publishObject, type PublishObjectDeps } from '../../netlify/lib/object-publish.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { publishReceiptSchema, type ObjectRecord, type Principal } from '../../src/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-04T12:00:00.000Z');
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -218,6 +218,11 @@ test('happy path: validates, materializes, commits, then stamps — in that orde
     assert.deepEqual(receipt.files, [expected.path]);
     assert.equal(receipt.content_revision, 2);
     assert.equal(receipt.exported_at, PUBLISHED_TIME);
+
+    // The written receipt must conform to the tightened publishReceiptSchema
+    // (one source of truth for consumers like the object inventory).
+    const parsed = publishReceiptSchema.safeParse(receipt);
+    assert.ok(parsed.success, JSON.stringify(parsed.success ? undefined : parsed.error.issues));
   });
 });
 
@@ -294,7 +299,9 @@ test('failure point B: stamp write fails → export fully committed and valid, r
       'a converging retry must not move the ref again'
     );
     assert.equal(
-      retryEvents.filter((event) => event.kind === 'github' && event.method === 'POST' && event.path.endsWith('/git/commits')).length,
+      retryEvents.filter(
+        (event) => event.kind === 'github' && event.method === 'POST' && event.path.endsWith('/git/commits')
+      ).length,
       0,
       'a converging retry must not mint a duplicate commit'
     );
