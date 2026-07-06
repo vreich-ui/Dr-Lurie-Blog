@@ -33,6 +33,27 @@ machine as-is. Continued into Phase 3: T3.2 (with amendment M-9) and T3.3
 homepage from the same build — the strongest available oracle — and passed
 5/5. `index.astro` remains untouched (T3.6 is the cutover).
 
+Continuation (same session, "keep working"): **T3.4+T3.5 seed half**
+(`3c17c24`) — `scripts/seed-page-home.mjs` creates `sec_newsletter_signup`
+then `page_home` with the seed-navigation discipline plus a schema-vintage
+gate (the bodies use M-8/M-9 fields; a create rejection on those keys means
+Phase 3 isn't deployed, not bad data); tests pin the seed deep-equal to the
+T3.2 render fixture, so the seeded record IS the proven data. **T3.10 lib
+half** (`050ada4`) — `netlify/lib/object-impact.ts` computes the real
+affected-pages lists (shared_ref / navigationOverrides-then-site-default /
+template provenance); `sec_newsletter_signup → page_home` pinned by test.
+
+**Everything still open is gated**, none of it agent-completable offline:
+T2.7 + T2.6 (Wolf), seed `--execute` + Tier 2 publishes (production creds,
+post-deploy), T3.6–T3.9 cutover chain (forbidden until T2.7 closes),
+T3.11 (needs published page objects), T3.10 admin wiring + T3.12 editor
+(admin-UI surfaces — take them with a fresh session's full context), T3.13
+(drill; also exposes that a new section type needs a union edit outside
+the registry dirs — flag to resolve when run). **Open dependency noted:**
+T3.4's archive-refusal needs an `archive` verb that does not exist yet —
+object-impact provides the reference count it will consume; building the
+verb is propose-first (new write path).
+
 New gotcha for the log: Astro silently excludes underscore-prefixed files
 in `src/pages` from routing — the render-gate fixture had to be named
 without the `__` prefix.
