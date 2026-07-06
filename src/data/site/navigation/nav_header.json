@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-06T09:54:09.676Z",
+    "at": "2026-07-06T16:26:59.372Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 8
+    "record_version": 20
   },
   "actions": [
     {
@@ -10,6 +10,14 @@
       "style": "primary",
       "target": {
         "href": "/solutions/early-access",
+        "kind": "route"
+      }
+    },
+    {
+      "label": "Join Newsletter",
+      "style": "primary",
+      "target": {
+        "href": "/newsletter",
         "kind": "route"
       }
     }
@@ -98,15 +106,6 @@
           "label": "Shop Preview",
           "target": {
             "href": "/solutions/shop-preview",
-            "kind": "route"
-          }
-        },
-        {
-          "description": "Join updates as research-led solutions become available.",
-          "id": "i_early_access",
-          "label": "Early Access",
-          "target": {
-            "href": "/solutions/early-access",
             "kind": "route"
           }
         },
