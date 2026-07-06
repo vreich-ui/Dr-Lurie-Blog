@@ -123,9 +123,7 @@ export function computeFieldDiffEntries(history: readonly HistoryEntry[]): Field
   const entries: FieldDiffEntry[] = [];
 
   history.forEach((historyEntry, historyIndex) => {
-    const details = historyEntry.details as
-      | { capture?: { kind?: string; before?: unknown; after?: unknown } }
-      | undefined;
+    const details = historyEntry.details as { capture?: { kind?: string; before?: unknown; after?: unknown } } | undefined;
     const capture = details?.capture;
     if (!capture || capture.kind !== 'fields') return;
     const leaves = fieldDiffLeaves(

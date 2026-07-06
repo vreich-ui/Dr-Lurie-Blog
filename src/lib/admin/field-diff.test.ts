@@ -44,10 +44,7 @@ describe('computeFieldDiffEntries', () => {
         at: AT,
         action: 'upsert_section',
         actor,
-        details: {
-          op: {},
-          capture: { kind: 'element', before: { exists: false }, after: { exists: true, value: {}, index: 0 } },
-        },
+        details: { op: {}, capture: { kind: 'element', before: { exists: false }, after: { exists: true, value: {}, index: 0 } } },
       },
     ];
 
