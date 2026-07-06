@@ -13,7 +13,12 @@ const mockFetch = (respond: (body: Record<string, unknown>) => Record<string, un
     calls.push({ url: String(input), body });
     return new Response(JSON.stringify(respond(body)), { status: 200 });
   }) as typeof fetch;
-  return { calls, restore: () => { globalThis.fetch = originalFetch; } };
+  return {
+    calls,
+    restore: () => {
+      globalThis.fetch = originalFetch;
+    },
+  };
 };
 
 let restoreFetch: (() => void) | undefined;
@@ -26,7 +31,11 @@ const getToken = async () => 'test-token';
 
 describe('LockManager — default config (article editor) is byte-for-byte unchanged', () => {
   it('checkout POSTs the exact legacy body to the exact legacy endpoint', async () => {
-    const mock = mockFetch(() => ({ ok: true, lockToken: 'tok-1', lock: { owner_id: 'a', owner_label: 'a', acquired_at: 'x', expires_at: 'y' } }));
+    const mock = mockFetch(() => ({
+      ok: true,
+      lockToken: 'tok-1',
+      lock: { owner_id: 'a', owner_label: 'a', acquired_at: 'x', expires_at: 'y' },
+    }));
     restoreFetch = mock.restore;
 
     const manager = new LockManager('req_smoke_pdf_cta_20260630_01', getToken);
@@ -51,7 +60,11 @@ describe('LockManager — default config (article editor) is byte-for-byte uncha
   it('checkin POSTs {action, requestId, lockToken} with no leaseSeconds field', async () => {
     const manager = new LockManager('req_x', getToken);
 
-    const checkoutMock = mockFetch(() => ({ ok: true, lockToken: 'tok-2', lock: { owner_id: 'a', owner_label: 'a', acquired_at: 'x', expires_at: 'y' } }));
+    const checkoutMock = mockFetch(() => ({
+      ok: true,
+      lockToken: 'tok-2',
+      lock: { owner_id: 'a', owner_label: 'a', acquired_at: 'x', expires_at: 'y' },
+    }));
     restoreFetch = checkoutMock.restore;
     await manager.checkout();
 
@@ -111,7 +124,11 @@ describe('LockManager — parameterized config (objects surface, T1.5)', () => {
   };
 
   it('checkout speaks the object-verbs wire shape at the object endpoint', async () => {
-    const mock = mockFetch(() => ({ ok: true, lockToken: 'tok-obj', lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y' } }));
+    const mock = mockFetch(() => ({
+      ok: true,
+      lockToken: 'tok-obj',
+      lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y' },
+    }));
     restoreFetch = mock.restore;
 
     const manager = new LockManager('nav_footer', getToken, objectLockConfig);
@@ -132,12 +149,19 @@ describe('LockManager — parameterized config (objects surface, T1.5)', () => {
   });
 
   it("refresh maps the internal action name 'refresh' to the wire action 'refresh_lock'", async () => {
-    const checkoutMock = mockFetch(() => ({ ok: true, lockToken: 'tok-obj', lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y' } }));
+    const checkoutMock = mockFetch(() => ({
+      ok: true,
+      lockToken: 'tok-obj',
+      lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y' },
+    }));
     restoreFetch = checkoutMock.restore;
     const manager = new LockManager('nav_footer', getToken, objectLockConfig);
     await manager.checkout(600);
 
-    const refreshMock = mockFetch(() => ({ ok: true, lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y2' } }));
+    const refreshMock = mockFetch(() => ({
+      ok: true,
+      lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y2' },
+    }));
     restoreFetch = refreshMock.restore;
     // Exercise the same request-building path doRefresh uses, without waiting on the real timer.
     await (manager as unknown as { doRefresh(leaseSeconds: number): Promise<void> }).doRefresh(600);
@@ -159,7 +183,11 @@ describe('LockManager — parameterized config (objects surface, T1.5)', () => {
   });
 
   it('checkin uses lock_token (snake_case) via the object config', async () => {
-    const checkoutMock = mockFetch(() => ({ ok: true, lockToken: 'tok-ci', lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y' } }));
+    const checkoutMock = mockFetch(() => ({
+      ok: true,
+      lockToken: 'tok-ci',
+      lock: { owner_id: 'h', owner_label: 'h', acquired_at: 'x', expires_at: 'y' },
+    }));
     restoreFetch = checkoutMock.restore;
     const manager = new LockManager('nav_footer', getToken, objectLockConfig);
     await manager.checkout();
