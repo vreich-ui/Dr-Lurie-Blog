@@ -21,7 +21,7 @@ site.
 | T2.6 observation + cleanup | **PARKED** — waits for your production-observation confirmation                                                 | §5                                                                                   |
 | T2.7 agent-flow drill      | scripted click-path below; needs the live Tier 3 flow + you                                                     | §6                                                                                   |
 | T2.8 S-2 newsletter CTA    | prepared; applies only after T2.5/T2.6                                                                          | §7                                                                                   |
-| T2.9 Solutions dedupe      | **CHECKPOINT — genuinely open, your call**                                                                      | §8                                                                                   |
+| T2.9 Solutions dedupe      | **DECIDED (Wolf, 2026-07-06)**: remove the 'Early Access' item; op prepared, applies post-T2.5                  | §8                                                                                   |
 
 Environment for every script below (run from the repo root, never in a browser
 context):
@@ -152,23 +152,43 @@ Prepared change, in two halves applied together as one reviewed Tier 3 change:
   `actions` from props in both the mobile utilities area and the desktop
   utilities area.
 
-**One rendering detail interacts with T2.9 and is worth ten seconds of your
-attention at execution time:** `Header.astro` today renders no `actions` at
-all — the seeded 'Join Early Access' action is faithful-but-dead data. Once
-the header renders actions from data, _both_ actions appear unless the
-'Join Early Access' action is removed (which is exactly one of the T2.9
-options). Sequencing T2.9's answer before T2.8 avoids deciding this twice.
+**Rendering consequence, now determined by the T2.9 answer (§8):** the
+'Join Early Access' header action is **kept** — so once the header renders
+`actions` from data, **both** 'Join Early Access' and 'Join Newsletter'
+appear as header CTAs on all devices. The T2.8 review's structural diff and
+deploy preview will show exactly that; approve it knowingly (or trim the
+action first as an ordinary reviewed edit if you change your mind).
 
 Expected post-deploy dist diff: header nav block only, on all pages — an
 _approved, intentional_ visible change (the byte-identical rule governs
 cutovers, not settled content decisions).
 
-## 8. T2.9 — CHECKPOINT (open question for Wolf, never pre-decided)
+## 8. T2.9 — DECISION-RECORD (answered by Wolf, 2026-07-06)
 
-The seeded nav faithfully carries three links to `/solutions/early-access`:
-the 'Early Access' item, the 'Join Early Access' item (both in the Solutions
-dropdown), and the 'Join Early Access' header action. **Question: remove one
-of the three (which?), or keep all three?** If dedupe: one reviewed
-`remove_item` (or `remove_action`) op through the standard flow, two minutes.
-If keep: nothing to do; the duplicate-target warning remains warn-only by
-design. See also the §7 interaction note.
+**Decision: remove the 'Early Access' dropdown item; keep the
+'Join Early Access' item and the 'Join Early Access' header action as-is.**
+(Confirmed directly in-session after the original question tool call failed
+to deliver; recorded here verbatim so the answer has a durable home.)
+
+The prepared op — one reviewed Tier 3 change through the standard flow,
+applied **after** the T2.5 cutover is verified (removing it earlier would
+break the byte-identical gate, since today's live dropdown shows the item):
+
+```
+{action:'checkout', object_type:'navigation', object_id:'nav_header'}
+{action:'patch', …, ops:[{op:'remove_item', group_id:'g_solutions', item_id:'i_early_access'}]}
+{action:'validate'} → zero blockers and ZERO warnings — the duplicate-target
+                      warning disappears with the duplicate
+{action:'submit_review', note:'T2.9: remove Early Access item (Wolf 2026-07-06)'} → checkin
+→ your approve + publish (structural diff: exactly one removed item)
+```
+
+Sequencing note: natural slot is together with (or just before) T2.8's
+review, since both touch `nav_header`. Expected visible diff: the Solutions
+dropdown drops from three entries to two on every page.
+
+Side effects to expect, both by design: (a) `nav_header` then validates with
+zero warnings — update any expectation pinned to the seed profile if you
+re-run checks against the live record; (b) `seed-navigation.mjs --execute`
+re-runs will refuse with "already exists with a DIFFERENT body" — correct,
+the draft has legitimately moved past the migration snapshot.
