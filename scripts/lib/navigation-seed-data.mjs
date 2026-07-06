@@ -109,7 +109,10 @@ export const navHeaderBody = {
         },
         // The audited duplication, carried faithfully (C§1.7-4): same target
         // as 'Early Access' above — object_validate warns, never rejects.
-        // Whether to dedupe is the T2.9 CHECKPOINT (Wolf's call, not ours).
+        // T2.9 DECIDED (Wolf, 2026-07-06): 'i_early_access' above is removed
+        // POST-CUTOVER via a reviewed remove_item op (runbook §8); this seed
+        // stays verbatim because it is the migration snapshot of the live
+        // site, not the end-state.
         {
           id: 'i_join_early_access',
           label: 'Join Early Access',
