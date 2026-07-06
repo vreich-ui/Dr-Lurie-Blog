@@ -5,8 +5,9 @@ import ToggleTheme from '~/components/common/ToggleTheme.astro';
 import ToggleMenu from '~/components/common/ToggleMenu.astro';
 import HeaderAuthButton from '~/components/common/HeaderAuthButton.astro';
 import LoginModal from '~/components/common/LoginModal.astro';
+import Button from '~/components/ui/Button.astro';
 import { getHomePermalink } from '~/utils/permalinks';
-import { trimSlash, getAsset, getPermalink } from '~/utils/permalinks';
+import { trimSlash, getAsset } from '~/utils/permalinks';
 import type { CallToAction } from '~/types';
 
 interface Link {
@@ -38,6 +39,7 @@ export interface Props {
 const {
   id = 'header',
   links = [],
+  actions = [],
   isSticky = false,
   isDark = false,
   isFullWidth = false,
@@ -46,6 +48,14 @@ const {
   position = 'center',
   logoText,
 } = Astro.props;
+
+// T2.8 (S-2 settled decision): actions render identically on every device —
+// no viewport-conditional structure, ever (05 §1). `data-newsletter-cta` is
+// keyed to the '/newsletter' target specifically (not to "any CTA") because
+// HeaderAuthButton's client script hides that one element — on both the
+// mobile and desktop instances rendered below — for signed-in visitors (auth
+// chrome behavior, unrelated to which actions exist).
+const isNewsletterAction = (action: CallToAction) => action.href === '/newsletter';
 
 const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
 ---
@@ -207,13 +217,19 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
           >
           </div>
         </div>
-        <a
-          class="inline-flex w-full justify-center rounded-full bg-primary px-5 py-3 text-base font-semibold text-white shadow-sm shadow-slate-900/10 transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950"
-          href={getPermalink('/newsletter')}
-          data-mobile-newsletter-cta
-        >
-          Join Newsletter
-        </a>
+        {
+          actions.length > 0 && (
+            <div class="flex flex-col gap-3" data-mobile-header-actions>
+              {actions.map((action) => (
+                <Button
+                  {...action}
+                  class="w-full justify-center"
+                  {...(isNewsletterAction(action) ? { 'data-newsletter-cta': true } : {})}
+                />
+              ))}
+            </div>
+          )
+        }
       </div>
     </nav>
     <div
@@ -251,6 +267,15 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
           }
           {showToggleTheme && <ToggleTheme iconClass="w-6 h-6 md:w-5 md:h-5 md:inline-block" />}
         </div>
+        {
+          actions.length > 0 && (
+            <span class="flex shrink-0 flex-wrap items-center gap-2 whitespace-nowrap" data-desktop-header-actions>
+              {actions.map((action) => (
+                <Button {...action} {...(isNewsletterAction(action) ? { 'data-newsletter-cta': true } : {})} />
+              ))}
+            </span>
+          )
+        }
         <span class="flex shrink-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap">
           <HeaderAuthButton />
         </span>

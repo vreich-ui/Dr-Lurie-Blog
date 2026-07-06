@@ -283,7 +283,9 @@ const { variant = 'desktop' } = Astro.props;
         if (signedInPanel) signedInPanel.hidden = !signedIn;
         if (adminLinks) renderAdminLinks(adminLinks, Boolean(adminState.isAdmin));
 
-        document.querySelectorAll('[data-mobile-newsletter-cta]').forEach((cta) => {
+        // Renders on both mobile and desktop as of T2.8 (S-2: no
+        // viewport-conditional structure) — hide both instances alike.
+        document.querySelectorAll('[data-newsletter-cta]').forEach((cta) => {
           cta.hidden = signedIn;
         });
 
