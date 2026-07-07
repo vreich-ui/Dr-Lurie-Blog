@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-07T05:41:22.901Z",
+    "at": "2026-07-07T12:33:05.460Z",
     "from": "objects/navigation/by-id/nav_footer.json",
-    "record_version": 52
+    "record_version": 67
   },
   "footNote": "\n    Educational content only — not medical advice. © Dr. Lurié.\n  ",
   "groups": [
@@ -11,7 +11,7 @@
       "items": [
         {
           "id": "i_home",
-          "label": "Home",
+          "label": "Testing Home",
           "target": {
             "href": "/",
             "kind": "route"
@@ -27,7 +27,7 @@
         },
         {
           "id": "i_education",
-          "label": "Education",
+          "label": "Testing Education",
           "target": {
             "kind": "listing",
             "list": "content_index"
@@ -65,7 +65,7 @@
         },
         {
           "id": "i_early_access",
-          "label": "Get Early Access",
+          "label": "Testing Access",
           "target": {
             "href": "/solutions/early-access",
             "kind": "route"
@@ -95,7 +95,7 @@
         },
         {
           "id": "i_privacy",
-          "label": "Privacy Policy",
+          "label": "Testing Privacy Policy",
           "target": {
             "href": "/privacy",
             "kind": "route"
