@@ -15,10 +15,12 @@
  * Which role can do what (documented defaults, D§3.9 / C§2.2):
  *   - execute publish: admin, publisher ("a publisher/admin executes",
  *     C§2.2 Tier 3 — the same authority applies to Tier 2 human execution).
- *   - decide reviews: any configured role (admin, publisher, editor) —
- *     review_decide is human-only (T1.4/05); an email with no configured
- *     role has no standing. Finer per-type publishRoles policy knobs are
- *     D§3.9 data, not implemented until a task needs them.
+ *   - decide reviews: any configured role (admin, publisher, editor) for a
+ *     HUMAN — an email with no configured role has no standing. Agents are now
+ *     also allowed to decide (the detached approval agent — see the TODO in
+ *     review-state.ts decideReview), so this role check applies to humans only.
+ *     Finer per-type publishRoles policy knobs are D§3.9 data, not implemented
+ *     until a task needs them.
  */
 import { parseAdminEmails } from './admin-auth.js';
 import type { Principal } from '../../src/schema/object-record-v1.js';
@@ -53,5 +55,6 @@ export const resolveRolesForPrincipal = (principal: Principal, env: RoleEnv = pr
 export const canExecutePublish = (roles: readonly Role[]): boolean =>
   roles.includes('admin') || roles.includes('publisher');
 
-/** Review decisions are human-only and require at least one configured role. */
+/** A HUMAN review decision requires at least one configured role. (Agents are
+ *  allowed to decide without a role — see review-state.ts decideReview.) */
 export const canDecideReview = (roles: readonly Role[]): boolean => roles.length > 0;

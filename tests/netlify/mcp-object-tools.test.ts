@@ -73,6 +73,10 @@ const OBJECT_TOOLS = [
   'object_patch',
   'object_validate',
   'object_inventory',
+  'object_submit_review',
+  'object_review_decide',
+  'object_discard',
+  'object_publish',
 ];
 
 const validPageBody = () => ({
@@ -213,6 +217,99 @@ test('object_patch without a held lock surfaces the 423 conflict code', async ()
   });
   assert.equal(res.isError, true);
   assert.equal(res.structuredContent?.statusCode, 423);
+});
+
+// ═══ P1 review + publish verbs ═══════════════════════════════════════════════
+
+test('the P1 review + publish tools declare the right required fields', async () => {
+  const tools = await listTools();
+  assert.deepEqual(getTool(tools, 'object_submit_review').inputSchema.required, [
+    'object_type',
+    'object_id',
+    'lock_token',
+  ]);
+  assert.deepEqual(getTool(tools, 'object_review_decide').inputSchema.required, [
+    'object_type',
+    'object_id',
+    'decision',
+  ]);
+  assert.deepEqual(getTool(tools, 'object_discard').inputSchema.required, [
+    'object_type',
+    'object_id',
+    'lock_token',
+    'entries',
+  ]);
+  assert.deepEqual(getTool(tools, 'object_publish').inputSchema.required, ['object_type', 'object_id', 'lock_token']);
+  // object_review_decide exposes the closed approve | request_changes enum.
+  const decision = getTool(tools, 'object_review_decide').inputSchema.properties?.decision as { enum?: string[] };
+  assert.deepEqual(decision.enum, ['approve', 'request_changes']);
+});
+
+test('object_publish documents the deferred-deploy model ([skip netlify], explicit release)', async () => {
+  const tools = await listTools();
+  const description = getTool(tools, 'object_publish').description;
+  assert.match(description, /\[skip netlify\]/i);
+  assert.match(description, /release_to_production/);
+});
+
+test('object_submit_review under a held lock opens a review through the proxy', async () => {
+  await reset();
+  await callTool('object_create', {
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+  const checkout = await callTool('object_checkout', { object_type: 'page', object_id: 'page_home' });
+  assert.ok(!checkout.isError, JSON.stringify(checkout.structuredContent));
+  const lockToken = checkout.structuredContent?.lockToken as string;
+
+  const submitted = await callTool('object_submit_review', {
+    object_type: 'page',
+    object_id: 'page_home',
+    lock_token: lockToken,
+    note: 'ready for review',
+    requested_publish_action: { published_time: 'immediate' },
+  });
+  assert.ok(!submitted.isError, JSON.stringify(submitted.structuredContent));
+  assert.equal(submitted.structuredContent?.review_state, 'open');
+});
+
+test('object_review_decide is agentic: the MCP agent principal may approve (no human)', async () => {
+  await reset();
+  await callTool('object_create', {
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+  // The detached approval agent decides over the shared MCP publish key.
+  const decided = await callTool('object_review_decide', {
+    object_type: 'page',
+    object_id: 'page_home',
+    decision: 'approve',
+    publish_action: { published_time: 'immediate' },
+  });
+  assert.ok(!decided.isError, JSON.stringify(decided.structuredContent));
+  assert.equal(decided.structuredContent?.review_state, 'approved');
+});
+
+test('object_publish enforces the held lock through the publish operation (423 without one)', async () => {
+  await reset();
+  await callTool('object_create', {
+    object_type: 'page',
+    site: 'site_drlurie',
+    body: validPageBody(),
+    requested_id: 'page_home',
+  });
+  const res = await callTool('object_publish', {
+    object_type: 'page',
+    object_id: 'page_home',
+    lock_token: 'not-held',
+  });
+  assert.equal(res.isError, true);
+  assert.equal(res.structuredContent?.statusCode, 423);
+  assert.equal(res.structuredContent?.code, 'lock_required');
 });
 
 // ═══ credential isolation: the proxy needs the publish key ═══════════════════

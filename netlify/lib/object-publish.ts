@@ -67,6 +67,21 @@ import type { ObjectRecord, ObjectType, Principal, PublishReceipt } from '../../
 /** Tolerance for caller-computed "now" timestamps before a time counts as future. */
 const SCHEDULING_SKEW_MS = 30_000;
 
+/**
+ * Object exports DEFER their production deploy. Every object-export commit
+ * carries Netlify's skip marker, so pushing it to main does not build or
+ * deploy — the exports accumulate on main and go live only on an explicit
+ * release (the production build hook, fired once, produces a single deploy
+ * that includes every skipped commit). Netlify: "[skip netlify]" in the
+ * commit message prevents the branch/production deploy for a directly-pushed
+ * commit, and the next un-skipped deploy includes the skipped changes. This is
+ * appended here (T1.3, the object-export publish), NOT in the generic T1.2
+ * committer, which stays message-agnostic and is reused by other callers.
+ */
+const NETLIFY_SKIP_MARKER = '[skip netlify]';
+const withDeferredDeployMarker = (message: string): string =>
+  message.includes(NETLIFY_SKIP_MARKER) ? message : `${message} ${NETLIFY_SKIP_MARKER}`;
+
 export type ObjectPublishStore = ObjectLockStore;
 
 export type PublishObjectInput = {
@@ -247,7 +262,7 @@ export const publishObject = async (
   try {
     commit = await commitMaterializedFiles({
       files: [file],
-      message: input.commit_message ?? `Publish ${input.object_type}: ${input.object_id}`,
+      message: withDeferredDeployMarker(input.commit_message ?? `Publish ${input.object_type}: ${input.object_id}`),
       fetchImpl: deps.fetchImpl,
       sleep: deps.sleep,
       backoffMs: deps.backoffMs,

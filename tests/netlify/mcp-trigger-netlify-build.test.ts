@@ -124,3 +124,43 @@ test('trigger_netlify_build tool description documents async queueing, deploy_st
   assert.match(tool!.description, /batch/i);
   assert.match(tool!.description, /build minutes/i);
 });
+
+const callReleaseToProduction = async (args: Record<string, unknown> = {}): Promise<ToolCallResult> => {
+  const response = await handler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name: 'release_to_production', arguments: args },
+    }),
+  });
+  const body = JSON.parse(response.body) as { result: ToolCallResult };
+  assert.equal(response.statusCode, 200);
+  return body.result;
+};
+
+test('release_to_production is listed and documents the deferred-deploy release model', async () => {
+  const response = await handler({
+    httpMethod: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+  });
+  const body = JSON.parse(response.body) as {
+    result: { tools: Array<{ name: string; description: string }> };
+  };
+  const tool = body.result.tools.find((candidate) => candidate.name === 'release_to_production');
+
+  assert.ok(tool, 'expected tools/list to include release_to_production');
+  assert.match(tool!.description, /\[skip netlify\]/i);
+  assert.match(tool!.description, /released:true only when/i);
+});
+
+test('release_to_production surfaces build_hook_not_configured as a tool error when forcing a build with no hook', async () => {
+  await withBuildHookEnv(undefined, async () => {
+    const result = await callReleaseToProduction({ force_build: true });
+    assert.equal(result.isError, true);
+    assert.equal(result.structuredContent?.error_code, 'build_hook_not_configured');
+  });
+});

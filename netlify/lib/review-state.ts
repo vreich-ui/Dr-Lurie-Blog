@@ -61,11 +61,17 @@ const validatePublishAction = (value: unknown): { action?: PublishAction; error?
   if (value === undefined) return {};
   const parsed = publishActionSchema.safeParse(value);
   if (!parsed.success) {
-    return { error: err(400, 'invalid_publish_action', { error: 'publish_action must be {published_time: ISO | null | "immediate"}.' }) };
+    return {
+      error: err(400, 'invalid_publish_action', {
+        error: 'publish_action must be {published_time: ISO | null | "immediate"}.',
+      }),
+    };
   }
   const time = parsed.data.published_time;
   if (typeof time === 'string' && time !== 'immediate' && Number.isNaN(Date.parse(time))) {
-    return { error: err(400, 'invalid_publish_action', { error: 'publish_action.published_time is not a valid instant.' }) };
+    return {
+      error: err(400, 'invalid_publish_action', { error: 'publish_action.published_time is not a valid instant.' }),
+    };
   }
   return { action: parsed.data };
 };
@@ -116,11 +122,25 @@ export const submitReview = (record: ObjectRecord, input: SubmitReviewInput): Re
   return { ok: true, status: 200, record: next, body: { review_state: 'open' } };
 };
 
-// ─── decide (approve / request_changes) — human-only ─────────────────────────
+// ─── decide (approve / request_changes) ──────────────────────────────────────
+//
+// Fully agentic (2026-07): a detached "approval agent" may decide reviews over
+// the shared MCP publish key, so an object can go edit → approve → publish with
+// NO human. Humans still decide via a configured role (roles.ts); an agent
+// principal is allowed without one. This does not weaken the downstream
+// invariant — an agent-executed publish on a gated type still requires the
+// approval to pin the exact action (M-6, publish-gate.ts) — so an agentic
+// approval is still explicit and pinned, just no longer human-gated.
+//
+// TODO(editor-agents): agent approval currently rides the SAME publish-key MCP
+// surface every editor/publishing agent already uses, so any key holder can
+// self-approve. Move it to a SEPARATE gate/credential dedicated to approval
+// agents (its own auth, distinct from the publishing agents) and re-tighten the
+// standing check below once that gate exists (OQ-3 per-agent credentials, OQ-5).
 
 export type DecideReviewInput = {
   actor: Principal;
-  /** Resolved via roles.ts by the caller; deciding requires ≥1 configured role. */
+  /** Resolved via roles.ts by the caller. Humans need ≥1 role; agents are allowed without one. */
   actorRoles: readonly Role[];
   at: string;
   decision: 'approve' | 'request_changes';
@@ -130,10 +150,10 @@ export type DecideReviewInput = {
 };
 
 export const decideReview = (record: ObjectRecord, input: DecideReviewInput): ReviewOpResult => {
-  if (input.actor.kind !== 'human') {
-    return err(403, 'human_only', { error: 'review_decide is human-only (C§2.0); agents cannot decide reviews.' });
-  }
-  if (!canDecideReview(input.actorRoles)) {
+  // A human decides through a configured role; the approval agent decides
+  // without one. (See the TODO above — the agent allowance is deliberately on
+  // the shared surface for now.)
+  if (input.actor.kind === 'human' && !canDecideReview(input.actorRoles)) {
     return err(403, 'review_role_required', { error: 'Deciding a review requires a configured role.' });
   }
   const { action, error } = validatePublishAction(input.publish_action);

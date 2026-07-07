@@ -62,11 +62,20 @@ const stored = (store: Store, objectType: ObjectRecord['object_type'], objectId:
 
 const validNavBody = () => ({
   role: 'footer',
-  groups: [{ id: 'g_primary', items: [{ id: 'n_privacy', label: 'Privacy', target: { kind: 'external', href: 'https://drlurie.com/privacy' } }] }],
+  groups: [
+    {
+      id: 'g_primary',
+      items: [{ id: 'n_privacy', label: 'Privacy', target: { kind: 'external', href: 'https://drlurie.com/privacy' } }],
+    },
+  ],
 });
 
 const seedNav = async (store: Store) => {
-  const res = await call(store, { action: 'create', object_type: 'navigation', site: 'site_drlurie', body: validNavBody() }, AGENT);
+  const res = await call(
+    store,
+    { action: 'create', object_type: 'navigation', site: 'site_drlurie', body: validNavBody() },
+    AGENT
+  );
   assert.equal(res.status, 200, JSON.stringify(res.body));
   const record = res.body.record as ObjectRecord;
   return record.object_id;
@@ -89,7 +98,12 @@ const withRoleEnv = async (fn: () => Promise<void>) => {
   }
 };
 
-const checkoutAs = async (store: Store, objectType: ObjectRecord['object_type'], objectId: string, principal: Principal) => {
+const checkoutAs = async (
+  store: Store,
+  objectType: ObjectRecord['object_type'],
+  objectId: string,
+  principal: Principal
+) => {
   const res = await call(store, { action: 'checkout', object_type: objectType, object_id: objectId }, principal);
   assert.equal(res.status, 200, JSON.stringify(res.body));
   return res.body.lockToken as string;
@@ -131,21 +145,32 @@ test('submit_review requires the active lock and opens review, bumping version o
 
 test('submit_review 404s cleanly for a missing object', async () => {
   const store = createMemoryStore();
-  const result = await call(store, { action: 'submit_review', object_type: 'navigation', object_id: 'nav_ghost', lock_token: 'x' });
+  const result = await call(store, {
+    action: 'submit_review',
+    object_type: 'navigation',
+    object_id: 'nav_ghost',
+    lock_token: 'x',
+  });
   assert.equal(result.status, 404);
 });
 
 // ─── review_decide ────────────────────────────────────────────────────────────
 
-test('review_decide is human-only at the wiring layer too (agents refused)', async () => {
+test('review_decide is agentic at the wiring layer: an agent may approve without a role', async () => {
   const store = createMemoryStore();
   const objectId = await seedNav(store);
   const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
   await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken });
 
-  const result = await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve' }, AGENT);
-  assert.equal(result.status, 403);
-  assert.equal(result.body.code, 'human_only');
+  // The detached approval agent decides over the shared publish key — no lock,
+  // no configured role — so edit → approve → publish needs no human.
+  const result = await call(
+    store,
+    { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve' },
+    AGENT
+  );
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.review_state, 'approved');
 });
 
 test('review_decide(approve) by a human pins content_revision + publish_action and does not require the lock', async () => {
@@ -153,8 +178,17 @@ test('review_decide(approve) by a human pins content_revision + publish_action a
     const store = createMemoryStore();
     const objectId = await seedNav(store);
     const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
-    await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken });
-    await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
+    await call(store, {
+      action: 'submit_review',
+      object_type: 'navigation',
+      object_id: objectId,
+      lock_token: lockToken,
+    });
+    await call(
+      store,
+      { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken },
+      AGENT
+    );
 
     const beforeDecide = stored(store, 'navigation', objectId);
     const result = await call(
@@ -197,14 +231,20 @@ test('discard reverts a rejected patch under the reviewer lock and bumps content
       object_type: 'navigation',
       object_id: objectId,
       lock_token: agentLock,
-      expected_record_version: (stored(store, 'navigation', objectId)).version,
-      ops: [{ op: 'update_item', group_id: 'g_primary', item_id: 'n_privacy', fields: { label: 'Agent-proposed label' } }],
+      expected_record_version: stored(store, 'navigation', objectId).version,
+      ops: [
+        { op: 'update_item', group_id: 'g_primary', item_id: 'n_privacy', fields: { label: 'Agent-proposed label' } },
+      ],
     },
     AGENT
   );
   assert.equal(patched.status, 200, JSON.stringify(patched.body));
   const afterPatch = stored(store, 'navigation', objectId);
-  await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: agentLock }, AGENT);
+  await call(
+    store,
+    { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: agentLock },
+    AGENT
+  );
 
   const reviewerLock = await checkoutAs(store, 'navigation', objectId, HUMAN_EDITOR);
   const proposalEntry = afterPatch.history[afterPatch.history.length - 1].details as { op: unknown; capture: unknown };
@@ -220,7 +260,13 @@ test('discard reverts a rejected patch under the reviewer lock and bumps content
 
   const result = await call(
     store,
-    { action: 'discard', object_type: 'navigation', object_id: objectId, lock_token: reviewerLock, entries: [proposalEntry] },
+    {
+      action: 'discard',
+      object_type: 'navigation',
+      object_id: objectId,
+      lock_token: reviewerLock,
+      entries: [proposalEntry],
+    },
     HUMAN_EDITOR
   );
   assert.equal(result.status, 200, JSON.stringify(result.body));
@@ -261,13 +307,16 @@ const createGitHubApiMock = () => {
     const method = (init?.method ?? 'GET').toUpperCase();
     const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : undefined;
     calls.push(`${method} ${url.pathname}`);
-    if (method === 'GET' && url.pathname.includes('/git/ref/heads/')) return new Response(JSON.stringify({ object: { sha: head.sha } }));
+    if (method === 'GET' && url.pathname.includes('/git/ref/heads/'))
+      return new Response(JSON.stringify({ object: { sha: head.sha } }));
     if (method === 'GET' && url.pathname.includes('/git/commits/')) {
       const sha = url.pathname.split('/').pop() as string;
       return new Response(JSON.stringify({ tree: { sha: commitTrees.get(sha) } }));
     }
-    if (method === 'POST' && url.pathname.endsWith('/git/blobs')) return new Response(JSON.stringify({ sha: sha1(String(body?.content)) }));
-    if (method === 'POST' && url.pathname.endsWith('/git/trees')) return new Response(JSON.stringify({ sha: `tree_${sha1(JSON.stringify(body))}` }));
+    if (method === 'POST' && url.pathname.endsWith('/git/blobs'))
+      return new Response(JSON.stringify({ sha: sha1(String(body?.content)) }));
+    if (method === 'POST' && url.pathname.endsWith('/git/trees'))
+      return new Response(JSON.stringify({ sha: `tree_${sha1(JSON.stringify(body))}` }));
     if (method === 'POST' && url.pathname.endsWith('/git/commits')) {
       commitCounter += 1;
       const sha = `commit${commitCounter}`;
@@ -292,7 +341,13 @@ test('publish_by_time: under the default (committed) policy, an agent publishes 
         action: 'create',
         object_type: 'page',
         site: 'site_drlurie',
-        body: { route: '/', pageType: 'home', title: 'Home', seo: {}, sections: [{ id: 's_hero', type: 'hero', data: { heading: 'Hi', actions: [] } }] },
+        body: {
+          route: '/',
+          pageType: 'home',
+          title: 'Home',
+          seo: {},
+          sections: [{ id: 's_hero', type: 'hero', data: { heading: 'Hi', actions: [] } }],
+        },
       },
       AGENT
     );
@@ -343,10 +398,30 @@ test('publish_by_time: with navigation overridden to require-approval, an APPROV
     const store = createMemoryStore();
     const objectId = await seedNav(store);
     const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
-    await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken, requested_publish_action: { published_time: 'immediate' } });
-    await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
+    await call(store, {
+      action: 'submit_review',
+      object_type: 'navigation',
+      object_id: objectId,
+      lock_token: lockToken,
+      requested_publish_action: { published_time: 'immediate' },
+    });
+    await call(
+      store,
+      { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken },
+      AGENT
+    );
     await withRoleEnv(async () => {
-      await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve', publish_action: { published_time: 'immediate' } }, HUMAN_ADMIN);
+      await call(
+        store,
+        {
+          action: 'review_decide',
+          object_type: 'navigation',
+          object_id: objectId,
+          decision: 'approve',
+          publish_action: { published_time: 'immediate' },
+        },
+        HUMAN_ADMIN
+      );
     });
 
     const relock = await checkoutAs(store, 'navigation', objectId, AGENT);
@@ -371,9 +446,22 @@ test('publish_by_time: with navigation overridden to require-approval, a human a
       const store = createMemoryStore();
       const objectId = await seedNav(store);
       const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
-      await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken });
-      await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
-      await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve' }, HUMAN_ADMIN);
+      await call(store, {
+        action: 'submit_review',
+        object_type: 'navigation',
+        object_id: objectId,
+        lock_token: lockToken,
+      });
+      await call(
+        store,
+        { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken },
+        AGENT
+      );
+      await call(
+        store,
+        { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve' },
+        HUMAN_ADMIN
+      );
 
       const relock = await checkoutAs(store, 'navigation', objectId, HUMAN_ADMIN);
       const github = createGitHubApiMock();

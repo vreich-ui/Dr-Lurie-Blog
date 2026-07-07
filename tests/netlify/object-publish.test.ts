@@ -66,6 +66,7 @@ const createGitHubApiMock = (events: PublishEvent[], options: { refPatchOutcomes
   const blobs = new Map<string, string>();
   const trees = new Map<string, Map<string, string>>([['tree0', new Map()]]);
   const commitTrees = new Map<string, string>([['head0', 'tree0']]);
+  const commitMessages: string[] = [];
   let head = { sha: 'head0', treeSha: 'tree0' };
   const patchOutcomes = [...(options.refPatchOutcomes ?? [])];
   let commitCounter = 0;
@@ -103,6 +104,7 @@ const createGitHubApiMock = (events: PublishEvent[], options: { refPatchOutcomes
       commitCounter += 1;
       const sha = `commit${commitCounter}`;
       commitTrees.set(sha, String(body?.tree));
+      commitMessages.push(String(body?.message));
       return jsonResponse({ sha });
     }
     if (method === 'PATCH' && url.pathname.includes('/git/refs/heads/')) {
@@ -121,7 +123,7 @@ const createGitHubApiMock = (events: PublishEvent[], options: { refPatchOutcomes
     return blobSha === undefined ? undefined : blobs.get(blobSha);
   };
 
-  return { fetchImpl, getHead: () => head, readFileAtHead };
+  return { fetchImpl, getHead: () => head, readFileAtHead, commitMessages };
 };
 
 const createStore = (events: PublishEvent[], options: { failSetTimes?: number } = {}) => {
@@ -181,6 +183,31 @@ const publishNav = (
     },
     { nowMs: NOW, fetchImpl, sleep: async () => {}, ...deps }
   );
+
+test('the object export commit carries [skip netlify] so the push does not deploy', async () => {
+  await withGitHubEnv(async () => {
+    // Default message. (Fresh mock per case: a re-publish of identical content
+    // no-ops in the committer and would mint no new commit to inspect.)
+    const defaultEvents: PublishEvent[] = [];
+    const defaultGitHub = createGitHubApiMock(defaultEvents);
+    const defaultStore = createStore(defaultEvents);
+    defaultStore.seed(navRecord());
+    assert.equal((await publishNav(defaultStore, defaultGitHub.fetchImpl)).status, 200);
+    assert.equal(defaultGitHub.commitMessages.at(-1), 'Publish navigation: nav_footer [skip netlify]');
+
+    // A caller-supplied commit_message still gets the deferral marker appended.
+    const customEvents: PublishEvent[] = [];
+    const customGitHub = createGitHubApiMock(customEvents);
+    const customStore = createStore(customEvents);
+    customStore.seed(navRecord());
+    assert.equal(
+      (await publishNav(customStore, customGitHub.fetchImpl, { commit_message: 'publish nav_footer + nav_header' }))
+        .status,
+      200
+    );
+    assert.equal(customGitHub.commitMessages.at(-1), 'publish nav_footer + nav_header [skip netlify]');
+  });
+});
 
 test('happy path: validates, materializes, commits, then stamps — in that order', async () => {
   await withGitHubEnv(async () => {
