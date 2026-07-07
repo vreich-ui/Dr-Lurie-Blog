@@ -177,6 +177,16 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     heading: z.string().min(1),
     products: z.array(productCardSchema),
   }),
+  // T3.13 extensibility drill: a reader/expert quote grid. No audited markup
+  // on the live site — this exists to prove a NEW section type is insertable
+  // through the registry pattern (one union member + one module + one
+  // component + one binding); see src/lib/registry/components/testimonial.ts.
+  sectionVariant('testimonial', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    quotes: z.array(z.object({ quote: z.string().min(1), attribution: z.string().optional() }).strict()),
+    anchor: z.string().optional(),
+  }),
   // Extracts the hardcoded Header search overlay (A§2.8).
   sectionVariant('search', {
     placeholder: z.string().optional(),

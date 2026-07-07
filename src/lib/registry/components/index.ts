@@ -18,12 +18,14 @@ import Checklist from '~/components/sections/Checklist.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
 import Hero from '~/components/sections/Hero.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
+import Testimonial from '~/components/sections/Testimonial.astro';
 
 import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
 import { contentGridDefinition } from './content-grid.js';
 import { heroDefinition } from './hero.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
+import { testimonialDefinition } from './testimonial.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
 
 export type RegisteredComponent = {
@@ -45,6 +47,7 @@ export const componentRegistry: Partial<Record<SectionType, RegisteredComponent>
   content_grid: bind(contentGridDefinition, ContentGrid),
   bio: bind(bioDefinition, Bio),
   newsletter_signup: bind(newsletterSignupDefinition, NewsletterSignup),
+  testimonial: bind(testimonialDefinition, Testimonial),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {

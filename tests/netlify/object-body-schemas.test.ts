@@ -270,12 +270,13 @@ test('sections: every union member parses from a seed fixture', () => {
     'prose',
     'search',
     'shared_ref',
+    'testimonial',
   ]);
 });
 
 test('sections: unknown types, bad ids, and shadow-copy shared_refs are rejected', () => {
   assert.equal(
-    sectionInstanceSchema.safeParse({ id: 's_x', type: 'testimonial', data: { quote: 'Nice' } }).success,
+    sectionInstanceSchema.safeParse({ id: 's_x', type: 'no_such_type', data: { quote: 'Nice' } }).success,
     false,
     'unknown union member must be rejected (growth is a code change)'
   );
@@ -448,7 +449,7 @@ test('template: unknown allowed section types and unknown PageTypes are rejected
   assert.equal(
     templateBodySchema.safeParse({
       ...templateFixture,
-      slots: [{ slotId: 's', allowed: ['testimonial'], required: false, repeatable: false }],
+      slots: [{ slotId: 's', allowed: ['no_such_type'], required: false, repeatable: false }],
     }).success,
     false
   );
