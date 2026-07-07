@@ -11,6 +11,7 @@ import {
   NetlifyBuildHookTriggerError,
   triggerNetlifyBuild,
 } from '../lib/netlify-deploys.js';
+import { releaseToProduction } from '../lib/production-release.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
 import {
@@ -1066,6 +1067,26 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     }),
   },
   {
+    name: 'release_to_production',
+    description:
+      'Force a fresh production build and BLOCK until the live production deploy is confirmed on a specific commit — the synchronous, verified counterpart to trigger_netlify_build. Publishing already deploys (Netlify auto-builds on every push to the content branch), so this is NOT required to make a change go live; use it when you need to CONFIRM go-live or force a rebuild and wait for it. Steps: resolve the target commit (defaults to the content branch HEAD), POST the same server-side build hook trigger_netlify_build uses (the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when a ready production deploy matches the target commit; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). Consumes real build minutes — do not spam it; batch publishes and release once.',
+    inputSchema: objectSchema({
+      commit: stringSchema(
+        'Optional commit SHA the live production deploy must reflect. Defaults to the current content branch HEAD.'
+      ),
+      force_build: {
+        type: 'boolean',
+        description:
+          'When true (default), POST the build hook to force a fresh production build before verifying. When false, only wait for and verify the deploy already triggered by the push.',
+      },
+      timeout_seconds: {
+        type: 'integer',
+        minimum: 1,
+        description: 'Optional maximum seconds to wait for the deploy to reach a terminal state before reporting back.',
+      },
+    }),
+  },
+  {
     name: 'create_artifact_upload_intent',
     description:
       'Create a short-lived scoped direct artifact upload intent. New clients should call this tool first, then upload raw bytes with HTTP POST application/octet-stream to /api/artifacts/upload using the returned requiredHeaders. Keeps binary bytes out of MCP arguments and returns no server secrets other than the scoped upload token. Accepted image formats: JPEG, PNG, WebP only — the upload decodes the bytes and rejects GIF, AVIF, SVG, and anything that does not decode as the declared type. PDF uploads must start with %PDF-.',
@@ -1835,6 +1856,39 @@ const callTriggerNetlifyBuild = async (event: LambdaEvent, input: Record<string,
   }
 };
 
+const callReleaseToProduction = async (event: LambdaEvent, input: Record<string, unknown>) => {
+  const commit = toNonEmptyString(input.commit);
+  const forceBuild = typeof input.force_build === 'boolean' ? input.force_build : undefined;
+  const timeoutSeconds = typeof input.timeout_seconds === 'number' ? input.timeout_seconds : undefined;
+
+  event.log?.({ event: 'production_release_requested', commit: commit ?? null, forceBuild: forceBuild ?? null });
+
+  try {
+    const result = await releaseToProduction({
+      ...(commit ? { commit } : {}),
+      ...(forceBuild !== undefined ? { forceBuild } : {}),
+      ...(timeoutSeconds !== undefined ? { timeoutSeconds } : {}),
+    });
+    event.log?.({
+      event: 'production_release_result',
+      status: result.status,
+      released: result.released,
+      commit: result.targetCommit || null,
+    });
+
+    // A configuration gap is a tool error the agent should surface, not a
+    // "released: false" success it might misread as "build still running".
+    if (result.status === 'build_hook_not_configured' || result.status === 'deploy_lookup_not_configured') {
+      return toolError(result.reason, { error_code: result.status, ...result });
+    }
+    return toolResult({ ...result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Production release failed.';
+    event.log?.({ event: 'production_release_failed', error: message });
+    return toolError(message, { error_code: 'production_release_failed' });
+  }
+};
+
 const hasReaderVisibleArticleBodyNode = (node: unknown) => {
   const record = getRecordValue(node);
   if (!record) return false;
@@ -2559,6 +2613,32 @@ const callObjectAction = async (event: LambdaEvent, payload: Record<string, unkn
   if ('isError' in result) return result;
 
   return toolResult(result);
+};
+
+// A successful object publish COMMITS to the content branch. Netlify auto-builds
+// on push, so the commit has triggered a production deploy — but the deploy is
+// asynchronous, so the change is not live the instant this returns. Attach an
+// explicit, honest production status to every successful publish so an agent
+// never mistakes "committed" for "live". (Reshaped from the original
+// "requires explicit release" wording: publishing DOES promote — via the push
+// — so the truthful guidance is "wait/confirm", not "release to go live".)
+const OBJECT_PUBLISH_LIVE_NOTE =
+  'Committed to the content branch. Netlify auto-builds on push, so this commit has triggered a production deploy — but the deploy is asynchronous and the change is NOT live yet (a build typically takes ~30-120s). Poll deploy_status with the receipt commit_sha until deployStatus is "ready", or call release_to_production to force a fresh build and block until the live site is confirmed on this commit.';
+
+const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unknown>) => {
+  const result = await invokeObjectStore(event, payload);
+
+  if ('isError' in result) return result;
+
+  return toolResult({
+    ...result,
+    production: {
+      committed: true,
+      live: false,
+      deploy_triggered_by_push: true,
+      note: OBJECT_PUBLISH_LIVE_NOTE,
+    },
+  });
 };
 
 const callNormalizedAction = async (
@@ -3504,6 +3584,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callVerifyArticleImages(event, input);
     case 'trigger_netlify_build':
       return callTriggerNetlifyBuild(event, input);
+    case 'release_to_production':
+      return callReleaseToProduction(event, input);
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
     case 'create_artifact_from_url': {
@@ -3724,7 +3806,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         entries: input.entries,
       });
     case 'object_publish':
-      return callObjectAction(event, {
+      return callObjectPublish(event, {
         action: 'publish_by_time',
         object_type: input.object_type,
         object_id: input.object_id,
