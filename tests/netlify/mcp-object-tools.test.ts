@@ -275,7 +275,7 @@ test('object_submit_review under a held lock opens a review through the proxy', 
   assert.equal(submitted.structuredContent?.review_state, 'open');
 });
 
-test('object_review_decide is refused for the agent principal (human-only rule preserved)', async () => {
+test('object_review_decide is agentic: the MCP agent principal may approve (no human)', async () => {
   await reset();
   await callTool('object_create', {
     object_type: 'page',
@@ -283,14 +283,15 @@ test('object_review_decide is refused for the agent principal (human-only rule p
     body: validPageBody(),
     requested_id: 'page_home',
   });
+  // The detached approval agent decides over the shared MCP publish key.
   const decided = await callTool('object_review_decide', {
     object_type: 'page',
     object_id: 'page_home',
     decision: 'approve',
+    publish_action: { published_time: 'immediate' },
   });
-  assert.equal(decided.isError, true);
-  assert.equal(decided.structuredContent?.statusCode, 403);
-  assert.equal(decided.structuredContent?.code, 'human_only');
+  assert.ok(!decided.isError, JSON.stringify(decided.structuredContent));
+  assert.equal(decided.structuredContent?.review_state, 'approved');
 });
 
 test('object_publish enforces the held lock through the publish operation (423 without one)', async () => {

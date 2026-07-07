@@ -47,7 +47,11 @@ test('submitReview opens review, records the M-6 requested action, bumps version
   if (!result.ok) return;
   assert.equal(result.record.review?.state, 'open');
   assert.equal(result.record.version, record.version + 1);
-  assert.equal(result.record.content_revision, record.content_revision, 'review bookkeeping never bumps content_revision');
+  assert.equal(
+    result.record.content_revision,
+    record.content_revision,
+    'review bookkeeping never bumps content_revision'
+  );
   const entry = result.record.history[result.record.history.length - 1];
   assert.equal(entry.action, 'submit_review');
   assert.deepEqual(entry.details, {
@@ -102,13 +106,15 @@ test('decideReview(approve) pins {content_revision, publish_action} together in 
   assert.deepEqual(effectiveApproval(result.record), { state: 'approved_current', approval: decision });
 });
 
-test('decideReview is human-only and requires a configured role; pins validate as instants', () => {
+test('decideReview: agents may decide (no role); humans need a role; pins validate as instants', () => {
   const record = pageRecord();
 
+  // Fully agentic: an agent principal decides without any configured role.
   const byAgent = decideReview(record, { actor: agentActor, actorRoles: [], at: AT, decision: 'approve' });
-  assert.equal(byAgent.ok, false);
-  assert.equal(!byAgent.ok && byAgent.body.code, 'human_only');
+  assert.equal(byAgent.ok, true);
+  assert.equal(byAgent.ok && byAgent.body.review_state, 'approved');
 
+  // A human with no configured role still has no standing.
   const noRole = decideReview(record, { actor: reviewer, actorRoles: [], at: AT, decision: 'approve' });
   assert.equal(noRole.ok, false);
   assert.equal(!noRole.ok && noRole.body.code, 'review_role_required');
@@ -139,7 +145,12 @@ test('effectiveApproval derives currency from the pin, not from review.state alo
   const open = submitReview(record, { actor: agentActor, at: AT });
   assert.equal(open.ok && effectiveApproval(open.record).state, 'open');
 
-  const changes = decideReview(record, { actor: reviewer, actorRoles: ['editor'], at: AT, decision: 'request_changes' });
+  const changes = decideReview(record, {
+    actor: reviewer,
+    actorRoles: ['editor'],
+    at: AT,
+    decision: 'request_changes',
+  });
   assert.equal(changes.ok && effectiveApproval(changes.record).state, 'changes_requested');
 
   const approved = decideReview(record, { actor: reviewer, actorRoles: ['editor'], at: AT, decision: 'approve' });

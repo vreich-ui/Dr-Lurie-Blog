@@ -69,7 +69,9 @@ export const reviewerAvailableActions = (input: ReviewerAvailabilityInput): Revi
   return {
     requiresApproval,
     canSubmitForReview: input.hasActiveLock,
-    // Deciding a review is human-only (T1.4 review-state.ts) and only meaningful while open.
+    // This admin surface is human (Netlify Identity), so decide buttons render
+    // for a role-holding human only; agentic approval happens on the MCP path
+    // (review-state.ts decideReview), not here. Decisions are meaningful while open.
     canRequestChanges: isHuman && input.roles.length > 0 && input.review?.state === 'open',
     canApprove: isHuman && input.roles.length > 0 && input.review?.state === 'open',
     // Gated types require a current approval; autonomous types need publish

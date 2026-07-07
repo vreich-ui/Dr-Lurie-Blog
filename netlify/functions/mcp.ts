@@ -1372,7 +1372,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   //    through one MCP surface. Every one proxies to object-store.ts with the
   //    publish key injected server-side; the shared object-verbs.ts core is the
   //    single authority for locks, the approval-policy publish gate, and the
-  //    human-only review-decision rule — this layer adds no new logic. ──
+  //    review-decision rule (now agentic — see object_review_decide) — this
+  //    layer adds no new logic. ──
   {
     name: 'object_submit_review',
     description:
@@ -1393,7 +1394,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_review_decide',
     description:
-      'Approve or request changes on an open review. HUMAN-ONLY (C§2.0): an agent principal (the shared publish key behind every MCP call) is always refused with 403 human_only — the identical rule the admin UI enforces, surfaced here so a human-driven MCP client can decide and so agents receive a truthful refusal rather than a missing verb. On approve, publish_action pins the authorized action (M-6); it is ignored for request_changes. Bumps version, never content_revision.',
+      'Approve or request changes on an open review. Fully agentic: a detached approval agent may decide over the shared MCP publish key, so an object can go edit → approve → publish with no human; a human decides through the admin UI with a configured role. Same shared logic, one path. On approve, publish_action pins the authorized action (M-6) that an agent-executed publish must then match exactly (publish-gate.ts), so an agentic approval is still explicit and pinned; publish_action is ignored for request_changes. Bumps version, never content_revision. TODO: agent approval currently rides the shared publish key and will move to a separate gate/credential dedicated to approval/editor agents.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
