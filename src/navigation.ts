@@ -8,7 +8,7 @@ export const headerData = {
       href: getPermalink('/'),
       links: [
         {
-          text: 'Home',
+          text: 'Homer',
           href: getPermalink('/'),
           description: 'A science-first overview of what changes in skin after 60.',
         },
