@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-06T21:29:28.932Z",
+    "at": "2026-07-07T05:41:22.901Z",
     "from": "objects/navigation/by-id/nav_footer.json",
-    "record_version": 44
+    "record_version": 52
   },
   "footNote": "\n    Educational content only — not medical advice. © Dr. Lurié.\n  ",
   "groups": [
@@ -65,7 +65,7 @@
         },
         {
           "id": "i_early_access",
-          "label": "Early Access",
+          "label": "Get Early Access",
           "target": {
             "href": "/solutions/early-access",
             "kind": "route"
