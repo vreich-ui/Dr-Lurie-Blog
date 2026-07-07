@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-07T12:42:26.375Z",
+    "at": "2026-07-07T19:06:40.938Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 31
+    "record_version": 40
   },
   "actions": [
     {
@@ -20,14 +20,6 @@
         "href": "/newsletter",
         "kind": "route"
       }
-    },
-    {
-      "label": "Testing Newsletter",
-      "style": "secondary",
-      "target": {
-        "href": "/newsletter",
-        "kind": "route"
-      }
     }
   ],
   "groups": [
@@ -35,9 +27,9 @@
       "id": "g_start_here",
       "items": [
         {
-          "description": "Live autonomous policy test: homepage navigation text changed visibly.",
+          "description": "A science-first overview of what changes in skin after 60.",
           "id": "i_home",
-          "label": "Testing Home",
+          "label": "Home",
           "target": {
             "href": "/",
             "kind": "route"
@@ -72,9 +64,9 @@
       "id": "g_learn",
       "items": [
         {
-          "description": "Live autonomous policy test: education library label and description changed.",
+          "description": "Browse all skin science articles and practical explainers.",
           "id": "i_library",
-          "label": "Testing Library",
+          "label": "Education Library",
           "target": {
             "kind": "listing",
             "list": "content_index"
@@ -118,9 +110,9 @@
           }
         },
         {
-          "description": "Live autonomous policy test: early-access menu copy changed.",
+          "description": "Request launch notes, previews, and member-only product updates.",
           "id": "i_join_early_access",
-          "label": "Testing Access",
+          "label": "Join Early Access",
           "target": {
             "href": "/solutions/early-access",
             "kind": "route"
