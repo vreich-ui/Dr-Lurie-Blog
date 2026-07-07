@@ -792,6 +792,21 @@ const objectTypeEnumSchema = (description = 'CMS object type.') => ({
 const anyObjectSchema = (description: string) => ({ type: 'object', additionalProperties: true, description });
 const patchOpsSchema = (description: string) =>
   arraySchema({ type: 'object', additionalProperties: true }, description);
+// The M-6 publish-action pin (review-state.ts publishActionSchema): an ISO
+// instant, the literal string 'immediate', or null (unpublish).
+const publishActionInputSchema = (description: string) =>
+  objectSchema(
+    {
+      published_time: {
+        anyOf: [
+          { type: 'string', minLength: 1, description: 'ISO 8601 instant, or the literal "immediate".' },
+          { type: 'null', description: 'null pins an unpublish.' },
+        ],
+      },
+    },
+    ['published_time'],
+    description
+  );
 
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
@@ -1327,6 +1342,87 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         candidate_patch: patchOpsSchema('Optional ops to dry-run through the engine before validating the result.'),
       },
       ['object_type', 'object_id']
+    ),
+  },
+
+  // ── Review + publish verbs (P1): the same submit_review / review_decide /
+  //    discard / publish_by_time actions the admin UI (admin-object.ts) drives,
+  //    exposed here so an agent can take an object edit → (review) → published
+  //    through one MCP surface. Every one proxies to object-store.ts with the
+  //    publish key injected server-side; the shared object-verbs.ts core is the
+  //    single authority for locks, the approval-policy publish gate, and the
+  //    human-only review-decision rule — this layer adds no new logic. ──
+  {
+    name: 'object_submit_review',
+    description:
+      'Open a review on a CMS object (review_state → "open"). Requires a held lock_token. For an approval-gated object type, pass requested_publish_action to pin the exact action the review requests ({ published_time: ISO | null | "immediate" }); an approval only authorizes agent-executed publish of the action it pinned (M-6). Review bookkeeping bumps version, never content_revision. Same path as the admin UI submit-for-review.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to submit for review.'),
+        note: stringSchema('Optional note recorded on the submit_review history entry.'),
+        requested_publish_action: publishActionInputSchema(
+          'Optional M-6 pin of the publish action being requested, e.g. { published_time: "immediate" }.'
+        ),
+      },
+      ['object_type', 'object_id', 'lock_token']
+    ),
+  },
+  {
+    name: 'object_review_decide',
+    description:
+      'Approve or request changes on an open review. HUMAN-ONLY (C§2.0): an agent principal (the shared publish key behind every MCP call) is always refused with 403 human_only — the identical rule the admin UI enforces, surfaced here so a human-driven MCP client can decide and so agents receive a truthful refusal rather than a missing verb. On approve, publish_action pins the authorized action (M-6); it is ignored for request_changes. Bumps version, never content_revision.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        decision: { type: 'string', enum: ['approve', 'request_changes'], description: 'The review decision.' },
+        note: stringSchema('Optional note recorded on the decision.'),
+        publish_action: publishActionInputSchema(
+          'Optional M-6 pin for an approval, e.g. { published_time: "immediate" }; ignored for request_changes.'
+        ),
+      },
+      ['object_type', 'object_id', 'decision']
+    ),
+  },
+  {
+    name: 'object_discard',
+    description:
+      'Discard rejected draft ops via compensating inverse writes (C§2.4). Requires a held lock_token and the rejected ops exactly as their history entries stored them ({ op, capture }); inverses are applied newest-first as one atomic batch attributed to the caller. This IS a body write: it bumps content_revision and invalidates any approval pinned to the prior revision. A blind revert over intervening accepted ops is refused (409).',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to write the inverse ops.'),
+        entries: arraySchema(
+          objectSchema(
+            {
+              op: { description: 'The rejected patch op, exactly as stored in the record history entry.' },
+              capture: { description: "The op's history capture, exactly as stored alongside it." },
+            },
+            ['op', 'capture']
+          ),
+          'Rejected ops to invert, exactly as their history entries store them (details.op / details.capture).'
+        ),
+      },
+      ['object_type', 'object_id', 'lock_token', 'entries']
+    ),
+  },
+  {
+    name: 'object_publish',
+    description:
+      'Publish a CMS object (page | section | navigation | taxonomy | site | template) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item is not served here — articles keep their own pipeline. A successful publish commits to the repository; production go-live is a separate deploy.',
+    inputSchema: objectSchema(
+      {
+        object_type: objectTypeEnumSchema(),
+        object_id: stringSchema(),
+        lock_token: stringSchema('Lock token from object_checkout; required to publish.'),
+        published_time: nullableStringSchema(
+          'Optional ISO instant. Omit to publish now. null (unpublish) and future timestamps are rejected in this phase.'
+        ),
+      },
+      ['object_type', 'object_id', 'lock_token']
     ),
   },
   {
@@ -3596,6 +3692,44 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         requires_approval: input.requires_approval,
         review_state: input.review_state,
         pending_changes: input.pending_changes,
+      });
+
+    // ── Review + publish verbs (P1) → object-store.ts (publish key injected).
+    //    Faithful passthrough: object-verbs.ts owns locks, the publish gate,
+    //    and the human-only review rule. ──
+    case 'object_submit_review':
+      return callObjectAction(event, {
+        action: 'submit_review',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+        note: input.note,
+        requested_publish_action: input.requested_publish_action,
+      });
+    case 'object_review_decide':
+      return callObjectAction(event, {
+        action: 'review_decide',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        decision: input.decision,
+        note: input.note,
+        publish_action: input.publish_action,
+      });
+    case 'object_discard':
+      return callObjectAction(event, {
+        action: 'discard',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+        entries: input.entries,
+      });
+    case 'object_publish':
+      return callObjectAction(event, {
+        action: 'publish_by_time',
+        object_type: input.object_type,
+        object_id: input.object_id,
+        lock_token: input.lock_token,
+        published_time: input.published_time,
       });
     case 'registry_get': {
       const registry = toNonEmptyString(input.registry) ?? null;
