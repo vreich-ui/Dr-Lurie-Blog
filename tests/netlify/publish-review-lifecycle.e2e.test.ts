@@ -5,28 +5,37 @@ import test from 'node:test';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { materialize, type MaterializableObjectType } from '../../netlify/lib/materialize.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
 import type { HistoryEntry, ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
 
 /**
  * T1.8 — Phase 1 exit drill.
  *
  * Proves the full publish/review machinery works as a SYSTEM — object store,
- * locking, patching, review-state, tier gate, materialize, git commit, and the
- * publish stamp — driven exclusively through `handleObjectVerb`, the single
- * shared dispatcher both production entry points (object-store.ts for agents,
- * admin-object.ts for humans) call. That is the real "system boundary" for
- * Phase 1: unlike Phase 0, the P1 exit criteria (04-phased-plan.md line 64)
- * name no MCP-reachability requirement, so this drill does not route through
- * MCP the way T0.11 did — `handleObjectVerb` IS production behavior here,
- * verbatim, for both auth paths.
+ * locking, patching, review-state, the configurable approval-policy publish
+ * gate, materialize, git commit, and the publish stamp — driven exclusively
+ * through `handleObjectVerb`, the single shared dispatcher both production
+ * entry points (object-store.ts for agents, admin-object.ts for humans)
+ * call. That is the real "system boundary" for Phase 1: unlike Phase 0, the
+ * P1 exit criteria (04-phased-plan.md line 64) name no MCP-reachability
+ * requirement, so this drill does not route through MCP the way T0.11 did —
+ * `handleObjectVerb` IS production behavior here, verbatim, for both auth
+ * paths.
  *
- * Matches 04-phased-plan.md's P1 exit criteria verbatim:
- *   "a test page object completes draft → patch → validate → submit →
- *    approve (field + structural surfaces both exercised, Discard exercised
- *    with an inverse) → publish → derived JSON committed → receipt on
- *    record; a Tier 3 publish attempt by an agent principal is refused; an
- *    approval is correctly invalidated by a subsequent body write and NOT by
- *    lock activity or the publish stamp."
+ * Matches 04-phased-plan.md's P1 exit criteria, UPDATED for the
+ * configurable-approval-policy replacement of T1.4's hardcoded tiers
+ * (2026-07-07, src/config/approval-policy.ts): the old "Tier 3 publish
+ * attempt by an agent principal is refused" criterion no longer holds as a
+ * universal rule — whether an agent may execute a publish is now the
+ * approval policy's call, and once approved, the agent (not a human)
+ * executes it, on every governed type. What survives verbatim: "a test page
+ * object completes draft → patch → validate → submit → approve (field +
+ * structural surfaces both exercised, Discard exercised with an inverse) →
+ * publish → derived JSON committed → receipt on record; an approval is
+ * correctly invalidated by a subsequent body write and NOT by lock activity
+ * or the publish stamp." Scenario 3 below now demonstrates the REPLACEMENT
+ * behavior: a type overridden to require approval still lets the approved
+ * AGENT execute the publish — there is no separate human-execute step.
  *
  * Every scenario below asserts actual end state (record fields, history
  * chains with attributed actors, committed bytes at the mocked git head) —
@@ -185,14 +194,24 @@ const call = (
   store: Store,
   request: ObjectVerbRequest,
   principal: Principal,
-  extra: { publishDeps?: Record<string, unknown> } = {}
+  extra: { publishDeps?: Record<string, unknown>; approvalPolicy?: ApprovalPolicy } = {}
 ) => {
   tick();
   return handleObjectVerb(store as unknown as ObjectVerbStore, request, principal, {
     nowMs: clockMs,
     publishDeps: extra.publishDeps,
+    approvalPolicy: extra.approvalPolicy,
   });
 };
+
+// Both scenarios below deliberately GATE the type under test via an explicit
+// override — the committed dev default is all-autonomous (src/config/
+// approval-policy.ts), which would let publish proceed with no review at
+// all and make the approval-invalidation assertions vacuous. Gating by
+// policy, not by leftover hardcoded tiers, is the whole point of this
+// change.
+const GATE_PAGE: ApprovalPolicy = { master: 'all-autonomous', overrides: { page: 'require-approval' } };
+const GATE_NAVIGATION: ApprovalPolicy = { master: 'all-autonomous', overrides: { navigation: 'require-approval' } };
 
 const historyActions = (record: ObjectRecord): Array<{ action: string; actor: string }> =>
   record.history.map((entry: HistoryEntry) => ({
@@ -201,11 +220,11 @@ const historyActions = (record: ObjectRecord): Array<{ action: string; actor: st
   }));
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Scenario 1 + 2: Tier 2 page — happy-path publish, then a second proposal
+// Scenario 1 + 2: a gated page — happy-path publish, then a second proposal
 // whose approval goes stale before publish (same object, per the brief).
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('Scenario 1+2 (Tier 2 page): propose → approve → agent publishes; then a second approval invalidated by a later body edit is correctly refused', async () => {
+test('Scenario 1+2 (page overridden to require-approval): propose → approve → agent publishes; then a second approval invalidated by a later body edit is correctly refused', async () => {
   await withDrillEnv(async () => {
     const store = createMemoryStore();
     const github = createGitHubApiMock();
@@ -315,7 +334,7 @@ test('Scenario 1+2 (Tier 2 page): propose → approve → agent publishes; then 
     assert.equal(approve1.status, 200, JSON.stringify(approve1.body));
     assert.equal(approve1.body.review_state, 'approved');
 
-    // ── agent publishes: Tier 2 + matching M-6 pin ⇒ allowed ───────────────
+    // ── agent publishes: gated type + matching M-6 pin ⇒ allowed ───────────
     const checkout2 = await call(store, { action: 'checkout', object_type: 'page', object_id: 'page_p1_drill' }, AGENT);
     const lock2 = checkout2.body.lockToken as string;
 
@@ -323,7 +342,7 @@ test('Scenario 1+2 (Tier 2 page): propose → approve → agent publishes; then 
       store,
       { action: 'publish_by_time', object_type: 'page', object_id: 'page_p1_drill', lock_token: lock2 },
       AGENT,
-      { publishDeps: publishDeps(github.fetchImpl) }
+      { publishDeps: publishDeps(github.fetchImpl), approvalPolicy: GATE_PAGE }
     );
     assert.equal(publish1.status, 200, JSON.stringify(publish1.body));
     assert.equal(publish1.body.published, true);
@@ -440,7 +459,7 @@ test('Scenario 1+2 (Tier 2 page): propose → approve → agent publishes; then 
       store,
       { action: 'publish_by_time', object_type: 'page', object_id: 'page_p1_drill', lock_token: lock5 },
       AGENT,
-      { publishDeps: publishDeps(github.fetchImpl) }
+      { publishDeps: publishDeps(github.fetchImpl), approvalPolicy: GATE_PAGE }
     );
     assert.equal(stalePublish.status, 403);
     assert.equal(stalePublish.body.code, 'approval_stale');
@@ -464,10 +483,13 @@ test('Scenario 1+2 (Tier 2 page): propose → approve → agent publishes; then 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Scenario 3: Tier 3 navigation — agent publish refused, human executes.
+// Scenario 3: navigation overridden to require-approval — the REPLACEMENT
+// behavior for the old Tier 3 rule. There is no separate human-execute step
+// anymore: once approved, the AGENT executes the publish. An unapproved
+// attempt is still denied before any commit.
 // ═══════════════════════════════════════════════════════════════════════════
 
-test('Scenario 3 (Tier 3 navigation): approved agent publish is refused; a human executes it successfully', async () => {
+test('Scenario 3 (navigation overridden to require-approval): an unapproved agent publish is denied before any commit; once approved, the agent executes it directly', async () => {
   await withDrillEnv(async () => {
     const store = createMemoryStore();
     const github = createGitHubApiMock();
@@ -510,6 +532,21 @@ test('Scenario 3 (Tier 3 navigation): approved agent publish is refused; a human
     );
     assert.equal(patch.status, 200, JSON.stringify(patch.body));
 
+    // An unapproved agent publish attempt is denied before any commit. The
+    // gate runs BEFORE the lock check in publish_by_time (object-verbs.ts),
+    // so this doesn't need its own lock — lock1 is still held by the patch
+    // above and stays untouched.
+    const githubCallsBeforeDenial = github.calls.length;
+    const unapprovedAttempt = await call(
+      store,
+      { action: 'publish_by_time', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: 'irrelevant-gate-denies-first' },
+      AGENT,
+      { publishDeps: publishDeps(github.fetchImpl), approvalPolicy: GATE_NAVIGATION }
+    );
+    assert.equal(unapprovedAttempt.status, 403);
+    assert.equal(unapprovedAttempt.body.code, 'approval_required');
+    assert.equal(github.calls.length, githubCallsBeforeDenial, 'the denial must happen before any git call');
+
     await call(
       store,
       {
@@ -537,40 +574,22 @@ test('Scenario 3 (Tier 3 navigation): approved agent publish is refused; a human
     assert.equal(approve.status, 200);
     assert.equal(approve.body.review_state, 'approved');
 
-    // Agent attempts to execute the publish: Tier 3 must refuse this
-    // UNCONDITIONALLY, even with a matching, current approval.
+    // Approved: the AGENT — not a human — executes the publish. There is no
+    // separate human-execute step in the configurable-policy model; approval
+    // is the only human touch (src/lib/approval-policy.ts).
     const agentCheckout = await call(store, { action: 'checkout', object_type: 'navigation', object_id: 'nav_p1_drill' }, AGENT);
     const agentLock = agentCheckout.body.lockToken as string;
-    const githubCallsBeforeRefusal = github.calls.length;
 
-    const agentAttempt = await call(
+    const agentPublish = await call(
       store,
       { action: 'publish_by_time', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: agentLock },
       AGENT,
-      { publishDeps: publishDeps(github.fetchImpl) }
+      { publishDeps: publishDeps(github.fetchImpl), approvalPolicy: GATE_NAVIGATION }
     );
-    assert.equal(agentAttempt.status, 403);
-    assert.equal(agentAttempt.body.code, 'human_execution_required');
-    assert.equal(github.calls.length, githubCallsBeforeRefusal, 'the Tier 3 refusal must happen before any git call');
-    assert.equal(store.read('navigation', 'nav_p1_drill').publication.published_time, null, 'still unpublished after the refused attempt');
+    assert.equal(agentPublish.status, 200, JSON.stringify(agentPublish.body));
+    assert.equal(agentPublish.body.published, true);
 
     await call(store, { action: 'checkin', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: agentLock }, AGENT);
-
-    // A human executes the SAME approved change successfully.
-    const humanCheckout = await call(store, { action: 'checkout', object_type: 'navigation', object_id: 'nav_p1_drill' }, HUMAN);
-    assert.equal(humanCheckout.status, 200, JSON.stringify(humanCheckout.body));
-    const humanLock = humanCheckout.body.lockToken as string;
-
-    const humanPublish = await call(
-      store,
-      { action: 'publish_by_time', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: humanLock },
-      HUMAN,
-      { publishDeps: publishDeps(github.fetchImpl) }
-    );
-    assert.equal(humanPublish.status, 200, JSON.stringify(humanPublish.body));
-    assert.equal(humanPublish.body.published, true);
-
-    await call(store, { action: 'checkin', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: humanLock }, HUMAN);
 
     const record = store.read('navigation', 'nav_p1_drill');
     assert.ok(record.publication.published_time, 'the record must now be stamped');
@@ -580,8 +599,9 @@ test('Scenario 3 (Tier 3 navigation): approved agent publish is refused; a human
     const marker = assertCommittedExportMatchesMaterializer(github, 'navigation', 'nav_p1_drill', record.body);
     assert.equal(marker.at, record.publication.published_time);
 
-    // History: the refused agent attempt left NO trace at all (denied before
-    // any write) — checkout/checkin around it are the only artifacts.
+    // History: the denied pre-approval attempt left NO trace at all (the gate
+    // denies before publishObject ever touches the record). The final
+    // publish is attributed to the AGENT, not the reviewer.
     assert.deepEqual(historyActions(record), [
       { action: 'create', actor: 'drill-agent' },
       { action: 'checkout', actor: 'drill-agent' },
@@ -590,10 +610,8 @@ test('Scenario 3 (Tier 3 navigation): approved agent publish is refused; a human
       { action: 'checkin', actor: 'drill-agent' },
       { action: 'review_decide', actor: 'reviewer@example.com' },
       { action: 'checkout', actor: 'drill-agent' },
+      { action: 'publish', actor: 'drill-agent' },
       { action: 'checkin', actor: 'drill-agent' },
-      { action: 'checkout', actor: 'reviewer@example.com' },
-      { action: 'publish', actor: 'reviewer@example.com' },
-      { action: 'checkin', actor: 'reviewer@example.com' },
     ]);
   });
 });

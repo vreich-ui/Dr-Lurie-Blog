@@ -76,7 +76,11 @@ describe('reviewerAvailableActions — gated types (policy: approval required)',
         contentRevision: 4,
         policy: ALL_REQUIRE,
       };
-      assert.equal(reviewerAvailableActions({ ...base, review: undefined }).canPublish, false, `${objectType}: no review`);
+      assert.equal(
+        reviewerAvailableActions({ ...base, review: undefined }).canPublish,
+        false,
+        `${objectType}: no review`
+      );
       assert.equal(
         reviewerAvailableActions({ ...base, review: approvedReview(4) }).canPublish,
         true,

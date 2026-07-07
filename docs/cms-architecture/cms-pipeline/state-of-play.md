@@ -7,6 +7,99 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Standing state (after session 2026-07-07)
+
+| Area                          | State                                                                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Configurable approval policy  | **Landed** (`b50c5e4` + follow-ups on PR #364) — replaces T1.4's hardcoded tier gate entirely. See "New model" below.                                                                       |
+| `netlify/lib/tier-gate.ts`    | **Deleted.** Replaced by `netlify/lib/publish-gate.ts`; `Tier` type and `tierForObjectType` are gone from the codebase.                                                                      |
+| Everything else from 2026-07-06 C | Unchanged — still standing as recorded below (T2.7/T2.6 waiting on Wolf, T3.2–T3.10 landed, homepage cutover still forbidden until T2.7 closes).                                        |
+
+### New model: configurable approval policy (replaces T1.4's hardcoded tiers)
+
+The old scheme hardcoded publish permission by tier: Tier 1 (`content_item`)
+untouched, Tier 2 (`page`/`section`/`template`) agent-publishes-after-approval,
+Tier 3 (`navigation`/`taxonomy`/`site`) approval-plus-**human-executed**. That
+fixed scheme is gone. There is now **one gate, one question, per object type**:
+*does a change to this type require human approval before it can be published?*
+
+- **Not gated (the default):** an agent proposes and publishes directly. Fully
+  autonomous, no human in the loop.
+- **Gated (opt-in):** an agent proposes → the change waits → a human approves
+  → **the agent publishes it**. There is no separate "human executes the
+  publish" step anymore — approval is the only human touch, on every governed
+  type, not just former-Tier-2. If a further edit invalidates the approval
+  (`content_revision` moves), it waits again.
+
+**How Wolf flips posture — one file, no code changes:**
+`src/config/approval-policy.ts`. Two levers:
+
+```ts
+export const approvalPolicyConfig = {
+  master: 'all-autonomous',      // or 'all-require-approval'
+  overrides: {},                 // e.g. { navigation: 'require-approval' }
+} satisfies ApprovalPolicyConfig;
+```
+
+- `master` is the fast lever for the whole system's posture.
+- `overrides` pins individual types (`page`, `section`, `navigation`,
+  `taxonomy`, `site`, `template`) against the master, either direction.
+- Resolution order: per-type override → master switch → hardcoded default
+  `autonomous`. An unconfigured type in an unconfigured system is fully
+  autonomous — this is the checked-in **dev-stage default** (`all-autonomous`,
+  no overrides).
+- `content_item` (articles) is structurally outside this config — the schema
+  rejects it as an override key — and keeps its own pipeline (OQ-8), untouched.
+
+**What's preserved verbatim from T1.4:** the `content_revision`-based approval
+invalidation (an approval is invalidated by a body write, not by lock
+checkout/checkin or the publish stamp — both still bump only `version`); the
+M-6 publish-action pin exactness for agent execution on gated types; the
+patch/inverse Discard mechanism. **What's decoupled:** audit-trail writing
+(history attribution, patch+inverse capture, the publish receipt) never lived
+in the gate to begin with — it's unconditional in `object-patch-apply.ts` and
+`object-publish.ts` regardless of gate outcome, so an autonomous publish is as
+attributed and revertible as an approved one. Nothing needed to change there;
+this was verified, not assumed (see `publish-gate.test.ts`'s explicit
+autonomous-publish-audit-trail assertions and the wiring tests in
+`object-verbs-review.test.ts` / `publish-review-lifecycle.e2e.test.ts`).
+
+**Module map:** `src/lib/approval-policy.ts` (pure resolution: `governedObjectTypes`,
+`publishRequiresApproval`, zod-validated `resolveApprovalPolicy` that THROWS on
+a malformed config rather than silently defaulting permissive) + `src/config/approval-policy.ts`
+(the one editable file) + `netlify/lib/publish-gate.ts` (the server gate,
+replacing `tier-gate.ts`) + `src/lib/admin/object-review-ui.ts` (client-safe
+display-only mirror for the admin UI's button visibility — same policy, same
+resolution, never the enforcement point).
+
+**Consumers updated:** `object-verbs.ts` (gate + inventory both take an
+injectable `approvalPolicy`, defaulting to the committed config),
+`object-inventory.ts` (`tier` field replaced by `requires_approval`),
+`mcp.ts`'s `object_inventory` tool (same rename), `admin-auth-state.ts` (comment
+only, gate reference updated). Three scripts (`drill-footer-cta.mjs`,
+`patch-nav-header-t28-t29.mjs`, `submit-navigation-review.mjs`) had their old
+"expect-403 live agent publish probe" removed — under an autonomous posture
+that probe would have actually **published**, not been refused, so firing it
+blind was no longer safe; `--verify-tier3` is retired with an explicit error
+pointing at the offline gate-matrix tests instead.
+
+**Test matrix (`tests/netlify/publish-gate.test.ts`, new, replaces
+`tier-gate.test.ts`):** every master × override × type combination in both
+directions (master all-autonomous per type, master all-require-approval per
+type, one override against each master for every governed type), the config
+parse itself (dev default pinned; malformed configs throw; `content_item` and
+typo'd keys rejected), M-6 pin exactness, the full content_revision
+invalidation lifecycle (survives lock ops and the publish stamp, dies on a
+body write), and two explicit "changing the config changes behavior
+immediately" tests. `object-verbs-review.test.ts` and
+`publish-review-lifecycle.e2e.test.ts` (the T1.8 exit drill) were rewritten at
+the wiring/e2e level for the same model — including a new drill scenario
+proving the replacement behavior end-to-end: gated navigation, approved by a
+human, **published by the agent**, not a human.
+
+Full suite green (822 netlify/src tests + 20 script tests, eslint/astro/prettier
+clean) before this landed.
+
 ## Standing state (after session 2026-07-06 C)
 
 | Area                   | State                                                                                                                                             |

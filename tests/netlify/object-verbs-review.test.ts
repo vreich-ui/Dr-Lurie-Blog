@@ -283,58 +283,7 @@ const createGitHubApiMock = () => {
   return { fetchImpl, calls };
 };
 
-test('publish_by_time: an agent is refused before any commit for a Tier 3 object (navigation), approved or not', async () => {
-  await withGitHubEnv(async () => {
-    const store = createMemoryStore();
-    const objectId = await seedNav(store);
-    const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
-    await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken, requested_publish_action: { published_time: 'immediate' } });
-    await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
-    await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve', publish_action: { published_time: 'immediate' } }, HUMAN_ADMIN);
-
-    const relock = await checkoutAs(store, 'navigation', objectId, AGENT);
-    const github = createGitHubApiMock();
-    const result = await call(
-      store,
-      { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock },
-      AGENT,
-      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} } }
-    );
-
-    assert.equal(result.status, 403);
-    assert.equal(result.body.code, 'human_execution_required');
-    assert.equal(github.calls.length, 0, 'the gate must deny before any GitHub call');
-  });
-});
-
-test('publish_by_time: a human admin executes an approved Tier 3 publish end to end', async () => {
-  await withGitHubEnv(async () => {
-    await withRoleEnv(async () => {
-      const store = createMemoryStore();
-      const objectId = await seedNav(store);
-      const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
-      await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken });
-      await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
-      await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve' }, HUMAN_ADMIN);
-
-      const relock = await checkoutAs(store, 'navigation', objectId, HUMAN_ADMIN);
-      const github = createGitHubApiMock();
-      const result = await call(
-        store,
-        { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock },
-        HUMAN_ADMIN,
-        { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} } }
-      );
-
-      assert.equal(result.status, 200, JSON.stringify(result.body));
-      assert.equal(result.body.published, true);
-      const record = stored(store, 'navigation', objectId);
-      assert.ok(record.publication.published_time, 'the record must be stamped');
-    });
-  });
-});
-
-test('publish_by_time: an unapproved Tier 2 page is denied before any commit', async () => {
+test('publish_by_time: under the default (committed) policy, an agent publishes a page directly with zero review', async () => {
   await withGitHubEnv(async () => {
     const store = createMemoryStore();
     const create = await call(
@@ -351,6 +300,9 @@ test('publish_by_time: an unapproved Tier 2 page is denied before any commit', a
     const lockToken = await checkoutAs(store, 'page', objectId, AGENT);
     const github = createGitHubApiMock();
 
+    // No submit_review / review_decide at all — the dev-stage default
+    // (src/config/approval-policy.ts: all-autonomous, no overrides) means
+    // this publishes straight through when no policy is injected.
     const result = await call(
       store,
       { action: 'publish_by_time', object_type: 'page', object_id: objectId, lock_token: lockToken },
@@ -358,8 +310,84 @@ test('publish_by_time: an unapproved Tier 2 page is denied before any commit', a
       { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} } }
     );
 
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.published, true);
+    assert.ok(github.calls.length > 0, 'an autonomous publish still commits the export');
+    const record = stored(store, 'page', objectId);
+    assert.ok(record.publication.published_time, 'the record must be stamped');
+  });
+});
+
+test('publish_by_time: with navigation overridden to require-approval, an unapproved agent is denied before any commit', async () => {
+  await withGitHubEnv(async () => {
+    const store = createMemoryStore();
+    const objectId = await seedNav(store);
+    const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
+    const github = createGitHubApiMock();
+
+    const result = await call(
+      store,
+      { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: lockToken },
+      AGENT,
+      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} }, approvalPolicy: GATE_NAVIGATION }
+    );
+
     assert.equal(result.status, 403);
     assert.equal(result.body.code, 'approval_required');
-    assert.equal(github.calls.length, 0);
+    assert.equal(github.calls.length, 0, 'the gate must deny before any GitHub call');
+  });
+});
+
+test('publish_by_time: with navigation overridden to require-approval, an APPROVED agent executes the publish directly (no separate human-execute step)', async () => {
+  await withGitHubEnv(async () => {
+    const store = createMemoryStore();
+    const objectId = await seedNav(store);
+    const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
+    await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken, requested_publish_action: { published_time: 'immediate' } });
+    await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
+    await withRoleEnv(async () => {
+      await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve', publish_action: { published_time: 'immediate' } }, HUMAN_ADMIN);
+    });
+
+    const relock = await checkoutAs(store, 'navigation', objectId, AGENT);
+    const github = createGitHubApiMock();
+    const result = await call(
+      store,
+      { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock },
+      AGENT,
+      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} }, approvalPolicy: GATE_NAVIGATION }
+    );
+
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.published, true, 'the agent — not a human — executes the publish once approved');
+    const record = stored(store, 'navigation', objectId);
+    assert.ok(record.publication.published_time, 'the record must be stamped');
+  });
+});
+
+test('publish_by_time: with navigation overridden to require-approval, a human admin executes an approved publish end to end', async () => {
+  await withGitHubEnv(async () => {
+    await withRoleEnv(async () => {
+      const store = createMemoryStore();
+      const objectId = await seedNav(store);
+      const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
+      await call(store, { action: 'submit_review', object_type: 'navigation', object_id: objectId, lock_token: lockToken });
+      await call(store, { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken }, AGENT);
+      await call(store, { action: 'review_decide', object_type: 'navigation', object_id: objectId, decision: 'approve' }, HUMAN_ADMIN);
+
+      const relock = await checkoutAs(store, 'navigation', objectId, HUMAN_ADMIN);
+      const github = createGitHubApiMock();
+      const result = await call(
+        store,
+        { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock },
+        HUMAN_ADMIN,
+        { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} }, approvalPolicy: GATE_NAVIGATION }
+      );
+
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      assert.equal(result.body.published, true);
+      const record = stored(store, 'navigation', objectId);
+      assert.ok(record.publication.published_time, 'the record must be stamped');
+    });
   });
 });
