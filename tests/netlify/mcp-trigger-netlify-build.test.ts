@@ -141,7 +141,7 @@ const callReleaseToProduction = async (args: Record<string, unknown> = {}): Prom
   return body.result;
 };
 
-test('release_to_production is listed and documents that publishing already deploys', async () => {
+test('release_to_production is listed and documents the deferred-deploy release model', async () => {
   const response = await handler({
     httpMethod: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -153,7 +153,7 @@ test('release_to_production is listed and documents that publishing already depl
   const tool = body.result.tools.find((candidate) => candidate.name === 'release_to_production');
 
   assert.ok(tool, 'expected tools/list to include release_to_production');
-  assert.match(tool!.description, /auto-builds on every push/i);
+  assert.match(tool!.description, /\[skip netlify\]/i);
   assert.match(tool!.description, /released:true only when/i);
 });
 

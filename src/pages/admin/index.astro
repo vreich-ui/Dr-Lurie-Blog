@@ -87,8 +87,8 @@ const metadata = {
           <p class="dashboard-kicker">Deploy</p>
           <h2>Release to Production</h2>
           <p>
-            Publishing already auto-deploys on push. Use this to force a fresh production build and wait until the live
-            site is confirmed on the latest commit.
+            Object publishes commit to main with <code>[skip netlify]</code> and do not deploy on their own. Release builds
+            the accumulated exports once and waits until the live site is confirmed on the latest commit.
           </p>
           <button type="button" class="btn-secondary" data-admin-release>Release to production</button>
           <p class="release-status" data-admin-release-status aria-live="polite" role="status"></p>

@@ -1069,7 +1069,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'release_to_production',
     description:
-      'Force a fresh production build and BLOCK until the live production deploy is confirmed on a specific commit — the synchronous, verified counterpart to trigger_netlify_build. Publishing already deploys (Netlify auto-builds on every push to the content branch), so this is NOT required to make a change go live; use it when you need to CONFIRM go-live or force a rebuild and wait for it. Steps: resolve the target commit (defaults to the content branch HEAD), POST the same server-side build hook trigger_netlify_build uses (the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when a ready production deploy matches the target commit; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). Consumes real build minutes — do not spam it; batch publishes and release once.',
+      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when a ready production deploy matches the target commit; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes. NOTE: if the site\'s Netlify "Auto Publishing" is Locked, the build succeeds as a deploy preview but does NOT update production until it is unlocked or the deploy is published manually.',
     inputSchema: objectSchema({
       commit: stringSchema(
         'Optional commit SHA the live production deploy must reflect. Defaults to the current content branch HEAD.'
@@ -1433,7 +1433,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_publish',
     description:
-      'Publish a CMS object (page | section | navigation | taxonomy | site | template) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item is not served here — articles keep their own pipeline. A successful publish commits to the repository; production go-live is a separate deploy.',
+      'Publish a CMS object (page | section | navigation | taxonomy | site | template) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item is not served here — articles keep their own pipeline. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -2615,15 +2615,14 @@ const callObjectAction = async (event: LambdaEvent, payload: Record<string, unkn
   return toolResult(result);
 };
 
-// A successful object publish COMMITS to the content branch. Netlify auto-builds
-// on push, so the commit has triggered a production deploy — but the deploy is
-// asynchronous, so the change is not live the instant this returns. Attach an
-// explicit, honest production status to every successful publish so an agent
-// never mistakes "committed" for "live". (Reshaped from the original
-// "requires explicit release" wording: publishing DOES promote — via the push
-// — so the truthful guidance is "wait/confirm", not "release to go live".)
+// A successful object publish COMMITS the export to main with the Netlify skip
+// marker ([skip netlify]), so the push does NOT build or deploy — object
+// exports deliberately accumulate on main and go live only on an explicit
+// release. Attach an explicit production status to every successful publish so
+// an agent never mistakes "committed" for "live" and knows the deploy is a
+// separate, deliberate step (release_to_production / the admin button).
 const OBJECT_PUBLISH_LIVE_NOTE =
-  'Committed to the content branch. Netlify auto-builds on push, so this commit has triggered a production deploy — but the deploy is asynchronous and the change is NOT live yet (a build typically takes ~30-120s). Poll deploy_status with the receipt commit_sha until deployStatus is "ready", or call release_to_production to force a fresh build and block until the live site is confirmed on this commit.';
+  'Committed to main with the Netlify skip marker ([skip netlify]): this commit does NOT build or deploy, so the change is NOT live and will not go live on its own. Object exports accumulate on main until an explicit release. Call release_to_production (or use the admin "Release to Production" button) to POST the production build hook once and deploy all accumulated exports as a single deploy, then confirm the live site.';
 
 const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unknown>) => {
   const result = await invokeObjectStore(event, payload);
@@ -2635,7 +2634,8 @@ const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unk
     production: {
       committed: true,
       live: false,
-      deploy_triggered_by_push: true,
+      deploy_deferred: true,
+      requires_explicit_release: true,
       note: OBJECT_PUBLISH_LIVE_NOTE,
     },
   });

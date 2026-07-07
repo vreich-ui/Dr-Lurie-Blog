@@ -245,6 +245,13 @@ test('the P1 review + publish tools declare the right required fields', async ()
   assert.deepEqual(decision.enum, ['approve', 'request_changes']);
 });
 
+test('object_publish documents the deferred-deploy model ([skip netlify], explicit release)', async () => {
+  const tools = await listTools();
+  const description = getTool(tools, 'object_publish').description;
+  assert.match(description, /\[skip netlify\]/i);
+  assert.match(description, /release_to_production/);
+});
+
 test('object_submit_review under a held lock opens a review through the proxy', async () => {
   await reset();
   await callTool('object_create', {

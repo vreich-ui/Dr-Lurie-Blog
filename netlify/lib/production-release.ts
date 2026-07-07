@@ -1,25 +1,28 @@
 /**
  * Production release + verification (Gap 2).
  *
- * Deploy reality (confirmed with the site owner, 2026-07-07): pushing to the
- * content branch auto-builds and auto-deploys on Netlify — a CMS object or
- * article publish already triggers a production deploy by committing to main.
- * So this is NOT a "promotion gate" that makes an otherwise-dark commit live;
- * publishing is what makes it live. What this module adds is the honest
- * other half of that story: a publish returns as soon as the COMMIT lands,
- * but the DEPLOY is asynchronous, so "committed" != "live" for the ~30-120s
- * the build runs. releaseToProduction lets an agent (or the admin dashboard)
- * force a fresh production build and then BLOCK until it can prove the live
- * production deploy reflects a specific commit.
+ * Deploy model: object-export publishes commit to main with `[skip netlify]`
+ * (see object-publish.ts), so pushing them does NOT build or deploy — the
+ * exports accumulate on main, dark, until an explicit release. This module IS
+ * that release: it fires the production build hook once (producing a single
+ * deploy that includes every accumulated skipped commit) and then BLOCKS until
+ * it can prove the live production deploy reflects a specific commit. This is
+ * what separates object export from production deploy.
  *
- * The build hook is the only thing here that can start a production build
- * (the project invariant): forceBuild POSTs `NETLIFY_BUILD_HOOK_URL` through
- * the existing triggerNetlifyBuild — there is deliberately no second env var
- * and no other trigger path. Everything else is read-only: resolve the target
- * commit (the content branch HEAD via the GitHub ref API, the same
- * GITHUB_CONTENT_TOKEN/GITHUB_REPOSITORY/GITHUB_BRANCH contract the object
- * committer uses), then poll Netlify deploy receipts until the deploy for that
- * commit is terminal, and report whether production actually reflects it.
+ * The build hook is the only thing here that can start a production build (the
+ * project invariant, and the whole point of the deferral): forceBuild POSTs
+ * `NETLIFY_BUILD_HOOK_URL` through the existing triggerNetlifyBuild — there is
+ * deliberately no second env var and no other trigger path. Everything else is
+ * read-only: resolve the target commit (the content-branch HEAD via the GitHub
+ * ref API, the same GITHUB_CONTENT_TOKEN/GITHUB_REPOSITORY/GITHUB_BRANCH
+ * contract the object committer uses — HEAD is exactly the accumulation point),
+ * then poll Netlify deploy receipts until the deploy for that commit is
+ * terminal, and report whether production actually reflects it.
+ *
+ * Operational note (not enforceable here): the build hook only helps if the
+ * site's Netlify builds are active and "Auto Publishing" is unlocked. Under a
+ * locked deploy, Netlify still builds but does not publish to the main site —
+ * a released:false / not-confirmed-live result can mean exactly that.
  *
  * Shared by BOTH surfaces so there is one release path, never two: the
  * `release_to_production` MCP tool (agents) and the admin dashboard
