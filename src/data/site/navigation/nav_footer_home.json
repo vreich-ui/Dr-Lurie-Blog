@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-06T10:02:39.748Z",
+    "at": "2026-07-07T12:48:13.189Z",
     "from": "objects/navigation/by-id/nav_footer_home.json",
-    "record_version": 8
+    "record_version": 24
   },
   "brand": {
     "descriptor": "Healthy Skin for Skincare Newcomers",
@@ -15,7 +15,7 @@
       "items": [
         {
           "id": "i_start_here",
-          "label": "Start Here",
+          "label": "Testing Start",
           "target": {
             "href": "/start-here",
             "kind": "route"
@@ -23,7 +23,7 @@
         },
         {
           "id": "i_library",
-          "label": "Library",
+          "label": "Testing Library",
           "target": {
             "kind": "listing",
             "list": "content_index"
@@ -61,7 +61,7 @@
         },
         {
           "id": "i_newsletter",
-          "label": "Newsletter",
+          "label": "Testing Newsletter",
           "target": {
             "href": "/newsletter",
             "kind": "route"
@@ -83,7 +83,7 @@
         },
         {
           "id": "i_privacy",
-          "label": "Privacy",
+          "label": "Testing Privacy",
           "target": {
             "href": "/privacy",
             "kind": "route"
