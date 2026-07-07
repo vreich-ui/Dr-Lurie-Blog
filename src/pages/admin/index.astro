@@ -83,6 +83,17 @@ const metadata = {
           <a class="btn-secondary" href="/admin/blobs">Manage blobs</a>
         </article>
 
+        <article class="dashboard-card">
+          <p class="dashboard-kicker">Deploy</p>
+          <h2>Release to Production</h2>
+          <p>
+            Publishing already auto-deploys on push. Use this to force a fresh production build and wait until the live
+            site is confirmed on the latest commit.
+          </p>
+          <button type="button" class="btn-secondary" data-admin-release>Release to production</button>
+          <p class="release-status" data-admin-release-status aria-live="polite" role="status"></p>
+        </article>
+
         <article class="dashboard-card dashboard-card-wide">
           <p class="dashboard-kicker">Coming soon</p>
           <h2>Dashboard roadmap</h2>
@@ -199,6 +210,13 @@ const metadata = {
     margin: 0.85rem 0 1.15rem;
   }
 
+  .release-status {
+    margin: 0.9rem 0 0;
+    min-height: 1.2em;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
   .dashboard-card ul {
     margin: 1rem 0 0;
     padding-left: 1.25rem;
@@ -277,6 +295,47 @@ const metadata = {
       // Wire up the Sign In button inside the gate panel
       document.querySelector('[data-admin-open-login]')?.addEventListener('click', () => {
         window.__drLurieLoginModal?.open();
+      });
+
+      // Wire up the "Release to Production" button — the human mirror of the
+      // release_to_production MCP tool, calling the same shared release path via
+      // the admin-release function (Netlify Identity authed).
+      const releaseButton = document.querySelector('[data-admin-release]');
+      const releaseStatus = document.querySelector('[data-admin-release-status]');
+      const setReleaseStatus = (message) => {
+        if (releaseStatus) releaseStatus.textContent = message;
+      };
+      releaseButton?.addEventListener('click', async () => {
+        if (releaseButton.disabled) return;
+        releaseButton.disabled = true;
+        setReleaseStatus('Forcing a production build and waiting for the deploy…');
+        try {
+          const token = await getAccessToken();
+          if (!token) {
+            setReleaseStatus('Sign in again to release.');
+            return;
+          }
+          const response = await fetch('/.netlify/functions/admin-release', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          const payload = await response.json().catch(() => ({}));
+          const result = payload && payload.result;
+          if (response.ok && result && result.released) {
+            const shortCommit = result.targetCommit ? String(result.targetCommit).slice(0, 7) : 'latest';
+            setReleaseStatus(`Live on ${shortCommit}.`);
+          } else if (result && result.reason) {
+            setReleaseStatus(result.reason);
+          } else {
+            setReleaseStatus((payload && payload.error) || 'Release could not be completed. Check deploy status.');
+          }
+        } catch (error) {
+          console.error('Production release failed.', error);
+          setReleaseStatus('Release failed. Please try again.');
+        } finally {
+          releaseButton.disabled = false;
+        }
       });
 
       const getAdminStateForUser = async (_user) => {
