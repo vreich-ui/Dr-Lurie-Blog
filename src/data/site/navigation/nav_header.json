@@ -1,18 +1,10 @@
 {
   "__generated": {
-    "at": "2026-07-07T19:06:40.938Z",
+    "at": "2026-07-07T19:14:00.783Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 40
+    "record_version": 44
   },
   "actions": [
-    {
-      "label": "Join Early Access",
-      "style": "primary",
-      "target": {
-        "href": "/solutions/early-access",
-        "kind": "route"
-      }
-    },
     {
       "label": "Join Newsletter",
       "style": "primary",
