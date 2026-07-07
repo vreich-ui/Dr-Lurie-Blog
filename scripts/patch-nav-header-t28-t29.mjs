@@ -154,21 +154,12 @@ console.info(
     `${warnings.length ? `warnings: ${warnings.join(', ')}` : 'zero warnings (the duplicate-target warning is gone, as expected)'}.`
 );
 
-// Tier 3 regression check: agent publish must still be refused.
-const attempt = await call({
-  action: 'publish_by_time',
-  object_type: 'navigation',
-  object_id: NAV_HEADER_OBJECT_ID,
-  lock_token: lockToken,
-});
-if (attempt.status === 403) {
-  console.info(`[patch-t28-t29] agent publish refused as required (403 ${attempt.body.code ?? ''}).`);
-} else {
-  console.error(
-    `[patch-t28-t29] TIER 3 REGRESSION — agent publish was NOT refused (got ${attempt.status}: ${JSON.stringify(attempt.body)}). ` +
-      'STOP: do not proceed to a human publish until this is understood.'
-  );
-}
+// The old "Tier 3 regression check" (a live agent publish_by_time expecting
+// 403) is deliberately GONE: publish authorization is now the configurable
+// approval policy (src/config/approval-policy.ts), and under an autonomous
+// posture that probe would not be refused — it would PUBLISH. Never fire a
+// publish call as a refusal probe; the gate matrix is covered offline in
+// tests/netlify/publish-gate.test.ts.
 
 const submit = await call({
   action: 'submit_review',

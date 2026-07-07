@@ -14,7 +14,7 @@
  *     the edit on a highlighted span; absent, the model revises the whole
  *     object (the article "revise this block" fallback, A§1.4).
  *
- * content_item is refused here — Tier 1 keeps the existing article Ask-AI
+ * content_item is refused here — articles keep the existing article Ask-AI
  * (admin-ask-ai-node.ts), which this task does not touch.
  *
  * Pure/testable like object-verbs.ts: auth, the real blob store, and env come

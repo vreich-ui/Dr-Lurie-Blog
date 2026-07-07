@@ -2,14 +2,17 @@
 /**
  * T2.3 (agent side) — submit the three seeded Navigation drafts for review.
  *
- * This script drives everything an agent principal MAY do for the first
- * Tier 3 publish, and nothing it may not (C§2.2: navigation publish is
- * human-executed, always):
+ * This script drives the agent side of the first navigation publish:
  *
- *   per record: PRE-FLIGHT (see below) → checkout → agent publish attempt
- *   (MUST be refused, 403 — the Tier 3 regression check in production
- *   config) → submit_review → checkin (review state survives checkin; the
- *   record is left unlocked for the human publisher).
+ *   per record: PRE-FLIGHT (see below) → checkout → submit_review → checkin
+ *   (review state survives checkin; the record is left unlocked for the
+ *   human publisher).
+ *
+ * 2026-07-07: the fixed Tier 3 human-execute rule (and this script's old
+ * expect-403 agent publish probe + --verify-tier3 mode) was replaced by the
+ * configurable approval policy — see src/config/approval-policy.ts. The
+ * probe is gone because under an autonomous posture it would PUBLISH, not
+ * be refused.
  *
  * PRE-FLIGHT — added after the first production run, where this script
  * submitted records for review even though the seed step had just reported
@@ -25,17 +28,12 @@
  * A record failing pre-flight is NOT submitted, and the run exits non-zero.
  *
  * No requested_publish_action is sent: the M-6 publish-action pin exists for
- * Tier 2 AGENT-executed publishes; here the publish itself is Wolf's act and
- * humans carry publish authority in themselves (C§2.2).
- *
- * After approval (and BEFORE the human publish), `--verify-tier3` re-checks
- * the stronger half of the regression: an agent attempt is still refused
- * even WITH an approved review on the record.
+ * agent-executed publishes of approval-gated types; here the publish is
+ * Wolf's act and humans carry publish authority in themselves (C§2.2).
  *
  * Usage:
  *   node scripts/submit-navigation-review.mjs                 # dry run
  *   node scripts/submit-navigation-review.mjs --execute       # pre-flight + submit all three
- *   node scripts/submit-navigation-review.mjs --verify-tier3  # post-approval refusal check
  *
  * Env: PUBLISH_SECRET (required), OBJECT_STORE_BASE_URL (default
  * http://localhost:8888). The human steps live in
@@ -48,10 +46,23 @@ const AGENT_NAME = 'phase-2-navigation-seed';
 
 const args = new Set(process.argv.slice(2));
 const execute = args.has('--execute');
-const verifyTier3 = args.has('--verify-tier3');
 const baseUrl = process.env.OBJECT_STORE_BASE_URL || 'http://localhost:8888';
 
-if (!execute && !verifyTier3) {
+if (args.has('--verify-tier3')) {
+  // Retired 2026-07-07: the fixed Tier 3 rule was replaced by the
+  // configurable approval policy (src/config/approval-policy.ts). The old
+  // check fired a live agent publish_by_time expecting a 403 — under an
+  // autonomous posture that call would PUBLISH, so it must never run blind.
+  console.error(
+    '[submit-review] --verify-tier3 is retired: publish authorization is now the configurable approval policy ' +
+      '(src/config/approval-policy.ts); the fixed "agents never publish navigation" rule no longer exists, and the ' +
+      'old probe would actually publish under an autonomous posture. The gate matrix is verified offline in ' +
+      'tests/netlify/publish-gate.test.ts.'
+  );
+  process.exit(2);
+}
+
+if (!execute) {
   console.info(
     '[submit-review] Dry run. --execute would, for each of:',
     NAVIGATION_SEEDS.map((seed) => seed.objectId).join(', ')
@@ -59,11 +70,9 @@ if (!execute && !verifyTier3) {
   console.info('  0. PRE-FLIGHT: draft exists + body byte-identical to the seed + validate has no blockers');
   console.info('     (a record failing pre-flight is NOT submitted; the run exits non-zero)');
   console.info('  1. checkout                      (object-store action=checkout)');
-  console.info('  2. publish attempt as agent      (action=publish_by_time — EXPECTED to be refused, 403 Tier 3)');
-  console.info('  3. submit_review                 (action=submit_review, note, no requested_publish_action)');
-  console.info('  4. checkin                       (record left unlocked for the human publisher)');
+  console.info('  2. submit_review                 (action=submit_review, note, no requested_publish_action)');
+  console.info('  3. checkin                       (record left unlocked for the human publisher)');
   console.info('Then Wolf approves + publishes in the admin objects editor (see phase-2-runbook.md).');
-  console.info('After approving, run --verify-tier3 to confirm an agent publish is refused even with approval.');
   process.exit(0);
 }
 
@@ -123,35 +132,12 @@ for (const seed of NAVIGATION_SEEDS) {
     continue;
   }
 
-  // Tier 3 regression check: the publish attempt by an agent principal MUST
-  // be refused (403) — approval state is irrelevant to this rule.
-  const attempt = await call({
-    action: 'publish_by_time',
-    object_type: 'navigation',
-    object_id: objectId,
-    lock_token: lockToken,
-  });
-  if (attempt.status === 403) {
-    console.info(`${label}: agent publish refused as required (403 ${attempt.body.code ?? ''}).`);
-  } else {
-    fail(
-      `${label}: TIER 3 REGRESSION — agent publish was NOT refused with 403 (got ${attempt.status}: ` +
-        `${JSON.stringify(attempt.body)}). STOP: do not proceed to a human publish until this is understood.`
-    );
-  }
-
-  if (verifyTier3) {
-    // Post-approval mode: only the refusal check + checkin; no resubmission
-    // (a resubmission would be a no-op but muddies the review history).
-    const checkin = await call({
-      action: 'checkin',
-      object_type: 'navigation',
-      object_id: objectId,
-      lock_token: lockToken,
-    });
-    if (checkin.status !== 200) fail(`${label}: checkin failed (${checkin.status}): ${JSON.stringify(checkin.body)}`);
-    continue;
-  }
+  // The old "Tier 3 regression check" (a live agent publish_by_time expecting
+  // 403) is deliberately GONE: publish authorization is now the configurable
+  // approval policy (src/config/approval-policy.ts), and under an autonomous
+  // posture that probe would not be refused — it would PUBLISH. Never fire a
+  // publish call as a refusal probe; the gate matrix is covered offline in
+  // tests/netlify/publish-gate.test.ts.
 
   const submit = await call({
     action: 'submit_review',
@@ -182,11 +168,6 @@ if (failed) {
   console.error('[submit-review] FAILED — see above. Records that failed pre-flight were NOT submitted.');
   process.exit(1);
 }
-if (verifyTier3) {
-  console.info('[submit-review] Tier 3 verified: agent publish attempts refused on all three records.');
-  console.info('[submit-review] The human publish can proceed (phase-2-runbook.md step 3).');
-} else {
-  console.info('[submit-review] All three records passed pre-flight, submitted, and unlocked.');
-  console.info('[submit-review] NEXT (human, Wolf): review + approve + publish each record in /admin/objects/…');
-  console.info('[submit-review] The full click-path is in docs/cms-architecture/cms-pipeline/phase-2-runbook.md.');
-}
+console.info('[submit-review] All three records passed pre-flight, submitted, and unlocked.');
+console.info('[submit-review] NEXT (human, Wolf): review + approve + publish each record in /admin/objects/…');
+console.info('[submit-review] The full click-path is in docs/cms-architecture/cms-pipeline/phase-2-runbook.md.');

@@ -1,102 +1,111 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { reviewerAvailableActions, tierForDisplay } from './object-review-ui.js';
+import { reviewerAvailableActions } from './object-review-ui.js';
+import { governedObjectTypes, type ApprovalPolicy } from '../approval-policy.js';
 
-describe('tierForDisplay', () => {
-  it('maps page/section/template to Tier 2 and navigation/taxonomy/site to Tier 3', () => {
-    assert.equal(tierForDisplay('page'), 2);
-    assert.equal(tierForDisplay('section'), 2);
-    assert.equal(tierForDisplay('template'), 2);
-    assert.equal(tierForDisplay('navigation'), 3);
-    assert.equal(tierForDisplay('taxonomy'), 3);
-    assert.equal(tierForDisplay('site'), 3);
-  });
-});
+const ALL_AUTONOMOUS: ApprovalPolicy = { master: 'all-autonomous', overrides: {} };
+const ALL_REQUIRE: ApprovalPolicy = { master: 'all-require-approval', overrides: {} };
 
 const approvedReview = (contentRevision: number) => ({
   state: 'approved' as const,
   decisions: [{ content_revision: contentRevision }],
 });
 
-describe('reviewerAvailableActions — the Tier 3 / agent acceptance criterion', () => {
-  it('a Tier 3 object with a current approval offers Publish to a human but never to an agent', () => {
-    const base = {
-      objectType: 'navigation' as const,
-      hasActiveLock: false,
-      review: approvedReview(4),
-      contentRevision: 4,
-    };
-
-    const forHuman = reviewerAvailableActions({ ...base, principalKind: 'human', roles: ['admin'] });
-    assert.equal(forHuman.canPublish, true, 'a role-holding human with a current approval must see Publish');
-
-    const forAgent = reviewerAvailableActions({ ...base, principalKind: 'agent', roles: [] });
-    assert.equal(forAgent.canPublish, false, 'an agent must never be offered Publish for a Tier 3 object');
-  });
-
-  it('an agent is denied Publish for every Tier 3 type even with a current approval and (hypothetically) admin roles', () => {
-    for (const objectType of ['navigation', 'taxonomy', 'site'] as const) {
+describe('reviewerAvailableActions — autonomous types (policy: no approval required)', () => {
+  it('offers Publish to a role-holding human with no review at all, for every governed type', () => {
+    for (const objectType of governedObjectTypes) {
       const result = reviewerAvailableActions({
         objectType,
-        principalKind: 'agent',
-        roles: ['admin', 'publisher'], // agents never actually carry roles (roles.ts) — proves this isn't a role gap
-        hasActiveLock: true,
-        review: approvedReview(1),
-        contentRevision: 1,
+        principalKind: 'human',
+        roles: ['admin'],
+        hasActiveLock: false,
+        review: undefined,
+        contentRevision: 3,
+        policy: ALL_AUTONOMOUS,
       });
-      assert.equal(result.canPublish, false, `${objectType}: agent must be denied regardless of roles`);
+      assert.equal(result.requiresApproval, false, objectType);
+      assert.equal(result.canPublish, true, `${objectType}: autonomous types publish without approval`);
     }
   });
 
-  it('Tier 2 also requires a current approval + role for a human, and is likewise absent for an agent', () => {
-    for (const objectType of ['page', 'section', 'template'] as const) {
-      const humanApproved = reviewerAvailableActions({
-        objectType,
-        principalKind: 'human',
-        roles: ['publisher'],
-        hasActiveLock: false,
-        review: approvedReview(2),
-        contentRevision: 2,
-      });
-      assert.equal(humanApproved.canPublish, true);
+  it('still hides Publish from humans without a publish role, and from agents', () => {
+    const editor = reviewerAvailableActions({
+      objectType: 'page',
+      principalKind: 'human',
+      roles: ['editor'],
+      hasActiveLock: false,
+      contentRevision: 1,
+      policy: ALL_AUTONOMOUS,
+    });
+    assert.equal(editor.canPublish, false, 'publish authority (admin/publisher) is still required');
 
-      const agentApproved = reviewerAvailableActions({
-        objectType,
-        principalKind: 'agent',
-        roles: [],
-        hasActiveLock: false,
-        review: approvedReview(2),
-        contentRevision: 2,
-      });
-      assert.equal(agentApproved.canPublish, false);
-    }
+    const agent = reviewerAvailableActions({
+      objectType: 'page',
+      principalKind: 'agent',
+      roles: [],
+      hasActiveLock: true,
+      contentRevision: 1,
+      policy: ALL_AUTONOMOUS,
+    });
+    assert.equal(agent.canPublish, false, 'this surface is human-only; agents never see Publish here');
+  });
+
+  it('the committed config (dev default all-autonomous) is used when no policy is injected', () => {
+    const result = reviewerAvailableActions({
+      objectType: 'navigation',
+      principalKind: 'human',
+      roles: ['publisher'],
+      hasActiveLock: false,
+      review: undefined,
+      contentRevision: 5,
+    });
+    assert.equal(result.requiresApproval, false);
+    assert.equal(result.canPublish, true);
   });
 });
 
-describe('reviewerAvailableActions — approval currency and role gates', () => {
-  it('canPublish is false without an approval at all', () => {
-    const result = reviewerAvailableActions({
-      objectType: 'page',
-      principalKind: 'human',
-      roles: ['admin'],
-      hasActiveLock: false,
-      review: undefined,
-      contentRevision: 3,
-    });
-    assert.equal(result.canPublish, false);
+describe('reviewerAvailableActions — gated types (policy: approval required)', () => {
+  it('requires a CURRENT approval before offering Publish, for every governed type', () => {
+    for (const objectType of governedObjectTypes) {
+      const base = {
+        objectType,
+        principalKind: 'human' as const,
+        roles: ['admin' as const],
+        hasActiveLock: false,
+        contentRevision: 4,
+        policy: ALL_REQUIRE,
+      };
+      assert.equal(reviewerAvailableActions({ ...base, review: undefined }).canPublish, false, `${objectType}: no review`);
+      assert.equal(
+        reviewerAvailableActions({ ...base, review: approvedReview(4) }).canPublish,
+        true,
+        `${objectType}: current approval`
+      );
+      assert.equal(
+        reviewerAvailableActions({ ...base, review: approvedReview(3) }).canPublish,
+        false,
+        `${objectType}: stale approval (content_revision moved)`
+      );
+    }
   });
 
-  it('canPublish is false once content_revision has moved past the pinned approval (stale)', () => {
-    const result = reviewerAvailableActions({
-      objectType: 'page',
-      principalKind: 'human',
-      roles: ['admin'],
+  it('a per-type override gates exactly that type while the master stays autonomous', () => {
+    const policy: ApprovalPolicy = { master: 'all-autonomous', overrides: { navigation: 'require-approval' } };
+    const base = {
+      principalKind: 'human' as const,
+      roles: ['publisher' as const],
       hasActiveLock: false,
-      review: approvedReview(2),
-      contentRevision: 3, // a body write happened after approval
-    });
-    assert.equal(result.canPublish, false);
+      review: undefined,
+      contentRevision: 2,
+      policy,
+    };
+    const nav = reviewerAvailableActions({ ...base, objectType: 'navigation' });
+    assert.equal(nav.requiresApproval, true);
+    assert.equal(nav.canPublish, false, 'gated navigation needs an approval first');
+    const page = reviewerAvailableActions({ ...base, objectType: 'page' });
+    assert.equal(page.requiresApproval, false);
+    assert.equal(page.canPublish, true, 'page stays autonomous');
   });
 
   it('canPublish is false for an editor (no publish role) even with a current approval', () => {
@@ -107,10 +116,13 @@ describe('reviewerAvailableActions — approval currency and role gates', () => 
       hasActiveLock: false,
       review: approvedReview(1),
       contentRevision: 1,
+      policy: ALL_REQUIRE,
     });
     assert.equal(result.canPublish, false);
   });
+});
 
+describe('reviewerAvailableActions — review controls (policy-independent)', () => {
   it('canApprove/canRequestChanges require an open review and at least one human role', () => {
     const noRole = reviewerAvailableActions({
       objectType: 'page',
@@ -119,6 +131,7 @@ describe('reviewerAvailableActions — approval currency and role gates', () => 
       hasActiveLock: false,
       review: { state: 'open', decisions: [] },
       contentRevision: 1,
+      policy: ALL_REQUIRE,
     });
     assert.equal(noRole.canApprove, false);
     assert.equal(noRole.canRequestChanges, false);
@@ -130,6 +143,7 @@ describe('reviewerAvailableActions — approval currency and role gates', () => 
       hasActiveLock: false,
       review: { state: 'open', decisions: [] },
       contentRevision: 1,
+      policy: ALL_REQUIRE,
     });
     assert.equal(withRole.canApprove, true);
     assert.equal(withRole.canRequestChanges, true);
@@ -141,6 +155,7 @@ describe('reviewerAvailableActions — approval currency and role gates', () => 
       hasActiveLock: false,
       review: approvedReview(1),
       contentRevision: 1,
+      policy: ALL_REQUIRE,
     });
     assert.equal(notOpen.canApprove, false);
     assert.equal(notOpen.canRequestChanges, false);
@@ -154,6 +169,7 @@ describe('reviewerAvailableActions — approval currency and role gates', () => 
         roles: [],
         hasActiveLock: true,
         contentRevision: 1,
+        policy: ALL_AUTONOMOUS,
       }).canSubmitForReview,
       true
     );
@@ -164,6 +180,7 @@ describe('reviewerAvailableActions — approval currency and role gates', () => 
         roles: [],
         hasActiveLock: false,
         contentRevision: 1,
+        policy: ALL_AUTONOMOUS,
       }).canSubmitForReview,
       false
     );

@@ -174,12 +174,12 @@ test('object_inventory proxies both the sweep and the single-object detail view'
   assert.ok(!sweep.isError, JSON.stringify(sweep.structuredContent));
   const rows = sweep.structuredContent?.objects as Array<{
     object_id: string;
-    tier: number;
+    requires_approval: boolean;
     unpublished_changes: boolean;
   }>;
   assert.deepEqual(
-    rows.map((row) => [row.object_id, row.tier, row.unpublished_changes]),
-    [['page_home', 2, true]]
+    rows.map((row) => [row.object_id, row.requires_approval, row.unpublished_changes]),
+    [['page_home', false, true]]
   );
 
   const detail = await callTool('object_inventory', { object_type: 'page', object_id: 'page_home' });

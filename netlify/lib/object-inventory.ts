@@ -11,7 +11,12 @@
  * has not seen.
  */
 import { isObjectLockActive, sanitizeObjectLock } from './object-lock.js';
-import { tierForObjectType, type Tier } from './tier-gate.js';
+import {
+  activeApprovalPolicy,
+  isGovernedObjectType,
+  publishRequiresApproval,
+  type ApprovalPolicy,
+} from '../../src/lib/approval-policy.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
 export type InventoryReviewState = 'none' | 'open' | 'changes_requested' | 'approved';
@@ -24,7 +29,12 @@ export type InventoryRow = {
   object_id: string;
   object_type: ObjectRecord['object_type'];
   status: ObjectRecord['status'];
-  tier: Tier;
+  /**
+   * Whether publishing this type currently requires human approval, per the
+   * configured approval policy (src/config/approval-policy.ts). Always false
+   * for content_item, which the generic gate does not serve.
+   */
+  requires_approval: boolean;
   version: number;
   content_revision: number;
   review_state: InventoryReviewState;
@@ -52,7 +62,7 @@ export type InventoryDetail = InventoryRow & {
 };
 
 export type InventoryFilters = {
-  tier?: Tier;
+  requires_approval?: boolean;
   review_state?: InventoryReviewState;
   pending_changes?: boolean;
   status?: 'active' | 'archived';
@@ -64,7 +74,11 @@ const publishedContentRevision = (record: ObjectRecord): number | null => {
   return typeof revision === 'number' ? revision : null;
 };
 
-export const inventoryRowFromRecord = (record: ObjectRecord, atMs: number): InventoryRow => {
+export const inventoryRowFromRecord = (
+  record: ObjectRecord,
+  atMs: number,
+  policy: ApprovalPolicy = activeApprovalPolicy()
+): InventoryRow => {
   const lockActive = isObjectLockActive(record.lock, atMs);
   const sanitized = lockActive ? sanitizeObjectLock(record.lock) : undefined;
   const publishedTime = record.publication.published_time;
@@ -73,7 +87,9 @@ export const inventoryRowFromRecord = (record: ObjectRecord, atMs: number): Inve
     object_id: record.object_id,
     object_type: record.object_type,
     status: record.status,
-    tier: tierForObjectType(record.object_type),
+    requires_approval: isGovernedObjectType(record.object_type)
+      ? publishRequiresApproval(record.object_type, policy)
+      : false,
     version: record.version,
     content_revision: record.content_revision,
     review_state: record.review?.state ?? 'none',
@@ -95,8 +111,12 @@ export const inventoryRowFromRecord = (record: ObjectRecord, atMs: number): Inve
   };
 };
 
-export const inventoryDetailFromRecord = (record: ObjectRecord, atMs: number): InventoryDetail => ({
-  ...inventoryRowFromRecord(record, atMs),
+export const inventoryDetailFromRecord = (
+  record: ObjectRecord,
+  atMs: number,
+  policy?: ApprovalPolicy
+): InventoryDetail => ({
+  ...inventoryRowFromRecord(record, atMs, policy),
   schema_version: record.schema_version,
   site: record.site,
   created_at: record.created_at,
@@ -108,7 +128,7 @@ export const inventoryDetailFromRecord = (record: ObjectRecord, atMs: number): I
 
 export const matchesInventoryFilters = (row: InventoryRow, filters: InventoryFilters): boolean => {
   if (filters.status !== undefined && row.status !== filters.status) return false;
-  if (filters.tier !== undefined && row.tier !== filters.tier) return false;
+  if (filters.requires_approval !== undefined && row.requires_approval !== filters.requires_approval) return false;
   if (filters.review_state !== undefined && row.review_state !== filters.review_state) return false;
   if (filters.pending_changes !== undefined && row.unpublished_changes !== filters.pending_changes) return false;
   return true;

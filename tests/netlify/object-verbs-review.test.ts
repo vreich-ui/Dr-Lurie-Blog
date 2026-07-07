@@ -4,13 +4,15 @@ import test from 'node:test';
 
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
 import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
 
-// Integration suite for T1.5's wiring of T1.3 (publish) / T1.4 (review-state,
-// tier-gate) into the shared verb core. The gate matrix and review-state
-// machine themselves are exhaustively tested in tier-gate.test.ts /
-// review-state.test.ts; this file only proves the endpoint wiring — auth,
-// lock checks, persistence — calls those pure functions correctly.
+// Integration suite for T1.5's wiring of T1.3 (publish) / the review-state
+// machine / the approval-policy publish gate into the shared verb core. The
+// gate matrix and review-state machine themselves are exhaustively tested in
+// publish-gate.test.ts / review-state.test.ts; this file only proves the
+// endpoint wiring — auth, lock checks, persistence, policy injection — calls
+// those pure functions correctly.
 
 const NOW = Date.parse('2026-07-05T12:00:00.000Z');
 const AGENT: Principal = { kind: 'agent', agent_name: 'draft-agent', auth: 'publish_key' };
@@ -40,12 +42,17 @@ const call = (
   store: Store,
   request: ObjectVerbRequest,
   principal: Principal = AGENT,
-  overrides: { nowMs?: number; publishDeps?: Record<string, unknown> } = {}
+  overrides: { nowMs?: number; publishDeps?: Record<string, unknown>; approvalPolicy?: ApprovalPolicy } = {}
 ) =>
   handleObjectVerb(store as unknown as ObjectVerbStore, request, principal, {
     nowMs: overrides.nowMs ?? NOW,
     publishDeps: overrides.publishDeps,
+    approvalPolicy: overrides.approvalPolicy,
   });
+
+// Gates navigation while everything else stays autonomous — the wiring tests
+// below exercise both directions of the policy through the SAME dispatcher.
+const GATE_NAVIGATION: ApprovalPolicy = { master: 'all-autonomous', overrides: { navigation: 'require-approval' } };
 
 const stored = (store: Store, objectType: ObjectRecord['object_type'], objectId: string): ObjectRecord => {
   const raw = store.blobs.get(objectRecordKey(objectType, objectId));
