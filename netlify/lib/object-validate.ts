@@ -46,7 +46,8 @@ import { assertReaderSafe } from '../../src/lib/article-content/assert-reader-sa
 import type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
 import { validateObjectIdForType, validateSectionInstanceId } from '../../src/lib/object-ids.js';
 import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
-import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
+import { navigationBodySchema, type NavigationBody } from '../../src/schema/bodies/navigation-v1.js';
+import { navActionCapacity, type CapacityRule } from '../../src/lib/registry/structural-capacity.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
@@ -730,6 +731,43 @@ const navItems = (value: unknown): NavItemish[] => (Array.isArray(value) ? value
  *   drafting. Existence itself is check 3's job; `route`-kind passes through
  *   (Gap Note 2). Without a resolver the criterion reports `optional`.
  */
+/**
+ * Structural-capacity criterion for a role's `actions[]` slot (T-guardrail).
+ * Reads the fixed bounds from the structural-capacity registry so the rule
+ * lives as inspectable data, not logic buried here. Within bounds → complete;
+ * out of bounds → the rule's level ('warning' always advises; 'missing' warns
+ * while drafting and hard-blocks at publish, the established nav idiom). No
+ * `min` is configured today, so emptying the slot never trips this.
+ */
+const navActionsCapacityCriterion = (
+  role: string | undefined,
+  actionsCount: number,
+  atPublish: boolean
+): ReadinessCriterion => {
+  const label = 'Header action capacity';
+  const rule: CapacityRule | undefined = role ? navActionCapacity[role as NavigationBody['role']] : undefined;
+  if (!rule) return crit('nav_actions_capacity', label, 'complete', '');
+
+  const blockLevel = rule.level === 'missing' && atPublish ? 'missing' : 'warning';
+  if (rule.max !== undefined && actionsCount > rule.max) {
+    return crit(
+      'nav_actions_capacity',
+      label,
+      blockLevel,
+      `${actionsCount} ${role} action(s) exceed the ${rule.max} this navigation renders comfortably — extra CTAs crowd the menu's shared header width. Remove or consolidate one.`
+    );
+  }
+  if (rule.min !== undefined && actionsCount < rule.min) {
+    return crit(
+      'nav_actions_capacity',
+      label,
+      blockLevel,
+      `${actionsCount} ${role} action(s) is below the ${rule.min} this navigation expects.`
+    );
+  }
+  return crit('nav_actions_capacity', label, 'complete', '');
+};
+
 export const checkNavigationStructure = (
   body: unknown,
   context: ObjectValidationContext,
@@ -795,6 +833,11 @@ export const checkNavigationStructure = (
     duplicateWarnings.length === 0
       ? crit('nav_duplicates', 'Duplicate targets within a group', 'complete', '')
       : crit('nav_duplicates', 'Duplicate targets within a group', 'warning', duplicateWarnings.slice(0, 5).join(' ')),
+    navActionsCapacityCriterion(
+      typeof body.role === 'string' ? body.role : undefined,
+      Array.isArray(body.actions) ? body.actions.length : 0,
+      atPublish
+    ),
   ];
 
   // Published-page requirement for page-kind targets (anywhere in the body:
