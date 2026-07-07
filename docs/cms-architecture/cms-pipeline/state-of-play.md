@@ -7,6 +7,46 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Standing state (after session 2026-07-08)
+
+| Area | State |
+| --- | --- |
+| **Homepage cutover (T3.6/T3.7/T3.8)** | **DONE + verified.** `index.astro` is a thin loader over the published `page_home` object (`src/lib/renderer/resolve.ts`). `build-diff` EMPTY (203/203 identical); verify-section-components 5/5; astro check 0 errors. On branch `claude/phase-3-cutover`, not merged. |
+| **T3.4/T3.5 exports** | Materialized locally (`page_home.json`, `sec_newsletter_signup.json`) via the real materializers. Blob records still unpublished — a real `object_publish` reconciles the `__generated` marker only (handoff Step 2). |
+| **Structural-capacity guardrail** | **NEW.** `src/lib/registry/structural-capacity.ts` + `nav_actions_capacity` criterion (warn-only; content stays editable). The first "JSON-based hard rules" layer — fixed structure, agents decide content. |
+| **T2.6** | **DONE** (was "parked"). `navigation.ts` + demo chain deleted; import chain verified self-contained. |
+| **T3.13 extensibility drill** | **DONE.** `testimonial` type added end-to-end; proves one-module-one-binding cost. |
+| **nav_header incident** | `nav_header.actions` is `[]` on `main` (test-probe fallout, not live). Fix is object-layer (handoff Step 1) — the guardrail, not a human gate, is the durable answer per Wolf's framing. |
+| **Remaining to close Phase 3** | All object-store operations: publish page/section (reconcile), T3.9 grid content (needs renderer wiring + curation), T3.11 route→page upgrade, release. **See `phase-3-handoff.md` for exact steps + payloads.** T3.10/T3.12 admin-UI deferred (block nothing). |
+
+### Session 2026-07-08 (Phase 3 cutover, one long autonomous session)
+
+Ran from a sandbox with **no route to the production object store** (no MCP
+tools, no `PUBLISH_SECRET`, no egress — verified at start). So this session did
+every **code + cutover** task and left every **object-store** task as a
+documented handoff (`phase-3-handoff.md`). Five commits on
+`claude/phase-3-cutover`, full suite green (848 netlify/src + 20 script), build
+green, `build-diff` empty for the cutover.
+
+**Landed:** the structural-capacity guardrail (the deconfliction framework Wolf
+asked for — warns on over-budget header CTAs, never blocks content, deliberately
+does NOT re-add the action↔menu duplication flag the seed's "exactly one warning
+class" invariant forbids); T2.6 dead-code deletion; the two derived exports; the
+homepage cutover (T3.6/T3.7/T3.8) verified byte-identical; the T3.13 testimonial
+drill.
+
+**Deliberately deferred (object-store / editorial / large admin-UI):** the real
+publishes, the nav_header incident fix, T3.9 grid content (renderer wiring +
+curation), T3.11 target upgrades, release, T3.10/T3.12. Phase 4 does not start
+until the cutover pattern is exercised against production (handoff Steps 1–5).
+
+**Judgment calls (per Wolf's "make reasonable decisions" directive):** treated
+T2.7's old blocking rationale as superseded (approval policy is `all-autonomous`,
+publish is agentic); kept the policy autonomous rather than re-gating (the fix
+for the incident is the structural guardrail); materialized exports locally from
+the canonical seed so the cutover could be verified, with the marker-reconcile
+documented.
+
 ## Standing state (after session 2026-07-07)
 
 | Area                          | State                                                                                                                                                                                       |
