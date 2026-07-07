@@ -10,7 +10,7 @@
  * the draft (C§2.4, stated consequence).
  *
  * Approvals pin `{content_revision, publish_action}` together (M-6): the
- * decision entry is the durable home of the pin the tier gate reads.
+ * decision entry is the durable home of the pin the publish gate reads.
  * Invalidation is LOGICAL, not stored — nothing here rewrites review.state
  * when the body later moves; the gate compares the pinned content_revision
  * against the record's current one (effectiveApproval), so lock churn and
@@ -78,9 +78,9 @@ export type SubmitReviewInput = {
   at: string;
   note?: string;
   /**
-   * M-6: REQUIRED (by contract, enforced at the gate) whenever a Tier 2
-   * agent-executed publish is intended — the reviewer approves this exact
-   * action and the decision pins it.
+   * M-6: REQUIRED (by contract, enforced at the gate) whenever an
+   * agent-executed publish of an approval-gated type is intended — the
+   * reviewer approves this exact action and the decision pins it.
    */
   requested_publish_action?: PublishAction;
 };
@@ -180,7 +180,7 @@ export const decideReview = (record: ObjectRecord, input: DecideReviewInput): Re
   return { ok: true, status: 200, record: next, body: { review_state: review.state } };
 };
 
-// ─── effective approval (what the tier gate reads) ───────────────────────────
+// ─── effective approval (what the publish gate reads) ────────────────────────
 
 export type EffectiveApproval =
   | { state: 'none' }

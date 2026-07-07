@@ -21,6 +21,7 @@ import {
 } from '../../netlify/lib/object-inventory.js';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
 import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-06T12:00:00.000Z');
@@ -43,8 +44,13 @@ const createMemoryStore = () => {
 };
 type Store = ReturnType<typeof createMemoryStore>;
 
-const call = (store: Store, request: ObjectVerbRequest, principal: Principal = AGENT, nowMs = NOW) =>
-  handleObjectVerb(store as unknown as ObjectVerbStore, request, principal, { nowMs });
+const call = (
+  store: Store,
+  request: ObjectVerbRequest,
+  principal: Principal = AGENT,
+  nowMs = NOW,
+  approvalPolicy?: ApprovalPolicy
+) => handleObjectVerb(store as unknown as ObjectVerbStore, request, principal, { nowMs, approvalPolicy });
 
 const validPageBody = (title = 'Dr. Lurié') => ({
   route: '/',
@@ -96,10 +102,17 @@ test('a never-published draft reports unpublished_changes with no receipt revisi
   assert.deepEqual(row.lock, { held: false });
 });
 
-test('tier derives from object_type: content_item 1, page 2, navigation 3', () => {
-  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW).tier, 1);
-  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW).tier, 2);
-  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW).tier, 3);
+test('requires_approval derives from the approval policy; content_item is never gated by the generic surface', () => {
+  const gateNavigation: ApprovalPolicy = { master: 'all-autonomous', overrides: { navigation: 'require-approval' } };
+  // Committed dev default (all-autonomous) applies when no policy is passed.
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW).requires_approval, false);
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW).requires_approval, false);
+  // An injected policy flows through.
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW, gateNavigation).requires_approval, true);
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW, gateNavigation).requires_approval, false);
+  // content_item stays outside the policy under every posture.
+  const allRequire: ApprovalPolicy = { master: 'all-require-approval', overrides: {} };
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW, allRequire).requires_approval, false);
 });
 
 test('a published record with the receipt at the current revision reports no pending changes', () => {
@@ -169,11 +182,11 @@ test('lock state: active lease → held with holder and expiry but never the tok
   assert.deepEqual(expired.lock, { held: false });
 });
 
-test('matchesInventoryFilters composes tier, review_state, pending_changes, and status', () => {
-  const row = inventoryRowFromRecord(baseRecord(), NOW); // page: tier 2, review none, pending true, active
+test('matchesInventoryFilters composes requires_approval, review_state, pending_changes, and status', () => {
+  const row = inventoryRowFromRecord(baseRecord(), NOW); // page (autonomous default), review none, pending true, active
   assert.equal(matchesInventoryFilters(row, {}), true);
-  assert.equal(matchesInventoryFilters(row, { tier: 2, review_state: 'none', pending_changes: true }), true);
-  assert.equal(matchesInventoryFilters(row, { tier: 3 }), false);
+  assert.equal(matchesInventoryFilters(row, { requires_approval: false, review_state: 'none', pending_changes: true }), true);
+  assert.equal(matchesInventoryFilters(row, { requires_approval: true }), false);
   assert.equal(matchesInventoryFilters(row, { review_state: 'open' }), false);
   assert.equal(matchesInventoryFilters(row, { pending_changes: false }), false);
   assert.equal(matchesInventoryFilters(row, { status: 'archived' }), false);
@@ -227,10 +240,18 @@ test('inventory sweeps every type when object_type is omitted, sorted and filter
   );
   assert.ok(typeof sweep.body.generated_at === 'string');
 
-  const tier3 = await call(store, { action: 'inventory', tier: 3 });
+  // The requires_approval filter reflects the injected policy: gate taxonomy
+  // only, then ask for gated rows.
+  const gateTaxonomy: ApprovalPolicy = { master: 'all-autonomous', overrides: { taxonomy: 'require-approval' } };
+  const gated = await call(store, { action: 'inventory', requires_approval: true }, AGENT, NOW, gateTaxonomy);
   assert.deepEqual(
-    (tier3.body.objects as Array<Record<string, unknown>>).map((row) => row.object_type),
+    (gated.body.objects as Array<Record<string, unknown>>).map((row) => row.object_type),
     ['taxonomy']
+  );
+  const free = await call(store, { action: 'inventory', requires_approval: false }, AGENT, NOW, gateTaxonomy);
+  assert.deepEqual(
+    (free.body.objects as Array<Record<string, unknown>>).map((row) => row.object_type),
+    ['page']
   );
 
   const pending = await call(store, { action: 'inventory', pending_changes: true });
@@ -346,7 +367,7 @@ test('inventory single-object detail requires the type, 404s on a missing id, an
   assert.equal(detail.status, 200);
   const object = detail.body.object as Record<string, unknown>;
   assert.equal(object.object_id, objectId);
-  assert.equal(object.tier, 2);
+  assert.equal(object.requires_approval, false, 'dev default: autonomous');
   assert.equal(object.site, 'site_drlurie');
   assert.equal(object.history_length, 1);
   assert.equal(object.unpublished_changes, true);

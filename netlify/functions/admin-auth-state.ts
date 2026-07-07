@@ -32,9 +32,9 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     error: adminState.error,
     // T1.4/T1.5: the generic objects review surface needs to know which of
     // ROLE_EMAILS_ADMIN/PUBLISHER/EDITOR this identity holds so it can show
-    // the Approve/Request-changes/Publish controls the tier gate would
+    // the Approve/Request-changes/Publish controls the publish gate would
     // actually allow. This is read-only display info — the server-side
-    // gate (tier-gate.ts) is the sole enforcement point regardless.
+    // gate (publish-gate.ts) is the sole enforcement point regardless.
     roles: adminState.authenticated && adminState.email ? resolveHumanRoles(adminState.email) : [],
   });
 };

@@ -1332,12 +1332,15 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_inventory',
     description:
-      'Read-only inventory of CMS objects: per object — id, type, status, tier (1 agent-publish / 2 approval-gated / 3 human-publish-only), lock state (held/free, holder, expiry), review state, version, content_revision, last-published time, and an unpublished_changes flag (current content_revision vs the publish receipt). Omit object_type to sweep every type; pass object_type + object_id for a single-object detail view (adds site, timestamps, full review decisions, publish receipt, history length). Filters: status, tier, review_state (none | open | changes_requested | approved), pending_changes.',
+      'Read-only inventory of CMS objects: per object — id, type, status, requires_approval (whether the configured approval policy gates publishing this type behind a human approval), lock state (held/free, holder, expiry), review state, version, content_revision, last-published time, and an unpublished_changes flag (current content_revision vs the publish receipt). Omit object_type to sweep every type; pass object_type + object_id for a single-object detail view (adds site, timestamps, full review decisions, publish receipt, history length). Filters: status, requires_approval, review_state (none | open | changes_requested | approved), pending_changes.',
     inputSchema: objectSchema({
       object_type: objectTypeEnumSchema(),
       object_id: stringSchema('With object_type: return the single-object detail view instead of a list.'),
       status: { type: 'string', enum: ['active', 'archived'], description: 'Optional status filter.' },
-      tier: { type: 'integer', enum: [1, 2, 3], description: 'Optional tier filter.' },
+      requires_approval: {
+        type: 'boolean',
+        description: 'Optional filter: true → only approval-gated types; false → only autonomous ones.',
+      },
       review_state: {
         type: 'string',
         enum: ['none', 'open', 'changes_requested', 'approved'],
@@ -3590,7 +3593,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         object_type: input.object_type,
         object_id: input.object_id,
         status: input.status,
-        tier: input.tier,
+        requires_approval: input.requires_approval,
         review_state: input.review_state,
         pending_changes: input.pending_changes,
       });

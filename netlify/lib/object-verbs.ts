@@ -62,8 +62,9 @@ import {
   type InventoryRow,
 } from './object-inventory.js';
 import { publishObject, type PublishObjectDeps } from './object-publish.js';
-import { checkPublishGate } from './tier-gate.js';
+import { checkPublishGate } from './publish-gate.js';
 import { resolveRolesForPrincipal } from './roles.js';
+import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
 import { decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     object_type: objectTypeSchema.optional(),
     object_id: objectId.optional(),
     status: z.enum(['active', 'archived']).optional(),
-    tier: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+    requires_approval: z.boolean().optional(),
     review_state: z.enum(['none', 'open', 'changes_requested', 'approved']).optional(),
     pending_changes: z.boolean().optional(),
   }),
@@ -144,8 +145,9 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     object_id: objectId,
     lock_token: z.string().min(1),
     note: z.string().optional(),
-    // M-6: required by contract whenever a Tier 2 agent-executed publish is
-    // intended (C§2.2); the tier gate — not this schema — enforces that.
+    // M-6: required by contract whenever an agent-executed publish of an
+    // approval-gated type is intended (C§2.2); the publish gate — not this
+    // schema — enforces that.
     requested_publish_action: publishActionSchema.optional(),
   }),
   z.object({
@@ -184,6 +186,8 @@ export type HandleObjectVerbOptions = {
   validationContext?: ObjectValidationContext;
   /** Forwarded to T1.3's publishObject (committer fetch/retry injection for tests). */
   publishDeps?: Omit<PublishObjectDeps, 'nowMs' | 'validationContext'>;
+  /** Approval policy for the publish gate + inventory; defaults to the committed config (tests inject). */
+  approvalPolicy?: ApprovalPolicy;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -336,12 +340,12 @@ export const handleObjectVerb = async (
         }
         const record = await loadRecord(store, objectRecordKey(request.object_type, request.object_id));
         if (!record) return err(404, { error: 'Object record not found', not_found: true });
-        return ok({ object: inventoryDetailFromRecord(record, ts), generated_at: timestamp });
+        return ok({ object: inventoryDetailFromRecord(record, ts, options.approvalPolicy), generated_at: timestamp });
       }
 
       const filters: InventoryFilters = {
         status: request.status,
-        tier: request.tier,
+        requires_approval: request.requires_approval,
         review_state: request.review_state,
         pending_changes: request.pending_changes,
       };
@@ -357,7 +361,7 @@ export const handleObjectVerb = async (
         for (const item of items) {
           const record = await loadRecord(store, item.key);
           if (!record) continue;
-          const row = inventoryRowFromRecord(record, ts);
+          const row = inventoryRowFromRecord(record, ts, options.approvalPolicy);
           if (matchesInventoryFilters(row, filters)) rows.push(row);
         }
       }
@@ -635,8 +639,9 @@ export const handleObjectVerb = async (
         principal,
         roles: resolveRolesForPrincipal(principal),
         requested: { published_time: request.published_time },
+        policy: options.approvalPolicy,
       });
-      if (!gate.allow) return err(gate.status, { error: gate.reason, code: gate.code, tier: gate.tier });
+      if (!gate.allow) return err(gate.status, { error: gate.reason, code: gate.code, requires_approval: gate.requires_approval });
 
       const result = await publishObject(
         store,

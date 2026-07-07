@@ -12,7 +12,7 @@
  * object type needs nothing here beyond its zod schema existing. The function
  * is deliberately type-agnostic; the only thing that knows the six concrete
  * types is the `ASK_AI_BODY_SCHEMAS` registry below, which simply re-exports
- * the T0.2 schemas (content_item is excluded — Tier 1 keeps the article path).
+ * the T0.2 schemas (content_item is excluded — articles keep their own path).
  *
  * "Partial" is the whole point: the AI returns ONLY the fields it changed, the
  * same contract the article tool states ("include only fields that should
@@ -37,7 +37,7 @@ export interface AskAiTool {
   input_schema: JsonSchema;
 }
 
-/** Object types the generic Ask-AI serves — every type except content_item (Tier 1, article path). */
+/** Object types the generic Ask-AI serves — every type except content_item (article pipeline, OQ-8). */
 export type AskAiObjectType = Exclude<ObjectType, 'content_item'>;
 
 /**
