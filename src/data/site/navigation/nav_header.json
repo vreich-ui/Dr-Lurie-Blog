@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-07T19:17:18.087Z",
+    "at": "2026-07-08T12:27:26.803Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 48
+    "record_version": 52
   },
   "actions": [],
   "groups": [
@@ -28,7 +28,7 @@
           }
         },
         {
-          "description": "Begin with the simplest path through Dr. Lurié skin health education.",
+          "description": "Visible navigation field test published on 2026-07-08.",
           "id": "i_start_here_guide",
           "label": "Start Here guide",
           "target": {
