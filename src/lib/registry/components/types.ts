@@ -63,6 +63,10 @@ export type HeroResolved = {
   /** hrefs for data.actions, aligned by index (page/route targets → urls). */
   actionHrefs: string[];
 };
+/** link_list: hrefs for data.links, aligned by index (same policy as actions). */
+export type LinkListResolved = {
+  linkHrefs: string[];
+};
 export type EmptyResolved = Record<string, never>;
 
 /**

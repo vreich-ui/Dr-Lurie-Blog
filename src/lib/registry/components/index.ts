@@ -17,8 +17,10 @@ import Bio from '~/components/sections/Bio.astro';
 import Checklist from '~/components/sections/Checklist.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
 import CtaBanner from '~/components/sections/CtaBanner.astro';
+import Faq from '~/components/sections/Faq.astro';
 import Hero from '~/components/sections/Hero.astro';
 import Lede from '~/components/sections/Lede.astro';
+import LinkList from '~/components/sections/LinkList.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
 import Prose from '~/components/sections/Prose.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
@@ -27,8 +29,10 @@ import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
 import { contentGridDefinition } from './content-grid.js';
 import { ctaBannerDefinition } from './cta-banner.js';
+import { faqDefinition } from './faq.js';
 import { heroDefinition } from './hero.js';
 import { ledeDefinition } from './lede.js';
+import { linkListDefinition } from './link-list.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
 import { proseDefinition } from './prose.js';
 import { testimonialDefinition } from './testimonial.js';
@@ -60,6 +64,8 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   newsletter_signup: bind(newsletterSignupDefinition, NewsletterSignup),
   testimonial: bind(testimonialDefinition, Testimonial),
   cta_banner: bind(ctaBannerDefinition, CtaBanner),
+  faq: bind(faqDefinition, Faq),
+  link_list: bind(linkListDefinition, LinkList),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {

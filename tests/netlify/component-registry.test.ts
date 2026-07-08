@@ -18,8 +18,10 @@ import { bioDefinition } from '../../src/lib/registry/components/bio.js';
 import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
 import { contentGridDefinition } from '../../src/lib/registry/components/content-grid.js';
 import { ctaBannerDefinition } from '../../src/lib/registry/components/cta-banner.js';
+import { faqDefinition } from '../../src/lib/registry/components/faq.js';
 import { heroDefinition } from '../../src/lib/registry/components/hero.js';
 import { ledeDefinition } from '../../src/lib/registry/components/lede.js';
+import { linkListDefinition } from '../../src/lib/registry/components/link-list.js';
 import { newsletterSignupDefinition } from '../../src/lib/registry/components/newsletter-signup.js';
 import { proseDefinition } from '../../src/lib/registry/components/prose.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
@@ -46,6 +48,8 @@ const DEFINITIONS = [
   // Reusable primitives (bind-the-catalog): general-purpose body copy + closing CTA.
   proseDefinition,
   ctaBannerDefinition,
+  faqDefinition,
+  linkListDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({

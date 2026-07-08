@@ -22,6 +22,8 @@ export const REGISTERED_SECTION_TYPES = [
   'newsletter_signup',
   'testimonial',
   'cta_banner',
+  'faq',
+  'link_list',
 ] as const satisfies readonly SectionType[];
 
 export type RegisteredSectionType = (typeof REGISTERED_SECTION_TYPES)[number];

@@ -1,0 +1,37 @@
+---
+/**
+ * `link_list` section component — an optional heading over a list of links.
+ * Each link's href arrives resolved by the renderer (LinkListResolved.linkHrefs,
+ * aligned by index), same target policy as hero/lede actions. A link whose
+ * `style` is primary/secondary renders as a button; otherwise a plain text
+ * link. The component owns only layout.
+ */
+import type { LinkListResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'link_list'>;
+  resolved: LinkListResolved;
+  ctx: RenderCtx;
+};
+
+const { data, resolved } = Astro.props;
+const linkClass = (style?: 'primary' | 'secondary' | 'link') =>
+  style === 'primary'
+    ? 'btn-primary'
+    : style === 'secondary'
+      ? 'btn-secondary'
+      : 'text-lg font-medium text-accent hover:underline';
+---
+
+<section class="dl-section">
+  {data.heading && <h2 class="text-3xl font-bold tracking-tight text-heading sm:text-4xl">{data.heading}</h2>}
+  <ul class="mt-6 max-w-3xl space-y-3">
+    {
+      data.links.map((link, index) => (
+        <li>
+          <a class={linkClass(link.style)} href={resolved.linkHrefs[index]} set:text={link.label} />
+        </li>
+      ))
+    }
+  </ul>
+</section>

@@ -77,7 +77,7 @@ test('componentTypeExists is true only for bound section types', async () => {
   assert.equal(ctx.componentTypeExists!('hero'), true);
   assert.equal(ctx.componentTypeExists!('lede'), true);
   assert.equal(ctx.componentTypeExists!('prose'), true); // now bound (Prose.astro)
-  assert.equal(ctx.componentTypeExists!('faq'), false); // schema-legal but unbound
+  assert.equal(ctx.componentTypeExists!('search'), false); // schema-legal but unbound
 });
 
 test('resolveTaxonomyTerm: omitted when no taxonomy object exists; follows merged_into when present', async () => {

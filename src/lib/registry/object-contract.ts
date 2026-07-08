@@ -32,8 +32,10 @@ import { bioDefinition } from './components/bio.js';
 import { checklistDefinition } from './components/checklist.js';
 import { contentGridDefinition } from './components/content-grid.js';
 import { ctaBannerDefinition } from './components/cta-banner.js';
+import { faqDefinition } from './components/faq.js';
 import { heroDefinition } from './components/hero.js';
 import { ledeDefinition } from './components/lede.js';
+import { linkListDefinition } from './components/link-list.js';
 import { newsletterSignupDefinition } from './components/newsletter-signup.js';
 import { proseDefinition } from './components/prose.js';
 import { isRegisteredSectionType } from './components/registered-types.js';
@@ -82,6 +84,8 @@ const SECTION_EDITORS = {
   newsletter_signup: newsletterSignupDefinition.editor,
   testimonial: testimonialDefinition.editor,
   cta_banner: ctaBannerDefinition.editor,
+  faq: faqDefinition.editor,
+  link_list: linkListDefinition.editor,
 } as const;
 
 export type SectionTypeContract = {

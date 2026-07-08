@@ -86,6 +86,7 @@ export const parseSharedSectionExport = (data: unknown): { type: SectionType; da
 };
 
 type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
+type LinkListLikeData = { links?: Array<{ target: NavTarget }> };
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
 const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
@@ -93,6 +94,12 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
   if (type === 'hero' || type === 'lede' || type === 'cta_banner') {
     return {
       actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)),
+    };
+  }
+  // link_list resolves its `links` with the same target policy (LinkListResolved).
+  if (type === 'link_list') {
+    return {
+      linkHrefs: ((data as LinkListLikeData).links ?? []).map((link) => deps.resolveActionHref(link.target)),
     };
   }
   if (type === 'content_grid') {
