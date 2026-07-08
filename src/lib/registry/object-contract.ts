@@ -44,6 +44,7 @@ import { proseDefinition } from './components/prose.js';
 import { isRegisteredSectionType } from './components/registered-types.js';
 import { searchDefinition } from './components/search.js';
 import { testimonialDefinition } from './components/testimonial.js';
+import { thankYouDefinition } from './components/thank-you.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
 import { navActionCapacity } from './structural-capacity.js';
@@ -94,6 +95,7 @@ const SECTION_EDITORS = {
   contact_form: contactFormDefinition.editor,
   search: searchDefinition.editor,
   content_embed: contentEmbedDefinition.editor,
+  thank_you: thankYouDefinition.editor,
 } as const;
 
 export type SectionTypeContract = {

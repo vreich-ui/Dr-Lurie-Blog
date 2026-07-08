@@ -28,6 +28,7 @@ import { newsletterSignupDefinition } from '../../src/lib/registry/components/ne
 import { productPreviewDefinition } from '../../src/lib/registry/components/product-preview.js';
 import { proseDefinition } from '../../src/lib/registry/components/prose.js';
 import { searchDefinition } from '../../src/lib/registry/components/search.js';
+import { thankYouDefinition } from '../../src/lib/registry/components/thank-you.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
 import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
 import {
@@ -58,6 +59,7 @@ const DEFINITIONS = [
   contactFormDefinition,
   searchDefinition,
   contentEmbedDefinition,
+  thankYouDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({

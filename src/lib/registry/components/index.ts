@@ -28,6 +28,7 @@ import ProductPreview from '~/components/sections/ProductPreview.astro';
 import Prose from '~/components/sections/Prose.astro';
 import Search from '~/components/sections/Search.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
+import ThankYou from '~/components/sections/ThankYou.astro';
 
 import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
@@ -44,6 +45,7 @@ import { productPreviewDefinition } from './product-preview.js';
 import { proseDefinition } from './prose.js';
 import { searchDefinition } from './search.js';
 import { testimonialDefinition } from './testimonial.js';
+import { thankYouDefinition } from './thank-you.js';
 import type { RegisteredSectionType } from './registered-types.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
 
@@ -78,6 +80,7 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   contact_form: bind(contactFormDefinition, ContactForm),
   search: bind(searchDefinition, Search),
   content_embed: bind(contentEmbedDefinition, ContentEmbed),
+  thank_you: bind(thankYouDefinition, ThankYou),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {

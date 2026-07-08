@@ -1,0 +1,59 @@
+{
+  "__generated": {
+    "at": "2026-07-08T00:00:00.000Z",
+    "from": "objects/page/by-id/page_thank_you.json",
+    "record_version": 1
+  },
+  "pageType": "standard",
+  "route": "/thank-you",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Return Home",
+            "style": "primary",
+            "target": {
+              "href": "/",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Explore Skin Science",
+            "style": "secondary",
+            "target": {
+              "href": "/learn/topics",
+              "kind": "route"
+            }
+          }
+        ],
+        "eyebrow": "Submission received",
+        "formMessages": [
+          {
+            "form": "contact",
+            "heading": "Thank you for reaching out.",
+            "message": "Your message has been received. The Dr. Lurié team will review it and follow up when appropriate."
+          },
+          {
+            "form": "free-guide",
+            "heading": "Your free guide request is in.",
+            "message": "Thank you for requesting the Senior’s Guide to Aging Skin & Body Odor. Please check your inbox for next steps."
+          },
+          {
+            "form": "newsletter",
+            "heading": "You’re on the list.",
+            "message": "Thank you for joining Dr. Lurié updates. We’ll send practical, science-led notes about aging skin changes."
+          }
+        ],
+        "heading": "Thank you for connecting with Dr. Lurié.",
+        "message": "Your submission has been received. We appreciate your interest in age-aware skin education and will follow up when appropriate."
+      },
+      "id": "s_thankyou",
+      "type": "thank_you"
+    }
+  ],
+  "seo": {
+    "description": "Thank you for connecting with Dr. Lurié."
+  },
+  "title": "Thank You"
+}
