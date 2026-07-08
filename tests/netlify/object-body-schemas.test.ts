@@ -255,6 +255,24 @@ const sectionFixtures: SectionInstance[] = [
       actions: [{ label: 'Return home', target: { kind: 'route', href: '/' } }],
     },
   },
+  {
+    id: 's_contact',
+    type: 'contact',
+    data: {
+      hero: { tagline: 'Contact', title: 'Get in touch' },
+      form: {
+        id: 'form',
+        formName: 'contact',
+        title: 'Send a note',
+        subtitle: 'We read every message.',
+        inputs: [{ type: 'text', name: 'name', label: 'Name' }],
+        textarea: { label: 'Message' },
+        disclaimer: { label: 'Privacy applies.' },
+        description: 'We respond when appropriate.',
+      },
+      features: { title: 'How we can help', items: [{ title: 'Questions', description: 'Ask us.', icon: 'tabler:help' }] },
+    },
+  },
   { id: 's_shared', type: 'shared_ref', data: { section: 'sec_newsletter_signup' } },
 ];
 
@@ -269,6 +287,7 @@ test('sections: every union member parses from a seed fixture', () => {
   assert.deepEqual([...sectionTypes].sort(), [
     'bio',
     'checklist',
+    'contact',
     'contact_form',
     'content_embed',
     'content_grid',

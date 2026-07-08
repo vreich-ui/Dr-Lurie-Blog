@@ -26,6 +26,7 @@ export const REGISTERED_SECTION_TYPES = [
   'link_list',
   'product_preview',
   'contact_form',
+  'contact',
   'search',
   'content_embed',
   'thank_you',
