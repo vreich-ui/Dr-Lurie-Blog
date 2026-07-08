@@ -8,17 +8,31 @@
  *   1. hashed asset names — `/_astro/<name>.<hash>.<ext>` (and the image
  *      service's `<hash>_<hash>` double segment) become `<name>.HASH.<ext>`,
  *      so an unrelated chunk-hash shift never reads as a page change;
- *   2. attribute order — attributes are sorted per tag;
- *   3. whitespace — runs collapse to a single space outside <script>/<style>.
+ *   2. shared CSS chunk stems — `/_astro/<stem>.HASH.css` becomes
+ *      `/_astro/CHUNK.HASH.css`. Astro assigns a shared CSS chunk an arbitrary
+ *      page-derived NAME (e.g. `privacy` vs `index`); adding one component
+ *      re-attributes that chunk and renames it site-wide though the CSS is
+ *      byte-identical. The name carries no content meaning. Scoped to `.css`
+ *      only — image stems (webp/png/…) stay the discriminator for content
+ *      assets, since their hash is collapsed by rule 1;
+ *   3. attribute order — attributes are sorted per tag;
+ *   4. class-attribute VALUE order — the space-separated classes inside a
+ *      `class="…"` are sorted. Class order in an HTML attribute has zero
+ *      rendering effect (CSS cascade is by rule order, never attribute order),
+ *      yet astro-compress reorders it by site-wide class frequency, so any new
+ *      component shifts it everywhere. The class SET is still content — a
+ *      changed/added/removed class fails the diff; only the order is dropped;
+ *   5. whitespace — runs collapse to a single space outside <script>/<style>.
  *
  * <script> and <style> contents are treated as opaque (inline scripts on this
  * site legitimately contain `<div …>` template-literal HTML that a naive tag
- * tokenizer would mangle); only the asset-hash rewrite applies inside them.
+ * tokenizer would mangle); only the asset rewrites (rules 1–2) apply inside them.
  *
- * Anything else — text, tag names, attribute values, element order — is
- * content and is deliberately left alone: a difference there MUST fail the
- * diff. The rules here are the ceiling of allowed variance, not a place to
- * hide inconvenient diffs.
+ * Anything else — text, tag names, non-class attribute values, the class SET,
+ * element order — is content and is deliberately left alone: a difference there
+ * MUST fail the diff. The rules here are the ceiling of allowed variance, not a
+ * place to hide inconvenient diffs; each drops a difference provably invisible
+ * to a reader (a renamed chunk file, a reordered class list).
  */
 
 // Astro emits 8-char base64url content hashes; the image service appends a
@@ -28,8 +42,25 @@ const ASTRO_ASSET_RE = /(\/_astro\/[^\s"'()<>]*?)\.([A-Za-z0-9_-]{8,12}(?:_[A-Za
 export const normalizeAssetHashes = (html) =>
   html.replace(ASTRO_ASSET_RE, (_m, base, _hash, ext) => `${base}.HASH.${ext}`);
 
+// After hashes collapse, a shared CSS chunk's arbitrary stem is the only
+// remaining volatile part of its name; drop it too (css only — see rule 2).
+const CSS_CHUNK_STEM_RE = /(\/_astro\/)[A-Za-z0-9_-]+(\.HASH\.css)/g;
+
+export const normalizeCssChunkStems = (html) => html.replace(CSS_CHUNK_STEM_RE, '$1CHUNK$2');
+
 // Attribute grammar: name, optionally =value (double-, single-, or unquoted).
 const ATTR_RE = /([^\s"'>/=]+)(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g;
+
+// Sort the space-separated values of a `class="…"` attribute string (rule 4).
+// Order-only: the class set is preserved, so a set change still differs.
+const CLASS_ATTR_RE = /^class=(["'])([\s\S]*)\1$/;
+const sortClassAttribute = (attrStr) => {
+  const match = attrStr.match(CLASS_ATTR_RE);
+  if (!match) return attrStr;
+  const [, quote, value] = match;
+  const sorted = value.split(/\s+/).filter(Boolean).sort().join(' ');
+  return `class=${quote}${sorted}${quote}`;
+};
 
 const sortTagAttributes = (tag) => {
   // Leave closers, comments, doctype, and CDATA alone.
@@ -39,7 +70,7 @@ const sortTagAttributes = (tag) => {
   const [, name, rawAttrs, selfClose] = match;
   const attrs = [];
   for (const attr of rawAttrs.matchAll(ATTR_RE)) {
-    attrs.push(`${attr[1]}${attr[2] ? `=${attr[3]}` : ''}`);
+    attrs.push(sortClassAttribute(`${attr[1]}${attr[2] ? `=${attr[3]}` : ''}`));
   }
   attrs.sort();
   const attrText = attrs.length ? ` ${attrs.join(' ')}` : '';
@@ -55,13 +86,13 @@ const SEGMENT_RE = /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>
 const TOKEN_RE = /(<[^>]*>)|([^<]+)/g;
 
 export const normalizeHtml = (html) => {
-  const withStableAssets = normalizeAssetHashes(html);
+  const withStableAssets = normalizeCssChunkStems(normalizeAssetHashes(html));
   const out = [];
   const segments = withStableAssets.split(SEGMENT_RE);
   for (const segment of segments) {
     if (segment === undefined || segment === '') continue;
     if (/^<script\b/i.test(segment) || /^<style\b/i.test(segment) || segment.startsWith('<!--')) {
-      out.push(segment); // opaque: asset hashes already normalized above
+      out.push(segment); // opaque: asset names already normalized above
       continue;
     }
     for (const token of segment.matchAll(TOKEN_RE)) {
