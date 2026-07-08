@@ -270,7 +270,13 @@ const sectionFixtures: SectionInstance[] = [
         disclaimer: { label: 'Privacy applies.' },
         description: 'We respond when appropriate.',
       },
-      features: { title: 'How we can help', items: [{ title: 'Questions', description: 'Ask us.', icon: 'tabler:help' }] },
+      features: {
+        title: 'How we can help',
+        items: [{ title: 'Questions', description: 'Ask us.', icon: 'tabler:help' }],
+      },
+    },
+  },
+  {
     id: 's_about',
     type: 'about',
     data: {
