@@ -28,6 +28,7 @@ import { heroDefinition } from './hero.js';
 import { ledeDefinition } from './lede.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
 import { testimonialDefinition } from './testimonial.js';
+import type { RegisteredSectionType } from './registered-types.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
 
 export type RegisteredComponent = {
@@ -43,7 +44,9 @@ const bind = <TType extends SectionType, TResolved>(
   component: component as AstroComponentFactory,
 });
 
-export const componentRegistry: Partial<Record<SectionType, RegisteredComponent>> = {
+// Typed as a TOTAL record over REGISTERED_SECTION_TYPES: a binding missing from
+// (or absent in) the list is a compile error, so the two cannot drift.
+export const componentRegistry: Record<RegisteredSectionType, RegisteredComponent> = {
   hero: bind(heroDefinition, Hero),
   lede: bind(ledeDefinition, Lede),
   checklist: bind(checklistDefinition, Checklist),
@@ -54,7 +57,7 @@ export const componentRegistry: Partial<Record<SectionType, RegisteredComponent>
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {
-  const entry = componentRegistry[type];
+  const entry = (componentRegistry as Partial<Record<SectionType, RegisteredComponent>>)[type];
   if (!entry) {
     throw new Error(
       `No component registered for section type '${type}' — add its registry module and binding (one of each, T3.2 pattern) before rendering it.`

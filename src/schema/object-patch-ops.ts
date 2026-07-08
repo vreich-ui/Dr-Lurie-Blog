@@ -378,7 +378,10 @@ const removeSlotSchema = z.strictObject({
 
 // Union members stay plain object schemas (a zod discriminated-union
 // requirement); cross-field rules live in the top-level superRefine below.
-const patchOpUnionSchema = z.discriminatedUnion('op', [
+// Exported so the MCP object-contract serializer can enumerate per-op argument
+// schemas (`.options`, keyed by each op's `op` literal) — `patchOpSchema` wraps
+// this in a `.superRefine`, which hides `.options`.
+export const patchOpUnionSchema = z.discriminatedUnion('op', [
   setPageMetaSchema,
   upsertSectionSchema,
   updateSectionDataSchema,
