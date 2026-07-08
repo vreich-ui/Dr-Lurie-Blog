@@ -1,0 +1,46 @@
+{
+  "__generated": {
+    "at": "2026-07-08T12:26:39.903Z",
+    "from": "objects/site/by-id/site_fieldtest.json",
+    "record_version": 2
+  },
+  "blog": {
+    "categoryBase": "/field-test/category",
+    "listPath": "/field-test",
+    "postsPerPage": 5,
+    "tagBase": "/field-test/tag"
+  },
+  "brandTokens": {
+    "colors": {
+      "accent": "#2563eb",
+      "background": "#ffffff",
+      "text": "#111827"
+    },
+    "fonts": {
+      "heading": "Inter",
+      "sans": "Inter",
+      "serif": "Georgia"
+    }
+  },
+  "chrome": {
+    "showRssFeed": false,
+    "showThemeToggle": false
+  },
+  "defaultNavigation": {
+    "footer": "nav_footer",
+    "header": "nav_header"
+  },
+  "logo": {
+    "text": "Field Test Site 2026-07-08"
+  },
+  "metadataDefaults": {
+    "description": "Visible field test site record created on 2026-07-08.",
+    "ogImage": "",
+    "titleTemplate": "%s | Field Test Site 2026-07-08"
+  },
+  "name": "Field Test Site 2026-07-08",
+  "urls": {
+    "base": "https://example.com",
+    "canonicalHost": "example.com"
+  }
+}
