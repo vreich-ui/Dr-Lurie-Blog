@@ -1,0 +1,32 @@
+{
+  "__generated": {
+    "at": "2026-07-08T12:27:16.469Z",
+    "from": "objects/page/by-id/page_fieldtest.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/field-test-page",
+  "sections": [
+    {
+      "data": {
+        "body": "<p>Visible page field test published on 2026-07-08.</p>"
+      },
+      "id": "s_fieldtestpage",
+      "type": "prose",
+      "visibility": "public"
+    }
+  ],
+  "seo": {
+    "description": "Visible page field test published on 2026-07-08.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Field Test Page 2026-07-08"
+  },
+  "template": {
+    "instantiated_at": "2026-07-08T12:24:56.373Z",
+    "ref": "tpl_fieldtest"
+  },
+  "title": "Field Test Page 2026-07-08"
+}
