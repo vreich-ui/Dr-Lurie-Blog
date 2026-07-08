@@ -37,6 +37,13 @@ files in full before writing any code, in this order:
    (A consolidated master reference, `cms-architecture-consolidated.md`, is named 
    by some briefs but has not been committed — the numbered source docs are 
    ground truth where anything conflicts.)
+6. `docs/cms-architecture/object-inventory.md` — the current catalog of content 
+   objects (each marked LIVE / SHELL / TODO), every object type's use + boundaries, 
+   and the MVP todo list. Read it to see what is already an editable object vs. still 
+   hardcoded. It is hand-maintained and drifts easily: **update the matching row in 
+   the SAME change** when you cut over a surface or publish/retire an object. For 
+   always-current machine truth, prefer the `object_contract` / `object_inventory` 
+   MCP tools over any doc.
 
 ## CMS hard constraints — every task, no exceptions
 
