@@ -12,15 +12,16 @@ the Dr-Lurié MCP tools or the admin UI. This file is the exact to-do.
 
 ---
 
-## Done this session (committed, full suite green: 848 + 20)
+## Done this session (committed, full suite green: 853 + 20)
 
-| Commit | What | Verified |
-| --- | --- | --- |
-| `structural-capacity guardrail` | New `src/lib/registry/structural-capacity.ts` + `nav_actions_capacity` criterion — warns (never blocks) when a header carries more CTAs than it renders comfortably; content stays fully editable | nav/validate suites |
-| `T2.6 delete dead navigation.ts` | Removed the inert `navigation.ts` + `LandingLayout` + `homes/saas` + 6 `landing/*` demos (import chain verified self-contained) | build green, 202 pages |
-| `T3.4/T3.5 materialize exports` | Generated `page_home.json` + `sec_newsletter_signup.json` via the real materializers from seed data | build unchanged (parallel path) |
-| `T3.6/T3.7/T3.8 cutover` | `index.astro` is now a thin loader over `page_home`; new `src/lib/renderer/resolve.ts` | **build-diff EMPTY (203/203)**, verify-section-components 5/5 identical, astro check 0 errors |
-| `T3.13 testimonial drill` | New `testimonial` section type proving the one-module-one-binding extensibility cost | registry invariants, astro check |
+| Commit                           | What                                                                                                                                                                                              | Verified                                                                                      |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `structural-capacity guardrail`  | New `src/lib/registry/structural-capacity.ts` + `nav_actions_capacity` criterion — warns (never blocks) when a header carries more CTAs than it renders comfortably; content stays fully editable | nav/validate suites                                                                           |
+| `T2.6 delete dead navigation.ts` | Removed the inert `navigation.ts` + `LandingLayout` + `homes/saas` + 6 `landing/*` demos (import chain verified self-contained)                                                                   | build green, 202 pages                                                                        |
+| `T3.4/T3.5 materialize exports`  | Generated `page_home.json` + `sec_newsletter_signup.json` via the real materializers from seed data                                                                                               | build unchanged (parallel path)                                                               |
+| `T3.6/T3.7/T3.8 cutover`         | `index.astro` is now a thin loader over `page_home`; new `src/lib/renderer/resolve.ts`                                                                                                            | **build-diff EMPTY (203/203)**, verify-section-components 5/5 identical, astro check 0 errors |
+| `T3.13 testimonial drill`        | New `testimonial` section type proving the one-module-one-binding extensibility cost                                                                                                              | registry invariants, astro check                                                              |
+| `T3.9 code half`                 | `manual`/`query` content_grid rendering wired into `resolve.ts` + `ContentGrid.astro`, resolvers built from `fetchPosts()` in `index.astro`                                                       | 12 new resolver tests, build-diff still EMPTY (seed unchanged)                                |
 
 **Phase 3 exit criteria status:** empty `/` diff ✓ (with the transitional
 static grid, which the criteria explicitly permit); testimonial-touches-only-
@@ -85,26 +86,35 @@ changing. If more than the marker moved, the blob record drifted from the seed
 
 ---
 
-## STEP 3 — T3.9: real start-here grid (renderer wiring + data + curation)
+## STEP 3 — T3.9: real start-here grid (data + curation — code is DONE)
 
 The homepage still shows the seed's **static placeholder** start-here cards
 (intentional — the cutover reproduced them byte-identically). T3.9 replaces
-them with real article cards (M-8 manual+fallback). This is **not** purely an
-object edit — it needs a small renderer addition first:
+them with real article cards (M-8 manual+fallback).
 
-1. **Code (next coding task):** wire `src/lib/renderer/resolve-content-grid.ts`
-   into `resolve.ts` + `ContentGrid.astro` so `manual`/`query` sources render
-   (today `ContentGrid.astro` throws on non-`static`). Inject resolvers that map
-   a content item id → `{title, description}` card and run a query against the
-   `post` collection. Unit-test with `resolve-content-grid`'s existing seams.
-2. **Data (object edit):** `object_patch` `page_home`'s `s_startgrid` section
+**Renderer wiring is done** (`resolve-content-grid.ts` is now wired into
+`resolve.ts` + `ContentGrid.astro`; `index.astro` builds sync resolvers from
+`fetchPosts()`, only loaded when a page needs them). `manual`/`query` sources
+render today — verified with unit tests (`renderer-resolve.test.ts`) and a
+full `build-diff` (still EMPTY, since the seed hasn't switched source kind
+yet). What's left is purely the object-layer step:
+
+1. **Data (object edit):** `object_patch` `page_home`'s `s_startgrid` section
    `source` from `{kind:'static',…}` to
-   `{kind:'manual', items:[…5 curated article ids…],
-     fallback:{kind:'query', query:{sort:'published_time_desc'}}}`.
-3. **Curation:** hand-pick 3–5 beginner-appropriate posts from
-   `src/data/post/*.md` matching the placeholder framing; **exclude** the
-   `*smoke-test*` / `dubl-*` junk posts present there (a pure recency fallback
-   with no curation would surface those on the homepage).
+   `{kind:'manual', items:[…3–5 curated article ids…],
+  fallback:{kind:'query', query:{sort:'published_time_desc'}}}`. Manual item
+   ids are the astro content-collection post `id` (matches `src/types.d.ts`
+   `Post.id`, resolved via `fetchPosts()` in `index.astro` — same identifier
+   space `findPostsByIds` already uses elsewhere).
+2. **Curation (your editorial call, not automated):** hand-pick 3–5
+   beginner-appropriate posts from `src/data/post/*.md` matching the
+   placeholder framing; **exclude** the `*smoke-test*` / `dubl-*` junk posts
+   present there. The fallback query (`published_time_desc`, no category
+   filter) auto-fills any remaining slots up to `limit` if fewer than `limit`
+   manual picks are supplied or any fail to resolve — this is the "grid fills
+   itself if nothing's chosen" behavior; it fills with the **most recent**
+   published posts, not randomly (no `random` sort exists in `ContentQuery`
+   today — flag if you want that added, it's a small addition).
 
 Verify: `build-diff` should now show a diff **scoped to `/`'s grid only** —
 inspect it, confirm it's exactly the placeholder→real-cards change.
@@ -148,6 +158,6 @@ preview without moving production).
 The old "T2.7 drill gates the homepage cutover" rule assumed T1.4's hardcoded
 human-execute tier. That model is gone: the approval policy is configurable and
 committed at `all-autonomous`, and `review_decide` + `object_publish` are both
-agent-callable (PR #364/#365). The cutover was gated on *byte-identical
-verification*, which passed here — not on a human click. T2.6 is now **done**,
+agent-callable (PR #364/#365). The cutover was gated on _byte-identical
+verification_, which passed here — not on a human click. T2.6 is now **done**,
 not parked.
