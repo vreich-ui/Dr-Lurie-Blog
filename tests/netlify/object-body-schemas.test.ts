@@ -256,6 +256,21 @@ const sectionFixtures: SectionInstance[] = [
     },
   },
   {
+    id: 's_contact',
+    type: 'contact',
+    data: {
+      hero: { tagline: 'Contact', title: 'Get in touch' },
+      form: {
+        id: 'form',
+        formName: 'contact',
+        title: 'Send a note',
+        subtitle: 'We read every message.',
+        inputs: [{ type: 'text', name: 'name', label: 'Name' }],
+        textarea: { label: 'Message' },
+        disclaimer: { label: 'Privacy applies.' },
+        description: 'We respond when appropriate.',
+      },
+      features: { title: 'How we can help', items: [{ title: 'Questions', description: 'Ask us.', icon: 'tabler:help' }] },
     id: 's_about',
     type: 'about',
     data: {
@@ -281,6 +296,7 @@ test('sections: every union member parses from a seed fixture', () => {
     'about',
     'bio',
     'checklist',
+    'contact',
     'contact_form',
     'content_embed',
     'content_grid',

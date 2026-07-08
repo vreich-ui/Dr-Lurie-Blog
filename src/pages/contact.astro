@@ -1,85 +1,11 @@
 ---
-import Layout from '~/layouts/PageLayout.astro';
-import HeroText from '~/components/widgets/HeroText.astro';
-import ContactUs from '~/components/widgets/Contact.astro';
-import Features2 from '~/components/widgets/Features2.astro';
-
-const metadata = {
-  title: 'Contact',
-};
+/**
+ * Contact (faithful cutover) — delegates to the shared PageObjectRenderer, which
+ * loads the published page_contact object and renders its `contact` section: the
+ * hero, the Netlify contact form, and the "how we can help" grid, all composed
+ * from the same audited widgets, now driven by CMS-object data.
+ */
+import PageObjectRenderer from '~/components/cms/PageObjectRenderer.astro';
 ---
 
-<Layout metadata={metadata}>
-  <!-- HeroText Widget ******************* -->
-
-  <HeroText tagline="Contact" title="Connect with Dr. Lurié" />
-
-  <ContactUs
-    id="form"
-    formName="contact"
-    title="Send a note to the Dr. Lurié team"
-    subtitle="Use this form for education questions, early-access and product-update requests, or media and partnership inquiries. We do not provide medical advice through this form."
-    inputs={[
-      {
-        type: 'text',
-        name: 'name',
-        label: 'Name',
-      },
-      {
-        type: 'email',
-        name: 'email',
-        label: 'Email',
-      },
-    ]}
-    textarea={{
-      label: 'Message',
-    }}
-    disclaimer={{
-      label:
-        'By submitting this contact form, you acknowledge and agree to the collection of your personal information as described in the Privacy Policy.',
-    }}
-    description="We review messages submitted through the website contact form and respond when appropriate."
-  />
-
-  <!-- Features2 Widget ************** -->
-
-  <Features2
-    title="How we can help"
-    items={[
-      {
-        title: 'Education questions',
-        description:
-          'Ask about Dr. Lurié educational content on aging skin, age-related scent changes, barrier function, and skincare science. This is educational only and not medical advice.',
-        icon: 'tabler:school',
-      },
-      {
-        title: 'Early access and product updates',
-        description:
-          'Request updates on research notes, guide availability, product previews, and future age-aware skincare launch announcements.',
-        icon: 'tabler:sparkles',
-      },
-      {
-        title: 'Media inquiries',
-        description:
-          'Reach out for interview requests, expert commentary, podcast opportunities, or citation questions related to Dr. Lurié topics.',
-        icon: 'tabler:microphone-2',
-      },
-      {
-        title: 'Partnership inquiries',
-        description:
-          'Contact us about aligned education, research, product-development, or distribution conversations.',
-        icon: 'tabler:heart-handshake',
-      },
-      {
-        title: 'Primary contact',
-        description: 'Please use the contact form on this page so your message reaches the right Dr. Lurié workflow.',
-        icon: 'tabler:message-circle',
-      },
-      {
-        title: 'Website',
-        description: 'https://drluriescience.netlify.app',
-        icon: 'tabler:world',
-      },
-    ]}
-  />
-</Layout>
+<PageObjectRenderer objectId="page_contact" />
