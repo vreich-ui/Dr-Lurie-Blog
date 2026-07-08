@@ -1,5 +1,18 @@
 # Dr-Lurie-Blog — CLAUDE.md
 
+## Design north star — flexible objects, not a site replica (READ FIRST)
+
+We are building a **flexible content backbone, not reproducing today's pages
+one-for-one.** Prefer **reusable, agent-configurable components** (a `content_grid`
+an agent can point at any content and set to N cells) over **bespoke per-page types**
+(a section that renders exactly one page). Byte-identical cutover was migration
+_safety_, not the goal — "an agent can now reconfigure this to play a different role"
+is. **Litmus test:** if an agent can't repoint or reuse a thing without a code
+change, it's a replica, not backbone — generalize it. Full rule + consequences:
+[`docs/cms-architecture/design-principles.md`](docs/cms-architecture/design-principles.md).
+This **governs** where the phased-plan's "faithful reproduction" / "new component
+type per page" framing conflicts.
+
 ## CMS architecture project — mandatory pre-task reading
 
 If the task you've been given relates to the agent-actionable CMS project (object store, Pages, Sections, Navigation, Taxonomy, Site config, Templates, or anything under `docs/cms-architecture/`), **read these files in full before writing any code, in this order**:
