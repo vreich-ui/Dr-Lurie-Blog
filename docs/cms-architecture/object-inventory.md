@@ -89,31 +89,30 @@ schema is `registry_get('component')` / `object_contract('page').section_types`.
 | `page_early_access` | `/solutions/early-access` | 🟢 LIVE | Lede-family interior page. |
 | `page_thank_you` | `/thank-you` | 🟢 LIVE | Bespoke section; owns the per-form message-swap script as fixed furniture. |
 | `page_about` | `/about` | 🟢 LIVE | Bespoke `about` section; prose is fixed furniture, only clean fields are data (merged PR #374). |
-| `page_contact` | `/contact` | 🔵 IN REVIEW | Bespoke `contact` widget-composition section (PR #375). One known merge conflict in two additive test lists — keep both `about` + `contact` entries. |
-| `page_fieldtest` | `/field-test-page` | 🟡 SHELL | Production field-test artifact (2026-07-08). Proves page create→publish→render works live; **throwaway**, delete after the field-test window. |
+| `page_contact` | `/contact` | 🟢 LIVE | Bespoke `contact` widget-composition section: re-invokes HeroText/Contact/Features2 with props promoted to object data (merged PR #375). |
 
 ### Shared sections
 
 | Object | Used by | Status | Notes |
 | ------ | ------- | ------ | ----- |
 | `sec_newsletter_signup` | `page_home` (via `shared_ref`) | 🟢 LIVE | The one genuinely-shared section today. |
-| `sec_fieldtest` | (nothing) | 🟡 SHELL | Field-test artifact; throwaway. |
 
 ### Navigation
 
 | Object | Role | Status | Notes |
 | ------ | ---- | ------ | ----- |
-| `nav_header` | Site header | 🟢 LIVE | Store-published (record_version 52). Currently carries a visible field-test description — restore real copy when convenient. |
+| `nav_header` | Site header | 🟢 LIVE | Store-published. Still carries a field-test description at store `record_version 52` — restoring the original needs a store-side `object_patch` + publish, not a file edit (a direct export edit would drift from the store). |
 | `nav_footer` | Default footer | 🟢 LIVE | Rendered on every page without a footer override. |
 | `nav_footer_home` | Homepage footer variant | 🟢 LIVE | Applied via `page_home.navigationOverrides.footer`. |
 
 ### Singletons & templates
 
-| Object | Status | Notes |
-| ------ | ------ | ----- |
-| `site.json` (`site_fieldtest`) | 🟡 SHELL | A **field-test stub** ("Field Test Site 2026-07-08", `/field-test` blog paths). The **real** site config still lives in `src/config.yaml`, and **nothing renders from the site object yet** (only the content-collection schema references it). Making a real `site` object the source of truth is a TODO. |
-| `taxonomy.json` (`tax_fieldtest`) | 🟡 SHELL | A **field-test stub** (one fake category + tag). The **real** categories/tags are still article frontmatter (the deliberate source of truth — see `02-architecture-and-schema.md` §5.5). Promoting a real `taxonomy` object is a TODO. |
-| `tpl_fieldtest` | 🟡 SHELL | Field-test template artifact; throwaway. No real templates in use. |
+🔴 **No `site`, `taxonomy`, or `template` object is committed.** The field-test
+stubs (`site_fieldtest`, `tax_fieldtest`, `tpl_fieldtest`) were deleted in PR #378.
+The real site config still lives in `src/config.yaml` (and is what actually drives
+rendering); real categories/tags remain article frontmatter (§5.5). Building real
+`site` / `taxonomy` objects is **MVP TODO #2 / #3**; template objects are not
+MVP-critical.
 
 ---
 
@@ -138,8 +137,7 @@ about/contact (bespoke section per page, byte-identical `build-diff`).
 
 Replace `src/config.yaml` as the source of truth with a real `site_drlurie` object
 (brand tokens, logo, chrome toggles, blog paths, default navigation) **and wire the
-layout to render from it**. Today the field-test stub is published but inert. This
-is what makes global site settings agent-editable.
+layout to render from it**. This is what makes global site settings agent-editable.
 
 ### 3. Real `taxonomy` object 🔴 (design decision first)
 
@@ -185,16 +183,17 @@ pages to the article (`content_item`) pipeline.
   (`src/data/site/pages/*.json`) is committed and the route renders from it at build
   time. That is not the same as the record existing in the **production blob store**
   (what the object verbs edit). The store is proven working end-to-end (the
-  2026-07-08 field-test round published one of every type), and `nav_header` is
-  confirmed store-published — but the migrated content pages were seeded as committed
-  exports, so confirm a given page via `object_inventory` before assuming an agent
-  can `object_patch` it in the store.
-- **Field-test objects are throwaway.** `page_fieldtest`, `sec_fieldtest`,
-  `tpl_fieldtest`, and the `site`/`taxonomy` field-test stubs exist to prove the
-  pipeline, not to serve content. Delete them (and restore `nav_header`'s real
-  description) when the field-test window closes.
+  2026-07-08 field-test round published one of every type, since cleaned up), and
+  `nav_header` is confirmed store-published — but the migrated content pages were
+  seeded as committed exports, so confirm a given page via `object_inventory` before
+  assuming an agent can `object_patch` it in the store.
+- **The field-test objects were deleted (PR #378).** The throwaway `page_fieldtest`,
+  `sec_fieldtest`, `tpl_fieldtest`, and `site`/`taxonomy` stubs proved the pipeline
+  end-to-end, then were removed. One remnant remains: `nav_header` still carries a
+  field-test description at store `record_version 52` — restore it store-side
+  (`object_patch` + publish), not by editing the export.
 - **Two sources of truth still live outside the object model:** `src/config.yaml`
   (site config) and article frontmatter (taxonomy). Until TODO #2 and #3 land, edits
   to those do **not** flow through the object workflow.
 
-_Last audited: 2026-07-08, against `main` @ `13c7283` (post-#374)._
+_Last audited: 2026-07-08, against `main` @ `4139d51` (contact live via #375; field-test objects removed via #378)._
