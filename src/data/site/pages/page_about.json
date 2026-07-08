@@ -1,0 +1,51 @@
+{
+  "__generated": {
+    "at": "2026-07-08T00:00:00.000Z",
+    "from": "objects/page/by-id/page_about.json",
+    "record_version": 1
+  },
+  "pageType": "standard",
+  "route": "/about",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Read the Insights",
+            "style": "primary",
+            "target": {
+              "kind": "listing",
+              "list": "content_index"
+            }
+          },
+          {
+            "label": "Get the Free Guide",
+            "style": "secondary",
+            "target": {
+              "href": "/guides/free-guide",
+              "kind": "route"
+            }
+          }
+        ],
+        "ctaHeading": "Start With the Science",
+        "heading": "About Dr. Leonid Lurie",
+        "portrait": {
+          "alt": "Portrait of Dr. Leonid Lurie",
+          "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg"
+        },
+        "sectionHeadings": [
+          "A Different Way of Thinking About Health",
+          "Why Most Products Fall Short",
+          "The Science Behind Real Results",
+          "From Research to Real Life",
+          "Why This Blog Exists",
+          "A Personal Note"
+        ]
+      },
+      "id": "s_about",
+      "type": "about"
+    }
+  ],
+  "seo": {},
+  "title": "About Dr. Leonid Lurie"
+}

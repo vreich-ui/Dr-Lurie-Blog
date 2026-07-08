@@ -28,6 +28,7 @@ import {
   type ApprovalPolicy,
 } from '../approval-policy.js';
 import type { PatchApplyErrorCode } from '../object-patch-apply.js';
+import { aboutDefinition } from './components/about.js';
 import { bioDefinition } from './components/bio.js';
 import { checklistDefinition } from './components/checklist.js';
 import { contactFormDefinition } from './components/contact-form.js';
@@ -96,6 +97,7 @@ const SECTION_EDITORS = {
   search: searchDefinition.editor,
   content_embed: contentEmbedDefinition.editor,
   thank_you: thankYouDefinition.editor,
+  about: aboutDefinition.editor,
 } as const;
 
 export type SectionTypeContract = {

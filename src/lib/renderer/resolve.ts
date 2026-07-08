@@ -97,8 +97,8 @@ type ProductPreviewLikeData = { products?: Array<{ action?: { target: NavTarget 
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
 const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
-  // hero, lede, cta_banner and thank_you share the action-hrefs resolved shape.
-  if (type === 'hero' || type === 'lede' || type === 'cta_banner' || type === 'thank_you') {
+  // hero, lede, cta_banner, thank_you and about share the action-hrefs resolved shape.
+  if (type === 'hero' || type === 'lede' || type === 'cta_banner' || type === 'thank_you' || type === 'about') {
     return {
       actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)),
     };
