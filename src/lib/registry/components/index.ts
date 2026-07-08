@@ -15,6 +15,8 @@ import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
 
 import Bio from '~/components/sections/Bio.astro';
 import Checklist from '~/components/sections/Checklist.astro';
+import ContactForm from '~/components/sections/ContactForm.astro';
+import ContentEmbed from '~/components/sections/ContentEmbed.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
 import CtaBanner from '~/components/sections/CtaBanner.astro';
 import Faq from '~/components/sections/Faq.astro';
@@ -22,11 +24,15 @@ import Hero from '~/components/sections/Hero.astro';
 import Lede from '~/components/sections/Lede.astro';
 import LinkList from '~/components/sections/LinkList.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
+import ProductPreview from '~/components/sections/ProductPreview.astro';
 import Prose from '~/components/sections/Prose.astro';
+import Search from '~/components/sections/Search.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 
 import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
+import { contactFormDefinition } from './contact-form.js';
+import { contentEmbedDefinition } from './content-embed.js';
 import { contentGridDefinition } from './content-grid.js';
 import { ctaBannerDefinition } from './cta-banner.js';
 import { faqDefinition } from './faq.js';
@@ -34,7 +40,9 @@ import { heroDefinition } from './hero.js';
 import { ledeDefinition } from './lede.js';
 import { linkListDefinition } from './link-list.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
+import { productPreviewDefinition } from './product-preview.js';
 import { proseDefinition } from './prose.js';
+import { searchDefinition } from './search.js';
 import { testimonialDefinition } from './testimonial.js';
 import type { RegisteredSectionType } from './registered-types.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
@@ -66,6 +74,10 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   cta_banner: bind(ctaBannerDefinition, CtaBanner),
   faq: bind(faqDefinition, Faq),
   link_list: bind(linkListDefinition, LinkList),
+  product_preview: bind(productPreviewDefinition, ProductPreview),
+  contact_form: bind(contactFormDefinition, ContactForm),
+  search: bind(searchDefinition, Search),
+  content_embed: bind(contentEmbedDefinition, ContentEmbed),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {

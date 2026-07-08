@@ -77,7 +77,9 @@ test('componentTypeExists is true only for bound section types', async () => {
   assert.equal(ctx.componentTypeExists!('hero'), true);
   assert.equal(ctx.componentTypeExists!('lede'), true);
   assert.equal(ctx.componentTypeExists!('prose'), true); // now bound (Prose.astro)
-  assert.equal(ctx.componentTypeExists!('search'), false); // schema-legal but unbound
+  // shared_ref is schema-legal but never a component — the renderer dereferences
+  // it to the target's variant before dispatch, so it is intentionally unbound.
+  assert.equal(ctx.componentTypeExists!('shared_ref'), false);
 });
 
 test('resolveTaxonomyTerm: omitted when no taxonomy object exists; follows merged_into when present', async () => {

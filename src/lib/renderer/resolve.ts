@@ -23,7 +23,7 @@
 import type { NavTarget } from '../../schema/bodies/navigation-v1.js';
 import { pageBodySchema, type PageBody } from '../../schema/bodies/page-v1.js';
 import { sectionBodySchema, type ContentGridSource } from '../../schema/bodies/section-v1.js';
-import type { ContentGridCard, RenderCtx, SectionType } from '../registry/components/types.js';
+import type { ContentEmbedCard, ContentGridCard, RenderCtx, SectionType } from '../registry/components/types.js';
 import { resolveContentGridCards, type ContentGridResolvers } from './resolve-content-grid.js';
 
 /** A section ready for component-registry dispatch: `{data, resolved, ctx}` plus its stable page key. */
@@ -62,6 +62,12 @@ export type ResolvePageDeps = {
    * actually carries a non-static content_grid section.
    */
   contentGrid?: ContentGridResolvers<ContentGridCardInternal>;
+  /**
+   * Resolve a content_embed's `contentItem` id to a link card (D§2.5 bridge to
+   * the article grammar). Returns undefined for a missing/unpublished item.
+   * Required only when a page actually carries a content_embed section.
+   */
+  resolveContentEmbed?: (contentItemId: string) => ContentEmbedCard | undefined;
 };
 
 // The audited homepage OG image is emitted at these fixed dimensions; page.v1
@@ -87,6 +93,7 @@ export const parseSharedSectionExport = (data: unknown): { type: SectionType; da
 
 type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
 type LinkListLikeData = { links?: Array<{ target: NavTarget }> };
+type ProductPreviewLikeData = { products?: Array<{ action?: { target: NavTarget } }> };
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
 const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
@@ -101,6 +108,21 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
     return {
       linkHrefs: ((data as LinkListLikeData).links ?? []).map((link) => deps.resolveActionHref(link.target)),
     };
+  }
+  // product_preview resolves each product's optional action to an href, aligned
+  // by index (undefined where a product carries no action).
+  if (type === 'product_preview') {
+    return {
+      productActionHrefs: ((data as ProductPreviewLikeData).products ?? []).map((product) =>
+        product.action ? deps.resolveActionHref(product.action.target) : undefined
+      ),
+    };
+  }
+  if (type === 'content_embed') {
+    if (!deps.resolveContentEmbed) {
+      throw new Error('index: a content_embed section requires resolveContentEmbed to be supplied to resolvePage.');
+    }
+    return { card: deps.resolveContentEmbed((data as { contentItem: string }).contentItem) };
   }
   if (type === 'content_grid') {
     const gridData = data as ContentGridLikeData;

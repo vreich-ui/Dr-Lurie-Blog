@@ -30,6 +30,8 @@ import {
 import type { PatchApplyErrorCode } from '../object-patch-apply.js';
 import { bioDefinition } from './components/bio.js';
 import { checklistDefinition } from './components/checklist.js';
+import { contactFormDefinition } from './components/contact-form.js';
+import { contentEmbedDefinition } from './components/content-embed.js';
 import { contentGridDefinition } from './components/content-grid.js';
 import { ctaBannerDefinition } from './components/cta-banner.js';
 import { faqDefinition } from './components/faq.js';
@@ -37,8 +39,10 @@ import { heroDefinition } from './components/hero.js';
 import { ledeDefinition } from './components/lede.js';
 import { linkListDefinition } from './components/link-list.js';
 import { newsletterSignupDefinition } from './components/newsletter-signup.js';
+import { productPreviewDefinition } from './components/product-preview.js';
 import { proseDefinition } from './components/prose.js';
 import { isRegisteredSectionType } from './components/registered-types.js';
+import { searchDefinition } from './components/search.js';
 import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
@@ -86,6 +90,10 @@ const SECTION_EDITORS = {
   cta_banner: ctaBannerDefinition.editor,
   faq: faqDefinition.editor,
   link_list: linkListDefinition.editor,
+  product_preview: productPreviewDefinition.editor,
+  contact_form: contactFormDefinition.editor,
+  search: searchDefinition.editor,
+  content_embed: contentEmbedDefinition.editor,
 } as const;
 
 export type SectionTypeContract = {

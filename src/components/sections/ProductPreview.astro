@@ -1,0 +1,43 @@
+---
+/**
+ * `product_preview` section component — a heading over a card grid of products
+ * (A§2.9, shop-preview). Each product action's href arrives resolved by the
+ * renderer (ProductPreviewResolved.productActionHrefs, aligned by index). The
+ * product `imageAssetRef` is a trusted-artifact reference the render path does
+ * not resolve yet (same posture as bio's portraitAssetRef), so no image is
+ * emitted until that resolver exists — the card renders title/description/CTA.
+ * The component owns only layout.
+ */
+import type { ProductPreviewResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'product_preview'>;
+  resolved: ProductPreviewResolved;
+  ctx: RenderCtx;
+};
+
+const { data, resolved } = Astro.props;
+const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
+  style === 'secondary' ? 'btn-secondary' : style === 'link' ? 'btn-link' : 'btn-primary';
+---
+
+<section class="dl-section">
+  <h2 class="text-3xl font-bold tracking-tight text-heading sm:text-4xl">{data.heading}</h2>
+  <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      data.products.map((product, index) => (
+        <article class="dl-card flex flex-col">
+          <h3 class="text-xl font-semibold text-heading">{product.title}</h3>
+          {product.description && <p class="mt-2 text-muted">{product.description}</p>}
+          {product.action && resolved.productActionHrefs[index] && (
+            <a
+              class:list={['mt-6', actionClass(product.action.style)]}
+              href={resolved.productActionHrefs[index]}
+              set:text={product.action.label}
+            />
+          )}
+        </article>
+      ))
+    }
+  </div>
+</section>

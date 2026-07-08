@@ -1,0 +1,32 @@
+---
+/**
+ * `content_embed` section component — the explicit bridge to the article
+ * grammar (D§2.5): a page places a reference to a published content_item and
+ * this renders a link card to it. The referenced item is resolved by the
+ * renderer (ContentEmbedResolved.card, via resolveContentEmbed); a missing or
+ * unpublished item resolves to no card, and the section renders nothing rather
+ * than failing the page. The component owns only layout.
+ */
+import type { ContentEmbedResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'content_embed'>;
+  resolved: ContentEmbedResolved;
+  ctx: RenderCtx;
+};
+
+const { resolved } = Astro.props;
+const { card } = resolved;
+---
+
+{
+  card && (
+    <section class="dl-section">
+      <a class="dl-card block max-w-3xl transition-colors hover:border-accent" href={card.href}>
+        <h3 class="text-xl font-semibold text-heading">{card.title}</h3>
+        {card.excerpt && <p class="mt-2 text-muted">{card.excerpt}</p>}
+        <span class="mt-4 inline-block text-sm font-medium text-accent">Read more →</span>
+      </a>
+    </section>
+  )
+}

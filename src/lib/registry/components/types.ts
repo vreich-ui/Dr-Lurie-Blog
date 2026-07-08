@@ -67,6 +67,22 @@ export type HeroResolved = {
 export type LinkListResolved = {
   linkHrefs: string[];
 };
+/**
+ * product_preview: one action href per product, aligned by index (undefined
+ * where a product carries no action). `imageAssetRef` is deliberately NOT
+ * resolved here — asset refs render only once a trusted-artifact resolver
+ * exists on the render path (same posture as bio's portraitAssetRef).
+ */
+export type ProductPreviewResolved = {
+  productActionHrefs: Array<string | undefined>;
+};
+/**
+ * content_embed: the referenced content_item resolved to a link card. `card` is
+ * absent when the article is missing or unpublished — an embed of a
+ * not-yet-published item simply renders nothing rather than failing the page.
+ */
+export type ContentEmbedCard = { title: string; href: string; excerpt?: string };
+export type ContentEmbedResolved = { card?: ContentEmbedCard };
 export type EmptyResolved = Record<string, never>;
 
 /**
