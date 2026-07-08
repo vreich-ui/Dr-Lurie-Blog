@@ -16,10 +16,19 @@ import test from 'node:test';
 import { splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import { bioDefinition } from '../../src/lib/registry/components/bio.js';
 import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
+import { contactFormDefinition } from '../../src/lib/registry/components/contact-form.js';
+import { contentEmbedDefinition } from '../../src/lib/registry/components/content-embed.js';
 import { contentGridDefinition } from '../../src/lib/registry/components/content-grid.js';
+import { ctaBannerDefinition } from '../../src/lib/registry/components/cta-banner.js';
+import { faqDefinition } from '../../src/lib/registry/components/faq.js';
 import { heroDefinition } from '../../src/lib/registry/components/hero.js';
 import { ledeDefinition } from '../../src/lib/registry/components/lede.js';
+import { linkListDefinition } from '../../src/lib/registry/components/link-list.js';
 import { newsletterSignupDefinition } from '../../src/lib/registry/components/newsletter-signup.js';
+import { productPreviewDefinition } from '../../src/lib/registry/components/product-preview.js';
+import { proseDefinition } from '../../src/lib/registry/components/prose.js';
+import { searchDefinition } from '../../src/lib/registry/components/search.js';
+import { thankYouDefinition } from '../../src/lib/registry/components/thank-you.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
 import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
 import {
@@ -41,6 +50,16 @@ const DEFINITIONS = [
   testimonialDefinition,
   // T4.2: interior-page lede, same invariants.
   ledeDefinition,
+  // Reusable primitives (bind-the-catalog): general-purpose body copy + closing CTA.
+  proseDefinition,
+  ctaBannerDefinition,
+  faqDefinition,
+  linkListDefinition,
+  productPreviewDefinition,
+  contactFormDefinition,
+  searchDefinition,
+  contentEmbedDefinition,
+  thankYouDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({

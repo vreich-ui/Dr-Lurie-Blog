@@ -208,6 +208,19 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
   sectionVariant('content_embed', {
     contentItem: z.string().min(1),
   }),
+  // Form-submission confirmation (the /thank-you page, A§2.x): a centered
+  // eyebrow + fallback title/message, plus per-form overrides the client script
+  // swaps in from the `?form=` query param. Copy is data; the message-swap
+  // furniture is owned by the component.
+  sectionVariant('thank_you', {
+    eyebrow: z.string().optional(),
+    heading: z.string().min(1),
+    message: z.string().min(1),
+    formMessages: z.array(
+      z.object({ form: z.string().min(1), heading: z.string().min(1), message: z.string().min(1) }).strict()
+    ),
+    actions: z.array(linkActionSchema),
+  }),
   // Reference to a shared 'section' object — no shadow copy of the target's
   // type/data (D§3.5).
   sectionVariant('shared_ref', {

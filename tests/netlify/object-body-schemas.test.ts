@@ -244,6 +244,17 @@ const sectionFixtures: SectionInstance[] = [
   },
   { id: 's_search', type: 'search', data: { placeholder: 'Search articles…', indexRoute: '/search.json' } },
   { id: 's_embed', type: 'content_embed', data: { contentItem: 'req_smoke_pdf_cta_20260630_01' } },
+  {
+    id: 's_thanks',
+    type: 'thank_you',
+    data: {
+      eyebrow: 'Submission received',
+      heading: 'Thank you.',
+      message: 'Your submission has been received.',
+      formMessages: [{ form: 'contact', heading: 'Thanks for reaching out.', message: 'We will follow up.' }],
+      actions: [{ label: 'Return home', target: { kind: 'route', href: '/' } }],
+    },
+  },
   { id: 's_shared', type: 'shared_ref', data: { section: 'sec_newsletter_signup' } },
 ];
 
@@ -272,6 +283,7 @@ test('sections: every union member parses from a seed fixture', () => {
     'search',
     'shared_ref',
     'testimonial',
+    'thank_you',
   ]);
 });
 

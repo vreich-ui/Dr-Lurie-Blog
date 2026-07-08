@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
 import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
+import { REGISTERED_SECTION_TYPES } from '../../src/lib/registry/components/registered-types.js';
 
 // Object-verb MCP tools (T0.9). The tools proxy to object-store.ts with the
 // publish key injected; object-store falls back to the local file store when no
@@ -124,7 +125,7 @@ test("registry_get('component') is now populated with the section-type registry"
   assert.equal(res.structuredContent?.available, true);
   const definitions = res.structuredContent?.definitions as Array<{ type: string; component_bound: boolean }>;
   assert.ok(definitions.length >= 16, 'every section variant is listed');
-  assert.equal(definitions.filter((d) => d.component_bound).length, 7);
+  assert.equal(definitions.filter((d) => d.component_bound).length, REGISTERED_SECTION_TYPES.length);
 });
 
 test('object_contract is listed and requires object_type', async () => {
