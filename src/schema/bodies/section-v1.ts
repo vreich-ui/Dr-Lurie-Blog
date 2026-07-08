@@ -238,6 +238,19 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
   sectionVariant('content_embed', {
     contentItem: z.string().min(1),
   }),
+  // The full /about page (faithful cutover, A§2.x): a bespoke single-use section
+  // whose prose blocks are fixed component furniture (inline emphasis can't
+  // round-trip as clean data), exposing only the clean fields — the page
+  // heading, the six body-section headings (paired positionally with their fixed
+  // prose), the portrait image, and the closing CTA. `actions` resolve to hrefs
+  // the same way hero/thank_you actions do.
+  sectionVariant('about', {
+    heading: z.string().min(1),
+    portrait: z.object({ src: z.string().min(1), alt: z.string().min(1) }).strict(),
+    sectionHeadings: z.array(z.string().min(1)).length(6),
+    ctaHeading: z.string().min(1),
+    actions: z.array(linkActionSchema),
+  }),
   // Form-submission confirmation (the /thank-you page, A§2.x): a centered
   // eyebrow + fallback title/message, plus per-form overrides the client script
   // swaps in from the `?form=` query param. Copy is data; the message-swap

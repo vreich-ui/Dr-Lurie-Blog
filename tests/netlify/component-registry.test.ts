@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
+import { aboutDefinition } from '../../src/lib/registry/components/about.js';
 import { bioDefinition } from '../../src/lib/registry/components/bio.js';
 import { contactDefinition } from '../../src/lib/registry/components/contact.js';
 import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
@@ -63,6 +64,8 @@ const DEFINITIONS = [
   thankYouDefinition,
   // Widget-composition faithful cutover (/contact); same registry invariants.
   contactDefinition,
+  // Bespoke single-use faithful cutover; held to the same registry invariants.
+  aboutDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({

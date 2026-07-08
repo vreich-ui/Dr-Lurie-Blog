@@ -1,0 +1,15 @@
+{
+  "__generated": {
+    "at": "2026-07-08T12:26:57.886Z",
+    "from": "objects/section/by-id/sec_fieldtest.json",
+    "record_version": 2
+  },
+  "section": {
+    "data": {
+      "body": "<p>Visible section field test published on 2026-07-08.</p>"
+    },
+    "id": "s_fieldtest",
+    "type": "prose",
+    "visibility": "public"
+  }
+}

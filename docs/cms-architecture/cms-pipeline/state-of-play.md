@@ -7,6 +7,33 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Standing state (after session 2026-07-08 D — bespoke-page cutovers)
+
+Continues the bespoke-page cutover track opened by the `/thank-you` cutover
+(`7c14eb4`, **merged to main** in `fdc55eb`), which established the
+functional-equivalence gate for pages carrying a page-level inline script/scoped
+style (`known-inert-diffs.md`). This session cut over the next two, each on its
+**own branch off `main`** (not stacked — applying the #368–#371 scoping lesson):
+
+| Page cutover              | Branch / commit                    | State                                                                                                                                                                                                                                                                                                    |
+| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`/about` → page_about** | `claude/cutover-about` (`6180f3a`) | **Cut over in CODE + verified.** Bespoke-markup page: prose blocks stay fixed component furniture, only the **clean fields** are object data — page + 6 section headings, portrait src/alt, closing CTA (Wolf's "clean fields only" call; no rich-text/injection surface). `build-diff` EMPTY (203/203). No page-level script/style → strict byte-identity, no ledger entry. **Not merged.** |
+| **`/contact` → page_contact** | `claude/cutover-contact` (`e7e734c`) | **Cut over in CODE + verified.** First **widget-composition** page: `ContactPage.astro` re-invokes the same HeroText/Contact/Features2 widgets, every prop now object data (promotes cleanly — no prose-emphasis problem, so no clean-fields compromise). Two editorial HTML comments kept verbatim (html-minifier `removeComments` off). `build-diff` EMPTY (203/203). No link actions → empty resolved, no `resolve.ts` change. **Not merged.** |
+
+**Two page-shape families identified for the remaining cutovers:**
+
+- **Bespoke raw markup** (`about` done; `shop-preview` remaining). Faithful repro = one bespoke section reproducing the exact markup. `shop-preview` also carries a scoped `<style>`, so it takes the **functional-equivalence** gate + a `known-inert-diffs.md` entry (like thank-you).
+- **Widget-composition** (`contact` done; `pricing`, `services` remaining). Faithful repro = a bespoke section re-invoking the page's existing widgets with props promoted to object data. `pricing`/`services` both use `CallToAction` (link actions), so each will need the action-hrefs resolved shape + a `resolve.ts` entry (like `about`) and richer data modeling (pricing tiers/steps/FAQ; content/testimonials).
+
+**Every cutover this session:** `astro check` 0 errors, eslint/prettier clean,
+full suite green (870 netlify+src, 24 script), `build-diff` EMPTY. **Object-store
+seed+publish still deferred to the handoff** (no production store in this sandbox)
+— same posture as thank_you and the lede family; the committed `page_*.json`
+exports are the derived-export half, publish reconciles the `__generated` marker.
+
+A separate `claude/state-of-play-cutovers` branch carries only this log entry, to
+keep each cutover branch a clean single-purpose diff for review.
+
 ## Standing state (after session 2026-07-08)
 
 | Area                                  | State                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |

@@ -13,6 +13,7 @@
  */
 import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
 
+import About from '~/components/sections/About.astro';
 import Bio from '~/components/sections/Bio.astro';
 import Checklist from '~/components/sections/Checklist.astro';
 import ContactForm from '~/components/sections/ContactForm.astro';
@@ -31,6 +32,7 @@ import Search from '~/components/sections/Search.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 import ThankYou from '~/components/sections/ThankYou.astro';
 
+import { aboutDefinition } from './about.js';
 import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
 import { contactFormDefinition } from './contact-form.js';
@@ -84,6 +86,7 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   search: bind(searchDefinition, Search),
   content_embed: bind(contentEmbedDefinition, ContentEmbed),
   thank_you: bind(thankYouDefinition, ThankYou),
+  about: bind(aboutDefinition, About),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {

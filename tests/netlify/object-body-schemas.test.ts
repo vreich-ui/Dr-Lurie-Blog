@@ -271,6 +271,14 @@ const sectionFixtures: SectionInstance[] = [
         description: 'We respond when appropriate.',
       },
       features: { title: 'How we can help', items: [{ title: 'Questions', description: 'Ask us.', icon: 'tabler:help' }] },
+    id: 's_about',
+    type: 'about',
+    data: {
+      heading: 'About Us',
+      portrait: { src: 'https://example.com/portrait.jpg', alt: 'Portrait' },
+      sectionHeadings: ['One', 'Two', 'Three', 'Four', 'Five', 'Six'],
+      ctaHeading: 'Start here',
+      actions: [{ label: 'Read', target: { kind: 'listing', list: 'content_index' } }],
     },
   },
   { id: 's_shared', type: 'shared_ref', data: { section: 'sec_newsletter_signup' } },
@@ -285,6 +293,7 @@ test('sections: every union member parses from a seed fixture', () => {
   assert.equal(SECTION_SCHEMA_VERSION, 'section.v1');
   // The union covers exactly the documented types.
   assert.deepEqual([...sectionTypes].sort(), [
+    'about',
     'bio',
     'checklist',
     'contact',
