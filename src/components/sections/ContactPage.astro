@@ -1,0 +1,47 @@
+---
+/**
+ * `contact` section component — the full /contact page (faithful cutover). A
+ * widget-composition page: it re-invokes the same audited widgets (HeroText,
+ * Contact, Features2) it always did, but every prop now comes from the CMS
+ * object rather than being hard-coded in the route file. The two editorial HTML
+ * comments are kept verbatim (the build's html-minifier preserves them, so
+ * dropping them would fail byte-identity). The page carries no link actions, so
+ * this section resolves to the empty resolved shape.
+ */
+import HeroText from '~/components/widgets/HeroText.astro';
+import ContactUs from '~/components/widgets/Contact.astro';
+import Features2 from '~/components/widgets/Features2.astro';
+import type { Input } from '~/types';
+import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'contact'>;
+  resolved: EmptyResolved;
+  ctx: RenderCtx;
+};
+
+const { data } = Astro.props;
+// The schema types an input's `type` as a plain string (any HTML input type is
+// valid data); the widget's Input.type is the narrower HTMLInputTypeAttribute
+// union. Narrow at this boundary — the value flows straight to the input's
+// `type` attribute, so no runtime concern.
+const formInputs = data.form.inputs as Input[];
+---
+
+<!-- HeroText Widget ******************* -->
+<HeroText tagline={data.hero.tagline} title={data.hero.title} />
+
+<ContactUs
+  id={data.form.id}
+  formName={data.form.formName}
+  title={data.form.title}
+  subtitle={data.form.subtitle}
+  inputs={formInputs}
+  textarea={data.form.textarea}
+  disclaimer={data.form.disclaimer}
+  description={data.form.description}
+/>
+
+<!-- Features2 Widget ************** -->
+
+<Features2 title={data.features.title} items={data.features.items} />

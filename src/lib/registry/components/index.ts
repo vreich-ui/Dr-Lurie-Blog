@@ -17,6 +17,7 @@ import About from '~/components/sections/About.astro';
 import Bio from '~/components/sections/Bio.astro';
 import Checklist from '~/components/sections/Checklist.astro';
 import ContactForm from '~/components/sections/ContactForm.astro';
+import ContactPage from '~/components/sections/ContactPage.astro';
 import ContentEmbed from '~/components/sections/ContentEmbed.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
 import CtaBanner from '~/components/sections/CtaBanner.astro';
@@ -35,6 +36,7 @@ import { aboutDefinition } from './about.js';
 import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
 import { contactFormDefinition } from './contact-form.js';
+import { contactDefinition } from './contact.js';
 import { contentEmbedDefinition } from './content-embed.js';
 import { contentGridDefinition } from './content-grid.js';
 import { ctaBannerDefinition } from './cta-banner.js';
@@ -80,6 +82,7 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   link_list: bind(linkListDefinition, LinkList),
   product_preview: bind(productPreviewDefinition, ProductPreview),
   contact_form: bind(contactFormDefinition, ContactForm),
+  contact: bind(contactDefinition, ContactPage),
   search: bind(searchDefinition, Search),
   content_embed: bind(contentEmbedDefinition, ContentEmbed),
   thank_you: bind(thankYouDefinition, ThankYou),

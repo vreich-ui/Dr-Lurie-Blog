@@ -29,6 +29,9 @@ const DIRS: Array<{ dir: string; type: ObjectType }> = [
   { dir: join(SITE_DATA, 'pages'), type: 'page' },
   { dir: join(SITE_DATA, 'sections'), type: 'section' },
   { dir: join(SITE_DATA, 'navigation'), type: 'navigation' },
+  // Templates too, so a committed page's `template.ref` resolves (the whole set
+  // must be present for cross-object references to validate).
+  { dir: join(SITE_DATA, 'templates'), type: 'template' },
 ];
 
 const stripGenerated = (data: Record<string, unknown>): Record<string, unknown> => {

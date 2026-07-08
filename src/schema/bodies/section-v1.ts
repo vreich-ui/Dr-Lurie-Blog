@@ -171,6 +171,36 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     heading: z.string().min(1),
     disclaimer: z.string().optional(),
   }),
+  // The full /contact page (faithful cutover, A§2.x): a widget-composition page
+  // reproduced as one bespoke section. Every widget prop the route file hard-coded
+  // (hero tagline/title, the Netlify form's fields + copy, the "how we can help"
+  // feature items) is promoted to editable object data; ContactPage.astro
+  // re-invokes HeroText/Contact/Features2 with it. No link actions → empty resolved.
+  sectionVariant('contact', {
+    hero: z.object({ tagline: z.string().min(1), title: z.string().min(1) }).strict(),
+    form: z
+      .object({
+        id: z.string().min(1),
+        formName: z.string().min(1),
+        title: z.string().min(1),
+        subtitle: z.string().min(1),
+        inputs: z.array(
+          z.object({ type: z.string().min(1), name: z.string().min(1), label: z.string().min(1) }).strict()
+        ),
+        textarea: z.object({ label: z.string().min(1) }).strict(),
+        disclaimer: z.object({ label: z.string().min(1) }).strict(),
+        description: z.string().min(1),
+      })
+      .strict(),
+    features: z
+      .object({
+        title: z.string().min(1),
+        items: z.array(
+          z.object({ title: z.string().min(1), description: z.string().min(1), icon: z.string().min(1) }).strict()
+        ),
+      })
+      .strict(),
+  }),
   sectionVariant('cta_banner', {
     heading: z.string().optional(),
     body: richTextSchema.optional(),

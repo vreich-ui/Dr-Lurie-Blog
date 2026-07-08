@@ -32,6 +32,7 @@ import { aboutDefinition } from './components/about.js';
 import { bioDefinition } from './components/bio.js';
 import { checklistDefinition } from './components/checklist.js';
 import { contactFormDefinition } from './components/contact-form.js';
+import { contactDefinition } from './components/contact.js';
 import { contentEmbedDefinition } from './components/content-embed.js';
 import { contentGridDefinition } from './components/content-grid.js';
 import { ctaBannerDefinition } from './components/cta-banner.js';
@@ -94,6 +95,7 @@ const SECTION_EDITORS = {
   link_list: linkListDefinition.editor,
   product_preview: productPreviewDefinition.editor,
   contact_form: contactFormDefinition.editor,
+  contact: contactDefinition.editor,
   search: searchDefinition.editor,
   content_embed: contentEmbedDefinition.editor,
   thank_you: thankYouDefinition.editor,

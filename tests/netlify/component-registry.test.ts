@@ -16,6 +16,7 @@ import test from 'node:test';
 import { splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import { aboutDefinition } from '../../src/lib/registry/components/about.js';
 import { bioDefinition } from '../../src/lib/registry/components/bio.js';
+import { contactDefinition } from '../../src/lib/registry/components/contact.js';
 import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
 import { contactFormDefinition } from '../../src/lib/registry/components/contact-form.js';
 import { contentEmbedDefinition } from '../../src/lib/registry/components/content-embed.js';
@@ -61,6 +62,8 @@ const DEFINITIONS = [
   searchDefinition,
   contentEmbedDefinition,
   thankYouDefinition,
+  // Widget-composition faithful cutover (/contact); same registry invariants.
+  contactDefinition,
   // Bespoke single-use faithful cutover; held to the same registry invariants.
   aboutDefinition,
 ] as const;
