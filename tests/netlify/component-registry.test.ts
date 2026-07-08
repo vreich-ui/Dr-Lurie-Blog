@@ -18,6 +18,7 @@ import { bioDefinition } from '../../src/lib/registry/components/bio.js';
 import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
 import { contentGridDefinition } from '../../src/lib/registry/components/content-grid.js';
 import { heroDefinition } from '../../src/lib/registry/components/hero.js';
+import { ledeDefinition } from '../../src/lib/registry/components/lede.js';
 import { newsletterSignupDefinition } from '../../src/lib/registry/components/newsletter-signup.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
 import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
@@ -38,6 +39,8 @@ const DEFINITIONS = [
   newsletterSignupDefinition,
   // T3.13 drill: the new type is held to the SAME invariants as the audited five.
   testimonialDefinition,
+  // T4.2: interior-page lede, same invariants.
+  ledeDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({

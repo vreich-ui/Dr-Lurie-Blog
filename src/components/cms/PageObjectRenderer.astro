@@ -1,0 +1,158 @@
+---
+/**
+ * PageObjectRenderer (T4.2) — the one thin loader every migrated page route
+ * delegates to, so 12 route files don't each re-implement load → resolve →
+ * dispatch. Given a published Page object id, it reads the derived export,
+ * resolves it (src/lib/renderer/resolve.ts: shared_ref dereference, hero/lede
+ * action hrefs, content_grid, page metadata), and dispatches each section to
+ * its registered component. The footer variant is applied only when the page
+ * carries navigationOverrides.footer (the homepage does, via S-4); every other
+ * page falls through to PageLayout's default footer slot.
+ *
+ * The proven section markup is unchanged — this component adds no wrapper
+ * element, so a page delegating to it renders byte-identically to the inline
+ * loader it replaces.
+ */
+import { getEntry } from 'astro:content';
+
+import PageLayout from '~/layouts/PageLayout.astro';
+import Footer from '~/components/widgets/Footer.astro';
+import { getRegisteredComponent } from '~/lib/registry/components/index';
+import { parsePageExport, parseSharedSectionExport, resolvePage, type ResolvePageDeps } from '~/lib/renderer/resolve';
+import type { NavTarget } from '~/schema/bodies/navigation-v1';
+import type { ContentQuery } from '~/schema/bodies/section-v1';
+import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
+import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
+
+interface Props {
+  objectId: string;
+}
+const { objectId } = Astro.props;
+
+const pageEntry = await getEntry('pageObject', objectId);
+if (!pageEntry) {
+  throw new Error(
+    `PageObjectRenderer: the published page export '${objectId}' is missing ` +
+      `(src/data/site/pages/${objectId}.json). The T3.5/T4.3 publish must land before this page builds.`
+  );
+}
+const page = parsePageExport(pageEntry.data);
+
+// Action hrefs resolve exactly as the audited pages did — route/asset through
+// getPermalink, listing to the blog permalink, external verbatim. page/taxonomy
+// targets aren't resolvable on a page body yet (T3.11/T4.5 upgrade them).
+const resolveActionHref = (target: NavTarget): string => {
+  switch (target.kind) {
+    case 'route':
+    case 'asset':
+      return getPermalink(target.href);
+    case 'external':
+      return target.href;
+    case 'listing':
+      return getBlogPermalink();
+    default:
+      throw new Error(`PageObjectRenderer: action target kind '${target.kind}' is not resolvable on a page body yet.`);
+  }
+};
+
+// Pre-load every shared_ref target so the pure resolver gets a sync lookup.
+const sharedSectionCache = new Map<string, ReturnType<typeof parseSharedSectionExport>>();
+for (const section of page.sections) {
+  if (section.type !== 'shared_ref') continue;
+  const refId = section.data.section;
+  if (sharedSectionCache.has(refId)) continue;
+  const sectionEntry = await getEntry('sectionObject', refId);
+  if (!sectionEntry) {
+    throw new Error(
+      `PageObjectRenderer: shared section export '${refId}' is missing (src/data/site/sections/${refId}.json).`
+    );
+  }
+  sharedSectionCache.set(refId, parseSharedSectionExport(sectionEntry.data));
+}
+
+// content_grid manual/query resolution (T3.9, M-8): only load posts if the page
+// (inline OR dereferenced via shared_ref) actually carries a non-static grid.
+const isNonStaticContentGrid = (type: string, data: unknown) =>
+  type === 'content_grid' && (data as { source: { kind: string } }).source.kind !== 'static';
+const needsContentGrid =
+  page.sections.some((section) => isNonStaticContentGrid(section.type, section.data)) ||
+  [...sharedSectionCache.values()].some((target) => isNonStaticContentGrid(target.type, target.data));
+let contentGrid: ResolvePageDeps['contentGrid'];
+if (needsContentGrid) {
+  // Dynamic import: keep the blog module (and its transitive graph) OUT of the
+  // bundle of pages that don't use a content grid, so adding this shared
+  // renderer doesn't perturb Astro's shared-CSS-chunk naming for every page.
+  // fetchPosts() is already published-only (published_time <= now) and sorted
+  // newest-first — exactly the "published content item" the schema requires.
+  const { fetchPosts } = await import('~/utils/blog');
+  const posts = await fetchPosts();
+  const toCard = (post: (typeof posts)[number]) => ({ id: post.id, title: post.title, description: post.excerpt });
+  const matchesQuery = (post: (typeof posts)[number], query: ContentQuery) => {
+    if (query.category && post.category?.slug !== query.category) return false;
+    if (query.tags && query.tags.length > 0) {
+      const postTagSlugs = new Set((post.tags ?? []).map((tag) => tag.slug));
+      if (!query.tags.some((tag) => postTagSlugs.has(tag))) return false;
+    }
+    return true;
+  };
+  contentGrid = {
+    resolveManualItem: (id) => {
+      const post = posts.find((candidate) => candidate.id === id);
+      return post ? toCard(post) : undefined;
+    },
+    runQuery: (query, limit) => {
+      const filtered = posts.filter((post) => matchesQuery(post, query));
+      const sorted =
+        query.sort === 'published_time_asc'
+          ? [...filtered].sort((a, b) => a.publishDate.valueOf() - b.publishDate.valueOf())
+          : [...filtered].sort((a, b) => b.publishDate.valueOf() - a.publishDate.valueOf());
+      return sorted.slice(0, limit).map(toCard);
+    },
+    idOf: (card) => card.id,
+  };
+}
+
+const deps: ResolvePageDeps = {
+  resolveActionHref,
+  resolveSharedSection: (sectionObjectId) => {
+    const resolved = sharedSectionCache.get(sectionObjectId);
+    if (!resolved) throw new Error(`PageObjectRenderer: shared section '${sectionObjectId}' was not preloaded.`);
+    return resolved;
+  },
+  contentGrid,
+};
+
+const { metadata, sections } = resolvePage(page, deps);
+
+// Footer variant: applied only when the page names one (S-4, homepage);
+// otherwise PageLayout's default footer slot renders nav_footer.
+let footerOverrideData: ReturnType<typeof navigationToFooterProps> | undefined;
+const footerNavId = page.navigationOverrides?.footer;
+if (footerNavId) {
+  const footerEntry = await getEntry('navigationObject', footerNavId);
+  if (!footerEntry) {
+    throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);
+  }
+  footerOverrideData = navigationToFooterProps(
+    parseNavigationExport(footerEntry.data),
+    createNavTargetResolver({ blogPermalink: getBlogPermalink() })
+  );
+}
+---
+
+<PageLayout metadata={metadata}>
+  {
+    sections.map((section) => {
+      const { component: SectionComponent } = getRegisteredComponent(section.type);
+      return <SectionComponent data={section.data} resolved={section.resolved} ctx={section.ctx} />;
+    })
+  }
+
+  {
+    footerOverrideData && (
+      <Fragment slot="footer">
+        <Footer {...footerOverrideData} />
+      </Fragment>
+    )
+  }
+</PageLayout>

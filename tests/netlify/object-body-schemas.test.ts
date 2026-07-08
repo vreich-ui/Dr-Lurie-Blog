@@ -264,6 +264,7 @@ test('sections: every union member parses from a seed fixture', () => {
     'cta_banner',
     'faq',
     'hero',
+    'lede',
     'link_list',
     'newsletter_signup',
     'product_preview',

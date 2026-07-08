@@ -112,6 +112,18 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
   sectionVariant('prose', {
     body: richTextSchema,
   }),
+  // Interior-page lede (T4.2): the kicker + h1 + intro + actions block the
+  // audited standalone pages open with (start-here, newsletter, member-updates,
+  // free-guide, early-access — A§2.x). Same field shape as `hero` but a
+  // distinct, lighter presentation (interior pages, not the landing hero), so
+  // it is its own type with its own component (Lede.astro), not a hero variant.
+  sectionVariant('lede', {
+    kicker: z.string().optional(),
+    heading: z.string().min(1),
+    body: richTextSchema.optional(),
+    actions: z.array(linkActionSchema),
+    anchor: z.string().optional(),
+  }),
   // "This is for you if…" (A§2.1)
   // M-9 (T3.2, 2026-07-06): optional `kicker` (the small uppercase lead-in
   // line every audited homepage section renders) and `anchor` (the public

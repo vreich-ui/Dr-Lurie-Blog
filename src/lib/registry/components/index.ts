@@ -17,6 +17,7 @@ import Bio from '~/components/sections/Bio.astro';
 import Checklist from '~/components/sections/Checklist.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
 import Hero from '~/components/sections/Hero.astro';
+import Lede from '~/components/sections/Lede.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 
@@ -24,6 +25,7 @@ import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
 import { contentGridDefinition } from './content-grid.js';
 import { heroDefinition } from './hero.js';
+import { ledeDefinition } from './lede.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
 import { testimonialDefinition } from './testimonial.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
@@ -43,6 +45,7 @@ const bind = <TType extends SectionType, TResolved>(
 
 export const componentRegistry: Partial<Record<SectionType, RegisteredComponent>> = {
   hero: bind(heroDefinition, Hero),
+  lede: bind(ledeDefinition, Lede),
   checklist: bind(checklistDefinition, Checklist),
   content_grid: bind(contentGridDefinition, ContentGrid),
   bio: bind(bioDefinition, Bio),

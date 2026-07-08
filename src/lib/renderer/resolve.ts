@@ -38,6 +38,7 @@ export type RenderableSection = {
 /** The Layout `metadata` prop this page renders with. */
 export type PageRenderMetadata = {
   title: string;
+  description?: string;
   ignoreTitleTemplate?: true;
   openGraph?: { images: Array<{ url: string; width: number; height: number }> };
 };
@@ -88,7 +89,8 @@ type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
 const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
-  if (type === 'hero') {
+  // hero and lede share the action-hrefs resolved shape (HeroResolved).
+  if (type === 'hero' || type === 'lede') {
     return {
       actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)),
     };
@@ -129,6 +131,7 @@ export const resolvePageSections = (page: PageBody, deps: ResolvePageDeps): Rend
 
 export const resolvePageMetadata = (page: PageBody): PageRenderMetadata => ({
   title: page.title,
+  ...(page.seo.description ? { description: page.seo.description } : {}),
   ...(page.pageType === 'home' ? { ignoreTitleTemplate: true as const } : {}),
   ...(page.seo.ogImage ? { openGraph: { images: [{ url: page.seo.ogImage, ...OG_IMAGE_DIMENSIONS }] } } : {}),
 });
