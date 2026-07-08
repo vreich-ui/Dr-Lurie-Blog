@@ -28,6 +28,7 @@ import {
   type ApprovalPolicy,
 } from '../approval-policy.js';
 import type { PatchApplyErrorCode } from '../object-patch-apply.js';
+import { childRuleFor } from './block-tree.js';
 import { aboutDefinition } from './components/about.js';
 import { bioDefinition } from './components/bio.js';
 import { checklistDefinition } from './components/checklist.js';
@@ -107,15 +108,32 @@ export type SectionTypeContract = {
   component_bound: boolean;
   data_schema: JsonSchema;
   editor?: (typeof SECTION_EDITORS)[keyof typeof SECTION_EDITORS];
+  /**
+   * Block-tree bounds (docs/cms-architecture/block-tree.md): which child block
+   * types this type may contain, and how many. Present only on container types;
+   * a type without `allowed_children` is a leaf. Lets an agent read the legal
+   * tree grammar before composing.
+   */
+  allowed_children?: SectionType[];
+  child_count?: { min?: number; max?: number };
 };
 
 export const listSectionTypeContracts = (): SectionTypeContract[] =>
-  (sectionTypes as SectionType[]).map((type) => ({
-    type,
-    component_bound: isRegisteredSectionType(type),
-    data_schema: toJson(sectionVariantDataSchema(type)),
-    ...(type in SECTION_EDITORS ? { editor: SECTION_EDITORS[type as keyof typeof SECTION_EDITORS] } : {}),
-  }));
+  (sectionTypes as SectionType[]).map((type) => {
+    const childRule = childRuleFor(type);
+    return {
+      type,
+      component_bound: isRegisteredSectionType(type),
+      data_schema: toJson(sectionVariantDataSchema(type)),
+      ...(type in SECTION_EDITORS ? { editor: SECTION_EDITORS[type as keyof typeof SECTION_EDITORS] } : {}),
+      ...(childRule
+        ? {
+            allowed_children: childRule.allowedChildren,
+            ...(childRule.childCount ? { child_count: childRule.childCount } : {}),
+          }
+        : {}),
+    };
+  });
 
 // ─── patch ops: the moves per type, with argument schemas ────────────────────
 
