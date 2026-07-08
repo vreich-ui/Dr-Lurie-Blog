@@ -31,9 +31,11 @@ import type { PatchApplyErrorCode } from '../object-patch-apply.js';
 import { bioDefinition } from './components/bio.js';
 import { checklistDefinition } from './components/checklist.js';
 import { contentGridDefinition } from './components/content-grid.js';
+import { ctaBannerDefinition } from './components/cta-banner.js';
 import { heroDefinition } from './components/hero.js';
 import { ledeDefinition } from './components/lede.js';
 import { newsletterSignupDefinition } from './components/newsletter-signup.js';
+import { proseDefinition } from './components/prose.js';
 import { isRegisteredSectionType } from './components/registered-types.js';
 import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
@@ -73,11 +75,13 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
 const SECTION_EDITORS = {
   hero: heroDefinition.editor,
   lede: ledeDefinition.editor,
+  prose: proseDefinition.editor,
   checklist: checklistDefinition.editor,
   content_grid: contentGridDefinition.editor,
   bio: bioDefinition.editor,
   newsletter_signup: newsletterSignupDefinition.editor,
   testimonial: testimonialDefinition.editor,
+  cta_banner: ctaBannerDefinition.editor,
 } as const;
 
 export type SectionTypeContract = {

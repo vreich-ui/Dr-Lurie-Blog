@@ -15,11 +15,13 @@ import type { SectionType } from '../../../schema/bodies/section-v1.js';
 export const REGISTERED_SECTION_TYPES = [
   'hero',
   'lede',
+  'prose',
   'checklist',
   'content_grid',
   'bio',
   'newsletter_signup',
   'testimonial',
+  'cta_banner',
 ] as const satisfies readonly SectionType[];
 
 export type RegisteredSectionType = (typeof REGISTERED_SECTION_TYPES)[number];

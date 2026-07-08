@@ -16,17 +16,21 @@ import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
 import Bio from '~/components/sections/Bio.astro';
 import Checklist from '~/components/sections/Checklist.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
+import CtaBanner from '~/components/sections/CtaBanner.astro';
 import Hero from '~/components/sections/Hero.astro';
 import Lede from '~/components/sections/Lede.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
+import Prose from '~/components/sections/Prose.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 
 import { bioDefinition } from './bio.js';
 import { checklistDefinition } from './checklist.js';
 import { contentGridDefinition } from './content-grid.js';
+import { ctaBannerDefinition } from './cta-banner.js';
 import { heroDefinition } from './hero.js';
 import { ledeDefinition } from './lede.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
+import { proseDefinition } from './prose.js';
 import { testimonialDefinition } from './testimonial.js';
 import type { RegisteredSectionType } from './registered-types.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
@@ -49,11 +53,13 @@ const bind = <TType extends SectionType, TResolved>(
 export const componentRegistry: Record<RegisteredSectionType, RegisteredComponent> = {
   hero: bind(heroDefinition, Hero),
   lede: bind(ledeDefinition, Lede),
+  prose: bind(proseDefinition, Prose),
   checklist: bind(checklistDefinition, Checklist),
   content_grid: bind(contentGridDefinition, ContentGrid),
   bio: bind(bioDefinition, Bio),
   newsletter_signup: bind(newsletterSignupDefinition, NewsletterSignup),
   testimonial: bind(testimonialDefinition, Testimonial),
+  cta_banner: bind(ctaBannerDefinition, CtaBanner),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {

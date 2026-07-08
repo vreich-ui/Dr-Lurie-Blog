@@ -89,8 +89,8 @@ type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
 const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
-  // hero and lede share the action-hrefs resolved shape (HeroResolved).
-  if (type === 'hero' || type === 'lede') {
+  // hero, lede and cta_banner share the action-hrefs resolved shape (HeroResolved).
+  if (type === 'hero' || type === 'lede' || type === 'cta_banner') {
     return {
       actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)),
     };

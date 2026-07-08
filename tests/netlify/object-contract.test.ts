@@ -7,6 +7,7 @@ import {
   type ObjectContract,
 } from '../../src/lib/registry/object-contract.js';
 import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
+import { REGISTERED_SECTION_TYPES } from '../../src/lib/registry/components/registered-types.js';
 import { sectionTypes } from '../../src/schema/bodies/section-v1.js';
 import { patchOpNamesByObjectType } from '../../src/schema/object-patch-ops.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
@@ -39,7 +40,7 @@ test('governed types carry a non-empty body JSON-schema; content_item points at 
   assert.equal(buildObjectContract('content_item').creatable, false);
 });
 
-test('section_types covers every variant; the 7 bound ones carry editor hints', () => {
+test('section_types covers every variant; the component-bound ones carry editor hints', () => {
   for (const type of ['page', 'section'] as ObjectType[]) {
     const sections = buildObjectContract(type).section_types ?? [];
     assert.deepEqual(
@@ -48,7 +49,11 @@ test('section_types covers every variant; the 7 bound ones carry editor hints', 
       `${type} must enumerate every section variant`
     );
     const bound = sections.filter((s) => s.component_bound);
-    assert.equal(bound.length, 7, 'exactly the 7 component-bound types');
+    assert.deepEqual(
+      bound.map((s) => s.type).sort(),
+      [...REGISTERED_SECTION_TYPES].sort(),
+      'component_bound exactly tracks the registered (component-bound) types'
+    );
     for (const s of bound) assert.ok(s.editor, `${s.type} (bound) must carry editor hints`);
     for (const s of sections) assert.ok(s.data_schema, `${s.type} must carry a data_schema`);
   }

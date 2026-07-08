@@ -17,9 +17,11 @@ import { splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import { bioDefinition } from '../../src/lib/registry/components/bio.js';
 import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
 import { contentGridDefinition } from '../../src/lib/registry/components/content-grid.js';
+import { ctaBannerDefinition } from '../../src/lib/registry/components/cta-banner.js';
 import { heroDefinition } from '../../src/lib/registry/components/hero.js';
 import { ledeDefinition } from '../../src/lib/registry/components/lede.js';
 import { newsletterSignupDefinition } from '../../src/lib/registry/components/newsletter-signup.js';
+import { proseDefinition } from '../../src/lib/registry/components/prose.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
 import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
 import {
@@ -41,6 +43,9 @@ const DEFINITIONS = [
   testimonialDefinition,
   // T4.2: interior-page lede, same invariants.
   ledeDefinition,
+  // Reusable primitives (bind-the-catalog): general-purpose body copy + closing CTA.
+  proseDefinition,
+  ctaBannerDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({
