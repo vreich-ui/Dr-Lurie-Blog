@@ -115,14 +115,45 @@ test('object tool input schemas declare the right required fields', async () => 
   assert.ok(enumValues?.includes('page') && enumValues?.includes('taxonomy'));
 });
 
-// ═══ registry_get stub ═══════════════════════════════════════════════════════
+// ═══ registry_get + object_contract ══════════════════════════════════════════
 
-test('registry_get returns the not_yet_populated stub for the component registry', async () => {
+test("registry_get('component') is now populated with the section-type registry", async () => {
   const res = await callTool('registry_get', { registry: 'component' });
   assert.ok(!res.isError);
-  assert.equal(res.structuredContent?.status, 'not_yet_populated');
-  assert.equal(res.structuredContent?.available, false);
-  assert.deepEqual(res.structuredContent?.definitions, []);
+  assert.equal(res.structuredContent?.status, 'ok');
+  assert.equal(res.structuredContent?.available, true);
+  const definitions = res.structuredContent?.definitions as Array<{ type: string; component_bound: boolean }>;
+  assert.ok(definitions.length >= 16, 'every section variant is listed');
+  assert.equal(definitions.filter((d) => d.component_bound).length, 7);
+});
+
+test('object_contract is listed and requires object_type', async () => {
+  const tools = await listTools();
+  const tool = getTool(tools, 'object_contract');
+  assert.deepEqual(tool.inputSchema.required, ['object_type']);
+  assert.match(tool.description, /READ THIS FIRST/i);
+});
+
+test('object_contract(navigation) returns the derived body schema, patch ops, and constraints', async () => {
+  const res = await callTool('object_contract', { object_type: 'navigation' });
+  assert.ok(!res.isError, JSON.stringify(res.structuredContent));
+  const contract = res.structuredContent?.contract as {
+    body_schema: { type?: string };
+    patch_ops: Array<{ op: string; arg_schema?: unknown }>;
+    constraints: Array<{ id: string }>;
+    publish_policy: { requires_approval: boolean };
+  };
+  assert.equal(contract.body_schema.type, 'object');
+  assert.ok(contract.patch_ops.some((o) => o.op === 'upsert_action' && o.arg_schema));
+  assert.ok(contract.constraints.some((c) => c.id === 'nav_actions_capacity'));
+  // committed policy is all-autonomous
+  assert.equal(contract.publish_policy.requires_approval, false);
+});
+
+test('object_contract rejects an unknown object_type', async () => {
+  const res = await callTool('object_contract', { object_type: 'widget' });
+  assert.equal(res.isError, true);
+  assert.equal(res.structuredContent?.error_code, 'invalid_object_type');
 });
 
 test("registry_get('page_type') serves the T3.1 definitions with the JSON-schema rendering", async () => {

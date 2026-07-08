@@ -17,6 +17,8 @@
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
+import { buildStoreValidationContext } from '../lib/object-validation-context.js';
+import type { ObjectType } from '../../src/schema/object-record-v1.js';
 import type { Principal } from '../../src/schema/object-record-v1.js';
 
 type LambdaEvent = {
@@ -61,7 +63,14 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
   try {
     const store = (await getSiteObjectsBlobStore(event)) as unknown as ObjectVerbStore;
-    const result = await handleObjectVerb(store, request.data, principal);
+    // Same live validation context as the publish-key path (object-store.ts):
+    // the browser admin path enforces the identical structural rules.
+    const requestData = request.data as { object_id?: string; object_type?: ObjectType };
+    const validationContext = await buildStoreValidationContext(store, {
+      selfObjectId: requestData.object_id,
+      selfObjectType: requestData.object_type,
+    });
+    const result = await handleObjectVerb(store, request.data, principal, { validationContext });
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('Admin_Object request failed.', error);

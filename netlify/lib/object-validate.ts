@@ -102,6 +102,13 @@ export type ObjectValidationContext = {
   trustedAssetRefs?: Set<string>;
   /** The PageType definition for a page's `pageType` (registry is code, D§3.4/OQ-4). */
   pageType?: PageTypeConstraint;
+  /**
+   * Resolve a page's PageType constraint from its `pageType` id (the code
+   * registry). Preferred over the static `pageType` field for the generic
+   * write path, which validates whatever page arrives; `pageType` still wins
+   * when set directly (tests). Absent → PageType rules not verified.
+   */
+  resolvePageType?: (pageTypeId: string) => PageTypeConstraint | undefined;
   /** True when validating a publish (or the record is already published). */
   publishIntent?: boolean;
 };
@@ -929,14 +936,18 @@ export const checkStructuralInvariants = (
     );
   }
 
-  // PageType allowed/required sections (D§3.4). The registry is code and injected
-  // via context.pageType; without it these constraints are not verifiable here.
-  if (!context.pageType) {
+  // PageType allowed/required sections (D§3.4). The registry is code, resolved
+  // via context.resolvePageType from the body's pageType (or a directly-injected
+  // context.pageType, which wins). Without either, not verifiable here.
+  const pageTypeConstraint =
+    context.pageType ??
+    (isRecord(body) && typeof body.pageType === 'string' ? context.resolvePageType?.(body.pageType) : undefined);
+  if (!pageTypeConstraint) {
     criteria.push(crit('structure_pagetype', 'PageType section rules', 'optional', 'No PageType definition supplied.'));
     return criteria;
   }
 
-  const { allowedSections, requiredSections } = context.pageType;
+  const { allowedSections, requiredSections } = pageTypeConstraint;
   if (allowedSections !== 'any') {
     const allowed = new Set(allowedSections);
     const disallowed: string[] = [];
@@ -953,7 +964,7 @@ export const checkStructuralInvariants = (
             'structure_allowed',
             'Allowed section types',
             'missing',
-            `Section types not allowed on PageType ${context.pageType.id ?? ''}: ${[...new Set(disallowed)].join(', ')}.`
+            `Section types not allowed on PageType ${pageTypeConstraint.id ?? ''}: ${[...new Set(disallowed)].join(', ')}.`
           )
     );
   }

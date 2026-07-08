@@ -50,6 +50,12 @@ import {
   pageTypeDefinitionJsonSchema,
   unimplementedPageTypeIds,
 } from '../../src/lib/registry/page-types.js';
+import {
+  buildObjectContract,
+  listSectionTypeContracts,
+  OBJECT_CONTRACT_TYPES,
+} from '../../src/lib/registry/object-contract.js';
+import { objectTypes, type ObjectType } from '../../src/schema/object-record-v1.js';
 
 const mediaPortabilityWarning =
   'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';
@@ -784,7 +790,9 @@ const contentSourceV1JsonSchema = objectSchema(
 
 // ── Object-verb tool schemas (T0.9). Additive; the article tool schemas above
 //    are untouched. ──
-const OBJECT_TYPE_VALUES = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'content_item'];
+// Single source of truth: the envelope's object-type vocabulary (was a
+// hand-copied literal that could drift from object-record-v1.ts).
+const OBJECT_TYPE_VALUES = [...objectTypes];
 const objectTypeEnumSchema = (description = 'CMS object type.') => ({
   type: 'string',
   enum: OBJECT_TYPE_VALUES,
@@ -1471,9 +1479,17 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     }),
   },
   {
+    name: 'object_contract',
+    description:
+      'The complete, machine-readable contract for creating and editing one CMS object type — READ THIS FIRST, before object_create/object_patch, so you never guess. Returns, all derived from the enforcing code (so it cannot drift): body_schema (the exact JSON-schema of a valid body); section_types (for page/section: every placeable section variant, its data JSON-schema, whether it has a bound component, and editor hints); patch_ops (exactly the ops allowed for this type, each with an argument JSON-schema and which id field is server-minted so you may omit it); constraints (the structural boundaries with severity and whether each is enforced live); publish_policy (whether publishing needs approval — computed from the live policy — plus the M-6 pin rules and denial codes); workflow (the checkout→validate→patch→publish→release sequence, the 423/409 lock/version discipline, and the patch error-code catalog); and auxiliary_inputs (side-data a move needs, e.g. artifact uploads for image fields). Live per-object state (version/lock/review) is in object_inventory; a dry run of a specific patch is object_validate.',
+    inputSchema: objectSchema({ object_type: objectTypeEnumSchema('The CMS object type to describe.') }, [
+      'object_type',
+    ]),
+  },
+  {
     name: 'registry_get',
     description:
-      "Read a code registry. registry: 'page_type' returns the T3.1 PageType definitions (route pattern, allowed/required sections, review policy) plus a JSON-schema rendering of the definition shape; 'component' is not yet populated (arrives with T3.2).",
+      "Read a code registry. registry: 'page_type' returns the PageType definitions (route pattern, allowed/required sections, review policy) plus a JSON-schema rendering of the definition shape; 'component' returns every section type with its data JSON-schema, editor hints, and whether a component is bound. For the full per-object-type contract (body schema + patch ops + constraints + publish policy), use object_contract instead.",
     inputSchema: objectSchema({
       registry: { type: 'string', enum: ['component', 'page_type'], description: 'Optional registry name.' },
     }),
@@ -3814,10 +3830,19 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         lock_token: input.lock_token,
         published_time: input.published_time,
       });
+    case 'object_contract': {
+      const objectType = toNonEmptyString(input.object_type);
+      if (!objectType || !OBJECT_CONTRACT_TYPES.includes(objectType as ObjectType)) {
+        return toolError(`object_type must be one of ${OBJECT_CONTRACT_TYPES.join('|')}.`, {
+          error_code: 'invalid_object_type',
+        });
+      }
+      // Pure, in-process, read-only — no store round-trip; derived from the
+      // enforcing schemas/registries/policy so it cannot drift.
+      return toolResult({ contract: buildObjectContract(objectType as ObjectType) });
+    }
     case 'registry_get': {
       const registry = toNonEmptyString(input.registry) ?? null;
-      // T3.1: page_type is served from the code registry. component stays the
-      // T0.9 stub until T3.2 lands the per-section-type modules.
       if (registry === 'page_type') {
         return toolResult({
           registry,
@@ -3828,19 +3853,24 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
           definition_schema: pageTypeDefinitionJsonSchema(),
         });
       }
-      if (registry === null) {
+      if (registry === 'component') {
+        // Now populated: every section variant with its data JSON-schema,
+        // component-bound flag, and editor hints (same source as
+        // object_contract.section_types).
         return toolResult({
-          registries: ['page_type', 'component'],
-          available: ['page_type'],
-          message: "Pass registry: 'page_type' for definitions; 'component' is not yet populated (T3.2).",
+          registry,
+          status: 'ok',
+          available: true,
+          definitions: listSectionTypeContracts(),
+          message:
+            'For the full per-object-type contract (body schema + patch ops + constraints), use object_contract.',
         });
       }
       return toolResult({
-        registry,
-        status: 'not_yet_populated',
-        available: false,
-        message: 'The component registry is not yet populated; it arrives with T3.2.',
-        definitions: [],
+        registries: ['page_type', 'component'],
+        available: ['page_type', 'component'],
+        message:
+          "Pass registry: 'page_type' or 'component'. For the complete per-object-type editing contract, prefer object_contract.",
       });
     }
 
