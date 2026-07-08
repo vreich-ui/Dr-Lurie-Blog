@@ -19,6 +19,8 @@ import { timingSafeEqual } from 'node:crypto';
 import { getHeader } from '../lib/admin-auth.js';
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
+import { buildStoreValidationContext } from '../lib/object-validation-context.js';
+import type { ObjectType } from '../../src/schema/object-record-v1.js';
 import type { Principal } from '../../src/schema/object-record-v1.js';
 
 type LambdaEvent = {
@@ -84,7 +86,16 @@ export const handler = async (event: LambdaEvent) => {
 
   try {
     const store = (await getSiteObjectsBlobStore(event)) as unknown as ObjectVerbStore;
-    const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value));
+    // Wire the store-backed validation context so reference integrity, PageType
+    // section rules, route uniqueness, and taxonomy resolution are enforced live
+    // (not the previous no-context degradation to `optional`). Flows to create,
+    // patch, validate, and publish.
+    const requestData = request.data as { object_id?: string; object_type?: ObjectType };
+    const validationContext = await buildStoreValidationContext(store, {
+      selfObjectId: requestData.object_id,
+      selfObjectType: requestData.object_type,
+    });
+    const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value), { validationContext });
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('Object_Store request failed.', error);
