@@ -215,3 +215,60 @@ test('without a resolver, published-page verification reports optional (not veri
   const criteria = checkNavigationStructure(navHeaderBody(), {}, true);
   assert.equal(statusOf(criteria, 'nav_published_targets'), 'optional');
 });
+
+// ── structural-capacity guardrail (header actions) ───────────────────────────
+// Content stays flexible (add/remove freely); the registry only advises when a
+// role's action slot exceeds the fixed budget its component renders comfortably.
+
+test('a header within the action budget reports capacity complete and adds no warning', () => {
+  // The seed fixture carries one action — well under the header max of 3.
+  const criteria = checkNavigationStructure(navHeaderBody(), {}, false);
+  assert.equal(statusOf(criteria, 'nav_actions_capacity'), 'complete');
+  const summary = summarizeValidation(
+    validateObject({ objectType: 'navigation', objectId: 'nav_header', body: navHeaderBody() })
+  );
+  assert.equal(summary.warnings.length, 1, 'capacity within budget must not add a second warning class');
+});
+
+test('exceeding the header action budget WARNS (never blocks) — at draft and at publish alike', () => {
+  const body = navHeaderBody() as unknown as { actions: Array<Record<string, unknown>> };
+  // Four header CTAs — one past the budget.
+  body.actions = [
+    { label: 'A', target: { kind: 'route', href: '/a' }, style: 'primary' },
+    { label: 'B', target: { kind: 'route', href: '/b' }, style: 'primary' },
+    { label: 'C', target: { kind: 'route', href: '/c' }, style: 'primary' },
+    { label: 'D', target: { kind: 'route', href: '/d' }, style: 'primary' },
+  ];
+  for (const atPublish of [false, true]) {
+    const criteria = checkNavigationStructure(body, {}, atPublish);
+    assert.equal(statusOf(criteria, 'nav_actions_capacity'), 'warning', `atPublish=${atPublish}`);
+  }
+  // Warn-only: an over-budget header must still be publish-eligible (no blocker).
+  const summary = summarizeValidation(validateObject({ objectType: 'navigation', objectId: 'nav_header', body }));
+  assert.equal(summary.eligible, true);
+  assert.ok(
+    summary.blockers.every((blocker) => blocker.id !== 'nav_actions_capacity'),
+    'capacity is advisory, never a blocker'
+  );
+});
+
+test('emptying the header action slot is legal (no capacity criterion trips)', () => {
+  const body = navHeaderBody() as unknown as { actions: unknown[] };
+  body.actions = [];
+  const criteria = checkNavigationStructure(body, {}, true);
+  assert.equal(statusOf(criteria, 'nav_actions_capacity'), 'complete');
+});
+
+test('roles without a configured capacity rule (footer) report capacity complete', () => {
+  const body = navHeaderBody() as unknown as { role: string; actions: Array<Record<string, unknown>> };
+  body.role = 'footer';
+  body.actions = [
+    { label: 'A', target: { kind: 'route', href: '/a' } },
+    { label: 'B', target: { kind: 'route', href: '/b' } },
+    { label: 'C', target: { kind: 'route', href: '/c' } },
+    { label: 'D', target: { kind: 'route', href: '/d' } },
+    { label: 'E', target: { kind: 'route', href: '/e' } },
+  ];
+  const criteria = checkNavigationStructure(body, {}, false);
+  assert.equal(statusOf(criteria, 'nav_actions_capacity'), 'complete');
+});

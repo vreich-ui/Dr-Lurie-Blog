@@ -1,13 +1,13 @@
 /**
- * `content_grid` registry module (T3.2, D§3.5) — replaces the audited
+ * `content_grid` registry module (T3.2/T3.9, D§3.5) — replaces the audited
  * placeholder article grid (A§2.1). The transitional `static` source renders
- * cards verbatim (deprecated-on-arrival, retired by T3.9); `manual`/`query`
- * sources render from resolved content summaries once the T3.6 renderer
- * executes them (M-8 fallback semantics arrive with T3.3).
+ * cards verbatim (deprecated-on-arrival); `manual`/`query` sources render from
+ * renderer-resolved content summaries (src/lib/renderer/resolve.ts, M-8
+ * fallback semantics from T3.3).
  */
-import { sectionVariantDataSchema, type EmptyResolved, type SectionComponentDefinition } from './types.js';
+import { sectionVariantDataSchema, type ContentGridResolved, type SectionComponentDefinition } from './types.js';
 
-export const contentGridDefinition: SectionComponentDefinition<'content_grid', EmptyResolved> = {
+export const contentGridDefinition: SectionComponentDefinition<'content_grid', ContentGridResolved> = {
   type: 'content_grid',
   schema: sectionVariantDataSchema('content_grid'),
   editor: {

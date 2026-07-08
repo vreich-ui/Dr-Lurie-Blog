@@ -51,6 +51,22 @@ const metadata = {
     <div data-admin-shell data-auth-gated hidden>
       <AdminNav activePath="/admin/objects" />
 
+      <!--
+        TODO (Wolf, 2026-07-08, NOT NOW — captured for T3.10/T3.12): this lookup
+        requires already knowing the exact object id (type + id, exact match).
+        There is no search/browse across objects. Two improvements to make
+        together when this page is next worked:
+          1. Real search/filter — list objects by type with a text filter over
+             id/title/labels, not just object_inventory's raw sweep; probably a
+             typeahead over object_list/object_inventory results.
+          2. Render the object as an editable inline preview on this page
+             (approximating how it'll actually look — e.g. a nav's groups/
+             actions, a page's sections) rather than only the raw JSON/diff
+             view, so reviewing and light-editing don't require reading raw
+             object bodies.
+        See docs/cms-architecture/05-task-breakdown-and-open-questions.md
+        (T3.10/T3.12 notes) for the same TODO tracked centrally.
+      -->
       <!-- Lookup form: shown until a real object id is resolved from the URL -->
       <section id="lookup-panel" class="objects-card" hidden>
         <p class="objects-kicker">Open an object</p>

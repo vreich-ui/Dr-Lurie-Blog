@@ -1,38 +1,46 @@
 ---
 /**
- * Homepage (T3.6 cutover) — a thin loader over the published `page_home` Page
- * object. It reads the derived export, resolves it (src/lib/renderer/resolve.ts:
- * shared_ref dereference, hero action hrefs, page metadata), and dispatches
- * each section to its registered component (src/lib/registry/components). The
- * proven section markup is unchanged; only who FEEDS it moved from inline
- * literals to the CMS object. The T2.5 interim footer bridge is gone — the
- * footer variant now comes from page_home.navigationOverrides.footer (S-4).
+ * PageObjectRenderer (T4.2) — the one thin loader every migrated page route
+ * delegates to, so 12 route files don't each re-implement load → resolve →
+ * dispatch. Given a published Page object id, it reads the derived export,
+ * resolves it (src/lib/renderer/resolve.ts: shared_ref dereference, hero/lede
+ * action hrefs, content_grid, page metadata), and dispatches each section to
+ * its registered component. The footer variant is applied only when the page
+ * carries navigationOverrides.footer (the homepage does, via S-4); every other
+ * page falls through to PageLayout's default footer slot.
+ *
+ * The proven section markup is unchanged — this component adds no wrapper
+ * element, so a page delegating to it renders byte-identically to the inline
+ * loader it replaces.
  */
 import { getEntry } from 'astro:content';
 
-import Layout from '~/layouts/PageLayout.astro';
+import PageLayout from '~/layouts/PageLayout.astro';
 import Footer from '~/components/widgets/Footer.astro';
 import { getRegisteredComponent } from '~/lib/registry/components/index';
 import { parsePageExport, parseSharedSectionExport, resolvePage, type ResolvePageDeps } from '~/lib/renderer/resolve';
 import type { NavTarget } from '~/schema/bodies/navigation-v1';
 import type { ContentQuery } from '~/schema/bodies/section-v1';
-import { fetchPosts } from '~/utils/blog';
 import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
 import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
 
-const pageEntry = await getEntry('pageObject', 'page_home');
+interface Props {
+  objectId: string;
+}
+const { objectId } = Astro.props;
+
+const pageEntry = await getEntry('pageObject', objectId);
 if (!pageEntry) {
   throw new Error(
-    'index: the published page_home export is missing (src/data/site/pages/page_home.json). ' +
-      'The T3.5 publish must land before the T3.6 cutover builds.'
+    `PageObjectRenderer: the published page export '${objectId}' is missing ` +
+      `(src/data/site/pages/${objectId}.json). The T3.5/T4.3 publish must land before this page builds.`
   );
 }
 const page = parsePageExport(pageEntry.data);
 
-// Hero action hrefs resolve exactly as the audited homepage did — route/asset
-// targets through getPermalink, listing to the blog permalink, external
-// verbatim. Only route-kind exists in the seed; the rest keep the homepage
-// honest as targets are upgraded (T3.11/T4.5).
+// Action hrefs resolve exactly as the audited pages did — route/asset through
+// getPermalink, listing to the blog permalink, external verbatim. page/taxonomy
+// targets aren't resolvable on a page body yet (T3.11/T4.5 upgrade them).
 const resolveActionHref = (target: NavTarget): string => {
   switch (target.kind) {
     case 'route':
@@ -43,7 +51,7 @@ const resolveActionHref = (target: NavTarget): string => {
     case 'listing':
       return getBlogPermalink();
     default:
-      throw new Error(`index: hero action target kind '${target.kind}' is not resolvable on the homepage yet.`);
+      throw new Error(`PageObjectRenderer: action target kind '${target.kind}' is not resolvable on a page body yet.`);
   }
 };
 
@@ -55,14 +63,15 @@ for (const section of page.sections) {
   if (sharedSectionCache.has(refId)) continue;
   const sectionEntry = await getEntry('sectionObject', refId);
   if (!sectionEntry) {
-    throw new Error(`index: shared section export '${refId}' is missing (src/data/site/sections/${refId}.json).`);
+    throw new Error(
+      `PageObjectRenderer: shared section export '${refId}' is missing (src/data/site/sections/${refId}.json).`
+    );
   }
   sharedSectionCache.set(refId, parseSharedSectionExport(sectionEntry.data));
 }
 
-// content_grid manual/query resolution (T3.9, M-8): only load posts if the
-// page (inline OR dereferenced via shared_ref) actually carries a non-static
-// content_grid section.
+// content_grid manual/query resolution (T3.9, M-8): only load posts if the page
+// (inline OR dereferenced via shared_ref) actually carries a non-static grid.
 const isNonStaticContentGrid = (type: string, data: unknown) =>
   type === 'content_grid' && (data as { source: { kind: string } }).source.kind !== 'static';
 const needsContentGrid =
@@ -70,12 +79,14 @@ const needsContentGrid =
   [...sharedSectionCache.values()].some((target) => isNonStaticContentGrid(target.type, target.data));
 let contentGrid: ResolvePageDeps['contentGrid'];
 if (needsContentGrid) {
+  // Dynamic import: keep the blog module (and its transitive graph) OUT of the
+  // bundle of pages that don't use a content grid, so adding this shared
+  // renderer doesn't perturb Astro's shared-CSS-chunk naming for every page.
   // fetchPosts() is already published-only (published_time <= now) and sorted
   // newest-first — exactly the "published content item" the schema requires.
+  const { fetchPosts } = await import('~/utils/blog');
   const posts = await fetchPosts();
   const toCard = (post: (typeof posts)[number]) => ({ id: post.id, title: post.title, description: post.excerpt });
-  // Tag filters match ANY listed tag (no AND semantics specified in
-  // ContentQuery) — the permissive interpretation for a backfill query.
   const matchesQuery = (post: (typeof posts)[number], query: ContentQuery) => {
     if (query.category && post.category?.slug !== query.category) return false;
     if (query.tags && query.tags.length > 0) {
@@ -85,8 +96,8 @@ if (needsContentGrid) {
     return true;
   };
   contentGrid = {
-    resolveManualItem: (objectId) => {
-      const post = posts.find((candidate) => candidate.id === objectId);
+    resolveManualItem: (id) => {
+      const post = posts.find((candidate) => candidate.id === id);
       return post ? toCard(post) : undefined;
     },
     runQuery: (query, limit) => {
@@ -105,7 +116,7 @@ const deps: ResolvePageDeps = {
   resolveActionHref,
   resolveSharedSection: (sectionObjectId) => {
     const resolved = sharedSectionCache.get(sectionObjectId);
-    if (!resolved) throw new Error(`index: shared section '${sectionObjectId}' was not preloaded.`);
+    if (!resolved) throw new Error(`PageObjectRenderer: shared section '${sectionObjectId}' was not preloaded.`);
     return resolved;
   },
   contentGrid,
@@ -113,24 +124,23 @@ const deps: ResolvePageDeps = {
 
 const { metadata, sections } = resolvePage(page, deps);
 
-// Footer variant (S-4): the homepage footer comes from the page's
-// navigationOverrides.footer (nav_footer_home), replacing T2.5's interim
-// direct reference. The <Fragment slot="footer"> mechanism is unchanged.
-const footerNavId = page.navigationOverrides?.footer;
-if (!footerNavId) {
-  throw new Error('index: page_home.navigationOverrides.footer is required for the homepage footer variant.');
-}
+// Footer: the page's override if it names one (S-4, homepage → nav_footer_home),
+// else the site default nav_footer — exactly what PageLayout's footer slot
+// renders by default. Always provided explicitly here rather than relying on
+// the slot fallback: a *conditional* `slot="footer"` makes Astro treat the slot
+// as handled and suppresses PageLayout's default, dropping the footer.
+const footerNavId = page.navigationOverrides?.footer ?? 'nav_footer';
 const footerEntry = await getEntry('navigationObject', footerNavId);
 if (!footerEntry) {
-  throw new Error(`index: the footer navigation export '${footerNavId}' is missing.`);
+  throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);
 }
-const homeFooterData = navigationToFooterProps(
+const footerData = navigationToFooterProps(
   parseNavigationExport(footerEntry.data),
   createNavTargetResolver({ blogPermalink: getBlogPermalink() })
 );
 ---
 
-<Layout metadata={metadata}>
+<PageLayout metadata={metadata}>
   {
     sections.map((section) => {
       const { component: SectionComponent } = getRegisteredComponent(section.type);
@@ -139,6 +149,6 @@ const homeFooterData = navigationToFooterProps(
   }
 
   <Fragment slot="footer">
-    <Footer {...homeFooterData} />
+    <Footer {...footerData} />
   </Fragment>
-</Layout>
+</PageLayout>

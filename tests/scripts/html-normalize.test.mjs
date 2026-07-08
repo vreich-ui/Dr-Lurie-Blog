@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { normalizeAssetHashes, normalizeHtml } from '../../scripts/lib/html-normalize.mjs';
+import { normalizeAssetHashes, normalizeCssChunkStems, normalizeHtml } from '../../scripts/lib/html-normalize.mjs';
 
 test('asset hashes collapse to HASH (single and double segment)', () => {
   assert.equal(
@@ -40,6 +40,38 @@ test('a one-character text change survives normalization (is caught)', () => {
 
 test('attribute VALUES are content — a changed href is caught', () => {
   assert.notEqual(normalizeHtml('<a href="/about">x</a>'), normalizeHtml('<a href="/about-us">x</a>'));
+});
+
+test('shared CSS chunk stems collapse to CHUNK (a rename is not a page change)', () => {
+  assert.equal(
+    normalizeCssChunkStems('<link href="/_astro/privacy.HASH.css">'),
+    '<link href="/_astro/CHUNK.HASH.css">'
+  );
+  assert.equal(
+    normalizeHtml('<link href="/_astro/privacy.HASH.css" rel="stylesheet">'),
+    normalizeHtml('<link href="/_astro/index.HASH.css" rel="stylesheet">')
+  );
+});
+
+test('CSS stem collapse is scoped to .css — image stems still discriminate content', () => {
+  // Two different images have different stems (and hashes); the stem must remain
+  // a discriminator (the hash is collapsed to HASH by rule 1).
+  assert.notEqual(
+    normalizeHtml('<img src="/_astro/hero.HASH.webp">'),
+    normalizeHtml('<img src="/_astro/bio.HASH.webp">')
+  );
+});
+
+test('class-attribute VALUE order is dropped (astro-compress frequency sort)', () => {
+  assert.equal(
+    normalizeHtml('<div class="mx-auto max-w-4xl px-4 py-16"></div>'),
+    normalizeHtml('<div class="px-4 mx-auto py-16 max-w-4xl"></div>')
+  );
+});
+
+test('the class SET is still content — a changed/added/removed class is caught', () => {
+  assert.notEqual(normalizeHtml('<div class="a b"></div>'), normalizeHtml('<div class="a c"></div>'));
+  assert.notEqual(normalizeHtml('<div class="a b"></div>'), normalizeHtml('<div class="a b c"></div>'));
 });
 
 test('script bodies are opaque: inner HTML-in-template-literals is preserved verbatim', () => {

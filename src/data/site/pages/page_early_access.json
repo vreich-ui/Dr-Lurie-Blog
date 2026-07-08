@@ -1,0 +1,42 @@
+{
+  "__generated": {
+    "at": "2026-07-08T00:00:00.000Z",
+    "from": "objects/page/by-id/page_early_access.json",
+    "record_version": 1
+  },
+  "pageType": "standard",
+  "route": "/solutions/early-access",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Join newsletter",
+            "style": "primary",
+            "target": {
+              "href": "/newsletter",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "View shop preview",
+            "style": "secondary",
+            "target": {
+              "href": "/solutions/shop-preview",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Early access is the place for launch timing, product previews, and research-led updates as Dr. Lurié solutions are prepared.</p>",
+        "heading": "Follow the product work before launch.",
+        "kicker": "Early access"
+      },
+      "id": "s_lede",
+      "type": "lede"
+    }
+  ],
+  "seo": {
+    "description": "Join Dr. Lurié early access for product previews, research notes, and launch updates."
+  },
+  "title": "Early Access"
+}
