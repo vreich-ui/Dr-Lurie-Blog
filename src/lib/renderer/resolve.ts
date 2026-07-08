@@ -17,13 +17,14 @@
  * Kept pure (no astro:content / Astro imports): the caller (index.astro)
  * performs the async collection loads and injects sync resolvers, so these
  * rules stay testable without a build. `static` content_grid needs no
- * resolution — the component renders it verbatim (transitional, retired T3.9);
- * manual/query resolution lands with T3.9 via resolve-content-grid.ts.
+ * resolution — the component renders it verbatim (transitional); `manual`/
+ * `query` sources resolve here (T3.9) via resolve-content-grid.ts (M-8).
  */
 import type { NavTarget } from '../../schema/bodies/navigation-v1.js';
 import { pageBodySchema, type PageBody } from '../../schema/bodies/page-v1.js';
-import { sectionBodySchema } from '../../schema/bodies/section-v1.js';
-import type { RenderCtx, SectionType } from '../registry/components/types.js';
+import { sectionBodySchema, type ContentGridSource } from '../../schema/bodies/section-v1.js';
+import type { ContentGridCard, RenderCtx, SectionType } from '../registry/components/types.js';
+import { resolveContentGridCards, type ContentGridResolvers } from './resolve-content-grid.js';
 
 /** A section ready for component-registry dispatch: `{data, resolved, ctx}` plus its stable page key. */
 export type RenderableSection = {
@@ -46,11 +47,20 @@ export type ResolvedPage = {
   sections: RenderableSection[];
 };
 
+/** Internal identity for de-duplicating manual picks against fallback-query backfill. */
+type ContentGridCardInternal = ContentGridCard & { id: string };
+
 export type ResolvePageDeps = {
   /** Resolve a hero action's target to its href (route/asset via permalink, external verbatim, listing → blog). */
   resolveActionHref: (target: NavTarget) => string;
   /** Dereference a shared_ref target object id to the inline section it wraps. */
   resolveSharedSection: (sectionObjectId: string) => { type: SectionType; data: unknown };
+  /**
+   * Resolvers for content_grid `manual`/`query` sources (M-8, T3.9). `static`
+   * needs none — the component renders it verbatim. Required only when a page
+   * actually carries a non-static content_grid section.
+   */
+  contentGrid?: ContentGridResolvers<ContentGridCardInternal>;
 };
 
 // The audited homepage OG image is emitted at these fixed dimensions; page.v1
@@ -75,11 +85,28 @@ export const parseSharedSectionExport = (data: unknown): { type: SectionType; da
 };
 
 type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
+type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
-const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown =>
-  type === 'hero'
-    ? { actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)) }
-    : {};
+const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
+  if (type === 'hero') {
+    return {
+      actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)),
+    };
+  }
+  if (type === 'content_grid') {
+    const gridData = data as ContentGridLikeData;
+    // static renders verbatim from data.source.cards — the component needs no
+    // resolved data for it (transitional, T3.2, retired on arrival by design).
+    if (gridData.source.kind === 'static') return {};
+    if (!deps.contentGrid) {
+      throw new Error(
+        `index: content_grid source kind '${gridData.source.kind}' requires contentGrid resolvers to be supplied to resolvePage.`
+      );
+    }
+    return { cards: resolveContentGridCards(gridData.source, gridData.limit, deps.contentGrid) };
+  }
+  return {};
+};
 
 const renderable = (id: string, type: SectionType, data: unknown, deps: ResolvePageDeps): RenderableSection => ({
   id,

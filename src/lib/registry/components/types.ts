@@ -65,6 +65,14 @@ export type HeroResolved = {
 };
 export type EmptyResolved = Record<string, never>;
 
+/**
+ * content_grid (M-8, T3.9): `manual`/`query` sources resolve to cards here;
+ * `static` needs none (the component renders data.source.cards verbatim), so
+ * `cards` is optional — absent/undefined is exactly the static case.
+ */
+export type ContentGridCard = { title: string; description?: string };
+export type ContentGridResolved = { cards?: ContentGridCard[] };
+
 /** Read-only site context (D§4.2). Populated from the Site export in P5; opaque until then. */
 export type RenderCtx = Record<string, unknown>;
 

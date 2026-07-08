@@ -112,3 +112,68 @@ test('resolvePage returns metadata + dispatch-ready sections together', () => {
     ['hero', 'newsletter_signup']
   );
 });
+
+// ── content_grid resolution (T3.9, M-8) ───────────────────────────────────────
+
+const gridPageExport = (source: unknown, limit = 4) => ({
+  ...pageExport(),
+  sections: [{ id: 's_grid', type: 'content_grid' as const, data: { heading: 'Start here', source, limit } }],
+});
+
+const CARDS = [
+  { id: 'p1', title: 'Post One', description: 'First post' },
+  { id: 'p2', title: 'Post Two', description: 'Second post' },
+  { id: 'p3', title: 'Post Three', description: 'Third post' },
+];
+
+const gridDeps = (): ResolvePageDeps => ({
+  ...deps(),
+  contentGrid: {
+    resolveManualItem: (id) => CARDS.find((card) => card.id === id),
+    runQuery: (_query, limit) => CARDS.slice(0, limit),
+    idOf: (card) => card.id,
+  },
+});
+
+test('content_grid static source needs no resolvers and resolves to {}', () => {
+  const page = parsePageExport(gridPageExport({ kind: 'static', cards: [{ title: 'A', description: 'a' }] }));
+  // No `contentGrid` deps supplied at all — static must not require them.
+  const sections = resolvePageSections(page, deps());
+  assert.deepEqual(sections[0].resolved, {});
+});
+
+test('content_grid manual source resolves each item through resolveManualItem, in order', () => {
+  const page = parsePageExport(gridPageExport({ kind: 'manual', items: ['p2', 'p1'] }));
+  const sections = resolvePageSections(page, gridDeps());
+  assert.deepEqual(sections[0].resolved, {
+    cards: [
+      { id: 'p2', title: 'Post Two', description: 'Second post' },
+      { id: 'p1', title: 'Post One', description: 'First post' },
+    ],
+  });
+});
+
+test('content_grid query source runs the query capped at limit', () => {
+  const page = parsePageExport(gridPageExport({ kind: 'query', query: { sort: 'published_time_desc' } }, 2));
+  const sections = resolvePageSections(page, gridDeps());
+  const resolved = sections[0].resolved as { cards: unknown[] };
+  assert.equal(resolved.cards.length, 2);
+});
+
+test('content_grid manual + fallback backfills from the query, de-duplicated', () => {
+  const page = parsePageExport(
+    gridPageExport({ kind: 'manual', items: ['p1'], fallback: { kind: 'query', query: {} } }, 3)
+  );
+  const sections = resolvePageSections(page, gridDeps());
+  const resolved = sections[0].resolved as { cards: Array<{ id: string }> };
+  // p1 from the manual pick; p2/p3 backfilled by the fallback query (p1 not duplicated).
+  assert.deepEqual(
+    resolved.cards.map((card) => card.id),
+    ['p1', 'p2', 'p3']
+  );
+});
+
+test('a non-static content_grid without contentGrid resolvers throws loudly, not silently', () => {
+  const page = parsePageExport(gridPageExport({ kind: 'manual', items: ['p1'] }));
+  assert.throws(() => resolvePageSections(page, deps()), /requires contentGrid resolvers/);
+});

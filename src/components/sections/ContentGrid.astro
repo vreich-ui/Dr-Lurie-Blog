@@ -1,28 +1,26 @@
 ---
 /**
- * `content_grid` section component (T3.2) — markup verbatim from the audited
- * "Start here" homepage grid (index.astro, A§2.1). v1 renders ONLY the
- * transitional `static` source (byte-identical cutover, C§1.7-1);
- * `manual`/`query` cards come from renderer-resolved content summaries and
- * land with T3.6/T3.9 — until then a non-static source fails the build
- * loudly rather than rendering placeholders that look real.
+ * `content_grid` section component (T3.2/T3.9) — markup verbatim from the
+ * audited "Start here" homepage grid (index.astro, A§2.1). `static` renders
+ * its cards verbatim (transitional, T3.2, byte-identical cutover, C§1.7-1).
+ * `manual`/`query` render from `resolved.cards`, computed by the renderer
+ * (src/lib/renderer/resolve.ts via resolve-content-grid.ts, M-8) — this
+ * component stays a pure layout consumer of already-resolved cards, same
+ * discipline as every other registry component.
  */
 import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
-import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+import type { ContentGridResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
 
 type Props = {
   data: SectionDataOf<'content_grid'>;
-  resolved: EmptyResolved;
+  resolved: ContentGridResolved;
   ctx: RenderCtx;
 };
 
-const { data } = Astro.props;
-if (data.source.kind !== 'static') {
-  throw new Error(
-    `ContentGrid: source kind '${data.source.kind}' renders from resolved content summaries, which arrive with T3.6 (resolve.ts) / T3.9 — only the transitional 'static' variant renders in T3.2.`
-  );
-}
-const cards = data.source.cards;
+const { data, resolved } = Astro.props;
+// An empty manual list with no fallback is an intentionally short grid
+// (resolve-content-grid.ts's own documented rule) — render nothing, not an error.
+const cards = data.source.kind === 'static' ? data.source.cards : (resolved.cards ?? []);
 const intro = splitRichTextParagraphs(data.body ?? '');
 ---
 

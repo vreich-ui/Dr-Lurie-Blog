@@ -15,6 +15,8 @@ import Footer from '~/components/widgets/Footer.astro';
 import { getRegisteredComponent } from '~/lib/registry/components/index';
 import { parsePageExport, parseSharedSectionExport, resolvePage, type ResolvePageDeps } from '~/lib/renderer/resolve';
 import type { NavTarget } from '~/schema/bodies/navigation-v1';
+import type { ContentQuery } from '~/schema/bodies/section-v1';
+import { fetchPosts } from '~/utils/blog';
 import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
 import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
 
@@ -58,6 +60,47 @@ for (const section of page.sections) {
   sharedSectionCache.set(refId, parseSharedSectionExport(sectionEntry.data));
 }
 
+// content_grid manual/query resolution (T3.9, M-8): only load posts if the
+// page (inline OR dereferenced via shared_ref) actually carries a non-static
+// content_grid section.
+const isNonStaticContentGrid = (type: string, data: unknown) =>
+  type === 'content_grid' && (data as { source: { kind: string } }).source.kind !== 'static';
+const needsContentGrid =
+  page.sections.some((section) => isNonStaticContentGrid(section.type, section.data)) ||
+  [...sharedSectionCache.values()].some((target) => isNonStaticContentGrid(target.type, target.data));
+let contentGrid: ResolvePageDeps['contentGrid'];
+if (needsContentGrid) {
+  // fetchPosts() is already published-only (published_time <= now) and sorted
+  // newest-first — exactly the "published content item" the schema requires.
+  const posts = await fetchPosts();
+  const toCard = (post: (typeof posts)[number]) => ({ id: post.id, title: post.title, description: post.excerpt });
+  // Tag filters match ANY listed tag (no AND semantics specified in
+  // ContentQuery) — the permissive interpretation for a backfill query.
+  const matchesQuery = (post: (typeof posts)[number], query: ContentQuery) => {
+    if (query.category && post.category?.slug !== query.category) return false;
+    if (query.tags && query.tags.length > 0) {
+      const postTagSlugs = new Set((post.tags ?? []).map((tag) => tag.slug));
+      if (!query.tags.some((tag) => postTagSlugs.has(tag))) return false;
+    }
+    return true;
+  };
+  contentGrid = {
+    resolveManualItem: (objectId) => {
+      const post = posts.find((candidate) => candidate.id === objectId);
+      return post ? toCard(post) : undefined;
+    },
+    runQuery: (query, limit) => {
+      const filtered = posts.filter((post) => matchesQuery(post, query));
+      const sorted =
+        query.sort === 'published_time_asc'
+          ? [...filtered].sort((a, b) => a.publishDate.valueOf() - b.publishDate.valueOf())
+          : [...filtered].sort((a, b) => b.publishDate.valueOf() - a.publishDate.valueOf());
+      return sorted.slice(0, limit).map(toCard);
+    },
+    idOf: (card) => card.id,
+  };
+}
+
 const deps: ResolvePageDeps = {
   resolveActionHref,
   resolveSharedSection: (sectionObjectId) => {
@@ -65,6 +108,7 @@ const deps: ResolvePageDeps = {
     if (!resolved) throw new Error(`index: shared section '${sectionObjectId}' was not preloaded.`);
     return resolved;
   },
+  contentGrid,
 };
 
 const { metadata, sections } = resolvePage(page, deps);
