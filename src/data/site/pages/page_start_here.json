@@ -1,0 +1,42 @@
+{
+  "__generated": {
+    "at": "2026-07-08T00:00:00.000Z",
+    "from": "objects/page/by-id/page_start_here.json",
+    "record_version": 1
+  },
+  "pageType": "standard",
+  "route": "/start-here",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Browse the library",
+            "style": "primary",
+            "target": {
+              "kind": "listing",
+              "list": "content_index"
+            }
+          },
+          {
+            "label": "Explore topics",
+            "style": "secondary",
+            "target": {
+              "href": "/learn/topics",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Use this hub as a calm first step: learn what healthy skin means, browse the library, then decide whether early access updates are useful for you.</p>",
+        "heading": "Begin with the basics.",
+        "kicker": "Start here"
+      },
+      "id": "s_lede",
+      "type": "lede"
+    }
+  ],
+  "seo": {
+    "description": "A simple path into Dr. Lurié skin health education for skincare newcomers."
+  },
+  "title": "Start Here"
+}

@@ -124,20 +124,20 @@ const deps: ResolvePageDeps = {
 
 const { metadata, sections } = resolvePage(page, deps);
 
-// Footer variant: applied only when the page names one (S-4, homepage);
-// otherwise PageLayout's default footer slot renders nav_footer.
-let footerOverrideData: ReturnType<typeof navigationToFooterProps> | undefined;
-const footerNavId = page.navigationOverrides?.footer;
-if (footerNavId) {
-  const footerEntry = await getEntry('navigationObject', footerNavId);
-  if (!footerEntry) {
-    throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);
-  }
-  footerOverrideData = navigationToFooterProps(
-    parseNavigationExport(footerEntry.data),
-    createNavTargetResolver({ blogPermalink: getBlogPermalink() })
-  );
+// Footer: the page's override if it names one (S-4, homepage → nav_footer_home),
+// else the site default nav_footer — exactly what PageLayout's footer slot
+// renders by default. Always provided explicitly here rather than relying on
+// the slot fallback: a *conditional* `slot="footer"` makes Astro treat the slot
+// as handled and suppresses PageLayout's default, dropping the footer.
+const footerNavId = page.navigationOverrides?.footer ?? 'nav_footer';
+const footerEntry = await getEntry('navigationObject', footerNavId);
+if (!footerEntry) {
+  throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);
 }
+const footerData = navigationToFooterProps(
+  parseNavigationExport(footerEntry.data),
+  createNavTargetResolver({ blogPermalink: getBlogPermalink() })
+);
 ---
 
 <PageLayout metadata={metadata}>
@@ -148,11 +148,7 @@ if (footerNavId) {
     })
   }
 
-  {
-    footerOverrideData && (
-      <Fragment slot="footer">
-        <Footer {...footerOverrideData} />
-      </Fragment>
-    )
-  }
+  <Fragment slot="footer">
+    <Footer {...footerData} />
+  </Fragment>
 </PageLayout>
