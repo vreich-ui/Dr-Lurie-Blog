@@ -9,15 +9,18 @@ store before building on anything below.**
 
 ## Standing state (after session 2026-07-08)
 
-| Area | State |
-| --- | --- |
-| **Homepage cutover (T3.6/T3.7/T3.8)** | **DONE + verified.** `index.astro` is a thin loader over the published `page_home` object (`src/lib/renderer/resolve.ts`). `build-diff` EMPTY (203/203 identical); verify-section-components 5/5; astro check 0 errors. On branch `claude/phase-3-cutover`, not merged. |
-| **T3.4/T3.5 exports** | Materialized locally (`page_home.json`, `sec_newsletter_signup.json`) via the real materializers. Blob records still unpublished — a real `object_publish` reconciles the `__generated` marker only (handoff Step 2). |
-| **Structural-capacity guardrail** | **NEW.** `src/lib/registry/structural-capacity.ts` + `nav_actions_capacity` criterion (warn-only; content stays editable). The first "JSON-based hard rules" layer — fixed structure, agents decide content. |
-| **T2.6** | **DONE** (was "parked"). `navigation.ts` + demo chain deleted; import chain verified self-contained. |
-| **T3.13 extensibility drill** | **DONE.** `testimonial` type added end-to-end; proves one-module-one-binding cost. |
-| **nav_header incident** | `nav_header.actions` is `[]` on `main` (test-probe fallout, not live). Fix is object-layer (handoff Step 1) — the guardrail, not a human gate, is the durable answer per Wolf's framing. |
-| **Remaining to close Phase 3** | All object-store operations: publish page/section (reconcile), T3.9 grid content (needs renderer wiring + curation), T3.11 route→page upgrade, release. **See `phase-3-handoff.md` for exact steps + payloads.** T3.10/T3.12 admin-UI deferred (block nothing). |
+| Area                                  | State                                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Homepage cutover (T3.6/T3.7/T3.8)** | **DONE + verified.** `index.astro` is a thin loader over the published `page_home` object (`src/lib/renderer/resolve.ts`). `build-diff` EMPTY (203/203 identical); verify-section-components 5/5; astro check 0 errors. On branch `claude/phase-3-cutover`, not merged.                             |
+| **T3.4/T3.5 exports**                 | Materialized locally (`page_home.json`, `sec_newsletter_signup.json`) via the real materializers. Blob records still unpublished — a real `object_publish` reconciles the `__generated` marker only (handoff Step 2).                                                                               |
+| **Structural-capacity guardrail**     | **NEW.** `src/lib/registry/structural-capacity.ts` + `nav_actions_capacity` criterion (warn-only; content stays editable). The first "JSON-based hard rules" layer — fixed structure, agents decide content.                                                                                        |
+| **T2.6**                              | **DONE** (was "parked"). `navigation.ts` + demo chain deleted; import chain verified self-contained.                                                                                                                                                                                                |
+| **T3.13 extensibility drill**         | **DONE.** `testimonial` type added end-to-end; proves one-module-one-binding cost.                                                                                                                                                                                                                  |
+| **nav_header incident**               | `nav_header.actions` is `[]` on `main` (test-probe fallout, not live). Fix is object-layer (handoff Step 1) — the guardrail, not a human gate, is the durable answer per Wolf's framing.                                                                                                            |
+| **Remaining to close Phase 3**        | All object-store operations: publish page/section (reconcile), T3.9 grid content (needs renderer wiring + curation), T3.11 route→page upgrade, release. **See `phase-3-handoff.md` for exact steps + payloads.** T3.10/T3.12 admin-UI deferred (block nothing).                                     |
+| **T3.9 content_grid code**            | **DONE.** `manual`/`query` rendering wired (`resolve-content-grid.ts` → `resolve.ts` + `ContentGrid.astro`, resolvers from `fetchPosts()`). Only the object-layer source-kind switch + curation remain (handoff Step 3).                                                                            |
+| **Phase 4 — lede family (T4.2/T4.3)** | **Cut over in CODE + verified.** New `lede` section type + component + shared `PageObjectRenderer`; 5 interior pages (start-here, member-updates, newsletter, free-guide, early-access) are thin loaders, `build-diff` EMPTY (203/203). Object-layer seed+publish is NEW records — handoff Step 4b. |
+| **build-diff normalizer**             | **Extended** (`0e34ea4`) to drop class-attribute-value ORDER + CSS chunk-STEM (both content-neutral; astro-compress frequency-sort + Astro chunk renaming churn every page when a component is added). Required to verify any Phase 4 page cutover.                                                 |
 
 ### Session 2026-07-08 (Phase 3 cutover, one long autonomous session)
 
@@ -49,11 +52,11 @@ documented.
 
 ## Standing state (after session 2026-07-07)
 
-| Area                          | State                                                                                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Configurable approval policy  | **Landed** (`b50c5e4` + follow-ups on PR #364) — replaces T1.4's hardcoded tier gate entirely. See "New model" below.                                                                       |
-| `netlify/lib/tier-gate.ts`    | **Deleted.** Replaced by `netlify/lib/publish-gate.ts`; `Tier` type and `tierForObjectType` are gone from the codebase.                                                                      |
-| Everything else from 2026-07-06 C | Unchanged — still standing as recorded below (T2.7/T2.6 waiting on Wolf, T3.2–T3.10 landed, homepage cutover still forbidden until T2.7 closes).                                        |
+| Area                              | State                                                                                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Configurable approval policy      | **Landed** (`b50c5e4` + follow-ups on PR #364) — replaces T1.4's hardcoded tier gate entirely. See "New model" below.                            |
+| `netlify/lib/tier-gate.ts`        | **Deleted.** Replaced by `netlify/lib/publish-gate.ts`; `Tier` type and `tierForObjectType` are gone from the codebase.                          |
+| Everything else from 2026-07-06 C | Unchanged — still standing as recorded below (T2.7/T2.6 waiting on Wolf, T3.2–T3.10 landed, homepage cutover still forbidden until T2.7 closes). |
 
 ### New model: configurable approval policy (replaces T1.4's hardcoded tiers)
 
@@ -61,7 +64,7 @@ The old scheme hardcoded publish permission by tier: Tier 1 (`content_item`)
 untouched, Tier 2 (`page`/`section`/`template`) agent-publishes-after-approval,
 Tier 3 (`navigation`/`taxonomy`/`site`) approval-plus-**human-executed**. That
 fixed scheme is gone. There is now **one gate, one question, per object type**:
-*does a change to this type require human approval before it can be published?*
+_does a change to this type require human approval before it can be published?_
 
 - **Not gated (the default):** an agent proposes and publishes directly. Fully
   autonomous, no human in the loop.
@@ -76,8 +79,8 @@ fixed scheme is gone. There is now **one gate, one question, per object type**:
 
 ```ts
 export const approvalPolicyConfig = {
-  master: 'all-autonomous',      // or 'all-require-approval'
-  overrides: {},                 // e.g. { navigation: 'require-approval' }
+  master: 'all-autonomous', // or 'all-require-approval'
+  overrides: {}, // e.g. { navigation: 'require-approval' }
 } satisfies ApprovalPolicyConfig;
 ```
 

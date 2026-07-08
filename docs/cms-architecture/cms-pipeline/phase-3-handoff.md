@@ -102,7 +102,7 @@ yet). What's left is purely the object-layer step:
 1. **Data (object edit):** `object_patch` `page_home`'s `s_startgrid` section
    `source` from `{kind:'static',…}` to
    `{kind:'manual', items:[…3–5 curated article ids…],
-  fallback:{kind:'query', query:{sort:'published_time_desc'}}}`. Manual item
+fallback:{kind:'query', query:{sort:'published_time_desc'}}}`. Manual item
    ids are the astro content-collection post `id` (matches `src/types.d.ts`
    `Post.id`, resolved via `fetchPosts()` in `index.astro` — same identifier
    space `findPostsByIds` already uses elsewhere).
@@ -129,6 +129,27 @@ Now that `page_home` is published, upgrade the `route`-kind `/` targets to
 `object_validate` confirms the page reference resolves and is published (the
 `nav_published_targets` criterion); materialized href stays `/`, so `build-diff`
 remains empty.
+
+---
+
+## STEP 4b — T4.3: seed + publish the 5 lede pages (NEW records)
+
+Five interior pages are now cut over **in code** on the branch (start-here,
+member-updates, newsletter, free-guide, early-access → thin `PageObjectRenderer`
+loaders + committed exports, build-diff EMPTY). Unlike `page_home`, these have
+**no blob-store record yet** — they must be CREATED, not just published:
+
+```
+for each of page_start_here, page_member_updates, page_newsletter,
+            page_free_guide, page_early_access:
+  object_create page  (body from scripts/lib/page-lede-family-seed-data.mjs)
+  object_checkout / object_publish / object_checkin
+```
+
+`scripts/lib/page-lede-family-seed-data.mjs` holds the exact bodies; a
+`--execute` seed script (mirroring `seed-page-home.mjs`) is the clean way to
+drive it. After publishing, `git diff` on the five `src/data/site/pages/*.json`
+should show only the `__generated` marker moving (byte-identical content).
 
 ---
 
