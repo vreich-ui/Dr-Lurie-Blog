@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-08T00:00:00.000Z",
+    "at": "2026-07-09T11:38:06.504Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 1
+    "record_version": 4
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -60,29 +60,10 @@
         "kicker": "Start here",
         "limit": 5,
         "source": {
-          "cards": [
-            {
-              "description": "A plain-language starting point for understanding comfort, resilience, and consistency in your skin.",
-              "title": "What Healthy Skin Means"
-            },
-            {
-              "description": "The essential steps to begin with, what each one is meant to do, and why more is not always better.",
-              "title": "How to Build a Simple Skincare Routine"
-            },
-            {
-              "description": "A practical way to read claims, compare options, and focus on what your skin actually needs.",
-              "title": "How to Choose Products Without Feeling Overwhelmed"
-            },
-            {
-              "description": "How to slow down, simplify your routine, and notice the patterns that may be affecting your skin.",
-              "title": "What to Do When Your Skin Feels Sensitive"
-            },
-            {
-              "description": "A guide to knowing when education is enough and when a skin concern deserves medical attention.",
-              "title": "When to Ask a Dermatology Professional"
-            }
-          ],
-          "kind": "static"
+          "kind": "query",
+          "query": {
+            "sort": "published_time_desc"
+          }
         }
       },
       "id": "s_startgrid",
