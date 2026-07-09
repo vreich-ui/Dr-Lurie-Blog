@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
+import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import { aboutDefinition } from '../../src/lib/registry/components/about.js';
 import { bioDefinition } from '../../src/lib/registry/components/bio.js';
 import { contactDefinition } from '../../src/lib/registry/components/contact.js';
@@ -132,4 +132,15 @@ test('splitRichTextParagraphs: faithful split, empty handling, loud refusal on n
   // Content outside <p> blocks must not be silently dropped.
   assert.throws(() => splitRichTextParagraphs('<p>One</p><ul><li>stray</li></ul>'), /outside top-level <p> blocks/);
   assert.throws(() => splitRichTextParagraphs('loose text'), /outside top-level <p> blocks/);
+});
+
+test('splitRichTextBlocks: prose gets the full allowlist (p/h2/h3/ul/ol), still refuses to drop content', () => {
+  assert.deepEqual(splitRichTextBlocks(''), []);
+  assert.deepEqual(splitRichTextBlocks('<p>One</p><h2>Two</h2>'), [
+    { tag: 'p', html: 'One' },
+    { tag: 'h2', html: 'Two' },
+  ]);
+  assert.deepEqual(splitRichTextBlocks('<ul><li>A</li><li>B</li></ul>'), [{ tag: 'ul', html: '<li>A</li><li>B</li>' }]);
+  assert.deepEqual(splitRichTextBlocks('<h3>Sub</h3>'), [{ tag: 'h3', html: 'Sub' }]);
+  assert.throws(() => splitRichTextBlocks('<p>One</p>loose text'), /outside top-level p\/h2\/h3\/ul\/ol blocks/);
 });
