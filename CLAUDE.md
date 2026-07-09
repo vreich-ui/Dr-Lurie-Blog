@@ -1,5 +1,13 @@
 # Dr-Lurie-Blog — CLAUDE.md
 
+## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
+
+The system standardizes on **Contentful's content model**: typed entry objects
+(pages/sections — already built) + **Contentful Rich Text** JSON for all rich
+content fields (replaces HTML strings). That doc has the canonical example for each
+level and the ordered task list to finish the CMS. It is the entry point; everything
+below elaborates it.
+
 ## Design north star — flexible objects, not a site replica (READ FIRST)
 
 We are building a **flexible content backbone, not reproducing today's pages

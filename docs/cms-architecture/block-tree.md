@@ -1,5 +1,12 @@
 # The Block Tree — recursive, bounded, agent-manipulable composition
 
+> **Partially superseded (2026-07-09):** the system standardized on **Contentful's
+> content model** — see [`core-structure.md`](core-structure.md) (read that first).
+> The home-grown `children` block shape below is replaced by Contentful Rich Text
+> embeds for flowing content. What **stands**: the bounded-composition enforcement
+> (`allowedChildren`/`childCount`, `src/lib/registry/block-tree.ts`) — it now
+> enforces the standard's link validations (`linkContentType` + `size`).
+
 > Companion to [`design-principles.md`](design-principles.md). Records Wolf's
 > 2026-07-08 direction: content is a **tree of blocks** — a page holds blocks, a
 > block (e.g. a grid) holds child blocks, all the way down — exactly like a
