@@ -1,0 +1,37 @@
+{
+  "__generated": {
+    "at": "2026-07-09T10:54:36.204Z",
+    "from": "objects/page/by-id/page_404.json",
+    "record_version": 3
+  },
+  "pageType": "system",
+  "route": "/404",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Back to homepage",
+            "style": "primary",
+            "target": {
+              "href": "/",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>But don’t worry, you can find plenty of other things on our homepage.</p>",
+        "heading": "Sorry, we couldn't find this page."
+      },
+      "id": "s_404",
+      "type": "cta_banner"
+    }
+  ],
+  "seo": {
+    "description": "The page you are looking for could not be found.",
+    "robots": {
+      "follow": true,
+      "index": true
+    }
+  },
+  "title": "Page Not Found"
+}
