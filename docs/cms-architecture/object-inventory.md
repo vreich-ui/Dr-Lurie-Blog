@@ -37,12 +37,12 @@ territory. The territory is: the production object store, `main`, and the live
 
 ### Status legend
 
-| Mark | Meaning |
-| ---- | ------- |
-| 🟢 **LIVE** | Real content. Drives the live site **and** is editable through the object verbs (create → checkout → patch → publish). |
-| 🟡 **SHELL** | Exists structurally (a record is published, or a route is scaffolded) but is a **placeholder, a test artifact, or not yet wired to drive the live site**. The real source of truth is still somewhere else. The note says which half is missing. |
-| 🔵 **IN REVIEW** | Built and verified; a PR is open but not merged. Becomes LIVE on merge (+ store publish where noted). |
-| 🔴 **TODO** | Needed for the CMS MVP. Not built yet. |
+| Mark             | Meaning                                                                                                                                                                                                                                          |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🟢 **LIVE**      | Real content. Drives the live site **and** is editable through the object verbs (create → checkout → patch → publish).                                                                                                                           |
+| 🟡 **SHELL**     | Exists structurally (a record is published, or a route is scaffolded) but is a **placeholder, a test artifact, or not yet wired to drive the live site**. The real source of truth is still somewhere else. The note says which half is missing. |
+| 🔵 **IN REVIEW** | Built and verified; a PR is open but not merged. Becomes LIVE on merge (+ store publish where noted).                                                                                                                                            |
+| 🔴 **TODO**      | Needed for the CMS MVP. Not built yet.                                                                                                                                                                                                           |
 
 ---
 
@@ -58,15 +58,15 @@ an agent proposes **and** publishes every governed type with no human gate (ever
 publish still writes a full, revertible audit trail). Flip one file to require
 human approval per type.
 
-| Type | What it is / used for | Key boundaries (summarized) |
-| ---- | --------------------- | --------------------------- |
-| **page** | One editable page of the site: a route + ordered list of sections. The unit a route file renders. | `route` unique and starts with `/`; ≥1 non-hidden section to publish; section types must satisfy the PageType's allow/require rules; `template`, `navigationOverrides`, `shared_ref` and grid references must resolve. |
-| **section** (shared) | A section stored on its own so several pages can reference the _same_ instance via `shared_ref` (edit once, changes everywhere). Inline sections live inside a page and are **not** separate objects. | Same per-variant schema as inline sections; a `shared_ref` may not shadow-copy its target's type/data. |
-| **navigation** | A menu: the header, a footer, or a variant footer. The site chrome renders from these. | No empty groups; menu depth ≤ 2; duplicate targets in a group **warn** (the audited nav does this legitimately); header action count over budget **warns**; a _published_ nav may not point at an _unpublished_ page. |
-| **taxonomy** (singleton) | The controlled vocabulary — categories & tags — articles and listings draw from. | Slugs lowercase-hyphen, unique per kind; a deprecated term's `merged_into` must point at an active same-kind term and form no cycle. **Boundary caveat: not yet the real source of truth — see below.** |
-| **site** (singleton) | Global config: brand tokens, logo, chrome toggles, blog paths, and the default header/footer navigation. | One per site. **Boundary caveat: not yet wired to drive rendering — see below.** |
-| **template** | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation. | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components. |
-| **content_item** (articles) | Blog posts / articles. **Outside** the generic object model — served by the older `save_json_blob_*` tools and its own review/publish flow. | Not creatable or patchable via the object verbs; has no generic body schema. Listed here only so the boundary is explicit. |
+| Type                        | What it is / used for                                                                                                                                                                                 | Key boundaries (summarized)                                                                                                                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **page**                    | One editable page of the site: a route + ordered list of sections. The unit a route file renders.                                                                                                     | `route` unique and starts with `/`; ≥1 non-hidden section to publish; section types must satisfy the PageType's allow/require rules; `template`, `navigationOverrides`, `shared_ref` and grid references must resolve. |
+| **section** (shared)        | A section stored on its own so several pages can reference the _same_ instance via `shared_ref` (edit once, changes everywhere). Inline sections live inside a page and are **not** separate objects. | Same per-variant schema as inline sections; a `shared_ref` may not shadow-copy its target's type/data.                                                                                                                 |
+| **navigation**              | A menu: the header, a footer, or a variant footer. The site chrome renders from these.                                                                                                                | No empty groups; menu depth ≤ 2; duplicate targets in a group **warn** (the audited nav does this legitimately); header action count over budget **warns**; a _published_ nav may not point at an _unpublished_ page.  |
+| **taxonomy** (singleton)    | The controlled vocabulary — categories & tags — articles and listings draw from.                                                                                                                      | Slugs lowercase-hyphen, unique per kind; a deprecated term's `merged_into` must point at an active same-kind term and form no cycle. **Boundary caveat: not yet the real source of truth — see below.**                |
+| **site** (singleton)        | Global config: brand tokens, logo, chrome toggles, blog paths, and the default header/footer navigation.                                                                                              | One per site. **Boundary caveat: not yet wired to drive rendering — see below.**                                                                                                                                       |
+| **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
+| **content_item** (articles) | Blog posts / articles. **Outside** the generic object model — served by the older `save_json_blob_*` tools and its own review/publish flow.                                                           | Not creatable or patchable via the object verbs; has no generic body schema. Listed here only so the boundary is explicit.                                                                                             |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
@@ -85,31 +85,34 @@ repeated. The live list + each type's field schema is `registry_get('component')
 
 ### Pages
 
-| Object | Route | Status | Notes |
-| ------ | ----- | ------ | ----- |
-| `page_home` | `/` | 🟢 LIVE | Homepage; renders via `resolvePage`; owns the `nav_footer_home` footer override and a `shared_ref` to the newsletter section. |
-| `page_start_here` | `/start-here` | 🟢 LIVE | Lede-family interior page. |
-| `page_member_updates` | `/member-updates` | 🟢 LIVE | Lede-family interior page. |
-| `page_newsletter` | `/newsletter` | 🟢 LIVE | Lede-family interior page. |
-| `page_free_guide` | `/guides/free-guide` | 🟢 LIVE | Lede-family interior page. |
-| `page_early_access` | `/solutions/early-access` | 🟢 LIVE | Lede-family interior page. |
-| `page_thank_you` | `/thank-you` | 🟢 LIVE | Bespoke section; owns the per-form message-swap script as fixed furniture. |
-| `page_about` | `/about` | 🟢 LIVE | Bespoke `about` section; prose is fixed furniture, only clean fields are data (merged PR #374). |
-| `page_contact` | `/contact` | 🟢 LIVE | Bespoke `contact` widget-composition section: re-invokes HeroText/Contact/Features2 with props promoted to object data (merged PR #375). |
+| Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                  |
+| --------------------- | ------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `page_home`           | `/`                       | 🟢 LIVE      | Homepage; renders via `resolvePage`; owns the `nav_footer_home` footer override and a `shared_ref` to the newsletter section. Grid: the invalid `static` placeholder was retired for a live `query` (latest posts) in PR #380; manual curation deferred (content_item resolver gap — playbook trap 4). |
+| `page_start_here`     | `/start-here`             | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
+| `page_member_updates` | `/member-updates`         | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
+| `page_newsletter`     | `/newsletter`             | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
+| `page_free_guide`     | `/guides/free-guide`      | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
+| `page_early_access`   | `/solutions/early-access` | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
+| `page_thank_you`      | `/thank-you`              | 🟢 LIVE      | Bespoke section; owns the per-form message-swap script as fixed furniture.                                                                                                                                                                                                                             |
+| `page_about`          | `/about`                  | 🟢 LIVE      | Bespoke `about` section; prose is fixed furniture, only clean fields are data (merged PR #374).                                                                                                                                                                                                        |
+| `page_contact`        | `/contact`                | 🟢 LIVE      | Bespoke `contact` widget-composition section: re-invokes HeroText/Contact/Features2 with props promoted to object data (merged PR #375).                                                                                                                                                               |
+| `page_privacy`        | `/privacy`                | 🔵 IN REVIEW | `system` PageType, one reusable `prose` section (full legal text, headings/lists via `splitRichTextBlocks`). Built through the real MCP lifecycle (PR #380).                                                                                                                                           |
+| `page_terms`          | `/terms`                  | 🔵 IN REVIEW | `system` PageType, one reusable `prose` section — same process as privacy (PR #380).                                                                                                                                                                                                                   |
+| `page_404`            | `/404`                    | 🔵 IN REVIEW | `system` PageType, one reusable `cta_banner` section; the route file stays at Astro's required error-page path (PR #380).                                                                                                                                                                              |
 
 ### Shared sections
 
-| Object | Used by | Status | Notes |
-| ------ | ------- | ------ | ----- |
+| Object                  | Used by                        | Status  | Notes                                   |
+| ----------------------- | ------------------------------ | ------- | --------------------------------------- |
 | `sec_newsletter_signup` | `page_home` (via `shared_ref`) | 🟢 LIVE | The one genuinely-shared section today. |
 
 ### Navigation
 
-| Object | Role | Status | Notes |
-| ------ | ---- | ------ | ----- |
-| `nav_header` | Site header | 🟢 LIVE | Store-published. Still carries a field-test description at store `record_version 52` — restoring the original needs a store-side `object_patch` + publish, not a file edit (a direct export edit would drift from the store). |
-| `nav_footer` | Default footer | 🟢 LIVE | Rendered on every page without a footer override. |
-| `nav_footer_home` | Homepage footer variant | 🟢 LIVE | Applied via `page_home.navigationOverrides.footer`. |
+| Object            | Role                    | Status  | Notes                                                                                                                                                                                                                         |
+| ----------------- | ----------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nav_header`      | Site header             | 🟢 LIVE | Store-published. Still carries a field-test description at store `record_version 52` — restoring the original needs a store-side `object_patch` + publish, not a file edit (a direct export edit would drift from the store). |
+| `nav_footer`      | Default footer          | 🟢 LIVE | Rendered on every page without a footer override.                                                                                                                                                                             |
+| `nav_footer_home` | Homepage footer variant | 🟢 LIVE | Applied via `page_home.navigationOverrides.footer`.                                                                                                                                                                           |
 
 ### Singletons & templates
 
@@ -136,11 +139,11 @@ pattern** — per [`design-principles.md`](design-principles.md), build these fr
 types), accepting an intentional non-empty `build-diff` where the flexible result
 isn't byte-identical.
 
-| TODO object | Route | Shape / gotcha |
-| ----------- | ----- | -------------- |
-| `page_pricing` | `/pricing` | Widget-composition (`HeroText`/`Pricing`/`FAQs`/`Steps`/`Features3`/`CallToAction`). `CallToAction` has link actions → needs the action-hrefs resolved shape + a `resolve.ts` entry (like `about`), plus pricing-tier/steps/FAQ data modeling. |
-| `page_services` | `/services` | Widget-composition (`Hero`/`Content`/`Features2`/`Testimonials`/`CallToAction`). Also has link actions. |
-| `page_shop_preview` | `/solutions/shop-preview` | Bespoke markup **+ a scoped `<style>`** → uses the functional-equivalence gate + a `known-inert-diffs.md` entry (like thank-you). |
+| TODO object         | Route                     | Shape / gotcha                                                                                                                                                                                                                                 |
+| ------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page_pricing`      | `/pricing`                | Widget-composition (`HeroText`/`Pricing`/`FAQs`/`Steps`/`Features3`/`CallToAction`). `CallToAction` has link actions → needs the action-hrefs resolved shape + a `resolve.ts` entry (like `about`), plus pricing-tier/steps/FAQ data modeling. |
+| `page_services`     | `/services`               | Widget-composition (`Hero`/`Content`/`Features2`/`Testimonials`/`CallToAction`). Also has link actions.                                                                                                                                        |
+| `page_shop_preview` | `/solutions/shop-preview` | Bespoke markup **+ a scoped `<style>`** → uses the functional-equivalence gate + a `known-inert-diffs.md` entry (like thank-you).                                                                                                              |
 
 ### 2. Real `site` object 🔴
 
@@ -157,15 +160,13 @@ truth (§5.5). Promoting the taxonomy object means either a one-way sync
 the direction before building — using the wrong source reintroduces the exact drift
 the project exists to fix.
 
-### 4. System pages → page objects 🔴
+### 4. System pages → page objects 🔵 DONE, in review (PR #380)
 
-The static legal/utility pages, as `system`-PageType page objects (prose-led):
-
-| TODO object | Currently |
-| ----------- | --------- |
-| `page_privacy` | `src/pages/privacy.md` |
-| `page_terms` | `src/pages/terms.md` |
-| `page_404` | `src/pages/404.astro` |
+`page_privacy`, `page_terms`, `page_404` are built (see the Pages table) via the
+process now written down in [`conversion-playbook.md`](conversion-playbook.md).
+Remaining from this batch as follow-ups: the `content_item` resolver gap
+(playbook trap 4, blocks manual grid curation) and retiring the `content_grid`
+`static` variant from the schema + `scripts/seed-page-home.mjs` (playbook trap 9).
 
 ### 5. Listing pages 🔴 (Phase 6 — larger)
 
@@ -205,4 +206,4 @@ pages to the article (`content_item`) pipeline.
   (site config) and article frontmatter (taxonomy). Until TODO #2 and #3 land, edits
   to those do **not** flow through the object workflow.
 
-_Last audited: 2026-07-08, against `main` @ `4139d51` (contact live via #375; field-test objects removed via #378)._
+_Last audited: 2026-07-09, on `claude/system-pages-and-grid` (PR #380: privacy/terms/404 cutovers + homepage grid query retrofit + site-wide noindex guard)._

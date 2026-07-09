@@ -175,6 +175,11 @@ release_to_production   → commit derived exports + Netlify build = actually li
 Everything is audited and revertible. Approval gates per object type are one config
 switch (`src/config/approval-policy.ts`); current posture is fully autonomous.
 
+**Executing a conversion?** The step-by-step operations manual — exact call/response
+field names, the trap table, the sandbox driver — is
+[`conversion-playbook.md`](conversion-playbook.md). Mandatory reading before doing
+one; every trap in it was hit for real once.
+
 ## Status and the path to done (ordered; sized for a Sonnet-class model)
 
 **Already built and tested** (876 tests): object store + envelope, locks, patch
