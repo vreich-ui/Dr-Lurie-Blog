@@ -8,7 +8,7 @@
  * component. Body is TipTap paragraphs (the D§3.5 richtext allowlist); the
  * splitter refuses anything but top-level <p> blocks rather than drop it.
  */
-import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
+import { splitRichTextBlocks } from '~/lib/richtext/paragraphs';
 import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
 
 type Props = {
@@ -18,11 +18,16 @@ type Props = {
 };
 
 const { data } = Astro.props;
-const paragraphs = splitRichTextParagraphs(data.body);
+const blocks = splitRichTextBlocks(data.body);
 ---
 
 <section class="dl-section">
   <div class="dl-reading">
-    {paragraphs.map((paragraph) => <p set:html={paragraph} />)}
+    {
+      blocks.map((block) => {
+        const Tag = block.tag;
+        return <Tag set:html={block.html} />;
+      })
+    }
   </div>
 </section>

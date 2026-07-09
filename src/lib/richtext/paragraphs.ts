@@ -39,3 +39,38 @@ export const splitRichTextParagraphs = (richText: string): string[] => {
   }
   return paragraphs;
 };
+
+/**
+ * A top-level rich-text block, tagged with its element name. Unlike
+ * `splitRichTextParagraphs` (paragraph-only, for short blurb-style copy: hero
+ * kickers, bio intros, …), `prose` is a full-page text section and needs the
+ * REST of the RichText allowlist that's already schema-valid (D§3.5) but that
+ * the narrower paragraph splitter can't represent: headings and lists. Same
+ * "never silently drop" contract — content outside a recognized top-level
+ * block throws rather than vanishing.
+ */
+export type RichTextBlock = { tag: 'p' | 'h2' | 'h3' | 'ul' | 'ol'; html: string };
+
+const BLOCK_RE = /<(p|h2|h3|ul|ol)>([\s\S]*?)<\/\1>/g;
+
+/** Top-level p/h2/h3/ul/ol blocks, in order, each with its tag + inner HTML. */
+export const splitRichTextBlocks = (richText: string): RichTextBlock[] => {
+  const trimmed = richText.trim();
+  if (trimmed === '') return [];
+  const blocks: RichTextBlock[] = [];
+  let consumed = '';
+  for (const match of trimmed.matchAll(BLOCK_RE)) {
+    blocks.push({ tag: match[1] as RichTextBlock['tag'], html: match[2] });
+    consumed += match[0];
+  }
+  const residue = trimmed.replaceAll(/\s+/g, '');
+  const covered = consumed.replaceAll(/\s+/g, '');
+  if (residue !== covered) {
+    throw new Error(
+      'splitRichTextBlocks: rich text contains content outside top-level p/h2/h3/ul/ol blocks; ' +
+        'refusing to drop it silently. Received: ' +
+        JSON.stringify(richText)
+    );
+  }
+  return blocks;
+};

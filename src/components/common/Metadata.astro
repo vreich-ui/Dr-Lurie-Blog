@@ -24,6 +24,13 @@ const {
   twitter = {},
 } = Astro.props;
 
+// SITE NOT YET LIVE: force noindex/nofollow on every page, unconditionally,
+// regardless of site config or any per-page `robots` override. This is a
+// single flag specifically so it can't be silently bypassed by a page (or a
+// future CMS object) opting back into indexing before launch is intended.
+// Flip to `false` when the site actually goes live.
+const SITE_NOT_YET_LIVE = true;
+
 const seoProps: AstroSeoProps = merge(
   {
     title: '',
@@ -63,6 +70,11 @@ const seoProps: AstroSeoProps = merge(
     twitter: twitter,
   }
 );
+
+if (SITE_NOT_YET_LIVE) {
+  seoProps.noindex = true;
+  seoProps.nofollow = true;
+}
 ---
 
 <AstroSeo {...{ ...seoProps, openGraph: await adaptOpenGraphImages(seoProps?.openGraph, Astro.site) }} />
