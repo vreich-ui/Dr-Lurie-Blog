@@ -1,0 +1,11 @@
+---
+/**
+ * Privacy Policy (object cutover) — delegates to the shared PageObjectRenderer,
+ * which loads the published page_privacy object and renders its `prose` section.
+ * Built entirely from existing, registered component types — no bespoke page
+ * section (docs/cms-architecture/design-principles.md).
+ */
+import PageObjectRenderer from '~/components/cms/PageObjectRenderer.astro';
+---
+
+<PageObjectRenderer objectId="page_privacy" />
