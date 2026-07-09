@@ -174,14 +174,20 @@ const assertCommittedExportMatchesMaterializer = (
   objectId: string,
   body: unknown
 ) => {
-  // Path never depends on meta/body — safe to compute with a throwaway meta.
-  const { path } = materialize(objectType, objectId, body, { at: '', record_version: 0 });
+  // Path never depends on meta/body — safe to compute with a throwaway meta
+  // (a VALID one: the materializer now guards meta at runtime, by design).
+  const { path } = materialize(objectType, objectId, body, { at: '1970-01-01T00:00:00.000Z', record_version: 0 });
   const committed = github.readFileAtHead(path);
   assert.ok(committed, `expected a committed export at ${path}`);
-  const marker = (JSON.parse(committed as string) as { __generated: { at: string; record_version: number } }).__generated;
+  const marker = (JSON.parse(committed as string) as { __generated: { at: string; record_version: number } })
+    .__generated;
 
   const expected = materialize(objectType, objectId, body, { at: marker.at, record_version: marker.record_version });
-  assert.equal(committed, expected.content, 'the committed export must be byte-identical to T1.1 output for its own marker');
+  assert.equal(
+    committed,
+    expected.content,
+    'the committed export must be byte-identical to T1.1 output for its own marker'
+  );
   return marker;
 };
 
@@ -271,7 +277,10 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
         expected_record_version: checkout1.body.record_version as number,
         ops: [
           { op: 'update_section_data', section_id: 's_drillhero', fields: { heading: 'Agent-proposed heading' } },
-          { op: 'upsert_section', section: { id: 's_drillnew', type: 'prose', data: { body: 'New structural section.' } } },
+          {
+            op: 'upsert_section',
+            section: { id: 's_drillnew', type: 'prose', data: { body: 'New structural section.' } },
+          },
         ],
       },
       AGENT
@@ -300,7 +309,11 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
 
     const validate1 = await call(store, { action: 'validate', object_type: 'page', object_id: 'page_p1_drill' }, AGENT);
     assert.equal(validate1.status, 200);
-    assert.equal((validate1.body.summary as { eligible: boolean }).eligible, true, 'the drafted page must validate clean');
+    assert.equal(
+      (validate1.body.summary as { eligible: boolean }).eligible,
+      true,
+      'the drafted page must validate clean'
+    );
 
     const submit1 = await call(
       store,
@@ -316,7 +329,11 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
     assert.equal(submit1.status, 200, JSON.stringify(submit1.body));
     assert.equal(submit1.body.review_state, 'open');
 
-    const checkin1 = await call(store, { action: 'checkin', object_type: 'page', object_id: 'page_p1_drill', lock_token: lock1 }, AGENT);
+    const checkin1 = await call(
+      store,
+      { action: 'checkin', object_type: 'page', object_id: 'page_p1_drill', lock_token: lock1 },
+      AGENT
+    );
     assert.equal(checkin1.status, 200);
 
     // ── human approves (field surface: update_section_data is a `fields` capture) ──
@@ -359,7 +376,8 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
     // and it reflects BOTH the field-surface and structural-surface changes.
     const marker1 = assertCommittedExportMatchesMaterializer(github, 'page', 'page_p1_drill', record.body);
     assert.equal(marker1.at, record.publication.published_time, "the marker's `at` is the effective published_time");
-    const publishedSections = (record.body as { sections: Array<{ id: string; data: Record<string, unknown> }> }).sections;
+    const publishedSections = (record.body as { sections: Array<{ id: string; data: Record<string, unknown> }> })
+      .sections;
     assert.equal(publishedSections[0].data.heading, 'Agent-proposed heading', 'the field-surface change is live');
     assert.equal(publishedSections[1].id, 's_drillnew', 'the structural-surface change (added section) is live');
 
@@ -426,7 +444,7 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
       HUMAN
     );
     assert.equal(approve2.status, 200);
-    const contentRevisionAtApproval = (store.read('page', 'page_p1_drill').review?.decisions.slice(-1)[0])
+    const contentRevisionAtApproval = store.read('page', 'page_p1_drill').review?.decisions.slice(-1)[0]
       ?.content_revision as number;
     assert.equal(contentRevisionAtApproval, contentRevisionAfterPublish + 1);
 
@@ -441,13 +459,19 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
         object_id: 'page_p1_drill',
         lock_token: lock4,
         expected_record_version: checkout4.body.record_version as number,
-        ops: [{ op: 'update_section_data', section_id: 's_drillhero', fields: { heading: 'Edited again after approval' } }],
+        ops: [
+          { op: 'update_section_data', section_id: 's_drillhero', fields: { heading: 'Edited again after approval' } },
+        ],
       },
       AGENT
     );
     assert.equal(patch3.status, 200);
     const contentRevisionAfterLateEdit = patch3.body.content_revision as number;
-    assert.equal(contentRevisionAfterLateEdit, contentRevisionAtApproval + 1, 'the late edit must move content_revision past the pin');
+    assert.equal(
+      contentRevisionAfterLateEdit,
+      contentRevisionAtApproval + 1,
+      'the late edit must move content_revision past the pin'
+    );
     await call(store, { action: 'checkin', object_type: 'page', object_id: 'page_p1_drill', lock_token: lock4 }, AGENT);
 
     // Publish attempt: MUST be refused as stale, before any commit.
@@ -464,14 +488,21 @@ test('Scenario 1+2 (page overridden to require-approval): propose → approve �
     assert.equal(stalePublish.status, 403);
     assert.equal(stalePublish.body.code, 'approval_stale');
 
-    assert.equal(github.calls.length, githubCallsBeforeStaleAttempt, 'a stale-approval refusal must not touch git at all');
+    assert.equal(
+      github.calls.length,
+      githubCallsBeforeStaleAttempt,
+      'a stale-approval refusal must not touch git at all'
+    );
     const afterStaleAttempt = store.read('page', 'page_p1_drill');
     assert.equal(
       afterStaleAttempt.publication.published_time,
       record.publication.published_time,
       'the stale, unauthorized content must NOT have been published — publication is unchanged from scenario 1'
     );
-    assert.ok(afterStaleAttempt.version > versionAfterPublish, 'the draft continued to accumulate real writes after the first publish');
+    assert.ok(
+      afterStaleAttempt.version > versionAfterPublish,
+      'the draft continued to accumulate real writes after the first publish'
+    );
     assert.equal(
       (afterStaleAttempt.body as { sections: Array<{ data: { heading: string } }> }).sections[0].data.heading,
       'Edited again after approval',
@@ -505,7 +536,9 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
           groups: [
             {
               id: 'g_drill',
-              items: [{ id: 'n_drill', label: 'Original label', target: { kind: 'external', href: 'https://drlurie.com/x' } }],
+              items: [
+                { id: 'n_drill', label: 'Original label', target: { kind: 'external', href: 'https://drlurie.com/x' } },
+              ],
             },
           ],
         },
@@ -515,7 +548,11 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
     );
     assert.equal(created.status, 200, JSON.stringify(created.body));
 
-    const checkout1 = await call(store, { action: 'checkout', object_type: 'navigation', object_id: 'nav_p1_drill' }, AGENT);
+    const checkout1 = await call(
+      store,
+      { action: 'checkout', object_type: 'navigation', object_id: 'nav_p1_drill' },
+      AGENT
+    );
     const lock1 = checkout1.body.lockToken as string;
 
     const patch = await call(
@@ -526,7 +563,9 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
         object_id: 'nav_p1_drill',
         lock_token: lock1,
         expected_record_version: checkout1.body.record_version as number,
-        ops: [{ op: 'update_item', group_id: 'g_drill', item_id: 'n_drill', fields: { label: 'Agent-proposed label' } }],
+        ops: [
+          { op: 'update_item', group_id: 'g_drill', item_id: 'n_drill', fields: { label: 'Agent-proposed label' } },
+        ],
       },
       AGENT
     );
@@ -539,7 +578,12 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
     const githubCallsBeforeDenial = github.calls.length;
     const unapprovedAttempt = await call(
       store,
-      { action: 'publish_by_time', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: 'irrelevant-gate-denies-first' },
+      {
+        action: 'publish_by_time',
+        object_type: 'navigation',
+        object_id: 'nav_p1_drill',
+        lock_token: 'irrelevant-gate-denies-first',
+      },
       AGENT,
       { publishDeps: publishDeps(github.fetchImpl), approvalPolicy: GATE_NAVIGATION }
     );
@@ -558,7 +602,11 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
       },
       AGENT
     );
-    await call(store, { action: 'checkin', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: lock1 }, AGENT);
+    await call(
+      store,
+      { action: 'checkin', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: lock1 },
+      AGENT
+    );
 
     const approve = await call(
       store,
@@ -577,7 +625,11 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
     // Approved: the AGENT — not a human — executes the publish. There is no
     // separate human-execute step in the configurable-policy model; approval
     // is the only human touch (src/lib/approval-policy.ts).
-    const agentCheckout = await call(store, { action: 'checkout', object_type: 'navigation', object_id: 'nav_p1_drill' }, AGENT);
+    const agentCheckout = await call(
+      store,
+      { action: 'checkout', object_type: 'navigation', object_id: 'nav_p1_drill' },
+      AGENT
+    );
     const agentLock = agentCheckout.body.lockToken as string;
 
     const agentPublish = await call(
@@ -589,7 +641,11 @@ test('Scenario 3 (navigation overridden to require-approval): an unapproved agen
     assert.equal(agentPublish.status, 200, JSON.stringify(agentPublish.body));
     assert.equal(agentPublish.body.published, true);
 
-    await call(store, { action: 'checkin', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: agentLock }, AGENT);
+    await call(
+      store,
+      { action: 'checkin', object_type: 'navigation', object_id: 'nav_p1_drill', lock_token: agentLock },
+      AGENT
+    );
 
     const record = store.read('navigation', 'nav_p1_drill');
     assert.ok(record.publication.published_time, 'the record must now be stamped');
@@ -630,13 +686,23 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
     };
     const created = await call(
       store,
-      { action: 'create', object_type: 'section', site: 'site_drlurie', body: originalBody, requested_id: 'sec_p1_drill' },
+      {
+        action: 'create',
+        object_type: 'section',
+        site: 'site_drlurie',
+        body: originalBody,
+        requested_id: 'sec_p1_drill',
+      },
       AGENT
     );
     assert.equal(created.status, 200, JSON.stringify(created.body));
     const preProposalBody = (created.body.record as ObjectRecord).body;
 
-    const checkout1 = await call(store, { action: 'checkout', object_type: 'section', object_id: 'sec_p1_drill' }, AGENT);
+    const checkout1 = await call(
+      store,
+      { action: 'checkout', object_type: 'section', object_id: 'sec_p1_drill' },
+      AGENT
+    );
     const lock1 = checkout1.body.lockToken as string;
 
     const patch = await call(
@@ -647,12 +713,18 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
         object_id: 'sec_p1_drill',
         lock_token: lock1,
         expected_record_version: checkout1.body.record_version as number,
-        ops: [{ op: 'update_section_data', section_id: 's_drillcta', fields: { body: 'Agent-proposed prose that will be rejected.' } }],
+        ops: [
+          {
+            op: 'update_section_data',
+            section_id: 's_drillcta',
+            fields: { body: 'Agent-proposed prose that will be rejected.' },
+          },
+        ],
       },
       AGENT
     );
     assert.equal(patch.status, 200, JSON.stringify(patch.body));
-    const proposalHistoryEntry = (store.read('section', 'sec_p1_drill').history.slice(-1)[0]).details as {
+    const proposalHistoryEntry = store.read('section', 'sec_p1_drill').history.slice(-1)[0].details as {
       op: unknown;
       capture: unknown;
     };
@@ -662,10 +734,18 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
       { action: 'submit_review', object_type: 'section', object_id: 'sec_p1_drill', lock_token: lock1 },
       AGENT
     );
-    await call(store, { action: 'checkin', object_type: 'section', object_id: 'sec_p1_drill', lock_token: lock1 }, AGENT);
+    await call(
+      store,
+      { action: 'checkin', object_type: 'section', object_id: 'sec_p1_drill', lock_token: lock1 },
+      AGENT
+    );
 
     // A human reviewer rejects it by discarding — under their OWN lock (C§2.4).
-    const reviewerCheckout = await call(store, { action: 'checkout', object_type: 'section', object_id: 'sec_p1_drill' }, HUMAN);
+    const reviewerCheckout = await call(
+      store,
+      { action: 'checkout', object_type: 'section', object_id: 'sec_p1_drill' },
+      HUMAN
+    );
     assert.equal(reviewerCheckout.status, 200);
     const reviewerLock = reviewerCheckout.body.lockToken as string;
 
@@ -683,7 +763,11 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
     );
     assert.equal(discard.status, 200, JSON.stringify(discard.body));
 
-    await call(store, { action: 'checkin', object_type: 'section', object_id: 'sec_p1_drill', lock_token: reviewerLock }, HUMAN);
+    await call(
+      store,
+      { action: 'checkin', object_type: 'section', object_id: 'sec_p1_drill', lock_token: reviewerLock },
+      HUMAN
+    );
 
     const record = store.read('section', 'sec_p1_drill');
     assert.deepEqual(record.body, preProposalBody, 'the object must cleanly revert to its pre-proposal body');
@@ -701,7 +785,11 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
     const inverseEntry = record.history[record.history.length - 2]; // last is checkin
     assert.equal(inverseEntry.action, 'update_section_data');
     assert.equal(inverseEntry.actor.kind, 'human');
-    assert.equal((inverseEntry.actor as { email: string }).email, 'reviewer@example.com', 'the inverse write is attributed to the reviewer, not the agent');
+    assert.equal(
+      (inverseEntry.actor as { email: string }).email,
+      'reviewer@example.com',
+      'the inverse write is attributed to the reviewer, not the agent'
+    );
 
     assert.deepEqual(historyActions(record), [
       { action: 'create', actor: 'drill-agent' },
@@ -807,7 +895,11 @@ test('Scenario 5 (transient git conflict): a retried publish converges to a sing
     assert.ok(record.publication.published_time, 'the record must be stamped despite the transient conflict');
     const storedReceipt = record.publication.publish_receipt as Record<string, unknown>;
     assert.equal(storedReceipt.attempts, 2, 'exactly one retry happened (lost race, then succeeded)');
-    assert.equal(storedReceipt.commit_sha, github.getHead().sha, 'the receipt names the commit that actually won the ref');
+    assert.equal(
+      storedReceipt.commit_sha,
+      github.getHead().sha,
+      'the receipt names the commit that actually won the ref'
+    );
 
     // Real git behavior: each attempt mints its own commit object (2 total —
     // one per attempt), but only ONE ref-move ever lands at head. The first

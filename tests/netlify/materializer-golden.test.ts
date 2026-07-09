@@ -10,7 +10,11 @@ test('golden: site materializes to src/data/site/site.json with __generated mark
     name: 'Dr. Lurié',
     logo: { text: 'Dr. Lurié' },
     urls: { base: 'https://drlurie.com', canonicalHost: 'drlurie.com' },
-    metadataDefaults: { titleTemplate: '%s — Dr. Lurié', description: 'Dermatology insights.', ogImage: '/images/og-default.png' },
+    metadataDefaults: {
+      titleTemplate: '%s — Dr. Lurié',
+      description: 'Dermatology insights.',
+      ogImage: '/images/og-default.png',
+    },
     brandTokens: {
       colors: { primary: '#1f2937', secondary: '#f59e0b' },
       fonts: { sans: 'Inter', serif: 'Georgia', heading: 'Inter' },
@@ -59,7 +63,9 @@ test('golden: navigation materializes to src/data/site/navigation/{nav_id}.json'
     groups: [
       {
         id: 'g_primary',
-        items: [{ id: 'n_privacy', label: 'Privacy', target: { kind: 'external', href: 'https://drlurie.com/privacy' } }],
+        items: [
+          { id: 'n_privacy', label: 'Privacy', target: { kind: 'external', href: 'https://drlurie.com/privacy' } },
+        ],
       },
     ],
   };
@@ -102,7 +108,11 @@ test('golden: shared section materializes to src/data/site/sections/{sec_id}.jso
 
   assert.equal(result.path, 'src/data/site/sections/sec_newsletter1.json');
   assert.deepStrictEqual(JSON.parse(result.content), {
-    __generated: { from: 'objects/section/by-id/sec_newsletter1.json', at: meta.at, record_version: meta.record_version },
+    __generated: {
+      from: 'objects/section/by-id/sec_newsletter1.json',
+      at: meta.at,
+      record_version: meta.record_version,
+    },
     ...body,
   });
 });
@@ -144,4 +154,14 @@ test('golden: taxonomy materializes to src/data/site/taxonomy.json — exact byt
 }
 `
   );
+});
+
+test('meta guard: a camelCase recordVersion (or missing at) fails loudly at materialize time', () => {
+  const body = { section: { id: 's_x', type: 'prose', data: { body: '<p>x</p>' } } };
+  // The classic untyped-caller mistake: camelCase key → record_version undefined.
+  assert.throws(
+    () => materialize('section', 'sec_x', body, { at: '2026-07-09T00:00:00.000Z', recordVersion: 3 } as never),
+    /record_version must be a non-negative integer/
+  );
+  assert.throws(() => materialize('section', 'sec_x', body, { at: '', record_version: 3 }), /meta\.at must be/);
 });
