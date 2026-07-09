@@ -1,3 +1,8 @@
+> **⚠️ Not live yet.** This site is under active development and is not a real, live
+> production project. Search-engine indexing is disabled site-wide
+> (`src/components/common/Metadata.astro`, `SITE_NOT_YET_LIVE`) until launch is
+> intended. See `docs/cms-architecture/` for the CMS work in progress.
+
 # 🚀 AstroWind
 
 <img src="https://raw.githubusercontent.com/arthelokyo/.github/main/resources/astrowind/lighthouse-score.png" align="right"
