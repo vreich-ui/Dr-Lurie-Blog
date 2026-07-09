@@ -7,6 +7,27 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-09 (system pages + grid via the real MCP lifecycle; playbook)
+
+PR #380 (`claude/system-pages-and-grid`): `page_privacy`/`page_terms`/`page_404`
+cut over as `system` pages using **reusable** section types (`prose`, `cta_banner`
+— no bespoke per-page types, per design-principles), and the homepage grid's
+invalid `static` placeholder retired for a live `query` source. Every object was
+driven through the REAL compiled MCP handler (create→checkout→validate→patch→
+publish→checkin, local file-backed store; publish correctly blocked at the
+`not_configured` git-commit gate — the expected sandbox boundary). Also: site-wide
+noindex/nofollow guard (`SITE_NOT_YET_LIVE`, Metadata.astro) + README notice — the
+site is not live; QA posts surfacing in the grid is accepted per Wolf.
+
+**Review pass (Fable) findings, fixed in the same PR:** literal markdown backticks
+shipped into page_privacy's rendered copy (no `code` tag in the allowlist);
+materializer meta silently dropped `record_version` when passed camelCase (now a
+loud runtime guard + test); the object-inventory same-change rule was missed.
+Every trap from this batch is codified in **`docs/cms-architecture/conversion-playbook.md`**
+(new; mandatory pre-conversion reading, wired into CLAUDE.md/AGENTS.md/core-structure)
+so Sonnet-class conversions don't need a fix-up pass. Open follow-ups: `content_item`
+resolver (manual grid curation), retiring the `static` grid variant + seed script.
+
 ## Standing state (after session 2026-07-08 D — bespoke-page cutovers)
 
 Continues the bespoke-page cutover track opened by the `/thank-you` cutover
@@ -15,9 +36,9 @@ functional-equivalence gate for pages carrying a page-level inline script/scoped
 style (`known-inert-diffs.md`). This session cut over the next two, each on its
 **own branch off `main`** (not stacked — applying the #368–#371 scoping lesson):
 
-| Page cutover              | Branch / commit                    | State                                                                                                                                                                                                                                                                                                    |
-| ------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`/about` → page_about** | `claude/cutover-about` (`6180f3a`) | **Cut over in CODE + verified.** Bespoke-markup page: prose blocks stay fixed component furniture, only the **clean fields** are object data — page + 6 section headings, portrait src/alt, closing CTA (Wolf's "clean fields only" call; no rich-text/injection surface). `build-diff` EMPTY (203/203). No page-level script/style → strict byte-identity, no ledger entry. **Not merged.** |
+| Page cutover                  | Branch / commit                      | State                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`/about` → page_about**     | `claude/cutover-about` (`6180f3a`)   | **Cut over in CODE + verified.** Bespoke-markup page: prose blocks stay fixed component furniture, only the **clean fields** are object data — page + 6 section headings, portrait src/alt, closing CTA (Wolf's "clean fields only" call; no rich-text/injection surface). `build-diff` EMPTY (203/203). No page-level script/style → strict byte-identity, no ledger entry. **Not merged.**                                                      |
 | **`/contact` → page_contact** | `claude/cutover-contact` (`e7e734c`) | **Cut over in CODE + verified.** First **widget-composition** page: `ContactPage.astro` re-invokes the same HeroText/Contact/Features2 widgets, every prop now object data (promotes cleanly — no prose-emphasis problem, so no clean-fields compromise). Two editorial HTML comments kept verbatim (html-minifier `removeComments` off). `build-diff` EMPTY (203/203). No link actions → empty resolved, no `resolve.ts` change. **Not merged.** |
 
 **Two page-shape families identified for the remaining cutovers:**
@@ -28,8 +49,7 @@ style (`known-inert-diffs.md`). This session cut over the next two, each on its
 **Every cutover this session:** `astro check` 0 errors, eslint/prettier clean,
 full suite green (870 netlify+src, 24 script), `build-diff` EMPTY. **Object-store
 seed+publish still deferred to the handoff** (no production store in this sandbox)
-— same posture as thank_you and the lede family; the committed `page_*.json`
-exports are the derived-export half, publish reconciles the `__generated` marker.
+— same posture as thank*you and the lede family; the committed `page*\*.json`exports are the derived-export half, publish reconciles the`\_\_generated` marker.
 
 A separate `claude/state-of-play-cutovers` branch carries only this log entry, to
 keep each cutover branch a clean single-purpose diff for review.

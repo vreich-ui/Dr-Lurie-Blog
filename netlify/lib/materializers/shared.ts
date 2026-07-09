@@ -48,11 +48,27 @@ const canonicalize = (value: unknown): unknown => {
 /** Deterministic JSON serialization: object keys sorted recursively, array order preserved. */
 export const canonicalJsonStringify = (value: unknown): string => `${JSON.stringify(canonicalize(value), null, 2)}\n`;
 
-const generatedMarker = (objectType: ObjectType, objectId: string, meta: MaterializeMeta): GeneratedMarker => ({
-  from: objectRecordKey(objectType, objectId),
-  at: meta.at,
-  record_version: meta.record_version,
-});
+const generatedMarker = (objectType: ObjectType, objectId: string, meta: MaterializeMeta): GeneratedMarker => {
+  // Runtime guard, not just a type: untyped callers (compiled-JS drivers,
+  // agent scripts) that pass camelCase `recordVersion` would otherwise have
+  // `record_version: undefined` silently DROPPED by JSON.stringify, producing
+  // an export whose failure only surfaces much later as an opaque astro
+  // content-collection error ("__generated.record_version: Required").
+  if (typeof meta.at !== 'string' || meta.at.length === 0) {
+    throw new Error('materialize: meta.at must be a non-empty ISO timestamp string.');
+  }
+  if (!Number.isInteger(meta.record_version) || meta.record_version < 0) {
+    throw new Error(
+      `materialize: meta.record_version must be a non-negative integer (got ${String(meta.record_version)}). ` +
+        'The MaterializeMeta contract is snake_case: { at, record_version } — a camelCase recordVersion key is not read.'
+    );
+  }
+  return {
+    from: objectRecordKey(objectType, objectId),
+    at: meta.at,
+    record_version: meta.record_version,
+  };
+};
 
 /** Wraps a validated body with its `__generated` marker and serializes it deterministically. */
 export const renderExport = <TBody extends object>(

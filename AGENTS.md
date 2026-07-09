@@ -40,47 +40,52 @@ change, it's a replica, not backbone — generalize it. Full rule + consequences
 
 ## CMS architecture project — mandatory context
 
-If any task touches the object store, Pages, Sections, Navigation, Taxonomy, 
-Site config, Templates, or anything under `docs/cms-architecture/`, read these 
+If any task touches the object store, Pages, Sections, Navigation, Taxonomy,
+Site config, Templates, or anything under `docs/cms-architecture/`, read these
 files in full before writing any code, in this order:
 
-1. The task's standalone brief: `docs/cms-architecture/cms-pipeline/T<phase>.<n>-*.md` 
-   — its header carries the task's `depends_on`, `mode`, and recommended 
-   model/effort. **Check `depends_on` before starting — if a dependency isn't 
+1. The task's standalone brief: `docs/cms-architecture/cms-pipeline/T<phase>.<n>-*.md`
+   — its header carries the task's `depends_on`, `mode`, and recommended
+   model/effort. **Check `depends_on` before starting — if a dependency isn't
    built and merged yet, stop and say so.**
-2. `docs/cms-architecture/cms-pipeline/queue.tsv` — task ordering and per-task 
+2. `docs/cms-architecture/cms-pipeline/queue.tsv` — task ordering and per-task
    mode/model/effort (the runner config; see `README.md` alongside it).
 3. For full schema/type detail: `docs/cms-architecture/02-architecture-and-schema.md`
 4. For permission/action rules: `docs/cms-architecture/03-mapping-and-agent-contract.md`
-5. For the full per-task spec: `docs/cms-architecture/05-task-breakdown-and-open-questions.md`. 
-   (A consolidated master reference, `cms-architecture-consolidated.md`, is named 
-   by some briefs but has not been committed — the numbered source docs are 
+5. For the full per-task spec: `docs/cms-architecture/05-task-breakdown-and-open-questions.md`.
+   (A consolidated master reference, `cms-architecture-consolidated.md`, is named
+   by some briefs but has not been committed — the numbered source docs are
    ground truth where anything conflicts.)
-6. `docs/cms-architecture/object-inventory.md` — the current catalog of content 
-   objects (each marked LIVE / SHELL / TODO), every object type's use + boundaries, 
-   and the MVP todo list. Read it to see what is already an editable object vs. still 
-   hardcoded. It is hand-maintained and drifts easily: **update the matching row in 
-   the SAME change** when you cut over a surface or publish/retire an object. For 
-   always-current machine truth, prefer the `object_contract` / `object_inventory` 
+6. `docs/cms-architecture/object-inventory.md` — the current catalog of content
+   objects (each marked LIVE / SHELL / TODO), every object type's use + boundaries,
+   and the MVP todo list. Read it to see what is already an editable object vs. still
+   hardcoded. It is hand-maintained and drifts easily: **update the matching row in
+   the SAME change** when you cut over a surface or publish/retire an object. For
+   always-current machine truth, prefer the `object_contract` / `object_inventory`
    MCP tools over any doc.
+7. **Converting a surface to an object? `docs/cms-architecture/conversion-playbook.md`
+   is mandatory** — the exact lifecycle recipe, the call/response field names (do
+   not guess them), and the trap table (deep-merge patch semantics, reference
+   seeding, rich-text vocabularies, the expected sandbox publish block).
 
 ## CMS hard constraints — every task, no exceptions
 
-- `admin-workflow-lock.ts`, `publish-article.ts`, and existing article MCP 
+- `admin-workflow-lock.ts`, `publish-article.ts`, and existing article MCP
   tools are **off-limits**. Do not modify, import from, or refactor them.
-- Every new file is additive. The public site must remain fully functional 
+- Every new file is additive. The public site must remain fully functional
   after every commit.
 - One task, one commit. Do not bundle cleanup or unrelated fixes.
 - Commit message must begin with the task ID, e.g. `T0.1: envelope schema module`.
 - Do not open a PR unless the task brief explicitly says to.
 - Do not push to `main`. Work on the task's integration branch.
 - `route`-kind nav targets are intentional — do not "fix" them to `page`-kind.
-- The `content_revision` counter and the `version` counter are independent — 
+- The `content_revision` counter and the `version` counter are independent —
   never conflate them. Lock writes bump `version` only, never `content_revision`.
 
 ## CMS amendment log — bake these in, do not miss them
 
 When implementing body schemas (T0.2), all of the following must be present:
+
 - M-1: `NavItem.description`
 - M-2: `groups[].slot`
 - M-5: `groups[].target` (stored, not rendered as a link)
