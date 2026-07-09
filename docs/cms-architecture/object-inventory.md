@@ -10,6 +10,10 @@ narrative lives in [`cms-pipeline/state-of-play.md`](cms-pipeline/state-of-play.
 This file answers a different question: _at rest, what objects exist and what is
 their status?_
 
+**Governing design rule:** the objects are a **flexible backbone, not a replica of
+the current site** — see [`design-principles.md`](design-principles.md). Prefer
+reusable, agent-configurable components over bespoke per-page types.
+
 ---
 
 ## How to keep this current (for agents)
@@ -70,8 +74,10 @@ are each one of the registered section types (`hero`, `lede`, `prose`, `checklis
 `link_list`, `product_preview`, `contact_form`, `search`, `content_embed`) plus the
 bespoke single-use page sections (`thank_you`, `about`, `contact`) and the
 `shared_ref` pointer. The reusable ones are meant to be composed onto any page; the
-bespoke ones mirror one specific page's markup. The live list + each type's field
-schema is `registry_get('component')` / `object_contract('page').section_types`.
+bespoke ones mirror one specific page's markup and are the **anti-pattern** under
+[`design-principles.md`](design-principles.md) — a migration expedient, not to be
+repeated. The live list + each type's field schema is `registry_get('component')` /
+`object_contract('page').section_types`.
 
 ---
 
@@ -122,10 +128,13 @@ What still has to become a real object for Dr. Lurié to function as a full CMS 
 i.e. for an agent (or a human via the admin UI) to edit **every meaningful part**
 of the live site through the one governed workflow. Roughly in priority order.
 
-### 1. Remaining bespoke pages → page objects 🔴
+### 1. Remaining hand-coded pages → page objects 🔴
 
-The last three hand-coded routes. Same faithful-reproduction cutover pattern as
-about/contact (bespoke section per page, byte-identical `build-diff`).
+The last three hand-coded routes. **Do NOT repeat the about/contact bespoke-per-page
+pattern** — per [`design-principles.md`](design-principles.md), build these from
+**reusable, agent-configurable components** (generalize existing ones or add reusable
+types), accepting an intentional non-empty `build-diff` where the flexible result
+isn't byte-identical.
 
 | TODO object | Route | Shape / gotcha |
 | ----------- | ----- | -------------- |

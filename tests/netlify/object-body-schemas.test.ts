@@ -287,6 +287,11 @@ const sectionFixtures: SectionInstance[] = [
       actions: [{ label: 'Read', target: { kind: 'listing', list: 'content_index' } }],
     },
   },
+  {
+    id: 's_card',
+    type: 'card',
+    data: { title: 'What Healthy Skin Means', description: 'A plain-language starting point.' },
+  },
   { id: 's_shared', type: 'shared_ref', data: { section: 'sec_newsletter_signup' } },
 ];
 
@@ -301,6 +306,7 @@ test('sections: every union member parses from a seed fixture', () => {
   assert.deepEqual([...sectionTypes].sort(), [
     'about',
     'bio',
+    'card',
     'checklist',
     'contact',
     'contact_form',

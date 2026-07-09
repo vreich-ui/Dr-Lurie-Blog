@@ -264,6 +264,14 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     ),
     actions: z.array(linkActionSchema),
   }),
+  // A single content cell — the reusable LEAF a container block (e.g.
+  // `content_grid`) holds as a child block (docs/cms-architecture/block-tree.md).
+  // Not tied to one page: the same `card` composes any grid, row, or strip.
+  sectionVariant('card', {
+    title: z.string().min(1),
+    description: z.string().optional(),
+    link: linkActionSchema.optional(),
+  }),
   // Reference to a shared 'section' object — no shadow copy of the target's
   // type/data (D§3.5).
   sectionVariant('shared_ref', {

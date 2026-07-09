@@ -109,4 +109,14 @@ export type SectionComponentDefinition<TType extends SectionType, TResolved> = {
   editor: ComponentEditorHints<TType>;
   /** Renderer hook (T3.6): computes TResolved from data. Absent = no references. */
   resolveRefs?: (data: SectionDataOf<TType>, ctx: RenderCtx) => Promise<TResolved>;
+  /**
+   * Block-tree bounds (docs/cms-architecture/block-tree.md): the child block
+   * types this type may contain, and how many. Absent = a **leaf** (no children).
+   * Validation walks the tree and enforces these at every node; `object_contract`
+   * surfaces them so an agent knows the legal tree grammar before acting. This
+   * generalizes `PageType.allowedSections` / `Template.slots.allowed` to every
+   * container block.
+   */
+  allowedChildren?: SectionType[];
+  childCount?: { min?: number; max?: number };
 };

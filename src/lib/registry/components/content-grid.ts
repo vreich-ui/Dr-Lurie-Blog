@@ -26,4 +26,10 @@ export const contentGridDefinition: SectionComponentDefinition<'content_grid', C
       limit: 4,
     },
   },
+  // Block-tree bounds: a grid is a CONTAINER of `card` leaf blocks an agent
+  // composes (docs/cms-architecture/block-tree.md). `card` is the only legal
+  // child; at most 8 cells. (The transitional `source.cards` data path is the
+  // pre-tree escape hatch this supersedes — slice 6 migrates it.)
+  allowedChildren: ['card'],
+  childCount: { max: 8 },
 };
