@@ -1,19 +1,23 @@
 {
   "__generated": {
-    "at": "2026-07-10T15:08:00.768Z",
+    "at": "2026-07-10T16:24:34.984Z",
     "from": "objects/section/by-id/sec_about_intro.json",
-    "record_version": 7
+    "record_version": 11
   },
   "section": {
     "data": {
-      "body": "<p>Let’s keep this simple.</p><p>If you’ve ever tried a health or skincare product that <em>promised everything</em>… and delivered very little—you’re not alone.</p><p>And there’s a reason for that.</p><p>Most products focus on <strong>what’s inside the bottle</strong>. Dr. Leonid Lurie focuses on <strong>whether it actually works in your body</strong>.</p>",
-      "heading": "About Dr. Leonid Lurie",
-      "kicker": "About",
+      "body": "<p>If you have tried products that promised everything and delivered very little, the problem may not be your effort. It may be that most skincare advice starts in the wrong place.</p><p>Dr. Leonid Lurie approaches skin health through a physician-scientist lens: what is happening in the body, how ingredients reach the right place, and why simpler decisions are often stronger than louder claims.</p><p>The goal of this site is to help you understand before you buy, so your next skincare step is clearer, calmer, and easier to trust.</p>",
+      "heading": "Dr. Leonid Lurie: the scientist behind the skin-health approach",
+      "kicker": "About the method",
       "portrait": {
         "alt": "Portrait of Dr. Leonid Lurie",
         "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg"
       },
-      "trustNotes": []
+      "trustNotes": [
+        "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
+        "Focus on delivery systems, stability, and whether active ingredients can actually do useful work.",
+        "Education-first guidance for readers who want less product noise and more scientific clarity."
+      ]
     },
     "id": "s_intro",
     "type": "bio"
