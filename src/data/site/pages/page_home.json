@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T08:38:51.090Z",
+    "at": "2026-07-10T08:40:28.783Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 6
+    "record_version": 13
   },
   "pageType": "standard",
   "route": "/cms-home-field-test",
@@ -33,89 +33,6 @@
       },
       "id": "s_homehero",
       "type": "hero",
-      "visibility": "public"
-    },
-    {
-      "data": {
-        "anchor": "start-here",
-        "heading": "You want skincare to feel understandable.",
-        "items": [
-          "You are new to skincare and want a calm place to begin.",
-          "You want to understand what your skin needs before buying more products.",
-          "You prefer physician-led education over trend-driven routines.",
-          "You want simple explanations that respect both science and everyday life."
-        ],
-        "kicker": "This is for you if..."
-      },
-      "id": "s_homechecklist",
-      "type": "checklist",
-      "visibility": "public"
-    },
-    {
-      "data": {
-        "anchor": "begin",
-        "body": "Read these in order or choose the question that feels most useful today.",
-        "heading": "Five simple places to begin.",
-        "kicker": "Start here",
-        "limit": 5,
-        "source": {
-          "cards": [
-            {
-              "description": "A plain-language starting point for newcomers who want healthy skin without building a complicated shelf of products.",
-              "title": "The Minimum Skincare Routine: What You Actually Need Before Buying More"
-            },
-            {
-              "description": "A practical guide to separating useful product information from front-label marketing language.",
-              "title": "How to Read a Skincare Label Without Falling for the Front of the Bottle"
-            },
-            {
-              "description": "A practical guide to moisturizer language, barrier claims, and choosing texture by skin state rather than marketing intensity.",
-              "title": "Moisturizer Is Not Just Hydration: What Barrier Products Are Really Trying to Do"
-            },
-            {
-              "description": "A practical way to judge skincare results without giving up too early, pushing through irritation, or buying the next promise too soon.",
-              "title": "How Long Should Skincare Take to Work? A Beginner's Guide Before You Quit or Buy More"
-            },
-            {
-              "description": "A calm beginner guide to what retinol is, what it may help, how to start slowly, and when to pause or ask for clinical guidance.",
-              "title": "Retinol, Explained Simply"
-            }
-          ],
-          "kind": "static"
-        }
-      },
-      "id": "s_homebegin",
-      "type": "content_grid",
-      "visibility": "public"
-    },
-    {
-      "data": {
-        "anchor": "about",
-        "body": "Dr. Lurié brings a physician and scientist’s lens to skin health education, translating complex ideas into steady guidance for people who are beginning their skincare journey.",
-        "disclaimer": "Educational content only. Not medical advice.",
-        "heading": "Meet Dr. Lurié",
-        "kicker": "About",
-        "trustNotes": [
-          "Physician-led perspective on skin health education.",
-          "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
-          "Clear explanations designed for people who are just beginning to care for their skin intentionally."
-        ]
-      },
-      "id": "s_homebio",
-      "type": "bio",
-      "visibility": "public"
-    },
-    {
-      "data": {
-        "anchor": "newsletter",
-        "body": "Join the Dr. Lurié newsletter for concise skin health education, beginner-friendly explanations, and calm guidance you can return to when you need it.",
-        "consentText": "No overwhelm, no trend chasing — just clear education for healthier skin.",
-        "formName": "newsletter",
-        "heading": "Learn about healthy skin one clear step at a time.",
-        "kicker": "Newsletter"
-      },
-      "id": "s_homenewsletter",
-      "type": "newsletter_signup",
       "visibility": "public"
     }
   ],
