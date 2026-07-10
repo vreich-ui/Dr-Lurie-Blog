@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T10:47:49.214Z",
+    "at": "2026-07-10T11:22:04.640Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 11
+    "record_version": 42
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -76,7 +76,13 @@
     }
   ],
   "seo": {
-    "ogImage": "/Social/og-home.jpg"
+    "description": "A calmer, clearer way to begin caring for your skin without complicated routines, product pressure, or trend-led advice.",
+    "ogImage": "/Social/og-home.jpg",
+    "robots": {
+      "follow": true,
+      "index": true
+    },
+    "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
   },
   "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
 }
