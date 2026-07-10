@@ -7,6 +7,30 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 (definition-of-done RESET; homepage-footer regression fix)
+
+Two things. **(1) Incident + fix (PR #383, merged):** four real production
+`object_publish` calls on 2026-07-10 progressively stripped `page_home`'s store
+record down to one section with no `navigationOverrides` — every step passed
+validation (the field is schema-optional) and only surfaced as a site-wide Netlify
+build crash (`index.astro` throws without `navigationOverrides.footer`; Astro's build
+is all-or-nothing). Added the `structure_home_footer` validation rule (rejects any
+page_home / pageType-home patch/publish missing the footer override, at validation
+time), restored the git export, documented in `object_contract`. The **live store
+record for page_home is still broken** — restoring it needs production credentials.
+
+**(2) Governing reset (Wolf):** "converted" was being used to mean "renders," which
+let half-done work look finished. New GOVERNING definition, added to CLAUDE.md /
+AGENTS.md / conversion-playbook.md: an object is converted ONLY when it renders **and**
+is store-backed **and** an agent can round-trip every permitted action via MCP **and**
+every permitted action is in the contract + has a server tool **and** it's recorded in
+docs. No half measures. **After every session, docs must be updated; no record =
+not converted.** Honest status recorded: **only nav_header/nav_footer/nav_footer_home
+are actually converted**; the 12 pages are rendered stubs. Root-cause analysis of why
+(no production credentials in any session; missing archive/unpublish + nested-block
+MCP verbs; content_item resolver gap; no standing round-trip test) is in
+`object-inventory.md` "Why only nav is converted."
+
 ## Session 2026-07-09 (system pages + grid via the real MCP lifecycle; playbook)
 
 PR #380 (`claude/system-pages-and-grid`): `page_privacy`/`page_terms`/`page_404`

@@ -7,6 +7,43 @@
 > [`core-structure.md`](core-structure.md) (the model) — this is the operations
 > manual.
 
+## What "converted" means — the definition of done (READ FIRST)
+
+**An object is converted ONLY when an agent can fully manipulate it, within its
+permitted scope, through the MCP _and_ Astro renders it.** Rendering from a
+committed JSON export is a _milestone, not done_. "Code-correct export" is worth
+nothing on its own — the whole point of this project is agent-editable objects.
+
+A conversion is finished when **all five** hold. No half measures; no partial
+credit:
+
+1. **Renders.** Astro builds the surface from the object — the four build gates
+   in recipe step 7 (`astro check`, `npm test`, `npm run build`, `dist` grep).
+2. **Store-backed.** A real record exists in the **production object store**
+   (`object_inventory` returns it), created/published through the real verbs —
+   **not** merely a git-committed export. A committed export that no store record
+   backs is NOT a converted object; it is a rendered stub.
+3. **Round-trips.** An agent can perform **every permitted action** on it via MCP
+   end-to-end — checkout → patch (each allowed op) → publish → release → see it
+   re-render — proven, not assumed.
+4. **Contract-complete.** Every action the object's permitted scope allows is
+   (a) described in `object_contract`, **and** (b) backed by an actual MCP server
+   tool. If a permitted action has no tool or no contract entry, **building that
+   is part of the conversion** — the object is not done until it exists.
+5. **Recorded.** `object-inventory.md` carries its row and `state-of-play.md`
+   carries the session entry. **No record = not converted**, full stop.
+
+> **Governing rule (Wolf, 2026-07-10):** "convert an object" means exactly the
+> above and nothing less. A task that says "convert X" is not complete until X
+> passes all five. Rendering-only work must be labelled "rendered, not converted"
+> — never "done."
+
+**Current reality check (be honest about it):** by this definition, as of
+2026-07-10 only `nav_header`, `nav_footer`, and `nav_footer_home` are actually
+converted. The 12 page exports render but are not store-backed round-trippable —
+they are **rendered stubs**, not converted objects (see the analysis in
+[`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
+
 ## The recipe (converting a page to an object)
 
 1. **Pre-flight.** Read `object_contract('page')` for the live schema/ops. Check
@@ -30,14 +67,26 @@ object_patch → object_publish → object_checkin`, against the local
    runtime since 2026-07-09 — a wrong key now throws immediately).
 6. **Route file** becomes a thin loader:
    `<PageObjectRenderer objectId="page_x" />`. Delete the old source file.
-7. **Verify — all four gates**: `npx astro check` (0 errors), `npm test` (all
-   green), `npm run build` (succeeds), and **grep the `dist/` output** for the
-   page's real content (headings, lists, CTAs actually rendered).
-8. **Same-change docs**: update the object's row in `object-inventory.md` in the
-   SAME commit/PR. (This step was missed on 2026-07-09; don't repeat that.)
-9. **Commit discipline**: one object, one commit; revert timestamp-only churn
-   (re-materializing an unchanged object bumps only `__generated.at` — don't
-   commit that noise on unrelated exports).
+7. **Verify RENDER (criterion 1) — all four build gates**: `npx astro check`
+   (0 errors), `npm test` (all green), `npm run build` (succeeds), and **grep the
+   `dist/` output** for the page's real content (headings, lists, CTAs actually
+   rendered). _This proves the object renders. It does NOT prove it is converted._
+8. **Seed + publish to the STORE (criterion 2).** Run the real verbs against the
+   **production** store (needs `PUBLISH_SECRET` + `GITHUB_CONTENT_TOKEN`) so a
+   real record exists — `object_inventory` must return it afterwards. Steps 3–6
+   only exercise the _local_ store; that is a rehearsal, not this step.
+9. **Round-trip proof (criterion 3).** From an agent principal, exercise EVERY
+   permitted op via MCP (checkout → each patch op → publish → `release_to_production`)
+   and confirm the change re-renders. If any permitted action has no tool or no
+   `object_contract` entry (criterion 4), **build it — that is part of this
+   conversion**, not a follow-up.
+10. **Record it (criterion 5), same change**: update the object's row in
+    `object-inventory.md` AND add the `state-of-play.md` session entry in the
+    SAME commit/PR. (Step missed on 2026-07-09; don't repeat that.) **No record =
+    not converted.**
+11. **Commit discipline**: one object, one commit; revert timestamp-only churn
+    (re-materializing an unchanged object bumps only `__generated.at` — don't
+    commit that noise on unrelated exports).
 
 ## Exact call/response field names (do not guess these)
 
