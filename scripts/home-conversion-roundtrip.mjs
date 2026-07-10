@@ -62,6 +62,11 @@
  *                 (the seed scripts' schema-vintage gate, generalized).
  *   --release     (production only) After the family publishes, fire the
  *                 build hook once, then confirm with short read-only polls.
+ *   --verify-only Prove the family still round-trips (ensure + every permitted
+ *                 op + validate + contract + inventory) but NEVER publish or
+ *                 release — for re-checking already-converted objects with no
+ *                 export churn and no build minutes. Works with --local or
+ *                 --production; incompatible with --release.
  *
  * Exit codes: 0 = every step proven; 1 = any failure (the report says which);
  * 2 = usage error.
@@ -71,6 +76,7 @@ import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 import { reconcileOps } from './lib/roundtrip-reconcile.mjs';
+import { drillOpsForSeed } from './lib/roundtrip-drill.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -110,6 +116,11 @@ if (unsupported.length > 0) {
 const production = args.has('--production');
 const writeExports = args.has('--write-exports');
 const release = args.has('--release');
+// --verify-only: prove the family still round-trips (ensure + every permitted op
+// + validate + contract + inventory) WITHOUT publishing or releasing — for
+// re-checking already-converted objects with no export churn and no build
+// minutes. It still exercises real ops, so it bumps content_revision.
+const verifyOnly = args.has('--verify-only');
 const AGENT_NAME = 'object-conversion-roundtrip';
 
 if (writeExports && production) {
@@ -118,6 +129,10 @@ if (writeExports && production) {
 }
 if (release && !production) {
   console.error('[roundtrip] --release only makes sense with --production.');
+  process.exit(2);
+}
+if (verifyOnly && release) {
+  console.error('[roundtrip] --verify-only cannot be combined with --release (release needs published objects).');
   process.exit(2);
 }
 
@@ -339,50 +354,10 @@ for (const seed of PAGE_HOME_SEEDS) {
 }
 
 // ─── drill: exercise EVERY permitted op, end byte-identical, publish ─────────
-
-const PROBE_SECTION = {
-  id: 's_rtprobe',
-  type: 'hero',
-  data: { heading: 'Round-trip probe — added and removed by the drill', actions: [] },
-};
-
-const drillOps = (seed) => {
-  if (seed.objectType === 'page') {
-    const sectionCount = seed.body.sections.length;
-    return {
-      expected: [
-        'set_page_meta',
-        'upsert_section',
-        'update_section_data',
-        'move_section',
-        'set_section_visibility',
-        'remove_section',
-      ],
-      ops: [
-        { op: 'set_page_meta', fields: { title: `${seed.body.title} [probe]` } },
-        { op: 'set_page_meta', fields: { title: seed.body.title } },
-        { op: 'upsert_section', section: PROBE_SECTION, position: sectionCount },
-        { op: 'update_section_data', section_id: PROBE_SECTION.id, fields: { kicker: 'probe' } },
-        { op: 'set_section_visibility', section_id: PROBE_SECTION.id, visibility: 'hidden' },
-        { op: 'move_section', section_id: PROBE_SECTION.id, to_index: 0 },
-        { op: 'move_section', section_id: PROBE_SECTION.id, to_index: sectionCount },
-        { op: 'remove_section', section_id: PROBE_SECTION.id },
-      ],
-    };
-  }
-  const instance = seed.body.section;
-  const originalKicker = instance.data.kicker ?? null;
-  return {
-    expected: ['upsert_section', 'update_section_data', 'set_section_visibility'],
-    ops: [
-      { op: 'upsert_section', section: instance },
-      { op: 'update_section_data', section_id: instance.id, fields: { kicker: 'probe' } },
-      { op: 'update_section_data', section_id: instance.id, fields: { kicker: originalKicker } },
-      { op: 'set_section_visibility', section_id: instance.id, visibility: 'hidden' },
-      { op: 'set_section_visibility', section_id: instance.id, visibility: null },
-    ],
-  };
-};
+// Drill-op construction (type-generic probe field, cloned-inline-section page
+// probe, collision-free probe id, original-visibility restore) lives in
+// scripts/lib/roundtrip-drill.mjs — unit-tested and safe for strict per-type
+// schemas, not just the home family's shapes.
 
 const publishOutcome = async (seed, lockToken) => {
   const published = await callTool('object_publish', {
@@ -411,7 +386,14 @@ for (const seed of PAGE_HOME_SEEDS) {
     continue;
   }
   const before = await getRecord(seed.objectType, seed.objectId);
-  const { expected, ops } = drillOps(seed);
+  let drill;
+  try {
+    drill = drillOpsForSeed(seed);
+  } catch (error) {
+    step(`drill ${seed.objectId}`, false, error.message);
+    continue;
+  }
+  const { expected, ops } = drill;
   exercisedByType.set(seed.objectType, expected);
 
   const result = await withLock(seed.objectType, seed.objectId, async (lockToken, recordVersion) => {
@@ -437,13 +419,17 @@ for (const seed of PAGE_HOME_SEEDS) {
       return `validate reported blockers: ${JSON.stringify(summary?.blockers ?? structured(validated))}`;
     }
 
+    if (verifyOnly) {
+      console.info(`[roundtrip]      ${seed.objectId}: verify-only — round-trip proven, publish skipped`);
+      return true;
+    }
     const publish = await publishOutcome(seed, lockToken);
     if (!publish.ok) return `publish failed: ${publish.detail}`;
     console.info(`[roundtrip]      ${seed.objectId}: ${publish.detail}`);
     return true;
   });
   step(
-    `drill ${seed.objectId}: every permitted op (${expected.join(', ')}) + validate + publish`,
+    `drill ${seed.objectId}: every permitted op (${expected.join(', ')}) + validate${verifyOnly ? ' (verify-only, no publish)' : ' + publish'}`,
     result === true,
     result === true ? '' : result
   );
@@ -501,9 +487,17 @@ if (writeExports) {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 if (release) {
+  // Track whether the build hook has actually been fired. The initial call
+  // fires it (force_build defaults true) — but if THAT call throws before the
+  // server reaches the hook, no build was triggered and pure force_build:false
+  // polls would wait forever. So a throw leaves hookFired=false and the first
+  // poll re-fires the hook; every successful call sets hookFired=true so we
+  // never fire a redundant second build.
+  let hookFired = false;
   let releaseResult;
   try {
     releaseResult = structured(await callTool('release_to_production', { timeout_seconds: 15 }));
+    hookFired = true;
   } catch (error) {
     console.warn(`[roundtrip] warn: release trigger call failed transiently (${error.message}); confirming by poll.`);
     releaseResult = {};
@@ -518,11 +512,12 @@ if (release) {
     try {
       const poll = structured(
         await callTool('release_to_production', {
-          force_build: false,
+          force_build: !hookFired, // fire once if the initial call never confirmed a build
           timeout_seconds: 15,
           ...(targetCommit ? { commit: targetCommit } : {}),
         })
       );
+      hookFired = true;
       releaseResult = poll;
       released = poll.released === true;
       console.info(`[roundtrip]      release poll: ${poll.status ?? JSON.stringify(poll).slice(0, 120)}`);
@@ -547,7 +542,9 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.info(
-  production
-    ? '\n[roundtrip] SUCCESS — the home-page object family is store-backed, round-trips every permitted op, and published.'
-    : '\n[roundtrip] SUCCESS (local rehearsal) — the full lifecycle ran against the file-backed store; publish blocked only at the expected credential boundary. Run with --production from a credentialed machine to convert for real.'
+  verifyOnly
+    ? '\n[roundtrip] SUCCESS (verify-only) — every object round-trips every permitted op and validates clean; nothing was published or released.'
+    : production
+      ? '\n[roundtrip] SUCCESS — the object family is store-backed, round-trips every permitted op, and published.'
+      : '\n[roundtrip] SUCCESS (local rehearsal) — the full lifecycle ran against the file-backed store; publish blocked only at the expected credential boundary. Run with --production from a credentialed machine to convert for real.'
 );
