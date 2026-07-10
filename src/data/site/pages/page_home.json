@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T11:22:04.640Z",
+    "at": "2026-07-10T11:47:36.207Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 42
+    "record_version": 53
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
