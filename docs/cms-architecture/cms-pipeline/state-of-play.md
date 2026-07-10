@@ -7,6 +7,29 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 D (HOME-PAGE FAMILY CONVERTED — all five criteria)
+
+Wolf's second credentialed run (after PR #386's driver fixes) came back
+**all-green**: every `ensure` reported "already matches the seed" (store ===
+seed byte-exact; page_home v44), all four objects re-published, contract and
+inventory checks passed, and `release_to_production` confirmed
+**`released: true`**. That completes criterion 3's release→re-render leg — so
+**`page_home`, `sec_home_audience_grid`, `sec_home_start_grid`, and
+`sec_newsletter_signup` are CONVERTED, all five criteria, no asterisks.**
+Seven objects total now (3 nav + the home family); the reality lines in
+CLAUDE.md / AGENTS.md / conversion-playbook.md / object-inventory.md /
+core-structure.md were all flipped in this change. The 2026-07-10 goal —
+"agents can change everything on the home page through the MCP, up to
+publishing live" — is met: hero and bio edit via `page_home`'s section ops,
+each grid and the newsletter via their own section objects, chrome via nav.
+
+Still-open, known follow-ups (unchanged): the `content_item` resolver gap
+(manual grid curation, playbook trap 4); archive/unpublish verbs; the other
+11 rendered-stub pages; `site`/`taxonomy` objects; `checklist` type now unused
+on the home page (kept registered — retirement optional). Also noted for
+later: rotate `PUBLISH_SECRET` before real go-live (exposed in a chat
+transcript during testing; Wolf accepted the risk for now — nothing is live).
+
 ## Session 2026-07-10 C (FIRST CREDENTIALED PRODUCTION RUN + driver hardening)
 
 PR #385 merged; **Wolf ran `home-conversion-roundtrip.mjs --production --release`

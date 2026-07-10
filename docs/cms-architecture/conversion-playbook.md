@@ -38,11 +38,14 @@ credit:
 > passes all five. Rendering-only work must be labelled "rendered, not converted"
 > — never "done."
 
-**Current reality check (be honest about it):** by this definition, as of
-2026-07-10 only `nav_header`, `nav_footer`, and `nav_footer_home` are actually
-converted. The 12 page exports render but are not store-backed round-trippable —
-they are **rendered stubs**, not converted objects (see the analysis in
-[`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
+**Current reality check (be honest about it):** as of 2026-07-10 evening,
+seven objects are converted: the three navigation objects, plus the home-page
+family — `page_home`, `sec_home_audience_grid`, `sec_home_start_grid`,
+`sec_newsletter_signup` — proven end-to-end by credentialed
+`scripts/home-conversion-roundtrip.mjs --production --release` runs
+(store-backed, every permitted op round-tripped, published, released). The
+other 11 page exports render but are **rendered stubs**, not converted objects
+(see [`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
 
 ## The recipe (converting a page to an object)
 
