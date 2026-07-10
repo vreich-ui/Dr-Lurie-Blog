@@ -167,6 +167,16 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     kicker: z.string().optional(),
     heading: z.string().min(1),
     portraitAssetRef: z.string().optional(),
+    // A rendered portrait image by URL (the reusable "person intro" got a photo
+    // when /about was decomposed, 2026-07-10). Distinct from `portraitAssetRef`
+    // (the trusted-artifact path, validated + still unrendered): `src`/`alt` do
+    // NOT match the *AssetRef key convention, so a plain site-asset URL is
+    // legal here and skips artifact-trust validation. Optional — a bio without
+    // it renders exactly as before (the homepage bio is unaffected).
+    portrait: z
+      .object({ src: z.string().min(1), alt: z.string().min(1) })
+      .strict()
+      .optional(),
     body: richTextSchema,
     trustNotes: z.array(z.string()),
     // M-9: the audited "Educational content only. Not medical advice." line.

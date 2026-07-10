@@ -1,8 +1,8 @@
 /**
- * `bio` registry module (T3.2, D§3.5) — the "Meet Dr. Lurié" section
- * (A§2.1). `portraitAssetRef` is schema-legal but the audited markup renders
- * no portrait; the component ignores it until a design uses it. No
- * references resolved in v1 (the asset ref would resolve here when used).
+ * `bio` registry module (T3.2, D§3.5) — the reusable "person intro" (the
+ * "Meet Dr. Lurié" homepage section, A§2.1, and the /about intro). An optional
+ * `portrait` ({src, alt}) renders a photo by URL; `portraitAssetRef` remains
+ * the trusted-artifact path, still unrendered. No references resolved in v1.
  */
 import { sectionVariantDataSchema, type EmptyResolved, type SectionComponentDefinition } from './types.js';
 
@@ -15,6 +15,11 @@ export const bioDefinition: SectionComponentDefinition<'bio', EmptyResolved> = {
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },
+      portrait: {
+        label: 'Portrait',
+        help: 'Optional photo shown under the heading (image URL + alt text).',
+        widget: 'image_url',
+      },
       body: { label: 'Introduction', widget: 'richtext' },
       trustNotes: { label: 'Trust notes', help: 'Credential lines shown with an accent border.', widget: 'text_list' },
       disclaimer: { label: 'Disclaimer', help: 'Small print under the trust notes.', widget: 'text' },
