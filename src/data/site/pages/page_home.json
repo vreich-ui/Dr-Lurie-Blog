@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T11:47:36.207Z",
+    "at": "2026-07-10T12:28:57.165Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 53
+    "record_version": 60
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -14,7 +14,7 @@
       "data": {
         "actions": [
           {
-            "label": "Start Here",
+            "label": "Test: Start Here",
             "style": "primary",
             "target": {
               "href": "/start-here",
@@ -22,7 +22,7 @@
             }
           },
           {
-            "label": "Join Newsletter",
+            "label": "Test: Join Newsletter",
             "style": "secondary",
             "target": {
               "href": "/newsletter",
@@ -30,19 +30,12 @@
             }
           }
         ],
-        "body": "<p>A calmer, clearer way to begin caring for your skin — without complicated routines, product pressure, or trend-led advice.</p><p>Dr. Lurié Skin Care helps newcomers understand the basics of healthy skin, choose simple next steps, and build confidence through physician-led education.</p>",
-        "heading": "Healthy Skin for Skincare Newcomers",
-        "kicker": "Physician-led skin health education"
+        "body": "<p>Test: A calmer, clearer way to begin caring for your skin — without complicated routines, product pressure, or trend-led advice.</p><p>Test: Dr. Lurié Skin Care helps newcomers understand the basics of healthy skin, choose simple next steps, and build confidence through physician-led education.</p>",
+        "heading": "Test: Healthy Skin for Skincare Newcomers",
+        "kicker": "Test: Physician-led skin health education"
       },
       "id": "s_hero",
       "type": "hero"
-    },
-    {
-      "data": {
-        "section": "sec_home_audience_grid"
-      },
-      "id": "s_audience",
-      "type": "shared_ref"
     },
     {
       "data": {
@@ -54,14 +47,14 @@
     {
       "data": {
         "anchor": "about",
-        "body": "<p>Dr. Lurié brings a physician and scientist’s lens to skin health education, translating complex ideas into steady guidance for people who are beginning their skincare journey.</p>",
-        "disclaimer": "Educational content only. Not medical advice.",
-        "heading": "Meet Dr. Lurié",
-        "kicker": "About",
+        "body": "<p>Test: Dr. Lurié brings a physician and scientist’s lens to skin health education, translating complex ideas into steady guidance for people who are beginning their skincare journey.</p>",
+        "disclaimer": "Test: Educational content only. Test: Not medical advice.",
+        "heading": "Test: Meet Dr. Lurié",
+        "kicker": "Test: About",
         "trustNotes": [
-          "Physician-led perspective on skin health education.",
-          "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
-          "Clear explanations designed for people who are just beginning to care for their skin intentionally."
+          "Test: Physician-led perspective on skin health education.",
+          "Test: MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
+          "Test: Clear explanations designed for people who are just beginning to care for their skin intentionally."
         ]
       },
       "id": "s_bio",
@@ -73,6 +66,19 @@
       },
       "id": "s_newsletter",
       "type": "shared_ref"
+    },
+    {
+      "data": {
+        "anchor": "test-checklist",
+        "heading": "Test: Added home page checklist.",
+        "items": [
+          "Test: This checklist is a new home page section type for the publish test.",
+          "Test: It was added after removing the audience grid."
+        ],
+        "kicker": "Test: Field test"
+      },
+      "id": "s_testchecklist",
+      "type": "checklist"
     }
   ],
   "seo": {
