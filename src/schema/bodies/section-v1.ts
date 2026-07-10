@@ -13,10 +13,14 @@
  * target's type or data; the Renderer (and admin preview) dereference it to
  * the target's current variant before validation and render dispatch.
  *
- * Transitional variant (04-phased-plan P3): `content_grid` accepts
- * `source: {kind: 'static', cards: [...]}` so the P3 homepage cutover can
- * render the audited placeholder copy byte-identically. Deprecated-on-arrival;
- * retired by the post-cutover switch task.
+ * The transitional `static` variant (04-phased-plan P3) is RETIRED (2026-07-10,
+ * home-page conversion): its sanctioned replacement is the `cards` source —
+ * curated card cells (title/description/optional link) an agent composes
+ * directly, the flat-data form of the block-tree's `card` children
+ * (docs/cms-architecture/block-tree.md, bounded by the same max the registry's
+ * `childCount` declares). Unlike `manual`, `cards` claims no content_item
+ * references, so reference integrity is not implicated — the cells ARE the
+ * curated copy, not pointers at it.
  *
  * M-8 (content_grid manual-primary + query fallback) landed at T3.3: the
  * manual source carries an optional `fallback` query; resolution semantics
@@ -75,6 +79,26 @@ const sectionVariant = <TType extends string, TData extends z.ZodRawShape>(type:
     })
     .strict();
 
+// A curated grid cell — the flat-data form of the block-tree `card` leaf
+// (title/description/link). At least one of title/description must be present:
+// a title-only cell is a headline card, a description-only cell a text card
+// (the audience grid's shape). `link` makes the cell navigable; its target is
+// resolved by the renderer exactly like hero/lede actions.
+export const gridCardCellSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    link: linkActionSchema.optional(),
+  })
+  .strict()
+  .refine((cell) => cell.title !== undefined || cell.description !== undefined, {
+    message: 'A grid card needs a title or a description.',
+  });
+export type GridCardCell = z.infer<typeof gridCardCellSchema>;
+
+/** Bounded composition: mirrors contentGridDefinition.childCount.max (block-tree.md). */
+export const CONTENT_GRID_MAX_CARDS = 8;
+
 export const contentGridSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('query'), query: contentQuerySchema }).strict(),
   // M-8 (settled S-1, applied at T3.3): manual-primary with optional query
@@ -92,11 +116,12 @@ export const contentGridSourceSchema = z.discriminatedUnion('kind', [
         .optional(),
     })
     .strict(),
-  // Transitional (P3 cutover): renders placeholder copy verbatim; deprecated-on-arrival.
+  // Curated cells composed directly on the grid (replaces the retired
+  // transitional `static` variant). Bounded like the block-tree child rule.
   z
     .object({
-      kind: z.literal('static'),
-      cards: z.array(z.object({ title: z.string().min(1), description: z.string() }).strict()),
+      kind: z.literal('cards'),
+      cards: z.array(gridCardCellSchema).max(CONTENT_GRID_MAX_CARDS),
     })
     .strict(),
 ]);

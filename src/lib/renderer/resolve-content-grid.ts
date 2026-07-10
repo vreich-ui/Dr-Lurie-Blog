@@ -13,8 +13,8 @@
  *      manually, fill up to `limit`. No fallback declared → no query runs,
  *      however short the manual list (an intentionally short grid is legal).
  *
- * `static` never reaches here: the component renders it verbatim
- * (transitional, retired by T3.9).
+ * `cards` never reaches here: its curated cells live in the section data and
+ * the component renders them directly (only cell links resolve, in resolve.ts).
  */
 import type { ContentGridSource, ContentQuery } from '../../schema/bodies/section-v1.js';
 
@@ -40,7 +40,7 @@ export class ContentGridResolutionError extends Error {
 }
 
 export const resolveContentGridCards = <TCard>(
-  source: Exclude<ContentGridSource, { kind: 'static' }>,
+  source: Exclude<ContentGridSource, { kind: 'cards' }>,
   limit: number,
   resolvers: ContentGridResolvers<TCard>
 ): TCard[] => {
