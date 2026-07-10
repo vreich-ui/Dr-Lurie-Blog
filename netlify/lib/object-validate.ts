@@ -880,6 +880,7 @@ export const checkNavigationStructure = (
 
 export const checkStructuralInvariants = (
   objectType: ObjectType,
+  objectId: string,
   body: unknown,
   context: ObjectValidationContext,
   atPublish: boolean
@@ -933,6 +934,43 @@ export const checkStructuralInvariants = (
           ? 'A published page must keep at least one visible section.'
           : 'No visible sections yet — required before this page can publish.'
       )
+    );
+  }
+
+  // The homepage renderer (src/pages/index.astro) hardcodes loading object id
+  // `page_home` and unconditionally throws if navigationOverrides.footer is
+  // absent (the homepage uses the nav_footer_home variant, never the site
+  // default) — a build-time crash that takes down the ENTIRE static build, not
+  // just this page, since Astro's build is all-or-nothing. That coupling is
+  // keyed on the literal object id, NOT on pageType — index.astro never reads
+  // pageType at all — so this gate checks id first; pageType 'home' is checked
+  // too (below) as the general, declared-intent case. Schema-wise
+  // `navigationOverrides` is optional (most pages have none), so nothing before
+  // this blocked an agent from validly patching/publishing page_home with it
+  // missing — discovered for real on 2026-07-10 when four production publishes
+  // progressively stripped page_home down to a single section with no
+  // navigationOverrides (and, midway, changed its OWN pageType away from
+  // 'home' too — which did nothing to stop the crash, proving the id-based
+  // gate is the one that matters), passing validation the whole way and only
+  // surfacing as an opaque site-wide Netlify build failure. This closes that
+  // gap at the layer it belongs in — validation, not a runtime throw
+  // discovered on deploy. (Existence-if-present is already checked above via
+  // requireObject 'navigationOverrides.footer'; this only adds that presence
+  // is REQUIRED.)
+  if (objectId === 'page_home' || (isRecord(body) && body.pageType === 'home')) {
+    const hasFooterOverride =
+      isRecord(body) && isRecord(body.navigationOverrides) && typeof body.navigationOverrides.footer === 'string';
+    criteria.push(
+      hasFooterOverride
+        ? crit('structure_home_footer', 'Home footer override', 'complete', '')
+        : crit(
+            'structure_home_footer',
+            'Home footer override',
+            atPublish ? 'missing' : 'warning',
+            "The object id 'page_home' (or a page declaring pageType 'home') must set " +
+              'navigationOverrides.footer — the renderer requires it unconditionally, and its absence ' +
+              'crashes the ENTIRE site build, not just this page.'
+          )
     );
   }
 
@@ -1015,7 +1053,7 @@ export const validateObject = (
     {
       id: 'structure',
       label: 'Structural invariants',
-      criteria: checkStructuralInvariants(input.objectType, input.body, context, atPublish),
+      criteria: checkStructuralInvariants(input.objectType, input.objectId, input.body, context, atPublish),
     },
   ];
 };

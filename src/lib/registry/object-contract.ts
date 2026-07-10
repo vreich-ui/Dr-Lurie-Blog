@@ -252,6 +252,15 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           description: 'The PageType’s requiredSections must all be present to publish (warns while drafting).',
         },
         {
+          id: 'structure_home_footer',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            'The object id "page_home" (or any page with pageType "home") must set navigationOverrides.footer — the ' +
+            'renderer (src/pages/index.astro) hardcodes this and unconditionally throws without it, crashing the ' +
+            'ENTIRE site build, not just this page (warns while drafting, blocks publish).',
+        },
+        {
           id: 'references',
           severity: 'blocks_write',
           enforced_live: true,
