@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T15:31:44.314Z",
+    "at": "2026-07-10T15:45:23.406Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 68
+    "record_version": 74
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -14,25 +14,25 @@
       "data": {
         "actions": [
           {
-            "label": "Start Here",
+            "label": "Get the Free Guide",
             "style": "primary",
             "target": {
-              "href": "/start-here",
+              "href": "/guides/free-guide",
               "kind": "route"
             }
           },
           {
-            "label": "Join Newsletter",
+            "label": "Start Here",
             "style": "secondary",
             "target": {
-              "href": "/newsletter",
+              "href": "/start-here",
               "kind": "route"
             }
           }
         ],
-        "body": "<p>A calmer, clearer way to begin caring for your skin without complicated routines, product pressure, or trend-led advice.</p><p>Dr. Lurié Skin Care helps newcomers understand the basics of healthy skin, choose simple next steps, and build confidence through physician-led education.</p>",
-        "heading": "Healthy Skin for Skincare Newcomers",
-        "kicker": "Physician-led skin health education"
+        "body": "<p>Most beginners are pushed toward more products before they understand what their skin is actually asking for. That is how simple routines become expensive, confusing, and hard to trust.</p><p>Dr. Lurié Skin Care gives you a physician-led starting point: learn the basics, choose one clear next step, and build confidence before you buy more.</p>",
+        "heading": "Stop buying skincare advice. Start understanding your skin.",
+        "kicker": "For skincare beginners who are tired of guessing"
       },
       "id": "s_hero",
       "type": "hero"
@@ -54,14 +54,14 @@
     {
       "data": {
         "anchor": "about",
-        "body": "<p>Dr. Lurié brings a physician and scientist's lens to skin health education, translating complex ideas into steady guidance for people who are beginning their skincare journey.</p>",
+        "body": "<p>Dr. Lurié brings medical training, biophysics, and pharmaceutical research experience to skin health education. The goal is not to sell a complicated routine. It is to help you understand what matters first.</p>",
         "disclaimer": "Educational content only. Not medical advice.",
-        "heading": "Meet Dr. Lurié",
-        "kicker": "About",
+        "heading": "A physician-scientist perspective, without the product noise.",
+        "kicker": "Why listen",
         "trustNotes": [
-          "Physician-led perspective on skin health education.",
+          "Physician-led education for people who want clearer skin-health decisions.",
           "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
-          "Clear explanations designed for people who are just beginning to care for their skin intentionally."
+          "Beginner-friendly explanations that separate durable principles from trend-driven claims."
         ]
       },
       "id": "s_bio",
@@ -69,17 +69,55 @@
     },
     {
       "data": {
-        "anchor": "home-guide",
-        "heading": "A simple path for learning about healthy skin.",
-        "items": [
-          "Begin with calm explanations before adding products or steps.",
-          "Use physician-led context to separate skin basics from skincare noise.",
-          "Return to short, practical guides when you want one clear next move."
-        ],
-        "kicker": "What you will find here"
+        "anchor": "choose-next-step",
+        "body": "<p>Magnetic Marketing principle: meet the reader inside the problem they already feel, then give them one obvious next action.</p>",
+        "heading": "Start with the problem you recognize most.",
+        "kicker": "Choose your next step",
+        "limit": 3,
+        "source": {
+          "cards": [
+            {
+              "description": "Begin with a plain-language starting point before adding products or steps.",
+              "link": {
+                "label": "Start Here",
+                "style": "primary",
+                "target": {
+                  "href": "/start-here",
+                  "kind": "route"
+                }
+              },
+              "title": "I do not know what my skin needs."
+            },
+            {
+              "description": "Read the education library to understand the basics behind claims, routines, and results.",
+              "link": {
+                "label": "Browse the Library",
+                "style": "secondary",
+                "target": {
+                  "kind": "listing",
+                  "list": "content_index"
+                }
+              },
+              "title": "I keep buying products and still feel unsure."
+            },
+            {
+              "description": "Use the newsletter as the low-pressure follow-up path for short, clear skin-health education.",
+              "link": {
+                "label": "Join Newsletter",
+                "style": "secondary",
+                "target": {
+                  "href": "/newsletter",
+                  "kind": "route"
+                }
+              },
+              "title": "I want calm guidance I can return to."
+            }
+          ],
+          "kind": "cards"
+        }
       },
       "id": "s_homeguide",
-      "type": "checklist"
+      "type": "content_grid"
     },
     {
       "data": {
