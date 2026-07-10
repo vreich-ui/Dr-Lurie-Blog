@@ -1,31 +1,31 @@
 {
   "__generated": {
-    "at": "2026-07-10T15:09:58.457Z",
+    "at": "2026-07-10T16:24:41.666Z",
     "from": "objects/section/by-id/sec_about_cta.json",
-    "record_version": 7
+    "record_version": 11
   },
   "section": {
     "data": {
       "actions": [
         {
-          "label": "Read the Insights",
-          "style": "primary",
-          "target": {
-            "kind": "listing",
-            "list": "content_index"
-          }
-        },
-        {
           "label": "Get the Free Guide",
-          "style": "secondary",
+          "style": "primary",
           "target": {
             "href": "/guides/free-guide",
             "kind": "route"
           }
+        },
+        {
+          "label": "Read the Insights",
+          "style": "secondary",
+          "target": {
+            "kind": "listing",
+            "list": "content_index"
+          }
         }
       ],
-      "body": "<p>Explore how aging skin changes, why common approaches often fall short, and what a delivery-system approach makes possible.</p>",
-      "heading": "Start With the Science"
+      "body": "<p>If skincare has felt noisy, start with the science instead of the shelf. Read the education library or get the free guide before making your next product decision.</p>",
+      "heading": "Understand First. Choose Better."
     },
     "id": "s_cta",
     "type": "cta_banner"
