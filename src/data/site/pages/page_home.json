@@ -1,11 +1,11 @@
 {
   "__generated": {
-    "at": "2026-07-10T08:40:28.783Z",
+    "at": "2026-07-10T08:42:13.853Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 13
+    "record_version": 17
   },
   "pageType": "standard",
-  "route": "/cms-home-field-test",
+  "route": "/_cms-disabled/home-field-test",
   "sections": [
     {
       "data": {
@@ -44,5 +44,9 @@
     },
     "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
   },
-  "title": "Healthy Skin for Skincare Newcomers"
+  "template": {
+    "instantiated_at": "2026-07-10T08:42:00.000Z",
+    "ref": "tpl_fieldtest"
+  },
+  "title": "Disabled CMS Home Field Test"
 }
