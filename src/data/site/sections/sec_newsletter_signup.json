@@ -1,17 +1,17 @@
 {
   "__generated": {
-    "at": "2026-07-10T12:28:48.061Z",
+    "at": "2026-07-10T15:31:50.292Z",
     "from": "objects/section/by-id/sec_newsletter_signup.json",
-    "record_version": 19
+    "record_version": 23
   },
   "section": {
     "data": {
       "anchor": "newsletter",
-      "body": "<p>Test: Join the Dr. Lurié newsletter for concise skin health education, beginner-friendly explanations, and calm guidance you can return to when you need it.</p>",
-      "consentText": "Test: No overwhelm, no trend chasing — just clear education for healthier skin.",
+      "body": "<p>Join the Dr. Lurié newsletter for concise skin health education, beginner-friendly explanations, and calm guidance you can return to when you need it.</p>",
+      "consentText": "No overwhelm, no trend chasing, just clear education for healthier skin.",
       "formName": "newsletter",
-      "heading": "Test: Learn about healthy skin one clear step at a time.",
-      "kicker": "Test: Newsletter"
+      "heading": "Learn about healthy skin one clear step at a time.",
+      "kicker": "Newsletter"
     },
     "id": "s_signup",
     "type": "newsletter_signup"
