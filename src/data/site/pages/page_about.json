@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T14:50:02.331Z",
+    "at": "2026-07-10T15:10:14.019Z",
     "from": "objects/page/by-id/page_about.json",
-    "record_version": 11
+    "record_version": 10
   },
   "pageType": "standard",
   "route": "/about",
