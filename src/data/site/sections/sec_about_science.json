@@ -1,12 +1,12 @@
 {
   "__generated": {
-    "at": "2026-07-10T15:08:56.527Z",
+    "at": "2026-07-10T16:24:29.244Z",
     "from": "objects/section/by-id/sec_about_science.json",
-    "record_version": 6
+    "record_version": 10
   },
   "section": {
     "data": {
-      "body": "<h2>The Science Behind Real Results</h2><p>Over decades of research, Dr. Lurie developed advanced delivery systems designed to help active ingredients:</p><ul><li>Reach the right place in the body</li><li>Work over time—not just for a few minutes</li><li>Stay stable and effective</li><li>Support the body without unnecessary stress</li></ul><p>In practical terms, this means products that are designed to <strong>work with your body—not against it</strong>.</p>"
+      "body": "<h2>The Science Behind Real Results</h2><p>Most skincare marketing asks you to believe the promise on the front of the bottle. Dr. Lurie asks a different question: can the active ingredient stay stable, reach the right place, and work long enough to matter?</p><ul><li>Delivery: helping useful ingredients get where they need to go</li><li>Stability: protecting ingredients so they can remain effective</li><li>Duration: supporting results over time, not just for a few minutes</li><li>Body fit: designing around how skin and physiology actually behave</li></ul><p>That is the practical difference between chasing claims and understanding the mechanism.</p>"
     },
     "id": "s_science",
     "type": "prose"
