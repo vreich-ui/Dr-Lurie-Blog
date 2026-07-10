@@ -176,7 +176,7 @@ export const pageHomeBody = {
  * Ordered: every referenced section MUST exist before the page that
  * references it (reference-integrity validation on page_home resolves them).
  */
-export const PAGE_HOME_SEEDS = [
+const HOME_SEEDS = [
   {
     objectType: 'section',
     objectId: SECTION_NEWSLETTER_SIGNUP_ID,
@@ -197,3 +197,14 @@ export const PAGE_HOME_SEEDS = [
   },
   { objectType: 'page', objectId: PAGE_HOME_ID, body: pageHomeBody, expectedWarningIds: [] },
 ];
+
+/**
+ * The generic seed-module contract the round-trip driver consumes
+ * (scripts/home-conversion-roundtrip.mjs --seeds <module>): CONVERSION_SEEDS +
+ * SEED_SITE. New family seed modules export ONLY these two names; the
+ * PAGE_HOME_* aliases below are kept for this module's existing importers
+ * (seed-page-home.mjs, page-home-seed.test.ts).
+ */
+export const CONVERSION_SEEDS = HOME_SEEDS;
+export const SEED_SITE = PAGE_HOME_SEED_SITE;
+export const PAGE_HOME_SEEDS = HOME_SEEDS;

@@ -7,6 +7,30 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 E (conversion factory: full object map + generalized driver + tightened recipe)
+
+Wolf's directive after the home-page success: tighten the instructions so any
+coding agent can convert the rest, and produce the complete object universe for
+him to set boundaries and priority. Landed:
+
+- **`conversion-map.md` (NEW)** — the full tree of every actual and potential
+  object in the Astro project: attributes, dependencies, dependents, status
+  marks, composable ⚪ potential objects (topics hub from content_grid, landing
+  pages, shared CTAs, pricing_table/steps/feature_grid/content_split types for
+  W5), and a PROPOSED wave order (W1 lede+system pages → W1-enabler
+  content_item resolver → W2 bespoke pages → W3 taxonomy decision → W4 site →
+  W5 pricing/services/shop → W6 listings → W7 rich text). **The priority table
+  is Wolf's to edit; agents follow it.** Wired into CLAUDE.md/AGENTS.md
+  mandatory reading and playbook criterion 5.
+- **Driver generalized** — `home-conversion-roundtrip.mjs --seeds
+  scripts/lib/<family>-seed-data.mjs`; a seed module exports CONVERSION_SEEDS
+  (ordered, referenced-before-referrer) + SEED_SITE. v1 drills page/section
+  types and refuses others loudly.
+- **Playbook recipe rewritten as the factory flow** (seed module → local
+  driver run → gates → record-as-RENDERS → merge+deploy → credentialed
+  `--production --release` → flip to CONVERTED) + traps 10–12 (deep-merge
+  heal strays; release gateway timeout; schema-vintage before --production).
+
 ## Session 2026-07-10 D (HOME-PAGE FAMILY CONVERTED — all five criteria)
 
 Wolf's second credentialed run (after PR #386's driver fixes) came back

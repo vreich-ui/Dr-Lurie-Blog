@@ -30,8 +30,9 @@ credit:
    (a) described in `object_contract`, **and** (b) backed by an actual MCP server
    tool. If a permitted action has no tool or no contract entry, **building that
    is part of the conversion** — the object is not done until it exists.
-5. **Recorded.** `object-inventory.md` carries its row and `state-of-play.md`
-   carries the session entry. **No record = not converted**, full stop.
+5. **Recorded.** `object-inventory.md` carries its row, `conversion-map.md`
+   carries its status mark, and `state-of-play.md` carries the session entry.
+   **No record = not converted**, full stop.
 
 > **Governing rule (Wolf, 2026-07-10):** "convert an object" means exactly the
 > above and nothing less. A task that says "convert X" is not complete until X
@@ -47,49 +48,66 @@ family — `page_home`, `sec_home_audience_grid`, `sec_home_start_grid`,
 other 11 page exports render but are **rendered stubs**, not converted objects
 (see [`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
 
-## The recipe (converting a page to an object)
+## The recipe — the conversion factory (proven end-to-end on the home page, 2026-07-10)
 
-1. **Pre-flight.** Read `object_contract('page')` for the live schema/ops. Check
-   the surface's row in [`object-inventory.md`](object-inventory.md). Branch off
-   `main`. Reuse **registered** section types only — never mint a bespoke
-   per-page type ([`design-principles.md`](design-principles.md)).
-2. **Build the body** from the canonical examples in `core-structure.md`.
-   Convert copy to allowlist HTML (see trap 6/7 — check every component's
-   vocabulary and strip markdown artifacts like backticks).
-3. **Drive the real MCP handler locally** (sandbox driver skeleton below): the
-   full lifecycle `object_create → object_checkout → object_validate →
-object_patch → object_publish → object_checkin`, against the local
-   file-backed store.
-4. **Expect publish to block** at `export_commit_failed` /
-   `committer_code: not_configured`. That is the **success signal** in a sandbox
-   (everything through validate→materialize ran; only the production git commit
-   needs `GITHUB_CONTENT_TOKEN`/`GITHUB_REPOSITORY`). Do NOT work around it.
-5. **Materialize the export** with the real `materialize()`/`materializePage()`
-   using the record's actual `version`, and write `file.path`/`file.content`.
-   Meta is **snake_case**: `{ at: '<ISO>', record_version: <int> }` (guarded at
-   runtime since 2026-07-09 — a wrong key now throws immediately).
-6. **Route file** becomes a thin loader:
-   `<PageObjectRenderer objectId="page_x" />`. Delete the old source file.
-7. **Verify RENDER (criterion 1) — all four build gates**: `npx astro check`
-   (0 errors), `npm test` (all green), `npm run build` (succeeds), and **grep the
-   `dist/` output** for the page's real content (headings, lists, CTAs actually
-   rendered). _This proves the object renders. It does NOT prove it is converted._
-8. **Seed + publish to the STORE (criterion 2).** Run the real verbs against the
-   **production** store (needs `PUBLISH_SECRET` + `GITHUB_CONTENT_TOKEN`) so a
-   real record exists — `object_inventory` must return it afterwards. Steps 3–6
-   only exercise the _local_ store; that is a rehearsal, not this step.
-9. **Round-trip proof (criterion 3).** From an agent principal, exercise EVERY
-   permitted op via MCP (checkout → each patch op → publish → `release_to_production`)
-   and confirm the change re-renders. If any permitted action has no tool or no
-   `object_contract` entry (criterion 4), **build it — that is part of this
-   conversion**, not a follow-up.
-10. **Record it (criterion 5), same change**: update the object's row in
-    `object-inventory.md` AND add the `state-of-play.md` session entry in the
-    SAME commit/PR. (Step missed on 2026-07-09; don't repeat that.) **No record =
-    not converted.**
-11. **Commit discipline**: one object, one commit; revert timestamp-only churn
-    (re-materializing an unchanged object bumps only `__generated.at` — don't
-    commit that noise on unrelated exports).
+The conversion machinery is standing, not per-session. One conversion = **one
+seed module + one driver run per environment**. Do it in this order:
+
+1. **Pre-flight.** Read the object's node in
+   [`conversion-map.md`](conversion-map.md) (boundaries, dependencies, Wolf's
+   priority) and its row in [`object-inventory.md`](object-inventory.md). Read
+   `object_contract('<type>')` for the live schema/ops. Branch off `main`.
+   Reuse **registered** section types only — never mint a bespoke per-page
+   type ([`design-principles.md`](design-principles.md)); if the surface needs
+   a shape the palette lacks, add a **reusable** type first (one union member
+   + one registry module + one component).
+2. **Write the family's SEED MODULE** — `scripts/lib/<family>-seed-data.mjs`,
+   exporting `CONVERSION_SEEDS` (ordered: every referenced object BEFORE its
+   referrer) and `SEED_SITE`. Follow `page-home-seed-data.mjs` as the
+   template. Bodies come from the canonical examples in `core-structure.md`;
+   copy converts to allowlist HTML (traps 5–7). If the family has a typed
+   fixture (render gate), pin seed ≡ fixture with a test
+   (`page-home-seed.test.ts` is the pattern).
+3. **Local rehearsal — one command** (after `rm -rf .tmp/ci-test && npx tsc -p
+   tsconfig.test.json`):
+   `node scripts/home-conversion-roundtrip.mjs --local --write-exports --seeds scripts/lib/<family>-seed-data.mjs`
+   This runs the ENTIRE lifecycle against an isolated local store: ensure
+   (create/heal), EVERY permitted op ending byte-identical, validate, publish
+   (**expected to block at `export_commit_failed` — the sandbox success
+   signal; do NOT work around it**), contract-completeness, inventory, then
+   materializes the derived exports into `src/data/site/`. Revert
+   timestamp-only churn on exports of unchanged objects.
+4. **Route file** becomes a thin loader:
+   `<PageObjectRenderer objectId="page_x" />`. Delete the old source file
+   (verify importers first).
+5. **Verify RENDER (criterion 1) — all four build gates**: `npx astro check`
+   (0 errors), `npm test` (all green), `npm run build` (succeeds), and **grep
+   the `dist/` output** for the page's real content. Run
+   `scripts/build-diff.mjs` and REVIEW the diff — byte-identical is required
+   only for pure cutovers; an intentional flexible-shape diff must be scoped
+   to the converted surface and inspected (design-principles rule 4).
+6. **Record it (criterion 5), same change**: `object-inventory.md` row +
+   `conversion-map.md` status mark + `state-of-play.md` session entry in the
+   SAME commit/PR. Status stays **RENDERS** at this point — never claim
+   CONVERTED before step 8's run.
+7. **Merge + deploy BEFORE the production run.** Commit (one object/family per
+   commit), push, PR per the session's instructions. The deployed MCP endpoint
+   validates against the schema that is LIVE — running step 8 against
+   undeployed schema fails with unrecognized-key errors (the schema-vintage
+   gate). Wait for the Netlify deploy of `main` to finish.
+8. **Production conversion — the same command, credentialed** (criteria 2+3;
+   run from a machine holding `PUBLISH_SECRET`, never paste secrets into
+   chats/commits):
+   `node scripts/home-conversion-roundtrip.mjs --production --release --seeds scripts/lib/<family>-seed-data.mjs`
+   ensure heals/creates the store records, the drill proves every permitted op,
+   publish commits the exports (`[skip netlify]`), release fires ONE build and
+   confirms `released: true`. Idempotent — safe to re-run. If any permitted
+   action has no tool or no `object_contract` entry (criterion 4), **build it —
+   that is part of this conversion**, not a follow-up.
+9. **Flip the record**: with the all-green run output in hand, flip the
+   object's marks to 🟢 CONVERTED (`object-inventory.md`, `conversion-map.md`,
+   the reality lines in `CLAUDE.md`/`AGENTS.md`/this file) and log the run in
+   `state-of-play.md`. **No record = not converted.**
 
 ## Exact call/response field names (do not guess these)
 
@@ -115,6 +133,9 @@ object_patch → object_publish → object_checkin`, against the local
 | 7   | Inline `_italic_` (or other md syntax) rendered literally                                                 | Hand-rolled md→HTML conversion missed a rule                                                                                                               | After converting, grep the HTML for leftover markdown tokens (`_`, `**`, `[`, `` ` ``) and visually check the dist output                                                |
 | 8   | `object_publish` "fails" in the sandbox                                                                   | No production secrets — by design                                                                                                                          | `export_commit_failed` + `not_configured` = the expected boundary. Materialize + write the export yourself (recipe step 5); production publish is the handoff            |
 | 9   | ~~Homepage seed script resurrects retired content~~ CLOSED 2026-07-10                                     | `scripts/seed-page-home.mjs` used to seed the RETIRED `static` grid variant                                                                                | `static` is gone from the schema (the sanctioned `cards` source of curated cells replaced it) and the seed carries the settled bodies — re-running the seed is safe again |
+| 10  | Reconcile/heal leaves stray fields; healed body fails the byte-identical check                            | Fields ops (`set_page_meta`, `update_section_data`) DEEP-MERGE: keys the target omits survive unless explicitly set to `null` — at EVERY nesting depth    | Never hand-build heal ops — use `scripts/lib/roundtrip-reconcile.mjs` (`diffFieldsForMerge` nulls strays recursively; unit-tested against the real page_home drift)      |
+| 11  | `release_to_production` dies with a non-JSON 504 "Inactivity Timeout"                                     | The server polls deploy receipts longer than intermediary gateways keep an idle response open                                                              | Use the driver's `--release` (hook fired once with `timeout_seconds: 15`, then short read-only `force_build:false` polls). The build usually DID fire — confirm, don't re-fire |
+| 12  | `--production` run rejects seeds with unrecognized-key/unknown-kind errors                                | The DEPLOYED endpoint validates against the schema live on main — your branch's new fields/variants don't exist there yet (schema-vintage gate)            | Merge + wait for the Netlify deploy of main BEFORE the production run (recipe step 7); never trim the seed to fit the old schema                                          |
 
 ## Component rich-text vocabularies
 
@@ -128,11 +149,12 @@ Inline (inside blocks), everywhere: `strong`, `em`, `a href="https://…"`, `br`
 
 ## Sandbox driver skeleton
 
-> **A standing, runnable driver exists:** `scripts/home-conversion-roundtrip.mjs`
-> drives the full lifecycle for the home-page object family (ensure/heal →
-> every permitted op → validate → publish → contract + inventory checks) in
-> `--local` and `--production` modes. Copy its pattern for new conversions
-> instead of writing a throwaway from this skeleton.
+> **A standing, runnable driver exists — use it, don't write throwaways:**
+> `scripts/home-conversion-roundtrip.mjs --seeds scripts/lib/<family>-seed-data.mjs`
+> drives the full lifecycle for ANY page/section family (ensure/heal → every
+> permitted op → validate → publish → contract + inventory checks →
+> materialize/release) in `--local` and `--production` modes. The skeleton
+> below remains only for ad-hoc exploration of a single verb.
 
 ```js
 // compile first:  rm -rf .tmp/ci-test && npx tsc -p tsconfig.test.json

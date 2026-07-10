@@ -1,0 +1,201 @@
+# Conversion Map — every actual and potential object, as a tree
+
+> **What this is (Wolf, 2026-07-10):** the complete object universe of the
+> Dr-Lurié Astro project — every object that exists, every surface that still
+> needs to become one, and every _potential_ object that can be composed from
+> others. One node per object: its **attributes**, what it **depends on**, what
+> **depends on it**, its **status**, and a **PROPOSED conversion priority**.
+> This document exists for Wolf to set **boundaries, relationships, and
+> priority** — the priority column is a proposal; edit it, and agents follow
+> the edited order.
+>
+> Status marks match [`object-inventory.md`](object-inventory.md):
+> 🟢 CONVERTED (all five playbook criteria) · 🟣 RENDERS (export only — a
+> rendered stub) · 🔴 TODO (no object at all) · 🔵 optional · ⚪ potential
+> (does not exist; composable from other objects) · ⛔ never an object.
+>
+> Machine truth for full field schemas is `object_contract('<type>')` — the
+> attribute lists here are the human summary, not the schema.
+> **How to convert any node:** [`conversion-playbook.md`](conversion-playbook.md)
+> (the driver-centric recipe). Record results in `object-inventory.md` +
+> `state-of-play.md`, and keep THIS tree's status marks current in the same
+> change.
+
+## The tree
+
+```text
+site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
+│   the root everything hangs off; today it is src/config.yaml (code, not agent-editable)
+│   attributes: name · site URL/base · metadata defaults (title template, description,
+│     og/twitter cards) · i18n (language/dir) · ui.theme · analytics vendors ·
+│     blog app config (paths, permalinks, per-page counts) · googleSiteVerificationId ·
+│     default navigation refs (header → nav_header, footer → nav_footer)
+│   dependents: EVERY page (Layout/Metadata.astro), rss.xml, sitemap, robots directives
+│   conversion note: build the object AND wire the layout to read it — the wiring is the work
+│
+├── CHROME — navigation objects (type: navigation)
+│   ├── nav_header ─ 🟢 CONVERTED
+│   │     attributes: brand · groups[] > items[] (menu, depth ≤ 2) · actions[] (CTA budget 3, warn-only)
+│   │     depends on: target refs → pages (page-kind must be published) / routes / listing
+│   │     dependents: every page's header
+│   ├── nav_footer ─ 🟢 CONVERTED — default footer; dependents: every page without an override
+│   ├── nav_footer_home ─ 🟢 CONVERTED — dependents: page_home via navigationOverrides.footer
+│   └── ⚪ announcement ─ potential ─ priority W-later
+│         Announcement.astro widget exists in the codebase but is not rendered anywhere today.
+│         If revived: a small site-level object (message, link, on/off) — never hardcode it.
+│
+├── PAGES — type: page (route + seo + navigationOverrides + ordered sections[])
+│   page attributes (all pages): route · pageType · title · seo{title, description, ogImage,
+│     robots} · navigationOverrides{header?, footer?} · template(provenance) · sections[]
+│   page depends on: every shared_ref target section · navigationOverrides nav objects ·
+│     (via content_grid/content_embed sections) the content_item pipeline
+│   │
+│   ├── page_home ─ / ─ 🟢 CONVERTED (2026-07-10, all five criteria)
+│   │   ├── s_hero ─ hero (inline) ─ kicker · heading · body(rich) · actions[LinkAction]
+│   │   ├── s_audience ─ shared_ref → sec_home_audience_grid 🟢
+│   │   ├── s_startgrid ─ shared_ref → sec_home_start_grid 🟢
+│   │   ├── s_bio ─ bio (inline) ─ kicker · heading · body · trustNotes[] · disclaimer ·
+│   │   │     portraitAssetRef (unused → MEDIA) · anchor
+│   │   └── s_newsletter ─ shared_ref → sec_newsletter_signup 🟢
+│   │
+│   ├── LEDE FAMILY ─ 5 interior pages ─ 🟣 RENDERS ─ priority W1 (easiest: code + exports
+│   │   │   done; only store records + round-trip missing — one seed module + one driver run)
+│   │   ├── page_start_here ─ /start-here ─ [lede]
+│   │   ├── page_member_updates ─ /member-updates ─ [lede]
+│   │   ├── page_newsletter ─ /newsletter ─ [lede]   (candidate: + shared_ref → sec_newsletter_signup)
+│   │   ├── page_free_guide ─ /guides/free-guide ─ [lede]
+│   │   └── page_early_access ─ /solutions/early-access ─ [lede]
+│   │         lede attributes: kicker · heading · body(rich) · actions[] · anchor
+│   │
+│   ├── SYSTEM PAGES ─ 🟣 RENDERS ─ priority W1 (same shape of work as the lede family)
+│   │   ├── page_privacy ─ /privacy ─ [prose]   prose: body (p/h2/h3/ul/ol allowlist)
+│   │   ├── page_terms ─ /terms ─ [prose]
+│   │   └── page_404 ─ /404 ─ [cta_banner]   cta_banner: heading · body · actions[]
+│   │
+│   ├── BESPOKE-SECTION PAGES ─ 🟣 RENDERS ─ priority W2 (convertible as-is; their section
+│   │   │   types are the design-principles anti-pattern — do NOT mint more; generalizing
+│   │   │   them into reusable types is OPTIONAL cleanup, not a blocker)
+│   │   ├── page_about ─ /about ─ [about]
+│   │   │     about: heading · portrait{src,alt} · sectionHeadings[6] · ctaHeading · actions[]
+│   │   ├── page_contact ─ /contact ─ [contact] ─ depends on: Netlify form (contact)
+│   │   │     contact: hero{tagline,title} · form{id, formName, title, subtitle, inputs[],
+│   │   │       textarea, disclaimer, description} · features{title, items[]}
+│   │   └── page_thank_you ─ /thank-you ─ [thank_you] ─ depended on by: form redirects
+│   │         thank_you: eyebrow · heading · message · formMessages[{form,heading,message}] · actions[]
+│   │
+│   ├── HAND-CODED PAGES ─ 🔴 TODO ─ priority W5 (need NEW REUSABLE section types first —
+│   │   │   see PALETTE ⚪ nodes; per design-principles, no new per-page types)
+│   │   ├── page_pricing ─ /pricing ─ composes widgets: HeroText · Pricing · FAQs · Steps ·
+│   │   │     Features3 · CallToAction → target objects: hero + ⚪pricing_table + faq +
+│   │   │     ⚪steps + ⚪feature_grid + cta_banner
+│   │   ├── page_services ─ /services ─ widgets: Hero · Content · Features2 · Testimonials ·
+│   │   │     CallToAction → target objects: hero + ⚪content_split + ⚪feature_grid +
+│   │   │     testimonial + cta_banner
+│   │   └── page_shop_preview ─ /solutions/shop-preview ─ bespoke markup + scoped <style> →
+│   │         target: product_preview (type exists; ProductCard[]) + prose/cta; needs the
+│   │         functional-equivalence gate (known-inert-diffs.md) for the scoped style
+│   │
+│   ├── LISTING SURFACES ─ 🔴 TODO ─ priority W6 (pageType 'listing'/'content_detail' are
+│   │   │   typed but deliberately unimplemented until the listing loaders are formalized;
+│   │   │   this is the chunk that connects pages to the article pipeline)
+│   │   ├── blog index ─ /[...blog]/ (+ /[...page] pagination) ─ depends on: content_item
+│   │   │     store · taxonomy · site blog config
+│   │   ├── category listing ─ /[...blog]/[category]/ ─ depends on: taxonomy(category)
+│   │   ├── tag listing ─ /[...blog]/[tag]/ ─ depends on: taxonomy(tag)
+│   │   ├── article detail ─ pageType 'content_detail' ─ the SinglePost surface (related
+│   │   │     posts, social share, pagination furniture)
+│   │   └── topics hub ─ /learn/topics + /learn/topics/[topicSlug] ─ TODAY: computed in code
+│   │         from category frontmatter. ⚪ composable TODAY as a page of content_grid
+│   │         (query by category) sections — a cheap early win IF Wolf wants it before W6
+│   │
+│   ├── DEMO PAGES ─ ⛔ not conversion targets — deletion candidates
+│   │     /homes/mobile-app · /homes/personal · /homes/startup (Astrowind starter demos)
+│   └── ADMIN SURFACES ─ ⛔ never objects ─ /admin/** (tooling that EDITS objects)
+│
+├── SHARED SECTIONS — type: section (standalone single-instance wrapper; reused via shared_ref)
+│   ├── sec_newsletter_signup ─ 🟢 CONVERTED ─ newsletter_signup: kicker · heading · body ·
+│   │     formName('newsletter' → Netlify form) · consentText · anchor
+│   │     dependents: page_home (candidate: page_newsletter, any future landing page)
+│   ├── sec_home_audience_grid ─ 🟢 CONVERTED ─ content_grid · cards source (curated text cells)
+│   ├── sec_home_start_grid ─ 🟢 CONVERTED ─ content_grid · query source ─ depends on:
+│   │     content_item pipeline (published posts feed the cards)
+│   └── ⚪ future shared sections ─ any section worth "edit once, changes everywhere"
+│         (e.g. a sec_cta_free_guide reused across interior pages)
+│
+├── SECTION-TYPE PALETTE — code registry (one schema + component + editor hints per type);
+│   │   NOT store objects themselves — the vocabulary pages/sections are composed FROM.
+│   │   Adding a ⚪ type is code work (one union member + one registry module + one component).
+│   ├── reusable, exist: hero · lede · prose · checklist(now unused on home; keep or retire) ·
+│   │     content_grid(query|manual|cards) · card(leaf; block-tree children later) · bio ·
+│   │     newsletter_signup · testimonial · cta_banner · faq · link_list · product_preview ·
+│   │     contact_form · search · content_embed
+│   ├── bespoke, exist (anti-pattern — do not mint more): about · contact · thank_you
+│   ├── wrapper: shared_ref (pointer, never rendered itself)
+│   └── ⚪ needed by W5 (design them REUSABLE, agent-configurable):
+│         pricing_table (tiers[] as card-like cells) · steps (ordered step cells) ·
+│         feature_grid (icon+title+text cells; covers Features2/Features3) ·
+│         content_split (Content widget: text + image/aside) ·
+│         (maybe) brand_row / stats if those widgets ever go live
+│
+├── TAXONOMY ─ singleton (tax_drlurie) ─ 🔴 TODO ─ priority W3 ─ ⚠ DECISION FIRST
+│     kinds: category (a.k.a. topic) · tag; term: term_id · slug · label · description? ·
+│       status(active|deprecated) · merged_into?
+│     TODAY the source of truth is article frontmatter (deliberate, §5.5 of 02-arch doc).
+│     Converting means choosing: one-way sync (frontmatter → object, object read-only) OR
+│     full ownership cutover. Do not build until Wolf picks the direction.
+│     dependents: content_grid queries · listing pages · learn/topics · rss categories
+│
+├── CONTENT_ITEM (articles) ─ separate pipeline ─ 🔵 deliberately OUTSIDE the object model (MVP boundary)
+│     attributes (frontmatter today): title · slug · excerpt · publishDate/published_time ·
+│       category? · tags[] · metadata{description} · image? · body (markdown today →
+│       Contentful Rich Text later, core-structure task 8)
+│     dependents: content_grid (query/manual) · content_embed · listings · rss.xml ·
+│       search.json · related posts
+│     ⚠ enabler gap: the content_item RESOLVER (playbook trap 4) — until built, grids
+│       cannot use manual article curation. Small, high-leverage, priority W1-enabler.
+│
+├── TEMPLATES ─ type: template ─ 🔵 optional, not MVP ─ page blueprints (slots + allowed
+│     types + defaults); provenance only — pages never live-inherit
+│
+├── MEDIA / ARTIFACTS ─ artifact store (images, PDFs) ─ 🔵 pipeline exists (upload/trust);
+│     refs consumed by: bio.portraitAssetRef · about.portrait · product cards · article images
+│     gap: trusted-artifact resolver on the RENDER path (embedded-asset-block later)
+│
+├── FORMS (Netlify forms: 'newsletter', contact) ─ ⚪ potential form object (formName +
+│     field definitions); today form shape lives inside newsletter_signup / contact / 
+│     contact_form section data — sufficient for MVP; a standalone form object only if
+│     forms multiply
+│
+└── DERIVED ENDPOINTS ─ ⛔ never objects — re-generated from the above at build:
+      rss.xml · search.json · sitemap-index.xml · robots.txt
+```
+
+## Potential objects composable from existing objects (no new code, or nearly none)
+
+| ⚪ Potential object                  | Composed of                                                                    | Unlocked by       |
+| ------------------------------------ | ------------------------------------------------------------------------------ | ----------------- |
+| Topics hub as a page object          | page + one `content_grid` (query source, per category)                          | W3 taxonomy (or now, with hardcoded category slugs) |
+| Any campaign/landing page            | page + hero + content_grid + cta_banner + shared newsletter section             | nothing — possible TODAY |
+| Newsletter page with live signup     | page_newsletter + `shared_ref → sec_newsletter_signup`                          | W1                |
+| Curated "start here" grid            | sec_home_start_grid switched `query → manual + fallback`                        | content_item resolver |
+| Related-content strip on any page    | `content_grid` (query by tag/category) placed via `upsert_section`              | W3 taxonomy for term filters |
+| Shared CTA reused across pages       | new section object (cta_banner) + `shared_ref` from N pages                     | nothing — TODAY   |
+| Article with embedded objects        | content_item body as Rich Text with `embedded-entry-block → section objects`    | W7 (rich text)    |
+
+## PROPOSED conversion order (Wolf: edit this table — it is the queue)
+
+| Wave | What                                                                       | Why this order                                                                       | Size |
+| ---- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
+| W1   | Lede family (5 pages) + system pages (3 pages)                              | Everything but the store record already exists; pure driver work, proves the factory | S    |
+| W1-enabler | `content_item` resolver (validation + render already handle manual)   | Unblocks manual curation everywhere; small and high-leverage                          | S    |
+| W2   | about / contact / thank-you pages                                           | Rendered stubs today; convertible as-is (keep bespoke types; generalize later/never)  | S    |
+| W3   | Taxonomy singleton — **after Wolf's source-of-truth decision**              | Unlocks term-filtered grids, listings, topics hub                                     | M    |
+| W4   | Site singleton + layout wiring                                              | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
+| W5   | pricing / services / shop-preview + the ⚪ reusable types they need         | New reusable section types (pricing_table, steps, feature_grid, content_split)        | M-L  |
+| W6   | Listing surfaces (blog index, category/tag, content_detail, topics hub)     | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                  | L    |
+| W7   | Articles onto Contentful Rich Text (+ embeds, assets)                       | Post-MVP by standing decision                                                         | L    |
+| any  | Housekeeping: delete /homes/* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted | Independent, non-blocking                     | S    |
+
+**Keep this file current:** whenever an object converts, flip its mark here AND
+in `object-inventory.md` in the same change (same rule, two views: the
+inventory is flat per-object bookkeeping; this map is the relationship truth).
