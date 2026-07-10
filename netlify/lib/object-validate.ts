@@ -504,6 +504,44 @@ const effectiveSectionType = (section: SectionInstance, context: ObjectValidatio
   return section.type;
 };
 
+// ─── check 6 (grid): content_grid cards vs. limit (warn-only) ────────────────
+//
+// A `cards`-source content_grid with more cells than `limit` silently truncates
+// at render (ContentGrid.astro slices curated cells to `limit`), so an agent who
+// adds or edits a cell beyond `limit` sees no change and gets no error. This
+// surfaces the overflow as a WARNING — never a blocker, because a deliberately
+// short render is a legal choice, but a surprising one worth flagging. Applies
+// to grids anywhere in the body (page sections OR a shared `section` wrapper),
+// so it runs for both page and section objects.
+export const checkContentGridCardLimits = (body: unknown): ReadinessCriterion[] => {
+  const overflow: string[] = [];
+  let sawGrid = false;
+  walkObjects(body, (node) => {
+    if (node.type !== 'content_grid' || !isRecord(node.data)) return;
+    sawGrid = true;
+    const data = node.data;
+    const source = data.source;
+    const limit = typeof data.limit === 'number' ? data.limit : undefined;
+    if (
+      isRecord(source) &&
+      source.kind === 'cards' &&
+      Array.isArray(source.cards) &&
+      limit !== undefined &&
+      source.cards.length > limit
+    ) {
+      const id = typeof node.id === 'string' ? node.id : '(grid)';
+      const hidden = source.cards.length - limit;
+      overflow.push(`${id}: ${source.cards.length} cards but limit ${limit} — ${hidden} will not render.`);
+    }
+  });
+  if (!sawGrid) return [];
+  return [
+    overflow.length === 0
+      ? crit('content_grid_card_limit', 'Content grid card count', 'complete', '')
+      : crit('content_grid_card_limit', 'Content grid card count', 'warning', overflow.slice(0, 5).join(' ')),
+  ];
+};
+
 // ─── check 6a: taxonomy registry integrity (body-only + optional usage) ──────
 
 // The slug shape shared with the article pipeline (A§1.6) and D§3.7.
@@ -892,11 +930,18 @@ export const checkStructuralInvariants = (
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
   if (objectType === 'template') return checkTemplate(body, context);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
+
+  // content_grid card/limit sanity applies to any body that can carry a grid —
+  // a page's inline sections OR a shared `section` wrapper. Emits nothing when
+  // no grid is present (so non-grid sections keep the generic result below).
+  const gridCriteria = checkContentGridCardLimits(body);
   if (objectType !== 'page') {
-    return [crit('structure', 'Structural invariants', 'optional', 'No structural invariants for this type.')];
+    return gridCriteria.length > 0
+      ? gridCriteria
+      : [crit('structure', 'Structural invariants', 'optional', 'No structural invariants for this type.')];
   }
 
-  const criteria: ReadinessCriterion[] = [];
+  const criteria: ReadinessCriterion[] = [...gridCriteria];
   const sections = collectSections(body);
   const visibleCount = sections.filter((section) => section.visibility !== 'hidden').length;
 
