@@ -60,7 +60,10 @@ reconfigure this to do something else" is.**
 - **Homepage grid** — retire the transitional `static` placeholder to the flexible
   **manual + query-fallback** config (M-8). Its five "Five simple places to begin"
   cards reference articles that don't exist and are invalid as manual items anyway;
-  uncurated ⇒ latest-posts fallback.
+  uncurated ⇒ latest-posts fallback. _(Done: PR #380 switched the start grid to a
+  `query` source; 2026-07-10 removed `static` from the schema entirely — the
+  sanctioned `cards` source of curated copy cells replaced it, and BOTH homepage
+  grids are now shared `content_grid` objects — one type, two roles by config.)_
 - **Bespoke section types (`about`, `contact`, `thank_you`)** — these are the
   Rule 1 anti-pattern: each renders exactly one page. They were an expedient
   migration. **Do not mint more of them.** Prefer generalizing into reusable

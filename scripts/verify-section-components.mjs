@@ -2,8 +2,8 @@
 /**
  * T3.2 render verification — the "markup structurally identical" gate.
  *
- * Renders the five extracted section components (Hero, Checklist,
- * ContentGrid, Bio, NewsletterSignup) from the C§1.1 fixture data through a
+ * Renders the five homepage sections (Hero, the two ContentGrid instances,
+ * Bio, NewsletterSignup) from the fixture data through a
  * REAL `astro build` (a temporary fixture route, removed afterwards), then
  * compares each rendered <section> fragment against the corresponding
  * fragment of the LIVE homepage from the SAME build, normalized by the same
@@ -34,29 +34,43 @@ const FIXTURE_SOURCE = `---
  * scripts/verify-section-components.mjs. Never commit this file. */
 import Layout from '~/layouts/PageLayout.astro';
 import Bio from '~/components/sections/Bio.astro';
-import Checklist from '~/components/sections/Checklist.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
 import Hero from '~/components/sections/Hero.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
 import {
+  homeAudienceGridData,
   homeBioData,
-  homeChecklistData,
-  homeContentGridData,
   homeHeroData,
   homeNewsletterSignupData,
+  homeStartGridData,
 } from '~/lib/registry/components/home-fixture-data';
+import { fetchPosts } from '~/utils/blog';
 import { getPermalink } from '~/utils/permalinks';
 
 const metadata = { title: 'T3.2 fixture' };
 const heroResolved = {
   actionHrefs: homeHeroData.actions.map((action) => getPermalink(action.target.href)),
 };
+// The audience grid's curated cells carry no links today; hrefs align by index.
+const audienceResolved = {
+  cardHrefs: homeAudienceGridData.source.cards.map((cell) =>
+    cell.link ? getPermalink(cell.link.target.href) : undefined
+  ),
+};
+// The start grid's query source resolves exactly as PageObjectRenderer does:
+// published posts, newest first, capped at limit.
+const posts = await fetchPosts();
+const startGridResolved = {
+  cards: posts
+    .slice(0, homeStartGridData.limit)
+    .map((post) => ({ id: post.id, title: post.title, description: post.excerpt })),
+};
 ---
 
 <Layout metadata={metadata}>
   <Hero data={homeHeroData} resolved={heroResolved} ctx={{}} />
-  <Checklist data={homeChecklistData} resolved={{}} ctx={{}} />
-  <ContentGrid data={homeContentGridData} resolved={{}} ctx={{}} />
+  <ContentGrid data={homeAudienceGridData} resolved={audienceResolved} ctx={{}} />
+  <ContentGrid data={homeStartGridData} resolved={startGridResolved} ctx={{}} />
   <Bio data={homeBioData} resolved={{}} ctx={{}} />
   <NewsletterSignup data={homeNewsletterSignupData} resolved={{}} ctx={{}} />
 </Layout>
@@ -64,8 +78,8 @@ const heroResolved = {
 
 const SECTION_LABELS = [
   'hero',
-  'checklist (audience)',
-  'content_grid (start-here)',
+  'content_grid (audience, cards source)',
+  'content_grid (start-here, query source)',
   'bio (about)',
   'newsletter_signup',
 ];

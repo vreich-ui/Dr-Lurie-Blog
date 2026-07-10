@@ -7,6 +7,53 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 B (home-page conversion push: restructure + standing round-trip driver)
+
+Wolf's goal: the home page at 100% conversion — hero, the two grids, about/bio,
+newsletter — everything agent-editable via MCP through to live publish. His
+structural call, implemented: **hero and bio stay inline on `page_home`; the two
+grids become standalone objects of the ONE reusable `content_grid` type**
+(`sec_home_audience_grid` — new sanctioned `cards` source of curated text cells;
+`sec_home_start_grid` — the settled M-8 `query` source), referenced via
+`shared_ref` like the newsletter. One grid type, two roles by configuration
+alone — the design-principles litmus passes.
+
+**Landed on `claude/home-page-conversion-state-6wsc2r`:**
+
+- **Schema:** `content_grid` gains the `cards` source (cells: optional
+  title/description + optional `link` LinkAction, ≥1 of title/description,
+  max 8 = the block-tree bound); the transitional `static` variant is **removed**
+  (playbook trap 9 closed; seed script now safe to re-run). Renderer resolves
+  cell links like hero actions (`ContentGridResolved.cardHrefs`).
+- **Restructure:** `page_home` = hero (inline), 2 grid `shared_ref`s, bio
+  (inline), newsletter `shared_ref`. `index.astro` collapsed to
+  `<PageObjectRenderer objectId="page_home" />` (removes the loader duplication
+  AND the 2026-07-10 footer-crash mode — the renderer falls back to `nav_footer`;
+  the `structure_home_footer` rule still guards the store record).
+- **Standing round-trip driver** (`scripts/home-conversion-roundtrip.mjs`) —
+  closes root-cause 4 (throwaway drivers): ensure/heal each record (the broken
+  production `page_home` reconciles via real patch ops), drill EVERY permitted
+  op per type ending byte-identical, validate (zero blockers), publish, then
+  contract-completeness (advertised ops ≡ exercised ops — criterion 4 ✓ for
+  page/section) and inventory checks. `--local` rehearsal **PASSED end-to-end**
+  (publish blocked exactly at `export_commit_failed` — the expected boundary);
+  `--production [--release]` is the credentialed conversion run.
+- **Gates:** astro check 0 errors; 882 + 24 tests green; build green; dist grep
+  shows all five sections' real copy; render gate 5/5 IDENTICAL (fixture updated
+  to the two-grid structure); build-diff reviewed: **scoped to `/` section 2
+  only** (audience cards adopt the grid card frame — intentional, per
+  design-principles rule 4), 202/203 pages byte-identical.
+
+**Honest status: page_home + the three shared sections are RENDERS + fully
+rehearsed, NOT yet converted.** Criteria 2/3 (production store record + proven
+production round-trip) still need what no agent session has: `PUBLISH_SECRET`
+(+ egress to `drluriescience.netlify.app` — this session verified the network
+policy blocks it). **The remaining work is one command from a credentialed
+machine:** `node scripts/home-conversion-roundtrip.mjs --production --release`
+(then re-check `object_inventory` and the live site; expect the four exports'
+`__generated` markers to reconcile). Alternatively: add `PUBLISH_SECRET` (and
+the domain) to this Claude environment's config and re-run from a session.
+
 ## Session 2026-07-10 (definition-of-done RESET; homepage-footer regression fix)
 
 Two things. **(1) Incident + fix (PR #383, merged):** four real production

@@ -11,8 +11,8 @@ import {
 } from '../../src/lib/renderer/resolve.js';
 import type { NavTarget } from '../../src/schema/bodies/navigation-v1.js';
 
-// A minimal page export mirroring the T3.5 page_home shape: hero (route-kind
-// actions), a static content_grid, and a shared_ref to a newsletter section.
+// A minimal page export mirroring the page_home shape: hero (route-kind
+// actions) and a shared_ref to a newsletter section.
 const pageExport = () => ({
   __generated: { from: 'objects/page/by-id/page_home.json', at: '2026-07-08T00:00:00.000Z', record_version: 1 },
   route: '/',
@@ -135,11 +135,19 @@ const gridDeps = (): ResolvePageDeps => ({
   },
 });
 
-test('content_grid static source needs no resolvers and resolves to {}', () => {
-  const page = parsePageExport(gridPageExport({ kind: 'static', cards: [{ title: 'A', description: 'a' }] }));
-  // No `contentGrid` deps supplied at all — static must not require them.
+test('content_grid cards source needs no post resolvers; cell links resolve to hrefs aligned by index', () => {
+  const page = parsePageExport(
+    gridPageExport({
+      kind: 'cards',
+      cards: [
+        { description: 'An unlinked text cell.' },
+        { title: 'A linked cell', link: { label: 'Start Here', target: { kind: 'route', href: '/start-here' } } },
+      ],
+    })
+  );
+  // No `contentGrid` deps supplied at all — a cards source must not require them.
   const sections = resolvePageSections(page, deps());
-  assert.deepEqual(sections[0].resolved, {});
+  assert.deepEqual(sections[0].resolved, { cardHrefs: [undefined, 'resolved:/start-here'] });
 });
 
 test('content_grid manual source resolves each item through resolveManualItem, in order', () => {
@@ -173,7 +181,7 @@ test('content_grid manual + fallback backfills from the query, de-duplicated', (
   );
 });
 
-test('a non-static content_grid without contentGrid resolvers throws loudly, not silently', () => {
+test('a post-backed content_grid without contentGrid resolvers throws loudly, not silently', () => {
   const page = parsePageExport(gridPageExport({ kind: 'manual', items: ['p1'] }));
   assert.throws(() => resolvePageSections(page, deps()), /requires contentGrid resolvers/);
 });

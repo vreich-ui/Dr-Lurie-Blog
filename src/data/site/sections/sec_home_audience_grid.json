@@ -1,0 +1,34 @@
+{
+  "__generated": {
+    "at": "2026-07-10T10:47:49.202Z",
+    "from": "objects/section/by-id/sec_home_audience_grid.json",
+    "record_version": 8
+  },
+  "section": {
+    "data": {
+      "anchor": "audience",
+      "heading": "You want skincare to feel understandable.",
+      "kicker": "This is for you if…",
+      "limit": 4,
+      "source": {
+        "cards": [
+          {
+            "description": "You are new to skincare and want a calm place to begin."
+          },
+          {
+            "description": "You want to understand what your skin needs before buying more products."
+          },
+          {
+            "description": "You prefer physician-led education over trend-driven routines."
+          },
+          {
+            "description": "You want simple explanations that respect both science and everyday life."
+          }
+        ],
+        "kind": "cards"
+      }
+    },
+    "id": "s_audiencegrid",
+    "type": "content_grid"
+  }
+}

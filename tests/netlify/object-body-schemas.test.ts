@@ -360,22 +360,48 @@ test('sections: unknown types, bad ids, and shadow-copy shared_refs are rejected
   );
 });
 
-test('content_grid: query, manual (with M-8 fallback), and transitional static sources parse', () => {
+test('content_grid: query, manual (with M-8 fallback), and curated cards sources parse', () => {
   assert.equal(contentGridSourceSchema.safeParse({ kind: 'query', query: {} }).success, true);
   assert.equal(
     contentGridSourceSchema.safeParse({ kind: 'manual', items: ['req_smoke_pdf_cta_20260630_01'] }).success,
     true
   );
-  // Transitional P3 variant: renders the audited placeholder copy verbatim.
+  // Curated cells (2026-07-10): title and/or description, optional link.
   assert.equal(
     contentGridSourceSchema.safeParse({
-      kind: 'static',
+      kind: 'cards',
       cards: [
         { title: 'Understanding Skin Changes After 60', description: 'What shifts in the skin barrier and why.' },
-        { title: 'Body Odor Changes', description: 'The science of nonenal.' },
+        { description: 'A description-only text cell (the audience-grid shape).' },
+        {
+          title: 'A linked cell',
+          link: { label: 'Start Here', target: { kind: 'route', href: '/start-here' }, style: 'link' },
+        },
       ],
     }).success,
     true
+  );
+  assert.equal(
+    contentGridSourceSchema.safeParse({ kind: 'cards', cards: [{}] }).success,
+    false,
+    'a card cell needs a title or a description'
+  );
+  assert.equal(
+    contentGridSourceSchema.safeParse({
+      kind: 'cards',
+      cards: Array.from({ length: 9 }, (_, index) => ({ title: `Cell ${index + 1}` })),
+    }).success,
+    false,
+    'the flat cards source carries the block-tree bound (max 8 cells)'
+  );
+  // The transitional P3 `static` variant is retired (2026-07-10).
+  assert.equal(
+    contentGridSourceSchema.safeParse({
+      kind: 'static',
+      cards: [{ title: 'Placeholder', description: 'Audited copy.' }],
+    }).success,
+    false,
+    "the retired 'static' escape hatch must not parse"
   );
   // M-8 (manual-primary + query fallback), landed at T3.3: an empty manual
   // list with a fallback is the legal pure-fallback configuration.
@@ -433,7 +459,7 @@ const pageHomeFixture: PageBody = {
       type: 'content_grid',
       data: {
         heading: 'Start here',
-        source: { kind: 'static', cards: [{ title: 'Placeholder card', description: 'Audited copy.' }] },
+        source: { kind: 'cards', cards: [{ title: 'Curated card', description: 'Audited copy.' }] },
         limit: 5,
       },
     },

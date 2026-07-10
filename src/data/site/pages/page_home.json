@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-09T11:38:06.504Z",
+    "at": "2026-07-10T10:47:49.214Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 4
+    "record_version": 11
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -39,35 +39,17 @@
     },
     {
       "data": {
-        "anchor": "audience",
-        "heading": "You want skincare to feel understandable.",
-        "items": [
-          "You are new to skincare and want a calm place to begin.",
-          "You want to understand what your skin needs before buying more products.",
-          "You prefer physician-led education over trend-driven routines.",
-          "You want simple explanations that respect both science and everyday life."
-        ],
-        "kicker": "This is for you if…"
+        "section": "sec_home_audience_grid"
       },
       "id": "s_audience",
-      "type": "checklist"
+      "type": "shared_ref"
     },
     {
       "data": {
-        "anchor": "start-here",
-        "body": "<p>Read these in order or choose the question that feels most useful today.</p>",
-        "heading": "Five simple places to begin.",
-        "kicker": "Start here",
-        "limit": 5,
-        "source": {
-          "kind": "query",
-          "query": {
-            "sort": "published_time_desc"
-          }
-        }
+        "section": "sec_home_start_grid"
       },
       "id": "s_startgrid",
-      "type": "content_grid"
+      "type": "shared_ref"
     },
     {
       "data": {

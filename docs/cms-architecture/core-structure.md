@@ -204,7 +204,7 @@ credentials), the missing MCP verbs (archive/unpublish; nested-block ops), the
 | 2   | Build-time renderer for the document (use `@contentful/rich-text-html-renderer` with custom renderers for embeds/assets)                                        | M           |
 | 3   | Migrate section `body` fields: accept legacy HTML string **or** document; convert the committed exports; keep validation allowlist as the node/mark declaration | M           |
 | 4   | Resolve `embedded-entry-block` through the existing shared-section resolution; `embedded-asset-block` through artifact refs                                     | M           |
-| 5   | Align `content_grid` cells with embeds (`card` children; retire the `static` escape hatch; M-8 query fallback when empty)                                       | M           |
+| 5   | Align `content_grid` cells with embeds (`card` children; M-8 query fallback when empty). _The `static` escape hatch is retired (2026-07-10) — the flat `cards` source of curated cells is the interim form the `card`-children migration starts from_ | M           |
 | 6   | Remaining pages (`pricing`, `services`, `shop-preview`) composed from **reusable** components — no new per-page types                                           | S each      |
 | 7   | Real `site` + `taxonomy` objects (taxonomy needs a source-of-truth decision first)                                                                              | M           |
 | 8   | Articles (`content_item`) onto the same Rich Text model — **later**, its pipeline is deliberately untouched in MVP                                              | L, post-MVP |

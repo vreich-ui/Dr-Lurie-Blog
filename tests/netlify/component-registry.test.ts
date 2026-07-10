@@ -34,11 +34,11 @@ import { thankYouDefinition } from '../../src/lib/registry/components/thank-you.
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
 import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
 import {
+  homeAudienceGridData,
   homeBioData,
-  homeChecklistData,
-  homeContentGridData,
   homeHeroData,
   homeNewsletterSignupData,
+  homeStartGridData,
 } from '../../src/lib/registry/components/home-fixture-data.js';
 import { sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
 
@@ -103,11 +103,11 @@ test('fieldHints only name fields the schema actually has', () => {
   }
 });
 
-test('the C§1.1 fixture data parses through the real union (what the render gate builds from)', () => {
+test('the homepage fixture data parses through the real union (what the render gate builds from)', () => {
   const fixtures = [
     ['hero', homeHeroData],
-    ['checklist', homeChecklistData],
-    ['content_grid', homeContentGridData],
+    ['content_grid', homeAudienceGridData],
+    ['content_grid', homeStartGridData],
     ['bio', homeBioData],
     ['newsletter_signup', homeNewsletterSignupData],
   ] as const;

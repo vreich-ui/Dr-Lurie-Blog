@@ -14,10 +14,10 @@
  *   3. page metadata → the Layout's metadata prop. The `home` PageType uses its
  *      title verbatim (ignoreTitleTemplate), matching the audited homepage.
  *
- * Kept pure (no astro:content / Astro imports): the caller (index.astro)
+ * Kept pure (no astro:content / Astro imports): the caller (the page loader)
  * performs the async collection loads and injects sync resolvers, so these
- * rules stay testable without a build. `static` content_grid needs no
- * resolution — the component renders it verbatim (transitional); `manual`/
+ * rules stay testable without a build. A `cards` content_grid renders its
+ * curated cells from data (only cell links resolve, to hrefs); `manual`/
  * `query` sources resolve here (T3.9) via resolve-content-grid.ts (M-8).
  */
 import type { NavTarget } from '../../schema/bodies/navigation-v1.js';
@@ -57,9 +57,9 @@ export type ResolvePageDeps = {
   /** Dereference a shared_ref target object id to the inline section it wraps. */
   resolveSharedSection: (sectionObjectId: string) => { type: SectionType; data: unknown };
   /**
-   * Resolvers for content_grid `manual`/`query` sources (M-8, T3.9). `static`
-   * needs none — the component renders it verbatim. Required only when a page
-   * actually carries a non-static content_grid section.
+   * Resolvers for content_grid `manual`/`query` sources (M-8, T3.9). A `cards`
+   * source needs none — its curated cells live in data. Required only when a
+   * page actually carries a `manual`/`query` content_grid section.
    */
   contentGrid?: ContentGridResolvers<ContentGridCardInternal>;
   /**
@@ -126,9 +126,16 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
   }
   if (type === 'content_grid') {
     const gridData = data as ContentGridLikeData;
-    // static renders verbatim from data.source.cards — the component needs no
-    // resolved data for it (transitional, T3.2, retired on arrival by design).
-    if (gridData.source.kind === 'static') return {};
+    // A `cards` source renders its curated cells verbatim from data; only each
+    // cell's optional link target needs resolving (same policy as hero actions),
+    // aligned by cell index.
+    if (gridData.source.kind === 'cards') {
+      return {
+        cardHrefs: gridData.source.cards.map((cell) =>
+          cell.link ? deps.resolveActionHref(cell.link.target) : undefined
+        ),
+      };
+    }
     if (!deps.contentGrid) {
       throw new Error(
         `index: content_grid source kind '${gridData.source.kind}' requires contentGrid resolvers to be supplied to resolvePage.`

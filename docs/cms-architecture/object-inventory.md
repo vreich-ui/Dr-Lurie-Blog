@@ -110,7 +110,7 @@ no agent can edit them via MCP, because no editable store record backs them (exc
 
 | Object                | Route                     | Status     | Notes                                                                                                                                                                                                                                                                           |
 | --------------------- | ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `page_home`           | `/`                       | 🟣 RENDERS | Renders via `resolvePage`; owns the `nav_footer_home` override + newsletter `shared_ref`. **Its production store record IS the broken 2026-07-10 field-test stub** — the git export was restored (PR #383) but the store record still needs a credentialed re-publish to match. |
+| `page_home`           | `/`                       | 🟣 RENDERS | **Restructured 2026-07-10 (home-page conversion):** hero + bio inline; the two grids and the newsletter are `shared_ref`s to standalone section objects (see Shared sections). Renders via `PageObjectRenderer`. **Its production store record is still the broken 2026-07-10 stub** — `scripts/home-conversion-roundtrip.mjs --production` heals it (reconcile ops), publishes, and proves the round-trip; that run needs credentials no agent session has had. |
 | `page_start_here`     | `/start-here`             | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
 | `page_member_updates` | `/member-updates`         | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
 | `page_newsletter`     | `/newsletter`             | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
@@ -125,9 +125,11 @@ no agent can edit them via MCP, because no editable store record backs them (exc
 
 ### Shared sections
 
-| Object                  | Used by                        | Status     | Notes                                                            |
-| ----------------------- | ------------------------------ | ---------- | ---------------------------------------------------------------- |
-| `sec_newsletter_signup` | `page_home` (via `shared_ref`) | 🟣 RENDERS | The one genuinely-shared section; renders, but not store-backed. |
+| Object                    | Used by                        | Status     | Notes                                                                                                                                                                                                 |
+| ------------------------- | ------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sec_newsletter_signup`   | `page_home` (via `shared_ref`) | 🟣 RENDERS | Renders, not yet store-backed.                                                                                                                                                                        |
+| `sec_home_audience_grid`  | `page_home` (via `shared_ref`) | 🟣 RENDERS | **New 2026-07-10.** The "This is for you if…" grid — a `content_grid` with the sanctioned `cards` source (curated text cells; replaced the bespoke `checklist` usage). Renders, not yet store-backed. |
+| `sec_home_start_grid`     | `page_home` (via `shared_ref`) | 🟣 RENDERS | **New 2026-07-10.** The "Start here" grid — the SAME `content_grid` type, `query` source (latest posts). One reusable type, two roles by configuration alone. Renders, not yet store-backed.          |
 
 ### Navigation
 
@@ -189,9 +191,10 @@ the project exists to fix.
 
 `page_privacy`, `page_terms`, `page_404` are built (see the Pages table) via the
 process now written down in [`conversion-playbook.md`](conversion-playbook.md).
-Remaining from this batch as follow-ups: the `content_item` resolver gap
-(playbook trap 4, blocks manual grid curation) and retiring the `content_grid`
-`static` variant from the schema + `scripts/seed-page-home.mjs` (playbook trap 9).
+Remaining from this batch as a follow-up: the `content_item` resolver gap
+(playbook trap 4, blocks manual grid curation). The `content_grid` `static`
+variant was retired 2026-07-10 (schema + seed script; the sanctioned `cards`
+source replaced it — playbook trap 9 is closed).
 
 ### 5. Listing pages 🔴 (Phase 6 — larger)
 
@@ -262,8 +265,13 @@ here is the honest why:
      sections stay flat; a hard blocker the moment nesting is real.
    - **`content_item` reference resolution is stubbed** — so a `content_grid` `manual`
      source can't validate against real articles (playbook trap 4).
-4. **No standing round-trip verification.** Nothing repeatably proves an object is
-   agent-editable; the one-off driver scripts were thrown away each session.
+4. **No standing round-trip verification.** ~~Nothing repeatably proves an object is
+   agent-editable; the one-off driver scripts were thrown away each session.~~
+   **Closed for the home family 2026-07-10:** `scripts/home-conversion-roundtrip.mjs`
+   is the standing driver — ensure/heal each record, exercise EVERY permitted op,
+   validate, publish, contract- and inventory-check, in `--local` (rehearsal) and
+   `--production` (real conversion) modes. Extend the same pattern to other
+   families as they convert.
 
 **What "finishing the roadmap" therefore requires (the honest remaining work):** a
 credentialed publishing path (or a documented human-run step) to seed each object
@@ -273,5 +281,6 @@ drives create→patch→publish→render per object as the enforceable "converte
 Until those exist, a "convert this page" task cannot actually be completed — say so
 rather than shipping a rendered stub.
 
-_Last audited: 2026-07-10, `claude/*` (PR #383 homepage-footer regression fix +
-definition-of-done reset). Prior: PR #380 (privacy/terms/404 render + grid retrofit)._
+_Last audited: 2026-07-10, `claude/home-page-conversion-state-6wsc2r` (home-page
+restructure: two shared grid objects + `cards` source + standing round-trip driver).
+Prior: PR #383 (homepage-footer regression fix + definition-of-done reset)._

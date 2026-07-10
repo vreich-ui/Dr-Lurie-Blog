@@ -86,12 +86,14 @@ export type ContentEmbedResolved = { card?: ContentEmbedCard };
 export type EmptyResolved = Record<string, never>;
 
 /**
- * content_grid (M-8, T3.9): `manual`/`query` sources resolve to cards here;
- * `static` needs none (the component renders data.source.cards verbatim), so
- * `cards` is optional — absent/undefined is exactly the static case.
+ * content_grid (M-8, T3.9): `manual`/`query` sources resolve to `cards` here.
+ * A `cards` source renders its curated cells from data instead — only each
+ * cell's optional link needs resolving, to `cardHrefs` aligned by cell index
+ * (undefined where a cell carries no link). Exactly one of the two fields is
+ * populated per grid, keyed by the source kind.
  */
 export type ContentGridCard = { title: string; description?: string };
-export type ContentGridResolved = { cards?: ContentGridCard[] };
+export type ContentGridResolved = { cards?: ContentGridCard[]; cardHrefs?: Array<string | undefined> };
 
 /** Read-only site context (D§4.2). Populated from the Site export in P5; opaque until then. */
 export type RenderCtx = Record<string, unknown>;
