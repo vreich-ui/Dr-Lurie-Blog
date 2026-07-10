@@ -99,25 +99,22 @@ export const sectionDrillOps = (instance) => {
 
 /**
  * Drill a `page` object: exercise all six page ops via a probe section that is
- * a CLONE of the page's first inline (non-shared_ref) section — guaranteed to
- * be a PageType-allowed, component-bound type (it is already on the published
- * page), instead of assuming `hero` is allowed. The probe is added, poked,
- * moved, hidden, and removed, so the final body is byte-identical to the seed.
- * Throws if the page carries only shared_ref sections (no inline type to clone)
- * — an honest "extend the driver" signal rather than a wrong guess.
+ * a CLONE of one of the page's OWN sections — guaranteed to be a PageType-legal
+ * placement (it is already on the published page), instead of assuming `hero`
+ * is allowed. For a fully-decomposed page (all `shared_ref`s — the normal shape
+ * once every section is its own object) the probe is a shared_ref duplicating
+ * one of the page's references: it resolves (the target exists) and its
+ * effective type is already sanctioned. The probe is added, poked, moved,
+ * hidden, and removed, so the final body is byte-identical to the seed. Throws
+ * only if the page carries no clonable section at all.
  */
 export const pageDrillOps = (page, probeId) => {
   const sections = Array.isArray(page.sections) ? page.sections : [];
-  const inline = sections.find(
-    (section) => isRecord(section) && section.type !== 'shared_ref' && isRecord(section.data)
-  );
-  if (!inline) {
-    throw new Error(
-      'pageDrillOps: page has only shared_ref sections — no inline section to clone as a probe. ' +
-        'Extend the driver to source a PageType-allowed type from object_contract before drilling such a page.'
-    );
+  const source = sections.find((section) => isRecord(section) && isRecord(section.data));
+  if (!source) {
+    throw new Error('pageDrillOps: page has no section with data to clone as a probe.');
   }
-  const probe = { id: probeId, type: inline.type, data: clone(inline.data) };
+  const probe = { id: probeId, type: source.type, data: clone(source.data) };
   const count = sections.length;
   const title = page.title;
   const { ops: updateOps } = updateDataProbeOps(probeId, probe.data);

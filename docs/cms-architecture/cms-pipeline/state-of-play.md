@@ -7,6 +7,40 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 F (/about DECOMPOSED into 8 generic objects; bio gains a portrait; driver handles all-shared_ref pages)
+
+Wolf: "convert the about page — the objects on it should each be their own
+converted object; mostly generic text sections." Done as the first W2
+conversion, the design-principles way (retire the bespoke, don't repeat it):
+
+- **/about decomposed** from the single bespoke `about` section into EIGHT
+  standalone shared sections of REUSABLE types — `sec_about_intro` (bio),
+  `sec_about_{thinking,products,science,research,blog,note}` (prose ×6),
+  `sec_about_cta` (cta_banner); `page_about` is now a `standard` page of 8
+  `shared_ref`s. Each piece is independently editable/reorderable/reusable.
+  Seed: `scripts/lib/page-about-seed-data.mjs`.
+- **bio generalized (Wolf's call)** to keep the doctor's portrait: added an
+  optional URL `portrait {src,alt}` field + rendering (distinct from the
+  artifact-ref `portraitAssetRef`, which fails artifact-trust on a raw URL —
+  that's WHY portrait is a separate field; pinned by test). The reusable "person
+  intro" now carries a photo; the homepage bio (no portrait) is byte-identical.
+- **Driver improvement surfaced by this conversion:** a fully-decomposed page is
+  ALL `shared_ref`s — the normal shape once every section is its own object —
+  which the page-drill's "refuse to guess" guard (fix 5) correctly stopped on.
+  `pageDrillOps` now handles it by cloning ANY of the page's own sections as the
+  probe (a shared_ref duplicate resolves + is PageType-legal). Unit-tested.
+- **Gates:** astro check 0 errors; 896 netlify/src + 37 scripts tests green (16
+  new); build green; dist grep shows all 8 sections + portrait + lists + CTA;
+  build-diff scoped to `/about` ONLY (202/203 identical — the home bio is
+  unaffected). Local `--seeds page-about` round-trip all-green.
+
+**Status: RENDERS, not yet CONVERTED** — criteria 2/3 need the credentialed
+`node scripts/home-conversion-roundtrip.mjs --production --release --seeds
+scripts/lib/page-about-seed-data.mjs` run (same as the home family). **Follow-up
+flagged:** the `about` section TYPE is now orphaned (no object uses it) — retire
+it (union member + About.astro + registry + resolve.ts entry + fixtures) in a
+separate focused change.
+
 ## Session 2026-07-10 E (conversion factory: full object map + generalized driver + tightened recipe)
 
 Wolf's directive after the home-page success: tighten the instructions so any
@@ -23,7 +57,7 @@ him to set boundaries and priority. Landed:
   is Wolf's to edit; agents follow it.** Wired into CLAUDE.md/AGENTS.md
   mandatory reading and playbook criterion 5.
 - **Driver generalized** — `home-conversion-roundtrip.mjs --seeds
-  scripts/lib/<family>-seed-data.mjs`; a seed module exports CONVERSION_SEEDS
+scripts/lib/<family>-seed-data.mjs`; a seed module exports CONVERSION_SEEDS
   (ordered, referenced-before-referrer) + SEED_SITE. v1 drills page/section
   types and refuses others loudly.
 - **Playbook recipe rewritten as the factory flow** (seed module → local

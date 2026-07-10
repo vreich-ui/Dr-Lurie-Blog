@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.299Z",
+    "from": "objects/section/by-id/sec_about_research.json",
+    "record_version": 7
+  },
+  "section": {
+    "data": {
+      "body": "<h2>From Research to Real Life</h2><p>This isn’t abstract science.</p><p>Dr. Lurie’s work has been applied in areas such as:</p><ul><li>Skin health and aging</li><li>Inflammation and healing</li><li>Hygiene and long-lasting protection</li><li>Professional-grade skincare used in clinics</li></ul><p>The focus is always the same: <strong>Create solutions that people can actually use—and actually benefit from.</strong></p>"
+    },
+    "id": "s_research",
+    "type": "prose"
+  }
+}

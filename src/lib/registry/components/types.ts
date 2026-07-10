@@ -43,7 +43,7 @@ export const sectionVariantDataSchema = (type: SectionType): z.ZodType<unknown> 
 export type FieldHint = {
   label: string;
   help?: string;
-  widget?: 'text' | 'richtext' | 'text_list' | 'link_actions' | 'select' | 'number' | 'cards' | 'hidden';
+  widget?: 'text' | 'richtext' | 'text_list' | 'link_actions' | 'select' | 'number' | 'cards' | 'image_url' | 'hidden';
 };
 
 export type ComponentEditorHints<TType extends SectionType> = {

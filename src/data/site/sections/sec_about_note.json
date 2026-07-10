@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.315Z",
+    "from": "objects/section/by-id/sec_about_note.json",
+    "record_version": 7
+  },
+  "section": {
+    "data": {
+      "body": "<h2>A Personal Note</h2><p>After decades in research, Dr. Lurie has seen what works—and what doesn’t.</p><p>This blog is a way to share that knowledge directly, without filters, trends, or shortcuts.</p><p>Because when it comes to your health, you deserve more than promises.</p><p><strong>You deserve solutions that make sense—and make a difference.</strong></p><p>If that’s what you’re looking for, you’re in the right place.</p>"
+    },
+    "id": "s_note",
+    "type": "prose"
+  }
+}

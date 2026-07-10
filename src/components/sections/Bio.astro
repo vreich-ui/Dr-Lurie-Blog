@@ -1,10 +1,13 @@
 ---
 /**
- * `bio` section component (T3.2) — markup verbatim from the audited
- * "Meet Dr. Lurié" homepage section (index.astro, A§2.1). The lead paragraph
- * class belongs to this component (first body paragraph renders large);
- * trust notes render as accent-bordered lines; the disclaimer is data (M-9).
- * `portraitAssetRef` is schema-legal but unrendered until a design uses it.
+ * `bio` section component (T3.2) — the reusable "person intro" (the audited
+ * "Meet Dr. Lurié" homepage section, A§2.1, and the /about intro since the
+ * 2026-07-10 decomposition). The lead paragraph class belongs to this
+ * component (first body paragraph renders large); trust notes render as
+ * accent-bordered lines; the disclaimer is data (M-9). An optional `portrait`
+ * ({src, alt}) renders a photo under the heading — a bio without one renders
+ * exactly as before (the homepage bio has none). `portraitAssetRef` remains
+ * the schema-legal trusted-artifact path, still unrendered until a design uses it.
  */
 import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
 import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
@@ -24,6 +27,16 @@ const paragraphs = splitRichTextParagraphs(data.body);
     <div>
       {data.kicker && <p class="text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
       <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">{data.heading}</h2>
+      {
+        data.portrait && (
+          <img
+            src={data.portrait.src}
+            alt={data.portrait.alt}
+            class="mt-6 h-auto w-full rounded-lg object-cover"
+            loading="lazy"
+          />
+        )
+      }
     </div>
     <div>
       {paragraphs.map((paragraph) => <p class="text-lg leading-8 text-default" set:html={paragraph} />)}

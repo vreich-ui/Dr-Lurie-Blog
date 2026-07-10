@@ -97,9 +97,28 @@ test('pageDrillOps clones the first inline section as an allowed-type probe, rem
   assert.deepEqual(metaOps.at(-1).fields, { title: 'Home' });
 });
 
-test('pageDrillOps refuses an all-shared_ref page instead of guessing (fix 5)', () => {
-  const page = { title: 'Refs', sections: [{ id: 's_a', type: 'shared_ref', data: { section: 'sec_a' } }] };
-  assert.throws(() => pageDrillOps(page, 's_rtprobe'), /only shared_ref sections/);
+test('pageDrillOps handles a fully-decomposed (all-shared_ref) page via a shared_ref probe', () => {
+  // The normal shape once every section is its own object (e.g. /about): the
+  // probe duplicates one of the page's own references — resolvable + allowed.
+  const page = {
+    title: 'Refs',
+    sections: [
+      { id: 's_a', type: 'shared_ref', data: { section: 'sec_a' } },
+      { id: 's_b', type: 'shared_ref', data: { section: 'sec_b' } },
+    ],
+  };
+  const { ops } = pageDrillOps(page, deriveProbeId(['s_a', 's_b']));
+  const upsert = ops.find((op) => op.op === 'upsert_section');
+  assert.equal(upsert.section.type, 'shared_ref');
+  assert.deepEqual(upsert.section.data, { section: 'sec_a' }, 'probe duplicates a real reference');
+  // update_section_data on the shared_ref self-values the only field (section).
+  const update = ops.find((op) => op.op === 'update_section_data');
+  assert.deepEqual(Object.keys(update.fields), ['section']);
+  assert.equal(ops.at(-1).op, 'remove_section', 'probe removed last → byte-identical');
+});
+
+test('pageDrillOps throws only when a page has no clonable section', () => {
+  assert.throws(() => pageDrillOps({ title: 'Empty', sections: [] }, 's_rtprobe'), /no section with data/);
 });
 
 test('deriveProbeId avoids collisions with existing section ids', () => {
