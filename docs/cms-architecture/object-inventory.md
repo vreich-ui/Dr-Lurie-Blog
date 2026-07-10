@@ -49,16 +49,20 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**Today, as of 2026-07-10, only three objects are CONVERTED:** `nav_header`,
-`nav_footer`, `nav_footer_home`. Every page below RENDERS but is a **rendered stub**
-— not store-backed, not agent-editable. See "Why only nav is converted" at the
-bottom.
+**As of 2026-07-10 (evening), seven objects are CONVERTED:** `nav_header`,
+`nav_footer`, `nav_footer_home`, and — proven by Wolf's credentialed
+`home-conversion-roundtrip.mjs --production --release` runs — `page_home`,
+`sec_home_audience_grid`, `sec_home_start_grid`, `sec_newsletter_signup`
+(store-backed, every permitted op round-tripped in production, published,
+released `released:true`). The other 11 pages still RENDER as **rendered
+stubs** — not store-backed, not agent-editable. See "Why only nav is
+converted" (historical root-cause analysis) at the bottom.
 
 ### Status legend
 
 | Mark             | Meaning                                                                                                                                                                                                                                          |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 🟢 **CONVERTED** | Real content, renders live **and** an agent can fully manipulate it through the MCP (the playbook's 5 criteria all met). Only nav today.                                                                                                         |
+| 🟢 **CONVERTED** | Real content, renders live **and** an agent can fully manipulate it through the MCP (the playbook's 5 criteria all met). Nav + the home-page family today.                                                                                       |
 | 🟣 **RENDERS**   | Builds and serves from a committed export, but has **no editable store record** — a rendered stub, not converted. Most "pages" are here.                                                                                                         |
 | 🟡 **SHELL**     | Exists structurally (a record is published, or a route is scaffolded) but is a **placeholder, a test artifact, or not yet wired to drive the live site**. The real source of truth is still somewhere else. The note says which half is missing. |
 | 🔴 **TODO**      | Needed for the CMS MVP. Not built yet.                                                                                                                                                                                                           |
@@ -102,15 +106,15 @@ repeated. The live list + each type's field schema is `registry_get('component')
 
 ## Object inventory (concrete records)
 
-### Pages — 12 render; **0 fully converted** (none is store-backed + round-trippable)
+### Pages — 12 render; **1 fully converted** (`page_home`)
 
-All 12 build and serve from committed exports (🟣 RENDERS). **None is CONVERTED** —
-no agent can edit them via MCP, because no editable store record backs them (except
-`page_home`, whose store record exists but is broken; see notes).
+All 12 build and serve from committed exports. **`page_home` is CONVERTED**
+(2026-07-10: store-backed, round-tripped, published, released — see its row).
+The other 11 have no editable store record backing them — rendered stubs.
 
 | Object                | Route                     | Status     | Notes                                                                                                                                                                                                                                                                           |
 | --------------------- | ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `page_home`           | `/`                       | 🟣 RENDERS | **Restructured 2026-07-10:** hero + bio inline; grids + newsletter are `shared_ref`s to standalone section objects. **Production round-trip PROVEN 2026-07-10** (Wolf's credentialed run): the broken store record was healed via reconcile ops, every permitted op exercised, record PUBLISHED (v42, `344faab`). Store body now equals the seed (its richer `seo` was adopted). Flip to 🟢 once the release rerun confirms `released:true` and the live homepage is eyeballed. |
+| `page_home`           | `/`                       | 🟢 CONVERTED | **All five criteria met 2026-07-10.** Hero + bio inline; grids + newsletter are `shared_ref`s to standalone section objects. The broken store record was healed via reconcile ops, every permitted op round-tripped in production, published (v44+, `4753ae7`), and released (`released:true`). Seed === store === export. |
 | `page_start_here`     | `/start-here`             | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
 | `page_member_updates` | `/member-updates`         | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
 | `page_newsletter`     | `/newsletter`             | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
@@ -127,9 +131,9 @@ no agent can edit them via MCP, because no editable store record backs them (exc
 
 | Object                    | Used by                        | Status     | Notes                                                                                                                                                                                                 |
 | ------------------------- | ------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `sec_newsletter_signup`   | `page_home` (via `shared_ref`) | 🟣 RENDERS | **Production round-trip PROVEN 2026-07-10**: created in the production store, every permitted op exercised, PUBLISHED (`a3d6e87`). Flip to 🟢 with the confirmed release (see page_home row).            |
-| `sec_home_audience_grid`  | `page_home` (via `shared_ref`) | 🟣 RENDERS | **New 2026-07-10.** "This is for you if…" — `content_grid`, sanctioned `cards` source (curated text cells; replaced the bespoke `checklist` usage). **Production round-trip PROVEN**, published (`4dbbc1f`). Flip to 🟢 with the confirmed release. |
-| `sec_home_start_grid`     | `page_home` (via `shared_ref`) | 🟣 RENDERS | **New 2026-07-10.** "Start here" — the SAME `content_grid` type, `query` source (latest posts): one reusable type, two roles by configuration alone. **Production round-trip PROVEN**, published (`86b9174`). Flip to 🟢 with the confirmed release.  |
+| `sec_newsletter_signup`   | `page_home` (via `shared_ref`) | 🟢 CONVERTED | **All five criteria met 2026-07-10:** store-backed, every permitted op round-tripped in production, published, released.                                                                                                            |
+| `sec_home_audience_grid`  | `page_home` (via `shared_ref`) | 🟢 CONVERTED | **New + converted 2026-07-10.** "This is for you if…" — `content_grid`, sanctioned `cards` source (curated text cells; replaced the bespoke `checklist` usage). Store-backed, round-tripped, published, released.                   |
+| `sec_home_start_grid`     | `page_home` (via `shared_ref`) | 🟢 CONVERTED | **New + converted 2026-07-10.** "Start here" — the SAME `content_grid` type, `query` source (latest posts): one reusable type, two roles by configuration alone. Store-backed, round-tripped, published, released.                  |
 
 ### Navigation
 
@@ -281,6 +285,7 @@ drives create→patch→publish→render per object as the enforceable "converte
 Until those exist, a "convert this page" task cannot actually be completed — say so
 rather than shipping a rendered stub.
 
-_Last audited: 2026-07-10, `claude/home-page-conversion-state-6wsc2r` (home-page
-restructure: two shared grid objects + `cards` source + standing round-trip driver).
+_Last audited: 2026-07-10 evening, `claude/home-page-conversion-state-6wsc2r`
+(home-page family CONVERTED: PRs #385/#386 + Wolf's credentialed
+`--production --release` runs, final run all-green with `released:true`).
 Prior: PR #383 (homepage-footer regression fix + definition-of-done reset)._

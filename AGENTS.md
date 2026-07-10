@@ -20,8 +20,10 @@ five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.
 
 Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
 X passes all five); **after every session, update the documentation** (no written record
-= not converted). Reality as of 2026-07-10: only `nav_header`/`nav_footer`/`nav_footer_home`
-are converted; the 12 page exports are rendered stubs.
+= not converted). Reality as of 2026-07-10 evening: seven objects converted —
+`nav_header`/`nav_footer`/`nav_footer_home` + the home-page family (`page_home`,
+`sec_home_audience_grid`, `sec_home_start_grid`, `sec_newsletter_signup`); the other
+11 page exports are rendered stubs.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 
