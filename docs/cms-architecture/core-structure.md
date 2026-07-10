@@ -47,10 +47,10 @@ Copy these shapes when building any new object. Everything else is a variation.
 ### Level 1 — Page (an entry that owns an ordered list of components)
 
 A page = route + metadata + ordered sections. **12 pages RENDER today from committed
-exports; ONE (`page_home`, with its three shared sections) is fully CONVERTED**
-(store-backed + agent-editable via MCP, 2026-07-10) — see the definition of done in
-[`conversion-playbook.md`](conversion-playbook.md) and the per-page status in
-[`object-inventory.md`](object-inventory.md). "Renders" is a milestone, not done.
+exports; TWO (`page_home` and `page_about`, with their shared sections) are fully
+CONVERTED** (store-backed + agent-editable via MCP, 2026-07-10) — see the definition
+of done in [`conversion-playbook.md`](conversion-playbook.md) and the per-page status
+in [`object-inventory.md`](object-inventory.md). "Renders" is a milestone, not done.
 
 ```jsonc
 {
@@ -189,8 +189,9 @@ one; every trap in it was hit for real once.
 **Already built and tested** (881 tests): object store + envelope, locks, patch
 grammar + inverses, validation, self-describing `object_contract`, publish +
 materializers, build-diff harness, navigation (3 objects CONVERTED) + the home-page
-family (page_home + 3 shared sections CONVERTED 2026-07-10 — store-backed,
-round-tripped, released), 11 further pages RENDERING (not yet converted), 17 component types,
+family (page_home + 3 shared sections) + the /about family (page_about + 8 shared
+sections) all CONVERTED 2026-07-10 (store-backed, round-tripped, released), 10 further
+pages RENDERING (not yet converted), 17 component types,
 container bounds (`allowedChildren`).
 
 **The real gap between here and the goal** (agents editing every page via MCP) is NOT

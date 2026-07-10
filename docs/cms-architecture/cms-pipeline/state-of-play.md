@@ -34,12 +34,19 @@ conversion, the design-principles way (retire the bespoke, don't repeat it):
   build-diff scoped to `/about` ONLY (202/203 identical — the home bio is
   unaffected). Local `--seeds page-about` round-trip all-green.
 
-**Status: RENDERS, not yet CONVERTED** — criteria 2/3 need the credentialed
-`node scripts/home-conversion-roundtrip.mjs --production --release --seeds
-scripts/lib/page-about-seed-data.mjs` run (same as the home family). **Follow-up
-flagged:** the `about` section TYPE is now orphaned (no object uses it) — retire
-it (union member + About.astro + registry + resolve.ts entry + fixtures) in a
-separate focused change.
+**Status: CONVERTED (all five criteria).** Wolf ran the credentialed
+`--production --release --seeds page-about` run: all 9 objects created,
+every permitted op drilled, published (9 export commits `e0a36af`…`029142c`
+on main), and `release_to_production` confirmed `released:true` (the resilient
+poller's first `build_not_confirmed_live` then `released` — the 504 fix
+working as designed). Byte-check: all 9 published exports === seed (no drift);
+page_about record_version 10; the intro bio kept the portrait. **Sixteen
+objects converted total** (3 nav + home family + /about family); the reality
+lines were flipped across CLAUDE.md/AGENTS.md/playbook/inventory/map/core-structure.
+
+**Follow-up flagged:** the `about` section TYPE is now orphaned (no object uses
+it) — retire it (union member + About.astro + registry + resolve.ts entry +
+fixtures) in a separate focused change.
 
 ## Session 2026-07-10 E (conversion factory: full object map + generalized driver + tightened recipe)
 
