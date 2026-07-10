@@ -108,8 +108,16 @@ export const pageHomeBody = {
   route: '/',
   pageType: 'home',
   title: 'Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers',
+  // seo: adopted from the production store record during the 2026-07-10
+  // credentialed heal — the record carried a real meta description plus
+  // explicit robots/title that the original transcription lacked. Kept
+  // deliberately (good SEO, matches the hero copy) so seed === store.
   seo: {
+    title: 'Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers',
+    description:
+      'A calmer, clearer way to begin caring for your skin without complicated routines, product pressure, or trend-led advice.',
     ogImage: '/Social/og-home.jpg',
+    robots: { index: true, follow: true },
   },
   sections: [
     {

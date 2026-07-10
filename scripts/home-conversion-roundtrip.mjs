@@ -55,6 +55,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { PAGE_HOME_SEEDS, PAGE_HOME_SEED_SITE } from './lib/page-home-seed-data.mjs';
+import { reconcileOps } from './lib/roundtrip-reconcile.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = new Set(process.argv.slice(2));
@@ -219,38 +220,8 @@ if (!production) {
 }
 
 // ─── ensure: create-or-reconcile each object to its seed body ────────────────
-
-const reconcileOps = (seed, currentBody) => {
-  if (seed.objectType === 'section') {
-    // The wrapper holds exactly one instance; upsert replaces it wholesale.
-    return [{ op: 'upsert_section', section: seed.body.section }];
-  }
-  const target = seed.body;
-  const current = currentBody ?? {};
-  const currentSections = Array.isArray(current.sections) ? current.sections : [];
-  const targetIds = new Set(target.sections.map((section) => section.id));
-  const ops = [];
-  // Meta first, so structure_home_footer sees the footer override immediately.
-  const metaFields = {};
-  for (const key of ['route', 'pageType', 'title', 'seo', 'navigationOverrides', 'template']) {
-    if (target[key] !== undefined) metaFields[key] = target[key];
-    else if (current[key] !== undefined) metaFields[key] = null; // delete stray meta
-  }
-  ops.push({ op: 'set_page_meta', fields: metaFields });
-  target.sections.forEach((section, index) => {
-    ops.push({ op: 'upsert_section', section, position: index });
-  });
-  for (const section of currentSections) {
-    if (section && typeof section.id === 'string' && !targetIds.has(section.id)) {
-      ops.push({ op: 'remove_section', section_id: section.id });
-    }
-  }
-  // upsert leaves pre-existing sections in place — pin the final order explicitly.
-  target.sections.forEach((section, index) => {
-    ops.push({ op: 'move_section', section_id: section.id, to_index: index });
-  });
-  return ops;
-};
+// Reconcile-op construction lives in scripts/lib/roundtrip-reconcile.mjs
+// (unit-tested; encodes playbook trap 2 — deep-merge strays must be nulled).
 
 const withLock = async (objectType, objectId, run) => {
   const checkout = await callTool('object_checkout', { object_type: objectType, object_id: objectId });
@@ -268,6 +239,8 @@ const withLock = async (objectType, objectId, run) => {
   }
 };
 
+const ensureFailed = new Set();
+
 for (const seed of PAGE_HOME_SEEDS) {
   const existing = await getRecord(seed.objectType, seed.objectId);
   if (!existing) {
@@ -277,11 +250,15 @@ for (const seed of PAGE_HOME_SEEDS) {
       requested_id: seed.objectId,
       body: seed.body,
     });
-    step(
-      `ensure ${seed.objectId}: created`,
-      !isToolError(created),
-      isToolError(created) ? JSON.stringify(structured(created)) : ''
-    );
+    if (
+      !step(
+        `ensure ${seed.objectId}: created`,
+        !isToolError(created),
+        isToolError(created) ? JSON.stringify(structured(created)) : ''
+      )
+    ) {
+      ensureFailed.add(seed.objectId);
+    }
     continue;
   }
   if (sameBody(existing.body, seed.body)) {
@@ -302,11 +279,15 @@ for (const seed of PAGE_HOME_SEEDS) {
     const after = await getRecord(seed.objectType, seed.objectId);
     return sameBody(after?.body, seed.body) ? true : 'reconciled body still differs from the seed';
   });
-  step(
-    `ensure ${seed.objectId}: reconciled drifted body (${ops.length} ops)`,
-    reconciled === true,
-    reconciled === true ? '' : reconciled
-  );
+  if (
+    !step(
+      `ensure ${seed.objectId}: reconciled drifted body (${ops.length} ops)`,
+      reconciled === true,
+      reconciled === true ? '' : reconciled
+    )
+  ) {
+    ensureFailed.add(seed.objectId);
+  }
 }
 
 // ─── drill: exercise EVERY permitted op, end byte-identical, publish ─────────
@@ -375,6 +356,12 @@ const publishOutcome = async (seed, lockToken) => {
 const exercisedByType = new Map();
 
 for (const seed of PAGE_HOME_SEEDS) {
+  if (ensureFailed.has(seed.objectId)) {
+    // Never drill/publish a record we could not bring to its intended body —
+    // publishing propagates the wrong content to the exports and the site.
+    step(`drill ${seed.objectId}`, false, 'skipped — ensure failed, refusing to publish a wrong body');
+    continue;
+  }
   const before = await getRecord(seed.objectType, seed.objectId);
   const { expected, ops } = drillOps(seed);
   exercisedByType.set(seed.objectType, expected);
@@ -456,10 +443,52 @@ if (writeExports) {
 }
 
 // ─── production release ──────────────────────────────────────────────────────
+// One long release_to_production call gets killed by intermediary gateways
+// ("Inactivity Timeout" 504 — hit for real on 2026-07-10) because the server
+// polls deploy receipts for minutes. Instead: fire the build hook ONCE with a
+// short server-side wait, then confirm with repeated short, read-only calls
+// (force_build:false — never re-fires the hook), tolerating transient
+// gateway/network errors between polls.
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 if (release) {
-  const released = structured(await callTool('release_to_production', {}));
-  step('release_to_production', released.released === true, JSON.stringify(released));
+  let releaseResult;
+  try {
+    releaseResult = structured(await callTool('release_to_production', { timeout_seconds: 15 }));
+  } catch (error) {
+    console.warn(`[roundtrip] warn: release trigger call failed transiently (${error.message}); confirming by poll.`);
+    releaseResult = {};
+  }
+  let released = releaseResult.released === true;
+  const targetCommit = releaseResult.commit;
+  const POLL_INTERVAL_MS = 20_000;
+  const POLL_BUDGET_MS = 10 * 60_000;
+  const deadline = Date.now() + POLL_BUDGET_MS;
+  while (!released && Date.now() < deadline) {
+    await sleep(POLL_INTERVAL_MS);
+    try {
+      const poll = structured(
+        await callTool('release_to_production', {
+          force_build: false,
+          timeout_seconds: 15,
+          ...(targetCommit ? { commit: targetCommit } : {}),
+        })
+      );
+      releaseResult = poll;
+      released = poll.released === true;
+      console.info(`[roundtrip]      release poll: ${poll.status ?? JSON.stringify(poll).slice(0, 120)}`);
+    } catch (error) {
+      console.warn(`[roundtrip] warn: release poll failed transiently (${error.message}); retrying.`);
+    }
+  }
+  step(
+    'release_to_production',
+    released,
+    released
+      ? `live at commit ${releaseResult.commit ?? targetCommit ?? '(unreported)'}`
+      : `not confirmed within ${POLL_BUDGET_MS / 60000} min: ${JSON.stringify(releaseResult).slice(0, 300)} — check the Netlify deploys dashboard (Auto Publishing must be unlocked)`
+  );
 }
 
 // ─── report ──────────────────────────────────────────────────────────────────
