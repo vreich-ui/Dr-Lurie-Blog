@@ -111,7 +111,7 @@ object_patch → object_publish → object_checkin`, against the local
 | 6   | Rendered page shows literal `` ` `` characters                                                            | The RichText allowlist has **no `code` tag** — markdown backticks survive conversion as visible text                                                       | Strip backticks (or use quotes) when converting markdown to allowlist HTML; grep the body for `` ` `` before shipping                                                    |
 | 7   | Inline `_italic_` (or other md syntax) rendered literally                                                 | Hand-rolled md→HTML conversion missed a rule                                                                                                               | After converting, grep the HTML for leftover markdown tokens (`_`, `**`, `[`, `` ` ``) and visually check the dist output                                                |
 | 8   | `object_publish` "fails" in the sandbox                                                                   | No production secrets — by design                                                                                                                          | `export_commit_failed` + `not_configured` = the expected boundary. Materialize + write the export yourself (recipe step 5); production publish is the handoff            |
-| 9   | Homepage seed script resurrects retired content                                                           | `scripts/seed-page-home.mjs` still seeds the RETIRED `static` grid variant (kept for its pinned tests)                                                     | Never re-run it against a real store; the `static` variant's full retirement is a listed follow-up                                                                       |
+| 9   | ~~Homepage seed script resurrects retired content~~ CLOSED 2026-07-10                                     | `scripts/seed-page-home.mjs` used to seed the RETIRED `static` grid variant                                                                                | `static` is gone from the schema (the sanctioned `cards` source of curated cells replaced it) and the seed carries the settled bodies — re-running the seed is safe again |
 
 ## Component rich-text vocabularies
 
@@ -124,6 +124,12 @@ Inline (inside blocks), everywhere: `strong`, `em`, `a href="https://…"`, `br`
 `li` inside lists. **No `code`, no images, no headings above `h2`.**
 
 ## Sandbox driver skeleton
+
+> **A standing, runnable driver exists:** `scripts/home-conversion-roundtrip.mjs`
+> drives the full lifecycle for the home-page object family (ensure/heal →
+> every permitted op → validate → publish → contract + inventory checks) in
+> `--local` and `--production` modes. Copy its pattern for new conversions
+> instead of writing a throwaway from this skeleton.
 
 ```js
 // compile first:  rm -rf .tmp/ci-test && npx tsc -p tsconfig.test.json
