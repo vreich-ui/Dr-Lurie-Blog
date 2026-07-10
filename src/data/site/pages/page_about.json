@@ -1,49 +1,67 @@
 {
   "__generated": {
-    "at": "2026-07-08T00:00:00.000Z",
+    "at": "2026-07-10T14:50:02.331Z",
     "from": "objects/page/by-id/page_about.json",
-    "record_version": 1
+    "record_version": 11
   },
   "pageType": "standard",
   "route": "/about",
   "sections": [
     {
       "data": {
-        "actions": [
-          {
-            "label": "Read the Insights",
-            "style": "primary",
-            "target": {
-              "kind": "listing",
-              "list": "content_index"
-            }
-          },
-          {
-            "label": "Get the Free Guide",
-            "style": "secondary",
-            "target": {
-              "href": "/guides/free-guide",
-              "kind": "route"
-            }
-          }
-        ],
-        "ctaHeading": "Start With the Science",
-        "heading": "About Dr. Leonid Lurie",
-        "portrait": {
-          "alt": "Portrait of Dr. Leonid Lurie",
-          "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg"
-        },
-        "sectionHeadings": [
-          "A Different Way of Thinking About Health",
-          "Why Most Products Fall Short",
-          "The Science Behind Real Results",
-          "From Research to Real Life",
-          "Why This Blog Exists",
-          "A Personal Note"
-        ]
+        "section": "sec_about_intro"
       },
-      "id": "s_about",
-      "type": "about"
+      "id": "s_intro",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_thinking"
+      },
+      "id": "s_thinking",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_products"
+      },
+      "id": "s_products",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_science"
+      },
+      "id": "s_science",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_research"
+      },
+      "id": "s_research",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_blog"
+      },
+      "id": "s_blog",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_note"
+      },
+      "id": "s_note",
+      "type": "shared_ref"
+    },
+    {
+      "data": {
+        "section": "sec_about_cta"
+      },
+      "id": "s_cta",
+      "type": "shared_ref"
     }
   ],
   "seo": {},

@@ -1,0 +1,33 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.323Z",
+    "from": "objects/section/by-id/sec_about_cta.json",
+    "record_version": 8
+  },
+  "section": {
+    "data": {
+      "actions": [
+        {
+          "label": "Read the Insights",
+          "style": "primary",
+          "target": {
+            "kind": "listing",
+            "list": "content_index"
+          }
+        },
+        {
+          "label": "Get the Free Guide",
+          "style": "secondary",
+          "target": {
+            "href": "/guides/free-guide",
+            "kind": "route"
+          }
+        }
+      ],
+      "body": "<p>Explore how aging skin changes, why common approaches often fall short, and what a delivery-system approach makes possible.</p>",
+      "heading": "Start With the Science"
+    },
+    "id": "s_cta",
+    "type": "cta_banner"
+  }
+}

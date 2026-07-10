@@ -1,0 +1,21 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.269Z",
+    "from": "objects/section/by-id/sec_about_intro.json",
+    "record_version": 8
+  },
+  "section": {
+    "data": {
+      "body": "<p>Let’s keep this simple.</p><p>If you’ve ever tried a health or skincare product that <em>promised everything</em>… and delivered very little—you’re not alone.</p><p>And there’s a reason for that.</p><p>Most products focus on <strong>what’s inside the bottle</strong>. Dr. Leonid Lurie focuses on <strong>whether it actually works in your body</strong>.</p>",
+      "heading": "About Dr. Leonid Lurie",
+      "kicker": "About",
+      "portrait": {
+        "alt": "Portrait of Dr. Leonid Lurie",
+        "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg"
+      },
+      "trustNotes": []
+    },
+    "id": "s_intro",
+    "type": "bio"
+  }
+}

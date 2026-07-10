@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.291Z",
+    "from": "objects/section/by-id/sec_about_science.json",
+    "record_version": 7
+  },
+  "section": {
+    "data": {
+      "body": "<h2>The Science Behind Real Results</h2><p>Over decades of research, Dr. Lurie developed advanced delivery systems designed to help active ingredients:</p><ul><li>Reach the right place in the body</li><li>Work over time—not just for a few minutes</li><li>Stay stable and effective</li><li>Support the body without unnecessary stress</li></ul><p>In practical terms, this means products that are designed to <strong>work with your body—not against it</strong>.</p>"
+    },
+    "id": "s_science",
+    "type": "prose"
+  }
+}

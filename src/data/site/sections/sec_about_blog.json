@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.308Z",
+    "from": "objects/section/by-id/sec_about_blog.json",
+    "record_version": 7
+  },
+  "section": {
+    "data": {
+      "body": "<h2>Why This Blog Exists</h2><p>This site isn’t here to overwhelm you with complex science.</p><p>It’s here to help you:</p><ul><li>Better understand how your body works</li><li>Make smarter decisions about products and treatments</li><li>Avoid common mistakes that waste time and money</li><li>Discover approaches grounded in real science—not marketing hype</li></ul><p>Over time, you’ll also find carefully developed resources, products, and insights designed to support your health in a practical, realistic way.</p>"
+    },
+    "id": "s_blog",
+    "type": "prose"
+  }
+}

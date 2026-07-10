@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.275Z",
+    "from": "objects/section/by-id/sec_about_thinking.json",
+    "record_version": 7
+  },
+  "section": {
+    "data": {
+      "body": "<h2>A Different Way of Thinking About Health</h2><p>Dr. Lurie is a physician, scientist, and developer with more than 30 years of experience in medical and pharmaceutical research.</p><p>But what makes his work different is this:</p><p>He doesn’t treat the body—especially the skin—as something passive.</p><p>He sees it as a <strong>living, active system</strong>.</p><p>And that changes everything. Because when you understand how the body really functions, you stop guessing… and start designing solutions that actually make a difference.</p>"
+    },
+    "id": "s_thinking",
+    "type": "prose"
+  }
+}

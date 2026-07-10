@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-10T14:50:02.282Z",
+    "from": "objects/section/by-id/sec_about_products.json",
+    "record_version": 7
+  },
+  "section": {
+    "data": {
+      "body": "<h2>Why Most Products Fall Short</h2><p>Here’s the uncomfortable truth:</p><p>Even the best ingredients are useless if your body can’t absorb or use them properly.</p><p>That’s why so many creams, treatments, and health products give <strong>temporary or disappointing results</strong>.</p><p>Dr. Lurie built his career solving that exact problem.</p>"
+    },
+    "id": "s_products",
+    "type": "prose"
+  }
+}
