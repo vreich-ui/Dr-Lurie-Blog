@@ -25,11 +25,11 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-10 evening: seven objects are converted — `nav_header`,
-  `nav_footer`, `nav_footer_home`, plus the home-page family (`page_home`,
-  `sec_home_audience_grid`, `sec_home_start_grid`, `sec_newsletter_signup`;
-  proven by credentialed `home-conversion-roundtrip.mjs --production --release`
-  runs). The other 11 page exports render but are rendered stubs.
+- Reality as of 2026-07-10 evening: sixteen objects are converted — the 3 nav
+  objects, the home-page family (`page_home` + 3 shared sections), and the /about
+  family (`page_about` + 8 shared sections) — all proven by credentialed
+  `home-conversion-roundtrip.mjs --production --release` runs. The other 10 page
+  exports render but are rendered stubs.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

@@ -72,19 +72,18 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   ├── page_terms ─ /terms ─ [prose]
 │   │   └── page_404 ─ /404 ─ [cta_banner]   cta_banner: heading · body · actions[]
 │   │
-│   ├── page_about ─ /about ─ 🟣 RENDERS ─ **DECOMPOSED 2026-07-10** off the bespoke `about`
+│   ├── page_about ─ /about ─ 🟢 CONVERTED (2026-07-10) ─ decomposed off the bespoke `about`
 │   │   │   anti-pattern into 8 standalone shared sections of REUSABLE types (the design-
-│   │   │   principles win); a `standard` page of 8 shared_refs. Local round-trip proven;
-│   │   │   RENDERS until the credentialed `--production` run. (Orphaned `about` TYPE →
-│   │   │   flagged follow-up removal.)
-│   │   ├── s_intro ─ shared_ref → sec_about_intro ─ bio (heading + copy + portrait photo)
-│   │   ├── s_thinking ─ shared_ref → sec_about_thinking ─ prose
-│   │   ├── s_products ─ shared_ref → sec_about_products ─ prose
-│   │   ├── s_science ─ shared_ref → sec_about_science ─ prose (list)
-│   │   ├── s_research ─ shared_ref → sec_about_research ─ prose (list)
-│   │   ├── s_blog ─ shared_ref → sec_about_blog ─ prose (list)
-│   │   ├── s_note ─ shared_ref → sec_about_note ─ prose
-│   │   └── s_cta ─ shared_ref → sec_about_cta ─ cta_banner (heading + body + actions)
+│   │   │   principles win); a `standard` page of 8 shared_refs. Store-backed, round-tripped
+│   │   │   in production, published, released. (Orphaned `about` TYPE → flagged follow-up removal.)
+│   │   ├── s_intro ─ shared_ref → sec_about_intro 🟢 ─ bio (heading + copy + portrait photo)
+│   │   ├── s_thinking ─ shared_ref → sec_about_thinking 🟢 ─ prose
+│   │   ├── s_products ─ shared_ref → sec_about_products 🟢 ─ prose
+│   │   ├── s_science ─ shared_ref → sec_about_science 🟢 ─ prose (list)
+│   │   ├── s_research ─ shared_ref → sec_about_research 🟢 ─ prose (list)
+│   │   ├── s_blog ─ shared_ref → sec_about_blog 🟢 ─ prose (list)
+│   │   ├── s_note ─ shared_ref → sec_about_note 🟢 ─ prose
+│   │   └── s_cta ─ shared_ref → sec_about_cta 🟢 ─ cta_banner (heading + body + actions)
 │   │
 │   ├── BESPOKE-SECTION PAGES ─ 🟣 RENDERS ─ priority W2 (convertible as-is; their section
 │   │   │   types are the design-principles anti-pattern — do NOT mint more; generalizing

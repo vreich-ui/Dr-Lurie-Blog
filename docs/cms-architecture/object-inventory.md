@@ -49,20 +49,21 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-10 (evening), seven objects are CONVERTED:** `nav_header`,
-`nav_footer`, `nav_footer_home`, and — proven by Wolf's credentialed
-`home-conversion-roundtrip.mjs --production --release` runs — `page_home`,
-`sec_home_audience_grid`, `sec_home_start_grid`, `sec_newsletter_signup`
-(store-backed, every permitted op round-tripped in production, published,
-released `released:true`). The other 11 pages still RENDER as **rendered
-stubs** — not store-backed, not agent-editable. See "Why only nav is
-converted" (historical root-cause analysis) at the bottom.
+**As of 2026-07-10 (evening), sixteen objects are CONVERTED** (all via credentialed
+`home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
+permitted op round-tripped in production, published, `released:true`): the 3 nav
+objects; the home-page family (`page_home`, `sec_home_audience_grid`,
+`sec_home_start_grid`, `sec_newsletter_signup`); and the /about family
+(`page_about` + `sec_about_intro`/`_thinking`/`_products`/`_science`/`_research`/
+`_blog`/`_note`/`_cta`). Two pages are fully converted (`page_home`, `page_about`);
+the other 10 still RENDER as **rendered stubs**. See "Why only nav is converted"
+(historical root-cause analysis) at the bottom.
 
 ### Status legend
 
 | Mark             | Meaning                                                                                                                                                                                                                                          |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 🟢 **CONVERTED** | Real content, renders live **and** an agent can fully manipulate it through the MCP (the playbook's 5 criteria all met). Nav + the home-page family today.                                                                                       |
+| 🟢 **CONVERTED** | Real content, renders live **and** an agent can fully manipulate it through the MCP (the playbook's 5 criteria all met). Nav + the home-page & /about families today.                                                                            |
 | 🟣 **RENDERS**   | Builds and serves from a committed export, but has **no editable store record** — a rendered stub, not converted. Most "pages" are here.                                                                                                         |
 | 🟡 **SHELL**     | Exists structurally (a record is published, or a route is scaffolded) but is a **placeholder, a test artifact, or not yet wired to drive the live site**. The real source of truth is still somewhere else. The note says which half is missing. |
 | 🔴 **TODO**      | Needed for the CMS MVP. Not built yet.                                                                                                                                                                                                           |
@@ -106,11 +107,11 @@ repeated. The live list + each type's field schema is `registry_get('component')
 
 ## Object inventory (concrete records)
 
-### Pages — 12 render; **1 fully converted** (`page_home`)
+### Pages — 12 render; **2 fully converted** (`page_home`, `page_about`)
 
-All 12 build and serve from committed exports. **`page_home` is CONVERTED**
-(2026-07-10: store-backed, round-tripped, published, released — see its row).
-The other 11 have no editable store record backing them — rendered stubs.
+All 12 build and serve from committed exports. **`page_home` and `page_about` are
+CONVERTED** (2026-07-10: store-backed, round-tripped, published, released — see
+their rows). The other 10 have no editable store record backing them — rendered stubs.
 
 | Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -121,7 +122,7 @@ The other 11 have no editable store record backing them — rendered stubs.
 | `page_free_guide`     | `/guides/free-guide`      | 🟣 RENDERS   | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                                                               |
 | `page_early_access`   | `/solutions/early-access` | 🟣 RENDERS   | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                                                               |
 | `page_thank_you`      | `/thank-you`              | 🟣 RENDERS   | Bespoke section (anti-pattern); message-swap script as furniture. Not store-backed.                                                                                                                                                                                                                                        |
-| `page_about`          | `/about`                  | 🟣 RENDERS   | **Decomposed 2026-07-10** off the bespoke `about` anti-pattern into EIGHT standalone shared sections (bio + prose ×6 + cta_banner) — a `standard` page of 8 `shared_ref`s. Local round-trip proven; RENDERS until the credentialed `--production` run. (The orphaned `about` TYPE awaits a follow-up removal.)             |
+| `page_about`          | `/about`                  | 🟢 CONVERTED | **Decomposed 2026-07-10** off the bespoke `about` anti-pattern into EIGHT standalone shared sections (bio + prose ×6 + cta_banner) — a `standard` page of 8 `shared_ref`s. Store-backed (record_version 10), round-tripped in production, published, released. (The orphaned `about` TYPE awaits a follow-up removal.)     |
 | `page_contact`        | `/contact`                | 🟣 RENDERS   | Bespoke `contact` section (anti-pattern), PR #375. Not store-backed.                                                                                                                                                                                                                                                       |
 | `page_privacy`        | `/privacy`                | 🟣 RENDERS   | `system` PageType, reusable `prose` section (PR #380). Not store-backed.                                                                                                                                                                                                                                                   |
 | `page_terms`          | `/terms`                  | 🟣 RENDERS   | `system` PageType, reusable `prose` section (PR #380). Not store-backed.                                                                                                                                                                                                                                                   |
@@ -134,14 +135,14 @@ The other 11 have no editable store record backing them — rendered stubs.
 | `sec_newsletter_signup`  | `page_home` (via `shared_ref`)  | 🟢 CONVERTED | **All five criteria met 2026-07-10:** store-backed, every permitted op round-tripped in production, published, released.                                                                                           |
 | `sec_home_audience_grid` | `page_home` (via `shared_ref`)  | 🟢 CONVERTED | **New + converted 2026-07-10.** "This is for you if…" — `content_grid`, sanctioned `cards` source (curated text cells; replaced the bespoke `checklist` usage). Store-backed, round-tripped, published, released.  |
 | `sec_home_start_grid`    | `page_home` (via `shared_ref`)  | 🟢 CONVERTED | **New + converted 2026-07-10.** "Start here" — the SAME `content_grid` type, `query` source (latest posts): one reusable type, two roles by configuration alone. Store-backed, round-tripped, published, released. |
-| `sec_about_intro`        | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10** (/about decomposition). `bio` — intro heading + copy + portrait photo (the reusable bio type gained a URL `portrait`). Local round-trip proven; awaits the credentialed run.                    |
-| `sec_about_thinking`     | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `prose` — "A Different Way of Thinking About Health". Awaits the credentialed run.                                                                                                             |
-| `sec_about_products`     | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `prose` — "Why Most Products Fall Short".                                                                                                                                                      |
-| `sec_about_science`      | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `prose` — "The Science Behind Real Results" (with list).                                                                                                                                       |
-| `sec_about_research`     | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `prose` — "From Research to Real Life" (with list).                                                                                                                                            |
-| `sec_about_blog`         | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `prose` — "Why This Blog Exists" (with list).                                                                                                                                                  |
-| `sec_about_note`         | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `prose` — "A Personal Note".                                                                                                                                                                   |
-| `sec_about_cta`          | `page_about` (via `shared_ref`) | 🟣 RENDERS   | **New 2026-07-10.** `cta_banner` — "Start With the Science" + the two closing actions.                                                                                                                             |
+| `sec_about_intro`        | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10** (/about decomposition). `bio` — intro heading + copy + portrait photo (the reusable bio type gained a URL `portrait`). Store-backed, round-tripped in production, published, released.          |
+| `sec_about_thinking`     | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `prose` — "A Different Way of Thinking About Health". Store-backed, round-tripped in production, published, released.                                                                          |
+| `sec_about_products`     | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `prose` — "Why Most Products Fall Short".                                                                                                                                                      |
+| `sec_about_science`      | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `prose` — "The Science Behind Real Results" (with list).                                                                                                                                       |
+| `sec_about_research`     | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `prose` — "From Research to Real Life" (with list).                                                                                                                                            |
+| `sec_about_blog`         | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `prose` — "Why This Blog Exists" (with list).                                                                                                                                                  |
+| `sec_about_note`         | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `prose` — "A Personal Note".                                                                                                                                                                   |
+| `sec_about_cta`          | `page_about` (via `shared_ref`) | 🟢 CONVERTED | **New 2026-07-10.** `cta_banner` — "Start With the Science" + the two closing actions.                                                                                                                             |
 
 ### Navigation
 
