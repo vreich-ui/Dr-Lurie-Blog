@@ -7,6 +7,43 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 C (FIRST CREDENTIALED PRODUCTION RUN + driver hardening)
+
+PR #385 merged; **Wolf ran `home-conversion-roundtrip.mjs --production --release`
+from his machine — the first credentialed store run since nav.** Results:
+
+- **`sec_newsletter_signup`, `sec_home_audience_grid`, `sec_home_start_grid`:
+  created in the production store, EVERY permitted op exercised, validated,
+  PUBLISHED** (export commits `a3d6e87`/`4dbbc1f`/`86b9174` on main).
+  `object_inventory` returns all of them. Criteria 1–4 all proven in
+  production for the section family.
+- **`page_home`: healed and PUBLISHED** (`344faab`, record_version 42) — the
+  broken record's structure was fully reconciled (hero inline, two grid refs,
+  bio, newsletter ref, footer override). The ensure check flagged a residual
+  diff: three `seo` subkeys from the old record (`description`/`robots`/`title`)
+  survived because the reconciler hit **playbook trap 2 itself** (`set_page_meta`
+  deep-merges; strays must be nulled). The values are good editorial content,
+  so they were **adopted into the seed** (seed === store now) rather than
+  stripped.
+- **`release_to_production` died at a gateway "Inactivity Timeout" 504** — the
+  server polls deploy receipts longer than intermediary proxies allow. The
+  build hook fires before the polling, and the #385 merge itself also triggers
+  a production build, so the release almost certainly happened; confirmation
+  rerun pending.
+
+**Hardening landed this session:** reconcile logic extracted to
+`scripts/lib/roundtrip-reconcile.mjs` with `diffFieldsForMerge` (nulls stray
+keys at every depth — unit-tested against the exact production drift); a failed
+ensure now SKIPS that object's drill/publish (never publish a wrong body); the
+release step fires the hook once (`timeout_seconds: 15`) then confirms via
+short read-only polls (`force_build: false`) tolerant of gateway errors.
+
+**Remaining to declare the home family CONVERTED:** one rerun of
+`--production --release` (expect: every ensure "already matches the seed";
+`released: true`), a look at the live homepage, then flip the four inventory
+rows to 🟢. **Security follow-up: rotate `PUBLISH_SECRET`** — it was exposed
+in a chat transcript during this run's setup.
+
 ## Session 2026-07-10 B (home-page conversion push: restructure + standing round-trip driver)
 
 Wolf's goal: the home page at 100% conversion — hero, the two grids, about/bio,
