@@ -346,6 +346,9 @@ test('publish_by_time: under the default (committed) policy, an agent publishes 
           pageType: 'home',
           title: 'Home',
           seo: {},
+          // Required for a 'home' page to clear publish validation
+          // (structure_home_footer, netlify/lib/object-validate.ts).
+          navigationOverrides: { footer: 'nav_footer_home' },
           sections: [{ id: 's_hero', type: 'hero', data: { heading: 'Hi', actions: [] } }],
         },
       },

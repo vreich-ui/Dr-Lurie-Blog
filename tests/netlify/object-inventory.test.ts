@@ -57,6 +57,10 @@ const validPageBody = (title = 'Dr. Lurié') => ({
   pageType: 'home',
   title,
   seo: { description: 'Science-first skincare.' },
+  // A 'home' PageType page must carry this (structure_home_footer,
+  // netlify/lib/object-validate.ts) or a further patch on an already-published
+  // record is rejected.
+  navigationOverrides: { footer: 'nav_footer_home' },
   sections: [{ id: 's_hero', type: 'hero', data: { heading: 'Hi', actions: [] } }],
 });
 
@@ -108,11 +112,20 @@ test('requires_approval derives from the approval policy; content_item is never 
   assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW).requires_approval, false);
   assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW).requires_approval, false);
   // An injected policy flows through.
-  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW, gateNavigation).requires_approval, true);
-  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW, gateNavigation).requires_approval, false);
+  assert.equal(
+    inventoryRowFromRecord(baseRecord({ object_type: 'navigation' }), NOW, gateNavigation).requires_approval,
+    true
+  );
+  assert.equal(
+    inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW, gateNavigation).requires_approval,
+    false
+  );
   // content_item stays outside the policy under every posture.
   const allRequire: ApprovalPolicy = { master: 'all-require-approval', overrides: {} };
-  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW, allRequire).requires_approval, false);
+  assert.equal(
+    inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW, allRequire).requires_approval,
+    false
+  );
 });
 
 test('a published record with the receipt at the current revision reports no pending changes', () => {
@@ -185,7 +198,10 @@ test('lock state: active lease → held with holder and expiry but never the tok
 test('matchesInventoryFilters composes requires_approval, review_state, pending_changes, and status', () => {
   const row = inventoryRowFromRecord(baseRecord(), NOW); // page (autonomous default), review none, pending true, active
   assert.equal(matchesInventoryFilters(row, {}), true);
-  assert.equal(matchesInventoryFilters(row, { requires_approval: false, review_state: 'none', pending_changes: true }), true);
+  assert.equal(
+    matchesInventoryFilters(row, { requires_approval: false, review_state: 'none', pending_changes: true }),
+    true
+  );
   assert.equal(matchesInventoryFilters(row, { requires_approval: true }), false);
   assert.equal(matchesInventoryFilters(row, { review_state: 'open' }), false);
   assert.equal(matchesInventoryFilters(row, { pending_changes: false }), false);
