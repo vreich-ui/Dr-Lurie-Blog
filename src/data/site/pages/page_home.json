@@ -1,11 +1,11 @@
 {
   "__generated": {
-    "at": "2026-07-10T08:36:24.867Z",
+    "at": "2026-07-10T08:38:51.090Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 2
+    "record_version": 6
   },
-  "pageType": "home",
-  "route": "/",
+  "pageType": "standard",
+  "route": "/cms-home-field-test",
   "sections": [
     {
       "data": {
