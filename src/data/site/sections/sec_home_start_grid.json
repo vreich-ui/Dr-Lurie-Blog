@@ -1,15 +1,15 @@
 {
   "__generated": {
-    "at": "2026-07-10T11:47:24.653Z",
+    "at": "2026-07-10T12:28:40.609Z",
     "from": "objects/section/by-id/sec_home_start_grid.json",
-    "record_version": 15
+    "record_version": 19
   },
   "section": {
     "data": {
       "anchor": "start-here",
-      "body": "<p>Read these in order or choose the question that feels most useful today.</p>",
-      "heading": "Five simple places to begin.",
-      "kicker": "Start here",
+      "body": "<p>Test: Read these in order or choose the question that feels most useful today.</p>",
+      "heading": "Test: Five simple places to begin.",
+      "kicker": "Test: Start here",
       "limit": 5,
       "source": {
         "kind": "query",
