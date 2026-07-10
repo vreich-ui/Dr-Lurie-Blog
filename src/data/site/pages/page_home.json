@@ -1,11 +1,14 @@
 {
   "__generated": {
-    "at": "2026-07-10T08:42:13.853Z",
+    "at": "2026-07-09T11:38:06.504Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 17
+    "record_version": 4
   },
-  "pageType": "standard",
-  "route": "/_cms-disabled/home-field-test",
+  "navigationOverrides": {
+    "footer": "nav_footer_home"
+  },
+  "pageType": "home",
+  "route": "/",
   "sections": [
     {
       "data": {
@@ -27,26 +30,71 @@
             }
           }
         ],
-        "body": "A calmer, clearer way to begin caring for your skin — without complicated routines, product pressure, or trend-led advice.\n\nDr. Lurié Skin Care helps newcomers understand the basics of healthy skin, choose simple next steps, and build confidence through physician-led education.",
+        "body": "<p>A calmer, clearer way to begin caring for your skin — without complicated routines, product pressure, or trend-led advice.</p><p>Dr. Lurié Skin Care helps newcomers understand the basics of healthy skin, choose simple next steps, and build confidence through physician-led education.</p>",
         "heading": "Healthy Skin for Skincare Newcomers",
         "kicker": "Physician-led skin health education"
       },
-      "id": "s_homehero",
-      "type": "hero",
-      "visibility": "public"
+      "id": "s_hero",
+      "type": "hero"
+    },
+    {
+      "data": {
+        "anchor": "audience",
+        "heading": "You want skincare to feel understandable.",
+        "items": [
+          "You are new to skincare and want a calm place to begin.",
+          "You want to understand what your skin needs before buying more products.",
+          "You prefer physician-led education over trend-driven routines.",
+          "You want simple explanations that respect both science and everyday life."
+        ],
+        "kicker": "This is for you if…"
+      },
+      "id": "s_audience",
+      "type": "checklist"
+    },
+    {
+      "data": {
+        "anchor": "start-here",
+        "body": "<p>Read these in order or choose the question that feels most useful today.</p>",
+        "heading": "Five simple places to begin.",
+        "kicker": "Start here",
+        "limit": 5,
+        "source": {
+          "kind": "query",
+          "query": {
+            "sort": "published_time_desc"
+          }
+        }
+      },
+      "id": "s_startgrid",
+      "type": "content_grid"
+    },
+    {
+      "data": {
+        "anchor": "about",
+        "body": "<p>Dr. Lurié brings a physician and scientist’s lens to skin health education, translating complex ideas into steady guidance for people who are beginning their skincare journey.</p>",
+        "disclaimer": "Educational content only. Not medical advice.",
+        "heading": "Meet Dr. Lurié",
+        "kicker": "About",
+        "trustNotes": [
+          "Physician-led perspective on skin health education.",
+          "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
+          "Clear explanations designed for people who are just beginning to care for their skin intentionally."
+        ]
+      },
+      "id": "s_bio",
+      "type": "bio"
+    },
+    {
+      "data": {
+        "section": "sec_newsletter_signup"
+      },
+      "id": "s_newsletter",
+      "type": "shared_ref"
     }
   ],
   "seo": {
-    "description": "A calmer, clearer way to begin caring for your skin without complicated routines, product pressure, or trend-led advice.",
-    "robots": {
-      "follow": true,
-      "index": true
-    },
-    "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
+    "ogImage": "/Social/og-home.jpg"
   },
-  "template": {
-    "instantiated_at": "2026-07-10T08:42:00.000Z",
-    "ref": "tpl_fieldtest"
-  },
-  "title": "Disabled CMS Home Field Test"
+  "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
 }

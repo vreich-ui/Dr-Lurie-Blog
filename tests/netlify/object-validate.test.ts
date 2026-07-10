@@ -33,6 +33,9 @@ const validPageBody = () => ({
   pageType: 'home' as const,
   title: 'Dr. Lurié Skin Care',
   seo: { description: 'Science-first skincare education.', robots: { index: true, follow: true } },
+  // A 'home' PageType page must carry this (structure_home_footer) — see
+  // check6's dedicated tests for what happens when it's absent.
+  navigationOverrides: { footer: 'nav_footer_home' },
   sections: [
     {
       id: 's_hero',
@@ -154,7 +157,11 @@ test('check3 refs REJECTION: a content_grid query naming an inactive term is rej
 });
 
 test('check3 refs: route-kind targets are ALLOWED (Gap Note 2 lifecycle), never rejected', () => {
-  const body = validPageBody(); // hero action already uses {kind:'route'}
+  // navigationOverrides dropped: irrelevant to what this test proves, and the
+  // stub resolver below (everything "exists:false") would otherwise make ITS
+  // real reference report missing, which isn't what this test is about.
+  const { navigationOverrides: _drop, ...body } = validPageBody(); // hero action already uses {kind:'route'}
+  void _drop;
   // Even with a resolver that would reject any object lookup, a route-kind target
   // triggers no lookup at all, so reference integrity never reports `missing`.
   const context = resolvingContext({ resolveObject: () => ({ exists: false }) });
@@ -239,20 +246,23 @@ test('check5 artifact trust REJECTION: data URIs, remote URLs, legacy paths, and
 // ═══ check 6: structural invariants (the in-scope warn-vs-reject axis) ════════
 
 test('check6 structure: a page with a visible section passes', () => {
-  assert.equal(statusOf(checkStructuralInvariants('page', validPageBody(), {}, true), 'structure_visible'), 'complete');
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', validPageBody(), {}, true), 'structure_visible'),
+    'complete'
+  );
 });
 
 test('check6 structure WARN-ONLY: zero visible sections warns while drafting', () => {
   const body = validPageBody();
   for (const section of body.sections) (section as { visibility?: string }).visibility = 'hidden';
-  const criteria = checkStructuralInvariants('page', body, {}, false); // atPublish = false
+  const criteria = checkStructuralInvariants('page', 'page_home', body, {}, false); // atPublish = false
   assert.equal(statusOf(criteria, 'structure_visible'), 'warning');
 });
 
 test('check6 structure REJECTION: zero visible sections is a hard failure at publish', () => {
   const body = validPageBody();
   for (const section of body.sections) (section as { visibility?: string }).visibility = 'hidden';
-  const criteria = checkStructuralInvariants('page', body, {}, true); // atPublish = true
+  const criteria = checkStructuralInvariants('page', 'page_home', body, {}, true); // atPublish = true
   assert.equal(statusOf(criteria, 'structure_visible'), 'missing');
 });
 
@@ -260,7 +270,10 @@ test('check6 structure REJECTION: a section type outside PageType.allowedSection
   const body = validPageBody();
   const context: ObjectValidationContext = { pageType: { id: 'home', allowedSections: ['hero'] } };
   // body has a 'bio' section, which is not allowed.
-  assert.equal(statusOf(checkStructuralInvariants('page', body, context, false), 'structure_allowed'), 'missing');
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', body, context, false), 'structure_allowed'),
+    'missing'
+  );
 });
 
 test('check6 structure WARN-ONLY vs REJECTION: a missing required section warns in draft, rejects at publish', () => {
@@ -268,8 +281,14 @@ test('check6 structure WARN-ONLY vs REJECTION: a missing required section warns 
   const context: ObjectValidationContext = {
     pageType: { id: 'home', allowedSections: 'any', requiredSections: ['newsletter_signup'] },
   };
-  assert.equal(statusOf(checkStructuralInvariants('page', body, context, false), 'structure_required'), 'warning');
-  assert.equal(statusOf(checkStructuralInvariants('page', body, context, true), 'structure_required'), 'missing');
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', body, context, false), 'structure_required'),
+    'warning'
+  );
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', body, context, true), 'structure_required'),
+    'missing'
+  );
 });
 
 test('check6 structure: shared_ref effective type is resolved for allowed-section checks', () => {
@@ -280,15 +299,56 @@ test('check6 structure: shared_ref effective type is resolved for allowed-sectio
     resolveSharedSectionType: () => 'newsletter_signup',
   };
   // The shared section resolves to newsletter_signup, which is not allowed → reject.
-  assert.equal(statusOf(checkStructuralInvariants('page', body, context, false), 'structure_allowed'), 'missing');
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', body, context, false), 'structure_allowed'),
+    'missing'
+  );
 });
 
 test('check6 structure: types without their own structural rules report optional', () => {
   // navigation gained its own rules with T2.1 (an unrecognized body reports
   // nav_structure optional; the real rules are tested in
   // object-validate-navigation.test.ts); site remains rule-free here.
-  assert.equal(statusOf(checkStructuralInvariants('navigation', {}, {}, true), 'nav_structure'), 'optional');
-  assert.equal(statusOf(checkStructuralInvariants('site', {}, {}, true), 'structure'), 'optional');
+  assert.equal(statusOf(checkStructuralInvariants('navigation', 'nav_x', {}, {}, true), 'nav_structure'), 'optional');
+  assert.equal(statusOf(checkStructuralInvariants('site', 'site_x', {}, {}, true), 'structure'), 'optional');
+});
+
+// Regression guard for the 2026-07-10 incident: four real production publishes
+// stripped page_home down to one section with no navigationOverrides, which
+// passed validation the whole way (schema-optional) and only surfaced as a
+// site-wide Netlify build crash (src/pages/index.astro hardcodes loading id
+// 'page_home' and unconditionally throws without navigationOverrides.footer).
+test('check6 structure: page_home (by id) REQUIRES navigationOverrides.footer — warn draft, reject publish', () => {
+  const { navigationOverrides: _drop, ...body } = validPageBody();
+  void _drop;
+  const draft = checkStructuralInvariants('page', 'page_home', body, {}, false);
+  assert.equal(statusOf(draft, 'structure_home_footer'), 'warning');
+  const publish = checkStructuralInvariants('page', 'page_home', body, {}, true);
+  assert.equal(statusOf(publish, 'structure_home_footer'), 'missing');
+});
+
+test('check6 structure: pageType "home" REQUIRES it too, even under a DIFFERENT object id', () => {
+  // Proves the OR-gate: the incident also changed page_home's OWN pageType away
+  // from 'home' partway through, which did nothing to stop the crash (the
+  // renderer's coupling is id-based, not pageType-based) — so this checks the
+  // other direction: a page declaring pageType 'home' under a different id is
+  // caught too, not just literal id 'page_home'.
+  const { navigationOverrides: _drop, ...body } = validPageBody();
+  void _drop;
+  const criteria = checkStructuralInvariants('page', 'page_other', body, {}, true);
+  assert.equal(statusOf(criteria, 'structure_home_footer'), 'missing');
+});
+
+test('check6 structure: a complete navigationOverrides.footer passes; an ordinary non-home page is exempt', () => {
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', validPageBody(), {}, true), 'structure_home_footer'),
+    'complete'
+  );
+  const ordinary = { ...validPageBody(), pageType: 'standard' as const, navigationOverrides: undefined };
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_other', ordinary, {}, true), 'structure_home_footer'),
+    undefined
+  );
 });
 
 // ═══ pipeline composition + summary ══════════════════════════════════════════
@@ -523,21 +583,24 @@ test('refs: a shared_ref to a real non-ref section stays clean', () => {
 // ═══ #6 route shape + uniqueness ══════════════════════════════════════════════
 
 test('structure: a route already used by another page is rejected', () => {
-  const criteria = checkStructuralInvariants('page', validPageBody(), { isRouteTaken: () => true }, false);
+  const criteria = checkStructuralInvariants('page', 'page_home', validPageBody(), { isRouteTaken: () => true }, false);
   assert.equal(statusOf(criteria, 'structure_route'), 'missing');
 });
 
 test('structure: a unique route passes; a malformed route is rejected; no resolver → optional', () => {
   assert.equal(
     statusOf(
-      checkStructuralInvariants('page', validPageBody(), { isRouteTaken: () => false }, false),
+      checkStructuralInvariants('page', 'page_home', validPageBody(), { isRouteTaken: () => false }, false),
       'structure_route'
     ),
     'complete'
   );
   const bad = { ...validPageBody(), route: 'start-here' }; // missing leading slash
-  assert.equal(statusOf(checkStructuralInvariants('page', bad, {}, false), 'structure_route'), 'missing');
-  assert.equal(statusOf(checkStructuralInvariants('page', validPageBody(), {}, false), 'structure_route'), 'optional');
+  assert.equal(statusOf(checkStructuralInvariants('page', 'page_home', bad, {}, false), 'structure_route'), 'missing');
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_home', validPageBody(), {}, false), 'structure_route'),
+    'optional'
+  );
 });
 
 // ═══ #9 taxonomy registry integrity ═══════════════════════════════════════════
