@@ -1,5 +1,28 @@
 # AGENTS (Project rules)
 
+## Definition of "converted" — NO HALF MEASURES (Wolf, 2026-07-10, GOVERNING)
+
+The project goal is: **agents edit objects on every page through the MCP.** "Convert
+an object" means exactly that and nothing less. An object is converted ONLY when ALL
+five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.md`):
+
+1. **Renders** in Astro from the object (the four build gates).
+2. **Store-backed** — a real record in the **production object store** (`object_inventory`
+   returns it), not merely a committed git export. A rendered export with no store
+   record is a **rendered stub, not a converted object**.
+3. **Round-trips** — an agent can perform **every permitted action** end-to-end via MCP
+   (checkout → each patch op → publish → release → re-render), proven not assumed.
+4. **Contract-complete** — every permitted action is in `object_contract` AND backed by
+   a real MCP server tool. A permitted action with no tool/contract entry is itself part
+   of the conversion — build it.
+5. **Recorded** — `object-inventory.md` row + `state-of-play.md` entry, same change.
+   **No record = not converted.**
+
+Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
+X passes all five); **after every session, update the documentation** (no written record
+= not converted). Reality as of 2026-07-10: only `nav_header`/`nav_footer`/`nav_footer_home`
+are converted; the 12 page exports are rendered stubs.
+
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 
 The system standardizes on **Contentful's content model**: typed entry objects

@@ -46,7 +46,11 @@ Copy these shapes when building any new object. Everything else is a variation.
 
 ### Level 1 — Page (an entry that owns an ordered list of components)
 
-Exists and works today (8 live pages). A page = route + metadata + ordered sections.
+A page = route + metadata + ordered sections. **12 pages RENDER today from committed
+exports; ZERO are fully CONVERTED** (store-backed + agent-editable via MCP) — see the
+definition of done in [`conversion-playbook.md`](conversion-playbook.md) and the
+per-page status + root-cause analysis in [`object-inventory.md`](object-inventory.md).
+"Renders" is a milestone, not done.
 
 ```jsonc
 {
@@ -182,10 +186,17 @@ one; every trap in it was hit for real once.
 
 ## Status and the path to done (ordered; sized for a Sonnet-class model)
 
-**Already built and tested** (876 tests): object store + envelope, locks, patch
+**Already built and tested** (881 tests): object store + envelope, locks, patch
 grammar + inverses, validation, self-describing `object_contract`, publish +
-materializers, build-diff harness, 8 live pages, navigation, 17 component types,
+materializers, build-diff harness, navigation (3 objects CONVERTED — store-backed +
+agent-editable), 12 pages RENDERING (not yet converted), 17 component types,
 container bounds (`allowedChildren`).
+
+**The real gap between here and the goal** (agents editing every page via MCP) is NOT
+more page-rendering — it is: seeding objects into the production store (needs
+credentials), the missing MCP verbs (archive/unpublish; nested-block ops), the
+`content_item` resolver, and a standing round-trip test. Full analysis:
+[`object-inventory.md`](object-inventory.md) "Why only nav is converted."
 
 | #   | Task                                                                                                                                                            | Size        |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |

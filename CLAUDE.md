@@ -1,5 +1,33 @@
 # Dr-Lurie-Blog — CLAUDE.md
 
+## Definition of "converted" — NO HALF MEASURES (Wolf, 2026-07-10, GOVERNING)
+
+The entire project goal is: **agents can change objects on every page — add
+permitted objects, edit them — through the MCP.** So "convert an object" means
+exactly this and nothing less. An object counts as converted ONLY when **all five**
+hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`](docs/cms-architecture/conversion-playbook.md)):
+
+1. **Renders** in Astro from the object (the four build gates).
+2. **Store-backed** — a real record in the **production object store**
+   (`object_inventory` returns it), not merely a committed git export. _A rendered
+   export with no store record is a **rendered stub, not a converted object.**_
+3. **Round-trips** — an agent can perform **every permitted action** end-to-end via
+   MCP (checkout → each patch op → publish → release → re-render), proven not assumed.
+4. **Contract-complete** — every permitted action is in `object_contract` AND backed
+   by an actual MCP server tool. **A permitted action with no tool/contract entry is
+   itself part of the conversion** — build it; the object is not done without it.
+5. **Recorded** — `object-inventory.md` row + `state-of-play.md` entry, same change.
+   **No record = not converted.**
+
+**Hard rules that follow:**
+
+- **No half measures, no unfinished work.** A "convert X" task is done only when X
+  passes all five. Rendering-only work is labelled "rendered, not converted."
+- **After EVERY session, update the documentation.** An object does not count as
+  converted without a written record of it (inventory row + session-log entry).
+- Reality as of 2026-07-10: only `nav_header`, `nav_footer`, `nav_footer_home` are
+  actually converted. The 12 page exports render but are rendered stubs.
+
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
 The system standardizes on **Contentful's content model**: typed entry objects

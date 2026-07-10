@@ -2,8 +2,9 @@
 
 **What this is:** the human-readable catalog of every content object the Dr. Lurié
 site is (or should be) made of — what each object is _for_, where its _boundaries_
-are, and whether it is **LIVE**, a **SHELL**, or still a **TODO**. Read this to
-understand "what can an agent actually edit today, and what is still hand-coded."
+are, and whether it is **CONVERTED** (agent-editable), merely **RENDERS**, a
+**SHELL**, or still a **TODO**. Read this to understand "what can an agent actually
+edit today, and what is still hand-coded."
 
 **This is a standing reference, not a session log.** The session-by-session
 narrative lives in [`cms-pipeline/state-of-play.md`](cms-pipeline/state-of-play.md).
@@ -29,19 +30,37 @@ territory. The territory is: the production object store, `main`, and the live
   `object_inventory` (store state) and `main` (rendered state). Before claiming a
   boundary, verify against `object_contract('<type>')` — that tool is _derived from
   the enforcing code_ and cannot drift; this doc can.
-- **Status is a claim about reality, not intent.** Mark something LIVE only when it
-  actually drives the live site _and_ is editable through the object workflow. If
-  only one of those is true, it is a SHELL — say which half is missing.
+- **Status is a claim about reality, not intent.** Mark something CONVERTED only when
+  it actually drives the live site _and_ is agent-editable through the MCP (all five
+  playbook criteria). If it only renders, it is RENDERS, not CONVERTED — never
+  overstate it.
 - **Keep it plain.** This page is read by humans deciding what to work on. Schemas,
   op names, and field lists belong in `object_contract`, not here.
+
+### Two different states — do not conflate them (Wolf, 2026-07-10)
+
+A page can **render** from a committed export while having **no editable record in
+the production store**. These are different, and only the second is "converted"
+([`conversion-playbook.md`](conversion-playbook.md) definition of done):
+
+- **RENDERS** — Astro builds the page from `src/data/site/pages/*.json`. Cheap; a
+  git commit is enough.
+- **CONVERTED** — a real record exists in the production object store and an agent
+  can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
+  This needs production credentials and a proven round-trip.
+
+**Today, as of 2026-07-10, only three objects are CONVERTED:** `nav_header`,
+`nav_footer`, `nav_footer_home`. Every page below RENDERS but is a **rendered stub**
+— not store-backed, not agent-editable. See "Why only nav is converted" at the
+bottom.
 
 ### Status legend
 
 | Mark             | Meaning                                                                                                                                                                                                                                          |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 🟢 **LIVE**      | Real content. Drives the live site **and** is editable through the object verbs (create → checkout → patch → publish).                                                                                                                           |
+| 🟢 **CONVERTED** | Real content, renders live **and** an agent can fully manipulate it through the MCP (the playbook's 5 criteria all met). Only nav today.                                                                                                         |
+| 🟣 **RENDERS**   | Builds and serves from a committed export, but has **no editable store record** — a rendered stub, not converted. Most "pages" are here.                                                                                                         |
 | 🟡 **SHELL**     | Exists structurally (a record is published, or a route is scaffolded) but is a **placeholder, a test artifact, or not yet wired to drive the live site**. The real source of truth is still somewhere else. The note says which half is missing. |
-| 🔵 **IN REVIEW** | Built and verified; a PR is open but not merged. Becomes LIVE on merge (+ store publish where noted).                                                                                                                                            |
 | 🔴 **TODO**      | Needed for the CMS MVP. Not built yet.                                                                                                                                                                                                           |
 
 ---
@@ -83,36 +102,42 @@ repeated. The live list + each type's field schema is `registry_get('component')
 
 ## Object inventory (concrete records)
 
-### Pages
+### Pages — 12 render; **0 fully converted** (none is store-backed + round-trippable)
 
-| Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                  |
-| --------------------- | ------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `page_home`           | `/`                       | 🟢 LIVE      | Homepage; renders via `resolvePage`; owns the `nav_footer_home` footer override and a `shared_ref` to the newsletter section. Grid: the invalid `static` placeholder was retired for a live `query` (latest posts) in PR #380; manual curation deferred (content_item resolver gap — playbook trap 4). |
-| `page_start_here`     | `/start-here`             | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
-| `page_member_updates` | `/member-updates`         | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
-| `page_newsletter`     | `/newsletter`             | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
-| `page_free_guide`     | `/guides/free-guide`      | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
-| `page_early_access`   | `/solutions/early-access` | 🟢 LIVE      | Lede-family interior page.                                                                                                                                                                                                                                                                             |
-| `page_thank_you`      | `/thank-you`              | 🟢 LIVE      | Bespoke section; owns the per-form message-swap script as fixed furniture.                                                                                                                                                                                                                             |
-| `page_about`          | `/about`                  | 🟢 LIVE      | Bespoke `about` section; prose is fixed furniture, only clean fields are data (merged PR #374).                                                                                                                                                                                                        |
-| `page_contact`        | `/contact`                | 🟢 LIVE      | Bespoke `contact` widget-composition section: re-invokes HeroText/Contact/Features2 with props promoted to object data (merged PR #375).                                                                                                                                                               |
-| `page_privacy`        | `/privacy`                | 🔵 IN REVIEW | `system` PageType, one reusable `prose` section (full legal text, headings/lists via `splitRichTextBlocks`). Built through the real MCP lifecycle (PR #380).                                                                                                                                           |
-| `page_terms`          | `/terms`                  | 🔵 IN REVIEW | `system` PageType, one reusable `prose` section — same process as privacy (PR #380).                                                                                                                                                                                                                   |
-| `page_404`            | `/404`                    | 🔵 IN REVIEW | `system` PageType, one reusable `cta_banner` section; the route file stays at Astro's required error-page path (PR #380).                                                                                                                                                                              |
+All 12 build and serve from committed exports (🟣 RENDERS). **None is CONVERTED** —
+no agent can edit them via MCP, because no editable store record backs them (except
+`page_home`, whose store record exists but is broken; see notes).
+
+| Object                | Route                     | Status     | Notes                                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page_home`           | `/`                       | 🟣 RENDERS | Renders via `resolvePage`; owns the `nav_footer_home` override + newsletter `shared_ref`. **Its production store record IS the broken 2026-07-10 field-test stub** — the git export was restored (PR #383) but the store record still needs a credentialed re-publish to match. |
+| `page_start_here`     | `/start-here`             | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
+| `page_member_updates` | `/member-updates`         | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
+| `page_newsletter`     | `/newsletter`             | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
+| `page_free_guide`     | `/guides/free-guide`      | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
+| `page_early_access`   | `/solutions/early-access` | 🟣 RENDERS | Lede-family interior page. Not store-backed.                                                                                                                                                                                                                                    |
+| `page_thank_you`      | `/thank-you`              | 🟣 RENDERS | Bespoke section (anti-pattern); message-swap script as furniture. Not store-backed.                                                                                                                                                                                             |
+| `page_about`          | `/about`                  | 🟣 RENDERS | Bespoke `about` section (anti-pattern), PR #374. Not store-backed.                                                                                                                                                                                                              |
+| `page_contact`        | `/contact`                | 🟣 RENDERS | Bespoke `contact` section (anti-pattern), PR #375. Not store-backed.                                                                                                                                                                                                            |
+| `page_privacy`        | `/privacy`                | 🟣 RENDERS | `system` PageType, reusable `prose` section (PR #380). Not store-backed.                                                                                                                                                                                                        |
+| `page_terms`          | `/terms`                  | 🟣 RENDERS | `system` PageType, reusable `prose` section (PR #380). Not store-backed.                                                                                                                                                                                                        |
+| `page_404`            | `/404`                    | 🟣 RENDERS | `system` PageType, reusable `cta_banner` section (PR #380). Not store-backed.                                                                                                                                                                                                   |
 
 ### Shared sections
 
-| Object                  | Used by                        | Status  | Notes                                   |
-| ----------------------- | ------------------------------ | ------- | --------------------------------------- |
-| `sec_newsletter_signup` | `page_home` (via `shared_ref`) | 🟢 LIVE | The one genuinely-shared section today. |
+| Object                  | Used by                        | Status     | Notes                                                            |
+| ----------------------- | ------------------------------ | ---------- | ---------------------------------------------------------------- |
+| `sec_newsletter_signup` | `page_home` (via `shared_ref`) | 🟣 RENDERS | The one genuinely-shared section; renders, but not store-backed. |
 
 ### Navigation
 
-| Object            | Role                    | Status  | Notes                                                                                                                                                                                                                         |
-| ----------------- | ----------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `nav_header`      | Site header             | 🟢 LIVE | Store-published. Still carries a field-test description at store `record_version 52` — restoring the original needs a store-side `object_patch` + publish, not a file edit (a direct export edit would drift from the store). |
-| `nav_footer`      | Default footer          | 🟢 LIVE | Rendered on every page without a footer override.                                                                                                                                                                             |
-| `nav_footer_home` | Homepage footer variant | 🟢 LIVE | Applied via `page_home.navigationOverrides.footer`.                                                                                                                                                                           |
+**The only truly CONVERTED objects today** — store-backed and agent-editable via MCP.
+
+| Object            | Role                    | Status       | Notes                                                                                                                                                                                    |
+| ----------------- | ----------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nav_header`      | Site header             | 🟢 CONVERTED | Store-backed (record_version ~54), agent-editable — proven by real edits this project. Still carries a field-test description that a store-side `object_patch` + publish should restore. |
+| `nav_footer`      | Default footer          | 🟢 CONVERTED | Store-backed, agent-editable; rendered on every page without a footer override. Store review_state is `changes_requested` from an old review never resolved.                             |
+| `nav_footer_home` | Homepage footer variant | 🟢 CONVERTED | Store-backed, agent-editable; applied via `page_home.navigationOverrides.footer`.                                                                                                        |
 
 ### Singletons & templates
 
@@ -206,4 +231,47 @@ pages to the article (`content_item`) pipeline.
   (site config) and article frontmatter (taxonomy). Until TODO #2 and #3 land, edits
   to those do **not** flow through the object workflow.
 
-_Last audited: 2026-07-09, on `claude/system-pages-and-grid` (PR #380: privacy/terms/404 cutovers + homepage grid query retrofit + site-wide noindex guard)._
+---
+
+## Why only nav is converted — the roadmap blocker (root-cause analysis, 2026-07-10)
+
+The goal is agents editing objects on every page via MCP. We are far from it, and
+here is the honest why:
+
+1. **"Converted" was defined as "renders," so half-done work looked finished.** Every
+   page "cutover" produced a committed export that Astro renders and stopped there.
+   The editability half — a real store record an agent can round-trip — was labelled
+   a "deferred handoff" and **never executed**. The playbook now forbids this: see
+   its definition of done.
+2. **The store-seed + publish step needs production credentials no working session
+   has had.** `object_publish`'s real path commits via the GitHub Git-Data API and
+   requires `GITHUB_CONTENT_TOKEN` + `GITHUB_REPOSITORY` (and the MCP write path needs
+   `PUBLISH_SECRET`). Every conversion session ran in a sandbox without them, so the
+   real seed could only be _rehearsed_ against a local file-backed store, never
+   completed against production. That is the single biggest reason only nav is real:
+   **nav_header/nav_footer/nav_footer_home were published in an earlier, credentialed
+   phase; nothing since was.**
+3. **The MCP tool/action surface is incomplete for "full manipulation."** Concrete
+   gaps found 2026-07-10:
+   - **No lifecycle removal verb** — 14 object tools exist, none can archive/delete or
+     unpublish an object (`object_publish` rejects `null`). So the field-test junk
+     records can't be removed, and "delete a page" is impossible via MCP.
+   - **No nested-block patch ops** — `upsert_block`/`move_block`/etc. from
+     [`block-tree.md`](block-tree.md) were designed but never built; only flat
+     section ops (`upsert_section`, `update_section_data`, …) exist. Fine while
+     sections stay flat; a hard blocker the moment nesting is real.
+   - **`content_item` reference resolution is stubbed** — so a `content_grid` `manual`
+     source can't validate against real articles (playbook trap 4).
+4. **No standing round-trip verification.** Nothing repeatably proves an object is
+   agent-editable; the one-off driver scripts were thrown away each session.
+
+**What "finishing the roadmap" therefore requires (the honest remaining work):** a
+credentialed publishing path (or a documented human-run step) to seed each object
+into the production store; the missing MCP verbs (archive/unpublish) and, when
+nesting lands, the block ops; the `content_item` resolver; and a standing test that
+drives create→patch→publish→render per object as the enforceable "converted" gate.
+Until those exist, a "convert this page" task cannot actually be completed — say so
+rather than shipping a rendered stub.
+
+_Last audited: 2026-07-10, `claude/*` (PR #383 homepage-footer regression fix +
+definition-of-done reset). Prior: PR #380 (privacy/terms/404 render + grid retrofit)._
