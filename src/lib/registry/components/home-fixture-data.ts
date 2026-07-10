@@ -1,18 +1,24 @@
 /**
- * The C§1.1 homepage section data (with the M-9 fields), copy-verbatim from
- * the audited index.astro literals. This is the render-verification fixture
- * for T3.2 (scripts/verify-section-components.mjs renders the components
- * from this data and requires the output to match the live homepage
- * fragment-for-fragment) and the data source T3.5's seed script assembles
- * the page_home record from — one transcription, used by both, so the
- * fixture the components were proven against IS the seed.
+ * The homepage section data — one transcription, used by both the render
+ * gate (scripts/verify-section-components.mjs renders the components from
+ * this data and requires the output to match the live homepage
+ * fragment-for-fragment) and the seed (scripts/lib/page-home-seed-data.mjs,
+ * pinned deep-equal by tests/netlify/page-home-seed.test.ts), so the fixture
+ * the components were proven against IS the seed.
  *
- * Deliberate C§1.1 deviations, both recorded:
- *   - checklist kicker/heading per the M-9 record (05 doc): row 2's literal
- *     `heading:'This is for you if…'` would have dropped the audited h2.
- *   - hero action targets are transitional `route`-kind (Gap Note 2): the
- *     row-1 `page`-kind targets need page_start_here / page_newsletter,
- *     which arrive in P4 — same transitional rule the navigation seeds used.
+ * Home-page conversion restructure (2026-07-10): the two audited card grids —
+ * "This is for you if…" (formerly a `checklist` inline section) and the
+ * "Start here" article grid — are both instances of the ONE reusable
+ * `content_grid` type, each stored as its own shared `section` object
+ * (sec_home_audience_grid / sec_home_start_grid) the page references via
+ * `shared_ref`. Hero and bio remain inline on the page. Copy is verbatim from
+ * the audited literals.
+ *
+ * Standing deviations, both recorded:
+ *   - hero action targets are transitional `route`-kind (Gap Note 2) until
+ *     nav targets are upgraded to `page`-kind (T3.11/T4.5);
+ *   - the start-here grid uses the settled M-8 `query` source (latest posts),
+ *     applied by PR #380 — not the retired placeholder cards.
  */
 import type { SectionDataOf } from './types.js';
 
@@ -28,49 +34,33 @@ export const homeHeroData: SectionDataOf<'hero'> = {
   ],
 };
 
-export const homeChecklistData: SectionDataOf<'checklist'> = {
+/** The audience grid — curated text cells (`cards` source), shared object sec_home_audience_grid. */
+export const homeAudienceGridData: SectionDataOf<'content_grid'> = {
   kicker: 'This is for you if…',
   heading: 'You want skincare to feel understandable.',
-  items: [
-    'You are new to skincare and want a calm place to begin.',
-    'You want to understand what your skin needs before buying more products.',
-    'You prefer physician-led education over trend-driven routines.',
-    'You want simple explanations that respect both science and everyday life.',
-  ],
+  source: {
+    kind: 'cards',
+    cards: [
+      { description: 'You are new to skincare and want a calm place to begin.' },
+      { description: 'You want to understand what your skin needs before buying more products.' },
+      { description: 'You prefer physician-led education over trend-driven routines.' },
+      { description: 'You want simple explanations that respect both science and everyday life.' },
+    ],
+  },
+  limit: 4,
   anchor: 'audience',
 };
 
-export const homeContentGridData: SectionDataOf<'content_grid'> = {
+/** The start-here grid — latest published posts (`query` source), shared object sec_home_start_grid. */
+export const homeStartGridData: SectionDataOf<'content_grid'> = {
   kicker: 'Start here',
   heading: 'Five simple places to begin.',
   body: '<p>Read these in order or choose the question that feels most useful today.</p>',
   source: {
-    kind: 'static',
-    cards: [
-      {
-        title: 'What Healthy Skin Means',
-        description:
-          'A plain-language starting point for understanding comfort, resilience, and consistency in your skin.',
-      },
-      {
-        title: 'How to Build a Simple Skincare Routine',
-        description:
-          'The essential steps to begin with, what each one is meant to do, and why more is not always better.',
-      },
-      {
-        title: 'How to Choose Products Without Feeling Overwhelmed',
-        description: 'A practical way to read claims, compare options, and focus on what your skin actually needs.',
-      },
-      {
-        title: 'What to Do When Your Skin Feels Sensitive',
-        description:
-          'How to slow down, simplify your routine, and notice the patterns that may be affecting your skin.',
-      },
-      {
-        title: 'When to Ask a Dermatology Professional',
-        description: 'A guide to knowing when education is enough and when a skin concern deserves medical attention.',
-      },
-    ],
+    kind: 'query',
+    query: {
+      sort: 'published_time_desc',
+    },
   },
   limit: 5,
   anchor: 'start-here',

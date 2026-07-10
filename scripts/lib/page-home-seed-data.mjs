@@ -1,39 +1,42 @@
 /**
- * T3.4 + T3.5 — seed data for the first Page-object migration: the shared
- * newsletter section (`sec_newsletter_signup`, C§1.1 row 5 / C§1.5) and the
- * homepage record (`page_home`, C§1.1 with amendment M-9 fields).
+ * Seed data for the home-page object family: the two shared grid sections
+ * (`sec_home_audience_grid`, `sec_home_start_grid` — both instances of the ONE
+ * reusable `content_grid` type), the shared newsletter section
+ * (`sec_newsletter_signup`), and the homepage record (`page_home`).
  *
- * Copy is verbatim from the audited index.astro literals. The SAME section
- * data lives, typed, in src/lib/registry/components/home-fixture-data.ts —
- * the fixture the T3.2 render gate proved the components against. A test
+ * Home-page conversion restructure (2026-07-10): hero and bio stay inline on
+ * the page; the two audited card grids are standalone shared `section`
+ * objects the page references via `shared_ref`, so an agent can edit or
+ * repoint each grid independently (and reuse them on other pages) with no
+ * code change. The audience grid uses the sanctioned `cards` source (curated
+ * text cells — replaced the retired transitional `static` variant, playbook
+ * trap 9); the start-here grid keeps the settled M-8 `query` source.
+ *
+ * Copy is verbatim from the audited literals. The SAME section data lives,
+ * typed, in src/lib/registry/components/home-fixture-data.ts — the fixture
+ * the render gate proves the components against. A test
  * (tests/netlify/page-home-seed.test.ts) pins the two transcriptions
  * deep-equal so they cannot drift; this file exists because plain-node seed
  * scripts cannot import TypeScript (same split as navigation-seed-data.mjs).
  *
- * Deliberate C§1.1 deviations (both recorded in the 05 doc's M-9 note and
- * home-fixture-data.ts):
- *   - checklist kicker/heading per M-9 (the row-2 literal would drop the
- *     audited h2);
+ * Standing deviations (recorded in home-fixture-data.ts too):
  *   - hero action targets are transitional `route`-kind (Gap Note 2) until
- *     page_start_here / page_newsletter exist (P4);
- *   - s_startgrid ships as the transitional `static` cards variant for the
- *     byte-identical cutover; T3.9 applies the settled M-8 configuration
- *     post-cutover.
+ *     nav targets upgrade to `page`-kind (T3.11/T4.5).
  *
- * `navigationOverrides.footer` carries nav_footer_home (S-4): T3.6's cutover
- * makes PageLayout consume it, removing T2.5's interim direct reference in
- * index.astro.
+ * `navigationOverrides.footer` carries nav_footer_home (S-4); the
+ * `structure_home_footer` validation rule (2026-07-10 incident) blocks any
+ * patch/publish that would drop it.
  *
- * SEO note for T3.6: the audited homepage metadata sets ignoreTitleTemplate
- * (the title is used verbatim, no "| site" suffix). page.v1 `seo` has no
- * such flag — the `home` PageType's loader applies the verbatim-title
- * behavior, matching today's output. Recorded here so the cutover doesn't
- * rediscover it.
+ * SEO note: the audited homepage metadata sets ignoreTitleTemplate (the title
+ * is used verbatim, no "| site" suffix). page.v1 `seo` has no such flag — the
+ * `home` PageType's loader applies the verbatim-title behavior.
  */
 
 export const PAGE_HOME_SEED_SITE = 'site_drlurie';
 
 export const SECTION_NEWSLETTER_SIGNUP_ID = 'sec_newsletter_signup';
+export const SECTION_HOME_AUDIENCE_GRID_ID = 'sec_home_audience_grid';
+export const SECTION_HOME_START_GRID_ID = 'sec_home_start_grid';
 export const PAGE_HOME_ID = 'page_home';
 
 const newsletterSignupData = {
@@ -45,6 +48,36 @@ const newsletterSignupData = {
   anchor: 'newsletter',
 };
 
+const audienceGridData = {
+  kicker: 'This is for you if…',
+  heading: 'You want skincare to feel understandable.',
+  source: {
+    kind: 'cards',
+    cards: [
+      { description: 'You are new to skincare and want a calm place to begin.' },
+      { description: 'You want to understand what your skin needs before buying more products.' },
+      { description: 'You prefer physician-led education over trend-driven routines.' },
+      { description: 'You want simple explanations that respect both science and everyday life.' },
+    ],
+  },
+  limit: 4,
+  anchor: 'audience',
+};
+
+const startGridData = {
+  kicker: 'Start here',
+  heading: 'Five simple places to begin.',
+  body: '<p>Read these in order or choose the question that feels most useful today.</p>',
+  source: {
+    kind: 'query',
+    query: {
+      sort: 'published_time_desc',
+    },
+  },
+  limit: 5,
+  anchor: 'start-here',
+};
+
 /** Body of the shared 'section' object (the D§2.5 one-instance wrapper). */
 export const sectionNewsletterSignupBody = {
   section: {
@@ -54,7 +87,23 @@ export const sectionNewsletterSignupBody = {
   },
 };
 
-/** Body of page_home — C§1.1 order: hero, audience, startgrid, bio, newsletter ref. */
+export const sectionHomeAudienceGridBody = {
+  section: {
+    id: 's_audiencegrid',
+    type: 'content_grid',
+    data: audienceGridData,
+  },
+};
+
+export const sectionHomeStartGridBody = {
+  section: {
+    id: 's_startgrid',
+    type: 'content_grid',
+    data: startGridData,
+  },
+};
+
+/** Body of page_home — audited order: hero, audience grid, start grid, bio, newsletter, all grids/newsletter by reference. */
 export const pageHomeBody = {
   route: '/',
   pageType: 'home',
@@ -80,59 +129,13 @@ export const pageHomeBody = {
     },
     {
       id: 's_audience',
-      type: 'checklist',
-      data: {
-        kicker: 'This is for you if…',
-        heading: 'You want skincare to feel understandable.',
-        items: [
-          'You are new to skincare and want a calm place to begin.',
-          'You want to understand what your skin needs before buying more products.',
-          'You prefer physician-led education over trend-driven routines.',
-          'You want simple explanations that respect both science and everyday life.',
-        ],
-        anchor: 'audience',
-      },
+      type: 'shared_ref',
+      data: { section: SECTION_HOME_AUDIENCE_GRID_ID },
     },
     {
       id: 's_startgrid',
-      type: 'content_grid',
-      data: {
-        kicker: 'Start here',
-        heading: 'Five simple places to begin.',
-        body: '<p>Read these in order or choose the question that feels most useful today.</p>',
-        source: {
-          kind: 'static',
-          cards: [
-            {
-              title: 'What Healthy Skin Means',
-              description:
-                'A plain-language starting point for understanding comfort, resilience, and consistency in your skin.',
-            },
-            {
-              title: 'How to Build a Simple Skincare Routine',
-              description:
-                'The essential steps to begin with, what each one is meant to do, and why more is not always better.',
-            },
-            {
-              title: 'How to Choose Products Without Feeling Overwhelmed',
-              description:
-                'A practical way to read claims, compare options, and focus on what your skin actually needs.',
-            },
-            {
-              title: 'What to Do When Your Skin Feels Sensitive',
-              description:
-                'How to slow down, simplify your routine, and notice the patterns that may be affecting your skin.',
-            },
-            {
-              title: 'When to Ask a Dermatology Professional',
-              description:
-                'A guide to knowing when education is enough and when a skin concern deserves medical attention.',
-            },
-          ],
-        },
-        limit: 5,
-        anchor: 'start-here',
-      },
+      type: 'shared_ref',
+      data: { section: SECTION_HOME_START_GRID_ID },
     },
     {
       id: 's_bio',
@@ -162,14 +165,26 @@ export const pageHomeBody = {
 };
 
 /**
- * Ordered: the shared section MUST exist before the page that references it
- * (reference-integrity validation on page_home resolves it once wired).
+ * Ordered: every referenced section MUST exist before the page that
+ * references it (reference-integrity validation on page_home resolves them).
  */
 export const PAGE_HOME_SEEDS = [
   {
     objectType: 'section',
     objectId: SECTION_NEWSLETTER_SIGNUP_ID,
     body: sectionNewsletterSignupBody,
+    expectedWarningIds: [],
+  },
+  {
+    objectType: 'section',
+    objectId: SECTION_HOME_AUDIENCE_GRID_ID,
+    body: sectionHomeAudienceGridBody,
+    expectedWarningIds: [],
+  },
+  {
+    objectType: 'section',
+    objectId: SECTION_HOME_START_GRID_ID,
+    body: sectionHomeStartGridBody,
     expectedWarningIds: [],
   },
   { objectType: 'page', objectId: PAGE_HOME_ID, body: pageHomeBody, expectedWarningIds: [] },

@@ -1,0 +1,24 @@
+{
+  "__generated": {
+    "at": "2026-07-10T10:47:49.208Z",
+    "from": "objects/section/by-id/sec_home_start_grid.json",
+    "record_version": 8
+  },
+  "section": {
+    "data": {
+      "anchor": "start-here",
+      "body": "<p>Read these in order or choose the question that feels most useful today.</p>",
+      "heading": "Five simple places to begin.",
+      "kicker": "Start here",
+      "limit": 5,
+      "source": {
+        "kind": "query",
+        "query": {
+          "sort": "published_time_desc"
+        }
+      }
+    },
+    "id": "s_startgrid",
+    "type": "content_grid"
+  }
+}

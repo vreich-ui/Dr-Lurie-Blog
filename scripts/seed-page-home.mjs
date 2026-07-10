@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * T3.4 + T3.5 — seed the first Page-object migration drafts into the
- * site-objects store: `sec_newsletter_signup` (shared section, Tier 2) and
- * `page_home` (the C§1.1 homepage record), in that order — the page
- * references the section.
+ * Seed the home-page object family into the site-objects store: the three
+ * shared sections (`sec_newsletter_signup`, `sec_home_audience_grid`,
+ * `sec_home_start_grid`) and `page_home`, in that order — the page references
+ * the sections. (2026-07-10 restructure: the two grids are standalone shared
+ * objects of the one reusable `content_grid` type; the retired `static` grid
+ * variant is gone from the seed — playbook trap 9 is closed.)
  *
  * Bodies live in scripts/lib/page-home-seed-data.mjs; offline verification
  * (schema parses, fixture-data drift pin, validation with resolvers, T3.1
@@ -19,11 +21,12 @@
  *
  * SCHEMA-VINTAGE GATE (the T2.2 lesson, stronger this time): these bodies
  * use Phase 3 schema amendments — M-9 fields (kicker/anchor/disclaimer/grid
- * intro) and the M-8 grammar. The DEPLOYED create verb validates against the
- * schema code live on main. If --execute reports a schema rejection naming
- * an unrecognized key on those fields, the Phase 3 branch has not merged and
- * deployed yet — deploy first; do not "fix" the seed data to match the old
- * schema.
+ * intro), the M-8 grammar, and the 2026-07-10 `cards` grid source. The
+ * DEPLOYED create verb validates against the schema code live on main. If
+ * --execute reports a schema rejection naming an unrecognized key on those
+ * fields (or an unknown `cards` source kind), the branch carrying them has
+ * not merged and deployed yet — deploy first; do not "fix" the seed data to
+ * match the old schema.
  *
  * Idempotent like seed-navigation.mjs: 409 + byte-identical body → OK;
  * 409 + drifted body → loud refusal (someone edited the draft; reconcile by
@@ -109,7 +112,7 @@ if (verify) {
     console.error('[verify] MISMATCHES FOUND — see above.');
     process.exit(1);
   }
-  console.info('[verify] Both drafts match the seed data exactly.');
+  console.info('[verify] Every draft matches the seed data exactly.');
   process.exit(0);
 }
 
@@ -173,7 +176,7 @@ if (failed) {
   console.error('[seed-page-home] FAILED — see above. Drafts may need reconciling; nothing was published.');
   process.exit(1);
 }
-console.info('[seed-page-home] Both drafts are in place and validate clean.');
+console.info('[seed-page-home] All drafts are in place and validate clean.');
 console.info(
-  '[seed-page-home] Next: Tier 2 review + approval for sec_newsletter_signup and page_home (T3.4/T3.6 flow); the homepage cutover itself waits on T3.6.'
+  '[seed-page-home] Next: publish each section, then page_home (sections before the page), then release — scripts/home-conversion-roundtrip.mjs drives the full sequence.'
 );

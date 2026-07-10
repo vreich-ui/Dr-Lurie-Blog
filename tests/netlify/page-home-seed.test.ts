@@ -1,17 +1,18 @@
 /**
- * T3.4 + T3.5 offline verification — the page_home / sec_newsletter_signup
- * seed data (scripts/lib/page-home-seed-data.mjs):
+ * Offline verification of the home-page object-family seed data
+ * (scripts/lib/page-home-seed-data.mjs):
  *
- *   - both bodies parse under the REAL body schemas (page.v1 / section.v1);
- *   - both requested ids pass the T0.3 validators;
- *   - the seed's section data deep-equals the T3.2 render-gate fixture
+ *   - all four bodies parse under the REAL body schemas (page.v1 / section.v1);
+ *   - all requested ids pass the T0.3 validators;
+ *   - the seed's section data deep-equals the render-gate fixture
  *     (src/lib/registry/components/home-fixture-data.ts) — two files, one
  *     transcription, pinned so they cannot drift (the fixture is what the
- *     components were proven byte-identical against);
- *   - validation with resolvers wired: zero blockers when the shared section
- *     and nav_footer_home resolve; a missing shared section is a blocker;
+ *     components were proven against);
+ *   - validation with resolvers wired: zero blockers when the three shared
+ *     sections and nav_footer_home resolve; a missing shared section is a
+ *     blocker;
  *   - the T3.1 `home` PageType constraints hold (hero required, every
- *     section type allowed, shared_ref included).
+ *     section type allowed — shared_ref targets counted by effective type).
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -19,22 +20,32 @@ import test from 'node:test';
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
 import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
 import {
+  homeAudienceGridData,
   homeBioData,
-  homeChecklistData,
-  homeContentGridData,
   homeHeroData,
   homeNewsletterSignupData,
+  homeStartGridData,
 } from '../../src/lib/registry/components/home-fixture-data.js';
 import { validateObjectIdForType } from '../../src/lib/object-ids.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { sectionBodySchema, type SectionInstance } from '../../src/schema/bodies/section-v1.js';
+import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
 import {
   PAGE_HOME_ID,
   PAGE_HOME_SEEDS,
+  SECTION_HOME_AUDIENCE_GRID_ID,
+  SECTION_HOME_START_GRID_ID,
   SECTION_NEWSLETTER_SIGNUP_ID,
   pageHomeBody,
+  sectionHomeAudienceGridBody,
+  sectionHomeStartGridBody,
   sectionNewsletterSignupBody,
 } from '../../scripts/lib/page-home-seed-data.mjs';
+
+const SECTION_SEEDS = [
+  { id: SECTION_NEWSLETTER_SIGNUP_ID, body: sectionNewsletterSignupBody, type: 'newsletter_signup' as const },
+  { id: SECTION_HOME_AUDIENCE_GRID_ID, body: sectionHomeAudienceGridBody, type: 'content_grid' as const },
+  { id: SECTION_HOME_START_GRID_ID, body: sectionHomeStartGridBody, type: 'content_grid' as const },
+];
 
 const sectionData = (id: string) => {
   const section = (pageHomeBody.sections as SectionInstance[]).find((candidate) => candidate.id === id);
@@ -42,41 +53,53 @@ const sectionData = (id: string) => {
   return section.data;
 };
 
-test('both seed bodies parse under the real body schemas and ids pass the T0.3 validators', () => {
+test('all seed bodies parse under the real body schemas and ids pass the T0.3 validators', () => {
   const page = pageBodySchema.safeParse(pageHomeBody);
   assert.ok(page.success, JSON.stringify(page.success ? '' : page.error.issues));
-  const section = sectionBodySchema.safeParse(sectionNewsletterSignupBody);
-  assert.ok(section.success, JSON.stringify(section.success ? '' : section.error.issues));
+  for (const seed of SECTION_SEEDS) {
+    const parsed = sectionBodySchema.safeParse(seed.body);
+    assert.ok(parsed.success, `${seed.id}: ${JSON.stringify(parsed.success ? '' : parsed.error.issues)}`);
+    assert.ok(validateObjectIdForType('section', seed.id).ok);
+  }
   assert.ok(validateObjectIdForType('page', PAGE_HOME_ID).ok);
-  assert.ok(validateObjectIdForType('section', SECTION_NEWSLETTER_SIGNUP_ID).ok);
-  // Seed order is load-bearing: the referenced section is created first.
+  // Seed order is load-bearing: every referenced section is created first.
   assert.deepEqual(
     PAGE_HOME_SEEDS.map((seed) => seed.objectId),
-    [SECTION_NEWSLETTER_SIGNUP_ID, PAGE_HOME_ID]
+    [SECTION_NEWSLETTER_SIGNUP_ID, SECTION_HOME_AUDIENCE_GRID_ID, SECTION_HOME_START_GRID_ID, PAGE_HOME_ID]
   );
 });
 
-test('the seed transcription deep-equals the T3.2 render-gate fixture data (no drift possible)', () => {
+test('the seed transcription deep-equals the render-gate fixture data (no drift possible)', () => {
   assert.deepEqual(sectionData('s_hero'), homeHeroData);
-  assert.deepEqual(sectionData('s_audience'), homeChecklistData);
-  assert.deepEqual(sectionData('s_startgrid'), homeContentGridData);
   assert.deepEqual(sectionData('s_bio'), homeBioData);
   assert.deepEqual(sectionNewsletterSignupBody.section.data, homeNewsletterSignupData);
-  // The page itself carries only the reference, never a shadow copy (D§3.5).
+  assert.deepEqual(sectionHomeAudienceGridBody.section.data, homeAudienceGridData);
+  assert.deepEqual(sectionHomeStartGridBody.section.data, homeStartGridData);
+  // The page itself carries only references, never shadow copies (D§3.5).
+  assert.deepEqual(sectionData('s_audience'), { section: SECTION_HOME_AUDIENCE_GRID_ID });
+  assert.deepEqual(sectionData('s_startgrid'), { section: SECTION_HOME_START_GRID_ID });
   assert.deepEqual(sectionData('s_newsletter'), { section: SECTION_NEWSLETTER_SIGNUP_ID });
+});
+
+test('both grids are instances of the ONE reusable content_grid type (design-principles litmus)', () => {
+  assert.equal(sectionHomeAudienceGridBody.section.type, 'content_grid');
+  assert.equal(sectionHomeStartGridBody.section.type, 'content_grid');
+  // Different roles from configuration alone — no code change between them.
+  assert.equal((sectionHomeAudienceGridBody.section.data as { source: { kind: string } }).source.kind, 'cards');
+  assert.equal((sectionHomeStartGridBody.section.data as { source: { kind: string } }).source.kind, 'query');
 });
 
 test('page_home validates clean with resolvers wired; a missing shared section is a blocker', () => {
   const home = getPageTypeDefinition('home');
   assert.ok(home.ok);
+  const sharedTypes = new Map<string, SectionType>(SECTION_SEEDS.map((seed) => [seed.id, seed.type]));
   const resolvingContext = {
     resolveObject: (objectType: string, objectId: string) => ({
       exists:
-        (objectType === 'section' && objectId === SECTION_NEWSLETTER_SIGNUP_ID) ||
+        (objectType === 'section' && sharedTypes.has(objectId)) ||
         (objectType === 'navigation' && objectId === 'nav_footer_home'),
     }),
-    resolveSharedSectionType: (objectId: string) =>
-      objectId === SECTION_NEWSLETTER_SIGNUP_ID ? ('newsletter_signup' as const) : undefined,
+    resolveSharedSectionType: (objectId: string) => sharedTypes.get(objectId),
     pageType: home.definition,
   };
 
@@ -94,14 +117,13 @@ test('page_home validates clean with resolvers wired; a missing shared section i
   assert.ok(missingSection.blockers.length > 0, 'unresolvable references must block');
 });
 
-test('the shared section wrapper validates clean as its own object', () => {
-  const summary = summarizeValidation(
-    validateObject(
-      { objectType: 'section', objectId: SECTION_NEWSLETTER_SIGNUP_ID, body: sectionNewsletterSignupBody },
-      {}
-    )
-  );
-  assert.deepEqual(summary.blockers, [], JSON.stringify(summary.blockers));
+test('every shared-section wrapper validates clean as its own object', () => {
+  for (const seed of SECTION_SEEDS) {
+    const summary = summarizeValidation(
+      validateObject({ objectType: 'section', objectId: seed.id, body: seed.body }, {})
+    );
+    assert.deepEqual(summary.blockers, [], `${seed.id}: ${JSON.stringify(summary.blockers)}`);
+  }
 });
 
 test("every page_home section type is allowed by the T3.1 'home' PageType, with the hero requirement met", () => {
@@ -109,8 +131,13 @@ test("every page_home section type is allowed by the T3.1 'home' PageType, with 
   assert.ok(home.ok);
   const allowed = home.definition.allowedSections;
   assert.ok(Array.isArray(allowed));
-  const types = (pageHomeBody.sections as SectionInstance[]).map((section) => section.type);
+  const sharedTypes = new Map<string, SectionType>(SECTION_SEEDS.map((seed) => [seed.id, seed.type]));
+  // Effective types: a shared_ref counts as its target's type for the allowlist.
+  const types = (pageHomeBody.sections as SectionInstance[]).map((section) =>
+    section.type === 'shared_ref' ? sharedTypes.get((section.data as { section: string }).section) : section.type
+  );
   for (const type of types) {
+    assert.ok(type, 'every shared_ref target must resolve to a seeded section');
     assert.ok((allowed as string[]).includes(type), `home PageType must allow '${type}'`);
   }
   for (const required of home.definition.requiredSections ?? []) {
