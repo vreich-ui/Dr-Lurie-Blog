@@ -72,11 +72,24 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   ├── page_terms ─ /terms ─ [prose]
 │   │   └── page_404 ─ /404 ─ [cta_banner]   cta_banner: heading · body · actions[]
 │   │
+│   ├── page_about ─ /about ─ 🟣 RENDERS ─ **DECOMPOSED 2026-07-10** off the bespoke `about`
+│   │   │   anti-pattern into 8 standalone shared sections of REUSABLE types (the design-
+│   │   │   principles win); a `standard` page of 8 shared_refs. Local round-trip proven;
+│   │   │   RENDERS until the credentialed `--production` run. (Orphaned `about` TYPE →
+│   │   │   flagged follow-up removal.)
+│   │   ├── s_intro ─ shared_ref → sec_about_intro ─ bio (heading + copy + portrait photo)
+│   │   ├── s_thinking ─ shared_ref → sec_about_thinking ─ prose
+│   │   ├── s_products ─ shared_ref → sec_about_products ─ prose
+│   │   ├── s_science ─ shared_ref → sec_about_science ─ prose (list)
+│   │   ├── s_research ─ shared_ref → sec_about_research ─ prose (list)
+│   │   ├── s_blog ─ shared_ref → sec_about_blog ─ prose (list)
+│   │   ├── s_note ─ shared_ref → sec_about_note ─ prose
+│   │   └── s_cta ─ shared_ref → sec_about_cta ─ cta_banner (heading + body + actions)
+│   │
 │   ├── BESPOKE-SECTION PAGES ─ 🟣 RENDERS ─ priority W2 (convertible as-is; their section
 │   │   │   types are the design-principles anti-pattern — do NOT mint more; generalizing
-│   │   │   them into reusable types is OPTIONAL cleanup, not a blocker)
-│   │   ├── page_about ─ /about ─ [about]
-│   │   │     about: heading · portrait{src,alt} · sectionHeadings[6] · ctaHeading · actions[]
+│   │   │   them into reusable types is OPTIONAL cleanup, not a blocker). /about is DONE
+│   │   │   (decomposed above); the remaining two:
 │   │   ├── page_contact ─ /contact ─ [contact] ─ depends on: Netlify form (contact)
 │   │   │     contact: hero{tagline,title} · form{id, formName, title, subtitle, inputs[],
 │   │   │       textarea, disclaimer, description} · features{title, items[]}
@@ -126,10 +139,12 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   NOT store objects themselves — the vocabulary pages/sections are composed FROM.
 │   │   Adding a ⚪ type is code work (one union member + one registry module + one component).
 │   ├── reusable, exist: hero · lede · prose · checklist(now unused on home; keep or retire) ·
-│   │     content_grid(query|manual|cards) · card(leaf; block-tree children later) · bio ·
+│   │     content_grid(query|manual|cards) · card(leaf; block-tree children later) ·
+│   │     bio(now with optional URL `portrait` — the reusable "person intro", used on home + about) ·
 │   │     newsletter_signup · testimonial · cta_banner · faq · link_list · product_preview ·
 │   │     contact_form · search · content_embed
-│   ├── bespoke, exist (anti-pattern — do not mint more): about · contact · thank_you
+│   ├── bespoke, exist (anti-pattern — do not mint more): about(now ORPHANED — /about decomposed
+│   │     off it 2026-07-10; retire in a follow-up) · contact · thank_you
 │   ├── wrapper: shared_ref (pointer, never rendered itself)
 │   └── ⚪ needed by W5 (design them REUSABLE, agent-configurable):
 │         pricing_table (tiers[] as card-like cells) · steps (ordered step cells) ·
@@ -162,7 +177,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │     gap: trusted-artifact resolver on the RENDER path (embedded-asset-block later)
 │
 ├── FORMS (Netlify forms: 'newsletter', contact) ─ ⚪ potential form object (formName +
-│     field definitions); today form shape lives inside newsletter_signup / contact / 
+│     field definitions); today form shape lives inside newsletter_signup / contact /
 │     contact_form section data — sufficient for MVP; a standalone form object only if
 │     forms multiply
 │
@@ -172,29 +187,29 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 
 ## Potential objects composable from existing objects (no new code, or nearly none)
 
-| ⚪ Potential object                  | Composed of                                                                    | Unlocked by       |
-| ------------------------------------ | ------------------------------------------------------------------------------ | ----------------- |
-| Topics hub as a page object          | page + one `content_grid` (query source, per category)                          | W3 taxonomy (or now, with hardcoded category slugs) |
-| Any campaign/landing page            | page + hero + content_grid + cta_banner + shared newsletter section             | nothing — possible TODAY |
-| Newsletter page with live signup     | page_newsletter + `shared_ref → sec_newsletter_signup`                          | W1                |
-| Curated "start here" grid            | sec_home_start_grid switched `query → manual + fallback`                        | content_item resolver |
-| Related-content strip on any page    | `content_grid` (query by tag/category) placed via `upsert_section`              | W3 taxonomy for term filters |
-| Shared CTA reused across pages       | new section object (cta_banner) + `shared_ref` from N pages                     | nothing — TODAY   |
-| Article with embedded objects        | content_item body as Rich Text with `embedded-entry-block → section objects`    | W7 (rich text)    |
+| ⚪ Potential object               | Composed of                                                                  | Unlocked by                                         |
+| --------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
+| Topics hub as a page object       | page + one `content_grid` (query source, per category)                       | W3 taxonomy (or now, with hardcoded category slugs) |
+| Any campaign/landing page         | page + hero + content_grid + cta_banner + shared newsletter section          | nothing — possible TODAY                            |
+| Newsletter page with live signup  | page_newsletter + `shared_ref → sec_newsletter_signup`                       | W1                                                  |
+| Curated "start here" grid         | sec_home_start_grid switched `query → manual + fallback`                     | content_item resolver                               |
+| Related-content strip on any page | `content_grid` (query by tag/category) placed via `upsert_section`           | W3 taxonomy for term filters                        |
+| Shared CTA reused across pages    | new section object (cta_banner) + `shared_ref` from N pages                  | nothing — TODAY                                     |
+| Article with embedded objects     | content_item body as Rich Text with `embedded-entry-block → section objects` | W7 (rich text)                                      |
 
 ## PROPOSED conversion order (Wolf: edit this table — it is the queue)
 
-| Wave | What                                                                       | Why this order                                                                       | Size |
-| ---- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
-| W1   | Lede family (5 pages) + system pages (3 pages)                              | Everything but the store record already exists; pure driver work, proves the factory | S    |
-| W1-enabler | `content_item` resolver (validation + render already handle manual)   | Unblocks manual curation everywhere; small and high-leverage                          | S    |
-| W2   | about / contact / thank-you pages                                           | Rendered stubs today; convertible as-is (keep bespoke types; generalize later/never)  | S    |
-| W3   | Taxonomy singleton — **after Wolf's source-of-truth decision**              | Unlocks term-filtered grids, listings, topics hub                                     | M    |
-| W4   | Site singleton + layout wiring                                              | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
-| W5   | pricing / services / shop-preview + the ⚪ reusable types they need         | New reusable section types (pricing_table, steps, feature_grid, content_split)        | M-L  |
-| W6   | Listing surfaces (blog index, category/tag, content_detail, topics hub)     | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                  | L    |
-| W7   | Articles onto Contentful Rich Text (+ embeds, assets)                       | Post-MVP by standing decision                                                         | L    |
-| any  | Housekeeping: delete /homes/* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted | Independent, non-blocking                     | S    |
+| Wave       | What                                                                                                                                               | Why this order                                                                       | Size |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
+| W1         | Lede family (5 pages) + system pages (3 pages)                                                                                                     | Everything but the store record already exists; pure driver work, proves the factory | S    |
+| W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
+| W2         | about / contact / thank-you pages                                                                                                                  | Rendered stubs today; convertible as-is (keep bespoke types; generalize later/never) | S    |
+| W3         | Taxonomy singleton — **after Wolf's source-of-truth decision**                                                                                     | Unlocks term-filtered grids, listings, topics hub                                    | M    |
+| W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
+| W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
+| W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                            | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
+| W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                              | Post-MVP by standing decision                                                        | L    |
+| any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted | Independent, non-blocking                                                            | S    |
 
 **Keep this file current:** whenever an object converts, flip its mark here AND
 in `object-inventory.md` in the same change (same rule, two views: the
