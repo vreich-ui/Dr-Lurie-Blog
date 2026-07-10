@@ -1,19 +1,28 @@
 #!/usr/bin/env node
 /**
- * Home-page conversion round-trip driver — the STANDING proof that the
- * home-page object family is agent-editable end-to-end via MCP (conversion
- * criteria 2 + 3, docs/cms-architecture/conversion-playbook.md). Replaces the
- * throwaway per-session driver scripts called out in object-inventory.md
- * "Why only nav is converted" (root cause 4: no standing round-trip
- * verification).
+ * Object-conversion round-trip driver — the STANDING proof that an object
+ * family is agent-editable end-to-end via MCP (conversion criteria 2 + 3,
+ * docs/cms-architecture/conversion-playbook.md). Replaces the throwaway
+ * per-session driver scripts called out in object-inventory.md "Why only nav
+ * is converted" (root cause 4: no standing round-trip verification).
  *
- * For every object in the family (scripts/lib/page-home-seed-data.mjs:
- * sec_newsletter_signup, sec_home_audience_grid, sec_home_start_grid,
- * page_home) it drives, through the REAL MCP handler:
+ * The family comes from a SEED MODULE (--seeds, default the home-page family
+ * in scripts/lib/page-home-seed-data.mjs). A seed module exports:
+ *   CONVERSION_SEEDS  ordered array of { objectType: 'page'|'section',
+ *                     objectId, body } — every referenced object BEFORE the
+ *                     object that references it;
+ *   SEED_SITE         the owning site id (e.g. 'site_drlurie').
+ * (The home module's PAGE_HOME_SEEDS / PAGE_HOME_SEED_SITE names are accepted
+ * as a fallback.) v1 drills page + section types; extend drillOps/materialize
+ * dispatch when another type's family converts.
+ *
+ * For every object in the family it drives, through the REAL MCP handler:
  *
  *   1. ensure   — object_get; object_create when missing; when present with a
  *                 drifted body, reconcile back to the seed with real patch ops
- *                 (this is how the broken production page_home record heals).
+ *                 (scripts/lib/roundtrip-reconcile.mjs — this is how the
+ *                 broken production page_home record was healed). An object
+ *                 that fails ensure is NEVER drilled or published.
  *   2. drill    — checkout → one batch exercising EVERY patch op the contract
  *                 permits for the type (page: set_page_meta, upsert_section,
  *                 update_section_data, move_section, set_section_visibility,
@@ -26,6 +35,8 @@
  *   4. inventory— object_inventory must return every object (criterion 2).
  *
  * Modes:
+ *   --seeds <path>  Seed module for the family under conversion (relative to
+ *                 the repo root or absolute). Default: the home-page family.
  *   --local       (default) Drive the compiled handler in-process against an
  *                 isolated file-backed store (.tmp/home-roundtrip-blobs).
  *                 Compile first: rm -rf .tmp/ci-test && npx tsc -p tsconfig.test.json
@@ -33,7 +44,8 @@
  *                 not_configured — that is the sandbox success signal
  *                 (playbook trap 8). Reference targets (the three navigation
  *                 objects) are seeded from their committed exports first
- *                 (playbook trap 3).
+ *                 (playbook trap 3); add further reference targets to the seed
+ *                 module itself, ordered before their referrers.
  *   --write-exports  (local only) After the drill, materialize each object
  *                 with the real materializers and write the derived exports
  *                 into src/data/site/ — the committed-export half of the
@@ -45,24 +57,60 @@
  *                 Publish must SUCCEED here (the server commits exports via
  *                 its own GITHUB_CONTENT_TOKEN). Run from a machine that holds
  *                 the secrets — never paste them into chats or commit them.
- *   --release     (production only) After all four objects publish, call
- *                 release_to_production once and report the deploy state.
+ *                 ⚠ Only run after the schema/code the seeds rely on is MERGED
+ *                 AND DEPLOYED — the endpoint validates against what is live
+ *                 (the seed scripts' schema-vintage gate, generalized).
+ *   --release     (production only) After the family publishes, fire the
+ *                 build hook once, then confirm with short read-only polls.
  *
- * Exit codes: 0 = every step proven; 1 = any failure (the report says which).
+ * Exit codes: 0 = every step proven; 1 = any failure (the report says which);
+ * 2 = usage error.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
-import { PAGE_HOME_SEEDS, PAGE_HOME_SEED_SITE } from './lib/page-home-seed-data.mjs';
 import { reconcileOps } from './lib/roundtrip-reconcile.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set();
+let seedsPathArg;
+for (let i = 0; i < argv.length; i += 1) {
+  if (argv[i] === '--seeds') {
+    seedsPathArg = argv[i + 1];
+    i += 1;
+  } else {
+    args.add(argv[i]);
+  }
+}
+const seedsPath = seedsPathArg
+  ? path.resolve(repoRoot, seedsPathArg)
+  : path.join(repoRoot, 'scripts', 'lib', 'page-home-seed-data.mjs');
+if (!fs.existsSync(seedsPath)) {
+  console.error(`[roundtrip] seed module not found: ${seedsPath}`);
+  process.exit(2);
+}
+const seedModule = await import(pathToFileURL(seedsPath).href);
+const PAGE_HOME_SEEDS = seedModule.CONVERSION_SEEDS ?? seedModule.PAGE_HOME_SEEDS;
+const PAGE_HOME_SEED_SITE = seedModule.SEED_SITE ?? seedModule.PAGE_HOME_SEED_SITE;
+if (!Array.isArray(PAGE_HOME_SEEDS) || PAGE_HOME_SEEDS.length === 0 || !PAGE_HOME_SEED_SITE) {
+  console.error(`[roundtrip] ${seedsPath} must export CONVERSION_SEEDS (non-empty array) and SEED_SITE.`);
+  process.exit(2);
+}
+const unsupported = PAGE_HOME_SEEDS.filter((seed) => seed.objectType !== 'page' && seed.objectType !== 'section');
+if (unsupported.length > 0) {
+  console.error(
+    `[roundtrip] driver v1 drills page/section objects only; extend drillOps for: ${unsupported
+      .map((seed) => `${seed.objectId} (${seed.objectType})`)
+      .join(', ')}`
+  );
+  process.exit(2);
+}
 const production = args.has('--production');
 const writeExports = args.has('--write-exports');
 const release = args.has('--release');
-const AGENT_NAME = 'home-conversion-roundtrip';
+const AGENT_NAME = 'object-conversion-roundtrip';
 
 if (writeExports && production) {
   console.error('[roundtrip] --write-exports is a local-mode flag; a production publish commits exports itself.');

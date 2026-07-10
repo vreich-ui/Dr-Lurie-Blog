@@ -81,13 +81,16 @@ files in full before writing any code, in this order:
    (A consolidated master reference, `cms-architecture-consolidated.md`, is named
    by some briefs but has not been committed — the numbered source docs are
    ground truth where anything conflicts.)
-6. `docs/cms-architecture/object-inventory.md` — the current catalog of content
+6. `docs/cms-architecture/conversion-map.md` — the FULL tree of actual + potential
+   objects (attributes, dependencies, dependents, Wolf's conversion priority).
+   **Pick conversion targets and their boundaries from here.** Then
+   `docs/cms-architecture/object-inventory.md` — the current catalog of content
    objects (each marked LIVE / SHELL / TODO), every object type's use + boundaries,
    and the MVP todo list. Read it to see what is already an editable object vs. still
-   hardcoded. It is hand-maintained and drifts easily: **update the matching row in
-   the SAME change** when you cut over a surface or publish/retire an object. For
-   always-current machine truth, prefer the `object_contract` / `object_inventory`
-   MCP tools over any doc.
+   hardcoded. Both are hand-maintained and drift easily: **update the matching row/
+   status mark in the SAME change** when you cut over a surface or publish/retire an
+   object. For always-current machine truth, prefer the `object_contract` /
+   `object_inventory` MCP tools over any doc.
 7. **Converting a surface to an object? `docs/cms-architecture/conversion-playbook.md`
    is mandatory** — the exact lifecycle recipe, the call/response field names (do
    not guess them), and the trap table (deep-merge patch semantics, reference
