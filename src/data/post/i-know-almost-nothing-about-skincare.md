@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-06-23T10:58:00Z
+published_time: 2026-06-23T10:58:00Z
 title: 'I Know Almost Nothing About Skincare'
 excerpt: "Start here: We'll walk you through the basics."
 image: '~/assets/images/uploads/i-know-almost-nothing-about-skincare/skincare-basics-beginner-hero.png'

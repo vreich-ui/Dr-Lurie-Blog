@@ -1,6 +1,7 @@
 ---
 title: 'How to Start Retinol Without Wrecking Your Skin Barrier'
 publishDate: 2026-06-08T15:57:00.000Z
+published_time: 2026-06-08T15:57:00.000Z
 excerpt: 'Retinol can be useful, but the first win is tolerance: go slowly, moisturize well, and let sunscreen do its quiet daily work.'
 tags:
   - retinoids

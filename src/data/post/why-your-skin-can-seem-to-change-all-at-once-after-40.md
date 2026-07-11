@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-05-26T12:50:00.000Z
+published_time: 2026-05-26T12:50:00.000Z
 title: "Why Your Skin Can Seem to Change All at Once After 40"
 excerpt: "A familiar thing can start to feel unfamiliar: your own face after rinsing it at the sink.
 Skin that used to tolerate almost anything — a quick wash, no moisturizer, a long day outside, the same cleanser for years — may begin to feel tight before the towel is even back on the rack. The tightness may"

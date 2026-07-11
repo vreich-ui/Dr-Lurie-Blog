@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-06-23T10:46:00Z
+published_time: 2026-06-23T10:46:00Z
 title: 'Skin Basics'
 excerpt: 'The best skin-care routine is not the longest one. Start with the habits that keep skin comfortable, protected, and consistent.'
 image: '~/assets/images/uploads/skin-basics/skin-basics-featured.png'

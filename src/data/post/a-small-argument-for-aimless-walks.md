@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-06-14T15:38:00+03:00
+published_time: 2026-06-14T15:38:00+03:00
 title: 'A Small Argument for Aimless Walks'
 excerpt: 'A brief, reflective piece on why unscheduled walks can help us notice more.'
 category: reflections
