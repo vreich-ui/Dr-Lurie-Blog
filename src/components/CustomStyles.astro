@@ -1,6 +1,8 @@
 ---
 import '@fontsource-variable/inter';
 
+import { getSiteObject } from '~/utils/site-object';
+
 // 'DM Sans'
 // Nunito
 // Dosis
@@ -17,6 +19,94 @@ import '@fontsource-variable/inter';
 // Oswald
 // 'Space Grotesk'
 // Urbanist
+
+// W4: the custom-property VALUES come from the site object's brandTokens
+// (src/data/site/site.json), falling back to the pre-conversion literals when
+// the export is absent. The emitted CSS keeps the exact pre-conversion layout
+// — build-diff treats <style> contents as opaque bytes, so the template below
+// is the old literal with only the values interpolated. Colors are keyed by
+// var name minus `--aw-color-`; the `.dark` block reads `dark:`-prefixed keys
+// first, then the light key, then the fallback. Font loading (the <link>s
+// below and the @fontsource import) stays code: agents repoint the stacks to
+// any loaded family; shipping new font files is a code change either way.
+const FALLBACK_FONTS: Record<string, string> = {
+  sans: "'Inter Variable'",
+  serif: "'Source Serif 4', Georgia, serif",
+  heading: "'Playfair Display', 'Times New Roman', serif",
+};
+
+const FALLBACK_COLORS: Record<string, string> = {
+  primary: 'rgb(46 111 149)',
+  secondary: 'rgb(37 90 120)',
+  accent: 'rgb(94 140 138)',
+  gold: 'rgb(194 168 120)',
+  'text-heading': 'rgb(22 26 29)',
+  'text-default': 'rgb(36 41 46)',
+  'text-muted': 'rgb(58 65 73 / 76%)',
+  'bg-page': 'rgb(252 251 248)',
+  'bg-surface': 'rgb(247 245 240)',
+  'bg-page-dark': 'rgb(3 6 32)',
+  'dark:text-heading': 'rgb(247, 248, 248)',
+  'dark:text-default': 'rgb(229 236 246)',
+  'dark:text-muted': 'rgb(229 236 246 / 66%)',
+  'dark:bg-page': 'rgb(3 6 32)',
+  'dark:bg-surface': 'rgb(19 24 46)',
+};
+
+const site = getSiteObject();
+const tokens = site?.brandTokens;
+
+const font = (key: string): string => tokens?.fonts[key as 'sans' | 'serif' | 'heading'] ?? FALLBACK_FONTS[key];
+const color = (key: string): string => tokens?.colors[key] ?? FALLBACK_COLORS[key];
+const darkColor = (key: string): string =>
+  tokens?.colors[`dark:${key}`] ?? tokens?.colors[key] ?? FALLBACK_COLORS[`dark:${key}`] ?? FALLBACK_COLORS[key];
+
+const css = `
+  :root {
+    --aw-font-sans: ${font('sans')};
+    --aw-font-serif: ${font('serif')};
+    --aw-font-heading: ${font('heading')};
+
+    --aw-color-primary: ${color('primary')};
+    --aw-color-secondary: ${color('secondary')};
+    --aw-color-accent: ${color('accent')};
+    --aw-color-gold: ${color('gold')};
+
+    --aw-color-text-heading: ${color('text-heading')};
+    --aw-color-text-default: ${color('text-default')};
+    --aw-color-text-muted: ${color('text-muted')};
+    --aw-color-bg-page: ${color('bg-page')};
+    --aw-color-bg-surface: ${color('bg-surface')};
+
+    --aw-color-bg-page-dark: ${color('bg-page-dark')};
+
+    ::selection {
+      background-color: lavender;
+    }
+  }
+
+  .dark {
+    --aw-font-sans: ${font('sans')};
+    --aw-font-serif: ${font('serif')};
+    --aw-font-heading: ${font('heading')};
+
+    --aw-color-primary: ${darkColor('primary')};
+    --aw-color-secondary: ${darkColor('secondary')};
+    --aw-color-accent: ${darkColor('accent')};
+    --aw-color-gold: ${darkColor('gold')};
+
+    --aw-color-text-heading: ${darkColor('text-heading')};
+    --aw-color-text-default: ${darkColor('text-default')};
+    --aw-color-text-muted: ${darkColor('text-muted')};
+    --aw-color-bg-page: ${darkColor('bg-page')};
+    --aw-color-bg-surface: ${darkColor('bg-surface')};
+
+    ::selection {
+      background-color: black;
+      color: snow;
+    }
+  }
+`;
 ---
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -26,49 +116,4 @@ import '@fontsource-variable/inter';
   rel="stylesheet"
 />
 
-<style is:inline>
-  :root {
-    --aw-font-sans: 'Inter Variable';
-    --aw-font-serif: 'Source Serif 4', Georgia, serif;
-    --aw-font-heading: 'Playfair Display', 'Times New Roman', serif;
-
-    --aw-color-primary: rgb(46 111 149);
-    --aw-color-secondary: rgb(37 90 120);
-    --aw-color-accent: rgb(94 140 138);
-    --aw-color-gold: rgb(194 168 120);
-
-    --aw-color-text-heading: rgb(22 26 29);
-    --aw-color-text-default: rgb(36 41 46);
-    --aw-color-text-muted: rgb(58 65 73 / 76%);
-    --aw-color-bg-page: rgb(252 251 248);
-    --aw-color-bg-surface: rgb(247 245 240);
-
-    --aw-color-bg-page-dark: rgb(3 6 32);
-
-    ::selection {
-      background-color: lavender;
-    }
-  }
-
-  .dark {
-    --aw-font-sans: 'Inter Variable';
-    --aw-font-serif: 'Source Serif 4', Georgia, serif;
-    --aw-font-heading: 'Playfair Display', 'Times New Roman', serif;
-
-    --aw-color-primary: rgb(46 111 149);
-    --aw-color-secondary: rgb(37 90 120);
-    --aw-color-accent: rgb(94 140 138);
-    --aw-color-gold: rgb(194 168 120);
-
-    --aw-color-text-heading: rgb(247, 248, 248);
-    --aw-color-text-default: rgb(229 236 246);
-    --aw-color-text-muted: rgb(229 236 246 / 66%);
-    --aw-color-bg-page: rgb(3 6 32);
-    --aw-color-bg-surface: rgb(19 24 46);
-
-    ::selection {
-      background-color: black;
-      color: snow;
-    }
-  }
-</style>
+<style is:inline set:html={css}></style>

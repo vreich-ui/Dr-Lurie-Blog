@@ -28,9 +28,13 @@ live). All proven by credentialed runs on 2026-07-11; no page renders from an un
 export anymore. The section-type palette is fully generic (`about`/`contact` decomposed,
 `thank_you`→`form_confirmation`). W3 step 2 SHIPPED (2026-07-11): the bounded
 publish-article enforcement hook (registry-gated, skips when no registry) + one-time
-frontmatter normalization (93 posts) + registry display labels. Still TODO: the `site`
-singleton (W4), the W5+ hand-coded pages, and (flagged, pre-existing) 28 posts lacking
-`published_time` are invisible in listings.
+frontmatter normalization (93 posts) + registry display labels. W4 BUILT + WIRED
+(2026-07-11): `site_drlurie` seeded and the layout renders brandTokens/logo/chrome/
+metadataDefaults/defaultNavigation from its export (urls/blog carried; config.yaml
+authoritative for routing — Wolf B2); pending the credentialed run to count as
+converted. The 28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts
+deleted, 18 stamped with `published_time`). Still TODO: the site credentialed run,
+then the W5+ hand-coded pages.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

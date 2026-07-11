@@ -194,7 +194,26 @@ export const taxonomyDrillOps = (body, probeTermId) => {
   };
 };
 
-/** Dispatch: build the drill for one seed (page, section, template, or taxonomy). */
+/**
+ * Drill a `site` object (W4): `set_site_fields` is the type's ONLY permitted
+ * op (C§2.0 — the singleton is one fields bag; there is no list structure to
+ * add/move/remove). Poke the display name and restore it — two real
+ * deep-merge patches ending byte-identical to the seed. Scalar replacement
+ * carries no stray-key risk (playbook trap 2 applies to OBJECT values; the
+ * reconcile path handles those via diffFieldsForMerge).
+ */
+export const siteDrillOps = (body) => {
+  const name = body.name;
+  return {
+    expected: ['set_site_fields'],
+    ops: [
+      { op: 'set_site_fields', fields: { name: `${name} [probe]` } },
+      { op: 'set_site_fields', fields: { name } },
+    ],
+  };
+};
+
+/** Dispatch: build the drill for one seed (page, section, template, taxonomy, or site). */
 export const drillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
@@ -215,6 +234,9 @@ export const drillOpsForSeed = (seed) => {
       .map((entry) => entry?.term_id)
       .filter((id) => typeof id === 'string');
     return taxonomyDrillOps(seed.body, deriveProbeId(existingTermIds, 't_rtprobe'));
+  }
+  if (seed.objectType === 'site') {
+    return siteDrillOps(seed.body);
   }
   return sectionDrillOps(seed.body.section);
 };

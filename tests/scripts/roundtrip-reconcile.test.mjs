@@ -197,3 +197,24 @@ test('reconcileOps for a template heals meta (slots excluded), slots, strays, an
     ]
   );
 });
+
+test('reconcileOps for a site singleton is one deep-merge diff that nulls strays at depth', () => {
+  const target = {
+    name: 'Dr. Lurié',
+    chrome: { showRssFeed: true, showThemeToggle: true },
+    blog: { listPath: 'learn/library', postsPerPage: 6 },
+  };
+  const current = {
+    name: 'Dr. Lurié (drifted)',
+    chrome: { showRssFeed: true, showThemeToggle: false, stray: 'x' },
+    blog: { listPath: 'learn/library', postsPerPage: 6 },
+    strayTop: { a: 1 },
+  };
+  const ops = reconcileOps({ objectType: 'site', objectId: 'site_drlurie', body: target }, current);
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].op, 'set_site_fields');
+  assert.equal(ops[0].fields.name, 'Dr. Lurié');
+  assert.equal(ops[0].fields.chrome.showThemeToggle, true);
+  assert.equal(ops[0].fields.chrome.stray, null, 'nested stray key must be explicitly nulled (trap 2)');
+  assert.equal(ops[0].fields.strayTop, null, 'top-level stray key must be explicitly nulled');
+});

@@ -163,10 +163,21 @@ reported "already matches the seed" → store === seed === export).
 
 ### Singletons & templates
 
-🔴 **No `site` object is committed.** The field-test stubs (`site_fieldtest`,
-`tax_fieldtest`, `tpl_fieldtest`) were deleted in PR #378. The real site config
-still lives in `src/config.yaml` (and is what actually drives rendering);
-building the real `site` object is **MVP TODO #2**.
+🟣 **`site_drlurie` RENDERS (W4, built + wired 2026-07-11; pending the
+credentialed run to be CONVERTED).** Seed `scripts/lib/site-seed-data.mjs`
+(byte-identical transcription of the previously hardcoded values), export
+`src/data/site/site.json`, driver drills `set_site_fields` (the type's only
+op). **LIVE from the object** (pre-conversion literals as fallback when the
+export is absent — `src/utils/site-object.ts`, a deliberately synchronous
+eager-glob loader so component evaluation order is unchanged): brandTokens
+(every CustomStyles custom property, light + `dark:` keys) · logo.text ·
+chrome{showRssFeed, showThemeToggle} · metadataDefaults (title template,
+description, ogImage, twitter handle, og site_name) · defaultNavigation
+{header, footer}. **CARRIED but config.yaml stays authoritative for routing**
+(Wolf B2): urls · blog{listPath, postsPerPage, categoryBase, tagBase} —
+permalink wiring is a later cutover. NOT in the object: i18n · ui.theme ·
+analytics · googleSiteVerificationId; chrome.announcement deferred (Wolf B3).
+(The field-test stubs were deleted in PR #378.)
 
 🟢 **`tax_drlurie` is CONVERTED (W3, 2026-07-11)** — Wolf's decision: a curated,
 agent-editable vocabulary (5 categories + 26 tags distilled from the drifted
@@ -220,11 +231,14 @@ isn't byte-identical.
 | `page_services`     | `/services`               | Widget-composition (`Hero`/`Content`/`Features2`/`Testimonials`/`CallToAction`). Also has link actions.                                                                                                                                        |
 | `page_shop_preview` | `/solutions/shop-preview` | Bespoke markup **+ a scoped `<style>`** → uses the functional-equivalence gate + a `known-inert-diffs.md` entry (like thank-you).                                                                                                              |
 
-### 2. Real `site` object 🔴
+### 2. Real `site` object 🟣 BUILT + WIRED (W4, 2026-07-11 — pending credentialed run)
 
-Replace `src/config.yaml` as the source of truth with a real `site_drlurie` object
-(brand tokens, logo, chrome toggles, blog paths, default navigation) **and wire the
-layout to render from it**. This is what makes global site settings agent-editable.
+`site_drlurie` is seeded and the layout renders from it (see "Singletons &
+templates" above): brand tokens, logo text, chrome toggles, metadata defaults,
+and default navigation are agent-editable via `set_site_fields`; urls/blog are
+carried in the object while config.yaml stays authoritative for routing (Wolf
+B2, 2026-07-11). Becomes 🟢 CONVERTED after Wolf's `--production --release`
+run of the site seed module.
 
 ### 3. Real `taxonomy` object 🟢 CONVERTED (2026-07-11)
 

@@ -7,6 +7,7 @@ import type { Props as AstroSeoProps } from '@astrolib/seo';
 import { SITE, METADATA, I18N } from 'astrowind:config';
 import type { MetaData } from '~/types';
 import { getCanonical } from '~/utils/permalinks';
+import { getSiteObject } from '~/utils/site-object';
 
 import { adaptOpenGraphImages } from '~/utils/images';
 
@@ -30,6 +31,12 @@ const {
 // future CMS object) opting back into indexing before launch is intended.
 // Flip to `false` when the site actually goes live.
 const SITE_NOT_YET_LIVE = true;
+
+// W4: the site object's metadataDefaults layer over the config.yaml layer —
+// when the export is absent every field is undefined and lodash.merge skips
+// it, leaving the config values (which the seed transcribes) in force.
+const siteObject = getSiteObject();
+const siteMeta = siteObject?.metadataDefaults;
 
 const seoProps: AstroSeoProps = merge(
   {
@@ -58,6 +65,14 @@ const seoProps: AstroSeoProps = merge(
     description: METADATA?.description,
     openGraph: METADATA?.openGraph,
     twitter: METADATA?.twitter,
+  },
+  {
+    titleTemplate: siteMeta?.titleTemplate,
+    description: siteMeta?.description,
+    openGraph: siteObject
+      ? { site_name: siteObject.name, ...(siteMeta ? { images: [{ url: siteMeta.ogImage }] } : {}) }
+      : undefined,
+    twitter: siteMeta?.twitterHandle ? { handle: siteMeta.twitterHandle, site: siteMeta.twitterHandle } : undefined,
   },
   {
     title: title,

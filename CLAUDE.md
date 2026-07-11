@@ -39,9 +39,14 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   (2026-07-11): the bounded publish-article taxonomy-enforcement hook (the
   sanctioned additive exception — registry-gated, skips when no registry) +
   the one-time frontmatter normalization of all 93 posts + registry display
-  labels in the blog renderer. Still TODO: the `site` singleton (W4), the W5+
-  hand-coded pages, and (flagged, pre-existing) 28 posts lack `published_time`
-  and are invisible in listings.
+  labels in the blog renderer. W4 BUILT + WIRED (2026-07-11): `site_drlurie`
+  seeded (byte-identical transcription of the hardcoded values) and the layout
+  renders brandTokens/logo/chrome/metadataDefaults/defaultNavigation from its
+  export (urls/blog carried; config.yaml stays authoritative for routing —
+  Wolf B2); pending the credentialed run to count as converted (#31). The
+  28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts deleted, 18
+  real ones stamped with `published_time`; 167 pages, topics hub live). Still
+  TODO: the site credentialed run, then the W5+ hand-coded pages.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
