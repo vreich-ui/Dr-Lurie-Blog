@@ -1,10 +1,10 @@
 ---
 /**
- * Thank You (faithful cutover) — delegates to the shared PageObjectRenderer,
- * which loads the published page_thank_you object and renders its `thank_you`
- * section: the confirmation copy plus the inline script that swaps in a
- * per-form title/message from the `?form=` query param. Copy lives in the CMS
- * object; the markup and script are unchanged.
+ * Thank You — delegates to the shared PageObjectRenderer, which loads the
+ * published page_thank_you object and renders its `form_confirmation` section
+ * (the reusable post-submit confirmation type): the confirmation copy plus the
+ * inline script that swaps in a per-form title/message from the `?form=` query
+ * param. Copy lives in the CMS object; the markup and script are unchanged.
  */
 import PageObjectRenderer from '~/components/cms/PageObjectRenderer.astro';
 ---

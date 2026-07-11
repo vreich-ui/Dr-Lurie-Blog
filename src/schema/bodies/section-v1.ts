@@ -83,9 +83,13 @@ const sectionVariant = <TType extends string, TData extends z.ZodRawShape>(type:
 // (title/description/link). At least one of title/description must be present:
 // a title-only cell is a headline card, a description-only cell a text card
 // (the audience grid's shape). `link` makes the cell navigable; its target is
-// resolved by the renderer exactly like hero/lede actions.
+// resolved by the renderer exactly like hero/lede actions. `icon` is an
+// optional Tabler icon name (e.g. 'tabler:school') rendered above the cell —
+// the "features / how we can help" grid shape (/contact) an agent composes as
+// curated cards rather than a bespoke per-page type.
 export const gridCardCellSchema = z
   .object({
+    icon: z.string().min(1).optional(),
     title: z.string().min(1).optional(),
     description: z.string().min(1).optional(),
     link: linkActionSchema.optional(),
@@ -204,38 +208,17 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
   sectionVariant('contact_form', {
     formName: z.string().min(1),
     heading: z.string().min(1),
+    // Optional intro copy shown between the heading and the form: `subtitle`
+    // sits under the heading, `description` is fine print above the field set.
+    // Both plain text (not rich) — the form is furniture, the copy is data.
+    subtitle: z.string().optional(),
+    description: z.string().optional(),
     disclaimer: z.string().optional(),
   }),
-  // The full /contact page (faithful cutover, A§2.x): a widget-composition page
-  // reproduced as one bespoke section. Every widget prop the route file hard-coded
-  // (hero tagline/title, the Netlify form's fields + copy, the "how we can help"
-  // feature items) is promoted to editable object data; ContactPage.astro
-  // re-invokes HeroText/Contact/Features2 with it. No link actions → empty resolved.
-  sectionVariant('contact', {
-    hero: z.object({ tagline: z.string().min(1), title: z.string().min(1) }).strict(),
-    form: z
-      .object({
-        id: z.string().min(1),
-        formName: z.string().min(1),
-        title: z.string().min(1),
-        subtitle: z.string().min(1),
-        inputs: z.array(
-          z.object({ type: z.string().min(1), name: z.string().min(1), label: z.string().min(1) }).strict()
-        ),
-        textarea: z.object({ label: z.string().min(1) }).strict(),
-        disclaimer: z.object({ label: z.string().min(1) }).strict(),
-        description: z.string().min(1),
-      })
-      .strict(),
-    features: z
-      .object({
-        title: z.string().min(1),
-        items: z.array(
-          z.object({ title: z.string().min(1), description: z.string().min(1), icon: z.string().min(1) }).strict()
-        ),
-      })
-      .strict(),
-  }),
+  // (The bespoke single-use `contact` type was RETIRED 2026-07-11: /contact is
+  // now composed from reusable lede + contact_form + content_grid (cards with
+  // icons) sections, so the one-page anti-pattern type has no instances — same
+  // move as `about` (2026-07-10). History in state-of-play.md.)
   sectionVariant('cta_banner', {
     heading: z.string().optional(),
     body: richTextSchema.optional(),
@@ -276,11 +259,13 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
   // (The bespoke single-use `about` type was RETIRED 2026-07-10: /about is now
   // composed from reusable bio/prose/cta_banner sections via shared_ref, so the
   // one-page anti-pattern type has no instances. History in state-of-play.md.)
-  // Form-submission confirmation (the /thank-you page, A§2.x): a centered
-  // eyebrow + fallback title/message, plus per-form overrides the client script
-  // swaps in from the `?form=` query param. Copy is data; the message-swap
-  // furniture is owned by the component.
-  sectionVariant('thank_you', {
+  // Form-submission confirmation (the reusable post-submit block; today's
+  // /thank-you page is one instance): a centered eyebrow + fallback
+  // title/message, plus per-form overrides the client script swaps in from the
+  // `?form=` query param. Copy is data; the message-swap furniture is owned by
+  // the component. Renamed from the page-named `thank_you` (2026-07-11) — it is
+  // the generic confirmation type, not a one-page type (design-principles rule 1).
+  sectionVariant('form_confirmation', {
     eyebrow: z.string().optional(),
     heading: z.string().min(1),
     message: z.string().min(1),

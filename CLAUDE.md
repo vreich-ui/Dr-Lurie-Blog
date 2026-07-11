@@ -30,6 +30,13 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   family (`page_about` + 8 shared sections) — all proven by credentialed
   `home-conversion-roundtrip.mjs --production --release` runs. The other 10 page
   exports render but are rendered stubs.
+- Update (2026-07-11): the 10 remaining page exports are now SEEDED at RENDERS
+  (W1: 8 interior/system pages; W2: /contact + /thank-you decomposed) and 3
+  starter templates are seeded (W2.5) — all awaiting one batched credentialed
+  run to become store-backed. **The section-type palette is now fully generic:**
+  the last bespoke per-page types are gone (`about`, `contact` decomposed;
+  `thank_you` → `form_confirmation`). Converted count is still sixteen until that
+  run lands.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

@@ -246,34 +246,13 @@ const sectionFixtures: SectionInstance[] = [
   { id: 's_embed', type: 'content_embed', data: { contentItem: 'req_smoke_pdf_cta_20260630_01' } },
   {
     id: 's_thanks',
-    type: 'thank_you',
+    type: 'form_confirmation',
     data: {
       eyebrow: 'Submission received',
       heading: 'Thank you.',
       message: 'Your submission has been received.',
       formMessages: [{ form: 'contact', heading: 'Thanks for reaching out.', message: 'We will follow up.' }],
       actions: [{ label: 'Return home', target: { kind: 'route', href: '/' } }],
-    },
-  },
-  {
-    id: 's_contact',
-    type: 'contact',
-    data: {
-      hero: { tagline: 'Contact', title: 'Get in touch' },
-      form: {
-        id: 'form',
-        formName: 'contact',
-        title: 'Send a note',
-        subtitle: 'We read every message.',
-        inputs: [{ type: 'text', name: 'name', label: 'Name' }],
-        textarea: { label: 'Message' },
-        disclaimer: { label: 'Privacy applies.' },
-        description: 'We respond when appropriate.',
-      },
-      features: {
-        title: 'How we can help',
-        items: [{ title: 'Questions', description: 'Ask us.', icon: 'tabler:help' }],
-      },
     },
   },
   {
@@ -296,12 +275,12 @@ test('sections: every union member parses from a seed fixture', () => {
     'bio',
     'card',
     'checklist',
-    'contact',
     'contact_form',
     'content_embed',
     'content_grid',
     'cta_banner',
     'faq',
+    'form_confirmation',
     'hero',
     'lede',
     'link_list',
@@ -311,7 +290,6 @@ test('sections: every union member parses from a seed fixture', () => {
     'search',
     'shared_ref',
     'testimonial',
-    'thank_you',
   ]);
 });
 
@@ -373,6 +351,20 @@ test('content_grid: query, manual (with M-8 fallback), and curated cards sources
     contentGridSourceSchema.safeParse({ kind: 'cards', cards: [{}] }).success,
     false,
     'a card cell needs a title or a description'
+  );
+  // Optional Tabler icon (the /contact "how we can help" feature-grid shape).
+  assert.equal(
+    contentGridSourceSchema.safeParse({
+      kind: 'cards',
+      cards: [{ icon: 'tabler:school', title: 'Education questions', description: 'Ask about our content.' }],
+    }).success,
+    true,
+    'a card cell may carry an optional icon'
+  );
+  assert.equal(
+    contentGridSourceSchema.safeParse({ kind: 'cards', cards: [{ icon: 'tabler:school' }] }).success,
+    false,
+    'an icon alone is not a card — it still needs a title or a description'
   );
   assert.equal(
     contentGridSourceSchema.safeParse({
