@@ -55,6 +55,33 @@ property while migrating, nothing more. Once a surface is object-backed, "matche
 the old markup exactly" is **not** the definition of done. **"An agent can now
 reconfigure this to do something else" is.**
 
+### 5. Templates are recipes; PageTypes are law (Wolf, 2026-07-11, GOVERNING)
+
+The resolution of the flexibility-vs-strict-rules tension for specialty pages —
+**generic objects only, composed by templates, bounded by PageTypes**:
+
+- **The palette is generic-only, grown ON DEMAND.** Every page is composed from
+  the reusable section types; each conversion adds exactly the types it needs
+  (never a speculative library built upfront, never a bespoke per-page type —
+  rule 1 stands).
+- **Templates (data — many, agent-editable) answer "how do I START a page of
+  kind X?"** A template is a named recipe: slots with allowed types, required/
+  repeatable flags, and pre-filled blueprints. Instantiation **copies** the
+  blueprints into a new page and stamps provenance (`page.template`) — pages
+  never live-inherit from templates afterwards (D§3.6 stands; no propagation
+  trap). Agents may create and evolve templates freely: a new specialty page
+  shape costs zero code.
+- **PageTypes (code — few, stable) answer "what must ALWAYS hold for kind X?"**
+  The registry + validation criteria (allowed/required sections,
+  `structure_home_footer`, …) remain the only _enforced_ structural law, run on
+  every patch/publish regardless of which template a page came from.
+- One is a starting point, the other is a boundary — only one is binding, so the
+  two cannot drift into contradiction. Behavior (form wiring, loaders, client
+  scripts) lives in generic _components_, never in templates.
+- Rejected alternatives, recorded: templates-as-law / live inheritance (the
+  propagation trap), and PageType-as-data (guardrails would become
+  agent-mutable; revisit only if agents should invent page _kinds_ — OQ-4).
+
 ## What this means for the current state (2026-07-08)
 
 - **Homepage grid** — retire the transitional `static` placeholder to the flexible
