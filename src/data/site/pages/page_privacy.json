@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-09T10:54:36.196Z",
+    "at": "2026-07-11T11:29:49.888Z",
     "from": "objects/page/by-id/page_privacy.json",
-    "record_version": 3
+    "record_version": 20
   },
   "pageType": "system",
   "route": "/privacy",
