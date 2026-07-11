@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-05-29T15:56:00.000Z
+published_time: 2026-05-29T15:56:00.000Z
 title: 'Your Products May Not Have Stopped Working'
 excerpt: 'Perimenopause and menopause can change skin comfort, tolerance, oil balance, and hair patterns. That does not make every change an anti-aging emergency.'
 image: '~/assets/images/uploads/hormonal-skin-changes-without-anti-aging-panic/serene-skincare-display-in-soft-light-small-.png'

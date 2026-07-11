@@ -1,6 +1,7 @@
 ---
 title: 'Not Every Dark Spot Is the Same'
 publishDate: 2026-05-29T16:16:00.000Z
+published_time: 2026-05-29T16:16:00.000Z
 excerpt: 'Age spots, sun spots, post-inflammatory marks, and melasma-like patches often get sold under one “brightening” promise. Your skin is more specific than that.'
 image: '~/assets/images/uploads/dark-spots-uneven-tone-age-spots-melasma/chatgpt-image-may-29-2026-08_38_27-pm.png'
 tags:

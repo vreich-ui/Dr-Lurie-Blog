@@ -1,6 +1,7 @@
 ---
 title: 'Why Sunscreen Seems to Break You Out'
 publishDate: 2026-06-08T14:56:00.000Z
+published_time: 2026-06-08T14:56:00.000Z
 excerpt: 'Sunscreen may not be the only reason for new bumps. Formula, sweat, friction, removal, and irritation can all make SPF feel impossible.'
 tags:
   - sun-protection

@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-06-12T17:10:25Z
+published_time: 2026-06-12T17:10:25Z
 title: 'The Small Weather of Stairwells'
 excerpt: 'A short, strange essay about the in-between places that quietly teach us how buildings breathe.'
 category: reflections

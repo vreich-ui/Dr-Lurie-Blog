@@ -1,5 +1,6 @@
 ---
 publishDate: 2026-05-10T15:52:00.000Z
+published_time: 2026-05-10T15:52:00.000Z
 title: 'Silymarin'
 excerpt: 'Silymarin refers to a group of flavonoid antioxidants that naturally occur in milk thistle seeds (used historically as an antidote for mushroom poisoning).'
 image: '~/assets/images/uploads/silymarin/dr-lurie-skin-barrier.webp'
