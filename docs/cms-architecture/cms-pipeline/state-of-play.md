@@ -35,8 +35,13 @@ scripts/lib/pages-interior-seed-data.mjs` run creates the 8 store records and
 proves the production round-trip (criteria 2/3). After it, 10 pages are
 converted (home, about, + these 8), leaving only contact + thank_you.
 
-Separately queued (Wolf's D1 = yes): retire the now-orphaned bespoke `about`
-section TYPE in its own focused PR.
+**Also this session (Wolf's D1 = yes, separate PR):** the now-orphaned bespoke
+`about` section TYPE was RETIRED — union member, `About.astro`, its registry
+module + binding, the registered-types/object-contract/resolve.ts entries, and
+two test artifacts all removed (the `componentRegistry` `Record` forces the
+union + binding to change in lockstep, so a miss is a compile error). No live
+data migration (zero objects were `type: 'about'`); build-diff EMPTY (203/203)
+— nothing rendered it. 17 registered section types remain.
 
 ## Session 2026-07-10 F (/about DECOMPOSED into 8 generic objects; bio gains a portrait; driver handles all-shared_ref pages)
 

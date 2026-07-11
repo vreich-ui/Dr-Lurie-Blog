@@ -30,7 +30,6 @@ export const REGISTERED_SECTION_TYPES = [
   'search',
   'content_embed',
   'thank_you',
-  'about',
 ] as const satisfies readonly SectionType[];
 
 export type RegisteredSectionType = (typeof REGISTERED_SECTION_TYPES)[number];

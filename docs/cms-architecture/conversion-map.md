@@ -77,7 +77,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   ├── page_about ─ /about ─ 🟢 CONVERTED (2026-07-10) ─ decomposed off the bespoke `about`
 │   │   │   anti-pattern into 8 standalone shared sections of REUSABLE types (the design-
 │   │   │   principles win); a `standard` page of 8 shared_refs. Store-backed, round-tripped
-│   │   │   in production, published, released. (Orphaned `about` TYPE → flagged follow-up removal.)
+│   │   │   in production, published, released. (The bespoke `about` TYPE was retired 2026-07-10.)
 │   │   ├── s_intro ─ shared_ref → sec_about_intro 🟢 ─ bio (heading + copy + portrait photo)
 │   │   ├── s_thinking ─ shared_ref → sec_about_thinking 🟢 ─ prose
 │   │   ├── s_products ─ shared_ref → sec_about_products 🟢 ─ prose
@@ -144,8 +144,8 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │     bio(now with optional URL `portrait` — the reusable "person intro", used on home + about) ·
 │   │     newsletter_signup · testimonial · cta_banner · faq · link_list · product_preview ·
 │   │     contact_form · search · content_embed
-│   ├── bespoke, exist (anti-pattern — do not mint more): about(now ORPHANED — /about decomposed
-│   │     off it 2026-07-10; retire in a follow-up) · contact · thank_you
+│   ├── bespoke, exist (anti-pattern — do not mint more): contact · thank_you
+│   │     (the `about` type was RETIRED 2026-07-10 after /about was decomposed)
 │   ├── wrapper: shared_ref (pointer, never rendered itself)
 │   └── ⚪ needed by W5 (design them REUSABLE, agent-configurable):
 │         pricing_table (tiers[] as card-like cells) · steps (ordered step cells) ·
