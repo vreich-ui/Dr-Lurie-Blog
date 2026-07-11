@@ -1,16 +1,16 @@
 {
   "__generated": {
-    "at": "2026-07-10T15:31:55.944Z",
+    "at": "2026-07-11T18:44:17.895Z",
     "from": "objects/section/by-id/sec_home_start_grid.json",
-    "record_version": 23
+    "record_version": 27
   },
   "section": {
     "data": {
       "anchor": "start-here",
-      "body": "<p>Read these in order or choose the question that feels most useful today.</p>",
-      "heading": "Five simple places to begin.",
-      "kicker": "Start here",
-      "limit": 5,
+      "body": "<p>This grid has a tighter count and a brighter intro so the page rhythm changes visibly.</p>",
+      "heading": "Four simple places to begin.",
+      "kicker": "Start here, refreshed",
+      "limit": 4,
       "source": {
         "kind": "query",
         "query": {
