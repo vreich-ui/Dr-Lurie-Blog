@@ -13,8 +13,8 @@
  *                     object that references it;
  *   SEED_SITE         the owning site id (e.g. 'site_drlurie').
  * (The home module's PAGE_HOME_SEEDS / PAGE_HOME_SEED_SITE names are accepted
- * as a fallback.) The driver drills page, section, template, and taxonomy
- * types — extend drillOps/reconcileOps/materialize dispatch when another
+ * as a fallback.) The driver drills page, section, template, taxonomy, and
+ * site types — extend drillOps/reconcileOps/materialize dispatch when another
  * type's family converts. Template families additionally get an instantiate proof: an
  * object_instantiate_template dry_run per template (W2.5), which builds and
  * validates the would-be page WITHOUT persisting — so production runs leave no
@@ -108,11 +108,11 @@ if (!Array.isArray(PAGE_HOME_SEEDS) || PAGE_HOME_SEEDS.length === 0 || !PAGE_HOM
   console.error(`[roundtrip] ${seedsPath} must export CONVERSION_SEEDS (non-empty array) and SEED_SITE.`);
   process.exit(2);
 }
-const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy']);
+const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy', 'site']);
 const unsupported = PAGE_HOME_SEEDS.filter((seed) => !SUPPORTED_SEED_TYPES.has(seed.objectType));
 if (unsupported.length > 0) {
   console.error(
-    `[roundtrip] the driver drills page/section/template/taxonomy objects only; extend drillOps for: ${unsupported
+    `[roundtrip] the driver drills page/section/template/taxonomy/site objects only; extend drillOps for: ${unsupported
       .map((seed) => `${seed.objectId} (${seed.objectType})`)
       .join(', ')}`
   );
@@ -514,11 +514,13 @@ if (writeExports) {
   const { materializeTaxonomy } = await import(
     path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'taxonomy.js')
   );
+  const { materializeSite } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'site.js'));
   const materializerByType = {
     page: materializePage,
     section: materializeSection,
     template: materializeTemplate,
     taxonomy: materializeTaxonomy,
+    site: materializeSite,
   };
   for (const seed of PAGE_HOME_SEEDS) {
     const record = await getRecord(seed.objectType, seed.objectId);

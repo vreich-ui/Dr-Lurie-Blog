@@ -23,6 +23,7 @@ import type { NavTarget } from '~/schema/bodies/navigation-v1';
 import type { ContentQuery } from '~/schema/bodies/section-v1';
 import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
 import { getBlogPermalink, getPermalink } from '~/utils/permalinks';
+import { getSiteObject } from '~/utils/site-object';
 
 interface Props {
   objectId: string;
@@ -141,11 +142,13 @@ const deps: ResolvePageDeps = {
 const { metadata, sections } = resolvePage(page, deps);
 
 // Footer: the page's override if it names one (S-4, homepage → nav_footer_home),
-// else the site default nav_footer — exactly what PageLayout's footer slot
-// renders by default. Always provided explicitly here rather than relying on
-// the slot fallback: a *conditional* `slot="footer"` makes Astro treat the slot
-// as handled and suppresses PageLayout's default, dropping the footer.
-const footerNavId = page.navigationOverrides?.footer ?? 'nav_footer';
+// else the site object's defaultNavigation.footer (W4; 'nav_footer' when the
+// site export is absent) — exactly what PageLayout's footer slot renders by
+// default. Always provided explicitly here rather than relying on the slot
+// fallback: a *conditional* `slot="footer"` makes Astro treat the slot as
+// handled and suppresses PageLayout's default, dropping the footer.
+const site = getSiteObject();
+const footerNavId = page.navigationOverrides?.footer ?? site?.defaultNavigation.footer ?? 'nav_footer';
 const footerEntry = await getEntry('navigationObject', footerNavId);
 if (!footerEntry) {
   throw new Error(`PageObjectRenderer: the footer navigation export '${footerNavId}' is missing.`);

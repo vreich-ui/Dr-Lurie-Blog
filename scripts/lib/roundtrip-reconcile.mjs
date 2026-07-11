@@ -64,6 +64,12 @@ export const reconcileOps = (seed, currentBody) => {
   if (seed.objectType === 'section') {
     return [{ op: 'upsert_section', section: seed.body.section }];
   }
+  if (seed.objectType === 'site') {
+    // The singleton is one fields bag and set_site_fields is its only op: one
+    // deep-merge diff against the current record, nulling strays at every
+    // depth (trap 2), heals it wholesale.
+    return [{ op: 'set_site_fields', fields: diffFieldsForMerge(seed.body, currentBody) }];
+  }
   if (seed.objectType === 'taxonomy') {
     const current = isPlainObject(currentBody) ? currentBody : {};
     const ops = [];

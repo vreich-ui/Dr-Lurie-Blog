@@ -17,6 +17,7 @@ import {
   drillOpsForSeed,
   pageDrillOps,
   sectionDrillOps,
+  siteDrillOps,
   taxonomyDrillOps,
   templateDrillOps,
   updateDataProbeOps,
@@ -233,4 +234,19 @@ test('drillOpsForSeed dispatches by object type', () => {
   const templateDrill = drillOpsForSeed(templateSeed);
   assert.equal(templateDrill.expected.length, 4);
   assert.equal(templateDrill.ops.find((op) => op.op === 'upsert_slot').slot.slotId, 'slot_rtprobe2');
+});
+
+test('siteDrillOps pokes and restores the name — set_site_fields is the only site op', () => {
+  const body = { name: 'Dr. Lurié', logo: { text: 'DR. LURIÉ SCIENCE' } };
+  const { ops, expected } = siteDrillOps(body);
+  assert.deepEqual(expected, ['set_site_fields']);
+  assert.deepEqual(ops, [
+    { op: 'set_site_fields', fields: { name: 'Dr. Lurié [probe]' } },
+    { op: 'set_site_fields', fields: { name: 'Dr. Lurié' } },
+  ]);
+});
+
+test('drillOpsForSeed dispatches a site seed to siteDrillOps', () => {
+  const seed = { objectType: 'site', body: { name: 'Dr. Lurié' } };
+  assert.deepEqual(drillOpsForSeed(seed).expected, ['set_site_fields']);
 });

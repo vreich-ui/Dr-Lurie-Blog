@@ -24,14 +24,18 @@
 ## The tree
 
 ```text
-site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
-│   the root everything hangs off; today it is src/config.yaml (code, not agent-editable)
-│   attributes: name · site URL/base · metadata defaults (title template, description,
-│     og/twitter cards) · i18n (language/dir) · ui.theme · analytics vendors ·
-│     blog app config (paths, permalinks, per-page counts) · googleSiteVerificationId ·
-│     default navigation refs (header → nav_header, footer → nav_footer)
+site_drlurie ─ SITE SINGLETON ─ 🟣 RENDERS (W4 built + wired 2026-07-11; pending the credentialed run)
+│   the root everything hangs off; seed scripts/lib/site-seed-data.mjs → export src/data/site/site.json
+│   LIVE from the object (pre-conversion literals as fallback when the export is absent):
+│     brandTokens (every CustomStyles custom property, light + dark:` keys) · logo.text ·
+│     chrome{showRssFeed, showThemeToggle} · metadataDefaults (title template, description,
+│     ogImage, twitter handle, og site_name) · defaultNavigation{header, footer} (D§5.4:
+│     the ONLY place default menus bind)
+│   CARRIED but config.yaml stays authoritative for routing (Wolf B2, 2026-07-11): urls ·
+│     blog{listPath, postsPerPage, categoryBase, tagBase} — permalink wiring is a later cutover
+│   NOT in the object (still config.yaml/code): i18n · ui.theme · analytics ·
+│     googleSiteVerificationId · trailingSlash; chrome.announcement deferred (Wolf B3)
 │   dependents: EVERY page (Layout/Metadata.astro), rss.xml, sitemap, robots directives
-│   conversion note: build the object AND wire the layout to read it — the wiring is the work
 │
 ├── CHROME — navigation objects (type: navigation)
 │   ├── nav_header ─ 🟢 CONVERTED
@@ -240,7 +244,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 | W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
 | W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                          | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles | Unlocks term-filtered grids, listings, topics hub                                    | M    |
-| W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
+| W4         | 🟣 BUILT + WIRED (2026-07-11, pending credentialed run): site_drlurie seeded; brandTokens/logo/chrome/metadataDefaults/defaultNavigation render from the object; urls/blog carried (config.yaml authoritative for routing per B2) | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
 | W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
 | W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                            | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
 | W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                              | Post-MVP by standing decision                                                        | L    |

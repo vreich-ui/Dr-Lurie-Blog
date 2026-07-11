@@ -10,6 +10,7 @@ import {
   parseNavigationExport,
 } from '~/utils/navigation-data';
 import { getBlogPermalink } from '~/utils/permalinks';
+import { getSiteObject } from '~/utils/site-object';
 
 import type { MetaData } from '~/types';
 
@@ -19,18 +20,27 @@ export interface Props {
 
 const { metadata } = Astro.props;
 
+// W4: WHICH navigation objects feed the default header/footer, and the Header
+// chrome flags, come from the site object (defaultNavigation / chrome — D§5.4:
+// the site object is the only place default menus bind), with the
+// pre-conversion ids/flags as fallback when the export is absent.
+const site = getSiteObject();
+const headerNavId = site?.defaultNavigation.header ?? 'nav_header';
+const footerNavId = site?.defaultNavigation.footer ?? 'nav_footer';
+const chrome = site?.chrome ?? { showRssFeed: true, showThemeToggle: true };
+
 // T2.5 cutover: header/footer render from the published navigation exports
 // (src/data/site/navigation/*.json, committed by the Tier 3 publish) through
 // the T2.4 prop adapter — same Header/Footer markup, new feed. There is
 // deliberately NO fallback to a hardcoded source: a missing export must fail
 // the build loudly, not half-feed the site (04 Part 2, "never leaves a
 // surface half-fed").
-const headerEntry = await getEntry('navigationObject', 'nav_header');
-const footerEntry = await getEntry('navigationObject', 'nav_footer');
+const headerEntry = await getEntry('navigationObject', headerNavId);
+const footerEntry = await getEntry('navigationObject', footerNavId);
 if (!headerEntry || !footerEntry) {
   throw new Error(
-    'PageLayout: published navigation exports are missing (src/data/site/navigation/nav_header.json / ' +
-      'nav_footer.json). The T2.3 Tier 3 publish must land on this branch before the T2.5 cutover builds — ' +
+    `PageLayout: published navigation exports are missing (src/data/site/navigation/${headerNavId}.json / ` +
+      `${footerNavId}.json). The T2.3 Tier 3 publish must land on this branch before the T2.5 cutover builds — ` +
       'see docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4.'
   );
 }
@@ -41,7 +51,7 @@ const footerData = navigationToFooterProps(parseNavigationExport(footerEntry.dat
 
 <Layout metadata={metadata}>
   <slot name="header">
-    <Header {...headerData} isSticky showRssFeed showToggleTheme />
+    <Header {...headerData} isSticky showRssFeed={chrome.showRssFeed} showToggleTheme={chrome.showThemeToggle} />
   </slot>
   <main>
     <slot />

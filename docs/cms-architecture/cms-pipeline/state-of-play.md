@@ -7,6 +7,56 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 I (W4 BUILT + WIRED: the site singleton renders the chrome — pending credentialed run)
+
+Wolf's W4 answers locked the scope (B1 autonomous publish; B2 urls/blog carried
+but config.yaml stays authoritative for routing; B3 announcement deferred). The
+singleton is built end-to-end and the layout renders from it:
+
+- **Seed** (`scripts/lib/site-seed-data.mjs`): `site_drlurie`, a byte-identical
+  transcription of the previously hardcoded values — name/urls/metadataDefaults/
+  blog from config.yaml, logo.text from Logo.astro, brandTokens from the
+  CustomStyles literals (colors keyed by var name minus `--aw-color-`, dark
+  overrides under `dark:` keys), chrome flags + defaultNavigation from
+  PageLayout. 5-test seed suite (schema/id/validation clean; dangling
+  defaultNavigation ref proven a real blocker; token set covers every custom
+  property).
+- **Wiring** (`src/utils/site-object.ts` + 5 consumers): CustomStyles renders
+  every custom property from brandTokens; Logo text; PageLayout header/footer
+  nav ids + Header chrome flags; PageObjectRenderer footer default; Metadata
+  gains a metadataDefaults layer (titleTemplate/description/ogImage/twitter
+  handle/og site_name) between config.yaml and per-page props. All with the
+  pre-conversion literals as fallback when the export is absent.
+- **The trap this session found (recorded for every future wiring): an `await`
+  in previously-sync component frontmatter flips astro-icon's `<symbol>`/`<use>`
+  placement.** First wiring used a memoized async `getEntry` loader — build-diff
+  lit up 153/168 pages, ALL of it icon-sprite placement shifts (Astro evaluates
+  sibling components concurrently; any new microtask changes which instance
+  renders first and wins the symbol). Fix: the loader is a deliberately
+  SYNCHRONOUS eager `import.meta.glob` (zero-or-one match, absent → undefined),
+  so frontmatter that was sync stays sync. Re-run: **build-diff EMPTY**.
+- **Driver**: `site` support — `siteDrillOps` (`set_site_fields` is the type's
+  only op: poke name + restore), reconcile = one `diffFieldsForMerge` fields op
+  (trap-2 stray-nulling), materializeSite dispatch. Local rehearsal green: full
+  lifecycle create → drill → validate → publish (sandbox boundary) → contract
+  (1 op advertised ≡ exercised) → inventory → site.json materialized.
+
+Gates: astro 0 errors · 994/994 tests (8 new) · build OK · **build-diff EMPTY**
+(the byte-identical cutover held). Still config-owned deliberately: i18n,
+ui.theme, analytics, googleSiteVerificationId, trailingSlash, and routing
+(urls/blog are carried, not wired — B2). NEXT: Wolf's credentialed run
+(`node scripts/home-conversion-roundtrip.mjs --production --release --seeds
+scripts/lib/site-seed-data.mjs`) flips site_drlurie to CONVERTED (#31).
+
+## Session 2026-07-11 H (content cleanup: 10 junk posts dumped, 18 surfaced — PR #402 merged)
+
+Wolf ruled on the 28 invisible posts ("you be the judge"): judged by content —
+deleted 10 (5 twenty-three-word "After N" stubs, 4 pipeline-test artifacts,
+1 malformed notes file), stamped `published_time` (from each `publishDate`) on
+the 18 real ones. Site 123 → 167 pages; topics hub renders all 5 registry
+categories; tag pages 18 → 26. The standing "28 posts invisible" caveat is
+CLOSED.
+
 ## Session 2026-07-11 G (W3 STEP 2 SHIPPED: publish-article taxonomy enforcement + frontmatter normalization + registry labels)
 
 Wolf picked "slugs + label lookup". The bounded exception is built — full §5.5
