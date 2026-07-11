@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-11T19:00:50.430Z",
+    "at": "2026-07-11T19:04:46.356Z",
     "from": "objects/section/by-id/sec_about_intro.json",
-    "record_version": 15
+    "record_version": 19
   },
   "section": {
     "data": {
@@ -11,7 +11,7 @@
       "kicker": "About the method",
       "portrait": {
         "alt": "Portrait of Dr. Leonid Lurie",
-        "src": "https://github.com/vreich-ui/Dr-Lurie-Blog/blob/main/src/assets/images/dr-lurie-portrait4.jpeg?raw=true"
+        "src": "https://raw.githubusercontent.com/vreich-ui/Dr-Lurie-Blog/main/src/assets/images/dr-lurie-portrait4.jpeg"
       },
       "trustNotes": [
         "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
