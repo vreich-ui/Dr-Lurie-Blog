@@ -4,9 +4,7 @@ title: 'Understanding the Differences Between Lotions, Creams, and Gels'
 excerpt: 'When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best.'
 image: '~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.webp'
 tags:
-  - 'Lotions'
-  - 'Creams'
-  - 'Gels'
+  - moisturizers
 ---
 
 When navigating skincare shelves, lotions, creams, and gels might seem like just different names for moisturizers. Yet each type has distinct formulation characteristics shaping how they feel on your skin, how they absorb, and which skin types they suit best.

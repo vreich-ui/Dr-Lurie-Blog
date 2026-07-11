@@ -4,12 +4,6 @@ published_time: 2026-06-30T16:13:05.383Z
 title: "Smoke Inline Image Fix 20260630 123640"
 excerpt: "A republished smoke-style article used to verify that a fresh featured image and a distinct inline image survive overwrite publishing without duplicate-image or path-loss behavior."
 image: "~/assets/images/uploads/smoke-inline-image-fix-20260630-123640/retinol-introduction-hero.png"
-tags:
-  - "smoke-test"
-  - "inline-image"
-  - "review-and-republish"
-  - "png"
-  - "regression"
 metadata:
   description: "Corrective review-and-republish regression verifying distinct featured and inline image replacement on an existing smoke article slug."
 ---

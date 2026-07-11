@@ -4,11 +4,6 @@ published_time: 2026-07-01T18:17:13.696Z
 title: "Smoke Test: Image Rendering With a Downloadable PDF CTA"
 excerpt: "A compact article created to verify that the current publisher renders an MCP image artifact and a visible PDF download CTA in the same page."
 image: "~/assets/images/uploads/smoke-test-image-rendering-with-a-downloadable-pdf-cta/smoke-image-pdf-rendering-hero-req.png"
-tags:
-  - "smoke-test"
-  - "publishing-test"
-  - "image-rendering"
-  - "pdf-cta"
 metadata:
   description: "A Dr. Lurie smoke-test article verifying image rendering and a visible PDF CTA."
 ---

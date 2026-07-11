@@ -3,12 +3,11 @@ title: 'How to Start Retinol Without Wrecking Your Skin Barrier'
 publishDate: 2026-06-08T15:57:00.000Z
 excerpt: 'Retinol can be useful, but the first win is tolerance: go slowly, moisturize well, and let sunscreen do its quiet daily work.'
 tags:
-  - 'retinol'
-  - 'retinoids'
-  - 'skin barrier'
-  - 'sensitive skin'
-  - 'skincare'
-  - 'patient education'
+  - retinoids
+  - skin-barrier
+  - sensitive-skin
+  - skincare
+  - patient-education
 author: 'Dr. Lurié'
 sources:
   - 'source_id: aad_retinoid_retinol; name: Retinoid or retinol?; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol; publisher: American Academy of Dermatology Association; accessed_at: 2026-06-08'

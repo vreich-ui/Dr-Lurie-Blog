@@ -4,10 +4,6 @@ published_time: 2026-07-03T15:35:00.090Z
 title: "Smoke T8 Hero Collision Retest"
 excerpt: "A targeted hero collision publishing smoke test."
 image: "~/assets/images/uploads/smoke-t8-hero-collision-retest/a.png"
-tags:
-  - "smoke-test"
-  - "t8"
-  - "hero-collision"
 metadata:
   description: "Hero collision smoke test with mismatched n_hero and featured image."
 ---

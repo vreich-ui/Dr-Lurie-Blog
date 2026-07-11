@@ -5,10 +5,7 @@ title: "Smoke Test: A PDF-Only CTA for a Calmer Menopause Visit"
 excerpt: "A compact Dr. Lurie smoke-test article that verifies whether a new article can publish with text plus one downloadable PDF, and no image payload fields."
 image: "~/assets/documents/uploads/smoke-test-a-pdf-only-cta-for-a-calmer-menopause-visit/dr-lurie-smoke-test-pdf-cta.pdf"
 tags:
-  - "smoke-test"
-  - "pdf-cta"
-  - "no-images"
-  - "menopause-care"
+  - menopause
 metadata:
   description: "A Dr. Lurie smoke-test article that publishes with one downloadable PDF CTA and no image payload fields."
 ---

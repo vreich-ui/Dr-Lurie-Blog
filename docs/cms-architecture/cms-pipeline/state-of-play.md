@@ -7,6 +7,48 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 G (W3 STEP 2 SHIPPED: publish-article taxonomy enforcement + frontmatter normalization + registry labels)
+
+Wolf picked "slugs + label lookup". The bounded exception is built — full §5.5
+for articles, in three pieces:
+
+- **Enforcement hook** (`netlify/lib/taxonomy-enforcement.ts` + a minimal
+  insertion in `publish-article.ts` before `buildFrontmatter`): when the
+  tax_drlurie registry exists in site-objects, every category/tag on a publish
+  resolves BY SLUG (labels and slugs both work), following `merged_into`
+  aliases (cycle-guarded); unresolvable terms → 422 `TAXONOMY_TERMS_UNRESOLVED`
+  with the offender list; resolved terms are materialized into frontmatter as
+  their CANONICAL SLUGS (deduped). **No registry → skipped, byte-identical old
+  behavior** — the bounded-exception guarantee is structural: all 56
+  pre-existing publish-article tests run storeless of taxonomy and pass
+  unchanged. Record free-strings stay lossy input (§3.10 untouched).
+- **One-time normalization** (`scripts/normalize-taxonomy-frontmatter.mjs`,
+  standing tool + audit trail): all 93 posts rewritten via RAW_TO_CANONICAL —
+  category kept 11 / dropped 3 (test posts); tag usages kept 122 / dropped 235
+  (the junk). Line surgery only; tag-list style preserved per file. One mapping
+  added beyond the approved table: tag `Health` → `skin-health` (the category
+  map already absorbed it; obvious cluster variant).
+- **Registry display labels** (`src/utils/blog.ts`): getNormalizedPost now
+  resolves category/tag titles from the taxonomy export by slug (memoized
+  `getEntry('taxonomyObject', …)`; raw-string fallback when absent). Labels
+  are registry-governed — rename a label in tax_drlurie and every card, chip,
+  tag page, and topics entry updates on the next build.
+
+Gates: **986/986 tests** (8 unit + 2 integration new — the integration pair
+drives the REAL handler against the REAL seed registry in an isolated local
+store: canonical-slug frontmatter committed on success; 422 + nothing committed
+on junk). astro 0 errors; build OK. **build-diff reviewed and intended**: 90
+only-in-base pages = junk-tag listing pages gone; 11 only-in-head = canonical
+merged-term tag pages (+ pagination); 75 changed = article pages' tag chips +
+kept tag pages now registry-labeled. Site: 202 → 123 pages.
+
+**Discovered, pre-existing, out of scope (flagged to Wolf):** `fetchPosts()`
+filters to posts with a finite `published_time`; 28 of 93 posts (including ALL
+11 categorized ones) lack it, so they are invisible in every listing/tag/topics
+surface TODAY — the /learn/topics hub renders zero topics at HEAD and after
+this change alike (build-diff: byte-identical). Fixing means stamping
+`published_time` on those 28 posts (an article-pipeline pass, Wolf's call).
+
 ## Session 2026-07-11 F (tax_drlurie CONVERTED — object #30; taxonomy registry live in production)
 
 Wolf ran the credentialed taxonomy command; single all-green run: ensure

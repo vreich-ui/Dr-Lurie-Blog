@@ -3,10 +3,6 @@ publishDate: 2026-07-03T16:26:30.046Z
 published_time: 2026-07-03T16:26:30.046Z
 title: "Smoke Test T1 Baseline No Image"
 excerpt: "A minimal no-image publishing baseline for the image pipeline smoke suite."
-tags:
-  - "smoke-test"
-  - "image-pipeline"
-  - "t1"
 metadata:
   description: "Baseline no-image smoke test for the publishing image pipeline."
 ---

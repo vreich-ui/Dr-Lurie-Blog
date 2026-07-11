@@ -4,13 +4,11 @@ draft: true
 publishDate: 2026-06-10T11:42:00.000Z
 excerpt: 'Retinol irritation is common, but pushing through every sting is not the goal. Learn the difference between mild adjustment and a routine that needs a reset.'
 tags:
-  - 'retinol'
-  - 'retinoids'
-  - 'skin barrier'
-  - 'irritation'
-  - 'sensitive skin'
-  - 'skincare'
-  - 'patient education'
+  - retinoids
+  - skin-barrier
+  - sensitive-skin
+  - skincare
+  - patient-education
 author: 'Dr. Lurié'
 sources:
   - 'source_id: aad_retinoid_retinol; name: Retinoid or retinol?; url: https://www.aad.org/public/everyday-care/skin-care-secrets/anti-aging/retinoid-retinol; publisher: American Academy of Dermatology Association; accessed_at: 2026-06-08'

@@ -3,12 +3,9 @@ publishDate: 2026-06-14T11:36:00.000Z
 title: 'The Blue Dot on the Floor'
 excerpt: 'A small reflection from a phone screen becomes a quiet way back into memory.'
 image: '~/assets/images/uploads/the-blue-dot-on-the-floor/scrolling-mood.webp'
-category: 'Essay'
+category: reflections
 tags:
-  - 'attention'
-  - 'nostalgia'
-  - 'small moments'
-  - 'reflection'
+  - reflections
 author: 'Dr. Lurie'
 metadata:
   description: 'A quiet essay about a tiny reflected light, pointless scrolling, and the small nostalgia hidden in ordinary rooms.'

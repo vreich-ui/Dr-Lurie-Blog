@@ -5,11 +5,8 @@ title: "Smoke Test: A Calmer Retinol Reset Without Repo Paths"
 excerpt: "A compact DTC-style smoke article built to verify that artifact-backed featured and inline images survive pre-publish payload assembly without any repository-style image path."
 image: "~/assets/images/uploads/smoke-test-a-calmer-retinol-reset-without-repo-paths/retinol-introduction-hero.png"
 tags:
-  - "smoke-test"
-  - "retinol"
-  - "skincare"
-  - "inline-image"
-  - "artifact-backed"
+  - retinoids
+  - skincare
 metadata:
   description: "A compact DTC-style smoke article verifying artifact-backed featured and inline images with the same slug and a replaced inline image."
 ---

@@ -4,10 +4,6 @@ published_time: 2026-07-02T13:21:14.547Z
 title: "A Calmer First Step When Smoke Exposure Feels Overwhelming"
 excerpt: "A compact smoke-test article for validating featured-image registration without inline media."
 image: "~/assets/images/uploads/a-calmer-first-step-when-smoke-exposure-feels-overwhelming/featured-only-smoke-test-hero-r2.png"
-tags:
-  - "smoke-test"
-  - "artifact-registration"
-  - "featured-only"
 metadata:
   description: "A compact smoke-test article for validating featured-image registration."
 ---

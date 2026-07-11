@@ -5,11 +5,11 @@ title: 'Moisturizer Is Not Just Hydration: What Barrier Products Are Really Tryi
 excerpt: 'A practical guide to moisturizer language, barrier claims, and choosing texture by skin state rather than marketing intensity.'
 image: '~/assets/images/uploads/moisturizer-is-not-just-hydration-what-barrier-products-are-really-trying-to-do/moisturizer-barrier-editorial-featured.webp'
 tags:
-  - 'Skincare Basics'
-  - 'Moisturizer'
-  - 'Skin Barrier'
-  - 'Dry Skin'
-  - 'Midlife Skin'
+  - skincare-basics
+  - moisturizers
+  - skin-barrier
+  - dry-skin
+  - skin-after-40
 metadata:
   description: 'A practical guide to moisturizer language, barrier repair claims, and choosing texture by your current skin state.'
 ---

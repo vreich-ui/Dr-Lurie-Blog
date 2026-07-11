@@ -3,11 +3,6 @@ publishDate: 2026-06-30T15:33:03.449Z
 published_time: 2026-06-30T15:33:03.449Z
 title: "No-Image PDF CTA Smoke Test for Dr. Lurie"
 excerpt: "A compact publish-path check for a new Dr. Lurie article that includes a downloadable PDF CTA and no image assets."
-tags:
-  - "smoke-test"
-  - "pdf-cta"
-  - "no-image"
-  - "dr-lurie"
 ---
 ### No-Image PDF CTA Smoke Test for Dr. Lurie
 

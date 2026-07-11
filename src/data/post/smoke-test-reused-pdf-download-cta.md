@@ -3,11 +3,6 @@ publishDate: 2026-07-01T08:48:02.187Z
 published_time: 2026-07-01T08:48:02.187Z
 title: "Smoke Test: Reused PDF Download CTA"
 excerpt: "A compact no-image publish-path check for a new Dr. Lurie article that reuses an existing PDF artifact as a download CTA."
-tags:
-  - "smoke-test"
-  - "pdf-cta"
-  - "no-image"
-  - "dr-lurie"
 metadata:
   description: "No-image smoke-test publish check for a new Dr. Lurie article with a reused PDF artifactReference behind a CTA."
 ---

@@ -4,10 +4,6 @@ published_time: 2026-07-02T13:21:21.975Z
 title: "What To Notice First When Smoke Starts Affecting Your Routine"
 excerpt: "A compact smoke-test article for validating inline-image registration without a featured image."
 image: "~/assets/images/uploads/what-to-notice-first-when-smoke-starts-affecting-your-routine/inline-only-smoke-test-image-r2.png"
-tags:
-  - "smoke-test"
-  - "artifact-registration"
-  - "inline-only"
 metadata:
   description: "A compact smoke-test article for validating inline-image registration."
 ---

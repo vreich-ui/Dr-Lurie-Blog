@@ -1,9 +1,37 @@
 import type { PaginateFunction } from 'astro';
-import { getCollection, render } from 'astro:content';
+import { getCollection, getEntry, render } from 'astro:content';
 import type { CollectionEntry } from 'astro:content';
 import type { Post } from '~/types';
 import { APP_BLOG } from 'astrowind:config';
 import { cleanSlug, trimSlash, BLOG_BASE, POST_PERMALINK_PATTERN, CATEGORY_BASE, TAG_BASE } from './permalinks';
+
+/**
+ * Display labels for category/tag slugs, from the taxonomy registry export
+ * (src/data/site/taxonomy.json — the derived export of the converted
+ * tax_drlurie object; W3 step 2, "slugs + label lookup"). Post frontmatter
+ * carries canonical SLUGS; the registry owns how a term is DISPLAYED — rename
+ * a term's label in the registry and every card, tag chip, listing title, and
+ * topics page updates on the next build. A slug not in the registry falls back
+ * to the raw frontmatter string, so unmapped terms render exactly as before.
+ */
+type TaxonomyLabelMaps = { category: Map<string, string>; tag: Map<string, string> };
+let taxonomyLabelsPromise: Promise<TaxonomyLabelMaps> | undefined;
+
+const getTaxonomyLabels = (): Promise<TaxonomyLabelMaps> => {
+  taxonomyLabelsPromise ??= (async () => {
+    const maps: TaxonomyLabelMaps = { category: new Map(), tag: new Map() };
+    const entry = await Promise.resolve(getEntry('taxonomyObject', 'taxonomy')).catch(() => undefined);
+    const kinds = (entry?.data as { kinds?: Record<string, { terms?: Array<{ slug?: string; label?: string }> }> })
+      ?.kinds;
+    for (const kind of ['category', 'tag'] as const) {
+      for (const term of kinds?.[kind]?.terms ?? []) {
+        if (term?.slug && term?.label) maps[kind].set(term.slug, term.label);
+      }
+    }
+    return maps;
+  })();
+  return taxonomyLabelsPromise;
+};
 
 const generatePermalink = async ({
   id,
@@ -65,16 +93,18 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
   const publishDate = new Date(rawPublishDate);
   const updateDate = rawUpdateDate ? new Date(rawUpdateDate) : undefined;
 
+  const labels = await getTaxonomyLabels();
+
   const category = rawCategory
     ? {
         slug: cleanSlug(rawCategory),
-        title: rawCategory,
+        title: labels.category.get(cleanSlug(rawCategory)) ?? rawCategory,
       }
     : undefined;
 
   const tags = rawTags.map((tag: string) => ({
     slug: cleanSlug(tag),
-    title: tag,
+    title: labels.tag.get(cleanSlug(tag)) ?? tag,
   }));
 
   return {

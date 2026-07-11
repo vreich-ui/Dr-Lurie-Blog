@@ -3,10 +3,6 @@ publishDate: 2026-07-01T09:48:51.682Z
 published_time: 2026-07-01T09:48:51.682Z
 title: "A Gentle Reset for a Brighter Day"
 excerpt: "A short, cheerful Dr. Lurie smoke-test article with a fresh PDF download CTA."
-tags:
-  - "smoke-test"
-  - "pdf-cta"
-  - "workflow-validation"
 metadata:
   description: "A compact Dr. Lurie smoke-test article validating a new PDF download CTA and real publish attempt."
 ---

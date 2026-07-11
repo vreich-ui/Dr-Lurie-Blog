@@ -3,10 +3,6 @@ publishDate: 2026-07-01T15:08:30.000Z
 published_time: 2026-07-01T15:08:30.000Z
 title: "PDF CTA Smoke Test: The Skin Reset Button Check"
 excerpt: "A compact smoke-test article created to verify that the visible CTA button points to a generated PDF download."
-tags:
-  - "smoke-test"
-  - "pdf-cta"
-  - "workflow-validation"
 metadata:
   description: "A compact Dr. Lurie smoke-test article validating that a visible button uses the generated PDF CTA link."
 ---

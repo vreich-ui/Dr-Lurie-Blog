@@ -3,12 +3,6 @@ publishDate: 2026-07-02T19:12:28.218Z
 published_time: 2026-07-02T19:12:28.218Z
 title: "CTA Rendering Smoke Test: Canonical PDF and Consultation Links"
 excerpt: "A compact publish-path article created to isolate CTA rendering behavior from image rendering."
-tags:
-  - "smoke-test"
-  - "cta-rendering"
-  - "pdf-cta"
-  - "no-images"
-  - "canonical-rerun"
 ---
 ### A No-Image CTA Rendering Check
 

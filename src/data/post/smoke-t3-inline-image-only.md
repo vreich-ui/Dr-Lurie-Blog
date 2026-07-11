@@ -4,10 +4,6 @@ published_time: 2026-07-05T18:33:09.360Z
 title: "Smoke T3 Inline Image Only"
 excerpt: "A compact smoke-test article for validating inline-only image publishing."
 image: "~/assets/images/uploads/smoke-t3-inline-image-only/t3-inline-small.png"
-tags:
-  - "smoke-test"
-  - "t3"
-  - "image-pipeline"
 ---
 ### Inline image smoke test
 

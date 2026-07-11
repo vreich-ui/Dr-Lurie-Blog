@@ -4,14 +4,9 @@ publishDate: 2026-05-29T16:16:00.000Z
 excerpt: 'Age spots, sun spots, post-inflammatory marks, and melasma-like patches often get sold under one “brightening” promise. Your skin is more specific than that.'
 image: '~/assets/images/uploads/dark-spots-uneven-tone-age-spots-melasma/chatgpt-image-may-29-2026-08_38_27-pm.png'
 tags:
-  - 'dark spots'
-  - 'uneven tone'
-  - 'hyperpigmentation'
-  - 'age spots'
-  - 'melasma'
-  - 'sun protection'
-  - 'skin over 40'
-  - 'melanin-rich skin'
+  - pigmentation
+  - sun-protection
+  - skin-after-40
 sources:
   - 'name: American Academy of Dermatology — Melasma self-care; url: https://www.aad.org/public/diseases/a-z/melasma-self-care'
   - 'name: American Academy of Dermatology — How to fade dark spots in darker skin tones; url: https://staging.aad.org/public/everyday-care/skin-care-secrets/routine/fade-dark-spots'

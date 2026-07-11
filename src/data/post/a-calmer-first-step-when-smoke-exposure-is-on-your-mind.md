@@ -5,10 +5,7 @@ title: "A Calmer First Step When Smoke Exposure Is on Your Mind"
 excerpt: "A compact DTC smoke-test article that checks structured article body publishing, CTA nodes, signup intent, and reusable image preservation without generating new assets."
 image: "~/assets/images/uploads/a-calmer-first-step-when-smoke-exposure-is-on-your-mind/smoke-debug-hero-square.png"
 tags:
-  - "smoke-test"
-  - "dtc-health"
-  - "air-quality"
-  - "publishing-test"
+  - dtc
 metadata:
   description: "A compact smoke-test DTC article validating structured publishing, CTA nodes, signup intent, and exact reusable image preservation."
 ---

@@ -4,10 +4,8 @@ published_time: 2026-06-26T16:08:55Z
 title: "How Long Should Skincare Take to Work? A Beginner's Guide Before You Quit or Buy More"
 excerpt: 'A practical way to judge skincare results without giving up too early, pushing through irritation, or buying the next promise too soon.'
 tags:
-  - 'skincare-basics'
-  - 'beginner-skincare'
-  - 'product-timelines'
-  - 'skin-barrier'
+  - skincare-basics
+  - skin-barrier
 metadata:
   description: 'A beginner-friendly guide to skincare timelines, irritation stop signs, and when to keep going before buying more.'
 ---

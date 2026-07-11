@@ -4,11 +4,6 @@ published_time: 2026-07-02T19:08:04.398Z
 title: "Smoke Test: Inline Image and Consultation CTA"
 excerpt: "A compact live publishing test for inline image placement and CTA rendering."
 image: "~/assets/images/uploads/smoke-test-inline-image-and-consultation-cta/smoke-inline-cta-tiny-20260702-02.png"
-tags:
-  - "smoke-test"
-  - "inline-image"
-  - "cta-rendering"
-  - "publishing-pipeline"
 ---
 ### A Small Test With Real Publishing Consequences
 

@@ -3,11 +3,6 @@ publishDate: 2026-07-01T17:30:31.670Z
 published_time: 2026-07-01T17:30:31.670Z
 title: "Smoke Test: Two Image Payload Handling"
 excerpt: "A compact article built to compare featured and inline image handling with two request-scoped images."
-tags:
-  - "smoke-test"
-  - "image-handling"
-  - "two-images"
-  - "repo-side"
 ---
 ### Smoke Test: Two Image Payload Handling
 

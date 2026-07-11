@@ -180,9 +180,10 @@ export const RAW_TO_CANONICAL = {
     cells: 'skin-science',
     'cellular biology': 'skin-science',
     mitochondria: 'skin-science',
-    // skin-health (4)
+    // skin-health (5)
     'skin health': 'skin-health',
     'skin-health': 'skin-health',
+    Health: 'skin-health',
     // dermatology (4)
     dermatology: 'dermatology',
     // menopause (4)

@@ -3,10 +3,10 @@ title: 'Why Sunscreen Seems to Break You Out'
 publishDate: 2026-06-08T14:56:00.000Z
 excerpt: 'Sunscreen may not be the only reason for new bumps. Formula, sweat, friction, removal, and irritation can all make SPF feel impossible.'
 tags:
-  - 'sunscreen'
-  - 'acne'
-  - 'sensitive skin'
-  - 'skin barrier'
+  - sun-protection
+  - acne
+  - sensitive-skin
+  - skin-barrier
 author: 'Dr. Lurie Editorial Team'
 sources:
   - 'source_id: reddit_spf_breakout_thread; name: Sunscreen breaks me out but I know I need to wear it; url: https://www.reddit.com/r/SkincareAddiction/comments/1o0psjp/sun_care_sunscreen_breaks_me_out_but_i_know_i/; publisher: Reddit r/SkincareAddiction'

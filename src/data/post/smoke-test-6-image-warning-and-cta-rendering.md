@@ -4,11 +4,6 @@ published_time: 2026-07-02T19:09:27.786Z
 title: "Smoke Test 6: Image Warning and CTA Rendering"
 excerpt: "A compact publishing smoke test for image-placement warnings and mixed CTA rendering."
 image: "~/assets/images/uploads/smoke-test-6-image-warning-and-cta-rendering/smoke-inline-missing-placement.png"
-tags:
-  - "smoke-test"
-  - "publishing-test"
-  - "image-warning"
-  - "cta-test"
 ---
 ### Smoke Test 6: Image Warning and CTA Rendering
 

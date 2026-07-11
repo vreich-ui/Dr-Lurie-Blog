@@ -3,11 +3,6 @@ publishDate: 2026-07-02T10:03:46.953Z
 published_time: 2026-07-02T10:03:46.953Z
 title: "Dubl Smoke Test: Duplicate Image Rendering Check"
 excerpt: "A compact rendering test article that intentionally repeats the same image artifact in multiple body placements."
-tags:
-  - "smoke-test"
-  - "dubl"
-  - "duplicate-image-rendering"
-  - "image-handling"
 metadata:
   description: "A fast smoke-test article that intentionally reuses the same image artifact in multiple placements to verify rendering behavior."
 ---

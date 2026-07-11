@@ -4,10 +4,6 @@ published_time: 2026-07-02T10:04:15.849Z
 title: "How to Track Hot Flash Patterns Before You Ask for Help"
 excerpt: "A compact two-image repo smoke article."
 image: "~/assets/images/uploads/how-to-track-hot-flash-patterns-before-you-ask-for-help/repo-smoke-canonical-two-featured.png"
-tags:
-  - "smoke-test"
-  - "repo-side"
-  - "two-images"
 metadata:
   description: "Canonical two-image smoke test."
 ---

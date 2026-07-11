@@ -5,10 +5,9 @@ title: "How to Restore Your Skin Barrier After Over-Exfoliation"
 excerpt: "A gentle reset plan for skin that feels tight, shiny, stinging, or unusually reactive after too many acids, scrubs, or retinoid nights."
 image: "~/assets/images/uploads/how-to-restore-your-skin-barrier-after-over-exfoliation/skin-barrier-smoke-hero.png"
 tags:
-  - "smoke-test"
-  - "skin-barrier"
-  - "over-exfoliation"
-  - "skincare"
+  - skin-barrier
+  - sensitive-skin
+  - skincare
 metadata:
   description: "A gentle, practical reset plan for calming tight, stinging, reactive skin after too many exfoliating products."
 ---

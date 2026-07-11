@@ -3,12 +3,6 @@ publishDate: 2026-06-12
 title: 'Fresh Publishing Smoke Test: A Clean Path to Live'
 draft: true
 excerpt: 'A compact alpha article used to validate immediate publishing with generated image assets.'
-category: 'Editorial'
-tags:
-  - 'Publishing'
-  - 'Smoke Test'
-  - 'Workflow'
-  - 'Alpha'
 author: 'Dr. Lurié'
 metadata:
   description: 'A compact alpha article used to validate immediate publishing with generated image assets.'

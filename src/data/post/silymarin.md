@@ -6,11 +6,10 @@ image: '~/assets/images/uploads/silymarin/dr-lurie-skin-barrier.webp'
 video: 'https://www.youtube.com'
 ctaLink: 'https://www.youtube.com'
 ctaText: 'Watch this video'
-category: 'Ingredients Wiki'
+category: ingredients
 tags:
-  - 'ingredients'
-  - 'knowledge'
-  - 'wiki'
+  - ingredients
+  - reflections
 author: 'Zeev Reich'
 ---
 

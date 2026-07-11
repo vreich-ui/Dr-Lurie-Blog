@@ -4,10 +4,6 @@ published_time: 2026-07-02T13:23:29.713Z
 title: "Smoke Test: Fresh Image and PDF CTA Rendering Check"
 excerpt: "A fresh workflow created to compare image rendering and PDF CTA rendering against the earlier smoke-test page."
 image: "~/assets/images/uploads/smoke-test-fresh-image-and-pdf-cta-rendering-check/fresh-image-pdf-cta-rendering-check-valid.png"
-tags:
-  - "smoke-test"
-  - "image-rendering"
-  - "pdf-cta"
 metadata:
   description: "Fresh smoke test for verifying image artifact rendering and PDF CTA rendering in the same published article."
 ---

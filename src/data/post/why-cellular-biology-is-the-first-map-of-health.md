@@ -4,11 +4,7 @@ published_time: 2026-06-26T15:52:41.137Z
 title: 'Why Cellular Biology Is the First Map of Health'
 excerpt: 'A plain-language guide to why cells are the smallest practical level for understanding health, resilience, and disease risk.'
 tags:
-  - 'cellular biology'
-  - 'health science'
-  - 'mitochondria'
-  - 'cells'
-  - 'science blog'
+  - skin-science
 metadata:
   description: 'A clear explanation of why cells, energy, signaling, repair, and immune coordination are the first practical map for understanding health.'
 ---

@@ -167,10 +167,12 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │       canonical list + raw→canonical mapping; scripts/lib/taxonomy-seed-data.mjs).
 │       Registry = source of truth for OBJECT-SIDE consumers from day one (the store
 │       validation context wires resolveTaxonomyTerm automatically, so content_grid
-│       query terms validate live). Article frontmatter stays the article-side input
-│       until step 2: a BOUNDED publish-time enforcement hook in publish-article.ts
-│       (sanctioned additive exception) + a one-time normalization pass using the
-│       committed RAW_TO_CANONICAL map. Full content_item→ObjectRecord conversion
+│       query terms validate live). STEP 2 SHIPPED 2026-07-11: the bounded
+│       publish-article hook resolves article terms against this registry (slug +
+│       merged_into aliases; unresolvable → 422 TAXONOMY_TERMS_UNRESOLVED; canonical
+│       slugs materialized into frontmatter; skips gracefully when no registry), all
+│       93 posts normalized via RAW_TO_CANONICAL, and the blog renderer displays term
+│       labels from the registry. Full content_item→ObjectRecord conversion stays
 │       deferred as its own wave (OQ-8) — explicitly NOT a taxonomy prerequisite.
 │     CONVERTED by the credentialed run 2026-07-11: store-backed, all 5 term ops
 │       round-tripped in production, published, released (export commit 627fa8d;
@@ -237,7 +239,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 | W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
 | W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
 | W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                          | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
-| W3         | ✅ CONVERTED (credentialed run 2026-07-11): tax_drlurie — curated agent-editable vocabulary. Remaining: step 2, the bounded publish-article enforcement hook + frontmatter normalization | Unlocks term-filtered grids, listings, topics hub                                    | M    |
+| W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
 | W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
 | W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                            | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |

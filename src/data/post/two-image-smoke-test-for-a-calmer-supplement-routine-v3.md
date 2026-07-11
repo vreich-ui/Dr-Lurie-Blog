@@ -5,10 +5,8 @@ title: "Two Image Smoke Test for a Calmer Supplement Routine V3"
 excerpt: "A compact DTC smoke-test article with one featured image and one inline image, built to verify distinct media through publication."
 image: "~/assets/images/uploads/two-image-smoke-test-for-a-calmer-supplement-routine-v3/smoke-debug-hero-square.png"
 tags:
-  - "smoke test"
-  - "dtc"
-  - "supplement routine"
-  - "publishing QA"
+  - dtc
+  - supplements
 metadata:
   description: "A compact DTC smoke-test article with one featured image, one inline image, and canonical body media for publish-path validation."
 ---

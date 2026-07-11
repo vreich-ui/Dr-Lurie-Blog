@@ -177,8 +177,12 @@ op round-tripped (add/update/deprecate/reactivate/remove), published, released
 (`released:true`; export commit `627fa8d`, store === seed === export). Its first
 consumer is live automatically: the validation context wires
 `resolveTaxonomyTerm`, so `content_grid` query terms now validate against the
-real registry. Article frontmatter remains the article-side input until the
-bounded publish-article enforcement hook (step 2) lands.
+real registry. **Step 2 SHIPPED 2026-07-11**: publish-article resolves
+category/tags against this registry at publish time (slug resolution +
+`merged_into` aliases; unresolvable terms → 422; canonical slugs materialized
+into frontmatter; skips gracefully when no registry), all 93 posts' frontmatter
+was normalized via the committed `RAW_TO_CANONICAL` map, and the blog renderer
+displays term labels from the registry — full §5.5 is live for articles.
 
 **Templates were ACTIVATED + CONVERTED 2026-07-11 (W2.5)** — design-principles
 rule 5 ("templates are recipes; PageTypes are law"). The `object_instantiate_template`
@@ -226,13 +230,11 @@ layout to render from it**. This is what makes global site settings agent-editab
 
 **Wolf decided: curated agent-editable vocabulary** (not a read-only mirror, not
 a full article-pipeline cutover). `tax_drlurie` converted via the credentialed
-run — see "Singletons & templates" above.
-Remaining for full §5.5: **step 2, the bounded publish-article enforcement hook**
-(a sanctioned additive exception to the off-limits rule: resolve article terms
-against the registry at publish time, following `merged_into` aliases) plus a
-one-time normalization pass over the 93 posts' frontmatter using the committed
-`RAW_TO_CANONICAL` map. The full content_item→ObjectRecord conversion is
-deferred as its own wave (OQ-8) — deliberately NOT a taxonomy prerequisite.
+run, and **step 2 SHIPPED 2026-07-11** (see "Singletons & templates" above):
+the bounded enforcement hook + the one-time normalization pass + registry
+display labels — full §5.5 is live for articles. The full
+content_item→ObjectRecord conversion remains deferred as its own wave (OQ-8) —
+deliberately NOT a taxonomy prerequisite.
 
 ### 4. System pages → page objects 🔵 DONE, in review (PR #380)
 
