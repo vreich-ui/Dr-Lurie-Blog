@@ -4,10 +4,8 @@ published_time: 2026-06-30T16:27:05.000Z
 title: "A Calm Checklist Before You Book a Skin Consultation"
 excerpt: "A no-image publishing smoke test article with one downloadable PDF CTA."
 tags:
-  - "smoke-test"
-  - "pdf-download"
-  - "no-image"
-  - "dermatology"
+  - guides
+  - dermatology
 metadata:
   description: "A compact no-image smoke test article with a downloadable PDF checklist CTA."
 ---

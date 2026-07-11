@@ -5,10 +5,8 @@ title: "Smoke Test: The Three-Minute Skin Barrier Reset"
 excerpt: "A practical, low-friction routine for calmer-looking skin when your regimen feels like too much."
 image: "~/assets/images/uploads/smoke-test-the-three-minute-skin-barrier-reset/smoke-debug-hero-square.png"
 tags:
-  - "smoke-test"
-  - "dtc-skincare"
-  - "skin-barrier"
-  - "image-publish-path"
+  - dtc
+  - skin-barrier
 metadata:
   description: "A compact DTC skincare smoke test article verifying image attachment through the publish path."
 ---

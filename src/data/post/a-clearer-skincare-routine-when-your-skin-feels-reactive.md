@@ -5,11 +5,9 @@ title: "A Clearer Skincare Routine When Your Skin Feels Reactive"
 excerpt: "A compact smoke-test article for a DTC skincare journey, with canonical inline image placement and preserved image artifact references."
 image: "~/assets/images/uploads/a-clearer-skincare-routine-when-your-skin-feels-reactive/retinol-introduction-thumbnail.png"
 tags:
-  - "smoke-test"
-  - "skincare"
-  - "dtc"
-  - "reactive-skin"
-  - "image-rendering"
+  - skincare
+  - dtc
+  - sensitive-skin
 metadata:
   description: "A compact DTC skincare smoke-test article with featured and inline image references preserved through publishing."
 ---

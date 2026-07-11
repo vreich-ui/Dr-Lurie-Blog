@@ -3,11 +3,6 @@ publishDate: 2026-07-01T17:31:24.831Z
 published_time: 2026-07-01T17:31:24.831Z
 title: "Smoke Test: Three Image Payload Handling"
 excerpt: "A compact article built to test one featured image and two inline images with valid request-scoped artifact references."
-tags:
-  - "smoke-test"
-  - "image-handling"
-  - "three-images"
-  - "repo-side"
 ---
 ### Smoke Test: Three Image Payload Handling
 

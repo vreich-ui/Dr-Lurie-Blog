@@ -4,11 +4,10 @@ published_time: 2026-06-29T16:51:19.615Z
 title: "A 10-Minute Skin Barrier Reset Before You Buy Another Product"
 excerpt: "A compact smoke-test DTC article for readers who want a calmer routine before adding one more active ingredient."
 tags:
-  - "Smoke Test"
-  - "Skincare Basics"
-  - "Skin Barrier"
-  - "DTC"
-  - "Routine Reset"
+  - skincare-basics
+  - skin-barrier
+  - dtc
+  - skincare-routine
 metadata:
   description: "A compact DTC smoke-test article about simplifying a skincare routine before buying another product."
 ---

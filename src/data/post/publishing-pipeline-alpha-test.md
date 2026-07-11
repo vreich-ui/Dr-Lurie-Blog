@@ -2,12 +2,6 @@
 title: 'Publishing Pipeline Alpha Test: From Draft to Release'
 draft: true
 excerpt: 'A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness.'
-category: 'Editorial'
-tags:
-  - 'Publishing'
-  - 'Alpha Test'
-  - 'Workflow'
-  - 'Editorial Operations'
 author: 'Dr. Lurié'
 metadata:
   description: 'A short test article for validating article creation, image handling, final-stage completion, and immediate publishing readiness.'

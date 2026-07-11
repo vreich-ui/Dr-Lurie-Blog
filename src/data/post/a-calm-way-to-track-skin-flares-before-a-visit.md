@@ -5,10 +5,8 @@ title: "A Calm Way to Track Skin Flares Before a Visit"
 excerpt: "A smoke-test article for Dr. Lurie that exercises image rendering and an artifact-backed PDF download CTA."
 image: "~/assets/images/uploads/a-calm-way-to-track-skin-flares-before-a-visit/smoke-pdf-image-handling-hero-20260701.png"
 tags:
-  - "smoke-test"
-  - "skin"
-  - "worksheet"
-  - "artifact-handling"
+  - skincare
+  - guides
 metadata:
   description: "A smoke-test article for validating image rendering and artifact-backed PDF CTA handling."
 ---

@@ -5,9 +5,8 @@ excerpt: 'In 2001, researchers in Japan identified a compound called 2-Nonenal t
 image: '~/assets/images/uploads/why-some-people-smell-stronger-than-others/People-Breathing.webp'
 ctaText: 'Get your confidence back'
 tags:
-  - 'Body Odor'
-  - 'Smell'
-  - 'Health'
+  - body-odor
+  - skin-health
 author: 'Roger Ebert-Smith'
 ---
 

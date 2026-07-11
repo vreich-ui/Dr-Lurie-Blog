@@ -4,13 +4,13 @@ title: "Why Your Skin Can Seem to Change All at Once After 40"
 excerpt: "A familiar thing can start to feel unfamiliar: your own face after rinsing it at the sink.
 Skin that used to tolerate almost anything — a quick wash, no moisturizer, a long day outside, the same cleanser for years — may begin to feel tight before the towel is even back on the rack. The tightness may"
 image: "~/assets/images/uploads/why-your-skin-can-seem-to-change-all-at-once-after-40/people-breathing.webp"
-category: "Skin after 40"
+category: skin-after-40
 tags:
-  - "dry skin"
-  - "sensitive skin"
-  - "sun damage"
-  - "40+ skincare"
-  - "skin barrier"
+  - dry-skin
+  - sensitive-skin
+  - sun-protection
+  - skin-after-40
+  - skin-barrier
 ---
 
 For many people over 40, this is the moment skincare first becomes hard to ignore.

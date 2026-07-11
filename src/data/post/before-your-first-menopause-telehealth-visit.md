@@ -4,10 +4,6 @@ published_time: 2026-07-02T10:04:08.068Z
 title: "Before Your First Menopause Telehealth Visit"
 excerpt: "A compact one-image repo smoke article."
 image: "~/assets/images/uploads/before-your-first-menopause-telehealth-visit/repo-smoke-canonical-one-featured.png"
-tags:
-  - "smoke-test"
-  - "repo-side"
-  - "one-image"
 metadata:
   description: "Canonical one-image smoke test."
 ---

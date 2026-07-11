@@ -4,10 +4,6 @@ published_time: 2026-07-05T18:35:58.281Z
 title: "Smoke T5 Two Inline Images"
 excerpt: "A compact smoke-test article for validating two inline body images with no featured image."
 image: "~/assets/images/uploads/smoke-t5-two-inline-images/t5-a.png"
-tags:
-  - "smoke-test"
-  - "t5"
-  - "image-pipeline"
 ---
 ### First inline image smoke test
 

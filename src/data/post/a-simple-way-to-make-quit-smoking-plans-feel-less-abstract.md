@@ -3,10 +3,6 @@ publishDate: 2026-07-01T18:22:52.044Z
 published_time: 2026-07-01T18:22:52.044Z
 title: "A Simple Way To Make Quit-Smoking Plans Feel Less Abstract"
 excerpt: "A compact smoke-test article for checking whether one inline image survives the publishing path."
-tags:
-  - "smoke-test"
-  - "inline-image-path"
-  - "current-request-safe-image"
 ---
 ### A Simple Way To Make Quit-Smoking Plans Feel Less Abstract
 

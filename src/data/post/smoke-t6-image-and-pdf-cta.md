@@ -4,10 +4,6 @@ published_time: 2026-07-03T17:53:43.174Z
 title: "Smoke T6 Image And PDF CTA"
 excerpt: "Hero image plus PDF CTA."
 image: "~/assets/images/uploads/smoke-t6-image-and-pdf-cta/smoke-t6-hero.png"
-tags:
-  - "smoke-test"
-  - "image-pipeline"
-  - "t6"
 ---
 ### Smoke T6 Image And PDF CTA
 

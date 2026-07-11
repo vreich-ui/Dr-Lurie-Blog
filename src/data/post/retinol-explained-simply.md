@@ -4,11 +4,10 @@ published_time: 2026-06-26T15:52:48.125Z
 title: 'Retinol, Explained Simply'
 excerpt: 'A calm beginner guide to what retinol is, what it may help, how to start slowly, and when to pause or ask for clinical guidance.'
 tags:
-  - 'retinol'
-  - 'retinoids'
-  - 'skin care'
-  - 'dermatology'
-  - 'science blog'
+  - retinoids
+  - skincare
+  - dermatology
+  - skin-science
 metadata:
   description: 'A calm beginner guide to retinol: what it is, what it may help, how to start slowly, what irritation means, and who should speak with a clinician first.'
 ---

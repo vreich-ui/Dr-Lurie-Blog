@@ -5,10 +5,7 @@ title: "A Simple Two-Step Reset for Midday Skin Dryness"
 excerpt: "A compact smoke-test article for validating inline-only media handling without a featured image."
 image: "~/assets/images/uploads/a-simple-two-step-reset-for-midday-skin-dryness/smoke-inline-01.png"
 tags:
-  - "smoke-test"
-  - "inline-images"
-  - "no-featured-image"
-  - "dtc"
+  - dtc
 ---
 ### A Simple Two-Step Reset for Midday Skin Dryness
 

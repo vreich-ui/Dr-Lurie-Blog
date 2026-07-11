@@ -4,10 +4,6 @@ published_time: 2026-07-02T10:04:25.252Z
 title: "Build a Menopause Care Plan You Can Actually Use"
 excerpt: "A compact three-image repo smoke article."
 image: "~/assets/images/uploads/build-a-menopause-care-plan-you-can-actually-use/repo-smoke-canonical-three-featured.png"
-tags:
-  - "smoke-test"
-  - "repo-side"
-  - "three-images"
 metadata:
   description: "Canonical three-image smoke test."
 ---

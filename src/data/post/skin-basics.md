@@ -5,13 +5,13 @@ excerpt: 'The best skin-care routine is not the longest one. Start with the habi
 image: '~/assets/images/uploads/skin-basics/skin-basics-featured.png'
 ctaLink: '/resources/skin-basics-reset'
 ctaText: 'Use the Skin Basics Reset'
-category: 'Skin Health'
+category: skin-health
 tags:
-  - 'skin care'
-  - 'skin basics'
-  - 'dermatology'
-  - 'sun protection'
-  - 'skin barrier'
+  - skincare
+  - skincare-basics
+  - dermatology
+  - sun-protection
+  - skin-barrier
 author: 'Dr. Lurie'
 metadata:
   description: 'Learn the skin-care basics that matter most: gentle cleansing, moisturizer, sunscreen, careful use of extras, and when to seek professional advice.'

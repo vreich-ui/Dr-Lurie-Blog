@@ -4,10 +4,7 @@ published_time: 2026-07-01T17:01:51.490Z
 title: "Smoke Test: One Image Skin Barrier Reset"
 excerpt: "A compact smoke-test article with exactly one image total: a featured skincare image and no inline media."
 tags:
-  - "smoke-test"
-  - "image-handling"
-  - "featured-image"
-  - "skincare"
+  - skincare
 metadata:
   description: "A compact image-handling smoke test with exactly one featured image and no inline images."
 ---

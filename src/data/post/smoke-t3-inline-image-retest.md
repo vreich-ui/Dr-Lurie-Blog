@@ -4,10 +4,6 @@ published_time: 2026-07-03T15:30:22.824Z
 title: "Smoke T3 Inline Image Retest"
 excerpt: "A targeted inline-image publishing smoke test."
 image: "~/assets/images/uploads/smoke-t3-inline-image-retest/a.png"
-tags:
-  - "smoke-test"
-  - "t3"
-  - "inline-image"
 metadata:
   description: "Single inline image smoke test without featured image."
 ---

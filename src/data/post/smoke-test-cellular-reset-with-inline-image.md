@@ -4,12 +4,6 @@ published_time: 2026-06-30T16:09:26.773Z
 title: "Smoke Test: Cellular Reset With Inline Image"
 excerpt: "A republished smoke-style article used to verify that a fresh featured image and a distinct inline image survive overwrite publishing without duplicate-image or path-loss behavior."
 image: "~/assets/images/uploads/smoke-test-cellular-reset-with-inline-image/retinol-introduction-thumbnail.png"
-tags:
-  - "smoke-test"
-  - "inline-image"
-  - "review-and-republish"
-  - "png"
-  - "regression"
 metadata:
   description: "Review-and-republish regression verifying distinct featured and inline image replacement on an existing smoke article slug."
 ---

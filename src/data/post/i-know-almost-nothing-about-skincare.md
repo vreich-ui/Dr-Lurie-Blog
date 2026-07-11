@@ -5,11 +5,11 @@ excerpt: "Start here: We'll walk you through the basics."
 image: '~/assets/images/uploads/i-know-almost-nothing-about-skincare/skincare-basics-beginner-hero.png'
 ctaLink: '/resources/first-skincare-routine'
 ctaText: 'Build the Beginner Routine'
-category: 'Skin Health'
+category: skin-health
 tags:
-  - 'skincare'
-  - 'skin health'
-  - 'beginner guide'
+  - skincare
+  - skin-health
+  - skincare-basics
 author: 'Dr. Lurie'
 metadata:
   description: 'A beginner-friendly skincare guide covering cleansing, moisturizing, sunscreen, and how to keep a routine simple.'

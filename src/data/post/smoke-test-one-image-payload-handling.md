@@ -3,11 +3,6 @@ publishDate: 2026-07-01T17:29:25.833Z
 published_time: 2026-07-01T17:29:25.833Z
 title: "Smoke Test: One Image Payload Handling"
 excerpt: "A compact article built to test whether one valid request-scoped image survives publish translation and rendering."
-tags:
-  - "smoke-test"
-  - "image-handling"
-  - "one-image"
-  - "repo-side"
 ---
 ### Smoke Test: One Image Payload Handling
 

@@ -4,10 +4,6 @@ published_time: 2026-07-03T15:33:33.656Z
 title: "Smoke T7 Missing Placement Retest"
 excerpt: "A targeted missing-placement publishing smoke test."
 image: "~/assets/images/uploads/smoke-t7-missing-placement-retest/c.png"
-tags:
-  - "smoke-test"
-  - "t7"
-  - "missing-placement"
 metadata:
   description: "Missing placement image smoke test without featured image."
 ---

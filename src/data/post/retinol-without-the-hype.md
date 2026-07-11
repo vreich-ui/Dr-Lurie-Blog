@@ -5,13 +5,13 @@ excerpt: 'Retinol is not magic, and it is not mandatory. It is a tool. Here is h
 image: '~/assets/images/uploads/retinol-without-the-hype/retinol-without-the-hype-featured.png'
 ctaLink: '/resources/retinol-reality-check'
 ctaText: 'Download the Retinol Reality Check'
-category: 'Skincare'
+category: skincare
 tags:
-  - 'retinol'
-  - 'skincare'
-  - 'beginner skincare'
-  - 'evidence-based skincare'
-  - 'skin barrier'
+  - retinoids
+  - skincare
+  - skincare-basics
+  - skin-science
+  - skin-barrier
 author: 'Dr. Lurie'
 metadata:
   description: "A skeptical beginner's guide to retinol: what it can do, what it cannot do, who should avoid it, and how to try it carefully."

@@ -35,10 +35,13 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   `--production --release` runs on 2026-07-11. **No page renders from an
   unbacked export anymore — the rendered-stub backlog is empty.** The
   section-type palette is fully generic (no bespoke per-page types: `about`/
-  `contact` decomposed, `thank_you` → `form_confirmation`). Still TODO: the
-  `site` singleton (W4), the bounded publish-article taxonomy-enforcement hook
-  + frontmatter normalization (a sanctioned additive exception; display-fork
-  decision pending with Wolf), and the W5+ hand-coded pages.
+  `contact` decomposed, `thank_you` → `form_confirmation`). W3 step 2 SHIPPED
+  (2026-07-11): the bounded publish-article taxonomy-enforcement hook (the
+  sanctioned additive exception — registry-gated, skips when no registry) +
+  the one-time frontmatter normalization of all 93 posts + registry display
+  labels in the blog renderer. Still TODO: the `site` singleton (W4), the W5+
+  hand-coded pages, and (flagged, pre-existing) 28 posts lack `published_time`
+  and are invisible in listings.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
@@ -75,7 +78,7 @@ Do not skip this because the task instructions in front of you look self-contain
 
 ## Hard constraints — every session, every task
 
-- **`admin-workflow-lock.ts`, `publish-article.ts`, and the existing article MCP tools are off-limits** except for the two explicitly bounded exceptions (T5.6, T5.7) — and even those must be additive, isolated, single-purpose PRs with zero behavior change to existing tests.
+- **`admin-workflow-lock.ts`, `publish-article.ts`, and the existing article MCP tools are off-limits** except for the explicitly bounded exceptions (T5.6, T5.7, and the W3 taxonomy-enforcement hook — Wolf-sanctioned 2026-07-11, shipped: a registry-gated insertion before `buildFrontmatter` that skips entirely when no taxonomy record exists) — and even those must be additive, isolated, single-purpose PRs with zero behavior change to existing tests.
 - **Never open a PR unless the task brief explicitly says to.** Commit to the working branch and stop; ask before pushing further or opening a PR if it isn't specified.
 - **Check the task's `mode` before starting any task** (the `mode` column in `docs/cms-architecture/cms-pipeline/queue.tsv`, repeated in each brief's header). `checkpoint` tasks do not start until Wolf has answered the open question in the brief — don't infer an answer and proceed. `human_gate` tasks can be prepared in full, but the task isn't done until the specified human action happens — don't attempt to complete that step yourself. (`notify` marks tasks run interactively and watched rather than by the headless runner.)
 - **Every surface migration task (Phase 2 onward) follows the seed → publish → cutover → verify → cleanup template** and must produce an empty diff from `scripts/build-diff.mjs` (once T2.0 exists) before a cutover is considered done. Don't invent a different verification approach.

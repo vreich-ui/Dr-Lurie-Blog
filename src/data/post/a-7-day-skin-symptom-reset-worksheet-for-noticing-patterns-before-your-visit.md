@@ -4,10 +4,8 @@ published_time: 2026-07-01T10:21:05Z
 title: "A 7-Day Skin Symptom Reset Worksheet for Noticing Patterns Before Your Visit"
 excerpt: "A compact smoke-test article that gives readers a practical way to track flares, routines, and questions before speaking with Dr. Lurie's team."
 tags:
-  - "smoke-test"
-  - "skin-health"
-  - "worksheet"
-  - "pdf-cta"
+  - skin-health
+  - guides
 metadata:
   description: "Download a practical 7-day worksheet for tracking skin symptoms, routines, and questions before a consultation."
 ---

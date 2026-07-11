@@ -4,10 +4,7 @@ published_time: 2026-07-01T12:24:57.686Z
 title: "A Simple Reset Plan for Irritated Midlife Skin"
 excerpt: "A compact no-image Dr. Lurie smoke-test article with a fresh PDF download CTA."
 tags:
-  - "smoke-test"
-  - "skin-care"
-  - "pdf-cta"
-  - "workflow-validation"
+  - skincare
 metadata:
   description: "A compact Dr. Lurie smoke-test article validating a fresh PDF download CTA and real publish attempt."
 ---

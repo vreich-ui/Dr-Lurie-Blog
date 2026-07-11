@@ -9,7 +9,8 @@ import {
   type ArtifactReference,
 } from '../lib/artifacts.js';
 import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import { enforceTaxonomy, TAXONOMY_RECORD_KEY } from '../lib/taxonomy-enforcement.js';
 import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
 import { PdfValidationError, validatePublishPdfBytes } from '../lib/pdf-validation.js';
 import {
@@ -1759,9 +1760,37 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       resolvedMarkdown = toStringValue(input.markdown) || '';
     }
 
+    // W3 step 2 (sanctioned bounded exception, Wolf 2026-07-11): when the
+    // tax_drlurie registry exists in the site-objects store, resolve
+    // category/tags against it — by slug, following merged_into aliases —
+    // rejecting unresolvable terms (§5.6 step 2) and materializing the
+    // resolved terms' CANONICAL SLUGS into frontmatter (§5.5 step 3). No
+    // registry record → skipped, and the publish behaves exactly as before.
+    const rawCategory = toStringValue(input.category);
+    const taxonomy = await enforceTaxonomy(
+      async () => {
+        const store = await getSiteObjectsBlobStore(event);
+        return (await store.get(TAXONOMY_RECORD_KEY)) ?? null;
+      },
+      rawCategory,
+      tags
+    );
+    if (taxonomy.status === 'rejected') {
+      return jsonResponse(422, {
+        error:
+          'Taxonomy terms do not resolve against the tax_drlurie registry: ' +
+          `${taxonomy.unresolved.join(', ')}. Use canonical terms (see the object_get taxonomy tools), ` +
+          'or add the term to the registry first.',
+        code: 'TAXONOMY_TERMS_UNRESOLVED',
+        unresolved: taxonomy.unresolved,
+      });
+    }
+    const frontmatterCategory = taxonomy.status === 'ok' ? taxonomy.category : rawCategory;
+    const frontmatterTags = taxonomy.status === 'ok' ? taxonomy.tags : tags;
+
     const rawMarkdown = buildFrontmatter({
       author: toStringValue(input.author),
-      category: toStringValue(input.category),
+      category: frontmatterCategory,
       content: resolvedMarkdown,
       ctaLink: toStringValue(input.ctaLink),
       ctaText: toStringValue(input.ctaText),
@@ -1770,7 +1799,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       publishDate,
       publishedTime,
       seoDescription: toStringValue(input.seoDescription),
-      tags,
+      tags: frontmatterTags,
       title,
       videoLink: toStringValue(input.videoLink),
     });

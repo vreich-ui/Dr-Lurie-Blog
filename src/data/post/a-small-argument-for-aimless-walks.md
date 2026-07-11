@@ -2,11 +2,9 @@
 publishDate: 2026-06-14T15:38:00+03:00
 title: 'A Small Argument for Aimless Walks'
 excerpt: 'A brief, reflective piece on why unscheduled walks can help us notice more.'
-category: 'Reflection'
+category: reflections
 tags:
-  - 'reflection'
-  - 'wellbeing'
-  - 'everyday life'
+  - reflections
 author: 'Dr. Lurie'
 metadata:
   description: 'A short reflective article on why taking an aimless walk can make ordinary life feel more vivid.'

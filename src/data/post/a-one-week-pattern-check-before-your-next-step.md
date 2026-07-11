@@ -3,10 +3,6 @@ publishDate: 2026-07-01T16:00:30.000Z
 published_time: 2026-07-01T16:00:30.000Z
 title: "A One-Week Pattern Check Before Your Next Step"
 excerpt: "A fresh Dr. Lurie smoke-test article built to verify a PDF-backed CTA button on the live page."
-tags:
-  - "smoke-test"
-  - "pdf-cta"
-  - "workflow-validation"
 metadata:
   description: "A Dr. Lurie smoke-test article validating a PDF-backed CTA button on a published page."
 ---

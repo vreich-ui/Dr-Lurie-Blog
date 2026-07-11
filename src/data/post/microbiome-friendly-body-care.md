@@ -2,13 +2,13 @@
 publishDate: 2026-06-16T11:50:00.000Z
 title: 'Microbiome-Friendly Body Care: What the Label Should Mean'
 excerpt: 'A practical look at the body-care trend, the ingredients behind it, and how to separate useful claims from marketing noise.'
-category: 'Skin Health'
+category: skin-health
 tags:
-  - 'microbiome'
-  - 'body care'
-  - 'skin barrier'
-  - 'clean beauty'
-  - 'dermatology'
+  - microbiome
+  - body-care
+  - skin-barrier
+  - marketing-claims
+  - dermatology
 author: 'Dr. Lurie'
 metadata:
   description: 'A practical guide to microbiome-friendly body care, including ingredients, gentle cleansing, certification, and claim caution.'

@@ -26,9 +26,11 @@ page_thank_you), the 12 shared sections under home/about, the 3 templates, and t
 `tax_drlurie` taxonomy registry (curated agent-editable vocabulary; resolveTaxonomyTerm is
 live). All proven by credentialed runs on 2026-07-11; no page renders from an unbacked
 export anymore. The section-type palette is fully generic (`about`/`contact` decomposed,
-`thank_you`→`form_confirmation`). Still TODO: the `site` singleton (W4), the bounded
-publish-article taxonomy-enforcement hook + frontmatter normalization (display-fork
-decision pending with Wolf), and the W5+ hand-coded pages.
+`thank_you`→`form_confirmation`). W3 step 2 SHIPPED (2026-07-11): the bounded
+publish-article enforcement hook (registry-gated, skips when no registry) + one-time
+frontmatter normalization (93 posts) + registry display labels. Still TODO: the `site`
+singleton (W4), the W5+ hand-coded pages, and (flagged, pre-existing) 28 posts lacking
+`published_time` are invisible in listings.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 
@@ -105,6 +107,9 @@ files in full before writing any code, in this order:
 
 - `admin-workflow-lock.ts`, `publish-article.ts`, and existing article MCP
   tools are **off-limits**. Do not modify, import from, or refactor them.
+  (Bounded exceptions only: T5.6, T5.7, and the W3 taxonomy-enforcement hook —
+  Wolf-sanctioned + shipped 2026-07-11; additive, registry-gated, zero behavior
+  change to existing tests.)
 - Every new file is additive. The public site must remain fully functional
   after every commit.
 - One task, one commit. Do not bundle cleanup or unrelated fixes.

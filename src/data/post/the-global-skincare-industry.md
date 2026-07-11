@@ -4,7 +4,7 @@ title: 'The global skincare industry'
 draft: true
 excerpt: 'The global skincare industry is a rapidly growing, highly competitive sector expected to generate US$204 billion in revenue in 2026, with a CAGR of roughly 6.5–7.3%. As the largest category in beauty, it is dominated by multinational corporations, with the U.S. being the largest market and South Kor'
 image: '~/assets/images/uploads/the-global-skincare-industry/skincare-industry.jpeg'
-category: 'Market'
+category: skincare
 author: 'Roger Smith'
 ---
 
