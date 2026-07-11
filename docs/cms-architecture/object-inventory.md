@@ -157,12 +157,25 @@ their rows). The other 10 have no editable store record backing them — rendere
 
 ### Singletons & templates
 
-🔴 **No `site`, `taxonomy`, or `template` object is committed.** The field-test
-stubs (`site_fieldtest`, `tax_fieldtest`, `tpl_fieldtest`) were deleted in PR #378.
+🔴 **No `site` or `taxonomy` object is committed.** The field-test stubs
+(`site_fieldtest`, `tax_fieldtest`, `tpl_fieldtest`) were deleted in PR #378.
 The real site config still lives in `src/config.yaml` (and is what actually drives
 rendering); real categories/tags remain article frontmatter (§5.5). Building real
-`site` / `taxonomy` objects is **MVP TODO #2 / #3**; template objects are not
-MVP-critical.
+`site` / `taxonomy` objects is **MVP TODO #2 / #3**.
+
+**Templates were ACTIVATED 2026-07-11 (W2.5)** — design-principles rule 5
+("templates are recipes; PageTypes are law"). The `object_instantiate_template`
+MCP tool creates a new page from a recipe through the standard create validation
+(`dry_run: true` previews without persisting); a required slot without a
+blueprint instantiates from the registry defaultData of its first allowed type.
+Three starter recipes are seeded (`scripts/lib/templates-seed-data.mjs`) and
+committed as exports:
+
+| Object         | appliesTo  | Status    | Notes                                                                                                                                                        |
+| -------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tpl_interior` | `standard` | 🟣 SEEDED | Lede open + prose body + optional cta close (the W1 interior shape). All 4 template ops + instantiate dry_run proven locally; store record pending the credentialed run. |
+| `tpl_landing`  | `standard` | 🟣 SEEDED | Hero open + curated card grid + cta close (campaign shape). Same local proof; store record pending.                                                            |
+| `tpl_legal`    | `system`   | 🟣 SEEDED | One required blueprint-less prose slot — deliberately exercises the defaultData fallback. Same local proof; store record pending.                              |
 
 ---
 
@@ -221,8 +234,9 @@ pages to the article (`content_item`) pipeline.
 
 - **`content_item` / articles** — already functional via the `save_json_blob_*`
   pipeline; intentionally outside the object model.
-- **Real `template` objects** — a convenience for spinning up new pages; nice to
-  have, not required for MVP.
+- **Real `template` objects** — ACTIVATED at W2.5 (see "Singletons & templates"):
+  three starter recipes seeded + the instantiate tool live; production store
+  records land with the batched credentialed run.
 - **`homes/mobile-app`, `homes/personal`, `homes/startup`** — Astrowind starter-theme
   demo pages, not real Dr. Lurié content. Candidates for deletion, not for cutover.
 - **`rss.xml`, `search.json`** — generated endpoints, not editable content.

@@ -108,3 +108,46 @@ test('reconcileOps for a page heals meta (with nested nulls), sections, strays, 
     ]
   );
 });
+
+test('reconcileOps for a template heals meta (slots excluded), slots, strays, and order', () => {
+  const target = {
+    name: 'Interior page',
+    appliesTo: ['standard'],
+    slots: [
+      { slotId: 'slot_lede', allowed: ['lede'], required: true, repeatable: false },
+      { slotId: 'slot_body', allowed: ['prose'], required: false, repeatable: true },
+    ],
+  };
+  const current = {
+    name: 'Interior page (drifted)',
+    appliesTo: ['standard', 'system'],
+    slots: [
+      { slotId: 'slot_stray', allowed: ['hero'], required: false, repeatable: false },
+      { slotId: 'slot_body', allowed: ['prose'], required: true, repeatable: true },
+    ],
+  };
+  const ops = reconcileOps({ objectType: 'template', objectId: 'tpl_interior', body: target }, current);
+
+  // set_template_meta forbids `slots` — the meta diff must never carry them.
+  assert.equal(ops[0].op, 'set_template_meta');
+  assert.ok(!('slots' in ops[0].fields), 'slots are owned by the slot ops, never set_template_meta');
+  assert.equal(ops[0].fields.name, 'Interior page');
+  assert.deepEqual(ops[0].fields.appliesTo, ['standard'], 'arrays replace wholesale');
+
+  assert.deepEqual(
+    ops.map((op) => op.op),
+    ['set_template_meta', 'upsert_slot', 'upsert_slot', 'remove_slot', 'move_slot', 'move_slot']
+  );
+  // Positioned wholesale upserts (heals slot_body's drifted `required` flag).
+  assert.deepEqual(ops[1].slot, target.slots[0]);
+  assert.equal(ops[1].position, 0);
+  assert.deepEqual(ops[2].slot, target.slots[1]);
+  assert.equal(ops[3].slot_id, 'slot_stray');
+  assert.deepEqual(
+    ops.slice(4).map((op) => [op.slot_id, op.to_index]),
+    [
+      ['slot_lede', 0],
+      ['slot_body', 1],
+    ]
+  );
+});

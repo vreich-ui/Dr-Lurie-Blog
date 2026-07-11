@@ -8,13 +8,17 @@
  *
  * The family comes from a SEED MODULE (--seeds, default the home-page family
  * in scripts/lib/page-home-seed-data.mjs). A seed module exports:
- *   CONVERSION_SEEDS  ordered array of { objectType: 'page'|'section',
+ *   CONVERSION_SEEDS  ordered array of { objectType: 'page'|'section'|'template',
  *                     objectId, body } — every referenced object BEFORE the
  *                     object that references it;
  *   SEED_SITE         the owning site id (e.g. 'site_drlurie').
  * (The home module's PAGE_HOME_SEEDS / PAGE_HOME_SEED_SITE names are accepted
- * as a fallback.) v1 drills page + section types; extend drillOps/materialize
- * dispatch when another type's family converts.
+ * as a fallback.) The driver drills page, section, and template types — extend
+ * drillOps/reconcileOps/materialize dispatch when another type's family
+ * converts. Template families additionally get an instantiate proof: an
+ * object_instantiate_template dry_run per template (W2.5), which builds and
+ * validates the would-be page WITHOUT persisting — so production runs leave no
+ * probe pages behind.
  *
  * For every object in the family it drives, through the REAL MCP handler:
  *
@@ -104,10 +108,11 @@ if (!Array.isArray(PAGE_HOME_SEEDS) || PAGE_HOME_SEEDS.length === 0 || !PAGE_HOM
   console.error(`[roundtrip] ${seedsPath} must export CONVERSION_SEEDS (non-empty array) and SEED_SITE.`);
   process.exit(2);
 }
-const unsupported = PAGE_HOME_SEEDS.filter((seed) => seed.objectType !== 'page' && seed.objectType !== 'section');
+const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template']);
+const unsupported = PAGE_HOME_SEEDS.filter((seed) => !SUPPORTED_SEED_TYPES.has(seed.objectType));
 if (unsupported.length > 0) {
   console.error(
-    `[roundtrip] driver v1 drills page/section objects only; extend drillOps for: ${unsupported
+    `[roundtrip] the driver drills page/section/template objects only; extend drillOps for: ${unsupported
       .map((seed) => `${seed.objectId} (${seed.objectType})`)
       .join(', ')}`
   );
@@ -435,6 +440,45 @@ for (const seed of PAGE_HOME_SEEDS) {
   );
 }
 
+// ─── instantiate proof (templates only): recipe → valid page, dry-run ────────
+// Instantiation is a VERB, not a patch op, so the drill above cannot cover it.
+// dry_run builds the would-be page, validates it through the full create
+// pipeline, and persists NOTHING — safe against production (no probe pages).
+
+for (const seed of PAGE_HOME_SEEDS) {
+  if (seed.objectType !== 'template') continue;
+  if (ensureFailed.has(seed.objectId)) {
+    step(`instantiate ${seed.objectId} (dry_run)`, false, 'skipped — ensure failed');
+    continue;
+  }
+  const result = await callTool('object_instantiate_template', {
+    template_id: seed.objectId,
+    site: PAGE_HOME_SEED_SITE,
+    route: `/rt-instantiate-probe-${seed.objectId.replace(/^tpl_/, '')}`,
+    title: 'Round-trip instantiate probe',
+    dry_run: true,
+  });
+  const payload = structured(result);
+  const eligible = payload?.summary?.eligible === true;
+  const provenance = payload?.body?.template?.ref === seed.objectId;
+  const requiredSlots = (seed.body.slots ?? []).filter((slot) => slot.required).length;
+  const sectionCount = Array.isArray(payload?.body?.sections) ? payload.body.sections.length : 0;
+  const filled = sectionCount >= requiredSlots;
+  step(
+    `instantiate ${seed.objectId}: dry_run builds a valid page (${sectionCount} section(s))`,
+    !isToolError(result) && eligible && provenance && filled,
+    isToolError(result)
+      ? JSON.stringify(payload).slice(0, 300)
+      : !eligible
+        ? `validation blockers: ${JSON.stringify(payload?.summary?.blockers ?? payload).slice(0, 300)}`
+        : !provenance
+          ? 'body.template.ref does not point back at the template'
+          : !filled
+            ? `only ${sectionCount} section(s) for ${requiredSlots} required slot(s)`
+            : ''
+  );
+}
+
 // ─── contract: advertised ops === exercised ops (criterion 4) ────────────────
 
 for (const [objectType, exercised] of exercisedByType) {
@@ -464,13 +508,15 @@ for (const seed of PAGE_HOME_SEEDS) {
 if (writeExports) {
   const { materializePage } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'page.js'));
   const { materializeSection } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'section.js'));
+  const { materializeTemplate } = await import(
+    path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'template.js')
+  );
+  const materializerByType = { page: materializePage, section: materializeSection, template: materializeTemplate };
   for (const seed of PAGE_HOME_SEEDS) {
     const record = await getRecord(seed.objectType, seed.objectId);
     const meta = { at: new Date().toISOString(), record_version: record.version };
-    const file =
-      seed.objectType === 'page'
-        ? materializePage(seed.objectId, record.body, meta)
-        : materializeSection(seed.objectId, record.body, meta);
+    const file = materializerByType[seed.objectType](seed.objectId, record.body, meta);
+    fs.mkdirSync(path.dirname(path.join(repoRoot, file.path)), { recursive: true });
     fs.writeFileSync(path.join(repoRoot, file.path), file.content);
     step(`materialize ${seed.objectId} → ${file.path}`, true, `record_version ${record.version}`);
   }

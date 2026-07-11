@@ -68,6 +68,7 @@ const OBJECT_TOOLS = [
   'object_get',
   'object_list',
   'object_create',
+  'object_instantiate_template',
   'object_checkout',
   'object_refresh_lock',
   'object_checkin',

@@ -1,0 +1,61 @@
+{
+  "__generated": {
+    "at": "2026-07-11T10:00:45.705Z",
+    "from": "objects/template/by-id/tpl_interior.json",
+    "record_version": 9
+  },
+  "appliesTo": [
+    "standard"
+  ],
+  "name": "Interior page",
+  "slots": [
+    {
+      "allowed": [
+        "lede"
+      ],
+      "blueprint": {
+        "data": {
+          "actions": [],
+          "heading": "New page heading",
+          "kicker": "Overview"
+        },
+        "id": "s_tplintlede",
+        "type": "lede"
+      },
+      "repeatable": false,
+      "required": true,
+      "slotId": "slot_lede"
+    },
+    {
+      "allowed": [
+        "prose"
+      ],
+      "blueprint": {
+        "data": {
+          "body": "<p></p>"
+        },
+        "id": "s_tplintbody",
+        "type": "prose"
+      },
+      "repeatable": true,
+      "required": true,
+      "slotId": "slot_body"
+    },
+    {
+      "allowed": [
+        "cta_banner"
+      ],
+      "blueprint": {
+        "data": {
+          "actions": [],
+          "heading": "Keep exploring"
+        },
+        "id": "s_tplintcta",
+        "type": "cta_banner"
+      },
+      "repeatable": false,
+      "required": false,
+      "slotId": "slot_cta"
+    }
+  ]
+}

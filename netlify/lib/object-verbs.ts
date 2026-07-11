@@ -46,6 +46,9 @@ import {
 import { validateObjectIdForType } from '../../src/lib/object-ids.js';
 import { mintId, MintIdError } from '../../src/lib/object-ids-mint.js';
 import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
+import { buildPageBodyFromTemplate } from '../../src/lib/template-instantiate.js';
+import { pageBodySchema, pageTypeIdSchema } from '../../src/schema/bodies/page-v1.js';
+import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import {
   objectTypes,
   objectTypeSchema,
@@ -104,6 +107,21 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     site: z.string().min(1),
     body: z.unknown(),
     requested_id: z.string().min(1).optional(),
+  }),
+  // ─── W2.5: create a page FROM a template recipe (design-principles rule 5).
+  // Builds the body from the template's slots (src/lib/template-instantiate.ts)
+  // and hands it to the `create` case — one write path, all rules apply.
+  z.object({
+    action: z.literal('instantiate'),
+    template_id: objectId,
+    site: z.string().min(1),
+    route: z.string().min(1),
+    title: z.string().min(1),
+    page_type: pageTypeIdSchema.optional(),
+    seo: pageBodySchema.shape.seo.optional(),
+    requested_id: z.string().min(1).optional(),
+    // Preview mode: build + validate the would-be page, persist NOTHING.
+    dry_run: z.boolean().optional(),
   }),
   z.object({
     action: z.literal('checkout'),
@@ -423,6 +441,83 @@ export const handleObjectVerb = async (
       return ok({ record });
     }
 
+    case 'instantiate': {
+      // The template must EXIST (draft is fine — the same existence semantics
+      // as a shared_ref target); its body must parse as template.v1.
+      const templateRecord = await loadRecord(store, objectRecordKey('template', request.template_id));
+      if (!templateRecord) {
+        return err(404, { error: 'Template not found', not_found: true, template_id: request.template_id });
+      }
+      const parsedTemplate = templateBodySchema.safeParse(templateRecord.body);
+      if (!parsedTemplate.success) {
+        return err(422, {
+          error: 'Template body does not parse as template.v1 — fix the template before instantiating.',
+          template_id: request.template_id,
+          issues: parsedTemplate.error.issues,
+        });
+      }
+
+      const built = buildPageBodyFromTemplate(parsedTemplate.data, {
+        route: request.route,
+        title: request.title,
+        pageType: request.page_type,
+        seo: request.seo,
+        templateRef: templateRecord.object_id,
+        instantiatedAt: timestamp,
+      });
+      if (!built.ok) {
+        return err(422, { error: built.error, template_id: request.template_id });
+      }
+
+      if (request.dry_run) {
+        // Preview: the exact body a real instantiate would create, its minted
+        // (or requested) id, id availability, and full validation — nothing
+        // persisted. This is also how the round-trip driver proves the verb
+        // against production without leaving probe pages behind.
+        let objectIdValue: string;
+        if (request.requested_id) {
+          const check = validateObjectIdForType('page', request.requested_id);
+          if (!check.ok) return err(400, { error: 'Invalid requested_id', detail: check.error });
+          objectIdValue = request.requested_id;
+        } else {
+          try {
+            objectIdValue = mintId({ kind: 'object', objectType: 'page' }, seedForCreate('page', built.body));
+          } catch (error) {
+            if (error instanceof MintIdError)
+              return err(400, { error: 'Could not mint an object id', detail: error.message });
+            throw error;
+          }
+        }
+        const groups = validateObject({ objectType: 'page', objectId: objectIdValue, body: built.body }, context);
+        const summary = summarizeValidation(groups);
+        const idTaken = Boolean(await store.get(objectRecordKey('page', objectIdValue)));
+        return ok({
+          dry_run: true,
+          instantiated_from: templateRecord.object_id,
+          object_id: objectIdValue,
+          id_available: !idTaken,
+          body: built.body,
+          validation: groups,
+          summary,
+        });
+      }
+
+      const result = await handleObjectVerb(
+        store,
+        {
+          action: 'create',
+          object_type: 'page',
+          site: request.site,
+          body: built.body,
+          ...(request.requested_id ? { requested_id: request.requested_id } : {}),
+        },
+        principal,
+        options
+      );
+      if (result.status !== 200) return result;
+      return ok({ ...result.body, instantiated_from: templateRecord.object_id });
+    }
+
     case 'checkout': {
       const key = objectRecordKey(request.object_type, request.object_id);
       const result = await checkoutObjectLock(store, key, {
@@ -641,7 +736,8 @@ export const handleObjectVerb = async (
         requested: { published_time: request.published_time },
         policy: options.approvalPolicy,
       });
-      if (!gate.allow) return err(gate.status, { error: gate.reason, code: gate.code, requires_approval: gate.requires_approval });
+      if (!gate.allow)
+        return err(gate.status, { error: gate.reason, code: gate.code, requires_approval: gate.requires_approval });
 
       const result = await publishObject(
         store,

@@ -56,6 +56,7 @@ import {
   OBJECT_CONTRACT_TYPES,
 } from '../../src/lib/registry/object-contract.js';
 import { objectTypes, type ObjectType } from '../../src/schema/object-record-v1.js';
+import { pageTypeIds } from '../../src/schema/bodies/page-v1.js';
 
 const mediaPortabilityWarning =
   'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';
@@ -1309,6 +1310,32 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
       },
       ['object_type', 'site', 'body']
+    ),
+  },
+  {
+    name: 'object_instantiate_template',
+    description:
+      "Create a new page FROM a template recipe (design rule 5: templates are recipes; PageTypes are law). Deep-copies the template's slot blueprints into a fresh page body in slot order (a required slot without a blueprint falls back to the registry defaultData of its first allowed type; an optional slot without one is skipped), stamps page.template provenance ({ref, instantiated_at} — pages never live-inherit from templates), and routes the result through the SAME create validation as object_create (route uniqueness, PageType law, reference integrity). The template must exist (draft is fine); page_type defaults to the template's first appliesTo entry. Pass dry_run: true to preview the built body, the would-be object id, id availability, and full validation without persisting anything.",
+    inputSchema: objectSchema(
+      {
+        template_id: stringSchema('The template object id, e.g. tpl_interior.'),
+        site: stringSchema('Owning site object id, e.g. site_drlurie.'),
+        route: stringSchema("The new page's route, e.g. /pricing — must be unique across pages."),
+        title: stringSchema("The new page's reader-facing title."),
+        page_type: {
+          type: 'string',
+          enum: [...pageTypeIds],
+          description: "Optional PageType for the new page; defaults to the template's first appliesTo entry.",
+        },
+        seo: anyObjectSchema('Optional seo object ({title?, description?, ogImage?, robots?}); defaults to {}.'),
+        requested_id: stringSchema('Optional explicit page id; a valid id is minted from the route when omitted.'),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the built body, would-be id, id availability, and validation; persist nothing.',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['template_id', 'site', 'route', 'title']
     ),
   },
   {
@@ -3742,6 +3769,19 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         site: input.site,
         body: input.body,
         requested_id: input.requested_id,
+        agent_name: input.agent_name,
+      });
+    case 'object_instantiate_template':
+      return callObjectAction(event, {
+        action: 'instantiate',
+        template_id: input.template_id,
+        site: input.site,
+        route: input.route,
+        title: input.title,
+        page_type: input.page_type,
+        seo: input.seo,
+        requested_id: input.requested_id,
+        dry_run: input.dry_run,
         agent_name: input.agent_name,
       });
     case 'object_checkout':

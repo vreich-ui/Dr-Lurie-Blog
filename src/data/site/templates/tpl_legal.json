@@ -1,0 +1,21 @@
+{
+  "__generated": {
+    "at": "2026-07-11T10:00:45.712Z",
+    "from": "objects/template/by-id/tpl_legal.json",
+    "record_version": 9
+  },
+  "appliesTo": [
+    "system"
+  ],
+  "name": "Legal page",
+  "slots": [
+    {
+      "allowed": [
+        "prose"
+      ],
+      "repeatable": true,
+      "required": true,
+      "slotId": "slot_body"
+    }
+  ]
+}
