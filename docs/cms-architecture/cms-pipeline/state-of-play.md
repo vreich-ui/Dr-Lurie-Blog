@@ -7,6 +7,38 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 L (INCIDENT: agent content tripped the deploy secrets scanner — trap 14)
+
+Wolf's agent, working the /about intro through the MCP (record_version 25 —
+real autonomous editing), set `portrait.src` to an images.weserv.nl proxy of
+`raw.githubusercontent.com/<repo>/…/dr-lurie-portrait4.jpeg`. That URL contains
+the repo slug — the VALUE of the secret-marked `GITHUB_REPOSITORY` env var —
+and Netlify's post-build secrets scan matches marked values (even URL-encoded)
+in repo files and build output, so **every production deploy failed** from that
+publish onward (the build itself compiled clean; the block is the scan).
+Everything published since the last good deploy (the agent's nav/home/site
+edits, the W4 record, the object-page catch-all) sat dark until healed.
+
+Response, in order:
+
+- **Heal through the store, not the export** (`scripts/fix-about-portrait.mjs`,
+  one-off): one `update_section_data` deep-merge of `portrait.src` back to the
+  site-asset original (kugelmedia host) — the agent's other edits on the
+  section are deliberately kept — then publish (server commits the corrected
+  export) + release. Refuses weserv/githubusercontent URLs as the new value.
+- **Agent-facing guardrail**: the bio `portrait` editor hint (surfaced through
+  `object_contract`) now names the sanctioned image sources and forbids repo
+  files/proxies, with the reason.
+- **The wanted photo, properly**: `dr-lurie-portrait4.jpeg` copied to
+  `public/images/` — after this PR deploys, `/images/dr-lurie-portrait4.jpeg`
+  is a legitimate first-party URL an agent can set in one op.
+- **Recorded as playbook trap 14** + the playbook's reality-check paragraph
+  refreshed (31 converted; catch-all live).
+
+Sequencing note (the part that bites): a PR's deploy preview ALSO runs the
+scan, so no PR can go green until the store heal has landed the corrected
+export on main — heal first, then merge.
+
 ## Session 2026-07-11 K (object-page catch-all: agent-CREATED pages are now live end-to-end — B1 closed)
 
 The last plumbing between "agent creates a page" and "that page is on the
@@ -268,10 +300,10 @@ remains** (design-principles rule 1 fully satisfied):
     curated cards.
   - `contact_form` gained optional `subtitle`/`description`; ContactForm renders
     them (the name/email/message field set stays fixed furniture).
-  The bespoke `contact` type + `ContactPage.astro` + `contact.ts` are REMOVED
-  (compile-lockstep gate). Intentional **scoped rule-4 visual diff on /contact**
-  (build-diff: 1 changed page; all copy + 6 icons + the Netlify form preserved,
-  only the widget→generic-component markup changed).
+    The bespoke `contact` type + `ContactPage.astro` + `contact.ts` are REMOVED
+    (compile-lockstep gate). Intentional **scoped rule-4 visual diff on /contact**
+    (build-diff: 1 changed page; all copy + 6 icons + the Netlify form preserved,
+    only the widget→generic-component markup changed).
 - **/thank-you**: the `thank_you` type was RENAMED to the reusable
   `form_confirmation` (ThankYou.astro → FormConfirmation.astro, thank-you.ts →
   form-confirmation.ts; the `?form=` swap script is unchanged). It was already
