@@ -1,0 +1,158 @@
+/**
+ * Ownership rules for the object-page catch-all (src/utils/object-page-routes.ts)
+ * — the derivation that makes agent-created pages live at their route while
+ * never fighting an existing owner for a path:
+ *
+ *   - file routes always win (the hand-wired converted pages emit nothing);
+ *   - article permalinks and reserved prefixes (blog bases, topics hub,
+ *     /admin) are refused with a named reason, never silently dropped;
+ *   - with today's exports (every page object file-owned) the emitted set is
+ *     EMPTY — the build-diff-empty guarantee of the cutover commit.
+ */
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import { computeObjectPageRoutes } from '../../src/utils/object-page-routes.js';
+
+const ROUTE_FILES = [
+  './index.astro',
+  './about.astro',
+  './404.astro',
+  './solutions/early-access.astro',
+  './learn/topics/index.astro',
+  './learn/topics/[topicSlug].astro',
+  './[...blog]/[...page].astro',
+  './[...objectPage].astro',
+];
+
+const RESERVED = ['learn/library', 'category', 'tag', 'learn/topics', 'admin'];
+
+test('a route served by a static file is skipped as file_route (root included)', () => {
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths: ROUTE_FILES,
+    pageExports: [
+      { objectId: 'page_home', route: '/' },
+      { objectId: 'page_about', route: '/about' },
+      { objectId: 'page_early_access', route: '/solutions/early-access' },
+    ],
+    postPermalinks: [],
+    reservedPrefixes: RESERVED,
+  });
+  assert.deepEqual(paths, []);
+  assert.deepEqual(
+    skipped.map((skip) => [skip.objectId, skip.reason]),
+    [
+      ['page_home', 'file_route'],
+      ['page_about', 'file_route'],
+      ['page_early_access', 'file_route'],
+    ]
+  );
+});
+
+test('an unowned route is emitted with the leading slash stripped from the param', () => {
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths: ROUTE_FILES,
+    pageExports: [
+      { objectId: 'page_campaign', route: '/campaigns/spring-launch' },
+      { objectId: 'page_faq', route: '/faq/' }, // trailing slash normalizes
+    ],
+    postPermalinks: [],
+    reservedPrefixes: RESERVED,
+  });
+  assert.deepEqual(skipped, []);
+  assert.deepEqual(paths, [
+    { objectId: 'page_campaign', route: '/campaigns/spring-launch', param: 'campaigns/spring-launch' },
+    { objectId: 'page_faq', route: '/faq', param: 'faq' },
+  ]);
+});
+
+test('article permalinks and reserved prefixes are refused with named reasons', () => {
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths: ROUTE_FILES,
+    pageExports: [
+      { objectId: 'page_clash', route: '/my-existing-post' },
+      { objectId: 'page_tagsquat', route: '/tag/retinoids' },
+      { objectId: 'page_libroot', route: '/learn/library' },
+      { objectId: 'page_admin', route: '/admin/backdoor' },
+      { objectId: 'page_topics', route: '/learn/topics/skin-health' },
+      { objectId: 'page_ok', route: '/learn/deep-dives' }, // sibling of a reserved prefix, not under it
+    ],
+    postPermalinks: ['my-existing-post', 'another-post'],
+    reservedPrefixes: RESERVED,
+  });
+  assert.deepEqual(
+    skipped.map((skip) => [skip.objectId, skip.reason]),
+    [
+      ['page_clash', 'blog_slug'],
+      ['page_tagsquat', 'reserved_prefix'],
+      ['page_libroot', 'reserved_prefix'],
+      ['page_admin', 'reserved_prefix'],
+      ['page_topics', 'reserved_prefix'],
+    ]
+  );
+  assert.deepEqual(paths, [{ objectId: 'page_ok', route: '/learn/deep-dives', param: 'learn/deep-dives' }]);
+});
+
+test('malformed routes are invalid_route, and dynamic files are never treated as owners', () => {
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths: ROUTE_FILES,
+    pageExports: [
+      { objectId: 'page_norel', route: 'no-leading-slash' },
+      { objectId: 'page_none', route: undefined },
+      // '[...blog]' the file exists, but a dynamic file must not own arbitrary paths:
+      { objectId: 'page_free', route: '/anything-not-a-post' },
+    ],
+    postPermalinks: [],
+    reservedPrefixes: RESERVED,
+  });
+  assert.deepEqual(
+    skipped.map((skip) => [skip.objectId, skip.reason]),
+    [
+      ['page_norel', 'invalid_route'],
+      ['page_none', 'invalid_route'],
+    ]
+  );
+  assert.deepEqual(paths, [{ objectId: 'page_free', route: '/anything-not-a-post', param: 'anything-not-a-post' }]);
+});
+
+test('the real committed exports emit ZERO paths today — every page object is file-owned', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  // Walk up from this file (source OR its .tmp/ci-test compiled copy) to the
+  // repo root — the test runner's cwd is not guaranteed.
+  let repoRoot = path.dirname(fileURLToPath(import.meta.url));
+  while (!fs.existsSync(path.join(repoRoot, 'src', 'data', 'site', 'pages'))) {
+    const parent = path.dirname(repoRoot);
+    if (parent === repoRoot) throw new Error('repo root with src/data/site/pages not found');
+    repoRoot = parent;
+  }
+  const pagesDir = path.join(repoRoot, 'src', 'data', 'site', 'pages');
+  const pageExports = fs
+    .readdirSync(pagesDir)
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => ({
+      objectId: path.basename(file, '.json'),
+      route: (JSON.parse(fs.readFileSync(path.join(pagesDir, file), 'utf8')) as { route?: unknown }).route,
+    }));
+  const walk = (dir: string): string[] =>
+    fs
+      .readdirSync(dir, { withFileTypes: true })
+      .flatMap((entry) => (entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]));
+  const routeFilePaths = walk(path.join(repoRoot, 'src', 'pages'))
+    .filter((file) => file.endsWith('.astro'))
+    .map((file) => `/src/pages/${path.relative(path.join(repoRoot, 'src', 'pages'), file).replace(/\\/g, '/')}`);
+
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths,
+    pageExports,
+    postPermalinks: [],
+    reservedPrefixes: RESERVED,
+  });
+  assert.deepEqual(paths, [], JSON.stringify(paths));
+  assert.equal(skipped.length, pageExports.length);
+  assert.ok(
+    skipped.every((skip) => skip.reason === 'file_route'),
+    JSON.stringify(skipped.filter((skip) => skip.reason !== 'file_route'))
+  );
+});

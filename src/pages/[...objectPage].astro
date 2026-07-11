@@ -1,0 +1,59 @@
+---
+/**
+ * Object-page catch-all — the last plumbing of fully-agentic page publishing
+ * (Wolf B1, 2026-07-11): a page an agent creates via object_create /
+ * object_instantiate_template, publishes, and releases is served at its route
+ * by THIS file, no per-page loader needed. The originally converted pages keep
+ * their thin hand-written loaders (file routes own their paths; this route
+ * skips them), so adding this emits zero paths until the first agent-created
+ * page publishes — the byte-identical gate for the cutover commit.
+ *
+ * Ownership rules live in src/utils/object-page-routes.ts (pure, unit-tested):
+ * file-owned routes, article permalinks, and reserved prefixes (blog bases,
+ * topics hub, /admin) are never emitted here — and every skip is warned, so an
+ * agent-published page that is NOT live shows up loudly in the build log.
+ */
+import type { InferGetStaticPropsType, GetStaticPaths } from 'astro';
+import { getCollection } from 'astro:content';
+
+import PageObjectRenderer from '~/components/cms/PageObjectRenderer.astro';
+import { fetchPosts } from '~/utils/blog';
+import { computeObjectPageRoutes } from '~/utils/object-page-routes';
+import { BLOG_BASE, CATEGORY_BASE, TAG_BASE } from '~/utils/permalinks';
+
+export const prerender = true;
+
+export const getStaticPaths = (async () => {
+  const routeFilePaths = Object.keys(import.meta.glob('./**/*.astro'));
+  const pageEntries = await getCollection('pageObject');
+  const posts = await fetchPosts();
+
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths,
+    pageExports: pageEntries.map((entry) => ({ objectId: entry.id, route: entry.data.route })),
+    postPermalinks: posts.map((post) => post.permalink),
+    // Path families owned by other dynamic routes or tooling (config.yaml is
+    // authoritative for the blog bases — Wolf B2). learn/topics is the topics
+    // hub ([topicSlug].astro); admin is the human dashboard.
+    reservedPrefixes: [BLOG_BASE, CATEGORY_BASE, TAG_BASE, 'learn/topics', 'admin'],
+  });
+
+  for (const skip of skipped) {
+    if (skip.reason === 'file_route') continue; // the normal state for the hand-wired pages
+    console.warn(
+      `[objectPage] NOT serving ${skip.objectId} at ${skip.route} — ${skip.reason}. ` +
+        'The published page is store-backed but unreachable; pick a route nobody else owns.'
+    );
+  }
+
+  return paths.map((path) => ({
+    params: { objectPage: path.param || undefined },
+    props: { objectId: path.objectId },
+  }));
+}) satisfies GetStaticPaths;
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+const { objectId } = Astro.props as Props;
+---
+
+<PageObjectRenderer objectId={objectId} />

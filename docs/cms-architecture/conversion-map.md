@@ -53,6 +53,9 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │     robots} · navigationOverrides{header?, footer?} · template(provenance) · sections[]
 │   page depends on: every shared_ref target section · navigationOverrides nav objects ·
 │     (via content_grid/content_embed sections) the content_item pipeline
+│   NEW pages are fully agentic (2026-07-11): the object-page catch-all serves any
+│     published Page object at its route with zero code (file routes/article
+│     permalinks/blog·topics·admin prefixes excluded, skips warned at build)
 │   │
 │   ├── page_home ─ / ─ 🟢 CONVERTED (2026-07-10, all five criteria)
 │   │   ├── s_hero ─ hero (inline) ─ kicker · heading · body(rich) · actions[LinkAction]
@@ -228,7 +231,7 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 | ⚪ Potential object               | Composed of                                                                  | Unlocked by                                         |
 | --------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
 | Topics hub as a page object       | page + one `content_grid` (query source, per category)                       | W3 taxonomy (or now, with hardcoded category slugs) |
-| Any campaign/landing page         | page + hero + content_grid + cta_banner + shared newsletter section          | nothing — possible TODAY                            |
+| Any campaign/landing page         | page + hero + content_grid + cta_banner + shared newsletter section          | nothing — possible TODAY, and **served live automatically** (the object-page catch-all, 2026-07-11) |
 | Newsletter page with live signup  | page_newsletter + `shared_ref → sec_newsletter_signup`                       | W1                                                  |
 | Curated "start here" grid         | sec_home_start_grid switched `query → manual + fallback`                     | content_item resolver                               |
 | Related-content strip on any page | `content_grid` (query by tag/category) placed via `upsert_section`           | W3 taxonomy for term filters                        |

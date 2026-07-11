@@ -44,7 +44,11 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   normalization of all 93 posts + registry display labels in the blog
   renderer. The 28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts
   deleted, 18 real ones stamped with `published_time`; 167 pages, topics hub
-  live). Still TODO: the W5+ hand-coded pages (Wolf: separate session).
+  live). **Agent-CREATED pages are live end-to-end (2026-07-11, B1 closed)**:
+  the object-page catch-all (`src/pages/[...objectPage].astro` +
+  `src/utils/object-page-routes.ts`) serves any published Page object whose
+  route no file owns — create → publish → release → live, zero code. Still
+  TODO: the W5+ hand-coded pages (Wolf: separate session).
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

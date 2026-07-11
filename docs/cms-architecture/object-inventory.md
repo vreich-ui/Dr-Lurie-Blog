@@ -120,6 +120,15 @@ pages + `page_contact` + `page_thank_you`) landed 2026-07-11 in one batched
 credentialed `convert-pending-production.sh` run (`released:true`; each `ensure`
 reported "already matches the seed" → store === seed === export).
 
+**NEW pages are fully agentic (2026-07-11):** the object-page catch-all
+(`src/pages/[...objectPage].astro`) serves any published Page object whose route
+no hand-written file owns — create (`object_create` / `object_instantiate_template`)
+→ publish → release, and the page is live at its route with zero code. Ownership
+rules (file routes win; article permalinks and the blog/topics/admin path families
+are refused with a build-log warning) live in `src/utils/object-page-routes.ts`.
+The 12 pages below keep their thin loader files, so the catch-all emits nothing
+for them.
+
 | Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `page_home`           | `/`                       | 🟢 CONVERTED | **All five criteria met 2026-07-10.** Hero + bio inline; grids + newsletter are `shared_ref`s to standalone section objects. The broken store record was healed via reconcile ops, every permitted op round-tripped in production, published (v44+, `4753ae7`), and released (`released:true`). Seed === store === export. |
