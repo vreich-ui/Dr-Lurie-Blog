@@ -7,6 +7,38 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 D (BATCHED CREDENTIALED RUN: 13 objects CONVERTED — the page + template backlog is cleared)
+
+Wolf ran `./scripts/convert-pending-production.sh --verify-only` (all green) then
+the real `./scripts/convert-pending-production.sh` from his credentialed laptop.
+The single run created/reconciled, drilled every permitted op, published, and
+released all 13 SEEDED objects in one deploy (`release poll: released` →
+`SUCCESS — store-backed, round-trips every permitted op, and published`):
+
+- **8 W1 pages** — page_start_here, page_member_updates, page_newsletter,
+  page_free_guide, page_early_access (lede); page_privacy, page_terms (prose),
+  page_404 (cta_banner).
+- **3 W2.5 templates** — tpl_interior, tpl_landing, tpl_legal (all 4 template
+  ops round-tripped + instantiate `dry_run` proven).
+- **2 W2 form pages** — page_contact, page_thank_you.
+
+Every `ensure` reported "already matches the seed" (store === seed); the 13
+`Publish …` commits are on main and carry the decomposed exports (store ===
+export); inventory returned all 13. All five criteria met → flipped to
+🟢 **CONVERTED** across object-inventory / conversion-map / this log /
+CLAUDE.md / AGENTS.md.
+
+**Converted count: 16 → 29.** All 12 page objects + all 3 templates + the 3 nav
+objects are now store-backed and agent-editable. **The rendered-stub backlog is
+empty** — no page renders from an unbacked export anymore. The now-cleared batch
+harness (pending-conversion-seeds.mjs + convert-pending-production.sh + its test)
+is retired; the batching PATTERN stays documented in the playbook for the next
+wave. `PUBLISH_SECRET` was pasted in chat and the run went live — **rotate it
+before any real go-live** (standing caveat, still open).
+
+Next: W3 taxonomy (Wolf's source-of-truth decision — the open checkpoint) and
+W4 site singleton.
+
 ## Session 2026-07-11 C (W2 SHIPPED: /contact + /thank-you decomposed — the palette is now FULLY GENERIC)
 
 Wolf: "Continue with W2." Answered the three framing questions (generic

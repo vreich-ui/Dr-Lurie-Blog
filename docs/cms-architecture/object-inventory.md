@@ -49,15 +49,18 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-10 (evening), sixteen objects are CONVERTED** (all via credentialed
+**As of 2026-07-11, twenty-nine objects are CONVERTED** (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
-`sec_home_start_grid`, `sec_newsletter_signup`); and the /about family
-(`page_about` + `sec_about_intro`/`_thinking`/`_products`/`_science`/`_research`/
-`_blog`/`_note`/`_cta`). Two pages are fully converted (`page_home`, `page_about`);
-the other 10 still RENDER as **rendered stubs**. See "Why only nav is converted"
-(historical root-cause analysis) at the bottom.
+`sec_home_start_grid`, `sec_newsletter_signup`); the /about family (`page_about` +
+`sec_about_intro`/`_thinking`/`_products`/`_science`/`_research`/`_blog`/`_note`/`_cta`);
+**all 8 W1 interior/system pages + `page_contact` + `page_thank_you`; and the 3
+templates (`tpl_interior`/`tpl_landing`/`tpl_legal`)** — the whole page + template
+backlog landed in one batched credentialed run on 2026-07-11. **All 12 page objects
+are converted; no page renders from an unbacked export anymore** — the rendered-stub
+backlog is empty. See "Why only nav is converted" (historical root-cause analysis)
+at the bottom.
 
 ### Status legend
 
@@ -107,26 +110,29 @@ The live list + each type's field schema is `registry_get('component')` /
 
 ## Object inventory (concrete records)
 
-### Pages — 12 render; **2 fully converted** (`page_home`, `page_about`)
+### Pages — 12 render; **all 12 CONVERTED** (2026-07-11 batched run)
 
-All 12 build and serve from committed exports. **`page_home` and `page_about` are
-CONVERTED** (2026-07-10: store-backed, round-tripped, published, released — see
-their rows). The other 10 have no editable store record backing them — rendered stubs.
+All 12 build and serve from committed exports and are now **CONVERTED** — store-backed
+in production, round-tripping every permitted op via MCP, published, and released.
+`page_home` + `page_about` landed 2026-07-10; the remaining 10 (8 W1 interior/system
+pages + `page_contact` + `page_thank_you`) landed 2026-07-11 in one batched
+credentialed `convert-pending-production.sh` run (`released:true`; each `ensure`
+reported "already matches the seed" → store === seed === export).
 
 | Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                                      |
 | --------------------- | ------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `page_home`           | `/`                       | 🟢 CONVERTED | **All five criteria met 2026-07-10.** Hero + bio inline; grids + newsletter are `shared_ref`s to standalone section objects. The broken store record was healed via reconcile ops, every permitted op round-tripped in production, published (v44+, `4753ae7`), and released (`released:true`). Seed === store === export. |
-| `page_start_here`     | `/start-here`             | 🟣 RENDERS   | Lede interior page. Seed in the W1 batch (`pages-interior-seed-data.mjs`); local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                    |
-| `page_member_updates` | `/member-updates`         | 🟣 RENDERS   | Lede interior page. W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                                                                 |
-| `page_newsletter`     | `/newsletter`             | 🟣 RENDERS   | Lede interior page (plain lede today — the shared newsletter section can be added later). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                           |
-| `page_free_guide`     | `/guides/free-guide`      | 🟣 RENDERS   | Lede interior page. W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                                                                 |
-| `page_early_access`   | `/solutions/early-access` | 🟣 RENDERS   | Lede interior page. W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                                                                 |
-| `page_thank_you`      | `/thank-you`              | 🟣 RENDERS   | **Decomposed 2026-07-11:** the bespoke `thank_you` type was RENAMED to the reusable `form_confirmation` (a `standard` page with one such section; the `?form=` swap script is unchanged furniture). Renders byte-identically; local round-trip proven; RENDERS until the credentialed run.                                    |
+| `page_start_here`     | `/start-here`             | 🟢 CONVERTED | Lede interior page. Seed in the W1 batch (`pages-interior-seed-data.mjs`); store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                    |
+| `page_member_updates` | `/member-updates`         | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                 |
+| `page_newsletter`     | `/newsletter`             | 🟢 CONVERTED | Lede interior page (plain lede today — the shared newsletter section can be added later). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                           |
+| `page_free_guide`     | `/guides/free-guide`      | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                 |
+| `page_early_access`   | `/solutions/early-access` | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                 |
+| `page_thank_you`      | `/thank-you`              | 🟢 CONVERTED | **Decomposed 2026-07-11:** the bespoke `thank_you` type was RENAMED to the reusable `form_confirmation` (a `standard` page with one such section; the `?form=` swap script is unchanged furniture). Renders byte-identically; store-backed + round-tripped in production, published, released 2026-07-11.                                    |
 | `page_about`          | `/about`                  | 🟢 CONVERTED | **Decomposed 2026-07-10** off the bespoke `about` anti-pattern into EIGHT standalone shared sections (bio + prose ×6 + cta_banner) — a `standard` page of 8 `shared_ref`s. Store-backed (record_version 10), round-tripped in production, published, released. (The bespoke `about` TYPE was retired 2026-07-10.)          |
-| `page_contact`        | `/contact`                | 🟣 RENDERS   | **Decomposed 2026-07-11** off the bespoke `contact` anti-pattern into reusable `lede` + `contact_form` (now carrying subtitle/description) + `content_grid` (`cards` source, cells gained an optional `icon`) — a `standard` page of 3 inline generic sections. Intentional scoped visual diff (rule 4); local round-trip proven; RENDERS until the credentialed run. (The bespoke `contact` TYPE was retired 2026-07-11.) |
-| `page_privacy`        | `/privacy`                | 🟣 RENDERS   | `system` PageType, reusable `prose` section (PR #380). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                              |
-| `page_terms`          | `/terms`                  | 🟣 RENDERS   | `system` PageType, reusable `prose` section (PR #380). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                              |
-| `page_404`            | `/404`                    | 🟣 RENDERS   | `system` PageType, reusable `cta_banner` section (PR #380). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                         |
+| `page_contact`        | `/contact`                | 🟢 CONVERTED | **Decomposed 2026-07-11** off the bespoke `contact` anti-pattern into reusable `lede` + `contact_form` (now carrying subtitle/description) + `content_grid` (`cards` source, cells gained an optional `icon`) — a `standard` page of 3 inline generic sections. Intentional scoped visual diff (rule 4); store-backed + round-tripped in production, published, released 2026-07-11. (The bespoke `contact` TYPE was retired 2026-07-11.) |
+| `page_privacy`        | `/privacy`                | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                              |
+| `page_terms`          | `/terms`                  | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                              |
+| `page_404`            | `/404`                    | 🟢 CONVERTED | `system` PageType, reusable `cta_banner` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                         |
 
 ### Shared sections
 
@@ -162,19 +168,19 @@ The real site config still lives in `src/config.yaml` (and is what actually driv
 rendering); real categories/tags remain article frontmatter (§5.5). Building real
 `site` / `taxonomy` objects is **MVP TODO #2 / #3**.
 
-**Templates were ACTIVATED 2026-07-11 (W2.5)** — design-principles rule 5
-("templates are recipes; PageTypes are law"). The `object_instantiate_template`
+**Templates were ACTIVATED + CONVERTED 2026-07-11 (W2.5)** — design-principles
+rule 5 ("templates are recipes; PageTypes are law"). The `object_instantiate_template`
 MCP tool creates a new page from a recipe through the standard create validation
 (`dry_run: true` previews without persisting); a required slot without a
 blueprint instantiates from the registry defaultData of its first allowed type.
-Three starter recipes are seeded (`scripts/lib/templates-seed-data.mjs`) and
-committed as exports:
+Three starter recipes are store-backed in production (batched run 2026-07-11 —
+all 4 template ops round-tripped + instantiate `dry_run` proven, published, released):
 
-| Object         | appliesTo  | Status    | Notes                                                                                                                                                        |
-| -------------- | ---------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tpl_interior` | `standard` | 🟣 SEEDED | Lede open + prose body + optional cta close (the W1 interior shape). All 4 template ops + instantiate dry_run proven locally; store record pending the credentialed run. |
-| `tpl_landing`  | `standard` | 🟣 SEEDED | Hero open + curated card grid + cta close (campaign shape). Same local proof; store record pending.                                                            |
-| `tpl_legal`    | `system`   | 🟣 SEEDED | One required blueprint-less prose slot — deliberately exercises the defaultData fallback. Same local proof; store record pending.                              |
+| Object         | appliesTo  | Status       | Notes                                                                                                                              |
+| -------------- | ---------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `tpl_interior` | `standard` | 🟢 CONVERTED | Lede open + prose body + optional cta close (the W1 interior shape). All 4 template ops + instantiate `dry_run` round-tripped in production. |
+| `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                        |
+| `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.        |
 
 ---
 
@@ -233,9 +239,9 @@ pages to the article (`content_item`) pipeline.
 
 - **`content_item` / articles** — already functional via the `save_json_blob_*`
   pipeline; intentionally outside the object model.
-- **Real `template` objects** — ACTIVATED at W2.5 (see "Singletons & templates"):
-  three starter recipes seeded + the instantiate tool live; production store
-  records land with the batched credentialed run.
+- **Real `template` objects** — ACTIVATED + CONVERTED at W2.5 (see "Singletons &
+  templates"): three starter recipes store-backed in production + the instantiate
+  tool live. Agents can create and evolve more freely.
 - **`homes/mobile-app`, `homes/personal`, `homes/startup`** — Astrowind starter-theme
   demo pages, not real Dr. Lurié content. Candidates for deletion, not for cutover.
 - **`rss.xml`, `search.json`** — generated endpoints, not editable content.
