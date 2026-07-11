@@ -14,6 +14,8 @@ export const contactFormDefinition: SectionComponentDefinition<'contact_form', E
     icon: 'tabler:mail',
     fieldHints: {
       heading: { label: 'Heading', widget: 'text' },
+      subtitle: { label: 'Subtitle', help: 'Optional intro line under the heading.', widget: 'text' },
+      description: { label: 'Description', help: 'Optional fine print above the form fields.', widget: 'text' },
       formName: {
         label: 'Form name',
         help: 'The Netlify form identity submissions are grouped under.',

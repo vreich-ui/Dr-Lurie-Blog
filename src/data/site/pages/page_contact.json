@@ -1,16 +1,38 @@
 {
   "__generated": {
-    "at": "2026-07-08T00:00:00.000Z",
+    "at": "2026-07-11T10:52:49.863Z",
     "from": "objects/page/by-id/page_contact.json",
-    "record_version": 1
+    "record_version": 12
   },
   "pageType": "standard",
   "route": "/contact",
   "sections": [
     {
       "data": {
-        "features": {
-          "items": [
+        "actions": [],
+        "heading": "Connect with Dr. Lurié",
+        "kicker": "Contact"
+      },
+      "id": "s_contactlede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "description": "We review messages submitted through the website contact form and respond when appropriate.",
+        "disclaimer": "By submitting this contact form, you acknowledge and agree to the collection of your personal information as described in the Privacy Policy.",
+        "formName": "contact",
+        "heading": "Send a note to the Dr. Lurié team",
+        "subtitle": "Use this form for education questions, early-access and product-update requests, or media and partnership inquiries. We do not provide medical advice through this form."
+      },
+      "id": "s_contactform",
+      "type": "contact_form"
+    },
+    {
+      "data": {
+        "heading": "How we can help",
+        "limit": 6,
+        "source": {
+          "cards": [
             {
               "description": "Ask about Dr. Lurié educational content on aging skin, age-related scent changes, barrier function, and skincare science. This is educational only and not medical advice.",
               "icon": "tabler:school",
@@ -42,40 +64,11 @@
               "title": "Website"
             }
           ],
-          "title": "How we can help"
-        },
-        "form": {
-          "description": "We review messages submitted through the website contact form and respond when appropriate.",
-          "disclaimer": {
-            "label": "By submitting this contact form, you acknowledge and agree to the collection of your personal information as described in the Privacy Policy."
-          },
-          "formName": "contact",
-          "id": "form",
-          "inputs": [
-            {
-              "label": "Name",
-              "name": "name",
-              "type": "text"
-            },
-            {
-              "label": "Email",
-              "name": "email",
-              "type": "email"
-            }
-          ],
-          "subtitle": "Use this form for education questions, early-access and product-update requests, or media and partnership inquiries. We do not provide medical advice through this form.",
-          "textarea": {
-            "label": "Message"
-          },
-          "title": "Send a note to the Dr. Lurié team"
-        },
-        "hero": {
-          "tagline": "Contact",
-          "title": "Connect with Dr. Lurié"
+          "kind": "cards"
         }
       },
-      "id": "s_contact",
-      "type": "contact"
+      "id": "s_contactgrid",
+      "type": "content_grid"
     }
   ],
   "seo": {},

@@ -23,6 +23,10 @@ X passes all five); **after every session, update the documentation** (no writte
 = not converted). Reality as of 2026-07-10 evening: sixteen objects converted — the 3 nav objects,
 the home-page family (`page_home` + 3 shared sections), and the /about family
 (`page_about` + 8 shared sections); the other 10 page exports are rendered stubs.
+Update (2026-07-11): those 10 exports are now SEEDED at RENDERS (W1 8 pages; W2 /contact +
+/thank-you decomposed) plus 3 seeded templates (W2.5), all awaiting one batched credentialed run;
+the section-type palette is now fully generic (last bespoke types `about`/`contact` decomposed,
+`thank_you`→`form_confirmation`). Converted count stays sixteen until that run.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

@@ -95,13 +95,12 @@ human approval per type.
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
 `content_grid`, `bio`, `newsletter_signup`, `testimonial`, `cta_banner`, `faq`,
-`link_list`, `product_preview`, `contact_form`, `search`, `content_embed`) plus the
-bespoke single-use page sections (`thank_you`, `contact` — the `about` type was
-retired 2026-07-10 once /about was decomposed into reusable sections) and the
-`shared_ref` pointer. The reusable ones are meant to be composed onto any page; the
-bespoke ones mirror one specific page's markup and are the **anti-pattern** under
-[`design-principles.md`](design-principles.md) — a migration expedient, not to be
-repeated. The live list + each type's field schema is `registry_get('component')` /
+`link_list`, `product_preview`, `contact_form`, `form_confirmation`, `search`,
+`content_embed`) plus the `card` leaf and the `shared_ref` pointer. **As of
+2026-07-11 the palette is fully generic — every bespoke single-use page type has
+been retired:** `about` (2026-07-10) and `contact` (2026-07-11) decomposed into
+reusable sections, and `thank_you` was renamed to the reusable `form_confirmation`.
+The live list + each type's field schema is `registry_get('component')` /
 `object_contract('page').section_types`.
 
 ---
@@ -122,9 +121,9 @@ their rows). The other 10 have no editable store record backing them — rendere
 | `page_newsletter`     | `/newsletter`             | 🟣 RENDERS   | Lede interior page (plain lede today — the shared newsletter section can be added later). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                           |
 | `page_free_guide`     | `/guides/free-guide`      | 🟣 RENDERS   | Lede interior page. W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                                                                 |
 | `page_early_access`   | `/solutions/early-access` | 🟣 RENDERS   | Lede interior page. W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                                                                 |
-| `page_thank_you`      | `/thank-you`              | 🟣 RENDERS   | Bespoke section (anti-pattern); message-swap script as furniture. Not store-backed.                                                                                                                                                                                                                                        |
+| `page_thank_you`      | `/thank-you`              | 🟣 RENDERS   | **Decomposed 2026-07-11:** the bespoke `thank_you` type was RENAMED to the reusable `form_confirmation` (a `standard` page with one such section; the `?form=` swap script is unchanged furniture). Renders byte-identically; local round-trip proven; RENDERS until the credentialed run.                                    |
 | `page_about`          | `/about`                  | 🟢 CONVERTED | **Decomposed 2026-07-10** off the bespoke `about` anti-pattern into EIGHT standalone shared sections (bio + prose ×6 + cta_banner) — a `standard` page of 8 `shared_ref`s. Store-backed (record_version 10), round-tripped in production, published, released. (The bespoke `about` TYPE was retired 2026-07-10.)          |
-| `page_contact`        | `/contact`                | 🟣 RENDERS   | Bespoke `contact` section (anti-pattern), PR #375. Not store-backed.                                                                                                                                                                                                                                                       |
+| `page_contact`        | `/contact`                | 🟣 RENDERS   | **Decomposed 2026-07-11** off the bespoke `contact` anti-pattern into reusable `lede` + `contact_form` (now carrying subtitle/description) + `content_grid` (`cards` source, cells gained an optional `icon`) — a `standard` page of 3 inline generic sections. Intentional scoped visual diff (rule 4); local round-trip proven; RENDERS until the credentialed run. (The bespoke `contact` TYPE was retired 2026-07-11.) |
 | `page_privacy`        | `/privacy`                | 🟣 RENDERS   | `system` PageType, reusable `prose` section (PR #380). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                              |
 | `page_terms`          | `/terms`                  | 🟣 RENDERS   | `system` PageType, reusable `prose` section (PR #380). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                              |
 | `page_404`            | `/404`                    | 🟣 RENDERS   | `system` PageType, reusable `cta_banner` section (PR #380). W1 batch; local round-trip proven; RENDERS until the credentialed run.                                                                                                                                                                                         |

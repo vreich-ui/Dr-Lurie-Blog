@@ -1,16 +1,17 @@
 /**
- * `thank_you` registry module — the form-submission confirmation section
- * (ThankYou.astro). Its `actions` resolve to hrefs the same way hero/lede
- * actions do (HeroResolved), computed centrally by the renderer
- * (src/lib/renderer/resolve.ts), so this module declares no resolveRefs.
+ * `form_confirmation` registry module — the reusable post-submit confirmation
+ * section (FormConfirmation.astro; today's /thank-you is one instance). Its
+ * `actions` resolve to hrefs the same way hero/lede actions do (HeroResolved),
+ * computed centrally by the renderer (src/lib/renderer/resolve.ts), so this
+ * module declares no resolveRefs. Renamed from `thank_you` (2026-07-11).
  */
 import { sectionVariantDataSchema, type HeroResolved, type SectionComponentDefinition } from './types.js';
 
-export const thankYouDefinition: SectionComponentDefinition<'thank_you', HeroResolved> = {
-  type: 'thank_you',
-  schema: sectionVariantDataSchema('thank_you'),
+export const formConfirmationDefinition: SectionComponentDefinition<'form_confirmation', HeroResolved> = {
+  type: 'form_confirmation',
+  schema: sectionVariantDataSchema('form_confirmation'),
   editor: {
-    label: 'Thank you',
+    label: 'Form confirmation',
     icon: 'tabler:circle-check',
     fieldHints: {
       eyebrow: { label: 'Eyebrow', help: 'Small uppercase lead-in above the title.', widget: 'text' },

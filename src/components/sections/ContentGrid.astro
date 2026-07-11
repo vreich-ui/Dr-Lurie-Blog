@@ -9,6 +9,8 @@
  * layout consumer of data + already-resolved values, same discipline as every
  * other registry component.
  */
+import { Icon } from 'astro-icon/components';
+
 import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
 import type { ContentGridResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
 
@@ -48,6 +50,7 @@ const intro = splitRichTextParagraphs(data.body ?? '');
     {
       curatedCells.map((cell) => (
         <article class="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-slate-900">
+          {cell.icon && <Icon name={cell.icon} class="mb-4 h-10 w-10 text-primary" />}
           {cell.title &&
             (cell.href ? (
               <h3 class="text-xl font-semibold text-heading">

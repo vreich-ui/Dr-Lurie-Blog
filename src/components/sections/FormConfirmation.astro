@@ -1,17 +1,18 @@
 ---
 /**
- * `thank_you` section component — the form-submission confirmation block
- * (/thank-you). Markup verbatim from the audited page: a centered eyebrow +
- * fallback title/message + two CTAs, plus the inline script that swaps in a
- * per-form title/message from the `?form=` query param (and a length-capped
- * `?message=` override). Copy is data (eyebrow/heading/message/formMessages,
- * CTA labels); the swap script is fixed furniture owned here. Action hrefs
- * arrive resolved by the renderer (HeroResolved), like hero/lede.
+ * `form_confirmation` section component — the reusable post-submit confirmation
+ * block (today's /thank-you is one instance). Markup verbatim from the audited
+ * page: a centered eyebrow + fallback title/message + two CTAs, plus the inline
+ * script that swaps in a per-form title/message from the `?form=` query param
+ * (and a length-capped `?message=` override). Copy is data
+ * (eyebrow/heading/message/formMessages, CTA labels); the swap script is fixed
+ * furniture owned here. Action hrefs arrive resolved by the renderer
+ * (HeroResolved), like hero/lede. Renamed from `thank_you` (2026-07-11).
  */
 import type { HeroResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
 
 type Props = {
-  data: SectionDataOf<'thank_you'>;
+  data: SectionDataOf<'form_confirmation'>;
   resolved: HeroResolved;
   ctx: RenderCtx;
 };

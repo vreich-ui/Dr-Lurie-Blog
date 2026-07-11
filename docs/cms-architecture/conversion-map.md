@@ -87,15 +87,19 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   ├── s_note ─ shared_ref → sec_about_note 🟢 ─ prose
 │   │   └── s_cta ─ shared_ref → sec_about_cta 🟢 ─ cta_banner (heading + body + actions)
 │   │
-│   ├── BESPOKE-SECTION PAGES ─ 🟣 RENDERS ─ priority W2 (convertible as-is; their section
-│   │   │   types are the design-principles anti-pattern — do NOT mint more; generalizing
-│   │   │   them into reusable types is OPTIONAL cleanup, not a blocker). /about is DONE
-│   │   │   (decomposed above); the remaining two:
-│   │   ├── page_contact ─ /contact ─ [contact] ─ depends on: Netlify form (contact)
-│   │   │     contact: hero{tagline,title} · form{id, formName, title, subtitle, inputs[],
-│   │   │       textarea, disclaimer, description} · features{title, items[]}
-│   │   └── page_thank_you ─ /thank-you ─ [thank_you] ─ depended on by: form redirects
-│   │         thank_you: eyebrow · heading · message · formMessages[{form,heading,message}] · actions[]
+│   ├── FORM PAGES ─ 🟡 DECOMPOSED (W2, 2026-07-11) — seeded, production run pending.
+│   │   │   All three bespoke per-page section types are now retired: the palette is
+│   │   │   fully generic (design-principles rule 1 satisfied).
+│   │   ├── page_contact ─ /contact ─ decomposed into 3 inline GENERIC sections:
+│   │   │     lede{kicker,heading} · contact_form{formName,heading,subtitle,description,
+│   │   │       disclaimer} (the fixed name/email/message field set is furniture) ·
+│   │   │       content_grid{cards[{icon,title,description}]} ("How we can help", icons
+│   │   │       added to the card cell). Bespoke `contact` type RETIRED. Scoped rule-4
+│   │   │       visual diff on /contact; local round-trip proven.
+│   │   └── page_thank_you ─ /thank-you ─ one `form_confirmation` section (the `thank_you`
+│   │         type RENAMED to the reusable post-submit type; ?form= swap script unchanged).
+│   │         eyebrow · heading · message · formMessages[{form,heading,message}] · actions[].
+│   │         Renders byte-identically; local round-trip proven. Depended on by form redirects.
 │   │
 │   ├── HAND-CODED PAGES ─ 🔴 TODO ─ priority W5 (need NEW REUSABLE section types first —
 │   │   │   see PALETTE ⚪ nodes; per design-principles, no new per-page types)
@@ -140,12 +144,14 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   NOT store objects themselves — the vocabulary pages/sections are composed FROM.
 │   │   Adding a ⚪ type is code work (one union member + one registry module + one component).
 │   ├── reusable, exist: hero · lede · prose · checklist(now unused on home; keep or retire) ·
-│   │     content_grid(query|manual|cards) · card(leaf; block-tree children later) ·
+│   │     content_grid(query|manual|cards; cards cells now take an optional `icon` —
+│   │       covers the "how we can help" feature-grid shape) · card(leaf; block-tree later) ·
 │   │     bio(now with optional URL `portrait` — the reusable "person intro", used on home + about) ·
 │   │     newsletter_signup · testimonial · cta_banner · faq · link_list · product_preview ·
-│   │     contact_form · search · content_embed
-│   ├── bespoke, exist (anti-pattern — do not mint more): contact · thank_you
-│   │     (the `about` type was RETIRED 2026-07-10 after /about was decomposed)
+│   │     contact_form(now with optional subtitle/description) · form_confirmation(the reusable
+│   │       post-submit type, ex-`thank_you`) · search · content_embed
+│   ├── bespoke single-use types: NONE — the palette is fully generic as of 2026-07-11
+│   │     (`about` retired 2026-07-10; `contact` retired + `thank_you`→`form_confirmation` 2026-07-11)
 │   ├── wrapper: shared_ref (pointer, never rendered itself)
 │   └── ⚪ needed by W5 (design them REUSABLE, agent-configurable):
 │         pricing_table (tiers[] as card-like cells) · steps (ordered step cells) ·
@@ -193,7 +199,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │     gap: trusted-artifact resolver on the RENDER path (embedded-asset-block later)
 │
 ├── FORMS (Netlify forms: 'newsletter', contact) ─ ⚪ potential form object (formName +
-│     field definitions); today form shape lives inside newsletter_signup / contact /
+│     field definitions); today form shape lives inside newsletter_signup /
 │     contact_form section data — sufficient for MVP; a standalone form object only if
 │     forms multiply
 │
@@ -219,7 +225,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
 | W1         | Lede family (5 pages) + system pages (3 pages)                                                                                                     | Everything but the store record already exists; pure driver work, proves the factory | S    |
 | W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
-| W2         | contact / thank-you pages (about is DONE) — decompose into generic types per rule 5                                                                | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
+| W2         | ✅ DONE (code + seeds, 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone — production run batched | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
 | W2.5       | ✅ DONE (code + seeds, 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, drilled locally — production run batched with W1        | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | Taxonomy singleton — **after Wolf's source-of-truth decision**                                                                                     | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |

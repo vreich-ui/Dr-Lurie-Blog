@@ -7,6 +7,42 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 C (W2 SHIPPED: /contact + /thank-you decomposed — the palette is now FULLY GENERIC)
+
+Wolf: "Continue with W2." Answered the three framing questions (generic
+decomposition + accept a scoped diff; reuse content_grid cards with an added
+optional icon rather than a new feature_grid type; rename thank_you). The last
+two bespoke per-page section types are retired — **no single-use page type
+remains** (design-principles rule 1 fully satisfied):
+
+- **/contact** decomposed off the bespoke `contact` type into 3 inline GENERIC
+  sections: `lede` (kicker + heading) + `contact_form` + `content_grid` (`cards`
+  source). To carry the current copy without a new type:
+  - `gridCardCellSchema` gained an optional `icon` (Tabler name); ContentGrid
+    renders it above the cell — the "how we can help" feature-grid shape as
+    curated cards.
+  - `contact_form` gained optional `subtitle`/`description`; ContactForm renders
+    them (the name/email/message field set stays fixed furniture).
+  The bespoke `contact` type + `ContactPage.astro` + `contact.ts` are REMOVED
+  (compile-lockstep gate). Intentional **scoped rule-4 visual diff on /contact**
+  (build-diff: 1 changed page; all copy + 6 icons + the Netlify form preserved,
+  only the widget→generic-component markup changed).
+- **/thank-you**: the `thank_you` type was RENAMED to the reusable
+  `form_confirmation` (ThankYou.astro → FormConfirmation.astro, thank-you.ts →
+  form-confirmation.ts; the `?form=` swap script is unchanged). It was already
+  fully data-driven — this makes the palette name honest. **Renders
+  byte-identically** (build-diff: /thank-you unchanged). The route `/thank-you`
+  and the `?form=` post targets are untouched.
+- Seeds: `scripts/lib/pages-forms-seed-data.mjs` (page_contact + page_thank_you,
+  both `standard`, sections inline). Exports regenerated via the driver.
+- Gates: **969/969 tests**, astro check 0 errors, build OK, build-diff = exactly
+  1 scoped change (/contact), reviewed. Local round-trip proven for both pages.
+
+**Status: page_contact + page_thank_you are RENDERS (decomposed, local proof),
+not CONVERTED** — production store records land with the batched credentialed
+run (`--seeds scripts/lib/pages-forms-seed-data.mjs`). Sixteen converted objects
+unchanged. Remaining waves: W3 taxonomy (Wolf's decision), W4 site, W5+ pages.
+
 ## Session 2026-07-11 B (W2.5 SHIPPED: templates activated — instantiate verb + 3 starter recipes)
 
 Wolf confirmed the two understandings (the MCP edit surface varies per

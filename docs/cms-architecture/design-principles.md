@@ -91,12 +91,13 @@ The resolution of the flexibility-vs-strict-rules tension for specialty pages �
   `query` source; 2026-07-10 removed `static` from the schema entirely — the
   sanctioned `cards` source of curated copy cells replaced it, and BOTH homepage
   grids are now shared `content_grid` objects — one type, two roles by config.)_
-- **Bespoke section types (`about`, `contact`, `thank_you`)** — these are the
-  Rule 1 anti-pattern: each renders exactly one page. They were an expedient
-  migration. **Do not mint more of them.** Prefer generalizing into reusable
-  building blocks (e.g. a configurable "prose page", "widget stack", "feature grid",
-  "form" an agent composes). Refactoring the existing three is optional cleanup;
-  **not** repeating the pattern is mandatory.
+- **Bespoke section types (`about`, `contact`, `thank_you`)** — these were the
+  Rule 1 anti-pattern: each rendered exactly one page. **All three are now gone
+  (as of 2026-07-11):** `about` (2026-07-10) and `contact` (2026-07-11) were
+  decomposed into reusable sections (`bio`/`prose`/`cta_banner`; `lede`/
+  `contact_form`/`content_grid`), and `thank_you` was renamed to the reusable
+  `form_confirmation`. The palette is fully generic. **Do not mint more per-page
+  types** — this rule stands for every future page.
 - **Remaining page migrations (`pricing`, `services`, `shop-preview`)** — build them
   from **reusable** components an agent can reconfigure, not new per-page types.
   Accept a non-empty `build-diff` when the flexible result is intentionally not
