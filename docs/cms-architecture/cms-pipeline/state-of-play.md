@@ -7,6 +7,30 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 F (tax_drlurie CONVERTED — object #30; taxonomy registry live in production)
+
+Wolf ran the credentialed taxonomy command; single all-green run: ensure
+(created) → drill (all 5 term ops: add/update/deprecate/reactivate/remove,
+byte-identical) → validate → published → contract 5/5 → inventory →
+`released:true` (one transient `build_not_confirmed_live` poll, then confirmed).
+Export commit `627fa8d` on main; byte-verified store === seed === export
+(5 categories + 26 tags, mint-convention ids). All five criteria met → flipped
+🟢 CONVERTED across inventory / conversion-map / reality lines.
+
+**Converted count: 29 → 30.** The taxonomy registry is now live: the store
+validation context wires `resolveTaxonomyTerm` automatically, so `content_grid`
+query terms validate against the real curated vocabulary in production from
+this moment.
+
+**Open next (Wolf's call pending on the design fork):** step 2 — the bounded
+publish-article enforcement hook + one-time frontmatter normalization of the
+93 posts via the committed `RAW_TO_CANONICAL` map. Fork presented to Wolf:
+normalize frontmatter to canonical SLUGS per §5.5 + teach the blog renderer to
+look up display labels from the registry (recommended — labels become
+registry-governed), or normalize to canonical LABELS (zero renderer change,
+display strings stay in frontmatter). Awaiting his pick before writing the
+sanctioned publish-article exception.
+
 ## Session 2026-07-11 E (W3 DECIDED + SEEDED: tax_drlurie — curated agent-editable vocabulary)
 
 **The taxonomy checkpoint is answered.** Wolf first proposed converting the whole
