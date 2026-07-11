@@ -7,6 +7,37 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-10 G (W1 batch: 5 lede + 3 system pages seeded for conversion)
+
+Wolf: do the next low-question conversions. The cleanest batch is the 8
+interior + system pages — all already thin `PageObjectRenderer` loaders with
+committed single-section exports (no restructure needed, unlike home/about):
+
+- **One combined seed module** `scripts/lib/pages-interior-seed-data.mjs`
+  (`SEED_SITE` + `CONVERSION_SEEDS`, 8 `page` entries): the 5 `lede` bodies
+  reused verbatim from `page-lede-family-seed-data.mjs`, the 3 `system` bodies
+  (privacy/terms `prose`, 404 `cta_banner`) inlined verbatim from their
+  committed exports (the large legal copy taken exactly, not re-transcribed).
+  page_newsletter stays a plain `lede` (Wolf's D2 choice; the shared newsletter
+  section can be added later).
+- **No rendering change**: these pages already render from committed exports, so
+  the conversion adds only the store-backed + round-trip half. The PR is just
+  the seed module + test; the 8 seed bodies byte-match the committed exports
+  (materialized exports reverted as marker-only churn).
+- **Gates:** astro check 0 errors; 899 netlify/src + 37 scripts tests green (3
+  new); build green (202 pages); dist grep confirms all 8 render; local
+  `--seeds pages-interior` round-trip all-green (every page drilled all 6
+  permitted ops via the inline-section probe).
+
+**Status: RENDERS, not yet CONVERTED** — the credentialed
+`node scripts/home-conversion-roundtrip.mjs --production --release --seeds
+scripts/lib/pages-interior-seed-data.mjs` run creates the 8 store records and
+proves the production round-trip (criteria 2/3). After it, 10 pages are
+converted (home, about, + these 8), leaving only contact + thank_you.
+
+Separately queued (Wolf's D1 = yes): retire the now-orphaned bespoke `about`
+section TYPE in its own focused PR.
+
 ## Session 2026-07-10 F (/about DECOMPOSED into 8 generic objects; bio gains a portrait; driver handles all-shared_ref pages)
 
 Wolf: "convert the about page — the objects on it should each be their own

@@ -58,8 +58,9 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   │     portraitAssetRef (unused → MEDIA) · anchor
 │   │   └── s_newsletter ─ shared_ref → sec_newsletter_signup 🟢
 │   │
-│   ├── LEDE FAMILY ─ 5 interior pages ─ 🟣 RENDERS ─ priority W1 (easiest: code + exports
-│   │   │   done; only store records + round-trip missing — one seed module + one driver run)
+│   ├── LEDE FAMILY ─ 5 interior pages ─ 🟣 RENDERS ─ priority W1 — SEEDED 2026-07-10
+│   │   │   (scripts/lib/pages-interior-seed-data.mjs; local round-trip proven; awaits the
+│   │   │   credentialed run). page_newsletter is a plain lede (shared newsletter section optional later).
 │   │   ├── page_start_here ─ /start-here ─ [lede]
 │   │   ├── page_member_updates ─ /member-updates ─ [lede]
 │   │   ├── page_newsletter ─ /newsletter ─ [lede]   (candidate: + shared_ref → sec_newsletter_signup)
@@ -67,7 +68,8 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   └── page_early_access ─ /solutions/early-access ─ [lede]
 │   │         lede attributes: kicker · heading · body(rich) · actions[] · anchor
 │   │
-│   ├── SYSTEM PAGES ─ 🟣 RENDERS ─ priority W1 (same shape of work as the lede family)
+│   ├── SYSTEM PAGES ─ 🟣 RENDERS ─ priority W1 — SEEDED 2026-07-10 (same combined batch +
+│   │   │   driver run as the lede family; local round-trip proven; awaits the credentialed run)
 │   │   ├── page_privacy ─ /privacy ─ [prose]   prose: body (p/h2/h3/ul/ol allowlist)
 │   │   ├── page_terms ─ /terms ─ [prose]
 │   │   └── page_404 ─ /404 ─ [cta_banner]   cta_banner: heading · body · actions[]
