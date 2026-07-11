@@ -7,6 +7,27 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 K (object-page catch-all: agent-CREATED pages are now live end-to-end — B1 closed)
+
+The last plumbing between "agent creates a page" and "that page is on the
+site": every converted page had a hand-written one-line loader file, so a NEW
+page object published + released was store-backed but unreachable. Now
+`src/pages/[...objectPage].astro` serves any published Page object whose route
+no file owns, via the standard PageObjectRenderer. Ownership rules are pure +
+unit-tested (`src/utils/object-page-routes.ts`): file routes always win (the
+12 converted pages emit nothing here), article permalinks and the reserved
+path families (blog list/category/tag bases from config.yaml per B2,
+learn/topics, admin) are refused — and every refusal is a loud build-log
+warning naming the object, never a silent drop. Route collisions between page
+objects are already blocked live at validation (`isRouteTaken`).
+
+Proof: a temp probe export at `/rt-probe-page` built and served (168th page,
+site-object titleTemplate applied) then removed. Gates: astro 0 errors ·
+999/999 tests (5 new, incl. "the real committed exports emit ZERO paths
+today") · build OK · **build-diff EMPTY**. The full agentic loop is now:
+instantiate/create → patch → validate → publish → release → **live at its
+route** — no code change per page.
+
 ## Session 2026-07-11 J (W4 CONVERTED: site_drlurie is object #31 — after a production credentials outage)
 
 Wolf's credentialed run went green after three failed attempts whose root cause
