@@ -20,16 +20,15 @@ five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.
 
 Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
 X passes all five); **after every session, update the documentation** (no written record
-= not converted). Reality as of 2026-07-11: **twenty-nine objects converted** — the 3 nav
+= not converted). Reality as of 2026-07-11: **thirty objects converted** — the 3 nav
 objects, all 12 page objects (home + about + 8 W1 interior/system pages + page_contact +
-page_thank_you), the 12 shared sections under home/about, and the 3 templates. The whole
-page + template backlog landed in one batched credentialed `convert-pending-production.sh`
-run on 2026-07-11 (store-backed, round-tripped, published, released); no page renders from an
-unbacked export anymore. The section-type palette is fully generic (`about`/`contact`
-decomposed, `thank_you`→`form_confirmation`). `tax_drlurie` is SEEDED (W3, Wolf's decision:
-curated agent-editable vocabulary) awaiting its credentialed run. Still TODO: the `site`
-singleton (W4), the bounded publish-article taxonomy-enforcement hook, and the W5+
-hand-coded pages.
+page_thank_you), the 12 shared sections under home/about, the 3 templates, and the
+`tax_drlurie` taxonomy registry (curated agent-editable vocabulary; resolveTaxonomyTerm is
+live). All proven by credentialed runs on 2026-07-11; no page renders from an unbacked
+export anymore. The section-type palette is fully generic (`about`/`contact` decomposed,
+`thank_you`→`form_confirmation`). Still TODO: the `site` singleton (W4), the bounded
+publish-article taxonomy-enforcement hook + frontmatter normalization (display-fork
+decision pending with Wolf), and the W5+ hand-coded pages.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

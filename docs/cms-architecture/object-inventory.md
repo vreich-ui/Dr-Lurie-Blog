@@ -49,15 +49,16 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-11, twenty-nine objects are CONVERTED** (all via credentialed
+**As of 2026-07-11, thirty objects are CONVERTED** (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
 `sec_home_start_grid`, `sec_newsletter_signup`); the /about family (`page_about` +
 `sec_about_intro`/`_thinking`/`_products`/`_science`/`_research`/`_blog`/`_note`/`_cta`);
-**all 8 W1 interior/system pages + `page_contact` + `page_thank_you`; and the 3
-templates (`tpl_interior`/`tpl_landing`/`tpl_legal`)** — the whole page + template
-backlog landed in one batched credentialed run on 2026-07-11. **All 12 page objects
+**all 8 W1 interior/system pages + `page_contact` + `page_thank_you`; the 3
+templates (`tpl_interior`/`tpl_landing`/`tpl_legal`); and the `tax_drlurie`
+taxonomy registry** — the page + template backlog landed in one batched
+credentialed run on 2026-07-11, the taxonomy in its own run the same day. **All 12 page objects
 are converted; no page renders from an unbacked export anymore** — the rendered-stub
 backlog is empty. See "Why only nav is converted" (historical root-cause analysis)
 at the bottom.
@@ -167,16 +168,17 @@ reported "already matches the seed" → store === seed === export).
 still lives in `src/config.yaml` (and is what actually drives rendering);
 building the real `site` object is **MVP TODO #2**.
 
-🟣 **`tax_drlurie` is SEEDED (W3, 2026-07-11)** — Wolf's decision: a curated,
+🟢 **`tax_drlurie` is CONVERTED (W3, 2026-07-11)** — Wolf's decision: a curated,
 agent-editable vocabulary (5 categories + 26 tags distilled from the drifted
 frontmatter of 93 posts; approved canonical list + raw→canonical mapping in
-`scripts/lib/taxonomy-seed-data.mjs`). Drilled locally (all 5 term ops
-byte-identical, contract 5/5); export committed (`src/data/site/taxonomy.json`);
-store record pending the credentialed run. Object-side consumers activate
-automatically once the record exists (the validation context wires
-`resolveTaxonomyTerm`, so `content_grid` query terms validate live). Article
-frontmatter remains the article-side input until the bounded publish-article
-enforcement hook (step 2) lands.
+`scripts/lib/taxonomy-seed-data.mjs`). **All five criteria met by the
+credentialed run 2026-07-11**: store-backed in production, every permitted term
+op round-tripped (add/update/deprecate/reactivate/remove), published, released
+(`released:true`; export commit `627fa8d`, store === seed === export). Its first
+consumer is live automatically: the validation context wires
+`resolveTaxonomyTerm`, so `content_grid` query terms now validate against the
+real registry. Article frontmatter remains the article-side input until the
+bounded publish-article enforcement hook (step 2) lands.
 
 **Templates were ACTIVATED + CONVERTED 2026-07-11 (W2.5)** — design-principles
 rule 5 ("templates are recipes; PageTypes are law"). The `object_instantiate_template`
@@ -220,11 +222,11 @@ Replace `src/config.yaml` as the source of truth with a real `site_drlurie` obje
 (brand tokens, logo, chrome toggles, blog paths, default navigation) **and wire the
 layout to render from it**. This is what makes global site settings agent-editable.
 
-### 3. Real `taxonomy` object 🟣 SEEDED (decision made 2026-07-11)
+### 3. Real `taxonomy` object 🟢 CONVERTED (2026-07-11)
 
 **Wolf decided: curated agent-editable vocabulary** (not a read-only mirror, not
-a full article-pipeline cutover). `tax_drlurie` is seeded from the approved
-canonical list and drilled locally — see "Singletons & templates" above.
+a full article-pipeline cutover). `tax_drlurie` converted via the credentialed
+run — see "Singletons & templates" above.
 Remaining for full §5.5: **step 2, the bounded publish-article enforcement hook**
 (a sanctioned additive exception to the off-limits rule: resolve article terms
 against the registry at publish time, following `merged_into` aliases) plus a

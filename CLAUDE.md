@@ -25,19 +25,20 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-11: **twenty-nine objects are converted** — the 3 nav
+- Reality as of 2026-07-11: **thirty objects are converted** — the 3 nav
   objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
-  page_contact + page_thank_you), the 12 shared sections under home/about, and
-  the 3 templates (tpl_interior/landing/legal). The whole page + template backlog
-  landed in one batched credentialed `convert-pending-production.sh` run on
-  2026-07-11 (store-backed, round-tripped, published, released). **No page renders
-  from an unbacked export anymore — the rendered-stub backlog is empty.** The
+  page_contact + page_thank_you), the 12 shared sections under home/about, the
+  3 templates (tpl_interior/landing/legal), and the `tax_drlurie` taxonomy
+  registry (W3 — Wolf's decision: curated agent-editable vocabulary, 5
+  categories + 26 tags; `resolveTaxonomyTerm` is live, so content_grid query
+  terms validate against the real registry). All proven by credentialed
+  `--production --release` runs on 2026-07-11. **No page renders from an
+  unbacked export anymore — the rendered-stub backlog is empty.** The
   section-type palette is fully generic (no bespoke per-page types: `about`/
-  `contact` decomposed, `thank_you` → `form_confirmation`). `tax_drlurie` is
-  SEEDED (W3 — Wolf's decision: curated agent-editable vocabulary) awaiting its
-  credentialed run. Still TODO: the `site` singleton (W4), the bounded
-  publish-article taxonomy-enforcement hook (a sanctioned additive exception),
-  and the W5+ hand-coded pages.
+  `contact` decomposed, `thank_you` → `form_confirmation`). Still TODO: the
+  `site` singleton (W4), the bounded publish-article taxonomy-enforcement hook
+  + frontmatter normalization (a sanctioned additive exception; display-fork
+  decision pending with Wolf), and the W5+ hand-coded pages.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
