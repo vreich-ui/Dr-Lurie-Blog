@@ -105,6 +105,17 @@ tsconfig.test.json`):
    confirms `released: true`. Idempotent — safe to re-run. If any permitted
    action has no tool or no `object_contract` entry (criterion 4), **build it —
    that is part of this conversion**, not a follow-up.
+
+   **Batching the whole backlog in one run + one deploy.** When several families
+   are seeded and awaiting the run, aggregate them into one combined seed module
+   and convert them in a single invocation (one `--release` = one Netlify deploy
+   for everything), instead of one command per family. The standing example is
+   `scripts/lib/pending-conversion-seeds.mjs` (re-exports the W1 pages + W2.5
+   templates + W2 form pages), wrapped by a preflighted one-liner:
+   `./scripts/convert-pending-production.sh` (`--verify-only` first for a safe
+   dry check; the driver drills page + template families in the same run and
+   proves each template's instantiation with a `dry_run`). As each family
+   converts for real, drop it from the combined module.
 9. **Flip the record**: with the all-green run output in hand, flip the
    object's marks to 🟢 CONVERTED (`object-inventory.md`, `conversion-map.md`,
    the reality lines in `CLAUDE.md`/`AGENTS.md`/this file) and log the run in
