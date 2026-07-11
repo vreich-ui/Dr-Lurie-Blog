@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-10T15:45:23.406Z",
+    "at": "2026-07-11T18:44:04.612Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 74
+    "record_version": 80
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -14,7 +14,7 @@
       "data": {
         "actions": [
           {
-            "label": "Get the Free Guide",
+            "label": "Get the Bright Guide",
             "style": "primary",
             "target": {
               "href": "/guides/free-guide",
@@ -22,17 +22,17 @@
             }
           },
           {
-            "label": "Start Here",
-            "style": "secondary",
+            "label": "Explore First",
+            "style": "link",
             "target": {
               "href": "/start-here",
               "kind": "route"
             }
           }
         ],
-        "body": "<p>Most beginners are pushed toward more products before they understand what their skin is actually asking for. That is how simple routines become expensive, confusing, and hard to trust.</p><p>Dr. Lurié Skin Care gives you a physician-led starting point: learn the basics, choose one clear next step, and build confidence before you buy more.</p>",
-        "heading": "Stop buying skincare advice. Start understanding your skin.",
-        "kicker": "For skincare beginners who are tired of guessing"
+        "body": "<p>Most beginners are pushed toward more products before they understand what their skin is actually asking for. This test gives the home page a brighter first impression while keeping the same steady educational promise.</p><p>Dr. Lurié Skin Care still gives you a physician-led starting point: learn the basics, choose one clear next step, and build confidence before you buy more.</p>",
+        "heading": "A calmer skin-care start, with a brighter visual cue.",
+        "kicker": "Fresh visual test for skincare beginners"
       },
       "id": "s_hero",
       "type": "hero"
@@ -54,14 +54,14 @@
     {
       "data": {
         "anchor": "about",
-        "body": "<p>Dr. Lurié brings medical training, biophysics, and pharmaceutical research experience to skin health education. The goal is not to sell a complicated routine. It is to help you understand what matters first.</p>",
+        "body": "<p>Dr. Lurié brings medical training, biophysics, and pharmaceutical research experience to skin health education. This visible test gives the biography block a slightly more editorial rhythm without changing its purpose.</p>",
         "disclaimer": "Educational content only. Not medical advice.",
-        "heading": "A physician-scientist perspective, without the product noise.",
-        "kicker": "Why listen",
+        "heading": "Science-led guidance, set off with a clearer accent.",
+        "kicker": "Clinician context",
         "trustNotes": [
           "Physician-led education for people who want clearer skin-health decisions.",
           "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
-          "Beginner-friendly explanations that separate durable principles from trend-driven claims."
+          "Beginner-friendly explanations with a stronger visual accent for this field test."
         ]
       },
       "id": "s_bio",
@@ -70,9 +70,9 @@
     {
       "data": {
         "anchor": "choose-next-step",
-        "body": "<p>Magnetic Marketing principle: meet the reader inside the problem they already feel, then give them one obvious next action.</p>",
-        "heading": "Start with the problem you recognize most.",
-        "kicker": "Choose your next step",
+        "body": "<p>This test varies the card button treatments so the page has more visible hierarchy.</p>",
+        "heading": "Three routes, three visual weights.",
+        "kicker": "Choose a clear path",
         "limit": 3,
         "source": {
           "cards": [
@@ -86,19 +86,19 @@
                   "kind": "route"
                 }
               },
-              "title": "I do not know what my skin needs."
+              "title": "Start with one simple routine question."
             },
             {
               "description": "Read the education library to understand the basics behind claims, routines, and results.",
               "link": {
-                "label": "Browse the Library",
-                "style": "secondary",
+                "label": "Browse Library",
+                "style": "link",
                 "target": {
                   "kind": "listing",
                   "list": "content_index"
                 }
               },
-              "title": "I keep buying products and still feel unsure."
+              "title": "Compare claims with calmer context."
             },
             {
               "description": "Use the newsletter as the low-pressure follow-up path for short, clear skin-health education.",
@@ -110,7 +110,7 @@
                   "kind": "route"
                 }
               },
-              "title": "I want calm guidance I can return to."
+              "title": "Get the next step by email."
             }
           ],
           "kind": "cards"
