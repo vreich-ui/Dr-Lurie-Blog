@@ -7,6 +7,34 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 A (ARCHITECTURE DECISION: templates are recipes, PageTypes are law)
+
+Wolf posed the standing tension directly — flexibility (generic components,
+agent responsibility) vs strict rules (encoded per set page) — and proposed:
+generic objects only + a template per specialty page. Repo survey confirmed the
+template machinery is BUILT and dormant (template.v1 schema with
+slots/allowed/required/repeatable/blueprint, 4 patch ops, validation,
+materializer — but zero instances and NO instantiate flow; deferred to P6 by
+the original plan). **Decision (Wolf): adopt the sharpened form — recipes + law
+split** (now design-principles.md rule 5, GOVERNING):
+
+- Palette stays generic-only and grows ON DEMAND (Wolf's second choice — no
+  speculative upfront library).
+- Templates = data recipes, agent-editable, creation-time COPY + provenance
+  only (D§3.6 stands; live inheritance explicitly rejected — the propagation
+  trap).
+- PageTypes (code registry + validation criteria) remain the only enforced
+  structural law. Behavior stays in generic components, never templates.
+- PageType-as-data (OQ-4) considered and deferred: guardrails must not become
+  agent-mutable unless agents should invent page _kinds_.
+
+**Implementation queued as W2.5 in the map** (~1–2 sessions, net-new):
+`instantiate_template` MCP verb (copy slot blueprints → new page body, stamp
+`page.template`), a starter recipe set (tpl_interior / tpl_landing /
+tpl_legal), a template drill in the round-trip driver, contract surfacing,
+docs. Remaining W2 (contact/thank_you) now explicitly decomposes into generic
+types per rule 5 — the last two bespoke types retire with it.
+
 ## Session 2026-07-10 G (W1 batch: 5 lede + 3 system pages seeded for conversion)
 
 Wolf: do the next low-question conversions. The cleanest batch is the 8

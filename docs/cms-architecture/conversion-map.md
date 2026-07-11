@@ -170,8 +170,16 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │     ⚠ enabler gap: the content_item RESOLVER (playbook trap 4) — until built, grids
 │       cannot use manual article curation. Small, high-leverage, priority W1-enabler.
 │
-├── TEMPLATES ─ type: template ─ 🔵 optional, not MVP ─ page blueprints (slots + allowed
-│     types + defaults); provenance only — pages never live-inherit
+├── TEMPLATES ─ type: template ─ 🔴 ADOPTED (Wolf, 2026-07-11 — design-principles rule 5:
+│     "templates are recipes; PageTypes are law") ─ priority W2.5
+│     the machinery is BUILT and dormant (template.v1 schema: name · appliesTo[pageTypes] ·
+│       slots[{slotId, allowed[], required, repeatable, blueprint}] · 4 patch ops ·
+│       validation · materializer); ZERO instances; NO instantiate flow yet
+│     to activate: an instantiate_template MCP verb (copy slot blueprints → new page body,
+│       stamp page.template provenance) + a starter recipe set (e.g. tpl_interior,
+│       tpl_landing, tpl_legal) + driver drill + docs
+│     boundary: recipes only — creation-time copy, never live-binding; PageType registry
+│       stays the enforced law; behavior stays in generic components
 │
 ├── MEDIA / ARTIFACTS ─ artifact store (images, PDFs) ─ 🔵 pipeline exists (upload/trust);
 │     refs consumed by: bio.portraitAssetRef · about.portrait · product cards · article images
@@ -204,7 +212,8 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
 | W1         | Lede family (5 pages) + system pages (3 pages)                                                                                                     | Everything but the store record already exists; pure driver work, proves the factory | S    |
 | W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
-| W2         | about / contact / thank-you pages                                                                                                                  | Rendered stubs today; convertible as-is (keep bespoke types; generalize later/never) | S    |
+| W2         | contact / thank-you pages (about is DONE) — decompose into generic types per rule 5                                                                | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
+| W2.5       | Activate templates as recipes: `instantiate_template` verb + starter recipe set (design-principles rule 5)                                         | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | Taxonomy singleton — **after Wolf's source-of-truth decision**                                                                                     | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
 | W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
