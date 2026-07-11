@@ -20,13 +20,14 @@ five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.
 
 Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
 X passes all five); **after every session, update the documentation** (no written record
-= not converted). Reality as of 2026-07-10 evening: sixteen objects converted — the 3 nav objects,
-the home-page family (`page_home` + 3 shared sections), and the /about family
-(`page_about` + 8 shared sections); the other 10 page exports are rendered stubs.
-Update (2026-07-11): those 10 exports are now SEEDED at RENDERS (W1 8 pages; W2 /contact +
-/thank-you decomposed) plus 3 seeded templates (W2.5), all awaiting one batched credentialed run;
-the section-type palette is now fully generic (last bespoke types `about`/`contact` decomposed,
-`thank_you`→`form_confirmation`). Converted count stays sixteen until that run.
+= not converted). Reality as of 2026-07-11: **twenty-nine objects converted** — the 3 nav
+objects, all 12 page objects (home + about + 8 W1 interior/system pages + page_contact +
+page_thank_you), the 12 shared sections under home/about, and the 3 templates. The whole
+page + template backlog landed in one batched credentialed `convert-pending-production.sh`
+run on 2026-07-11 (store-backed, round-tripped, published, released); no page renders from an
+unbacked export anymore. The section-type palette is fully generic (`about`/`contact`
+decomposed, `thank_you`→`form_confirmation`). Still TODO: the `site`/`taxonomy` singletons
+(W3/W4) and the W5+ hand-coded pages.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

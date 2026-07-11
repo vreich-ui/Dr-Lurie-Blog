@@ -39,15 +39,17 @@ credit:
 > passes all five. Rendering-only work must be labelled "rendered, not converted"
 > — never "done."
 
-**Current reality check (be honest about it):** as of 2026-07-10 evening,
-sixteen objects are converted: the three navigation objects, the home-page
-family (`page_home` + 3 shared sections), and the /about family (`page_about`
-
-- 8 shared sections) — all proven end-to-end by credentialed
-  `scripts/home-conversion-roundtrip.mjs --production --release` runs
-  (store-backed, every permitted op round-tripped, published, released). The
-  other 10 page exports render but are **rendered stubs**, not converted objects
-  (see [`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
+**Current reality check (be honest about it):** as of 2026-07-11,
+**twenty-nine objects are converted**: the three navigation objects, all twelve
+page objects (home + about + the 8 W1 interior/system pages + page_contact +
+page_thank_you), the twelve shared sections under home/about, and the three
+templates — all proven end-to-end by credentialed
+`scripts/home-conversion-roundtrip.mjs --production --release` runs (store-backed,
+every permitted op round-tripped, published, released; the whole page + template
+backlog landed in one batched run on 2026-07-11). **No page renders from an
+unbacked export anymore — the rendered-stub backlog is empty.** Still TODO: the
+`site` / `taxonomy` singletons (W3/W4) and the W5+ hand-coded pages (see
+[`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
 
 ## The recipe — the conversion factory (proven end-to-end on the home page, 2026-07-10)
 
@@ -106,16 +108,20 @@ tsconfig.test.json`):
    action has no tool or no `object_contract` entry (criterion 4), **build it —
    that is part of this conversion**, not a follow-up.
 
-   **Batching the whole backlog in one run + one deploy.** When several families
-   are seeded and awaiting the run, aggregate them into one combined seed module
-   and convert them in a single invocation (one `--release` = one Netlify deploy
-   for everything), instead of one command per family. The standing example is
-   `scripts/lib/pending-conversion-seeds.mjs` (re-exports the W1 pages + W2.5
-   templates + W2 form pages), wrapped by a preflighted one-liner:
-   `./scripts/convert-pending-production.sh` (`--verify-only` first for a safe
-   dry check; the driver drills page + template families in the same run and
-   proves each template's instantiation with a `dry_run`). As each family
-   converts for real, drop it from the combined module.
+   **Batching the whole backlog in one run + one deploy (the pattern).** When
+   several families are seeded and awaiting the run, aggregate them into one
+   throwaway combined seed module (`scripts/lib/pending-conversion-seeds.mjs`)
+   that re-exports the union of each family's `CONVERSION_SEEDS` + a shared
+   `SEED_SITE`, and convert them in a single driver invocation — one `--release`
+   = one Netlify deploy for everything, instead of one command per family. Wrap
+   it with a preflighted one-liner (`scripts/convert-pending-production.sh`:
+   require `PUBLISH_SECRET`, run `--verify-only` first for a safe dry check, then
+   the real `--production --release`). The driver drills page + template families
+   in the same run and proves each template's instantiation with a `dry_run`.
+   **Retire the combined module + wrapper once the backlog is empty** (they are
+   single-batch tooling) — the 2026-07-11 batch converted 13 objects (8 W1 pages
+   + 3 W2.5 templates + 2 W2 form pages) exactly this way and its harness was
+   then removed. Recreate a fresh one for the next wave.
 9. **Flip the record**: with the all-green run output in hand, flip the
    object's marks to 🟢 CONVERTED (`object-inventory.md`, `conversion-map.md`,
    the reality lines in `CLAUDE.md`/`AGENTS.md`/this file) and log the run in

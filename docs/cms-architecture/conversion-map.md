@@ -58,9 +58,9 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   │     portraitAssetRef (unused → MEDIA) · anchor
 │   │   └── s_newsletter ─ shared_ref → sec_newsletter_signup 🟢
 │   │
-│   ├── LEDE FAMILY ─ 5 interior pages ─ 🟣 RENDERS ─ priority W1 — SEEDED 2026-07-10
-│   │   │   (scripts/lib/pages-interior-seed-data.mjs; local round-trip proven; awaits the
-│   │   │   credentialed run). page_newsletter is a plain lede (shared newsletter section optional later).
+│   ├── LEDE FAMILY ─ 5 interior pages ─ 🟢 CONVERTED (W1, batched run 2026-07-11)
+│   │   │   (scripts/lib/pages-interior-seed-data.mjs; store-backed, round-tripped, published,
+│   │   │   released). page_newsletter is a plain lede (shared newsletter section optional later).
 │   │   ├── page_start_here ─ /start-here ─ [lede]
 │   │   ├── page_member_updates ─ /member-updates ─ [lede]
 │   │   ├── page_newsletter ─ /newsletter ─ [lede]   (candidate: + shared_ref → sec_newsletter_signup)
@@ -68,8 +68,8 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   └── page_early_access ─ /solutions/early-access ─ [lede]
 │   │         lede attributes: kicker · heading · body(rich) · actions[] · anchor
 │   │
-│   ├── SYSTEM PAGES ─ 🟣 RENDERS ─ priority W1 — SEEDED 2026-07-10 (same combined batch +
-│   │   │   driver run as the lede family; local round-trip proven; awaits the credentialed run)
+│   ├── SYSTEM PAGES ─ 🟢 CONVERTED (W1, batched run 2026-07-11) (same combined batch +
+│   │   │   driver run as the lede family; store-backed, round-tripped, published, released)
 │   │   ├── page_privacy ─ /privacy ─ [prose]   prose: body (p/h2/h3/ul/ol allowlist)
 │   │   ├── page_terms ─ /terms ─ [prose]
 │   │   └── page_404 ─ /404 ─ [cta_banner]   cta_banner: heading · body · actions[]
@@ -87,7 +87,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │   │   ├── s_note ─ shared_ref → sec_about_note 🟢 ─ prose
 │   │   └── s_cta ─ shared_ref → sec_about_cta 🟢 ─ cta_banner (heading + body + actions)
 │   │
-│   ├── FORM PAGES ─ 🟡 DECOMPOSED (W2, 2026-07-11) — seeded, production run pending.
+│   ├── FORM PAGES ─ 🟢 CONVERTED (W2, batched run 2026-07-11) — store-backed, published, released.
 │   │   │   All three bespoke per-page section types are now retired: the palette is
 │   │   │   fully generic (design-principles rule 1 satisfied).
 │   │   ├── page_contact ─ /contact ─ decomposed into 3 inline GENERIC sections:
@@ -176,7 +176,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │     ⚠ enabler gap: the content_item RESOLVER (playbook trap 4) — until built, grids
 │       cannot use manual article curation. Small, high-leverage, priority W1-enabler.
 │
-├── TEMPLATES ─ type: template ─ 🟡 ACTIVATED (W2.5, 2026-07-11) — seeded, production run pending
+├── TEMPLATES ─ type: template ─ 🟢 CONVERTED (W2.5, batched run 2026-07-11)
 │     machinery LIVE end-to-end: template.v1 schema (name · appliesTo[pageTypes] ·
 │       slots[{slotId, allowed[], required, repeatable, blueprint}]) · 4 patch ops ·
 │       validation · materializer · the `object_instantiate_template` MCP tool
@@ -188,9 +188,8 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │     ├── tpl_landing  ─ standard ─ hero + curated card grid + cta (campaign shape)
 │     └── tpl_legal    ─ system   ─ one required blueprint-less prose slot (exercises
 │           the defaultData fallback)
-│     seeds: scripts/lib/templates-seed-data.mjs · drilled locally end-to-end (all 4 ops
-│       + instantiate dry_run per recipe) · exports committed · production credentialed
-│       run PENDING (batched with the postponed W1 run)
+│     seeds: scripts/lib/templates-seed-data.mjs · store-backed in production (all 4 ops
+│       round-tripped + instantiate dry_run per recipe) · published · released 2026-07-11
 │     boundary: recipes only — creation-time copy, never live-binding; PageType registry
 │       stays the enforced law; behavior stays in generic components
 │
@@ -223,10 +222,10 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 
 | Wave       | What                                                                                                                                               | Why this order                                                                       | Size |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
-| W1         | Lede family (5 pages) + system pages (3 pages)                                                                                                     | Everything but the store record already exists; pure driver work, proves the factory | S    |
+| W1         | ✅ CONVERTED (batched run 2026-07-11): Lede family (5 pages) + system pages (3 pages) — store-backed, published, released                          | Everything but the store record already exists; pure driver work, proves the factory | S    |
 | W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
-| W2         | ✅ DONE (code + seeds, 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone — production run batched | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
-| W2.5       | ✅ DONE (code + seeds, 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, drilled locally — production run batched with W1        | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
+| W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
+| W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                          | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | Taxonomy singleton — **after Wolf's source-of-truth decision**                                                                                     | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
 | W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
