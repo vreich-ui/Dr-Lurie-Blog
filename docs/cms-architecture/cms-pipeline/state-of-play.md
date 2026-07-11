@@ -7,6 +7,37 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 J (W4 CONVERTED: site_drlurie is object #31 — after a production credentials outage)
+
+Wolf's credentialed run went green after three failed attempts whose root cause
+was **environment, not code**: every object verb 500'd because Netlify Blobs
+rejected the store credentials. The diagnosis chain, recorded because it will
+recur: (1) the generic 500 hides the real error — it lives in the Netlify
+function log after `Object_Store request failed.`; (2) first failure was
+`BlobsInternalError (401)` — the token env var held a non-token value (an
+all-a–p string, i.e. a clipboard/extension-ID mishap or an expired credential);
+(3) mid-repair, `MissingBlobsEnvironmentError` = siteID/token env vars absent
+entirely (the MCP function proxies object verbs in-process, so the
+platform-injected Lambda blob context never reaches the store — the explicit
+env vars do ALL the work); (4) the release path can still report green while
+blobs are down (deploys API tolerates things blobs does not — including the
+site NAME where blobs requires the UUID), so a green release proves nothing
+about store health. **The 5-second local probe that isolates it** (run from the
+repo, no redeploys): `getStore({name:'site-objects', siteID:<UUID>,
+token:<PAT>}).list(...)` via `node --input-type=module`. Fix: fresh `nfp_` PAT
+in `NETLIFY_AUTH_TOKEN` (no separate `NETLIFY_BLOBS_TOKEN` — one live token,
+both paths fall back to it), `NETLIFY_SITE_ID` = the site UUID, redeploy.
+TODO(nice-to-have): expose `getCoreBlobStoreSourceDiagnostics` as a read-only
+`blob_store_diagnostics` MCP tool.
+
+The run itself: create → `set_site_fields` drill byte-identical → validate →
+publish → contract (1 op ≡ exercised) → inventory → release `released:true`.
+Export commit `a20f107` (`Publish site: site_drlurie [skip netlify]`);
+**store === seed === export byte-verified** post-release. `site_drlurie` is
+🟢 CONVERTED — **31 objects converted**; the layout renders chrome/brand/
+metadata/default-nav from the store-backed object with `set_site_fields` as
+the agent's lever.
+
 ## Session 2026-07-11 I (W4 BUILT + WIRED: the site singleton renders the chrome — pending credentialed run)
 
 Wolf's W4 answers locked the scope (B1 autonomous publish; B2 urls/blog carried

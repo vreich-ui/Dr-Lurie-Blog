@@ -163,21 +163,24 @@ reported "already matches the seed" → store === seed === export).
 
 ### Singletons & templates
 
-🟣 **`site_drlurie` RENDERS (W4, built + wired 2026-07-11; pending the
-credentialed run to be CONVERTED).** Seed `scripts/lib/site-seed-data.mjs`
+🟢 **`site_drlurie` is CONVERTED (W4, credentialed run 2026-07-11)** — all five
+criteria: store-backed in production (create + publish + release
+`released:true`; export commit `a20f107`, **store === seed === export
+byte-verified**), `set_site_fields` (the type's only op) round-tripped, contract
+advertised ≡ exercised, recorded here. Seed `scripts/lib/site-seed-data.mjs`
 (byte-identical transcription of the previously hardcoded values), export
-`src/data/site/site.json`, driver drills `set_site_fields` (the type's only
-op). **LIVE from the object** (pre-conversion literals as fallback when the
-export is absent — `src/utils/site-object.ts`, a deliberately synchronous
-eager-glob loader so component evaluation order is unchanged): brandTokens
-(every CustomStyles custom property, light + `dark:` keys) · logo.text ·
-chrome{showRssFeed, showThemeToggle} · metadataDefaults (title template,
-description, ogImage, twitter handle, og site_name) · defaultNavigation
-{header, footer}. **CARRIED but config.yaml stays authoritative for routing**
-(Wolf B2): urls · blog{listPath, postsPerPage, categoryBase, tagBase} —
-permalink wiring is a later cutover. NOT in the object: i18n · ui.theme ·
-analytics · googleSiteVerificationId; chrome.announcement deferred (Wolf B3).
-(The field-test stubs were deleted in PR #378.)
+`src/data/site/site.json`. **LIVE from the object** (pre-conversion literals as
+fallback when the export is absent — `src/utils/site-object.ts`, a deliberately
+synchronous eager-glob loader so component evaluation order is unchanged):
+brandTokens (every CustomStyles custom property, light + `dark:` keys) ·
+logo.text · chrome{showRssFeed, showThemeToggle} · metadataDefaults (title
+template, description, ogImage, twitter handle, og site_name) ·
+defaultNavigation{header, footer}. **CARRIED but config.yaml stays
+authoritative for routing** (Wolf B2): urls · blog{listPath, postsPerPage,
+categoryBase, tagBase} — permalink wiring is a later cutover. NOT in the
+object: i18n · ui.theme · analytics · googleSiteVerificationId;
+chrome.announcement deferred (Wolf B3). (The field-test stubs were deleted in
+PR #378.)
 
 🟢 **`tax_drlurie` is CONVERTED (W3, 2026-07-11)** — Wolf's decision: a curated,
 agent-editable vocabulary (5 categories + 26 tags distilled from the drifted
@@ -231,14 +234,13 @@ isn't byte-identical.
 | `page_services`     | `/services`               | Widget-composition (`Hero`/`Content`/`Features2`/`Testimonials`/`CallToAction`). Also has link actions.                                                                                                                                        |
 | `page_shop_preview` | `/solutions/shop-preview` | Bespoke markup **+ a scoped `<style>`** → uses the functional-equivalence gate + a `known-inert-diffs.md` entry (like thank-you).                                                                                                              |
 
-### 2. Real `site` object 🟣 BUILT + WIRED (W4, 2026-07-11 — pending credentialed run)
+### 2. Real `site` object 🟢 CONVERTED (W4, credentialed run 2026-07-11)
 
-`site_drlurie` is seeded and the layout renders from it (see "Singletons &
-templates" above): brand tokens, logo text, chrome toggles, metadata defaults,
-and default navigation are agent-editable via `set_site_fields`; urls/blog are
-carried in the object while config.yaml stays authoritative for routing (Wolf
-B2, 2026-07-11). Becomes 🟢 CONVERTED after Wolf's `--production --release`
-run of the site seed module.
+`site_drlurie` is store-backed in production and the layout renders from it
+(see "Singletons & templates" above): brand tokens, logo text, chrome toggles,
+metadata defaults, and default navigation are agent-editable via
+`set_site_fields`; urls/blog are carried in the object while config.yaml stays
+authoritative for routing (Wolf B2, 2026-07-11).
 
 ### 3. Real `taxonomy` object 🟢 CONVERTED (2026-07-11)
 

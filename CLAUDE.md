@@ -25,28 +25,26 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-11: **thirty objects are converted** — the 3 nav
+- Reality as of 2026-07-11: **thirty-one objects are converted** — the 3 nav
   objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
   page_contact + page_thank_you), the 12 shared sections under home/about, the
-  3 templates (tpl_interior/landing/legal), and the `tax_drlurie` taxonomy
-  registry (W3 — Wolf's decision: curated agent-editable vocabulary, 5
-  categories + 26 tags; `resolveTaxonomyTerm` is live, so content_grid query
-  terms validate against the real registry). All proven by credentialed
-  `--production --release` runs on 2026-07-11. **No page renders from an
-  unbacked export anymore — the rendered-stub backlog is empty.** The
-  section-type palette is fully generic (no bespoke per-page types: `about`/
-  `contact` decomposed, `thank_you` → `form_confirmation`). W3 step 2 SHIPPED
-  (2026-07-11): the bounded publish-article taxonomy-enforcement hook (the
-  sanctioned additive exception — registry-gated, skips when no registry) +
-  the one-time frontmatter normalization of all 93 posts + registry display
-  labels in the blog renderer. W4 BUILT + WIRED (2026-07-11): `site_drlurie`
-  seeded (byte-identical transcription of the hardcoded values) and the layout
-  renders brandTokens/logo/chrome/metadataDefaults/defaultNavigation from its
-  export (urls/blog carried; config.yaml stays authoritative for routing —
-  Wolf B2); pending the credentialed run to count as converted (#31). The
-  28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts deleted, 18
-  real ones stamped with `published_time`; 167 pages, topics hub live). Still
-  TODO: the site credentialed run, then the W5+ hand-coded pages.
+  3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
+  registry (W3 — curated agent-editable vocabulary, 5 categories + 26 tags;
+  `resolveTaxonomyTerm` is live), and the `site_drlurie` SITE SINGLETON (W4,
+  credentialed run 2026-07-11: the layout renders brandTokens/logo/chrome/
+  metadataDefaults/defaultNavigation from its export via `set_site_fields`;
+  urls/blog carried, config.yaml stays authoritative for routing — Wolf B2).
+  All proven by credentialed `--production --release` runs on 2026-07-11.
+  **No page renders from an unbacked export anymore — the rendered-stub
+  backlog is empty.** The section-type palette is fully generic (no bespoke
+  per-page types: `about`/`contact` decomposed, `thank_you` →
+  `form_confirmation`). W3 step 2 SHIPPED (2026-07-11): the bounded
+  publish-article taxonomy-enforcement hook (the sanctioned additive exception
+  — registry-gated, skips when no registry) + the one-time frontmatter
+  normalization of all 93 posts + registry display labels in the blog
+  renderer. The 28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts
+  deleted, 18 real ones stamped with `published_time`; 167 pages, topics hub
+  live). Still TODO: the W5+ hand-coded pages (Wolf: separate session).
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

@@ -24,7 +24,7 @@
 ## The tree
 
 ```text
-site_drlurie ─ SITE SINGLETON ─ 🟣 RENDERS (W4 built + wired 2026-07-11; pending the credentialed run)
+site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07-11; export commit a20f107)
 │   the root everything hangs off; seed scripts/lib/site-seed-data.mjs → export src/data/site/site.json
 │   LIVE from the object (pre-conversion literals as fallback when the export is absent):
 │     brandTokens (every CustomStyles custom property, light + dark:` keys) · logo.text ·
@@ -244,7 +244,7 @@ site_drlurie ─ SITE SINGLETON ─ 🟣 RENDERS (W4 built + wired 2026-07-11; p
 | W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
 | W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                          | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles | Unlocks term-filtered grids, listings, topics hub                                    | M    |
-| W4         | 🟣 BUILT + WIRED (2026-07-11, pending credentialed run): site_drlurie seeded; brandTokens/logo/chrome/metadataDefaults/defaultNavigation render from the object; urls/blog carried (config.yaml authoritative for routing per B2) | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
+| W4         | ✅ CONVERTED (credentialed run 2026-07-11): site_drlurie store-backed; brandTokens/logo/chrome/metadataDefaults/defaultNavigation render from the object; urls/blog carried (config.yaml authoritative for routing per B2) | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
 | W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
 | W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                            | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
 | W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                              | Post-MVP by standing decision                                                        | L    |
