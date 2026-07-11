@@ -1,10 +1,19 @@
 {
   "__generated": {
-    "at": "2026-07-08T12:27:26.803Z",
+    "at": "2026-07-11T18:44:24.130Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 52
+    "record_version": 56
   },
-  "actions": [],
+  "actions": [
+    {
+      "label": "Get the Guide",
+      "style": "primary",
+      "target": {
+        "href": "/guides/free-guide",
+        "kind": "route"
+      }
+    }
+  ],
   "groups": [
     {
       "id": "g_start_here",
