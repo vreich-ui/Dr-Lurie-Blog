@@ -101,6 +101,18 @@ const SECTION_EDITORS = {
   thank_you: thankYouDefinition.editor,
 } as const;
 
+/**
+ * The registry editor's `defaultData` for a component-bound section type
+ * (undefined for `shared_ref`, which has no component or editor). Exported for
+ * template instantiation: a required slot without a blueprint falls back to its
+ * first allowed type's defaultData — the exact promise the `template_required`
+ * warning makes ("registry defaultData may supply it").
+ */
+export const sectionEditorDefaultData = (type: SectionType): Record<string, unknown> | undefined =>
+  type in SECTION_EDITORS
+    ? (SECTION_EDITORS[type as keyof typeof SECTION_EDITORS].defaultData as Record<string, unknown>)
+    : undefined;
+
 export type SectionTypeContract = {
   type: SectionType;
   component_bound: boolean;
@@ -423,6 +435,18 @@ const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
   sequence: [
     'object_contract (this call) → read the schema, ops, constraints',
     ...(objectType === 'content_item' ? [] : ['object_create (omit requested_id to mint one) — for a new object']),
+    // W2.5, design-principles rule 5: templates are recipes — instantiation
+    // copies slot blueprints into a NEW page via the standard create path.
+    ...(objectType === 'page'
+      ? [
+          'object_instantiate_template (template_id + route + title) — alternative create: start the page from a template recipe',
+        ]
+      : []),
+    ...(objectType === 'template'
+      ? [
+          'object_instantiate_template (template_id + route + title [+ page_type/seo]) → creates a NEW page from this recipe through the standard page create validation; dry_run: true previews the built body without persisting. Pages copy the blueprints at creation and never live-inherit from the template.',
+        ]
+      : []),
     'object_checkout → lock_token + record_version',
     'object_validate (dry-run the candidate_patch) then object_patch (with lock_token + expected_record_version)',
     ...(publishPolicy(objectType, policy).requires_approval

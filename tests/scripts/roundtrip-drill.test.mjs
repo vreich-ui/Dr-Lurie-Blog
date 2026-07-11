@@ -17,6 +17,7 @@ import {
   drillOpsForSeed,
   pageDrillOps,
   sectionDrillOps,
+  templateDrillOps,
   updateDataProbeOps,
 } from '../../scripts/lib/roundtrip-drill.mjs';
 
@@ -127,6 +128,45 @@ test('deriveProbeId avoids collisions with existing section ids', () => {
   assert.equal(deriveProbeId(['s_rtprobe', 's_rtprobe2']), 's_rtprobe3');
 });
 
+test('templateDrillOps exercises all four template ops via an always-legal probe slot, byte-identical', () => {
+  const body = {
+    name: 'Interior page',
+    appliesTo: ['standard'],
+    slots: [
+      { slotId: 'slot_lede', allowed: ['lede'], required: true, repeatable: false },
+      { slotId: 'slot_body', allowed: ['prose'], required: false, repeatable: true },
+    ],
+  };
+  const { ops, expected } = templateDrillOps(body, 'slot_rtprobe');
+  assert.deepEqual(expected, ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot']);
+
+  // Name round-trips to the exact original.
+  const metaOps = ops.filter((op) => op.op === 'set_template_meta');
+  assert.deepEqual(metaOps[0].fields, { name: 'Interior page [probe]' });
+  assert.deepEqual(metaOps.at(-1).fields, { name: 'Interior page' });
+
+  // The probe slot is optional + clones an allowed type the template already
+  // sanctions (registry-legal by construction), appended at the end.
+  const upsert = ops.find((op) => op.op === 'upsert_slot');
+  assert.deepEqual(upsert.slot, { slotId: 'slot_rtprobe', allowed: ['lede'], required: false, repeatable: false });
+  assert.equal(upsert.position, 2);
+
+  // Moved to the front and back, then removed last → byte-identical body.
+  const moves = ops.filter((op) => op.op === 'move_slot');
+  assert.deepEqual(
+    moves.map((op) => op.to_index),
+    [0, 2]
+  );
+  assert.deepEqual(ops.at(-1), { op: 'remove_slot', slot_id: 'slot_rtprobe' });
+});
+
+test('templateDrillOps falls back to a prose probe for a template with no allowed types yet', () => {
+  const { ops } = templateDrillOps({ name: 'Bare', appliesTo: [], slots: [] }, 'slot_rtprobe');
+  const upsert = ops.find((op) => op.op === 'upsert_slot');
+  assert.deepEqual(upsert.slot.allowed, ['prose']);
+  assert.equal(upsert.position, 0);
+});
+
 test('drillOpsForSeed dispatches by object type', () => {
   const sectionSeed = {
     objectType: 'section',
@@ -142,4 +182,16 @@ test('drillOpsForSeed dispatches by object type', () => {
     body: { title: 'P', sections: [{ id: 's_h', type: 'hero', data: { heading: 'H', actions: [] } }] },
   };
   assert.equal(drillOpsForSeed(pageSeed).expected.length, 6);
+  const templateSeed = {
+    objectType: 'template',
+    body: {
+      name: 'T',
+      appliesTo: ['standard'],
+      // A slot already holding the default probe id forces the collision-free fallback.
+      slots: [{ slotId: 'slot_rtprobe', allowed: ['prose'], required: false, repeatable: false }],
+    },
+  };
+  const templateDrill = drillOpsForSeed(templateSeed);
+  assert.equal(templateDrill.expected.length, 4);
+  assert.equal(templateDrill.ops.find((op) => op.op === 'upsert_slot').slot.slotId, 'slot_rtprobe2');
 });

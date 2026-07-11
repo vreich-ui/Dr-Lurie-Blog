@@ -39,6 +39,8 @@ export const diffFieldsForMerge = (target, current) => {
 };
 
 const PAGE_META_KEYS = ['route', 'pageType', 'title', 'seo', 'navigationOverrides', 'template'];
+// set_template_meta forbids 'slots' (the slot ops own them) — mirror that split.
+const TEMPLATE_META_KEYS = ['name', 'appliesTo'];
 
 /**
  * The patch ops that heal a drifted record back to its seed body.
@@ -49,10 +51,38 @@ const PAGE_META_KEYS = ['route', 'pageType', 'title', 'seo', 'navigationOverride
  *   override immediately), via diffFieldsForMerge against the CURRENT record's
  *   meta (nulling strays at every depth); then per-section upserts (wholesale
  *   replace by id), removal of stray sections, and explicit final ordering.
+ * - template objects (W2.5): the same shape as pages with slots in place of
+ *   sections — meta diff (name/appliesTo; set_template_meta forbids `slots`),
+ *   positioned per-slot upserts, stray-slot removal, explicit final ordering.
  */
 export const reconcileOps = (seed, currentBody) => {
   if (seed.objectType === 'section') {
     return [{ op: 'upsert_section', section: seed.body.section }];
+  }
+  if (seed.objectType === 'template') {
+    const target = seed.body;
+    const current = isPlainObject(currentBody) ? currentBody : {};
+    const targetSlotIds = new Set(target.slots.map((slot) => slot.slotId));
+    const ops = [];
+
+    const pickMeta = (source) =>
+      Object.fromEntries(TEMPLATE_META_KEYS.flatMap((key) => (source[key] === undefined ? [] : [[key, source[key]]])));
+    ops.push({ op: 'set_template_meta', fields: diffFieldsForMerge(pickMeta(target), pickMeta(current)) });
+
+    target.slots.forEach((slot, index) => {
+      ops.push({ op: 'upsert_slot', slot, position: index });
+    });
+    const currentSlots = Array.isArray(current.slots) ? current.slots : [];
+    for (const slot of currentSlots) {
+      if (slot && typeof slot.slotId === 'string' && !targetSlotIds.has(slot.slotId)) {
+        ops.push({ op: 'remove_slot', slot_id: slot.slotId });
+      }
+    }
+    // upsert leaves pre-existing slots in place — pin the final order explicitly.
+    target.slots.forEach((slot, index) => {
+      ops.push({ op: 'move_slot', slot_id: slot.slotId, to_index: index });
+    });
+    return ops;
   }
   const target = seed.body;
   const current = isPlainObject(currentBody) ? currentBody : {};

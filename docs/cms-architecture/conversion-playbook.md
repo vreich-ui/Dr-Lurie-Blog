@@ -110,16 +110,40 @@ tsconfig.test.json`):
    the reality lines in `CLAUDE.md`/`AGENTS.md`/this file) and log the run in
    `state-of-play.md`. **No record = not converted.**
 
+### Template families (W2.5 — recipes, not rendered surfaces)
+
+The same factory converts `template` objects, with three differences:
+
+- **No route file, no render gate.** Templates materialize to
+  `src/data/site/templates/{tpl_id}.json` but render nothing — criterion 1's
+  analogue is "**each recipe instantiates** into a page that validates clean
+  under its PageType" (pinned offline in `templates-seed.test.ts`).
+- **The driver drills the four template ops** (`set_template_meta`,
+  `upsert_slot`, `move_slot`, `remove_slot`) via an always-legal probe slot,
+  and then proves instantiation with an `object_instantiate_template`
+  **`dry_run: true`** call per template — the dry run builds and validates the
+  would-be page WITHOUT persisting, so production runs leave no probe pages.
+- **Blueprints must be self-contained** (no `shared_ref`s, no content refs, no
+  asset refs) so an instantiated page validates with zero external targets;
+  required slots may omit the blueprint ONLY when the first allowed type has
+  registry `defaultData` (instantiation falls back to it — `tpl_legal` keeps
+  that path exercised deliberately). Blueprint section ids are `s_<alnum>`
+  (no underscores after `s_`) — same rule as any section instance.
+
+Starter set: `scripts/lib/templates-seed-data.mjs` (`tpl_interior`,
+`tpl_landing`, `tpl_legal`).
+
 ## Exact call/response field names (do not guess these)
 
-| Call              | Send                                                           | Read from `structuredContent`                            |
-| ----------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
-| `object_create`   | `object_type`, `site: 'site_drlurie'`, `body`, `requested_id`  | `.record` (the full ObjectRecord)                        |
-| `object_checkout` | `object_type`, `object_id`                                     | `.lockToken` (camelCase), `.record_version`              |
-| `object_validate` | `object_type`, `object_id`, `candidate_patch: [...]` (or `[]`) | blockers list on failure                                 |
-| `object_patch`    | `lock_token` (snake), `expected_record_version`, `ops`         | `.record_version` (new)                                  |
-| `object_publish`  | `object_type`, `object_id`, `lock_token`                       | sandbox: error `code: 'export_commit_failed'` — expected |
-| `object_get`      | `object_type`, `object_id`                                     | `.record.body`, `.record.version` — **not** `.object`    |
+| Call                          | Send                                                                                        | Read from `structuredContent`                            |
+| ----------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `object_create`               | `object_type`, `site: 'site_drlurie'`, `body`, `requested_id`                               | `.record` (the full ObjectRecord)                        |
+| `object_instantiate_template` | `template_id`, `site`, `route`, `title` (+ `page_type`, `seo`, `requested_id`, `dry_run`)  | `.record` + `.instantiated_from`; dry run: `.body`, `.object_id`, `.id_available`, `.summary` |
+| `object_checkout`             | `object_type`, `object_id`                                                                  | `.lockToken` (camelCase), `.record_version`              |
+| `object_validate`             | `object_type`, `object_id`, `candidate_patch: [...]` (or `[]`)                              | blockers list on failure                                 |
+| `object_patch`                | `lock_token` (snake), `expected_record_version`, `ops`                                      | `.record_version` (new)                                  |
+| `object_publish`              | `object_type`, `object_id`, `lock_token`                                                    | sandbox: error `code: 'export_commit_failed'` — expected |
+| `object_get`                  | `object_type`, `object_id`                                                                  | `.record.body`, `.record.version` — **not** `.object`    |
 
 ## Trap table (symptom → cause → fix)
 

@@ -7,6 +7,56 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 B (W2.5 SHIPPED: templates activated — instantiate verb + 3 starter recipes)
+
+Wolf confirmed the two understandings (the MCP edit surface varies per
+object/PageType through the always-exact, self-describing contract; the W1
+credentialed run is postponed until all page types are ready) and said
+"proceed" — so W2.5 was built end-to-end:
+
+- **`src/lib/template-instantiate.ts`** — pure builder: template slots → page
+  body. Blueprint → deep-copy with a fresh deterministic `s_` id; required
+  slot without blueprint → registry `defaultData` of its first allowed type
+  (the exact promise the `template_required` warning makes); optional empty
+  slot → skipped; `page.template = {ref, instantiated_at}` provenance stamped;
+  pageType defaults to `appliesTo[0]` (explicit `page_type` must be within a
+  non-empty `appliesTo`).
+- **`instantiate` verb** (object-verbs.ts) — loads the template (must EXIST,
+  draft fine), builds the body, then **delegates to the existing `create`
+  case**: one write path, so route uniqueness, PageType law, reference
+  integrity, and reader safety all gate an instantiated page exactly like a
+  hand-authored one ("law beats recipe" is a pinned test). `dry_run: true`
+  returns the built body + would-be id + `id_available` + full validation and
+  persists NOTHING. Exposed as the **`object_instantiate_template`** MCP tool
+  (also available to the admin mirror via the shared verb core); surfaced in
+  `object_contract('template')` and `('page')` workflow sequences.
+- **Starter recipes** (`scripts/lib/templates-seed-data.mjs`): `tpl_interior`
+  (standard: lede + prose + optional cta), `tpl_landing` (standard: hero +
+  curated card grid + cta), `tpl_legal` (system: one required blueprint-less
+  prose slot — keeps the defaultData fallback exercised). Blueprints are
+  self-contained; blueprint ids are `s_<alnum>` (no underscores — the id
+  regex bit once).
+- **Driver extended**: seeds may be `objectType: 'template'`; drill covers all
+  4 template ops via an always-legal probe slot; reconcile heals templates
+  (meta diff excludes `slots`; positioned wholesale slot upserts + stray
+  removal + explicit ordering); `--write-exports` materializes to
+  `src/data/site/templates/`; and a per-template **instantiate dry_run proof**
+  runs after the drill (no probe pages left behind, production-safe).
+- **Local rehearsal all-green**: ensure(create) → all 4 ops byte-identical →
+  validate → publish blocked at the expected sandbox boundary → 3/3
+  instantiate dry_runs eligible → contract 4/4 ops → inventory 3/3 →
+  exports written. Gates: **963/963 tests**, astro check 0 errors, build OK,
+  **build-diff EMPTY** (templates render nothing — expected).
+- Docs: playbook "Template families" section + `object_instantiate_template`
+  call-table row; conversion-map TEMPLATES node → 🟡 ACTIVATED/SEEDED; W2.5
+  row → DONE (code + seeds); inventory "Singletons & templates" table added.
+
+**Status: the three templates are SEEDED (local proof), not CONVERTED** — the
+production store records land with the batched credentialed run
+(`node scripts/home-conversion-roundtrip.mjs --production --release --seeds
+scripts/lib/templates-seed-data.mjs`, after merge+deploy; batch it with the
+postponed W1 run). Sixteen converted objects unchanged.
+
 ## Session 2026-07-11 A (ARCHITECTURE DECISION: templates are recipes, PageTypes are law)
 
 Wolf posed the standing tension directly — flexibility (generic components,

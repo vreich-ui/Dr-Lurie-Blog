@@ -140,13 +140,48 @@ export const pageDrillOps = (page, probeId) => {
   };
 };
 
-/** Dispatch: build the drill for one seed (page or section). */
+/**
+ * Drill a `template` object (W2.5): exercise all four template ops via a probe
+ * SLOT that is always legal — optional, non-repeatable, allowing a type cloned
+ * from the template's own first slot (already registry-sanctioned; `prose` as
+ * the fallback for a slotless template). The probe is added, moved to the
+ * front, moved back to the end, and removed; the name round-trips through
+ * set_template_meta — so the final body is byte-identical to the seed.
+ * (Instantiation is a separate verb, not a patch op — the driver proves it
+ * with an object_instantiate_template dry_run after the drill.)
+ */
+export const templateDrillOps = (body, probeSlotId) => {
+  const name = body.name;
+  const slots = Array.isArray(body.slots) ? body.slots : [];
+  const count = slots.length;
+  const firstAllowed = slots.find((slot) => Array.isArray(slot?.allowed) && slot.allowed.length > 0)?.allowed[0];
+  const probe = { slotId: probeSlotId, allowed: [firstAllowed ?? 'prose'], required: false, repeatable: false };
+  return {
+    expected: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
+    ops: [
+      { op: 'set_template_meta', fields: { name: `${name} [probe]` } },
+      { op: 'set_template_meta', fields: { name } },
+      { op: 'upsert_slot', slot: probe, position: count },
+      { op: 'move_slot', slot_id: probeSlotId, to_index: 0 },
+      { op: 'move_slot', slot_id: probeSlotId, to_index: count },
+      { op: 'remove_slot', slot_id: probeSlotId },
+    ],
+  };
+};
+
+/** Dispatch: build the drill for one seed (page, section, or template). */
 export const drillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
       .map((section) => section?.id)
       .filter((id) => typeof id === 'string');
     return pageDrillOps(seed.body, deriveProbeId(existingIds));
+  }
+  if (seed.objectType === 'template') {
+    const existingSlotIds = (Array.isArray(seed.body.slots) ? seed.body.slots : [])
+      .map((slot) => slot?.slotId)
+      .filter((id) => typeof id === 'string');
+    return templateDrillOps(seed.body, deriveProbeId(existingSlotIds, 'slot_rtprobe'));
   }
   return sectionDrillOps(seed.body.section);
 };
