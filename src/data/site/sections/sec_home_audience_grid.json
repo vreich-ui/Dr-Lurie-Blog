@@ -1,28 +1,28 @@
 {
   "__generated": {
-    "at": "2026-07-10T11:47:12.268Z",
+    "at": "2026-07-11T18:43:51.804Z",
     "from": "objects/section/by-id/sec_home_audience_grid.json",
-    "record_version": 15
+    "record_version": 19
   },
   "section": {
     "data": {
       "anchor": "audience",
-      "heading": "You want skincare to feel understandable.",
-      "kicker": "This is for you if…",
+      "heading": "Four quick signals, with sharper card copy.",
+      "kicker": "For this visual pass",
       "limit": 4,
       "source": {
         "cards": [
           {
-            "description": "You are new to skincare and want a calm place to begin."
+            "description": "New to skincare and looking for a calmer first step."
           },
           {
-            "description": "You want to understand what your skin needs before buying more products."
+            "description": "Trying to understand your skin before buying another product."
           },
           {
-            "description": "You prefer physician-led education over trend-driven routines."
+            "description": "Choosing physician-led education over trend-driven routines."
           },
           {
-            "description": "You want simple explanations that respect both science and everyday life."
+            "description": "Wanting simple explanations with a bit more visual contrast."
           }
         ],
         "kind": "cards"
