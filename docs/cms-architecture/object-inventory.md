@@ -162,11 +162,21 @@ reported "already matches the seed" → store === seed === export).
 
 ### Singletons & templates
 
-🔴 **No `site` or `taxonomy` object is committed.** The field-test stubs
-(`site_fieldtest`, `tax_fieldtest`, `tpl_fieldtest`) were deleted in PR #378.
-The real site config still lives in `src/config.yaml` (and is what actually drives
-rendering); real categories/tags remain article frontmatter (§5.5). Building real
-`site` / `taxonomy` objects is **MVP TODO #2 / #3**.
+🔴 **No `site` object is committed.** The field-test stubs (`site_fieldtest`,
+`tax_fieldtest`, `tpl_fieldtest`) were deleted in PR #378. The real site config
+still lives in `src/config.yaml` (and is what actually drives rendering);
+building the real `site` object is **MVP TODO #2**.
+
+🟣 **`tax_drlurie` is SEEDED (W3, 2026-07-11)** — Wolf's decision: a curated,
+agent-editable vocabulary (5 categories + 26 tags distilled from the drifted
+frontmatter of 93 posts; approved canonical list + raw→canonical mapping in
+`scripts/lib/taxonomy-seed-data.mjs`). Drilled locally (all 5 term ops
+byte-identical, contract 5/5); export committed (`src/data/site/taxonomy.json`);
+store record pending the credentialed run. Object-side consumers activate
+automatically once the record exists (the validation context wires
+`resolveTaxonomyTerm`, so `content_grid` query terms validate live). Article
+frontmatter remains the article-side input until the bounded publish-article
+enforcement hook (step 2) lands.
 
 **Templates were ACTIVATED + CONVERTED 2026-07-11 (W2.5)** — design-principles
 rule 5 ("templates are recipes; PageTypes are law"). The `object_instantiate_template`
@@ -210,14 +220,17 @@ Replace `src/config.yaml` as the source of truth with a real `site_drlurie` obje
 (brand tokens, logo, chrome toggles, blog paths, default navigation) **and wire the
 layout to render from it**. This is what makes global site settings agent-editable.
 
-### 3. Real `taxonomy` object 🔴 (design decision first)
+### 3. Real `taxonomy` object 🟣 SEEDED (decision made 2026-07-11)
 
-A real `tax_drlurie` with the site's actual categories/tags. **Blocked on a
-decision**, not just work: today article frontmatter is the deliberate source of
-truth (§5.5). Promoting the taxonomy object means either a one-way sync
-(frontmatter → object, object read-only) or a genuine cutover of ownership. Decide
-the direction before building — using the wrong source reintroduces the exact drift
-the project exists to fix.
+**Wolf decided: curated agent-editable vocabulary** (not a read-only mirror, not
+a full article-pipeline cutover). `tax_drlurie` is seeded from the approved
+canonical list and drilled locally — see "Singletons & templates" above.
+Remaining for full §5.5: **step 2, the bounded publish-article enforcement hook**
+(a sanctioned additive exception to the off-limits rule: resolve article terms
+against the registry at publish time, following `merged_into` aliases) plus a
+one-time normalization pass over the 93 posts' frontmatter using the committed
+`RAW_TO_CANONICAL` map. The full content_item→ObjectRecord conversion is
+deferred as its own wave (OQ-8) — deliberately NOT a taxonomy prerequisite.
 
 ### 4. System pages → page objects 🔵 DONE, in review (PR #380)
 

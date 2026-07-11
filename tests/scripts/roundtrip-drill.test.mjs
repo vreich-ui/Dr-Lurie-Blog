@@ -17,6 +17,7 @@ import {
   drillOpsForSeed,
   pageDrillOps,
   sectionDrillOps,
+  taxonomyDrillOps,
   templateDrillOps,
   updateDataProbeOps,
 } from '../../scripts/lib/roundtrip-drill.mjs';
@@ -165,6 +166,44 @@ test('templateDrillOps falls back to a prose probe for a template with no allowe
   const upsert = ops.find((op) => op.op === 'upsert_slot');
   assert.deepEqual(upsert.slot.allowed, ['prose']);
   assert.equal(upsert.position, 0);
+});
+
+test('taxonomyDrillOps exercises all five term ops via a probe tag, byte-identical', () => {
+  const body = {
+    kinds: {
+      category: { terms: [{ term_id: 't_skinhealth', slug: 'skin-health', label: 'Skin Health', status: 'active' }] },
+      tag: { terms: [{ term_id: 't_retinoids', slug: 'retinoids', label: 'Retinoids', status: 'active' }] },
+    },
+  };
+  const { ops, expected } = taxonomyDrillOps(body, 't_rtprobe');
+  assert.deepEqual(expected, ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term']);
+  assert.deepEqual(
+    ops.map((op) => op.op),
+    ['add_term', 'update_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term']
+  );
+  // The probe is added and removed in the tag kind; label round-trips exactly.
+  assert.equal(ops[0].term.term_id, 't_rtprobe');
+  assert.equal(ops[0].term.status, 'active');
+  assert.deepEqual(ops[2].fields, { label: ops[0].term.label });
+  assert.deepEqual(ops.at(-1), { op: 'remove_term', kind: 'tag', term_id: 't_rtprobe' });
+  assert.ok(
+    ops.every((op) => op.kind === 'tag'),
+    'the probe lives entirely in the tag kind'
+  );
+});
+
+test('drillOpsForSeed derives a collision-free probe term id across BOTH kinds', () => {
+  const seed = {
+    objectType: 'taxonomy',
+    body: {
+      kinds: {
+        category: { terms: [{ term_id: 't_rtprobe', slug: 'x', label: 'X', status: 'active' }] },
+        tag: { terms: [{ term_id: 't_rtprobe2', slug: 'y', label: 'Y', status: 'active' }] },
+      },
+    },
+  };
+  const { ops } = drillOpsForSeed(seed);
+  assert.equal(ops[0].term.term_id, 't_rtprobe3');
 });
 
 test('drillOpsForSeed dispatches by object type', () => {

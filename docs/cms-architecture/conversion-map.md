@@ -159,12 +159,20 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 │         content_split (Content widget: text + image/aside) ·
 │         (maybe) brand_row / stats if those widgets ever go live
 │
-├── TAXONOMY ─ singleton (tax_drlurie) ─ 🔴 TODO ─ priority W3 ─ ⚠ DECISION FIRST
+├── TAXONOMY ─ singleton (tax_drlurie) ─ 🟣 SEEDED (W3, 2026-07-11) — production run pending
 │     kinds: category (a.k.a. topic) · tag; term: term_id · slug · label · description? ·
 │       status(active|deprecated) · merged_into?
-│     TODAY the source of truth is article frontmatter (deliberate, §5.5 of 02-arch doc).
-│     Converting means choosing: one-way sync (frontmatter → object, object read-only) OR
-│     full ownership cutover. Do not build until Wolf picks the direction.
+│     DECISION (Wolf, 2026-07-11): curated agent-editable vocabulary — 5 categories +
+│       26 tags distilled from the 93 posts' drifted frontmatter (Wolf approved the
+│       canonical list + raw→canonical mapping; scripts/lib/taxonomy-seed-data.mjs).
+│       Registry = source of truth for OBJECT-SIDE consumers from day one (the store
+│       validation context wires resolveTaxonomyTerm automatically, so content_grid
+│       query terms validate live). Article frontmatter stays the article-side input
+│       until step 2: a BOUNDED publish-time enforcement hook in publish-article.ts
+│       (sanctioned additive exception) + a one-time normalization pass using the
+│       committed RAW_TO_CANONICAL map. Full content_item→ObjectRecord conversion
+│       deferred as its own wave (OQ-8) — explicitly NOT a taxonomy prerequisite.
+│     drilled locally: all 5 term ops byte-identical + contract 5/5 + export committed
 │     dependents: content_grid queries · listing pages · learn/topics · rss categories
 │
 ├── CONTENT_ITEM (articles) ─ separate pipeline ─ 🔵 deliberately OUTSIDE the object model (MVP boundary)
@@ -226,7 +234,7 @@ site_drlurie ─ SITE SINGLETON ─ 🔴 TODO ─ priority W4
 | W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
 | W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
 | W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                          | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
-| W3         | Taxonomy singleton — **after Wolf's source-of-truth decision**                                                                                     | Unlocks term-filtered grids, listings, topics hub                                    | M    |
+| W3         | 🟣 SEEDED (2026-07-11, decision made: curated agent-editable vocabulary): tax_drlurie drilled locally, awaiting the credentialed run. Step 2 = bounded publish-article enforcement hook + frontmatter normalization | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | Site singleton + layout wiring                                                                                                                     | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
 | W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
 | W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                            | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |

@@ -169,7 +169,32 @@ export const templateDrillOps = (body, probeSlotId) => {
   };
 };
 
-/** Dispatch: build the drill for one seed (page, section, or template). */
+/**
+ * Drill a `taxonomy` object (W3): exercise all five term ops via a probe TERM
+ * in the `tag` kind that is added, relabeled, deprecated, reactivated, and
+ * removed — ending byte-identical to the seed. The probe slug is collision-free
+ * against every seeded slug ('rt-probe' is not a plausible editorial term); the
+ * probe id derives collision-free against existing term ids. `reactivate_term`
+ * is inverse-machinery in the contract (agents don't hand-author it) but it IS
+ * an advertised op, and the driver's criterion-4 gate is advertised ≡
+ * exercised — deprecate→reactivate exercises it while restoring state exactly.
+ */
+export const taxonomyDrillOps = (body, probeTermId) => {
+  const probe = { term_id: probeTermId, slug: 'rt-probe', label: 'RT Probe', status: 'active' };
+  return {
+    expected: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
+    ops: [
+      { op: 'add_term', kind: 'tag', term: probe },
+      { op: 'update_term', kind: 'tag', term_id: probeTermId, fields: { label: 'RT Probe [poked]' } },
+      { op: 'update_term', kind: 'tag', term_id: probeTermId, fields: { label: 'RT Probe' } },
+      { op: 'deprecate_term', kind: 'tag', term_id: probeTermId },
+      { op: 'reactivate_term', kind: 'tag', term_id: probeTermId },
+      { op: 'remove_term', kind: 'tag', term_id: probeTermId },
+    ],
+  };
+};
+
+/** Dispatch: build the drill for one seed (page, section, template, or taxonomy). */
 export const drillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
@@ -182,6 +207,14 @@ export const drillOpsForSeed = (seed) => {
       .map((slot) => slot?.slotId)
       .filter((id) => typeof id === 'string');
     return templateDrillOps(seed.body, deriveProbeId(existingSlotIds, 'slot_rtprobe'));
+  }
+  if (seed.objectType === 'taxonomy') {
+    const kinds = seed.body.kinds ?? {};
+    const existingTermIds = ['category', 'tag']
+      .flatMap((kind) => (Array.isArray(kinds[kind]?.terms) ? kinds[kind].terms : []))
+      .map((entry) => entry?.term_id)
+      .filter((id) => typeof id === 'string');
+    return taxonomyDrillOps(seed.body, deriveProbeId(existingTermIds, 't_rtprobe'));
   }
   return sectionDrillOps(seed.body.section);
 };

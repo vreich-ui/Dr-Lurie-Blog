@@ -1,0 +1,208 @@
+{
+  "__generated": {
+    "at": "2026-07-11T13:11:22.719Z",
+    "from": "objects/taxonomy/by-id/tax_drlurie.json",
+    "record_version": 9
+  },
+  "kinds": {
+    "category": {
+      "terms": [
+        {
+          "description": "The science and health of skin — barrier function, biology, and what actually changes it.",
+          "label": "Skin Health",
+          "slug": "skin-health",
+          "status": "active",
+          "term_id": "t_skinhealth"
+        },
+        {
+          "description": "Products, routines, and the industry around them.",
+          "label": "Skincare",
+          "slug": "skincare",
+          "status": "active",
+          "term_id": "t_skincare"
+        },
+        {
+          "description": "How skin changes with age — and what to do about it.",
+          "label": "Skin After 40",
+          "slug": "skin-after-40",
+          "status": "active",
+          "term_id": "t_skinafter40"
+        },
+        {
+          "description": "Plain-language entries on individual skincare ingredients.",
+          "label": "Ingredients Wiki",
+          "slug": "ingredients",
+          "status": "active",
+          "term_id": "t_ingredients"
+        },
+        {
+          "description": "Personal essays and observations.",
+          "label": "Reflections",
+          "slug": "reflections",
+          "status": "active",
+          "term_id": "t_reflections"
+        }
+      ]
+    },
+    "tag": {
+      "terms": [
+        {
+          "label": "Skin Barrier",
+          "slug": "skin-barrier",
+          "status": "active",
+          "term_id": "t_skinbarrier"
+        },
+        {
+          "label": "Skincare",
+          "slug": "skincare",
+          "status": "active",
+          "term_id": "t_skincare"
+        },
+        {
+          "label": "Skin After 40",
+          "slug": "skin-after-40",
+          "status": "active",
+          "term_id": "t_skinafter40"
+        },
+        {
+          "label": "Reflections",
+          "slug": "reflections",
+          "status": "active",
+          "term_id": "t_reflections"
+        },
+        {
+          "label": "Skincare Basics",
+          "slug": "skincare-basics",
+          "status": "active",
+          "term_id": "t_skincarebasics"
+        },
+        {
+          "label": "Dry Skin",
+          "slug": "dry-skin",
+          "status": "active",
+          "term_id": "t_dryskin"
+        },
+        {
+          "label": "Retinoids",
+          "slug": "retinoids",
+          "status": "active",
+          "term_id": "t_retinoids"
+        },
+        {
+          "label": "Sun Protection",
+          "slug": "sun-protection",
+          "status": "active",
+          "term_id": "t_sunprotection"
+        },
+        {
+          "label": "Pigmentation",
+          "slug": "pigmentation",
+          "status": "active",
+          "term_id": "t_pigmentation"
+        },
+        {
+          "label": "Sensitive Skin",
+          "slug": "sensitive-skin",
+          "status": "active",
+          "term_id": "t_sensitiveskin"
+        },
+        {
+          "label": "Direct-to-Consumer",
+          "slug": "dtc",
+          "status": "active",
+          "term_id": "t_dtc"
+        },
+        {
+          "label": "Skin Science",
+          "slug": "skin-science",
+          "status": "active",
+          "term_id": "t_skinscience"
+        },
+        {
+          "label": "Skin Health",
+          "slug": "skin-health",
+          "status": "active",
+          "term_id": "t_skinhealth"
+        },
+        {
+          "label": "Dermatology",
+          "slug": "dermatology",
+          "status": "active",
+          "term_id": "t_dermatology"
+        },
+        {
+          "label": "Menopause & Skin",
+          "slug": "menopause",
+          "status": "active",
+          "term_id": "t_menopause"
+        },
+        {
+          "label": "Moisturizers",
+          "slug": "moisturizers",
+          "status": "active",
+          "term_id": "t_moisturizers"
+        },
+        {
+          "label": "Marketing Claims",
+          "slug": "marketing-claims",
+          "status": "active",
+          "term_id": "t_marketingclaims"
+        },
+        {
+          "label": "Guides & Downloads",
+          "slug": "guides",
+          "status": "active",
+          "term_id": "t_guides"
+        },
+        {
+          "label": "Acne",
+          "slug": "acne",
+          "status": "active",
+          "term_id": "t_acne"
+        },
+        {
+          "label": "Body Odor",
+          "slug": "body-odor",
+          "status": "active",
+          "term_id": "t_bodyodor"
+        },
+        {
+          "label": "Skincare Routine",
+          "slug": "skincare-routine",
+          "status": "active",
+          "term_id": "t_skincareroutine"
+        },
+        {
+          "label": "Supplements",
+          "slug": "supplements",
+          "status": "active",
+          "term_id": "t_supplements"
+        },
+        {
+          "label": "Patient Education",
+          "slug": "patient-education",
+          "status": "active",
+          "term_id": "t_patienteducation"
+        },
+        {
+          "label": "Ingredients",
+          "slug": "ingredients",
+          "status": "active",
+          "term_id": "t_ingredients"
+        },
+        {
+          "label": "Microbiome",
+          "slug": "microbiome",
+          "status": "active",
+          "term_id": "t_microbiome"
+        },
+        {
+          "label": "Body Care",
+          "slug": "body-care",
+          "status": "active",
+          "term_id": "t_bodycare"
+        }
+      ]
+    }
+  }
+}
