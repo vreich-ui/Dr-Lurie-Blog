@@ -20,21 +20,20 @@ five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.
 
 Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
 X passes all five); **after every session, update the documentation** (no written record
-= not converted). Reality as of 2026-07-11: **thirty objects converted** — the 3 nav
+= not converted). Reality as of 2026-07-11: **thirty-one objects converted** — the 3 nav
 objects, all 12 page objects (home + about + 8 W1 interior/system pages + page_contact +
-page_thank_you), the 12 shared sections under home/about, the 3 templates, and the
+page_thank_you), the 12 shared sections under home/about, the 3 templates, the
 `tax_drlurie` taxonomy registry (curated agent-editable vocabulary; resolveTaxonomyTerm is
-live). All proven by credentialed runs on 2026-07-11; no page renders from an unbacked
+live), and the `site_drlurie` site singleton (W4, credentialed run 2026-07-11: the layout
+renders brandTokens/logo/chrome/metadataDefaults/defaultNavigation from its export via
+`set_site_fields`; urls/blog carried, config.yaml authoritative for routing — Wolf B2).
+All proven by credentialed runs on 2026-07-11; no page renders from an unbacked
 export anymore. The section-type palette is fully generic (`about`/`contact` decomposed,
 `thank_you`→`form_confirmation`). W3 step 2 SHIPPED (2026-07-11): the bounded
 publish-article enforcement hook (registry-gated, skips when no registry) + one-time
-frontmatter normalization (93 posts) + registry display labels. W4 BUILT + WIRED
-(2026-07-11): `site_drlurie` seeded and the layout renders brandTokens/logo/chrome/
-metadataDefaults/defaultNavigation from its export (urls/blog carried; config.yaml
-authoritative for routing — Wolf B2); pending the credentialed run to count as
-converted. The 28-invisible-posts caveat is CLOSED (2026-07-11: 10 junk posts
-deleted, 18 stamped with `published_time`). Still TODO: the site credentialed run,
-then the W5+ hand-coded pages.
+frontmatter normalization (93 posts) + registry display labels. The 28-invisible-posts
+caveat is CLOSED (2026-07-11: 10 junk posts deleted, 18 stamped with `published_time`).
+Still TODO: the W5+ hand-coded pages (Wolf: separate session).
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 
