@@ -26,8 +26,10 @@ page_thank_you), the 12 shared sections under home/about, and the 3 templates. T
 page + template backlog landed in one batched credentialed `convert-pending-production.sh`
 run on 2026-07-11 (store-backed, round-tripped, published, released); no page renders from an
 unbacked export anymore. The section-type palette is fully generic (`about`/`contact`
-decomposed, `thank_you`→`form_confirmation`). Still TODO: the `site`/`taxonomy` singletons
-(W3/W4) and the W5+ hand-coded pages.
+decomposed, `thank_you`→`form_confirmation`). `tax_drlurie` is SEEDED (W3, Wolf's decision:
+curated agent-editable vocabulary) awaiting its credentialed run. Still TODO: the `site`
+singleton (W4), the bounded publish-article taxonomy-enforcement hook, and the W5+
+hand-coded pages.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

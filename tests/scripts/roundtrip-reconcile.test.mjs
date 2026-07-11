@@ -109,6 +109,52 @@ test('reconcileOps for a page heals meta (with nested nulls), sections, strays, 
   );
 });
 
+test('reconcileOps for a taxonomy rebuilds ONLY the drifted kind, wholesale and in seed order', () => {
+  const target = {
+    kinds: {
+      category: { terms: [{ term_id: 't_skinhealth', slug: 'skin-health', label: 'Skin Health', status: 'active' }] },
+      tag: {
+        terms: [
+          { term_id: 't_skinbarrier', slug: 'skin-barrier', label: 'Skin Barrier', status: 'active' },
+          { term_id: 't_retinoids', slug: 'retinoids', label: 'Retinoids', status: 'active' },
+        ],
+      },
+    },
+  };
+  const current = {
+    kinds: {
+      // category kind matches the seed exactly → untouched.
+      category: { terms: [{ term_id: 't_skinhealth', slug: 'skin-health', label: 'Skin Health', status: 'active' }] },
+      // tag kind drifted: stray term, wrong order, drifted label.
+      tag: {
+        terms: [
+          { term_id: 't_stray', slug: 'stray', label: 'Stray', status: 'active' },
+          { term_id: 't_retinoids', slug: 'retinoids', label: 'Retinoids (drifted)', status: 'active' },
+        ],
+      },
+    },
+  };
+  const ops = reconcileOps({ objectType: 'taxonomy', objectId: 'tax_drlurie', body: target }, current);
+
+  assert.ok(
+    ops.every((op) => op.kind === 'tag'),
+    'the matching category kind is untouched'
+  );
+  assert.deepEqual(
+    ops.map((op) => op.op),
+    ['remove_term', 'remove_term', 'add_term', 'add_term']
+  );
+  // Removal in reverse order; re-add carries the FULL seed payload at position.
+  assert.deepEqual(
+    ops.slice(0, 2).map((op) => op.term_id),
+    ['t_retinoids', 't_stray']
+  );
+  assert.deepEqual(ops[2].term, target.kinds.tag.terms[0]);
+  assert.equal(ops[2].position, 0);
+  assert.deepEqual(ops[3].term, target.kinds.tag.terms[1]);
+  assert.equal(ops[3].position, 1);
+});
+
 test('reconcileOps for a template heals meta (slots excluded), slots, strays, and order', () => {
   const target = {
     name: 'Interior page',

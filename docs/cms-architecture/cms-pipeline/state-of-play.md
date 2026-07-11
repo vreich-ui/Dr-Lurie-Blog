@@ -7,6 +7,51 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 E (W3 DECIDED + SEEDED: tax_drlurie — curated agent-editable vocabulary)
+
+**The taxonomy checkpoint is answered.** Wolf first proposed converting the whole
+article pipeline (publish-article + workflow) to the new schema so taxonomy
+would be unblocked; assessment: right destination, wrong prerequisite — the
+pipeline is ~4,700 lines / 31 tool surfaces / 27 test files of load-bearing,
+deliberately-frozen contract (§3.10 protects ContentSourceV1; OQ-8 unresolved),
+and taxonomy enforcement needs only a HOOK in the publish step, not a new
+envelope. **Wolf approved the recommended path:**
+
+1. **Curated registry now (this session):** `tax_drlurie` = agent-editable
+   vocabulary, seeded from a CLEANED canonical set Wolf approved term-by-term —
+   5 categories + 26 tags distilled from the raw frontmatter of 93 posts
+   (158 distinct tag strings; ~2/3 of usage pipeline-test junk; real terms split
+   across casing variants — e.g. skin-barrier ×3 spellings = 18 uses). The
+   approved raw→canonical mapping is committed as `RAW_TO_CANONICAL` in the
+   seed module (step 2's normalization input). Judgment calls recorded:
+   Market→skincare, retinol+retinoids→retinoids, photoaging/sun damage→
+   sun-protection, essays kept under `reflections`, melanin-rich-skin dropped
+   (promotable later — the registry is editable data; nothing is locked in).
+2. **Step 2 (next): bounded publish-article enforcement hook** — a third
+   sanctioned additive exception to the off-limits rule (resolve article terms
+   against the registry at publish time per §5.5/§5.6-step-2, following
+   `merged_into` aliases) + one-time frontmatter normalization via the map.
+3. **Full content_item→ObjectRecord conversion**: deferred as its own wave
+   (OQ-8 adapter-vs-migration decided then) — explicitly NOT a prerequisite.
+
+Built: `scripts/lib/taxonomy-seed-data.mjs` (registry body + mapping); driver
+extended to taxonomy (drill = all 5 term ops via a probe tag — add → relabel →
+deprecate → reactivate → remove, byte-identical; reactivate_term is
+inverse-machinery but advertised, so the drill exercises it; reconcile =
+wholesale per-kind rebuild, since there is no reorder op and slug renames mint
+aliases; materialize → src/data/site/taxonomy.json). Local rehearsal all-green
+(create → 5 ops → validate → publish at sandbox boundary → contract 5/5 →
+inventory → export). Gates: **976/976 tests**, astro 0 errors, build OK,
+build-diff EMPTY (the registry renders nothing itself; its first live consumer
+is store-side validation — resolveTaxonomyTerm wires automatically in
+production the moment the record exists, so content_grid query terms start
+validating for real).
+
+**Status: tax_drlurie is SEEDED, not CONVERTED** — one-command credentialed run:
+`node scripts/home-conversion-roundtrip.mjs --production --release --seeds scripts/lib/taxonomy-seed-data.mjs`
+(after merge + deploy — schema-vintage gate: the taxonomy drill needs nothing
+new server-side, but run on latest main anyway).
+
 ## Session 2026-07-11 D (BATCHED CREDENTIALED RUN: 13 objects CONVERTED — the page + template backlog is cleared)
 
 Wolf ran `./scripts/convert-pending-production.sh --verify-only` (all green) then

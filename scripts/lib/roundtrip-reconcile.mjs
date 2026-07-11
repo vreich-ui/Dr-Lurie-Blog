@@ -54,10 +54,33 @@ const TEMPLATE_META_KEYS = ['name', 'appliesTo'];
  * - template objects (W2.5): the same shape as pages with slots in place of
  *   sections — meta diff (name/appliesTo; set_template_meta forbids `slots`),
  *   positioned per-slot upserts, stray-slot removal, explicit final ordering.
+ * - taxonomy objects (W3): a drifted kind is rebuilt WHOLESALE — remove every
+ *   current term (in reverse), then add_term each target term in order with its
+ *   full payload. Blunt but exact: there is no reorder op, and update_term slug
+ *   renames mint deprecated aliases (C§2.3-taxonomy) that would leave the healed
+ *   body differing from the seed. A kind already matching the seed is untouched.
  */
 export const reconcileOps = (seed, currentBody) => {
   if (seed.objectType === 'section') {
     return [{ op: 'upsert_section', section: seed.body.section }];
+  }
+  if (seed.objectType === 'taxonomy') {
+    const current = isPlainObject(currentBody) ? currentBody : {};
+    const ops = [];
+    for (const kind of ['category', 'tag']) {
+      const targetTerms = seed.body.kinds?.[kind]?.terms ?? [];
+      const currentTerms = Array.isArray(current.kinds?.[kind]?.terms) ? current.kinds[kind].terms : [];
+      if (JSON.stringify(currentTerms) === JSON.stringify(targetTerms)) continue;
+      for (const entry of [...currentTerms].reverse()) {
+        if (entry && typeof entry.term_id === 'string') {
+          ops.push({ op: 'remove_term', kind, term_id: entry.term_id });
+        }
+      }
+      targetTerms.forEach((entry, index) => {
+        ops.push({ op: 'add_term', kind, term: entry, position: index });
+      });
+    }
+    return ops;
   }
   if (seed.objectType === 'template') {
     const target = seed.body;
