@@ -209,3 +209,47 @@ test('sectionDataSchemaForType serves every registered union member and nothing 
   assert.ok(sectionDataSchemaForType('shared_ref'), 'the member exists (the scope path refuses it earlier)');
   assert.equal(sectionDataSchemaForType('not_a_type'), undefined);
 });
+
+test('a shared SECTION OBJECT auto-scopes to its inner instance — inner grammar, inner id', async () => {
+  const store = createStore();
+  const sectionObject: ObjectRecord = {
+    object_id: 'sec_newsletter_signup',
+    object_type: 'section',
+    schema_version: 'section.v1',
+    site: 'site_drlurie',
+    created_at: '2026-07-10T00:00:00.000Z',
+    updated_at: '2026-07-10T00:00:00.000Z',
+    status: 'active',
+    body: {
+      section: {
+        id: 's_signup',
+        type: 'newsletter_signup',
+        data: { formName: 'newsletter', heading: 'Learn about healthy skin.' },
+      },
+    },
+    publication: { published_time: null },
+    history: [{ at: '2026-07-10T00:00:00.000Z', action: 'create', actor: AGENT }],
+    version: 1,
+    content_revision: 1,
+  };
+  store.seed(sectionObject);
+  const anthropic = anthropicMock({ heading: 'One useful skin letter a month.' });
+
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'section', object_id: 'sec_newsletter_signup', instruction: 'Friendlier heading.' },
+    deps(anthropic.fetchImpl)
+  );
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.section_id, 's_signup', 'the INNER instance id — what update_section_data targets');
+  assert.equal(result.body.section_type, 'newsletter_signup');
+  assert.deepEqual(result.body.suggestion, { heading: 'One useful skin letter a month.' });
+
+  assert.equal(anthropic.calls[0].toolName, 'propose_section_changes');
+  const properties = anthropic.calls[0].toolSchema.properties as Record<string, unknown>;
+  assert.ok('formName' in properties, 'the inner data grammar, not the wrapper');
+  assert.equal('section' in properties, false, 'the wrapper must not leak');
+  assert.match(anthropic.calls[0].userMessage, /shared section object "sec_newsletter_signup"/);
+  assert.match(anthropic.calls[0].userMessage, /every page that references it/);
+});

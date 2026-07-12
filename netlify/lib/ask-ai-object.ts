@@ -96,9 +96,13 @@ const buildSectionUserMessage = (
   const selectionClause = request.selected_text
     ? `\nThe editor highlighted this specific span: """${request.selected_text}"""\n`
     : '';
+  const framing =
+    typeof page.title === 'string'
+      ? `You are editing ONE SECTION of the page "${page.title}"` +
+        `${typeof page.route === 'string' ? ` (route ${page.route})` : ''}.`
+      : `You are editing the shared section object "${record.object_id}" — it renders on every page that references it.`;
   return [
-    `You are editing ONE SECTION of the page "${typeof page.title === 'string' ? page.title : record.object_id}"` +
-      `${typeof page.route === 'string' ? ` (route ${page.route})` : ''}.`,
+    framing,
     `The section is a "${section.type}" (id ${section.id}). Its current data:`,
     '```json',
     JSON.stringify(section.data, null, 2),
@@ -222,6 +226,28 @@ export const askAiForObject = async (
         'Omit every field that stays the same. Preserve the existing voice, tone, and structure.',
     });
     userMessage = buildSectionUserMessage(record, section, request);
+  } else if (request.object_type === 'section') {
+    // A shared section object IS one section: auto-scope to the inner
+    // instance so the model answers in the section's own data grammar (the
+    // wrapper schema would push it to restate id/type/data wholesale). The
+    // returned section_id is the INNER instance id — exactly what an
+    // update_section_data op on this object targets.
+    const inner = (record.body as { section?: PageSectionInstance }).section;
+    const dataSchema = inner ? sectionDataSchemaForType(inner.type) : undefined;
+    if (!inner || !dataSchema || inner.type === 'shared_ref') {
+      return err(422, {
+        error: `Section object ${request.object_id} does not wrap an editable section instance.`,
+        code: 'invalid_section_body',
+      });
+    }
+    scopedSection = inner;
+    tool = deriveAskAiToolSchema(dataSchema, {
+      toolName: 'propose_section_changes',
+      description:
+        "Return ONLY the fields of this section's data that should change to satisfy the instruction. " +
+        'Omit every field that stays the same. Preserve the existing voice, tone, and structure.',
+    });
+    userMessage = buildSectionUserMessage(record, inner, request);
   } else {
     // Tool schema derived from the type's zod body schema at request time.
     tool = deriveAskAiToolSchema(bodySchema);
