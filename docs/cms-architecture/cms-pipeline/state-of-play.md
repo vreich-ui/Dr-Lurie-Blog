@@ -7,6 +7,43 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 L (W7 PLANNED: OQ-8 RESOLVED as one-time migration — articles onto the object model + Rich Text; plan doc, not code)
+
+Wolf opened the article wave ("let's move with articles W7. be careful, I
+need the functionality developed for article publishing") and answered the
+four forks in-session — **OQ-8 is resolved: (1) one-time MIGRATION to
+ObjectRecords** (adapter path retired), (2) **build the Contentful Rich Text
+substrate now** (core-structure tasks 1–5, confirmed never built — sections
+use TipTap-HTML strings + splitters today), (3) canvas-for-articles in-wave
+if it fits, (4) plan doc first per the shop precedent. His preservation
+directive is the wave's prime rule: the `article_body.v1` semantic layer
+(per-node `private.strategy`/`intent`, commercial metadata + disclosure,
+chat, opaque ids, input templates; envelope-level emotional_strategy/claims/
+sources/compliance/scoring slots) exists so "agents can judge, score and
+build variants quickly" — it must come out of W7 MORE agent-usable, never
+flattened.
+
+**The plan is [`08-articles-plan.md`](../08-articles-plan.md).** Spine:
+`content_item` = ninth object type keeping `req_*` ids verbatim (artifact
+trust/blobKeys survive unchanged); body = **node envelope outside, Rich Text
+inside** (a hook can span paragraphs — the node grouping IS the behavioral
+structure; `public.body` upgrades string → `rich_text.v1` document); one
+renderer for build/admin/canvas; `create_variant` + typed `scores[]` as the
+A/B substrate (serving/traffic-split explicitly out of v1); the ~31 article
+tool names live on as thin aliases over object verbs (external agent configs
+call them by name); 5-agent workflow state moves into `body.workflow`;
+per-article cutover flags + a DOM-equivalence harness (83 committed posts
+keep URLs and rendering); the `workflows` store retires read-only as the
+rollback source. Ten-bug register dispositioned (recon this session; nothing
+was in the issue tracker): ①⑦⑨ die structurally, ② becomes the renderer
+feature matrix (offers/adSlots/chatInvite/PDF media render for the first
+time), ③④⑤⑥⑧⑩ are named phase tasks. Phases W7.1–W7.9, each its own
+session/PR; six OQ-W7 checkpoints for Wolf (alias sunset, variant serving,
+strategy vocabulary as a `strategy_drlurie` registry vs code enums, Tier 1
+posture, `.md` retirement, credentialed workflows-store inventory). §3.10's
+freeze lifts only inside the approved phases. NOT in this session: any code —
+W7.1 (rich_text.v1 substrate) starts on Wolf's approval of the plan.
+
 ## Session 2026-07-12 K (CANVAS Ask-AI runs on OpenAI; retheme + review fixes landed)
 
 Follow-ups to the merged canvas (PRs #415/#417/#418), each its own PR restarted
