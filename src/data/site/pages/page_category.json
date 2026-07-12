@@ -1,0 +1,21 @@
+{
+  "__generated": {
+    "at": "2026-07-12T09:41:56.801Z",
+    "from": "objects/page/by-id/page_category.json",
+    "record_version": 12
+  },
+  "pageType": "listing",
+  "route": "/category/[category]",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "heading": "%term%"
+      },
+      "id": "s_categoryhead",
+      "type": "lede"
+    }
+  ],
+  "seo": {},
+  "title": "Category '%term%'"
+}

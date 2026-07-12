@@ -30,7 +30,11 @@ export const getStaticPaths = (async () => {
 
   const { paths, skipped } = computeObjectPageRoutes({
     routeFilePaths,
-    pageExports: pageEntries.map((entry) => ({ objectId: entry.id, route: entry.data.route })),
+    pageExports: pageEntries.map((entry) => ({
+      objectId: entry.id,
+      route: entry.data.route,
+      pageType: entry.data.pageType,
+    })),
     postPermalinks: posts.map((post) => post.permalink),
     // Path families owned by other dynamic routes or tooling (config.yaml is
     // authoritative for the blog bases — Wolf B2). learn/topics is the topics
@@ -40,6 +44,10 @@ export const getStaticPaths = (async () => {
 
   for (const skip of skipped) {
     if (skip.reason === 'file_route') continue; // the normal state for the hand-wired pages
+    // W6: listing/content_detail objects are SERVED — by their formalized
+    // loader files, which read them directly — so this skip is the intended
+    // arrangement, not an unreachable page.
+    if (skip.reason === 'loader_owned_page_type') continue;
     console.warn(
       `[objectPage] NOT serving ${skip.objectId} at ${skip.route} — ${skip.reason}. ` +
         'The published page is store-backed but unreachable; pick a route nobody else owns.'

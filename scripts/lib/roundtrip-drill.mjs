@@ -104,15 +104,22 @@ export const sectionDrillOps = (instance) => {
  * is allowed. For a fully-decomposed page (all `shared_ref`s — the normal shape
  * once every section is its own object) the probe is a shared_ref duplicating
  * one of the page's references: it resolves (the target exists) and its
- * effective type is already sanctioned. The probe is added, poked, moved,
- * hidden, and removed, so the final body is byte-identical to the seed. Throws
- * only if the page carries no clonable section at all.
+ * effective type is already sanctioned. A SECTION-LESS page (legal since W6:
+ * `content_detail` publishes with zero sections) has nothing to clone, so its
+ * seed must declare `drillProbe: { type, data }` — a PageType-legal section the
+ * drill uses instead. The probe is added, poked, moved, hidden, and removed,
+ * so the final body is byte-identical to the seed. Throws only if the page
+ * carries no clonable section AND no declared probe.
  */
-export const pageDrillOps = (page, probeId) => {
+export const pageDrillOps = (page, probeId, fallbackProbe) => {
   const sections = Array.isArray(page.sections) ? page.sections : [];
-  const source = sections.find((section) => isRecord(section) && isRecord(section.data));
+  const source =
+    sections.find((section) => isRecord(section) && isRecord(section.data)) ??
+    (isRecord(fallbackProbe) && isRecord(fallbackProbe.data) ? fallbackProbe : undefined);
   if (!source) {
-    throw new Error('pageDrillOps: page has no section with data to clone as a probe.');
+    throw new Error(
+      'pageDrillOps: page has no section with data to clone as a probe and the seed declares no drillProbe.'
+    );
   }
   const probe = { id: probeId, type: source.type, data: clone(source.data) };
   const count = sections.length;
@@ -219,7 +226,7 @@ export const drillOpsForSeed = (seed) => {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
       .map((section) => section?.id)
       .filter((id) => typeof id === 'string');
-    return pageDrillOps(seed.body, deriveProbeId(existingIds));
+    return pageDrillOps(seed.body, deriveProbeId(existingIds), seed.drillProbe);
   }
   if (seed.objectType === 'template') {
     const existingSlotIds = (Array.isArray(seed.body.slots) ? seed.body.slots : [])

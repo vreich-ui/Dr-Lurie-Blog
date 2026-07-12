@@ -55,7 +55,11 @@ export type ResolvePageDeps = {
   /** Resolve a hero action's target to its href (route/asset via permalink, external verbatim, listing → blog). */
   resolveActionHref: (target: NavTarget) => string;
   /** Dereference a shared_ref target object id to the inline section it wraps. */
-  resolveSharedSection: (sectionObjectId: string) => { type: SectionType; data: unknown };
+  resolveSharedSection: (sectionObjectId: string) => {
+    type: SectionType;
+    data: unknown;
+    visibility?: 'public' | 'hidden';
+  };
   /**
    * Resolvers for content_grid `manual`/`query` sources (M-8, T3.9). A `cards`
    * source needs none — its curated cells live in data. Required only when a
@@ -85,10 +89,21 @@ const stripGenerated = (data: unknown): unknown => {
 /** Parse a page export (marker stripped) into its validated body. */
 export const parsePageExport = (data: unknown): PageBody => pageBodySchema.parse(stripGenerated(data));
 
-/** Parse a shared-section export into the inline `{type, data}` a shared_ref dereferences to. */
-export const parseSharedSectionExport = (data: unknown): { type: SectionType; data: unknown } => {
+/**
+ * Parse a shared-section export into the inline `{type, data, visibility}` a
+ * shared_ref dereferences to. `visibility` is carried so the resolver can
+ * honor a shared section hidden AT ITS OWN OBJECT (`set_section_visibility`
+ * on the section object) — hide once, hidden everywhere it is referenced.
+ */
+export const parseSharedSectionExport = (
+  data: unknown
+): { type: SectionType; data: unknown; visibility?: 'public' | 'hidden' } => {
   const body = sectionBodySchema.parse(stripGenerated(data));
-  return { type: body.section.type, data: body.section.data };
+  return {
+    type: body.section.type,
+    data: body.section.data,
+    ...(body.section.visibility !== undefined ? { visibility: body.section.visibility } : {}),
+  };
 };
 
 type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
@@ -154,16 +169,34 @@ const renderable = (id: string, type: SectionType, data: unknown, deps: ResolveP
   ctx: {},
 });
 
+/**
+ * Resolve a bare section list (W6): the listing surfaces render object
+ * sections around their derived list furniture, not through a whole-page
+ * body, so the section half of resolvePage is exported on its own.
+ *
+ * Never-render-private (A§1.1): a section with `visibility: 'hidden'` is
+ * skipped — whether hidden on the PAGE (the instance, including a hidden
+ * shared_ref) or, for a shared_ref, hidden at the TARGET section object
+ * (hide the shared section once, it disappears from every page referencing
+ * it). This mirrors the validator's `structure_visible` count, which already
+ * treats hidden sections as not rendered.
+ */
+export const resolveSections = (sections: PageBody['sections'], deps: ResolvePageDeps): RenderableSection[] =>
+  sections
+    .filter((section) => section.visibility !== 'hidden')
+    .flatMap((section) => {
+      if (section.type === 'shared_ref') {
+        // Render the referenced shared section as its own variant, keyed by the
+        // page section id so React-style keys stay stable and unique per page.
+        const target = deps.resolveSharedSection(section.data.section);
+        if (target.visibility === 'hidden') return [];
+        return [renderable(section.id, target.type, target.data, deps)];
+      }
+      return [renderable(section.id, section.type, section.data, deps)];
+    });
+
 export const resolvePageSections = (page: PageBody, deps: ResolvePageDeps): RenderableSection[] =>
-  page.sections.map((section) => {
-    if (section.type === 'shared_ref') {
-      // Render the referenced shared section as its own variant, keyed by the
-      // page section id so React-style keys stay stable and unique per page.
-      const target = deps.resolveSharedSection(section.data.section);
-      return renderable(section.id, target.type, target.data, deps);
-    }
-    return renderable(section.id, section.type, section.data, deps);
-  });
+  resolveSections(page.sections, deps);
 
 export const resolvePageMetadata = (page: PageBody): PageRenderMetadata => ({
   title: page.title,

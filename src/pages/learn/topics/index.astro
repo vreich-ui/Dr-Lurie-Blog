@@ -1,7 +1,9 @@
 ---
 import Layout from '~/layouts/PageLayout.astro';
+import ObjectSections from '~/components/cms/ObjectSections.astro';
 import { fetchPosts } from '~/utils/blog';
 import { getPermalink } from '~/utils/permalinks';
+import { loadRoutePageObject } from '~/utils/route-page-object';
 
 const posts = await fetchPosts();
 const topicMap = new Map<string, { title: string; slug: string; count: number; excerpts: Array<string> }>();
@@ -23,13 +25,27 @@ posts.forEach((post) => {
 
 const topics = Array.from(topicMap.values()).sort((a, b) => a.title.localeCompare(b.title));
 
+// W6 (T6.1): the hub's header copy + SEO are agent-editable via
+// `page_topics_index` (pageType 'listing'); the topic cards stay computed from
+// category frontmatter — topics remain category presentations, no Topic
+// entity (D§5.5). Fallback literals = the pre-conversion page.
+const hub = await loadRoutePageObject('page_topics_index');
+const header = hub?.header ?? {
+  kicker: 'Education library',
+  heading: 'Topics',
+  paragraphs: [
+    'Topics are generated from article category frontmatter, so this hub always mirrors the science themes used in the library.',
+  ],
+};
+
 const metadata = {
-  title: 'Topics',
-  description: 'Browse Dr. Lurié articles by the category frontmatter topic assigned to each article.',
+  title: hub?.title ?? 'Topics',
+  description:
+    hub?.seo.description ?? 'Browse Dr. Lurié articles by the category frontmatter topic assigned to each article.',
   openGraph: {
     images: [
       {
-        url: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-topics-social-preview.jpg',
+        url: hub?.seo.ogImage ?? 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-topics-social-preview.jpg',
         width: 1200,
         height: 630,
       },
@@ -40,13 +56,10 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section class="dl-section">
-    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Education library</p>
+    {header.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>}
     <div class="dl-reading mt-3">
-      <h1 class="text-4xl font-bold sm:text-5xl">Topics</h1>
-      <p class="mt-5 text-lg text-muted">
-        Topics are generated from article category frontmatter, so this hub always mirrors the science themes used in
-        the library.
-      </p>
+      <h1 class="text-4xl font-bold sm:text-5xl" set:html={header.heading} />
+      {header.paragraphs.map((paragraph) => <p class="mt-5 text-lg text-muted" set:html={paragraph} />)}
     </div>
 
     <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -68,4 +81,5 @@ const metadata = {
       }
     </div>
   </section>
+  <ObjectSections sections={hub?.extraSections ?? []} />
 </Layout>

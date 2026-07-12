@@ -1,0 +1,22 @@
+{
+  "__generated": {
+    "at": "2026-07-12T09:41:56.787Z",
+    "from": "objects/page/by-id/page_library.json",
+    "record_version": 12
+  },
+  "pageType": "listing",
+  "route": "/learn/library",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>Browse all Dr. Lurié skin science articles and practical explainers.</p>",
+        "heading": "Library"
+      },
+      "id": "s_libraryhead",
+      "type": "lede"
+    }
+  ],
+  "seo": {},
+  "title": "Library"
+}

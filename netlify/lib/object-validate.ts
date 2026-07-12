@@ -69,6 +69,8 @@ export type PageTypeConstraint = {
   id?: string;
   allowedSections: readonly SectionType[] | 'any';
   requiredSections?: readonly SectionType[];
+  /** Minimum visible sections to publish; defaults to 1 (W6: content_detail sets 0). */
+  minVisibleSections?: number;
 };
 
 export type ObjectValidationContext = {
@@ -953,6 +955,15 @@ export const checkStructuralInvariants = (
   const sections = collectSections(body);
   const visibleCount = sections.filter((section) => section.visibility !== 'hidden').length;
 
+  // PageType constraint, resolved up front: the ≥N-visible rule below is
+  // per-PageType since W6 (content_detail publishes with zero sections — the
+  // article is its content), and the allowed/required checks reuse it further
+  // down. context.pageType (directly injected, tests) wins over the registry
+  // lookup from the body's declared pageType.
+  const pageTypeConstraint =
+    context.pageType ??
+    (isRecord(body) && typeof body.pageType === 'string' ? context.resolvePageType?.(body.pageType) : undefined);
+
   // Route shape + uniqueness (§2.3-page). Shape is checked here because the
   // body schema only pins `route` to a non-empty string; uniqueness needs the
   // injected resolver (T0.8 supplies it, excluding this page).
@@ -973,10 +984,20 @@ export const checkStructuralInvariants = (
     );
   }
 
-  // ≥1 visible section — the analogue of article_body's "≥1 public node"
-  // (A§1.1). Publish-gated: a hard failure at publish, a warning while drafting.
-  if (visibleCount >= 1) {
-    criteria.push(crit('structure_visible', 'At least one visible section', 'complete', ''));
+  // ≥N visible sections — the analogue of article_body's "≥1 public node"
+  // (A§1.1). Publish-gated: a hard failure at publish, a warning while
+  // drafting. N defaults to 1; a PageType may lower it (W6: `content_detail`
+  // sets 0 — the article IS the page's content, sections are optional extras).
+  const minVisible = pageTypeConstraint?.minVisibleSections ?? 1;
+  if (visibleCount >= minVisible) {
+    criteria.push(
+      crit(
+        'structure_visible',
+        'At least one visible section',
+        'complete',
+        minVisible === 0 ? `PageType ${pageTypeConstraint?.id ?? ''} publishes without sections.` : ''
+      )
+    );
   } else {
     criteria.push(
       crit(
@@ -1027,12 +1048,9 @@ export const checkStructuralInvariants = (
     );
   }
 
-  // PageType allowed/required sections (D§3.4). The registry is code, resolved
-  // via context.resolvePageType from the body's pageType (or a directly-injected
-  // context.pageType, which wins). Without either, not verifiable here.
-  const pageTypeConstraint =
-    context.pageType ??
-    (isRecord(body) && typeof body.pageType === 'string' ? context.resolvePageType?.(body.pageType) : undefined);
+  // PageType allowed/required sections (D§3.4) — the constraint was resolved
+  // above (it also feeds the visible-section minimum). Without one, not
+  // verifiable here.
   if (!pageTypeConstraint) {
     criteria.push(crit('structure_pagetype', 'PageType section rules', 'optional', 'No PageType definition supplied.'));
     return criteria;

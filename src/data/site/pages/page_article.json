@@ -1,0 +1,12 @@
+{
+  "__generated": {
+    "at": "2026-07-12T09:41:56.809Z",
+    "from": "objects/page/by-id/page_article.json",
+    "record_version": 12
+  },
+  "pageType": "content_detail",
+  "route": "/%slug%",
+  "sections": [],
+  "seo": {},
+  "title": "Article"
+}

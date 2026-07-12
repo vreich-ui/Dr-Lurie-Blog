@@ -120,8 +120,48 @@ test('pageDrillOps handles a fully-decomposed (all-shared_ref) page via a shared
   assert.equal(ops.at(-1).op, 'remove_section', 'probe removed last → byte-identical');
 });
 
-test('pageDrillOps throws only when a page has no clonable section', () => {
+test('pageDrillOps throws only when a page has no clonable section AND no declared probe', () => {
   assert.throws(() => pageDrillOps({ title: 'Empty', sections: [] }, 's_rtprobe'), /no section with data/);
+});
+
+test('pageDrillOps drills a section-less page from a declared drillProbe (W6 content_detail)', () => {
+  const page = { title: 'Article', sections: [] };
+  const probe = { type: 'cta_banner', data: { heading: 'Probe', body: '<p>probe</p>', actions: [] } };
+  const { expected, ops } = pageDrillOps(page, 's_rtprobe', probe);
+  assert.deepEqual(expected, [
+    'set_page_meta',
+    'upsert_section',
+    'update_section_data',
+    'move_section',
+    'set_section_visibility',
+    'remove_section',
+  ]);
+  const upsert = ops.find((op) => op.op === 'upsert_section');
+  assert.equal(upsert.section.type, 'cta_banner');
+  assert.notEqual(upsert.section.data, probe.data, 'probe data is cloned, never shared');
+  assert.deepEqual(upsert.section.data, probe.data);
+  assert.equal(ops.at(-1).op, 'remove_section', 'probe removed last → byte-identical (still zero sections)');
+});
+
+test('drillOpsForSeed passes the seed drillProbe through for pages', () => {
+  const seed = {
+    objectType: 'page',
+    objectId: 'page_article',
+    body: { title: 'Article', sections: [] },
+    drillProbe: { type: 'cta_banner', data: { heading: 'Probe', actions: [] } },
+  };
+  const { ops } = drillOpsForSeed(seed);
+  assert.equal(ops.find((op) => op.op === 'upsert_section').section.type, 'cta_banner');
+});
+
+test('a page with its own sections ignores the declared probe — the clone stays PageType-proven', () => {
+  const page = {
+    title: 'Listing',
+    sections: [{ id: 's_head', type: 'lede', data: { heading: 'Library', actions: [] } }],
+  };
+  const probe = { type: 'cta_banner', data: { heading: 'Probe', actions: [] } };
+  const { ops } = pageDrillOps(page, 's_rtprobe', probe);
+  assert.equal(ops.find((op) => op.op === 'upsert_section').section.type, 'lede');
 });
 
 test('deriveProbeId avoids collisions with existing section ids', () => {

@@ -2,8 +2,10 @@
 import type { GetStaticPaths, InferGetStaticPropsType } from 'astro';
 import Layout from '~/layouts/PageLayout.astro';
 import GridItem from '~/components/blog/GridItem.astro';
+import ObjectSections from '~/components/cms/ObjectSections.astro';
 import { fetchPosts } from '~/utils/blog';
 import { getPermalink } from '~/utils/permalinks';
+import { loadRoutePageObject } from '~/utils/route-page-object';
 
 export const prerender = true;
 
@@ -27,9 +29,20 @@ export const getStaticPaths = (async () => {
 type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 const { topic, posts } = Astro.props as Props;
 
+// W6 (T6.1): ONE `page_topic_detail` object (pageType 'listing') serves every
+// topic page — pattern copy, `%term%` interpolated with this category's
+// display label (topics remain category presentations, D§5.5). The post grid
+// and the back-link stay computed furniture.
+const detail = await loadRoutePageObject('page_topic_detail', topic.title);
+const header = detail?.header ?? {
+  kicker: 'Topic',
+  heading: topic.title,
+  paragraphs: ['A focused collection of Dr. Lurié education assigned to this category in article frontmatter.'],
+};
+
 const metadata = {
-  title: `${topic.title} articles`,
-  description: `Science-led Dr. Lurié articles about ${topic.title}.`,
+  title: detail?.title ?? `${topic.title} articles`,
+  description: detail?.seo.description ?? `Science-led Dr. Lurié articles about ${topic.title}.`,
 };
 ---
 
@@ -39,15 +52,14 @@ const metadata = {
       ← All topics
     </a>
     <div class="mt-4 rounded-3xl bg-gradient-to-br from-sky-50 via-amber-50 to-transparent p-6 sm:p-10">
-      <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">Topic</p>
-      <h1 class="mt-3 text-4xl font-bold capitalize sm:text-5xl">{topic.title}</h1>
-      <p class="dl-reading mt-5 text-muted">
-        A focused collection of Dr. Lurié education assigned to this category in article frontmatter.
-      </p>
+      {header.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>}
+      <h1 class="mt-3 text-4xl font-bold capitalize sm:text-5xl" set:html={header.heading} />
+      {header.paragraphs.map((paragraph) => <p class="dl-reading mt-5 text-muted" set:html={paragraph} />)}
     </div>
 
     <div class="mt-10 grid gap-8 md:grid-cols-2">
       {posts.map((post) => <GridItem post={post} />)}
     </div>
   </section>
+  <ObjectSections sections={detail?.extraSections ?? []} />
 </Layout>

@@ -62,7 +62,9 @@ template backlog landed in one batched credentialed run on 2026-07-11, the
 taxonomy and site singleton in their own runs the same day. **All 12 page objects
 are converted; no page renders from an unbacked export anymore** — the rendered-stub
 backlog is empty. See "Why only nav is converted" (historical root-cause analysis)
-at the bottom.
+at the bottom. **W6 (2026-07-12) added six SEEDED listing/article page objects**
+(see "Listing & article surfaces") — rendered + locally round-tripped, awaiting
+their credentialed run.
 
 ### Status legend
 
@@ -144,6 +146,33 @@ for them.
 | `page_privacy`        | `/privacy`                | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                              |
 | `page_terms`          | `/terms`                  | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                              |
 | `page_404`            | `/404`                    | 🟢 CONVERTED | `system` PageType, reusable `cta_banner` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                         |
+
+### Listing & article surfaces (W6, seeded 2026-07-12)
+
+The six T6.1 page objects: **headings/copy/SEO are object data; the query
+machinery (post feeds, term filters, pagination, topic cards) stays the audited
+build-time derivation.** Convention: the object's FIRST `lede` section is the
+surface's header block (required by the `listing` PageType), rendered through
+the surface's existing header furniture; every EXTRA section renders through
+the component registry after the list/article — so "put a newsletter signup
+below every article" is one `upsert_section` on `page_article`. Per-term
+surfaces are ONE object per route family: their copy carries the `%term%`
+token, interpolated with each term's display label at build. Seeds:
+`scripts/lib/pages-listing-seed-data.mjs` (byte-identical transcriptions).
+
+**Status: 🟣 RENDERS + SEEDED, not CONVERTED** — local round-trip all green;
+the credentialed `--production --release --seeds
+scripts/lib/pages-listing-seed-data.mjs` run (after merge + deploy — the new
+PageType definitions must be live first) flips these to CONVERTED.
+
+| Object              | Serves                                | Status    | Notes                                                                                                                                           |
+| ------------------- | ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `page_library`      | `/learn/library` (+ pagination)       | 🟣 SEEDED | `listing`. Header lede ("Library" + blurb); title base + " — Page N" furniture.                                                                 |
+| `page_topics_index` | `/learn/topics`                       | 🟣 SEEDED | `listing`. Header lede (kicker "Education library"); topic cards stay computed from category frontmatter (D§5.5), og image in seo.              |
+| `page_topic_detail` | `/learn/topics/<slug>` (every topic)  | 🟣 SEEDED | `listing`, per-term: heading `%term%`, kicker "Topic"; description pattern in seo.                                                              |
+| `page_category`     | `/category/<slug>` (every category)   | 🟣 SEEDED | `listing`, per-term: heading `%term%`, title "Category '%term%'".                                                                              |
+| `page_tag`          | `/tag/<slug>` (every tag)             | 🟣 SEEDED | `listing`, per-term: heading "Tag: %term%", title "Posts by tag '%term%'".                                                                     |
+| `page_article`      | every article page (SinglePost route) | 🟣 SEEDED | `content_detail`: route-level SEO defaults (robots fallback = config.yaml) + optional sections below the post. Publishes with zero sections.    |
 
 ### Shared sections
 
@@ -271,12 +300,13 @@ manual grid curation validates against committed content and is agent-usable. Th
 variant was retired 2026-07-10 (schema + seed script; the sanctioned `cards`
 source replaced it — playbook trap 9 is closed).
 
-### 5. Listing pages 🔴 (Phase 6 — larger)
+### 5. Listing pages 🟣 BUILT + SEEDED (W6, 2026-07-12)
 
-The blog index, category, and tag listings (`/[...blog]`, `/learn/topics`) and the
-`listing` PageType are **typed but deliberately unimplemented** until the listing
-loaders are formalized. This is the biggest remaining chunk and is what connects
-pages to the article (`content_item`) pipeline.
+The `listing` and `content_detail` PageTypes are now **defined law** (all five
+PageTypeIds implemented), the listing loaders are formalized, and the six page
+objects are seeded + wired with a byte-identical cutover (see "Listing &
+article surfaces" above). Remaining: the one credentialed
+`--production --release` run to flip them CONVERTED.
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 
@@ -360,7 +390,10 @@ drives create→patch→publish→render per object as the enforceable "converte
 Until those exist, a "convert this page" task cannot actually be completed — say so
 rather than shipping a rendered stub.
 
-_Last audited: 2026-07-10 evening, `claude/home-page-conversion-state-6wsc2r`
-(home-page family CONVERTED: PRs #385/#386 + Wolf's credentialed
-`--production --release` runs, final run all-green with `released:true`).
-Prior: PR #383 (homepage-footer regression fix + definition-of-done reset)._
+_Last audited: 2026-07-12, `claude/w6-cms-conversion-lus2d7` (W6 listing
+surfaces built + seeded: listing/content_detail PageTypes defined, six page
+objects wired byte-identically, local round-trip green — awaiting the
+credentialed run). Prior: 2026-07-10 evening,
+`claude/home-page-conversion-state-6wsc2r` (home-page family CONVERTED: PRs
+#385/#386 + Wolf's credentialed `--production --release` runs, final run
+all-green with `released:true`)._

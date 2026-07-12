@@ -6,6 +6,8 @@ import Layout from '~/layouts/PageLayout.astro';
 import BlogList from '~/components/blog/List.astro';
 import Headline from '~/components/blog/Headline.astro';
 import Pagination from '~/components/blog/Pagination.astro';
+import ObjectSections from '~/components/cms/ObjectSections.astro';
+import { loadRoutePageObject, type RoutePageHeader } from '~/utils/route-page-object';
 
 export const prerender = true;
 
@@ -19,19 +21,33 @@ const { page, category } = Astro.props as Props;
 
 const currentPage = page.currentPage ?? 1;
 
+// W6 (T6.1): ONE `page_category` object (pageType 'listing') serves every
+// category page — its copy is pattern copy, `%term%` interpolated with this
+// category's display label. The post filter + pagination stay derivation.
+const listing = await loadRoutePageObject('page_category', category.title);
+const header: RoutePageHeader = listing?.header ?? { heading: category.title, paragraphs: [] };
+const baseTitle = listing?.title ?? `Category '${category.title}'`;
+
 const metadata = {
-  title: `Category '${category.title}' ${currentPage > 1 ? ` — Page ${currentPage}` : ''}`,
+  title: `${baseTitle} ${currentPage > 1 ? ` — Page ${currentPage}` : ''}`,
+  ...(listing?.seo.description ? { description: listing.seo.description } : {}),
   robots: {
-    index: blogCategoryRobots?.index,
-    follow: blogCategoryRobots?.follow,
+    index: listing?.seo.robots?.index ?? blogCategoryRobots?.index,
+    follow: listing?.seo.robots?.follow ?? blogCategoryRobots?.follow,
   },
 };
 ---
 
 <Layout metadata={metadata}>
   <section class="px-4 md:px-6 py-12 sm:py-16 lg:py-20 mx-auto max-w-4xl">
-    <Headline>{category.title}</Headline>
+    {
+      header.kicker && (
+        <p class="mb-4 text-center text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>
+      )
+    }
+    <Headline subtitle={header.paragraphs.join(' ')}>{header.heading}</Headline>
     <BlogList posts={page.data} />
     <Pagination prevUrl={page.url.prev} nextUrl={page.url.next} />
   </section>
+  <ObjectSections sections={listing?.extraSections ?? []} />
 </Layout>

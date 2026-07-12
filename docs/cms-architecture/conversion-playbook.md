@@ -48,9 +48,15 @@ site singleton (W4) — all proven end-to-end by credentialed
 `scripts/home-conversion-roundtrip.mjs --production --release` runs (store-backed,
 every permitted op round-tripped, published, released). **No page renders from an
 unbacked export anymore — the rendered-stub backlog is empty**, and agent-CREATED
-pages are served live by the object-page catch-all (2026-07-11). Still TODO: the
-W5+ hand-coded pages (see [`object-inventory.md`](object-inventory.md) and
-`state-of-play.md`).
+pages are served live by the object-page catch-all (2026-07-11). W6 (2026-07-12):
+the six listing/article page objects (library, topics ×2, category, tag, article)
+are **RENDERS + SEEDED, not converted** — local round-trip green, awaiting their
+credentialed run (`--seeds scripts/lib/pages-listing-seed-data.mjs`). Note their
+two family quirks: per-term objects carry `%term%` pattern copy (one object serves
+a whole route family), and `page_article` (content_detail) publishes with ZERO
+sections — its drill probe comes from the seed's `drillProbe`, not a page section.
+Still TODO: the W5 hand-coded pages (see
+[`object-inventory.md`](object-inventory.md) and `state-of-play.md`).
 
 ## The recipe — the conversion factory (proven end-to-end on the home page, 2026-07-10)
 

@@ -7,6 +7,82 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 (W6 BUILT + SEEDED: listing surfaces — the last unimplemented PageTypes are formalized)
+
+Wolf: "Move to W6 on the conversion to CMS path." The T6.1 batch, built the
+design-principles way: **the six listing/article page objects own headings/
+copy/SEO; the query machinery stays the audited build-time derivation**
+(A§2.5–2.7 — getStaticPathsBlogList/Category/Tag, fetchPosts, the topics
+derivation; D§5.5 holds: topics remain category presentations, no Topic
+entity).
+
+- **PageType law completed** (`src/lib/registry/page-types.ts`): `listing`
+  (allowed: lede/prose/cta_banner/newsletter_signup/content_grid/link_list/
+  shared_ref; **required: lede** — the first lede IS the surface's header
+  block; `listing: {source: 'content_items', defaultQuery
+  {sort: published_time_desc}, paginate: true}`) and `content_detail`
+  (no lede — the post supplies its heading; **`minVisibleSections: 0`**, a new
+  per-PageType knob on the ≥1-visible-section publish gate: page_article
+  publishes with zero sections because the article IS its content).
+  `unimplementedPageTypeIds()` is now empty; `object_contract('page')` and
+  `registry_get('page_type')` serve all five definitions automatically.
+- **Six objects seeded** (`scripts/lib/pages-listing-seed-data.mjs`), bodies
+  verbatim transcriptions: `page_library` (/learn/library), `page_topics_index`
+  (/learn/topics), `page_topic_detail`, `page_category`, `page_tag`,
+  `page_article`. **Per-term surfaces are ONE object per route family with
+  `%term%` pattern copy** (`src/lib/renderer/listing-term.ts`, deep string
+  interpolation, unit-tested): `page_tag.title = "Posts by tag '%term%'"` is an
+  agent-editable heading pattern — the loader substitutes each term's display
+  label at build. Routes are self-describing family patterns
+  (`/category/[category]`, `/%slug%`) — unique, and never emitted by the
+  catch-all: `object-page-routes.ts` gained the `loader_owned_page_type` skip
+  (listing/content_detail objects are served BY their loaders; without this,
+  page_article's `/%slug%` route would have minted a literal page).
+- **Wiring** (the six route files + shared plumbing): each loader reads its
+  object via `loadRoutePageObject` (`src/utils/route-page-object.ts` — first
+  visible lede → header copy; title/seo term-interpolated; pre-conversion
+  literals as fallback when the export is absent, the W4 pattern), renders the
+  header through the surface's EXISTING furniture (Headline / topics hub
+  markup — byte-identical cutover), keeps pagination suffixes + robots gating
+  as furniture (object seo.robots wins when set, config.yaml stays the
+  fallback), and dispatches **every extra section through the component
+  registry after the list/article** (`ObjectSections.astro` — hidden filtered).
+  An agent can now put a cta_banner under the library list or a
+  newsletter_signup below EVERY article with one patch op (proven with temp
+  probes in dist, then removed). PageObjectRenderer's dep-building was
+  extracted to `section-resolve-deps.ts` and shared — no behavior change.
+- **Driver**: section-less pages drill via a seed-declared `drillProbe`
+  (PageType-legal clone source; `roundtrip-drill.mjs`) — page_article
+  exercises all six page ops like everyone else.
+
+Gates: **1030/1030 tests** (981 compiled + 49 scripts; ~20 new) · astro check
+0 errors · build OK (167 pages) · **build-diff EMPTY (168/168 identical)** —
+a pure cutover · local driver run ALL GREEN (create → every permitted op
+byte-identical → validate → publish blocked at the expected sandbox boundary →
+contract 6/6 → inventory 6/6 → exports materialized).
+
+**Status: the six listing objects are RENDERS + SEEDED, not CONVERTED** —
+criteria 2/3 need the credentialed run after merge + deploy:
+`node scripts/home-conversion-roundtrip.mjs --production --release --seeds scripts/lib/pages-listing-seed-data.mjs`
+(schema-vintage gate applies: the deployed endpoint must carry the new
+PageType definitions before the run). After it, 37 objects are converted and
+the P6 exit criterion "every object type in the C§2.2 matrix exists in
+production" is met for pages. Remaining waves: W5 hand-coded pages (Wolf:
+separate session), W7 rich text (OQ-8).
+
+**Follow-up in the same PR (Wolf: "address visibility: 'hidden' in the earlier
+converted scope"): the never-render-private gap is CLOSED at the resolver.**
+`resolveSections` (the pure layer BOTH render paths share — PageObjectRenderer
+for the 12 converted pages + the object-page catch-all, and ObjectSections for
+the listing surfaces) now skips a section when its page instance is hidden
+(including a hidden `shared_ref`, which is not even dereferenced) OR when a
+`shared_ref` target's own section object is hidden
+(`parseSharedSectionExport` surfaces the inner `visibility`) — so
+`set_section_visibility` on a shared section hides it on every page that
+references it, matching the validator's `structure_visible` semantics. No
+committed export carries `visibility` today, so the change is render-neutral:
+build-diff EMPTY again. 4 new resolver tests pin all four cases.
+
 ## Session 2026-07-11 M (content_item resolver: manual article curation is agent-usable — trap 4 closed)
 
 The first real step toward the article object model, per the post-W4 path

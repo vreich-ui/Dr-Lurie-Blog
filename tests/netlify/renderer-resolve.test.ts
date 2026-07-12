@@ -185,3 +185,60 @@ test('a post-backed content_grid without contentGrid resolvers throws loudly, no
   const page = parsePageExport(gridPageExport({ kind: 'manual', items: ['p1'] }));
   assert.throws(() => resolvePageSections(page, deps()), /requires contentGrid resolvers/);
 });
+
+// ═══ never-render-private (A§1.1): hidden sections are skipped at resolve ════
+
+test('a hidden inline section is skipped; public/unset ones render', () => {
+  const raw = pageExport();
+  (raw.sections[0] as { visibility?: string }).visibility = 'hidden';
+  const sections = resolvePageSections(parsePageExport(raw), deps());
+  assert.deepEqual(
+    sections.map((section) => section.id),
+    ['s_newsletter'],
+    'the hidden hero must not reach component dispatch'
+  );
+});
+
+test('a hidden shared_ref INSTANCE is skipped without dereferencing its target', () => {
+  const raw = pageExport();
+  (raw.sections[1] as { visibility?: string }).visibility = 'hidden';
+  const trackingDeps: ResolvePageDeps = {
+    ...deps(),
+    resolveSharedSection: () => {
+      throw new Error('a hidden shared_ref must not be dereferenced');
+    },
+  };
+  const sections = resolvePageSections(parsePageExport(raw), trackingDeps);
+  assert.deepEqual(
+    sections.map((section) => section.id),
+    ['s_hero']
+  );
+});
+
+test('a shared_ref whose TARGET section object is hidden is skipped — hide once, hidden everywhere', () => {
+  const hiddenTarget = sectionExport();
+  (hiddenTarget.section as { visibility?: string }).visibility = 'hidden';
+  const sections = resolvePageSections(parsePageExport(pageExport()), {
+    ...deps(),
+    resolveSharedSection: () => parseSharedSectionExport(hiddenTarget),
+  });
+  assert.deepEqual(
+    sections.map((section) => section.id),
+    ['s_hero']
+  );
+});
+
+test('parseSharedSectionExport surfaces the inner visibility; a public target still renders', () => {
+  const publicTarget = sectionExport();
+  (publicTarget.section as { visibility?: string }).visibility = 'public';
+  assert.equal(parseSharedSectionExport(publicTarget).visibility, 'public');
+  assert.equal(parseSharedSectionExport(sectionExport()).visibility, undefined);
+  const sections = resolvePageSections(parsePageExport(pageExport()), {
+    ...deps(),
+    resolveSharedSection: () => parseSharedSectionExport(publicTarget),
+  });
+  assert.deepEqual(
+    sections.map((section) => section.id),
+    ['s_hero', 's_newsletter']
+  );
+});

@@ -166,10 +166,10 @@ test("registry_get('page_type') serves the T3.1 definitions with the JSON-schema
   const definitions = res.structuredContent?.definitions as Array<{ id: string; reviewPolicy: { required: boolean } }>;
   assert.deepEqual(
     definitions.map((definition) => definition.id),
-    ['home', 'standard', 'system']
+    ['home', 'standard', 'system', 'listing', 'content_detail']
   );
   assert.ok(definitions.every((definition) => definition.reviewPolicy.required === true));
-  assert.deepEqual(res.structuredContent?.not_yet_implemented, ['listing', 'content_detail']);
+  assert.deepEqual(res.structuredContent?.not_yet_implemented, []);
   const schema = res.structuredContent?.definition_schema as { type?: string };
   assert.equal(schema.type, 'object');
 });

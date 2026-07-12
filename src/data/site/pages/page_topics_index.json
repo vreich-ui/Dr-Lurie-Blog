@@ -1,0 +1,26 @@
+{
+  "__generated": {
+    "at": "2026-07-12T09:41:56.791Z",
+    "from": "objects/page/by-id/page_topics_index.json",
+    "record_version": 12
+  },
+  "pageType": "listing",
+  "route": "/learn/topics",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>Topics are generated from article category frontmatter, so this hub always mirrors the science themes used in the library.</p>",
+        "heading": "Topics",
+        "kicker": "Education library"
+      },
+      "id": "s_topicshead",
+      "type": "lede"
+    }
+  ],
+  "seo": {
+    "description": "Browse Dr. Lurié articles by the category frontmatter topic assigned to each article.",
+    "ogImage": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-topics-social-preview.jpg"
+  },
+  "title": "Topics"
+}

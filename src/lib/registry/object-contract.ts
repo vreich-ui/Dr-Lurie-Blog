@@ -244,7 +244,10 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           id: 'structure_visible',
           severity: 'blocks_publish',
           enforced_live: true,
-          description: 'At least one non-hidden section is required to publish (warns while drafting).',
+          description:
+            'At least one non-hidden section is required to publish (warns while drafting). A PageType may ' +
+            'lower the minimum: "content_detail" publishes with zero sections — the article is its content, ' +
+            'and any sections are optional extras rendered after it.',
         },
         {
           id: 'structure_allowed',
