@@ -180,16 +180,57 @@ v1 scope (deliberately bounded):
   for it (OQ-W7-2). What v1 buys: agents can build, score, and compare
   variants quickly, and publishing a winner is one `object_publish`.
 
-### 2.5 The strategy vocabulary as data (recommended — OQ-W7-3)
+### 2.5 The strategy vocabulary as data (`strategy_drlurie`) — expanded design (OQ-W7-3)
 
-Today `strategy`/`intent` are **code enums** (12 + 5 values). The
-design-principles litmus ("if an agent can't extend it without a code change,
-it's a replica") argues for a **registry singleton** (`strategy_drlurie`,
-tax_drlurie's sibling): kinds `strategy` / `intent` / `framework`, terms with
-definitions agents read to know what a hook IS, governance via the same term
-ops + Tier 3 publish. The enums become the seed vocabulary. This directly
-serves "agents need to know what it is" — the definition travels with the
-term. Wolf's call; buildable in W7.3 or deferred without blocking anything.
+Today `strategy` (12 values) and `intent` (5) are **closed code enums**: a
+term is a bare word. Three failures against the mandate: extending the
+vocabulary is a code change (the design-principles litmus fails); no
+definition travels with the term, so agents guess what the house means by
+"agitation"; and there is nothing shared to score against. The behavioral
+theory lives implicitly in prompts — the registry makes it a versioned,
+agent-readable asset of the CMS.
+
+**Design: one singleton registry, three term kinds** (taxonomy's sibling —
+same term ops, `merged_into` alias machinery, and Tier 3 human-executed
+publish, since vocabulary changes alter validation site-wide):
+
+- **`strategy`** — the per-node role. Term fields: `definition` (what it IS,
+  house-style), `purpose` (behavioral rationale — what it does to the
+  reader), `cues[]` (signals a node is doing this job), `quality_criteria[]`
+  (what agents score against), `placement` (zone + typical count),
+  `followed_well_by[]` (sequencing hints), `examples[]` (curated from the
+  83-post corpus), `status`/`merged_into`.
+- **`intent`** — educate/persuade/reassure/convert/navigate, each with
+  definition + funnel position.
+- **`framework`** — named arcs bundling strategies in order with optionality:
+  PAS (hook → agitation → resolution → recommendation), AIDA,
+  Before-After-Bridge, house arcs. Agents use frameworks to BUILD (instantiate
+  the arc) and to JUDGE (does the article realize its declared arc?).
+
+**Wiring:** `private.strategy` resolves against active terms
+(`resolveStrategyTerm`, the `resolveTaxonomyTerm` sibling; aliases followed;
+unknown term at patch = named blocker with near matches).
+`object_contract('content_item')` serves the vocabulary WITH definitions;
+input templates reference terms. `scores[]` cite `{framework, dimension}` as
+term ids, making scores comparable across articles and variants — the
+"judge, score, build variants quickly" mechanism made concrete (a variant
+hypothesis becomes legible: "same article, PAS arc vs BAB arc"). Optional
+article-level `editorial.framework` declares the arc; a validator **warns,
+never blocks** when the node sequence deviates. Deprecating a term in live
+use requires `merged_into` (the taxonomy no-stranding rule).
+
+**Seed:** today's 12 + 5 become the seed terms; definitions/criteria drafted
+from the corpus and docs, **approved by Wolf term-by-term** (the tax_drlurie
+precedent). Existing annotations already use the seed values — zero
+normalization.
+
+**Costs:** one more registry to curate (machinery identical to taxonomy);
+strategy values lose static TypeScript typing (runtime validation — the same
+trade taxonomy made); definitions are load-bearing prompt material, so their
+quality propagates — which is the point: theory encoded once, inherited by
+every agent.
+
+Its own bounded slice of W7.3; blocks nothing in W7.1/W7.2 either way.
 
 ## 3. Functional continuity
 
@@ -302,10 +343,13 @@ ruling 3 but severable if the wave runs long.
 - **OQ-W7-2 (anytime):** variant serving / traffic splitting — confirm out of
   scope for W7 (records + scoring only).
 - **OQ-W7-3 (before W7.3):** strategy/intent vocabulary as a governed registry
-  (`strategy_drlurie`) vs staying code enums. Recommendation: registry —
-  definitions travel with terms; agents extend without code changes.
-- **OQ-W7-4 (before W7.3):** articles keep Tier 1 direct publish (recommended)
-  or flip to review-required now that the machinery exists?
+  (`strategy_drlurie`, full design §2.5) vs staying code enums. Recommendation:
+  registry — definitions travel with terms; agents extend without code
+  changes. _Expanded design delivered to Wolf 2026-07-12; awaiting his
+  go/no-go._
+- **OQ-W7-4: ✅ RESOLVED (Wolf, 2026-07-12): articles keep Tier 1 direct
+  publish.** Review stays an optional policy knob; migration changes the
+  substrate, not the trust posture.
 - **OQ-W7-5 (before W7.6):** committed `.md` files — retire at cutover
   (recommended) or keep as a derived mirror?
 - **OQ-W7-6 (before W7.4):** confirm you can run the credentialed inventory of
