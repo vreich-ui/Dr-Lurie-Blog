@@ -7,6 +7,33 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 K (CANVAS Ask-AI runs on OpenAI; retheme + review fixes landed)
+
+Follow-ups to the merged canvas (PRs #415/#417/#418), each its own PR restarted
+from main:
+
+- **Ask-AI provider → OpenAI (Wolf's call: "replace")**: the generic canvas
+  Ask-AI (`netlify/lib/ask-ai-object.ts` + `admin-ask-ai-object.ts`) now calls
+  OpenAI Chat Completions function-calling with `OPENAI_API_KEY` (already
+  configured for ChatKit / the publisher agent) and `OPENAI_MODEL` (default
+  `gpt-4o`), replacing the Anthropic Messages call. The zod-derived tool schema
+  is plain JSON Schema, so it is the OpenAI function's `parameters` verbatim; a
+  forced `tool_choice` keeps the reply structured (arguments arrive as a JSON
+  string — parsed before the null-strip). **Provider-only swap**: read-only
+  contract, section scoping, shared_ref refusal, and the human **Accept** gate
+  are unchanged — the AI still cannot write a field; Accept → object_patch
+  (draft) → Publish → Release remain the three human gates. The article Ask-AI
+  (`admin-ask-ai-node.ts`) is a separate system, untouched. Both ask-ai test
+  files reworked to the OpenAI wire shape; 23 ask-ai tests + full suite green.
+- **Retheme (#418, merged)**: canvas chrome derives every color/font from the
+  project's `--aw-*` design tokens (auto-flips light/dark); no hardcoded purple.
+- **Review fixes (#417, merged)**: lapsed-token sessions keep the canvas;
+  listing-page headers carry editing chips.
+
+Gates for the OpenAI swap: 1089 + 49 tests, astro check 0 errors, build 172
+pages, eslint/prettier clean. Not yet exercised against the real OpenAI
+endpoint (same credentialed-run boundary as the rest of the canvas).
+
 ## Session 2026-07-12 J (W5 PAGES SEEDED: /pricing, /services, shop-preview — zero hand-coded page routes left; commerce_orders admin tool)
 
 Same session (PR #416 merged; branch restarted). The plan's "after S2/S3"
