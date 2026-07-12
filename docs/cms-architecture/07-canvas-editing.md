@@ -69,6 +69,20 @@ reply structured. The swap is provider-only — the read-only contract, section
 scoping, and the human Accept gate are unchanged. (The article Ask-AI,
 `admin-ask-ai-node.ts`, is a separate system and keeps its own provider.)
 
+**Copy-only guard (2026-07-12):** the section-scoped tool schema strips
+**protected fields** — media/asset URLs (`portrait`, `*AssetRef`, `logo`,
+`icon`, `ogImage`, `src`…), references/bindings (`source`, `products`,
+`contentItem`, `section`, `formName`, `actions`/`links`…), and
+structure/routing (`route`, `sections`, `slug`, `anchor`…) — via
+`isProtectedAskAiField` (`ask-ai-schema.ts`), with a defensive re-strip of the
+returned suggestion. The copy AI can therefore change **text only**; it can
+never rewrite or invent an image/link, even if it tries. This closes the
+About-portrait incident: a heading edit that also swapped a real local image
+for a hallucinated CDN URL, breaking the page on publish. Whole-object admin
+asks (site/nav/template — the deliberate JSON-review surface) keep every field
+(`protectFields` is off there). A future manual (non-AI) field editor is the
+sanctioned path for deliberately changing an image.
+
 ### 3. The overlay (`src/lib/edit-mode/`)
 
 - **Dormant loader** (`EditMode.astro`, included by `Layout.astro`): ~1.5 KB;

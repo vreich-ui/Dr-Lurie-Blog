@@ -9,6 +9,8 @@ import {
   deriveAskAiToolForObjectType,
   deriveAskAiToolSchema,
   isAskAiObjectType,
+  isProtectedAskAiField,
+  sectionDataSchemaForType,
 } from '../../netlify/lib/ask-ai-schema.js';
 
 // Every registered object type produces a valid Anthropic tool: partial (no
@@ -110,4 +112,68 @@ test('derivation is generic for a union schema too (no .partial): required strip
   assert.equal(tool.input_schema.$schema, undefined);
   assert.equal(tool.input_schema.required, undefined);
   assert.ok(tool.input_schema.anyOf || tool.input_schema.oneOf, 'a union should surface as anyOf/oneOf');
+});
+
+// ── protected fields: the copy AI cannot touch media/asset/reference fields ──
+// (the 2026-07-12 About-portrait incident: a heading edit also swapped a real
+// local image for a hallucinated CDN URL, breaking the page on publish.)
+test('isProtectedAskAiField flags media/asset/reference/structure, not copy', () => {
+  for (const key of [
+    'portrait',
+    'portraitAssetRef',
+    'imageAssetRef',
+    'ogImage',
+    'logo',
+    'icon',
+    'src',
+    'source',
+    'products',
+    'contentItem',
+    'formName',
+    'actions',
+    'links',
+    'route',
+    'sections',
+    'slug',
+    'anchor',
+    'brandTokens',
+  ]) {
+    assert.equal(isProtectedAskAiField(key), true, `${key} must be protected`);
+  }
+  for (const key of [
+    'heading',
+    'kicker',
+    'body',
+    'title',
+    'subtitle',
+    'description',
+    'message',
+    'items',
+    'trustNotes',
+    'disclaimer',
+    'quotes',
+    'consentText',
+  ]) {
+    assert.equal(isProtectedAskAiField(key), false, `${key} is copy and must stay editable`);
+  }
+});
+
+test("a bio section's protected tool schema exposes copy but NOT the portrait/asset fields", () => {
+  const bioData = sectionDataSchemaForType('bio');
+  assert.ok(bioData, 'bio is a registered section type');
+  const props = deriveAskAiToolSchema(bioData!, { protectFields: true }).input_schema.properties as Record<
+    string,
+    unknown
+  >;
+  assert.ok('heading' in props, 'heading (copy) stays editable');
+  assert.ok('body' in props, 'body (copy) stays editable');
+  assert.ok('trustNotes' in props, 'trustNotes (copy) stays editable');
+  assert.equal('portrait' in props, false, 'portrait (image object) must be removed');
+  assert.equal('portraitAssetRef' in props, false, 'portraitAssetRef (asset) must be removed');
+});
+
+test('without protectFields the schema is unchanged (whole-object admin asks keep every field)', () => {
+  const bioData = sectionDataSchemaForType('bio');
+  const props = deriveAskAiToolSchema(bioData!).input_schema.properties as Record<string, unknown>;
+  assert.ok('portrait' in props, 'unprotected derivation keeps portrait');
 });

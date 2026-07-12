@@ -85,6 +85,13 @@ export interface DeriveAskAiToolOptions {
   toolName?: string;
   /** Tool description shown to the model. */
   description?: string;
+  /**
+   * Remove protected (non-copy) fields — media/asset/reference/structure — from
+   * the schema so the model can only edit text. Set for the edit-mode canvas
+   * (section-scoped) path, where a copy edit must never touch an image or link;
+   * left off for whole-object admin asks, which are a deliberate review surface.
+   */
+  protectFields?: boolean;
 }
 
 const DEFAULT_TOOL_NAME = 'propose_object_changes';
@@ -93,9 +100,64 @@ const DEFAULT_DESCRIPTION =
   'Omit every field that stays the same. Preserve the existing voice, tone, and structure.';
 
 /**
+ * Fields the copy-editing Ask-AI must NEVER be able to change: media/asset
+ * URLs (portrait, *AssetRef, logo, icon, ogImage…), object references and
+ * bindings (source, products, contentItem, section, formName, actions/links
+ * targets…), and structure/routing/config (route, pageType, sections, slug,
+ * anchor, brandTokens…). None of these are "copy", and an LLM hallucinates
+ * them — the 2026-07-12 About-portrait incident: asked to edit a heading, the
+ * model also swapped a working local image for a made-up CDN URL, which broke
+ * the page on publish. These keys are stripped from the tool schema (so the
+ * model can't propose them) AND defensively from the returned suggestion
+ * (ask-ai-object.ts). Changing an image/link is a deliberate action, never an
+ * AI side-effect of a copy edit.
+ */
+const PROTECTED_FIELD_NAME_RE = /asset|image|portrait|logo|icon|favicon|media|src|url|href|ogimage/i;
+const PROTECTED_FIELD_NAMES = new Set([
+  'source',
+  'products',
+  'contentItem',
+  'section',
+  'formName',
+  'indexRoute',
+  'actions',
+  'links',
+  'action',
+  'link',
+  'target',
+  'page_ref',
+  'commerce',
+  'fulfillment',
+  'stripe',
+  'stripe_test',
+  'availability',
+  'route',
+  'pageType',
+  'template',
+  'navigationOverrides',
+  'sections',
+  'defaultNavigation',
+  'urls',
+  'blog',
+  'brandTokens',
+  'chrome',
+  'metadataDefaults',
+  'slug',
+  'anchor',
+  'robots',
+]);
+
+/** True when a field must not be rewritten by the copy-editing Ask-AI (see above). */
+export const isProtectedAskAiField = (key: string): boolean =>
+  PROTECTED_FIELD_NAME_RE.test(key) || PROTECTED_FIELD_NAMES.has(key);
+
+/**
  * Derive a forced-tool descriptor from ANY zod schema. Generic by
  * construction: no per-type branching, so a new object type is served the
- * moment its zod schema exists (T1.6 acceptance property).
+ * moment its zod schema exists (T1.6 acceptance property). With
+ * `protectFields`, protected fields (isProtectedAskAiField —
+ * media/asset/reference/structure) are removed from the properties so the
+ * model literally cannot propose changing them.
  */
 export const deriveAskAiToolSchema = (bodySchema: z.ZodType, options: DeriveAskAiToolOptions = {}): AskAiTool => {
   // The AI proposes a partial (only changed fields). `.partial()` drops the
@@ -111,6 +173,15 @@ export const deriveAskAiToolSchema = (bodySchema: z.ZodType, options: DeriveAskA
   // `required` (belt-and-suspenders for the non-partial fallback).
   delete jsonSchema.$schema;
   delete jsonSchema.required;
+
+  // Copy-only (canvas): remove protected (non-copy) fields so the model can
+  // only edit text — an image/link/reference is never changed by a copy edit.
+  const properties = jsonSchema.properties as Record<string, unknown> | undefined;
+  if (options.protectFields && properties) {
+    for (const key of Object.keys(properties)) {
+      if (isProtectedAskAiField(key)) delete properties[key];
+    }
+  }
 
   return {
     name: options.toolName ?? DEFAULT_TOOL_NAME,

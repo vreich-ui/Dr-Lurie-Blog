@@ -7,6 +7,37 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 L (CANVAS bug: copy-AI dropped an image — copy-only guard added)
+
+First real production incident from the canvas, reported by Wolf: an AI edit
+to the /about intro (heading → add "Ph.D") also **silently swapped the bio
+`portrait.src`** from the working local `/images/dr-lurie-portrait4.jpeg` to a
+hallucinated `https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg`
+(the model echoed the `kugelmedia.netlify.app/drlurieblog/` CDN pattern it saw
+elsewhere in site data + a plausible filename). Published as `36b060c`, it
+broke the About portrait — and was the "change I did not make." (The three
+`prod_*` rows in Wolf's pending tray were unrelated: shop products the
+inventory `pending_changes` filter surfaces, not canvas edits.)
+
+**Root cause**: the section-scoped Ask-AI exposed the section's FULL data
+schema — including media/asset/reference fields — to the model, and applied
+whatever it returned (deep-merge). An LLM will hallucinate URLs.
+
+**Fix (copy-only guard)**: `isProtectedAskAiField` (`ask-ai-schema.ts`) names
+the non-copy fields — media/asset (`portrait`, `*AssetRef`, `logo`, `icon`,
+`ogImage`, `src`…), references/bindings (`source`, `products`, `contentItem`,
+`section`, `formName`, `actions`/`links`…), structure/routing (`route`,
+`sections`, `slug`, `anchor`…). `deriveAskAiToolSchema` gains `protectFields`
+(set on the canvas section path, off for whole-object admin asks) that strips
+them from the tool schema, plus a defensive re-strip of the suggestion in
+`ask-ai-object.ts`. The copy AI now edits **text only**. 1093 + 49 tests
+(27 ask-ai, incl. a hallucinated-portrait regression test), astro check 0,
+eslint/prettier clean. **Follow-ups**: (1) restore the live portrait to
+`/images/dr-lurie-portrait4.jpeg` on `sec_about_intro` (inner id `s_intro`) —
+needs the production key; (2) the canvas has no manual (non-AI) field editor,
+which is now the only sanctioned way to deliberately change an image — worth
+building next.
+
 ## Session 2026-07-12 K (CANVAS Ask-AI runs on OpenAI; retheme + review fixes landed)
 
 Follow-ups to the merged canvas (PRs #415/#417/#418), each its own PR restarted
@@ -112,8 +143,7 @@ product type's permitted-action surface is now COMPLETE:
   charges the chosen amount against the linked Stripe Product). Buy box
   grew an amount input.
 - **Free claim** (netlify/functions/claim-free.ts): direct token issuance
-  through the SAME order/event machinery (ord_free_…, session null, amount
-  0) + the lead-capture tie-in (optional email → the opt-ins store). Buy
+  through the SAME order/event machinery (ord*free*…, session null, amount 0) + the lead-capture tie-in (optional email → the opt-ins store). Buy
   box: "Get it free" renders the download link inline.
 - **Unlock kind**: checkout requires an EXISTING pre-generated artifact
   under the product's unlock_prefix (nobody pays for a ghost); the webhook
@@ -131,6 +161,7 @@ at approval_required → Wolf approves), the LIVE Stripe exit test (launch
 gate, needs keys), and the after-S3 page conversions (/pricing with
 pricing_table; /services + shop-preview with mockup copy per Wolf's
 directive).
+
 ## Session 2026-07-12 H (CANVAS SHIPPED: the site is the editing surface — admin inline Ask-AI, draft-in-place, publish/release tray)
 
 Wolf approved the edit-mode canvas plan ("go on and start work on this,
@@ -143,9 +174,8 @@ feasibility/UX write-up + interactive mockup. Shipped in four commits on
 - **Section identity in the built HTML**: both dispatch sites wrap every
   section in a `display:contents` element carrying
   `data-cms-object-id/-section-id/-section-type` (+ `-shared-object` for
-  shared_ref derefs — `resolveSections` now keeps the `sec_*` id on
-  `RenderableSection`). No box, no layout change; ObjectSections gained a
-  required `objectId` prop (threaded from the 6 listing routes).
+  shared*ref derefs — `resolveSections` now keeps the `sec*\*`id on`RenderableSection`). No box, no layout change; ObjectSections gained a
+required `objectId` prop (threaded from the 6 listing routes).
 - **Section-scoped Ask-AI (additive)**: `admin-ask-ai-object` takes
   `section_id` (pages) — tool derived from the section type's own data
   grammar (`sectionDataSchemaForType`, generic over the union), suggestion
@@ -165,7 +195,7 @@ feasibility/UX write-up + interactive mockup. Shipped in four commits on
   astro check 0, build 167 pages, **headless-browser drive of the real built
   site end-to-end** (dormant visitor path verified — zero admin calls/chunk;
   full edit flow wire shapes asserted; one real bug found+fixed by the drive).
-  Build output now differs from pre-canvas builds by the inert data-cms-*
+  Build output now differs from pre-canvas builds by the inert data-cms-\*
   attributes only — sanctioned, one-time.
 - **NOT done (deliberate)**: articles on the canvas (W7/OQ-8 — Wolf's stop),
   structural ops UI (add/move/remove/meta), OQ-9 SSR draft preview, W7 rich
@@ -186,7 +216,7 @@ Wolf's mockup-data directive applied:
   collection ONLY when a section needs them (the dynamic-import chunk rule);
   mode decides the price badge ("$19" / "Pay what you want" / "Free").
   Manual picks validate through reference integrity (`requireObject
-  'product'`).
+'product'`).
 - **`/shop`** — NO route file: `page_shop` (standard) is the FIRST page
   served by the object-page catch-all in production use (the zero-code
   promise cashed in). Its grid is a `query` source, so newly published
@@ -234,7 +264,7 @@ signature verification; hand-rolling signature checks is malpractice).
   'test' — a missing flag must never charge real cards);
   `stripeLinkageForMode` picks `commerce.stripe` vs `stripe_test`. All four
   key envs + the token secret are in PROTECTED_ENV_KEYS (§8.5). Lazy client
-  + injectable test seam.
+  - injectable test seam.
 - **`create-checkout-session.ts`**: buyability gated on STORE state
   (published + active + available + linked); charges the linked `price_id`,
   never the cache (§3); stamps `metadata {product_id, event_id}`;
@@ -314,25 +344,26 @@ token delivery + success page), which is next on the critical path.
 
 Shop build sequence started per [`06-shop-module-plan.md`](../06-shop-module-plan.md)
 §9. **S1a is complete**: `product.v1` schema + object type + validation criteria
-+ contract + the review-required approval flip — the seam everything else hangs
-on. What exists now:
 
-- **`product.v1` body schema** (`src/schema/bodies/product-v1.ts`): slug +
+- contract + the review-required approval flip — the seam everything else hangs
+  on. What exists now:
+
+* **`product.v1` body schema** (`src/schema/bodies/product-v1.ts`): slug +
   presentation (title/excerpt/images/seo/`page_ref`/notes) + commerce
   (provider/mode/price/pwyw/stripe/stripe_test/availability, Stripe id shapes
   pinned so keys can't sit where ids belong) + **fulfillment as THE
   discriminated union** (`download` {artifact_ref, filename} / `unlock`
   {unlock_prefix} / `none`), all strict.
-- **Type wiring end-to-end**: `objectTypes` + `prod_` id patterns/minting
+* **Type wiring end-to-end**: `objectTypes` + `prod_` id patterns/minting
   (minted from `slug`), store keys, `object_create` seeding, materializer →
   `src/data/site/products/{id}.json`, Ask-AI schema registry, admin
   `prod_→product` prefix map.
-- **`set_product_fields`** patch op (deep-merge + exact inverse, the
+* **`set_product_fields`** patch op (deep-merge + exact inverse, the
   set_site_fields mechanics) with the **§3 canonicality funnel in the
   grammar**: `commerce.price` / `commerce.stripe` / `commerce.stripe_test`
   payloads are refused at write with a pointer to `product_set_price` (S3) —
   price drift is impossible by construction, not by discipline.
-- **Validation criteria** (standing engine): `product_slug` (shape + live
+* **Validation criteria** (standing engine): `product_slug` (shape + live
   uniqueness via the new `isSlugTaken` store resolver — the isRouteTaken
   analogue), `product_commerce` (mode↔fields coherence: fixed⇒price cache,
   pwyw⇒pwyw block + NO Stripe Price, free⇒provider none + no linkage),
@@ -343,10 +374,10 @@ on. What exists now:
   until the Stripe surface lands). `presentation.page_ref` resolves through
   reference integrity like any object ref. `STRIPE_SECRET_KEY` /
   `STRIPE_WEBHOOK_SECRET` pre-marked in the deploy-safety scanner (§8.5).
-- **The §0.4 flip**: `src/config/approval-policy.ts` pins
+* **The §0.4 flip**: `src/config/approval-policy.ts` pins
   `product: 'require-approval'` under the all-autonomous master — the one
   deliberate exception; publish-gate matrix tests updated to pin it.
-- **Proven, not assumed** (sandbox, real MCP handler against an isolated
+* **Proven, not assumed** (sandbox, real MCP handler against an isolated
   store): contract → create (id minted `prod_barrier_repair_guide`) →
   duplicate-slug create BLOCKED → checkout → validate → patch applies →
   price-edit patch REFUSED (`product_set_price` pointer) → publish DENIED
@@ -430,7 +461,7 @@ entity).
   (allowed: lede/prose/cta_banner/newsletter_signup/content_grid/link_list/
   shared_ref; **required: lede** — the first lede IS the surface's header
   block; `listing: {source: 'content_items', defaultQuery
-  {sort: published_time_desc}, paginate: true}`) and `content_detail`
+{sort: published_time_desc}, paginate: true}`) and `content_detail`
   (no lede — the post supplies its heading; **`minVisibleSections: 0`**, a new
   per-PageType knob on the ≥1-visible-section publish gate: page_article
   publishes with zero sections because the article IS its content).

@@ -261,8 +261,67 @@ test('a shared SECTION OBJECT auto-scopes to its inner instance — inner gramma
 
   assert.equal(openai.calls[0].toolName, 'propose_section_changes');
   const properties = openai.calls[0].toolSchema.properties as Record<string, unknown>;
-  assert.ok('formName' in properties, 'the inner data grammar, not the wrapper');
+  assert.ok('heading' in properties, 'the inner copy grammar, not the wrapper');
   assert.equal('section' in properties, false, 'the wrapper must not leak');
+  assert.equal('formName' in properties, false, 'formName is a form binding (protected), not copy');
   assert.match(openai.calls[0].userMessage, /shared section object "sec_newsletter_signup"/);
   assert.match(openai.calls[0].userMessage, /every page that references it/);
+});
+
+test('a hallucinated image field is dropped — a copy edit can never change the portrait (About-portrait incident)', async () => {
+  const store = createStore();
+  const bioObject: ObjectRecord = {
+    object_id: 'sec_about_intro',
+    object_type: 'section',
+    schema_version: 'section.v1',
+    site: 'site_drlurie',
+    created_at: '2026-07-10T00:00:00.000Z',
+    updated_at: '2026-07-10T00:00:00.000Z',
+    status: 'active',
+    body: {
+      section: {
+        id: 's_bio',
+        type: 'bio',
+        data: {
+          heading: 'Dr. Leonid Lurie: the scientist behind the approach',
+          body: '<p>Physician-scientist lens.</p>',
+          trustNotes: ['MD, PhD in Biophysics.'],
+          portrait: { alt: 'Portrait of Dr. Leonid Lurie', src: '/images/dr-lurie-portrait4.jpeg' },
+        },
+      },
+    },
+    publication: { published_time: null },
+    history: [{ at: '2026-07-10T00:00:00.000Z', action: 'create', actor: AGENT }],
+    version: 1,
+    content_revision: 1,
+  };
+  store.seed(bioObject);
+
+  // The model over-reaches: asked to tweak the heading, it ALSO returns a
+  // hallucinated portrait URL (exactly the real incident). The tool schema
+  // excludes portrait, and the defensive strip drops it if returned anyway.
+  const openai = openAiMock({
+    heading: 'Dr. Leonid Lurie, Ph.D: the scientist behind the approach',
+    portrait: {
+      alt: 'Portrait of Dr. Leonid Lurie',
+      src: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg',
+    },
+    portraitAssetRef: 'made-up-ref',
+  });
+
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'section', object_id: 'sec_about_intro', instruction: 'Add Ph.D to the heading.' },
+    deps(openai.fetchImpl)
+  );
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(
+    result.body.suggestion,
+    { heading: 'Dr. Leonid Lurie, Ph.D: the scientist behind the approach' },
+    'only the heading survives — the image fields are stripped'
+  );
+  const properties = openai.calls[0].toolSchema.properties as Record<string, unknown>;
+  assert.equal('portrait' in properties, false, 'the model was never offered the portrait field');
+  assert.equal('portraitAssetRef' in properties, false, 'nor the asset ref');
 });

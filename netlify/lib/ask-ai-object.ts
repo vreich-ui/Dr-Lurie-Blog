@@ -39,6 +39,7 @@ import {
   bodySchemaForObjectType,
   deriveAskAiToolSchema,
   isAskAiObjectType,
+  isProtectedAskAiField,
   sectionDataSchemaForType,
   type AskAiTool,
 } from './ask-ai-schema.js';
@@ -242,7 +243,9 @@ export const askAiForObject = async (
       toolName: 'propose_section_changes',
       description:
         "Return ONLY the fields of this section's data that should change to satisfy the instruction. " +
-        'Omit every field that stays the same. Preserve the existing voice, tone, and structure.',
+        'Omit every field that stays the same. Preserve the existing voice, tone, and structure. ' +
+        'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
+      protectFields: true,
     });
     userMessage = buildSectionUserMessage(record, section, request);
   } else if (request.object_type === 'section') {
@@ -264,7 +267,9 @@ export const askAiForObject = async (
       toolName: 'propose_section_changes',
       description:
         "Return ONLY the fields of this section's data that should change to satisfy the instruction. " +
-        'Omit every field that stays the same. Preserve the existing voice, tone, and structure.',
+        'Omit every field that stays the same. Preserve the existing voice, tone, and structure. ' +
+        'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
+      protectFields: true,
     });
     userMessage = buildSectionUserMessage(record, inner, request);
   } else {
@@ -276,10 +281,18 @@ export const askAiForObject = async (
   const aiResult = await callOpenAI(userMessage, tool, deps);
   if (!aiResult.ok) return err(aiResult.status, { error: aiResult.error });
 
-  // Strip null/undefined, exactly as the article version does before returning.
+  // Strip null/undefined (as the article version does) AND, on the copy-only
+  // section path, any protected field the model returned anyway — media/asset/
+  // reference/structure keys are off-limits there (ask-ai-schema.ts). The tool
+  // schema already excludes them; this is the defensive backstop so a
+  // hallucinated image/link URL can never reach object_patch (the About-
+  // portrait incident, 2026-07-12). Whole-object admin asks keep every field.
+  const copyOnly = scopedSection !== undefined;
   const suggestion: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(aiResult.input)) {
-    if (value !== undefined && value !== null) suggestion[key] = value;
+    if (value === undefined || value === null) continue;
+    if (copyOnly && isProtectedAskAiField(key)) continue;
+    suggestion[key] = value;
   }
 
   return {
