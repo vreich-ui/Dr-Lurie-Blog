@@ -936,6 +936,11 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_product_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // The funnel's writer (§3): fields restricted BY THE GRAMMAR to the
+    // price cache + linkage blocks; mechanically the same deep merge.
+    case 'set_product_price':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— template family ———
     case 'set_template_meta':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
@@ -1091,10 +1096,15 @@ const inverseOfRemove = (
  */
 export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchOp => {
   switch (op.op) {
+    // Fields ops invert to THEMSELVES with the captured before-tree. For
+    // set_product_price that IS the §3 "re-point to the archived price"
+    // Discard semantics: the old price_id + cache are restored, and the
+    // archived Stripe Price remains chargeable when re-pointed.
     case 'set_page_meta':
     case 'set_nav_meta':
     case 'set_site_fields':
     case 'set_product_fields':
+    case 'set_product_price':
     case 'set_template_meta': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });

@@ -7,6 +7,52 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 I (S3 SHIPPED: PWYW + free + unlock paths; the two commerce MCP tools — criterion 4 closes)
+
+Same session (PR #414 merged; branch restarted). S3 per plan §9 — the
+product type's permitted-action surface is now COMPLETE:
+
+- **`set_product_price` patch op** — the §3 funnel's WRITER, the exact
+  complement of set_product_fields' refusal: `fields` restricted BY THE
+  GRAMMAR to commerce.price/stripe/stripe_test (shape-pinned); internal
+  (`agent_authored: false`, the reactivate_term posture); inverts to itself
+  with the captured before-tree = "re-point to the archived price".
+- **`product_set_price` MCP tool** (netlify/lib/product-set-price.ts):
+  creates the new Stripe Price (immutable prices), archives the old one,
+  writes cache + the running mode's linkage in ONE governed
+  checkout→patch→checkin — cache ≡ what Stripe just created, by
+  construction. Bootstraps a Stripe Product for unlinked products. Does NOT
+  publish: the change waits for the §0.4 human approval.
+- **`order_reissue` MCP tool** (netlify/lib/order-reissue.ts): regenerates
+  a download link from the ORDER record alone (orders now store
+  `fulfillment.artifact_ref` — §5's "fulfillment is a pure function of the
+  order record" made literal; S1c-era orders fall back to the product's
+  current ref). Audited reissue entries {at, token_hash, by} + a
+  fulfillment_reissued event; ttl 1h–14d.
+- **PWYW checkout**: the buyer picks the amount; create-checkout-session is
+  the minimum-enforcement point (§3 — no Stripe Price exists; price_data
+  charges the chosen amount against the linked Stripe Product). Buy box
+  grew an amount input.
+- **Free claim** (netlify/functions/claim-free.ts): direct token issuance
+  through the SAME order/event machinery (ord_free_…, session null, amount
+  0) + the lead-capture tie-in (optional email → the opt-ins store). Buy
+  box: "Get it free" renders the download link inline.
+- **Unlock kind**: checkout requires an EXISTING pre-generated artifact
+  under the product's unlock_prefix (nobody pays for a ghost); the webhook
+  mints the token over exactly that key. The buy box keeps unlock products
+  unbuyable until the artifact-generator integration exists.
+- Drill: fixed products now exercise BOTH ops (price poked one cent,
+  restored byte-identical); the driver unions exercised ops per type for
+  the contract check. Local rehearsal: contract product 2/2 — **criterion 4
+  is fully closed for the product type**.
+
+Suite 1061 + 49 green; astro check 0; eslint/prettier clean; build 172
+pages. The shop plan's §9 critical path (S1a→S1b→S1c→S2→S3) is now fully
+built. Remaining, per plan: the credentialed production run (products stop
+at approval_required → Wolf approves), the LIVE Stripe exit test (launch
+gate, needs keys), and the after-S3 page conversions (/pricing with
+pricing_table; /services + shop-preview with mockup copy per Wolf's
+directive).
 ## Session 2026-07-12 H (CANVAS SHIPPED: the site is the editing surface — admin inline Ask-AI, draft-in-place, publish/release tray)
 
 Wolf approved the edit-mode canvas plan ("go on and start work on this,

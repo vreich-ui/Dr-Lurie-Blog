@@ -111,21 +111,33 @@ test('page_shop is catch-all-served (standard) with a query product grid — new
   assert.equal(grid.data.source.kind, 'query');
 });
 
-test('the product drill round-trips set_product_fields and never touches the §3 funnel keys', () => {
+test('the product drill exercises both ops where coherent and always restores byte-identical', () => {
   for (const seed of products) {
+    const body = seed.body as unknown as ProductBody;
     const drill = drillOpsForSeed(seed) as {
       expected: string[];
       ops: Array<{ op: string; fields: Record<string, unknown> }>;
     };
-    assert.deepEqual(drill.expected, ['set_product_fields'], seed.objectId);
-    assert.equal(drill.ops.length, 2, 'poke + restore');
-    for (const op of drill.ops) {
-      assert.equal(op.op, 'set_product_fields');
-      assert.equal('commerce' in op.fields, false, 'the drill must never patch commerce (price funnel safety)');
+    if (body.commerce.mode === 'fixed') {
+      // Fixed products also drill the §3 writer: cache poked one cent, then
+      // cache + linkage restored exactly.
+      assert.deepEqual(drill.expected, ['set_product_fields', 'set_product_price'], seed.objectId);
+      assert.equal(drill.ops.length, 4);
+      assert.deepEqual(drill.ops[3].fields, {
+        commerce: { price: body.commerce.price, stripe_test: body.commerce.stripe_test },
+      });
+    } else {
+      // pwyw/free products cannot legally carry a price — fields op only;
+      // the driver unions exercised ops across the family for the contract check.
+      assert.deepEqual(drill.expected, ['set_product_fields'], seed.objectId);
+      assert.equal(drill.ops.length, 2);
     }
-    // The restore op ends byte-identical to the seed title.
-    const title = (seed.body as unknown as ProductBody).presentation.title;
-    assert.deepEqual(drill.ops[1].fields, { presentation: { title } });
+    for (const op of drill.ops) {
+      if (op.op === 'set_product_fields') {
+        assert.equal('commerce' in op.fields, false, 'set_product_fields never patches commerce (funnel safety)');
+      }
+    }
+    assert.deepEqual(drill.ops[1].fields, { presentation: { title: body.presentation.title } });
   }
 });
 

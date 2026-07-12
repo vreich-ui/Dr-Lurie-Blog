@@ -50,7 +50,13 @@ const detailObject = await loadRoutePageObject('page_product_detail');
 
 const heroImage = body.presentation.images?.[0];
 const badge = productPriceBadge(body.commerce);
-const buyable = body.commerce.mode === 'fixed'; // PWYW/free claim paths land with S3
+// The purchase path by mode (S3): fixed/pwyw go through Checkout, free
+// claims directly. Unlock products need their PRE-generated artifact key
+// (quiz/result integration) which no surface supplies yet — unbuyable here.
+const purchasePath = body.fulfillment.kind === 'unlock' ? 'none' : body.commerce.mode;
+const pwyw = body.commerce.pwyw;
+const minDollars = pwyw ? (pwyw.min_cents / 100).toFixed(2) : undefined;
+const suggestedDollars = pwyw ? ((pwyw.suggested_cents ?? pwyw.min_cents) / 100).toFixed(2) : undefined;
 
 const metadata = merge(
   {
@@ -86,18 +92,58 @@ const metadata = merge(
           )
         }
         <p class="mt-6 text-3xl font-bold text-heading">{badge}</p>
-        <div class="mt-6" id="buy-box" data-product-id={productId}>
+        <div
+          class="mt-6"
+          id="buy-box"
+          data-product-id={productId}
+          data-mode={purchasePath}
+          data-min-cents={pwyw?.min_cents}
+        >
           {
-            buyable ? (
+            purchasePath === 'fixed' && (
               <button class="btn btn-primary w-full sm:w-auto" data-role="buy" type="button">
                 Buy now
               </button>
-            ) : (
+            )
+          }
+          {
+            purchasePath === 'pwyw' && (
+              <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center md:justify-start">
+                <label class="sr-only" for="pwyw-amount">
+                  Amount in dollars (minimum ${minDollars})
+                </label>
+                <input
+                  id="pwyw-amount"
+                  data-role="pwyw-amount"
+                  class="form-input w-32 rounded-md"
+                  type="number"
+                  min={minDollars}
+                  step="1"
+                  value={suggestedDollars}
+                />
+                <button class="btn btn-primary" data-role="buy" type="button">
+                  Support
+                </button>
+              </div>
+            )
+          }
+          {
+            purchasePath === 'free' && (
+              <button class="btn btn-primary w-full sm:w-auto" data-role="claim" type="button">
+                Get it free
+              </button>
+            )
+          }
+          {
+            purchasePath === 'none' && (
               <button class="btn w-full cursor-not-allowed opacity-60 sm:w-auto" type="button" disabled>
                 Coming soon
               </button>
             )
           }
+          <p class="mt-4 hidden" data-role="claim-result">
+            <a class="btn btn-primary" href="#" data-role="claim-link"> Download </a>
+          </p>
           <p class="mt-3 hidden text-sm text-red-600" data-role="buy-error">
             Checkout could not be started. Please try again.
           </p>
@@ -143,16 +189,34 @@ const metadata = merge(
   // lossy/duplicative by contract and consumers dedupe).
   sendEvent('product_viewed');
 
+  const mode = buyBox?.dataset.mode ?? 'none';
+  const minCents = Number(buyBox?.dataset.minCents ?? '0');
   const buyButton = buyBox?.querySelector<HTMLButtonElement>('[data-role="buy"]');
+  const claimButton = buyBox?.querySelector<HTMLButtonElement>('[data-role="claim"]');
+  const amountInput = buyBox?.querySelector<HTMLInputElement>('[data-role="pwyw-amount"]');
   const buyError = buyBox?.querySelector('[data-role="buy-error"]');
+  const claimResult = buyBox?.querySelector('[data-role="claim-result"]');
+  const claimLink = buyBox?.querySelector('[data-role="claim-link"]');
+
+  // fixed + pwyw → hosted Checkout (pwyw sends the buyer's amount; the
+  // session function enforces the minimum server-side, §3).
   buyButton?.addEventListener('click', async () => {
+    const request: Record<string, unknown> = { product_id: productId };
+    if (mode === 'pwyw') {
+      const amountCents = Math.round(Number(amountInput?.value ?? '0') * 100);
+      if (!Number.isInteger(amountCents) || amountCents < minCents) {
+        buyError?.classList.remove('hidden');
+        return;
+      }
+      request.amount_cents = amountCents;
+    }
     buyButton.disabled = true;
     buyError?.classList.add('hidden');
     try {
       const response = await fetch('/.netlify/functions/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: productId }),
+        body: JSON.stringify(request),
       });
       const payload = (await response.json()) as { url?: string };
       if (!response.ok || !payload.url) throw new Error('no checkout url');
@@ -161,6 +225,32 @@ const metadata = merge(
     } catch {
       buyError?.classList.remove('hidden');
       buyButton.disabled = false;
+    }
+  });
+
+  // free → direct claim (§5): the order/token machinery runs server-side and
+  // the download link renders right here — no Stripe, no email dependency.
+  claimButton?.addEventListener('click', async () => {
+    claimButton.disabled = true;
+    buyError?.classList.add('hidden');
+    try {
+      const response = await fetch('/.netlify/functions/claim-free', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId }),
+      });
+      const payload = (await response.json()) as { download?: { url: string; filename: string } | null };
+      if (!response.ok) throw new Error('claim failed');
+      sendEvent('checkout_started');
+      if (payload.download && claimLink instanceof HTMLAnchorElement) {
+        claimLink.href = payload.download.url;
+        claimLink.textContent = `Download ${payload.download.filename}`;
+        claimResult?.classList.remove('hidden');
+        claimButton.classList.add('hidden');
+      }
+    } catch {
+      buyError?.classList.remove('hidden');
+      claimButton.disabled = false;
     }
   });
 </script>

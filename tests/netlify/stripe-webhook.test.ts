@@ -138,7 +138,9 @@ test('completed session: order created, token issued (hash only), authoritative 
   const fulfillment = order.fulfillment as Record<string, unknown>;
   assert.equal(fulfillment.state, 'issued');
   assert.match(String(fulfillment.token_hash), /^sha256:[0-9a-f]{64}$/);
-  assert.equal(JSON.stringify(order).includes('.pdf"'), false, 'no raw token/artifact leaks into the order');
+  // The artifact_ref is stored deliberately (§5 purity); the raw TOKEN never
+  // is (its base64url JSON body would start with "eyJ").
+  assert.equal(JSON.stringify(order).includes('eyJ'), false, 'no raw token leaks into the order');
 
   const files = await listEventFiles();
   assert.equal(files.length, 2, 'checkout_completed + fulfillment_issued');
@@ -212,4 +214,74 @@ test('a webhook-issued token verifies and embeds the session as order_key', asyn
     'purchase-token-secret-0123456789abcdef'
   );
   assert.ok(verified.ok && verified.payload.order_key === SESSION_ID);
+});
+
+// ─── S3: artifact_ref persistence + unlock fulfillment ───────────────────────
+
+test('the order stores fulfillment.artifact_ref (fulfillment = pure function of the record, §5)', async () => {
+  await reset();
+  await deliver(stripeEventBody('checkout.session.completed', paidSession()));
+  const order = await readOrderFile();
+  const fulfillment = order?.fulfillment as Record<string, unknown>;
+  assert.equal(fulfillment.artifact_ref, ARTIFACT_REF);
+});
+
+test('unlock completion mints the token over the session-named pre-generated artifact', async () => {
+  await reset();
+  const siteObjects = createLocalBlobStore('site-objects');
+  await siteObjects.setJSON(objectRecordKey('product', PRODUCT_ID), {
+    object_id: PRODUCT_ID,
+    object_type: 'product',
+    status: 'active',
+    publication: { published_time: '2026-07-12T00:00:00.000Z' },
+    body: {
+      slug: 'barrier-repair-guide',
+      presentation: { title: 'The Barrier Repair Guide' },
+      commerce: {
+        provider: 'stripe',
+        mode: 'fixed',
+        price: { amount_cents: 1900, currency: 'usd' },
+        stripe_test: { product_id: 'prod_Test1', price_id: 'price_Test1' },
+        availability: 'available',
+      },
+      fulfillment: { kind: 'unlock', unlock_prefix: 'unlock/quiz-results/' },
+    },
+  });
+
+  const withKey = await deliver(
+    stripeEventBody(
+      'checkout.session.completed',
+      paidSession({ metadata: { product_id: PRODUCT_ID, unlock_key: 'unlock/quiz-results/r_abc.pdf' } })
+    )
+  );
+  assert.equal(withKey.statusCode, 200);
+  const order = await readOrderFile();
+  const fulfillment = order?.fulfillment as Record<string, unknown>;
+  assert.equal(fulfillment.state, 'issued');
+  assert.equal(fulfillment.artifact_ref, 'unlock/quiz-results/r_abc.pdf');
+
+  // A completed unlock session WITHOUT a valid key records the order
+  // unfulfilled (support case) — never a token over the wrong blob.
+  await reset();
+  await siteObjects.setJSON(objectRecordKey('product', PRODUCT_ID), {
+    object_id: PRODUCT_ID,
+    object_type: 'product',
+    status: 'active',
+    publication: { published_time: '2026-07-12T00:00:00.000Z' },
+    body: {
+      slug: 'barrier-repair-guide',
+      presentation: { title: 'The Barrier Repair Guide' },
+      commerce: {
+        provider: 'stripe',
+        mode: 'fixed',
+        price: { amount_cents: 1900, currency: 'usd' },
+        stripe_test: { product_id: 'prod_Test1', price_id: 'price_Test1' },
+        availability: 'available',
+      },
+      fulfillment: { kind: 'unlock', unlock_prefix: 'unlock/quiz-results/' },
+    },
+  });
+  await deliver(stripeEventBody('checkout.session.completed', paidSession()));
+  const unfulfilled = await readOrderFile();
+  assert.equal((unfulfilled?.fulfillment as Record<string, unknown>).state, 'none');
 });

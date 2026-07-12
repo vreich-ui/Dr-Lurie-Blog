@@ -339,7 +339,7 @@ approves each product in /admin/objects, then the publish re-runs.**
 | `page_shop`                 | `/shop`                      | 🟣 SEEDED | `standard`; lede + `query` product grid — new products appear with zero page edits.           |
 | `page_product_detail`       | every `/shop/<slug>` page    | 🟣 SEEDED | `content_detail` SEO defaults (the page_article idiom); zero sections + drillProbe.           |
 
-### 6. Shop module (products + commerce) — S1 (a+b+c) BUILT (2026-07-12)
+### 6. Shop module (products + commerce) — S1 + S2 + S3 BUILT (2026-07-12): the §9 critical path is complete
 
 The plan is [`06-shop-module-plan.md`](06-shop-module-plan.md) (Stripe-only v1,
 digital goods). **S1a is done**: the `product` object type is live end-to-end in
@@ -367,10 +367,18 @@ the official `stripe` SDK is the one new dependency. The §9 exit test ran in
 sandbox form (webhook replayed twice → one order, no duplicate events); the
 LIVE Stripe test-mode run needs keys (STRIPE_MODE + both key pairs +
 PURCHASE_TOKEN_SECRET, all deploy-scanner-marked) and is a launch-gate item.
-**No product records exist yet** — the store is empty by design until S2
-seeds the shop surfaces (with MOCKUP content — Wolf, 2026-07-12). Next:
-S2 (/shop catalog + /shop/[slug] + seeds), then S3 (PWYW/free/unlock + the
-`product_set_price` / `order_reissue` MCP tools that complete criterion 4).
+**S3 is done too** (same day): PWYW checkout (the session function enforces
+the minimum, §3), the free-claim path (direct token issuance + opt-in
+tie-in), unlock checkout/fulfillment (pre-generated artifact named at
+session creation), and the two MCP tools — `product_set_price` (Stripe
+Price create/archive + one governed `set_product_price` patch; publish
+stays human-gated) and `order_reissue` (regenerates links from the order
+record alone; orders now store `fulfillment.artifact_ref`). **Criterion 4
+is closed for the product type** (contract 2/2 ops drilled). Remaining:
+the credentialed production run (products stop at `approval_required` →
+Wolf approves in /admin/objects), the LIVE Stripe exit test (launch gate),
+and the after-S3 page conversions (/pricing, /services, shop-preview —
+mockup copy sanctioned).
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 

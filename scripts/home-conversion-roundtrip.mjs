@@ -410,7 +410,10 @@ for (const seed of PAGE_HOME_SEEDS) {
     continue;
   }
   const { expected, ops } = drill;
-  exercisedByType.set(seed.objectType, expected);
+  // UNION per type: a mixed family (e.g. fixed + pwyw + free products) may
+  // legally exercise different op subsets per seed; the contract check needs
+  // the family-wide union.
+  exercisedByType.set(seed.objectType, [...new Set([...(exercisedByType.get(seed.objectType) ?? []), ...expected])]);
 
   const result = await withLock(seed.objectType, seed.objectId, async (lockToken, recordVersion) => {
     const patched = await callTool('object_patch', {

@@ -30,20 +30,35 @@ export const loadPublishedProduct = async (store: ReadableStore, productId: stri
 };
 
 export type BuyabilityCheck =
-  | { ok: true; priceId: string; amountCents: number; currency: string }
-  | { ok: false; reason: 'not_available' | 'mode_not_supported' | 'not_linked' };
+  | { ok: true; mode: 'fixed'; priceId: string; amountCents: number; currency: string }
+  | { ok: true; mode: 'pwyw'; minCents: number; suggestedCents?: number; stripeProductId?: string }
+  | { ok: false; reason: 'not_available' | 'mode_not_supported' | 'not_linked' | 'free_product' };
 
 /**
- * Can a Checkout Session be created for this product right now? v1 charges
- * fixed-price products only (PWYW/free paths land in S3, §9); the linkage
- * block is picked by STRIPE_MODE (§8.7).
+ * Can a Checkout Session be created for this product right now? fixed charges
+ * the linked Price; pwyw charges a buyer-chosen amount the session function
+ * validates against `pwyw.min_cents` (§3 — no Stripe Price object exists for
+ * PWYW; this check is the enforcement point's data source). Free products
+ * never get a session (§1 — claim-free is their path). The linkage block is
+ * picked by STRIPE_MODE (§8.7).
  */
 export const checkBuyability = (body: ProductBody, env: NodeJS.ProcessEnv = process.env): BuyabilityCheck => {
   if (body.commerce.availability !== 'available') return { ok: false, reason: 'not_available' };
-  if (body.commerce.mode !== 'fixed') return { ok: false, reason: 'mode_not_supported' };
+  if (body.commerce.mode === 'free') return { ok: false, reason: 'free_product' };
   const linkage = stripeLinkageForMode(body.commerce, env);
+  if (body.commerce.mode === 'pwyw') {
+    const pwyw = body.commerce.pwyw;
+    if (!pwyw) return { ok: false, reason: 'not_linked' };
+    return {
+      ok: true,
+      mode: 'pwyw',
+      minCents: pwyw.min_cents,
+      ...(pwyw.suggested_cents !== undefined ? { suggestedCents: pwyw.suggested_cents } : {}),
+      ...(linkage?.product_id ? { stripeProductId: linkage.product_id } : {}),
+    };
+  }
   const priceId = linkage?.price_id;
   const price = body.commerce.price;
   if (!priceId || !price) return { ok: false, reason: 'not_linked' };
-  return { ok: true, priceId, amountCents: price.amount_cents, currency: price.currency };
+  return { ok: true, mode: 'fixed', priceId, amountCents: price.amount_cents, currency: price.currency };
 };
