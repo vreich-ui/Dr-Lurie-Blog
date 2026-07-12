@@ -93,8 +93,11 @@ export const releaseToProduction = async (getToken: GetToken): Promise<ReleaseRe
   return { ok: response.ok, status: response.status, result: body.result as ReleaseResult['result'] };
 };
 
+/** Ids the endpoint minted for id-less op payloads (e.g. a quick-added section). */
+export type MintedId = { index: number; field: string; id: string };
+
 export type PatchOutcome =
-  | { ok: true; version: number }
+  | { ok: true; version: number; minted: MintedId[] }
   | { ok: false; status: number; error: string; blockers?: string[] };
 
 /**
@@ -176,7 +179,8 @@ export class EditSession {
     }
     if (result.status === 200) {
       this.recordVersion = result.body.version as number;
-      return { ok: true, version: this.recordVersion };
+      const minted = Array.isArray(result.body.minted) ? (result.body.minted as MintedId[]) : [];
+      return { ok: true, version: this.recordVersion, minted };
     }
     const blockers = Array.isArray(result.body.blockers) ? (result.body.blockers as string[]) : undefined;
     return {

@@ -113,6 +113,36 @@ sanctioned path for deliberately changing an image.
   regions carry the amber flag on page load, so unpublished state survives
   reloads and is visible to every admin.
 
+### 3b. Manual tools (2026-07-12, Wolf: "add text edit tools to each relevant object")
+
+The chip is now an **icon toolbar** — no "Ask AI" wording. Right-to-left:
+
+- **✨ Sparkles** (AI chat, as before) — the stars render in `--dlem-spark`, a
+  brightened site gold, deliberately a notch brighter than the neighboring
+  tools so the AI action reads first. Selection-armed = gold glow ring.
+- **✏️ Pencil — Edit text**: a field form of the section's COPY (strings →
+  inputs, rich-text → textarea with the allowlist noted, string lists → one
+  per line). Structured values (actions, FAQ items, quotes) stay AI/admin
+  work. **Save draft** goes through the same checkout → `update_section_data`
+  path; in-place preview; publish stays separate.
+- **🖼 Image** (section types with image fields — `bio` today): src + alt
+  inputs with a live thumbnail. This is the DELIBERATE way to change an
+  image — the complement of the copy-only AI guard. (Real file upload is a
+  later slice; today it takes a path/URL.)
+
+**Gap "+" affordances**: in edit mode, a small round + sits above the first
+section, between sections of the same page object, and below the last. Click
+→ a compact palette (`sections-palette.ts`, pure + unit-tested: every starter
+body is schema-valid under the real section.v1 union and splitter-safe, so a
+quick-add can never 422): Text, Intro header, Call to action, Checklist, FAQ,
+Quotes, Newsletter signup. Reference/binding types (content_grid,
+product_preview, contact_form, search, shared_ref) are deliberately absent —
+a quick-add cannot responsibly invent references. Insert = `upsert_section`
+at a RECORD-derived position (hidden sections still occupy indices; anchored
+by section id, never DOM order), id minted server-side; an honest draft
+placeholder appears in place (annotated — immediately editable with the same
+tools) until publish + release renders it for real.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

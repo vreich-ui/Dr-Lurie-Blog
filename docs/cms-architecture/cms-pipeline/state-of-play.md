@@ -7,6 +7,35 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 M (CANVAS manual tools: icon toolbar, field editor, image tool, gap "+" add)
+
+Wolf: "add text edit tools to each relevant object … remove the wording Ask AI
+and replace it with an icon [stars slightly brighter] … other objects may
+require uploads or other tools … hovering between objects [show] an Add
+symbol." Shipped on the #423 branch (same canvas scope as the guard):
+
+- **Chip → icon toolbar**: pencil (Edit text), image tool (types with image
+  fields — `bio`), and an icon-only sparkles whose stars use `--dlem-spark`
+  (site gold lifted toward white) so the AI action reads a notch brighter
+  than the other tools. Tooltips carry the words; no "Ask AI" text.
+- **Manual field editor** (pencil): copy fields only (same non-copy exclusion
+  the AI guard enforces), Save draft → checkout → `update_section_data`,
+  in-place preview, publish separate. **Image tool**: src/alt + live
+  thumbnail — the deliberate image-change path (AI stays schema-blocked);
+  also Wolf's in-canvas fix for the About portrait. Upload = later slice.
+- **Gap "+"**: subtle round + above/between/below a page object's sections →
+  compact palette (`sections-palette.ts`, pure; starters proven schema-valid
+  + splitter-safe in tests) → `upsert_section` at a record-derived position
+  (hidden-section safe, anchored by id), server-minted id, honest annotated
+  draft placeholder in place until publish + release.
+- Fixed en route: `.dl-em-actions[hidden]` was overridden by its own
+  display:flex (the Accept row showed empty on fresh panels).
+- **Gates**: 1104 + 49 tests (palette starters validated against the REAL
+  section schema + splitters; insert-position math), astro check 0, build
+  172 pages, headless drive extended to 25 assertions (icon toolbar, manual
+  edit patch shape, image tool patch shape incl. alt preservation, gap add
+  upsert wire shape + placeholder) — all green in both themes.
+
 ## Session 2026-07-12 L (CANVAS bug: copy-AI dropped an image — copy-only guard added)
 
 First real production incident from the canvas, reported by Wolf: an AI edit
