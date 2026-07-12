@@ -25,7 +25,7 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-11: **thirty-one objects are converted** — the 3 nav
+- Reality as of 2026-07-12: **thirty-seven objects are converted** — the 3 nav
   objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
   page_contact + page_thank_you), the 12 shared sections under home/about, the
   3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
@@ -53,18 +53,21 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   (protected env values in any encoding; repo-file hotlink URLs) or the build
   (per-component rich-text vocabulary, checked with the real splitters) — an
   agent can no longer publish something that dead-ends the pipeline.
-  **W6 BUILT + SEEDED (2026-07-12)**: the `listing`/`content_detail` PageTypes
-  are defined law (all five implemented; content_detail publishes with zero
-  sections via `minVisibleSections: 0`), and six page objects (page_library,
-  page_topics_index, page_topic_detail, page_category, page_tag, page_article)
-  make the listing surfaces' headings/copy/SEO agent-editable — first lede =
-  the header block, extra sections render after the list/article, per-term
-  objects carry `%term%` pattern copy — while the query machinery stays the
-  audited build-time derivation. Byte-identical cutover; local round-trip
-  green; **RENDERS + SEEDED, not CONVERTED** until the credentialed
-  `--production --release --seeds scripts/lib/pages-listing-seed-data.mjs`
-  run (after merge + deploy — schema-vintage gate). Still TODO: the W5
-  hand-coded pages (Wolf: separate session).
+  **W6 CONVERTED (2026-07-12, credentialed run same day)**: the
+  `listing`/`content_detail` PageTypes are defined law (all five implemented;
+  content_detail publishes with zero sections via `minVisibleSections: 0`),
+  and six page objects (page_library, page_topics_index, page_topic_detail,
+  page_category, page_tag, page_article) make the listing surfaces'
+  headings/copy/SEO agent-editable — first lede = the header block, extra
+  sections render after the list/article, per-term objects carry `%term%`
+  pattern copy — while the query machinery stays the audited build-time
+  derivation. Byte-identical cutover; all six store-backed, round-tripped,
+  published, released (store === seed === export). Hidden sections are now
+  filtered at the resolver on every render path (never-render-private).
+  W5 was RE-GROUNDED in the shop module
+  (`docs/cms-architecture/06-shop-module-plan.md` — Stripe-only v1 plan;
+  /pricing renders from product objects, /services awaits a copy-or-delete
+  call; the shop build runs in its own session).
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
