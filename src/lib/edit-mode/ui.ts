@@ -26,11 +26,14 @@ import { SECTION_PALETTE, insertPositionFor } from './sections-palette.js';
 import {
   changedFieldsOnly,
   deriveEditTarget,
+  deriveNavTarget,
   suggestionToOps,
   summarizeFieldChanges,
   type EditTarget,
   type FieldChange,
 } from './targets.js';
+import { applyNavChangesToBody, navChangesToOps, navEditFieldsFor, type NavEditField } from './nav-editor.js';
+import type { NavigationBody } from '../../schema/bodies/navigation-v1.js';
 import { previewFieldChange, restoreRegion, snapshotRegion, type RegionSnapshot } from './preview.js';
 import {
   askAiSuggestion,
@@ -46,6 +49,8 @@ import {
 } from './verbs-client.js';
 
 const REGION_SELECTOR = '[data-cms-section-id]';
+const NAV_SELECTOR = '[data-cms-nav-object]';
+const EMPTY_OBJECT_SELECTOR = '[data-cms-empty-object]';
 const MODE_KEY = 'dl-edit-mode';
 
 export type MountOptions = { email: string; roles: string[]; getToken: GetToken };
@@ -64,6 +69,8 @@ type PanelState = {
   selectedText?: string;
   /** Armed "Re: <image>" reference (AI chat image chips) — sent with every ask. */
   imageRef?: { field: string; name: string; url: string };
+  /** Navigation targets: the object body the copy form edits (nav grammar ops). */
+  navBody?: NavigationBody;
   suggestion?: Record<string, unknown>;
   changes?: FieldChange[];
   snapshot?: RegionSnapshot;
@@ -158,9 +165,9 @@ body.dl-em-on{padding-top:38px}
   border:none;background:var(--dlem-accent);color:var(--dlem-accent-ink);font:18px var(--dlem-font);cursor:pointer;
   box-shadow:var(--dlem-shadow)}
 body.dl-em-on .dl-em-fab{display:none}
-body.dl-em-on [data-cms-section-id].dl-em-hot>*{outline:2px solid color-mix(in srgb,var(--dlem-accent) 60%,transparent);outline-offset:6px;border-radius:2px}
-body.dl-em-on [data-cms-section-id].dl-em-focus>*{outline:2px solid var(--dlem-accent);outline-offset:6px}
-body.dl-em-on [data-cms-section-id].dl-em-draft>*{outline:2px dashed var(--dlem-draft);outline-offset:6px}
+body.dl-em-on [data-cms-section-id].dl-em-hot>*,body.dl-em-on [data-cms-nav-object].dl-em-hot>*{outline:2px solid color-mix(in srgb,var(--dlem-accent) 60%,transparent);outline-offset:6px;border-radius:2px}
+body.dl-em-on [data-cms-section-id].dl-em-focus>*,body.dl-em-on [data-cms-nav-object].dl-em-focus>*{outline:2px solid var(--dlem-accent);outline-offset:6px}
+body.dl-em-on [data-cms-section-id].dl-em-draft>*,body.dl-em-on [data-cms-nav-object].dl-em-draft>*{outline:2px dashed var(--dlem-draft);outline-offset:6px}
 .dl-em-chip{position:fixed;z-index:99991;display:none;align-items:center;gap:7px;padding:4px 6px 4px 10px;
   border-radius:7px;background:var(--dlem-accent);color:var(--dlem-accent-ink);font:600 11.5px var(--dlem-font);
   box-shadow:var(--dlem-shadow)}
@@ -175,6 +182,13 @@ body.dl-em-on [data-cms-section-id].dl-em-draft>*{outline:2px dashed var(--dlem-
 .dl-em-chip .dl-em-tool svg{display:block}
 .dl-em-chip .dl-em-ask.dl-em-sel{background:color-mix(in srgb,var(--dlem-spark) 30%,transparent);
   box-shadow:0 0 0 1.5px var(--dlem-spark)}
+/* Selection-algorithm dropdown (related grids) — a chip-native compact select. */
+.dl-em-alg{appearance:none;-webkit-appearance:none;height:24px;padding:2px 18px 2px 8px;cursor:pointer;
+  border:1px solid color-mix(in srgb,var(--dlem-accent-ink) 35%,transparent);border-radius:5px;
+  background:color-mix(in srgb,var(--dlem-accent-ink) 12%,transparent) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center;
+  color:var(--dlem-accent-ink);font:600 10.5px var(--dlem-font)}
+.dl-em-alg:hover{border-color:var(--dlem-accent-ink)}
+.dl-em-alg option{color:var(--dlem-text);background:var(--dlem-surface)}
 .dl-em-gaplayer{position:absolute;top:0;left:0;width:100%;height:0;z-index:99989;display:none;pointer-events:none}
 body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-gap{position:absolute;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;
@@ -256,6 +270,8 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-acc-body{display:none;flex-direction:column;min-height:0;flex:1}
 .dl-em-acc.dl-em-open>.dl-em-acc-body{display:flex}
 .dl-em-panel:not(.dl-em-has-image) .dl-em-acc[data-em-acc="image"]{display:none}
+/* Chrome (navigation objects): copy form only — AI/Image sections don't apply. */
+.dl-em-panel.dl-em-nav .dl-em-acc[data-em-acc="ai"],.dl-em-panel.dl-em-nav .dl-em-acc[data-em-acc="image"]{display:none}
 .dl-em-log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .dl-em-msg{max-width:92%;padding:8px 11px;border-radius:10px;font-size:12.5px}
 .dl-em-msg.dl-em-user{align-self:flex-end;background:var(--dlem-accent);color:var(--dlem-accent-ink);border-bottom-right-radius:3px}
@@ -654,6 +670,22 @@ export const mountEditMode = (options: MountOptions): void => {
         gaps.push({ host, anchorId, where: 'after', x, y: rect.bottom + scrollY + 12 });
       }
     }
+    // Object-EMPTY pages (e.g. page_article before its first section): the
+    // zero-height marker ObjectSections leaves behind gets one "+" so the
+    // FIRST section can be added from the canvas. anchorId '' → append (the
+    // insert-position rule: unknown anchor appends; an empty list appends at 0).
+    for (const marker of Array.from(document.querySelectorAll<HTMLElement>(EMPTY_OBJECT_SELECTOR))) {
+      const host = marker.dataset.cmsEmptyObject as string;
+      if (regions.some((entry) => entry.target.hostObjectId === host)) continue; // no longer empty (draft added)
+      const rect = marker.getBoundingClientRect();
+      gaps.push({
+        host,
+        anchorId: '',
+        where: 'after',
+        x: rect.width > 0 ? rect.left + rect.width / 2 : window.innerWidth / 2,
+        y: rect.top + scrollY,
+      });
+    }
     return gaps;
   };
 
@@ -737,7 +769,11 @@ export const mountEditMode = (options: MountOptions): void => {
     // A draft placeholder in place: the static page can't render the new
     // section until publish+release, so show an honest, immediately-editable
     // stand-in (it carries the annotation, so the chip tools work on it).
-    const anchorRegion = document.querySelector<HTMLElement>(`[data-cms-section-id="${CSS.escape(gap.anchorId)}"]`);
+    // Anchor: the anchor section's region, or — first section on an
+    // object-empty page — the page object's empty marker.
+    const anchorRegion =
+      document.querySelector<HTMLElement>(`[data-cms-section-id="${CSS.escape(gap.anchorId)}"]`) ??
+      document.querySelector<HTMLElement>(`[data-cms-empty-object="${CSS.escape(gap.host)}"]`);
     if (anchorRegion && mintedId) {
       const placeholder = document.createElement('div');
       placeholder.dataset.cmsObjectId = gap.host;
@@ -769,29 +805,93 @@ export const mountEditMode = (options: MountOptions): void => {
     chip.style.top = `${Math.max(42, rect.top - 14)}px`;
   };
 
+  /** Labels for the related-grid selection algorithms (chip dropdown). */
+  const ALGORITHM_LABELS: Record<string, string> = {
+    tag_similarity: 'Similar',
+    same_category: 'Same category',
+    latest: 'Latest',
+  };
+
   const renderChip = (region: HTMLElement): void => {
-    const target = deriveEditTarget(region.dataset as Record<string, string>);
+    const isNav = region.dataset.cmsNavObject !== undefined;
+    const target = isNav
+      ? deriveNavTarget(region.dataset as Record<string, string>)
+      : deriveEditTarget(region.dataset as Record<string, string>);
     if (!target) return;
-    const hasSelection = Boolean(currentSelectionText && selectionRegion === region);
+    const hasSelection = !isNav && Boolean(currentSelectionText && selectionRegion === region);
     const isDraft = region.classList.contains('dl-em-draft');
-    const hasImage = IMAGE_SECTION_TYPES.has(target.sectionType);
+    const hasImage = !isNav && IMAGE_SECTION_TYPES.has(target.sectionType);
+    // A `related` content_grid announces its algorithm — the chip offers the
+    // selection dropdown inline with the AI tool (small footprint, no panel).
+    const algorithm = region.dataset.cmsRelatedAlgorithm;
     chip.innerHTML =
       `<span>${escapeHtml(target.sectionType)}</span>` +
       `<span class="dl-em-id">${escapeHtml(target.objectId)}</span>` +
-      (target.shared ? `<span class="dl-em-shared">shared</span>` : '') +
+      (target.shared ? `<span class="dl-em-shared">${isNav ? 'site-wide' : 'shared'}</span>` : '') +
       (isDraft ? `<span class="dl-em-draftflag">draft</span>` : '') +
       `<span class="dl-em-tools">` +
+      (algorithm
+        ? `<select class="dl-em-alg" data-em-alg title="Selection algorithm" aria-label="Selection algorithm">` +
+          Object.entries(ALGORITHM_LABELS)
+            .map(
+              ([value, label]) => `<option value="${value}"${value === algorithm ? ' selected' : ''}>${label}</option>`
+            )
+            .join('') +
+          `</select>`
+        : '') +
       `<button class="dl-em-tool dl-em-edit" title="Edit text" aria-label="Edit text">${ICON_PENCIL}</button>` +
       (hasImage
         ? `<button class="dl-em-tool dl-em-img" title="Image" aria-label="Edit image">${ICON_IMAGE}</button>`
         : '') +
-      `<button class="dl-em-tool dl-em-ask${hasSelection ? ' dl-em-sel' : ''}" ` +
-      `title="Ask AI${hasSelection ? ' about selection' : ''}" aria-label="Ask AI">${ICON_SPARKLES}</button>` +
+      (isNav
+        ? ''
+        : `<button class="dl-em-tool dl-em-ask${hasSelection ? ' dl-em-sel' : ''}" ` +
+          `title="Ask AI${hasSelection ? ' about selection' : ''}" aria-label="Ask AI">${ICON_SPARKLES}</button>`) +
       `</span>`;
     chip.querySelector('.dl-em-edit')?.addEventListener('click', () => void openPanel(target, region, 'edit'));
     chip.querySelector('.dl-em-img')?.addEventListener('click', () => void openPanel(target, region, 'image'));
     chip.querySelector('.dl-em-ask')?.addEventListener('click', () => void openPanel(target, region, 'ai'));
+    chip.querySelector<HTMLSelectElement>('[data-em-alg]')?.addEventListener('change', (event) => {
+      void applyAlgorithm(target, region, (event.target as HTMLSelectElement).value);
+    });
     positionChip(region);
+  };
+
+  /**
+   * Chip dropdown → draft: patch the related grid's selection algorithm
+   * through the normal reviewable path (checkout → update_section_data).
+   * Only `source.algorithm` changes — the source keeps kind 'related', so the
+   * deep-merge is key-stable. Shared grids route to their sec_* object.
+   */
+  const applyAlgorithm = async (target: EditTarget, region: HTMLElement, algorithm: string): Promise<void> => {
+    setStatus(`Switching selection to “${ALGORITHM_LABELS[algorithm] ?? algorithm}”…`);
+    const objectSession = session(target.objectType, target.objectId);
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      setStatus(`Locked by ${checkout.heldBy ?? 'another editor'} — try again when the lock frees.`);
+      return;
+    }
+    let sectionId = target.sectionId;
+    if (!sectionId) {
+      // Shared grid: the patch scopes to the inner instance id on the sec_* object.
+      const { record } = await getObjectRecord(getToken, target.objectType, target.objectId);
+      sectionId = ((record?.body as { section?: { id?: string } })?.section?.id ?? '') || undefined;
+    }
+    if (!sectionId) {
+      setStatus('Could not resolve the section instance to patch.');
+      return;
+    }
+    const outcome = await objectSession.patch([
+      { op: 'update_section_data', section_id: sectionId, fields: { source: { kind: 'related', algorithm } } },
+    ]);
+    if (!outcome.ok) {
+      setStatus(`Not saved: ${outcome.error}`);
+      return;
+    }
+    region.dataset.cmsRelatedAlgorithm = algorithm;
+    region.classList.add('dl-em-draft');
+    setStatus(`Selection set to “${ALGORITHM_LABELS[algorithm] ?? algorithm}” — draft saved, not published.`);
+    await refreshPending();
   };
 
   const clearChipSoon = (): void => {
@@ -812,7 +912,9 @@ export const mountEditMode = (options: MountOptions): void => {
         window.clearTimeout(chipHideTimer);
         return;
       }
-      const region = element.closest<HTMLElement>(REGION_SELECTOR);
+      // Sections first (they sit inside <main>), then chrome (header/footer
+      // wrap a nav object) — a hover matches exactly one editable region.
+      const region = element.closest<HTMLElement>(REGION_SELECTOR) ?? element.closest<HTMLElement>(NAV_SELECTOR);
       if (!region) {
         clearChipSoon();
         return;
@@ -864,7 +966,7 @@ export const mountEditMode = (options: MountOptions): void => {
   let panelRegion: HTMLElement | undefined;
 
   const closePanel = (): void => {
-    panel.classList.remove('dl-em-open', 'dl-em-mode-edit', 'dl-em-mode-image', 'dl-em-has-image');
+    panel.classList.remove('dl-em-open', 'dl-em-mode-edit', 'dl-em-mode-image', 'dl-em-has-image', 'dl-em-nav');
     panel.querySelectorAll('.dl-em-acc').forEach((section) => section.classList.remove('dl-em-open'));
     panelState?.region.classList.remove('dl-em-focus');
     panelState = undefined;
@@ -916,6 +1018,11 @@ export const mountEditMode = (options: MountOptions): void => {
       (target.shared ? `<span class="dl-em-idot dl-em-shd" title="Shared — affects every page using it"></span>` : '') +
       (isDraft ? `<span class="dl-em-idot dl-em-drf" title="Unpublished draft"></span>` : '');
     panel.classList.toggle('dl-em-has-image', IMAGE_SECTION_TYPES.has(target.sectionType));
+    // Chrome (navigation objects) is a copy form only: no section grammar for
+    // AI scoping, no images — the accordion shows just the Edit section.
+    const isNav = target.objectType === 'navigation';
+    panel.classList.toggle('dl-em-nav', isNav);
+    if (isNav) mode = 'edit';
     setActiveSection(mode);
     if (mode !== 'ai') panel.querySelector(`[data-em-acc-body="${mode}"]`)?.append(formEl);
 
@@ -934,6 +1041,18 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     const body = record.body as Record<string, unknown>;
+    if (isNav) {
+      panelState = {
+        target,
+        region,
+        mode: 'edit',
+        currentData: {},
+        patchSectionId: '',
+        navBody: body as unknown as NavigationBody,
+      };
+      renderNavForm(panelState);
+      return;
+    }
     let currentData: Record<string, unknown> | undefined;
     let patchSectionId: string | undefined;
     if (target.objectType === 'page') {
@@ -1148,6 +1267,87 @@ export const mountEditMode = (options: MountOptions): void => {
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveForm(state, fields));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
+  };
+
+  // ── navigation copy form ──────────────────────────────────────────────────
+  // Chrome edits ride the NAV grammar (set_nav_meta / update_item /
+  // upsert_group / remove+upsert_action — nav-editor.ts), never page ops.
+  // Copy only: item labels, group titles, brand text, footer note. Targets/
+  // hrefs/icons stay admin/agent work — the same boundary the Ask-AI
+  // protected-field list draws.
+  const renderNavForm = (state: PanelState): void => {
+    const fields = navEditFieldsFor(state.navBody as NavigationBody);
+    formEl.innerHTML = '';
+    if (fields.length === 0) {
+      formEl.innerHTML = '<div class="dl-em-fieldnote">No editable copy on this navigation object.</div>';
+      return;
+    }
+    for (const field of fields) {
+      const row = document.createElement('div');
+      row.className = 'dl-em-formrow';
+      row.innerHTML =
+        `<label>${escapeHtml(field.label)}</label>` +
+        `<input type="text" data-em-nav-field="${escapeHtml(field.key)}" value="${escapeHtml(field.value)}">`;
+      formEl.append(row);
+    }
+    const foot = document.createElement('div');
+    foot.className = 'dl-em-formfoot';
+    foot.innerHTML =
+      `<button class="dl-em-btn dl-em-save dl-em-ico" data-em-form-save>${ICON_CHECK} Save draft</button>` +
+      `<button class="dl-em-btn dl-em-ghost dl-em-ico" data-em-form-cancel title="Cancel" aria-label="Cancel">${ICON_CLOSE}</button>`;
+    foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveNavForm(state, fields));
+    foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
+    formEl.append(foot);
+  };
+
+  const saveNavForm = async (state: PanelState, fields: NavEditField[]): Promise<void> => {
+    const body = state.navBody as NavigationBody;
+    const changes: Record<string, string> = {};
+    const previews: Array<{ before: string; after: string }> = [];
+    for (const field of fields) {
+      const input = formEl.querySelector<HTMLInputElement>(`[data-em-nav-field="${CSS.escape(field.key)}"]`);
+      if (!input) continue;
+      const raw = input.value;
+      // Labels are schema-min(1): an emptied input is ignored, not saved.
+      if (raw === field.value || !raw.trim()) continue;
+      changes[field.key] = raw;
+      previews.push({ before: field.value, after: raw });
+    }
+    if (Object.keys(changes).length === 0) {
+      log('sys', 'No changes to save.');
+      return;
+    }
+    let ops: Array<Record<string, unknown>>;
+    try {
+      ops = navChangesToOps(body, changes);
+    } catch (error) {
+      log('sys', escapeHtml(error instanceof Error ? error.message : String(error)));
+      return;
+    }
+    const working = log('sys', 'Saving…');
+    const objectSession = session('navigation', state.target.objectId);
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      working.remove();
+      log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
+      return;
+    }
+    const outcome = await objectSession.patch(ops);
+    working.remove();
+    if (!outcome.ok) {
+      const blockers = outcome.blockers?.length ? `<br>${outcome.blockers.map(escapeHtml).join('<br>')}` : '';
+      log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
+      return;
+    }
+    for (const preview of previews) previewFieldChange(state.region, 'string', preview.before, preview.after);
+    // Keep the panel body in step with the draft record, then re-snapshot the
+    // form (a later upsert_group resends whole groups — staleness reverts edits).
+    state.navBody = applyNavChangesToBody(body, changes);
+    renderNavForm(state);
+    state.region.classList.add('dl-em-draft');
+    log('sys', `${ICON_CHECK} Draft saved — <strong>not published</strong>. Changes apply site-wide on release.`);
+    setStatus(`${state.target.objectId}: draft saved.`);
+    await refreshPending();
   };
 
   /**

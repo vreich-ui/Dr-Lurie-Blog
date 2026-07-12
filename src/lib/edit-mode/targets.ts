@@ -17,7 +17,7 @@
 
 export type EditTarget = {
   /** The object the verbs edit. */
-  objectType: 'page' | 'section';
+  objectType: 'page' | 'section' | 'navigation';
   objectId: string;
   /** Page targets: the section instance the request scopes to. */
   sectionId?: string;
@@ -32,6 +32,26 @@ export type EditTarget = {
 export type SectionAnnotationDataset = Partial<
   Record<'cmsObjectId' | 'cmsSectionId' | 'cmsSectionType' | 'cmsSharedObject', string>
 >;
+
+/** Camel-cased dataset keys of the data-cms-nav-* chrome annotation. */
+export type NavAnnotationDataset = Partial<Record<'cmsNavObject' | 'cmsNavRole', string>>;
+
+/**
+ * Chrome (header/footer) regions target the NAVIGATION object they render
+ * from. Marked shared: nav renders on every page, so an edit is site-wide —
+ * the same "affects every page using it" banner shared sections get.
+ */
+export const deriveNavTarget = (dataset: NavAnnotationDataset): EditTarget | undefined => {
+  const { cmsNavObject, cmsNavRole } = dataset;
+  if (!cmsNavObject) return undefined;
+  return {
+    objectType: 'navigation',
+    objectId: cmsNavObject,
+    sectionType: `${cmsNavRole ?? 'site'} navigation`,
+    hostObjectId: cmsNavObject,
+    shared: true,
+  };
+};
 
 export const deriveEditTarget = (dataset: SectionAnnotationDataset): EditTarget | undefined => {
   const { cmsObjectId, cmsSectionId, cmsSectionType, cmsSharedObject } = dataset;

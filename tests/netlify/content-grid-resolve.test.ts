@@ -165,3 +165,60 @@ test('validation rejects a fallback query naming an unknown taxonomy term', () =
     JSON.stringify(summary.blockers)
   );
 });
+
+// ——— `related` source (the "other articles to read" block, 2026-07-12) ———
+
+test('related source runs the algorithm resolver and caps at limit', () => {
+  const calls: Array<{ algorithm: string; limit: number }> = [];
+  const { resolvers } = makeResolvers();
+  const cards = resolveContentGridCards(
+    { kind: 'related', algorithm: 'tag_similarity' },
+    3,
+    {
+      ...resolvers,
+      runRelated: (algorithm, limit) => {
+        calls.push({ algorithm, limit });
+        return [card('req_r1'), card('req_r2'), card('req_r3'), card('req_r4')];
+      },
+    }
+  );
+  assert.deepEqual(calls, [{ algorithm: 'tag_similarity', limit: 3 }]);
+  assert.deepEqual(
+    cards.map((c) => c.id),
+    ['req_r1', 'req_r2', 'req_r3'],
+    'over-returned results are capped at limit'
+  );
+});
+
+test('related source WITHOUT a runRelated resolver degrades to newest-first (empty query)', () => {
+  const { queries, resolvers } = makeResolvers();
+  const cards = resolveContentGridCards({ kind: 'related', algorithm: 'same_category' }, 2, resolvers);
+  assert.equal(queries.length, 1, 'exactly one degradation query runs');
+  assert.deepEqual(queries[0], {}, 'the degradation query is unfiltered (all posts, newest-first)');
+  assert.equal(cards.length, 2);
+});
+
+test('a related content_grid section validates against the object schema', () => {
+  const groups = validateObject(
+    {
+      objectType: 'page',
+      objectId: 'page_related_demo',
+      body: {
+        route: '/related-demo',
+        pageType: 'standard',
+        title: 'Related demo',
+        seo: {},
+        sections: [
+          {
+            id: 's_related',
+            type: 'content_grid',
+            data: { heading: 'Related Posts', source: { kind: 'related', algorithm: 'tag_similarity' }, limit: 4 },
+          },
+        ],
+      },
+    },
+    { resolveTaxonomyTerm: () => undefined }
+  );
+  const summary = summarizeValidation(groups);
+  assert.deepEqual(summary.blockers, [], JSON.stringify(summary.blockers));
+});

@@ -21,7 +21,7 @@
  * `cards` never reaches here: its curated cells live in the section data and
  * the component renders them directly (only cell links resolve, in resolve.ts).
  */
-import type { ContentQuery } from '../../schema/bodies/section-v1.js';
+import type { ContentQuery, RelatedAlgorithm } from '../../schema/bodies/section-v1.js';
 
 // The structural source shape shared by every M-8 grid (content_grid over
 // posts, product_preview over products — S2): the query type is generic, the
@@ -32,12 +32,21 @@ export type GridManualSource<TQuery> = {
   items: string[];
   fallback?: GridQuerySource<TQuery>;
 };
+/** Related-to-the-current-item selection (the "other articles" block). */
+export type GridRelatedSource = { kind: 'related'; algorithm: RelatedAlgorithm };
 
 export type ContentGridResolvers<TCard, TQuery = ContentQuery> = {
   /** Published content summary for a manual item id; undefined = does not resolve. */
   resolveManualItem: (objectId: string) => TCard | undefined;
   /** Run a content query, best-first, at most `limit` results. */
   runQuery: (query: TQuery, limit: number) => TCard[];
+  /**
+   * Run a `related` selection, best-first, at most `limit` results. Supplied
+   * by surfaces that know the current content item (the article route);
+   * absent, a `related` grid degrades to `latest` via runQuery — the section
+   * stays legal on any page.
+   */
+  runRelated?: (algorithm: RelatedAlgorithm, limit: number) => TCard[];
   /** Stable identity for de-duplication between manual picks and query results. */
   idOf: (card: TCard) => string;
 };
@@ -46,11 +55,19 @@ export type ContentGridResolvers<TCard, TQuery = ContentQuery> = {
 export type ContentGridWarn = (message: string) => void;
 
 export const resolveContentGridCards = <TCard, TQuery = ContentQuery>(
-  source: GridQuerySource<TQuery> | GridManualSource<TQuery>,
+  source: GridQuerySource<TQuery> | GridManualSource<TQuery> | GridRelatedSource,
   limit: number,
   resolvers: ContentGridResolvers<TCard, TQuery>,
   warn: ContentGridWarn = console.warn
 ): TCard[] => {
+  if (source.kind === 'related') {
+    // No current-item context on this surface → newest-first degradation
+    // (an empty query is "all posts"; the resolver sorts newest-first).
+    if (!resolvers.runRelated) {
+      return resolvers.runQuery({} as TQuery, limit).slice(0, limit);
+    }
+    return resolvers.runRelated(source.algorithm, limit).slice(0, limit);
+  }
   if (source.kind === 'query') {
     return resolvers.runQuery(source.query, limit).slice(0, limit);
   }

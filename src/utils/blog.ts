@@ -284,9 +284,13 @@ export const getStaticPathsBlogTag = async ({ paginate }: { paginate: PaginateFu
   );
 };
 
-/** */
-export async function getRelatedPosts(originalPost: Post, maxResults: number = 4): Promise<Post[]> {
-  const allPosts = await fetchPosts();
+/**
+ * The related-posts scoring, pure: same category +5, each shared tag +1,
+ * best-first, current post excluded. Single source of truth for BOTH the
+ * legacy RelatedPosts furniture (getRelatedPosts below) and the object-backed
+ * `related` content_grid source (section-resolve-deps.ts, `tag_similarity`).
+ */
+export function rankRelatedPosts(allPosts: Post[], originalPost: Post, maxResults: number): Post[] {
   const originalTagsSet = new Set(originalPost.tags ? originalPost.tags.map((tag) => tag.slug) : []);
 
   const postsWithScores = allPosts.reduce((acc: { post: Post; score: number }[], iteratedPost: Post) => {
@@ -311,12 +315,11 @@ export async function getRelatedPosts(originalPost: Post, maxResults: number = 4
 
   postsWithScores.sort((a, b) => b.score - a.score);
 
-  const selectedPosts: Post[] = [];
-  let i = 0;
-  while (selectedPosts.length < maxResults && i < postsWithScores.length) {
-    selectedPosts.push(postsWithScores[i].post);
-    i++;
-  }
+  return postsWithScores.slice(0, maxResults).map((entry) => entry.post);
+}
 
-  return selectedPosts;
+/** */
+export async function getRelatedPosts(originalPost: Post, maxResults: number = 4): Promise<Post[]> {
+  const allPosts = await fetchPosts();
+  return rankRelatedPosts(allPosts, originalPost, maxResults);
 }

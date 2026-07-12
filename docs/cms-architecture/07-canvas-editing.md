@@ -215,6 +215,45 @@ the sys/log lines are terse and glyph-prefixed. Every color is a
 project `--aw-*` design token (via the `--dlem-*` layer) — nothing bespoke;
 it flips light/dark with the site.
 
+### 3f. Tier-1 surfaces: article pages, chrome, the related-articles block (2026-07-12, Wolf)
+
+**Article pages.** `page_article`'s object sections already rendered through
+the annotated dispatcher — but the object was empty, so articles had no
+canvas. Now: (a) `ObjectSections` leaves a zero-height
+`data-cms-empty-object` marker when a page object has no sections, and the
+gap layer turns it into one add "+" — the FIRST section of an object-empty
+page is addable from the canvas (create → publish → release, no code);
+(b) the article route passes the current post into resolution, anchoring
+`related` grids. The article BODY (title/hero/prose) stays the Tier-1
+pipeline (OQ-8 stop line) — `/admin/publish` remains its editor.
+
+**"Other articles to read".** `content_grid` gained a `related` SOURCE KIND
+(design-principles: generalize, don't invent a bespoke type):
+`{ kind: 'related', algorithm: 'tag_similarity' | 'same_category' | 'latest' }`.
+`tag_similarity` is the site's existing scoring (same category +5, each
+shared tag +1 — now the pure `rankRelatedPosts`, single source of truth with
+the legacy furniture); anchored to the current post on article pages,
+newest-first anywhere else, so the section is legal on any page. The chip on
+a related grid grows a **compact algorithm dropdown inline with the AI
+button** — switching it patches `source.algorithm` through the normal draft
+path (checkout → `update_section_data` → publish stays separate). The
+palette offers "Related articles" (the one content_grid shape a quick-add
+can create: reference-free). When `page_article` carries a related grid, it
+REPLACES the hardcoded `RelatedPosts` furniture; until then the legacy block
+renders exactly as before. Related-grid titles link to their posts
+(query/manual grids keep the audited unlinked markup).
+
+**Chrome (header/footer).** `PageLayout` (and the per-page footer override)
+wrap Header/Footer in `data-cms-nav-object` annotations. Hovering chrome
+shows the chip (marked **site-wide**); the pencil opens a copy form of the
+NAVIGATION object — item labels (children included), group titles, brand
+text/descriptor, footer note — flattened by the pure `nav-editor.ts`, and
+saved through the nav grammar (`update_item`, `upsert_group` replace-by-id,
+`remove_action`+`upsert_action` for label-keyed renames, coalesced
+`set_nav_meta`), never page ops. Targets/hrefs/icons are deliberately not in
+the form — retargeting is structural work (the Ask-AI protected boundary),
+and chrome offers no AI chat (copy form only).
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

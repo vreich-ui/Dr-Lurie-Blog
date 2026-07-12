@@ -51,12 +51,21 @@ const footerData = navigationToFooterProps(parseNavigationExport(footerEntry.dat
 
 <Layout metadata={metadata}>
   <slot name="header">
-    <Header {...headerData} isSticky showRssFeed={chrome.showRssFeed} showToggleTheme={chrome.showThemeToggle} />
+    {
+      /* data-cms-nav-object: the edit-mode canvas reads this to offer chrome
+        copy editing on the navigation OBJECT (nav grammar ops, never page
+        ops). display:contents — no box, visitor-inert. */
+    }
+    <div style="display:contents" data-cms-nav-object={headerNavId} data-cms-nav-role="header">
+      <Header {...headerData} isSticky showRssFeed={chrome.showRssFeed} showToggleTheme={chrome.showThemeToggle} />
+    </div>
   </slot>
   <main>
     <slot />
   </main>
   <slot name="footer">
-    <Footer {...footerData} />
+    <div style="display:contents" data-cms-nav-object={footerNavId} data-cms-nav-role="footer">
+      <Footer {...footerData} />
+    </div>
   </slot>
 </Layout>

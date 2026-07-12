@@ -40,7 +40,7 @@ const bodySchema = z
       .object({
         field: z.string().min(1).max(200),
         name: z.string().min(1).max(200),
-        url: z.string().url().max(2000),
+        url: z.url().max(2000),
       })
       .strict()
       .optional(),

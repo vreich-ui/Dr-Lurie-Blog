@@ -138,8 +138,22 @@ export type GridCardCell = z.infer<typeof gridCardCellSchema>;
 /** Bounded composition: mirrors contentGridDefinition.childCount.max (block-tree.md). */
 export const CONTENT_GRID_MAX_CARDS = 8;
 
+/**
+ * Selection algorithms for a `related` content_grid (the "other articles to
+ * read" block, 2026-07-12): `tag_similarity` is the site's existing related-
+ * posts scoring (same category +5, each shared tag +1 — utils/blog.ts
+ * rankRelatedPosts), `same_category` filters to the current post's category,
+ * `latest` is newest-first. All are relative to the CURRENT content item when
+ * the rendering surface provides one (the article route passes it); without
+ * one they degrade to `latest`, so the same section is legal on any page.
+ */
+export const relatedAlgorithmSchema = z.enum(['tag_similarity', 'same_category', 'latest']);
+export type RelatedAlgorithm = z.infer<typeof relatedAlgorithmSchema>;
+
 export const contentGridSourceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('query'), query: contentQuerySchema }).strict(),
+  // Related-to-the-current-item selection (see relatedAlgorithmSchema above).
+  z.object({ kind: z.literal('related'), algorithm: relatedAlgorithmSchema }).strict(),
   // M-8 (settled S-1, applied at T3.3): manual-primary with optional query
   // fallback. Resolution order (src/lib/renderer/resolve-content-grid.ts):
   // manual refs first — each MUST resolve to a published content item — then

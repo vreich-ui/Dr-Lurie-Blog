@@ -7,6 +7,56 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 R (CANVAS Tier-1 surfaces: article pages, chrome, related-articles dropdown)
+
+Wolf: "Article publishing Tier 1 after conversion does not have canvas mode …
+apply the same treatment to the article and other tier one objects like
+headers, footers … A set of 'other articles to read' below an article can
+have an AI option and a simple choice of existing selection algorithms
+through a stylish dropdown … inline with AI action button." Shipped on the
+canvas branch (PR #425):
+
+- **`content_grid` `related` source kind** (generalize-don't-replicate):
+  `{kind:'related', algorithm: tag_similarity|same_category|latest}` —
+  tag_similarity = the existing related-posts scoring, extracted pure as
+  `rankRelatedPosts` (utils/blog.ts, single source of truth); anchored to
+  the current post via a new resolve context (article route passes
+  `relatedToPostId`), newest-first degradation elsewhere. Related-grid
+  titles link to posts; query/manual grids keep audited unlinked markup.
+- **Chip algorithm dropdown**: a related grid announces its algorithm via
+  `data-cms-related-algorithm`; the chip renders a compact chip-native
+  select inline with the sparkles; change → checkout →
+  `update_section_data {source:{kind:'related',algorithm}}` draft.
+- **Article pages get canvas**: `ObjectSections` leaves a zero-height
+  `data-cms-empty-object` marker on object-empty pages; the gap layer turns
+  it into one add "+" → the FIRST page_article section is addable from the
+  canvas ("Related articles" joined the palette — the one reference-free
+  content_grid starter). An object-backed related grid REPLACES the
+  hardcoded RelatedPosts furniture; absent one, byte-identical legacy. The
+  article BODY stays Tier-1 (OQ-8 line; /admin/publish).
+- **Chrome**: Header/Footer wrapped in `data-cms-nav-object` (PageLayout +
+  PageObjectRenderer footer override). Chip marked site-wide, pencil-only →
+  copy form (item labels incl. children, group titles, brand, footNote)
+  from pure `nav-editor.ts`; saves map to the NAV grammar — update_item,
+  upsert_group (replace-by-id, current group rides along),
+  remove_action+upsert_action renames, coalesced set_nav_meta — via
+  EditSession('navigation'). Local body kept in step
+  (`applyNavChangesToBody`) so sequential saves never resend stale groups.
+  Targets/hrefs/icons excluded (structural = protected boundary); no AI
+  chat on chrome.
+- **Gates**: 11 new tests (related resolver + degradation + schema-valid
+  page; annotation announces algorithm and only for related; nav-editor
+  flatten/ops/throw/apply incl. every-op-legal check; palette related-only
+  content_grid rule + empty-anchor append), suite 1159+49 green, astro
+  check 0, build 172 pages, drive 60 assertions (nav chip site-wide/no-AI,
+  nav grammar op on save, dropdown value + inline-with-AI + patch wire
+  shape + annotation update, empty-marker "+" → palette targets
+  page_article → upsert_section related grid). Docs: 07 §3f.
+- **To make it real on production**: enter edit mode on any article page,
+  click the "+" below the article, pick "Related articles", publish +
+  release (the store write happens through the verbs; no code or seed
+  needed). Header/footer copy edits work the same day-one.
+
 ## Session 2026-07-12 Q (CANVAS panel UI: icon-led collapsible accordion)
 
 Wolf: "make the modal UI collapsible accordion. use less text and more
