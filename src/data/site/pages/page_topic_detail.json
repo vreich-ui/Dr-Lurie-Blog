@@ -1,0 +1,25 @@
+{
+  "__generated": {
+    "at": "2026-07-12T09:41:56.797Z",
+    "from": "objects/page/by-id/page_topic_detail.json",
+    "record_version": 12
+  },
+  "pageType": "listing",
+  "route": "/learn/topics/[topic]",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>A focused collection of Dr. Lurié education assigned to this category in article frontmatter.</p>",
+        "heading": "%term%",
+        "kicker": "Topic"
+      },
+      "id": "s_topichead",
+      "type": "lede"
+    }
+  ],
+  "seo": {
+    "description": "Science-led Dr. Lurié articles about %term%."
+  },
+  "title": "%term% articles"
+}

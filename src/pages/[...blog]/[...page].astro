@@ -5,9 +5,10 @@ import Layout from '~/layouts/PageLayout.astro';
 import BlogList from '~/components/blog/List.astro';
 import Headline from '~/components/blog/Headline.astro';
 import Pagination from '~/components/blog/Pagination.astro';
-// import PostTags from "~/components/blog/Tags.astro";
+import ObjectSections from '~/components/cms/ObjectSections.astro';
 
 import { blogListRobots, getStaticPathsBlogList } from '~/utils/blog';
+import { loadRoutePageObject } from '~/utils/route-page-object';
 
 export const prerender = true;
 
@@ -20,14 +21,22 @@ type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 const { page } = Astro.props as Props;
 const currentPage = page.currentPage ?? 1;
 
-// const allCategories = await findCategories();
-// const allTags = await findTags();
+// W6 (T6.1): the header copy + SEO are agent-editable via `page_library`
+// (pageType 'listing'); the post feed + pagination stay the audited
+// build-time derivation. Fallback literals = the pre-conversion page.
+const listing = await loadRoutePageObject('page_library');
+const header = listing?.header ?? {
+  heading: 'Library',
+  paragraphs: ['Browse all Dr. Lurié skin science articles and practical explainers.'],
+};
+const baseTitle = listing?.title ?? 'Library';
 
 const metadata = {
-  title: `Library${currentPage > 1 ? ` — Page ${currentPage}` : ''}`,
+  title: `${baseTitle}${currentPage > 1 ? ` — Page ${currentPage}` : ''}`,
+  ...(listing?.seo.description ? { description: listing.seo.description } : {}),
   robots: {
-    index: blogListRobots?.index && currentPage === 1,
-    follow: blogListRobots?.follow,
+    index: (listing?.seo.robots?.index ?? blogListRobots?.index) && currentPage === 1,
+    follow: listing?.seo.robots?.follow ?? blogListRobots?.follow,
   },
   openGraph: {
     type: 'blog',
@@ -37,7 +46,12 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section class="px-6 sm:px-6 py-12 sm:py-16 lg:py-20 mx-auto max-w-4xl">
-    <Headline subtitle="Browse all Dr. Lurié skin science articles and practical explainers."> Library </Headline>
+    {
+      header.kicker && (
+        <p class="mb-4 text-center text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>
+      )
+    }
+    <Headline subtitle={header.paragraphs.join(' ')}>{header.heading}</Headline>
     <BlogList posts={page.data} />
     <Pagination prevUrl={page.url.prev} nextUrl={page.url.next} />
     <!--
@@ -45,4 +59,5 @@ const metadata = {
       <PostTags tags={allTags}  title="Search by Tags:" />
     -->
   </section>
+  <ObjectSections sections={listing?.extraSections ?? []} />
 </Layout>

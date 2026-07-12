@@ -52,8 +52,19 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   now blocks, at patch/create/publish, content that would break the deploy
   (protected env values in any encoding; repo-file hotlink URLs) or the build
   (per-component rich-text vocabulary, checked with the real splitters) — an
-  agent can no longer publish something that dead-ends the pipeline. Still
-  TODO: the W5+ hand-coded pages (Wolf: separate session).
+  agent can no longer publish something that dead-ends the pipeline.
+  **W6 BUILT + SEEDED (2026-07-12)**: the `listing`/`content_detail` PageTypes
+  are defined law (all five implemented; content_detail publishes with zero
+  sections via `minVisibleSections: 0`), and six page objects (page_library,
+  page_topics_index, page_topic_detail, page_category, page_tag, page_article)
+  make the listing surfaces' headings/copy/SEO agent-editable — first lede =
+  the header block, extra sections render after the list/article, per-term
+  objects carry `%term%` pattern copy — while the query machinery stays the
+  audited build-time derivation. Byte-identical cutover; local round-trip
+  green; **RENDERS + SEEDED, not CONVERTED** until the credentialed
+  `--production --release --seeds scripts/lib/pages-listing-seed-data.mjs`
+  run (after merge + deploy — schema-vintage gate). Still TODO: the W5
+  hand-coded pages (Wolf: separate session).
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

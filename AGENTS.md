@@ -38,8 +38,17 @@ catch-all serves any published Page object whose route no file owns — create �
 publish → release → live, zero code. Write-time guardrails (2026-07-11, traps
 5+14 closed): validateObject blocks, at patch/create/publish, content that would
 break the deploy (protected env values in any encoding; repo-file hotlink URLs)
-or the build (per-component rich-text vocabulary via the real splitters). Still
-TODO: the W5+ hand-coded pages (Wolf: separate session).
+or the build (per-component rich-text vocabulary via the real splitters).
+W6 BUILT + SEEDED (2026-07-12): `listing`/`content_detail` PageTypes are defined
+law (all five implemented; content_detail publishes with zero sections) and six
+page objects (library, topics ×2, category, tag, article) make listing
+headings/copy/SEO agent-editable — first lede = header block, extra sections
+render after the list/article, per-term objects carry `%term%` pattern copy —
+while query machinery stays the audited build-time derivation. Byte-identical
+cutover, local round-trip green; RENDERS + SEEDED, not CONVERTED until the
+credentialed `--production --release --seeds
+scripts/lib/pages-listing-seed-data.mjs` run (after merge + deploy). Still
+TODO: the W5 hand-coded pages (Wolf: separate session).
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

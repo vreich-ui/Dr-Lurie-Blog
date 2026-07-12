@@ -93,6 +93,32 @@ test('article permalinks and reserved prefixes are refused with named reasons', 
   assert.deepEqual(paths, [{ objectId: 'page_ok', route: '/learn/deep-dives', param: 'learn/deep-dives' }]);
 });
 
+test('listing/content_detail page objects are loader-owned — never emitted, even on free routes (W6)', () => {
+  const { paths, skipped } = computeObjectPageRoutes({
+    routeFilePaths: ROUTE_FILES,
+    pageExports: [
+      // Family-pattern routes (the real W6 objects' shape) …
+      { objectId: 'page_category', route: '/category/[category]', pageType: 'listing' },
+      { objectId: 'page_article', route: '/%slug%', pageType: 'content_detail' },
+      // … and even a route nobody else owns: the pageType alone refuses it.
+      { objectId: 'page_rogue_listing', route: '/totally-free-route', pageType: 'listing' },
+      // A standard page on a free route still emits.
+      { objectId: 'page_ok', route: '/another-free-route', pageType: 'standard' },
+    ],
+    postPermalinks: [],
+    reservedPrefixes: RESERVED,
+  });
+  assert.deepEqual(
+    skipped.map((skip) => [skip.objectId, skip.reason]),
+    [
+      ['page_category', 'loader_owned_page_type'],
+      ['page_article', 'loader_owned_page_type'],
+      ['page_rogue_listing', 'loader_owned_page_type'],
+    ]
+  );
+  assert.deepEqual(paths, [{ objectId: 'page_ok', route: '/another-free-route', param: 'another-free-route' }]);
+});
+
 test('malformed routes are invalid_route, and dynamic files are never treated as owners', () => {
   const { paths, skipped } = computeObjectPageRoutes({
     routeFilePaths: ROUTE_FILES,
@@ -131,10 +157,15 @@ test('the real committed exports emit ZERO paths today — every page object is 
   const pageExports = fs
     .readdirSync(pagesDir)
     .filter((file) => file.endsWith('.json'))
-    .map((file) => ({
-      objectId: path.basename(file, '.json'),
-      route: (JSON.parse(fs.readFileSync(path.join(pagesDir, file), 'utf8')) as { route?: unknown }).route,
-    }));
+    .map((file) => {
+      const body = JSON.parse(fs.readFileSync(path.join(pagesDir, file), 'utf8')) as {
+        route?: unknown;
+        pageType?: unknown;
+      };
+      // Mirrors the real catch-all's mapping ([...objectPage].astro), which
+      // passes pageType so listing/content_detail exports stay loader-owned.
+      return { objectId: path.basename(file, '.json'), route: body.route, pageType: body.pageType };
+    });
   const walk = (dir: string): string[] =>
     fs
       .readdirSync(dir, { withFileTypes: true })
@@ -151,8 +182,14 @@ test('the real committed exports emit ZERO paths today — every page object is 
   });
   assert.deepEqual(paths, [], JSON.stringify(paths));
   assert.equal(skipped.length, pageExports.length);
+  // Every committed export is served by a dedicated file: the 12 originally
+  // converted pages by their thin loaders (file_route), and the W6 listing/
+  // content_detail objects by the formalized listing loaders that read them
+  // (loader_owned_page_type). Any OTHER reason means a committed export is
+  // unreachable — that must fail here.
+  const servedElsewhere = new Set(['file_route', 'loader_owned_page_type']);
   assert.ok(
-    skipped.every((skip) => skip.reason === 'file_route'),
-    JSON.stringify(skipped.filter((skip) => skip.reason !== 'file_route'))
+    skipped.every((skip) => servedElsewhere.has(skip.reason)),
+    JSON.stringify(skipped.filter((skip) => !servedElsewhere.has(skip.reason)))
   );
 });

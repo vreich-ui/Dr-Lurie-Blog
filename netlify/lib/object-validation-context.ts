@@ -89,9 +89,10 @@ export const buildStoreValidationContext = async (
   const resolvePageType: ObjectValidationContext['resolvePageType'] = (pageTypeId) => {
     const lookup = getPageTypeDefinition(pageTypeId);
     if (!lookup.ok) return undefined;
-    const { id, allowedSections, requiredSections } = lookup.definition;
+    const { id, allowedSections, requiredSections, minVisibleSections } = lookup.definition;
     const constraint: PageTypeConstraint = { id, allowedSections };
     if (requiredSections) constraint.requiredSections = requiredSections;
+    if (minVisibleSections !== undefined) constraint.minVisibleSections = minVisibleSections;
     return constraint;
   };
 

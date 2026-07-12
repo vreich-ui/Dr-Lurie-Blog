@@ -154,8 +154,13 @@ const renderable = (id: string, type: SectionType, data: unknown, deps: ResolveP
   ctx: {},
 });
 
-export const resolvePageSections = (page: PageBody, deps: ResolvePageDeps): RenderableSection[] =>
-  page.sections.map((section) => {
+/**
+ * Resolve a bare section list (W6): the listing surfaces render object
+ * sections around their derived list furniture, not through a whole-page
+ * body, so the section half of resolvePage is exported on its own.
+ */
+export const resolveSections = (sections: PageBody['sections'], deps: ResolvePageDeps): RenderableSection[] =>
+  sections.map((section) => {
     if (section.type === 'shared_ref') {
       // Render the referenced shared section as its own variant, keyed by the
       // page section id so React-style keys stay stable and unique per page.
@@ -164,6 +169,9 @@ export const resolvePageSections = (page: PageBody, deps: ResolvePageDeps): Rend
     }
     return renderable(section.id, section.type, section.data, deps);
   });
+
+export const resolvePageSections = (page: PageBody, deps: ResolvePageDeps): RenderableSection[] =>
+  resolveSections(page.sections, deps);
 
 export const resolvePageMetadata = (page: PageBody): PageRenderMetadata => ({
   title: page.title,

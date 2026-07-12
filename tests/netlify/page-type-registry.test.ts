@@ -1,9 +1,10 @@
 /**
- * T3.1 — PageType registry v1. Pins the D§3.4 contract:
+ * T3.1 — PageType registry v1 (+ W6/T6.1 completion). Pins the D§3.4 contract:
  *
- *   - home / standard / system fully defined; listing / content_detail typed
- *     in the enum but deliberately unimplemented until P6 — and the lookup
- *     distinguishes "unknown id" from "known, not yet implemented".
+ *   - all five PageTypeIds are defined since W6 (2026-07-12): home / standard /
+ *     system (T3.1) plus listing / content_detail (T6.1 — the formalized blog
+ *     listing loaders); the lookup still distinguishes "unknown id" from
+ *     "known, not yet implemented" for any future enum addition.
  *   - every definition is review-required (pages are Tier 2, D§3.9) with
  *     publish roles drawn from the real Role union in netlify/lib/roles.ts.
  *   - allowed/required section names are drawn from the live sectionTypeSchema
@@ -25,21 +26,43 @@ import {
   type PublishRole,
 } from '../../src/lib/registry/page-types.js';
 
-test('home, standard, and system are defined; listing and content_detail are typed but unimplemented', () => {
-  for (const id of ['home', 'standard', 'system']) {
+test('all five PageTypeIds are defined (W6); unknown ids still fail loudly', () => {
+  for (const id of ['home', 'standard', 'system', 'listing', 'content_detail']) {
     const lookup = getPageTypeDefinition(id);
     assert.ok(lookup.ok, `${id} must be defined`);
   }
-  for (const id of ['listing', 'content_detail']) {
-    assert.deepEqual(getPageTypeDefinition(id), { ok: false, reason: 'not_yet_implemented' });
-  }
   assert.deepEqual(getPageTypeDefinition('landing'), { ok: false, reason: 'unknown_page_type' });
-  assert.deepEqual(unimplementedPageTypeIds(), ['listing', 'content_detail']);
+  assert.deepEqual(unimplementedPageTypeIds(), []);
   // The registry's id universe is exactly the page-v1 enum: defined + pending.
   assert.deepEqual(
     [...listPageTypeDefinitions().map((definition) => definition.id), ...unimplementedPageTypeIds()].sort(),
     [...pageTypeIds].sort()
   );
+});
+
+test('listing formalizes the loader pattern: required lede header, content_items query, paginated (T6.1)', () => {
+  const listing = getPageTypeDefinition('listing');
+  assert.ok(listing.ok);
+  assert.deepEqual(listing.definition.requiredSections, ['lede']);
+  assert.ok(Array.isArray(listing.definition.allowedSections));
+  assert.ok((listing.definition.allowedSections as string[]).includes('shared_ref'));
+  assert.deepEqual(listing.definition.listing, {
+    source: 'content_items',
+    defaultQuery: { sort: 'published_time_desc' },
+    paginate: true,
+  });
+  // Default minimum applies: a listing page must keep its visible header block.
+  assert.equal(listing.definition.minVisibleSections, undefined);
+});
+
+test('content_detail publishes with zero sections (the article is the content) and never allows a lede', () => {
+  const detail = getPageTypeDefinition('content_detail');
+  assert.ok(detail.ok);
+  assert.equal(detail.definition.minVisibleSections, 0);
+  assert.equal(detail.definition.requiredSections, undefined);
+  assert.ok(Array.isArray(detail.definition.allowedSections));
+  assert.ok(!(detail.definition.allowedSections as string[]).includes('lede'));
+  assert.equal(detail.definition.listing, undefined);
 });
 
 test('every definition is review-required with roles from the real Role union (D§3.9)', () => {

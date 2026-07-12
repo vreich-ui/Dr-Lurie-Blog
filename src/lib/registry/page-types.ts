@@ -5,12 +5,13 @@
  * loaders that are necessarily code. Exposed read-only through the MCP
  * `registry_get` tool (replacing the T0.9 stub); shared across sites.
  *
- * v1 ships the three types Phase 3 needs — `home`, `standard`, `system` —
- * fully defined. `listing` and `content_detail` are TYPED here (the
- * PageTypeId enum in page-v1.ts has carried all five since T0.2) but their
- * definitions are deliberately absent until P6 formalizes the blog listing
- * loaders (A§2.5–2.6): an unimplemented type failing registry lookup loudly
- * beats a guessed definition silently constraining validation.
+ * v1 shipped the three types Phase 3 needed — `home`, `standard`, `system`.
+ * W6 (T6.1, 2026-07-12) formalized the last two: `listing` (the blog
+ * list/category/tag/topics loaders — the query machinery stays the audited
+ * build-time derivation, A§2.5–2.7; the page object owns headings/SEO) and
+ * `content_detail` (the SinglePost article surface — route-level SEO defaults
+ * plus optional sections rendered after the article; the article body itself
+ * stays outside the object model, OQ-8). All five PageTypeIds are now defined.
  *
  * Review policy (D§3.9): pages are review-required across the board —
  * `page` is Tier 2, so publish is agent-executable but only after an
@@ -46,6 +47,14 @@ export type PageTypeDefinition = {
   allowedSections: SectionType[] | 'any';
   requiredSections?: SectionType[];
   listing?: PageTypeListing;
+  /**
+   * Minimum count of visible (non-hidden) sections a page must keep to
+   * publish. Defaults to 1 (the A§1.1 "≥1 public node" analogue) when absent.
+   * `content_detail` sets 0: its content IS the article — the page object
+   * exists for route-level SEO defaults, and sections are optional extras
+   * rendered after the post.
+   */
+  minVisibleSections?: number;
   reviewPolicy: ReviewPolicy;
 };
 
@@ -57,9 +66,9 @@ const PAGE_REVIEW_POLICY: ReviewPolicy = {
 };
 
 /**
- * The definitions, keyed by id. `listing` / `content_detail` are absent by
- * design until P6 — `getPageTypeDefinition` distinguishes "unknown id" from
- * "known but not yet implemented" so validators and editors can say which.
+ * The definitions, keyed by id. All five PageTypeIds are defined as of W6;
+ * `getPageTypeDefinition` still distinguishes "unknown id" from "known but
+ * not yet implemented" so a future enum addition fails loudly, not silently.
  */
 export const pageTypeDefinitions: Partial<Record<PageTypeId, PageTypeDefinition>> = {
   home: {
@@ -86,6 +95,40 @@ export const pageTypeDefinitions: Partial<Record<PageTypeId, PageTypeDefinition>
     allowedSections: ['hero', 'prose', 'link_list', 'cta_banner'],
     reviewPolicy: PAGE_REVIEW_POLICY,
   },
+  listing: {
+    id: 'listing',
+    // Five loader files bind here: src/pages/[...blog]/[...page].astro (the
+    // library), [...blog]/[category|tag]/[...page].astro, and the topics hub
+    // pair under src/pages/learn/topics/. The loaders keep the audited
+    // build-time derivation (getStaticPathsBlogList/Category/Tag, fetchPosts —
+    // A§2.5–2.7); the page object supplies the editable header copy (its first
+    // `lede` section, `%term%` interpolated on per-term surfaces), SEO, and
+    // any extra sections rendered after the list.
+    routePattern: '/[...listing]',
+    allowedSections: ['lede', 'prose', 'cta_banner', 'newsletter_signup', 'content_grid', 'link_list', 'shared_ref'],
+    // The first lede IS the listing header block — a listing page without one
+    // has no editable heading, so it is required (publish-gated, D§3.4).
+    requiredSections: ['lede'],
+    listing: {
+      source: 'content_items',
+      // The per-surface term filter (category/tag) is the loader's derivation;
+      // the default is the unfiltered newest-first feed every listing starts from.
+      defaultQuery: { sort: 'published_time_desc' },
+      paginate: true,
+    },
+    reviewPolicy: PAGE_REVIEW_POLICY,
+  },
+  content_detail: {
+    id: 'content_detail',
+    // Binds to src/pages/[...blog]/index.astro (the SinglePost surface). The
+    // article body stays outside the object model (OQ-8); `page_article`
+    // carries route-level SEO defaults plus optional sections rendered after
+    // the article (no lede — the post supplies its own heading).
+    routePattern: '/[...blog]',
+    allowedSections: ['prose', 'cta_banner', 'newsletter_signup', 'content_grid', 'link_list', 'shared_ref'],
+    minVisibleSections: 0,
+    reviewPolicy: PAGE_REVIEW_POLICY,
+  },
 };
 
 export type PageTypeLookup =
@@ -102,7 +145,7 @@ export const getPageTypeDefinition = (id: string): PageTypeLookup => {
 export const listPageTypeDefinitions = (): PageTypeDefinition[] =>
   Object.values(pageTypeDefinitions).filter((definition): definition is PageTypeDefinition => Boolean(definition));
 
-/** Ids typed in the enum but not yet defined here (P6 scope) — surfaced by registry_get. */
+/** Ids typed in the enum but not yet defined here — empty since W6; surfaced by registry_get. */
 export const unimplementedPageTypeIds = (): PageTypeId[] =>
   pageTypeIdSchema.options.filter((id) => !pageTypeDefinitions[id]);
 
@@ -128,6 +171,7 @@ export const pageTypeDefinitionJsonSchema = () =>
           })
           .strict()
           .optional(),
+        minVisibleSections: z.number().int().nonnegative().optional(),
         reviewPolicy: z
           .object({
             required: z.boolean(),

@@ -16,11 +16,19 @@
  *     (`/%slug%`); a page route equal to one would collide at build.
  *   - `reserved_prefix` — path families owned by other dynamic routes or
  *     tooling: the blog list/category/tag bases, the topics hub, and /admin.
+ *   - `loader_owned_page_type` — pageType 'listing' / 'content_detail' (W6):
+ *     these page objects bind to the formalized listing loaders (the blog
+ *     list/category/tag routes, the topics hub, the article route), which
+ *     read their headings/SEO/extra sections directly. Their `route` fields
+ *     are family patterns (e.g. '/category/[category]', '/%slug%'), never
+ *     standalone paths — the catch-all must not mint literal pages for them.
  *   - `invalid_route` — not a string, not absolute, or empty.
  *
  * Skips are returned (not dropped) so the caller can `console.warn` each one —
  * an agent-published page that is NOT live must be loudly visible in the build
- * log, never silently truncated.
+ * log, never silently truncated. (`file_route` and `loader_owned_page_type`
+ * are the two exceptions a caller may keep quiet: both mean the page IS
+ * served, just by a dedicated file, not by the catch-all.)
  */
 
 export type PageExportLike = {
@@ -28,6 +36,8 @@ export type PageExportLike = {
   objectId: string;
   /** body.route from the derived export (unknown until validated here). */
   route: unknown;
+  /** body.pageType from the derived export (unknown until validated here). */
+  pageType?: unknown;
 };
 
 export type ObjectPageRoutesInput = {
@@ -47,7 +57,7 @@ export type ObjectPageRoutesInput = {
 export type SkippedObjectPageRoute = {
   objectId: string;
   route: string;
-  reason: 'file_route' | 'blog_slug' | 'reserved_prefix' | 'invalid_route';
+  reason: 'file_route' | 'blog_slug' | 'reserved_prefix' | 'loader_owned_page_type' | 'invalid_route';
 };
 
 export type ObjectPageRoutes = {
@@ -57,6 +67,9 @@ export type ObjectPageRoutes = {
 };
 
 const trimSlashes = (value: string) => value.replace(/^\/+/, '').replace(/\/+$/, '');
+
+/** PageTypes whose objects bind to dedicated loader files, never the catch-all (W6). */
+const LOADER_OWNED_PAGE_TYPES = new Set(['listing', 'content_detail']);
 
 /** '/src/pages/solutions/early-access.astro' | './index.astro' → 'solutions/early-access' | '' */
 const routeFileToPath = (filePath: string): string | undefined => {
@@ -85,6 +98,10 @@ export const computeObjectPageRoutes = (input: ObjectPageRoutesInput): ObjectPag
     }
     const param = trimSlashes(rawRoute);
     const route = `/${param}`;
+    if (typeof entry.pageType === 'string' && LOADER_OWNED_PAGE_TYPES.has(entry.pageType)) {
+      skipped.push({ objectId: entry.objectId, route, reason: 'loader_owned_page_type' });
+      continue;
+    }
     if (fileOwned.has(param)) {
       skipped.push({ objectId: entry.objectId, route, reason: 'file_route' });
       continue;

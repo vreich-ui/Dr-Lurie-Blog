@@ -266,6 +266,35 @@ test('check6 structure REJECTION: zero visible sections is a hard failure at pub
   assert.equal(statusOf(criteria, 'structure_visible'), 'missing');
 });
 
+test('check6 structure (W6): minVisibleSections 0 lets a content_detail page publish with zero sections', () => {
+  const body = { route: '/%slug%', pageType: 'content_detail', title: 'Article', seo: {}, sections: [] };
+  const context: ObjectValidationContext = {
+    pageType: { id: 'content_detail', allowedSections: ['prose', 'cta_banner'], minVisibleSections: 0 },
+  };
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_article', body, context, true), 'structure_visible'),
+    'complete'
+  );
+});
+
+test('check6 structure (W6): the constraint may also arrive via resolvePageType (the live wiring path)', () => {
+  const body = { route: '/%slug%', pageType: 'content_detail', title: 'Article', seo: {}, sections: [] };
+  const context: ObjectValidationContext = {
+    resolvePageType: (id) =>
+      id === 'content_detail' ? { id, allowedSections: ['prose'], minVisibleSections: 0 } : undefined,
+  };
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_article', body, context, true), 'structure_visible'),
+    'complete'
+  );
+  // A pageType WITHOUT the exemption still hard-fails empty at publish.
+  const standard = { ...body, pageType: 'standard' };
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_article', standard, context, true), 'structure_visible'),
+    'missing'
+  );
+});
+
 test('check6 structure REJECTION: a section type outside PageType.allowedSections is rejected', () => {
   const body = validPageBody();
   const context: ObjectValidationContext = { pageType: { id: 'home', allowedSections: ['hero'] } };

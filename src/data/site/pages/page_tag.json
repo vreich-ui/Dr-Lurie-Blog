@@ -1,0 +1,21 @@
+{
+  "__generated": {
+    "at": "2026-07-12T09:41:56.805Z",
+    "from": "objects/page/by-id/page_tag.json",
+    "record_version": 12
+  },
+  "pageType": "listing",
+  "route": "/tag/[tag]",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "heading": "Tag: %term%"
+      },
+      "id": "s_taghead",
+      "type": "lede"
+    }
+  ],
+  "seo": {},
+  "title": "Posts by tag '%term%'"
+}

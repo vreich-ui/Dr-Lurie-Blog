@@ -12,6 +12,8 @@ import { getStaticPathsBlogPost, blogPostRobots } from '~/utils/blog';
 import { findImage, isDocumentPath } from '~/utils/images';
 import type { MetaData } from '~/types';
 import RelatedPosts from '~/components/blog/RelatedPosts.astro';
+import ObjectSections from '~/components/cms/ObjectSections.astro';
+import { loadRoutePageObject } from '~/utils/route-page-object';
 
 export const prerender = true;
 
@@ -31,13 +33,19 @@ const image =
     ? undefined
     : ((await findImage(post.image)) as ImageMetadata | string | undefined);
 
+// W6 (T6.1): `page_article` (pageType 'content_detail') carries route-level
+// SEO defaults for EVERY article page (post frontmatter still wins where set)
+// plus optional sections rendered after the article — the article body itself
+// stays in the content_item pipeline (OQ-8). Fallback = config.yaml robots.
+const articleObject = await loadRoutePageObject('page_article');
+
 const metadata = merge(
   {
     title: post.title,
     description: post.excerpt,
     robots: {
-      index: blogPostRobots?.index,
-      follow: blogPostRobots?.follow,
+      index: articleObject?.seo.robots?.index ?? blogPostRobots?.index,
+      follow: articleObject?.seo.robots?.follow ?? blogPostRobots?.follow,
     },
     openGraph: {
       type: 'article',
@@ -56,4 +64,5 @@ const metadata = merge(
   </SinglePost>
   <ToBlogLink />
   <RelatedPosts post={post} />
+  <ObjectSections sections={articleObject?.extraSections ?? []} />
 </Layout>
