@@ -1,0 +1,166 @@
+---
+/**
+ * Product detail route (S2, 06-shop-module-plan §4) — the SinglePost-shaped
+ * loader for /shop/<slug>:
+ *
+ * - getStaticPaths derives from published + AVAILABLE product exports
+ *   (never-render-private: retired/coming_soon products publish for drafting
+ *   but get no live path);
+ * - the buy box + hero imagery render from the product object (the commerce
+ *   facet); `presentation.page_ref`'s sections render after it through the
+ *   standard ObjectSections path — a product without one is a thin
+ *   card+buy-box page, and that's fine (§2);
+ * - `page_product_detail` (content_detail) supplies route-level SEO defaults
+ *   exactly like `page_article` does for articles; product fields win.
+ * - client side: a `product_viewed` beacon on load, `checkout_started` fired
+ *   on the buy CTA before redirecting to the Checkout Session URL.
+ */
+import type { GetStaticPaths, InferGetStaticPropsType } from 'astro';
+import { getEntry } from 'astro:content';
+import merge from 'lodash.merge';
+
+import ObjectSections from '~/components/cms/ObjectSections.astro';
+import Layout from '~/layouts/PageLayout.astro';
+import { parsePageExport } from '~/lib/renderer/resolve';
+import type { MetaData } from '~/types';
+import { loadAvailableProducts, productPriceBadge } from '~/utils/products';
+import { loadRoutePageObject } from '~/utils/route-page-object';
+
+export const prerender = true;
+
+export const getStaticPaths = (async () => {
+  const products = await loadAvailableProducts();
+  return products.map((product) => ({
+    params: { slug: product.body.slug },
+    props: { productId: product.id, body: product.body },
+  }));
+}) satisfies GetStaticPaths;
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { productId, body } = Astro.props as Props;
+
+// Long-form sections composed from the OPTIONAL referenced Page object (§2).
+const pageRefId = body.presentation.page_ref;
+const pageRefEntry = pageRefId ? await getEntry('pageObject', pageRefId) : undefined;
+const pageRefSections = pageRefEntry ? parsePageExport(pageRefEntry.data).sections : [];
+
+// Route-level SEO defaults, the page_article pattern (W6).
+const detailObject = await loadRoutePageObject('page_product_detail');
+
+const heroImage = body.presentation.images?.[0];
+const badge = productPriceBadge(body.commerce);
+const buyable = body.commerce.mode === 'fixed'; // PWYW/free claim paths land with S3
+
+const metadata = merge(
+  {
+    title: body.presentation.title,
+    description: detailObject?.seo.description,
+    robots: {
+      index: detailObject?.seo.robots?.index ?? true,
+      follow: detailObject?.seo.robots?.follow ?? true,
+    },
+  },
+  {
+    ...(body.presentation.seo?.description ? { description: body.presentation.seo.description } : {}),
+    ...(body.presentation.seo?.ogImage
+      ? { openGraph: { images: [{ url: body.presentation.seo.ogImage, width: 1200, height: 630 }] } }
+      : {}),
+  }
+) as MetaData;
+---
+
+<Layout metadata={metadata}>
+  <section class="px-4 py-16 sm:px-6 mx-auto lg:px-8 lg:py-20 max-w-4xl">
+    <div class="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-start">
+      {
+        heroImage && (
+          <img class="w-full rounded-lg object-cover" src={heroImage.src} alt={heroImage.alt} loading="eager" />
+        )
+      }
+      <div class:list={[heroImage ? '' : 'md:col-span-2 text-center']}>
+        <h1 class="text-4xl font-bold leading-tighter tracking-tighter font-heading">{body.presentation.title}</h1>
+        {
+          body.presentation.excerpt && (
+            <p class="mt-4 text-xl text-muted dark:text-slate-400">{body.presentation.excerpt}</p>
+          )
+        }
+        <p class="mt-6 text-3xl font-bold text-heading">{badge}</p>
+        <div class="mt-6" id="buy-box" data-product-id={productId}>
+          {
+            buyable ? (
+              <button class="btn btn-primary w-full sm:w-auto" data-role="buy" type="button">
+                Buy now
+              </button>
+            ) : (
+              <button class="btn w-full cursor-not-allowed opacity-60 sm:w-auto" type="button" disabled>
+                Coming soon
+              </button>
+            )
+          }
+          <p class="mt-3 hidden text-sm text-red-600" data-role="buy-error">
+            Checkout could not be started. Please try again.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+  {pageRefId && <ObjectSections objectId={pageRefId} sections={pageRefSections} />}
+</Layout>
+
+<script>
+  // Best-effort commerce beacons (plan §6) — the save-opt-in sendBeacon
+  // pattern; lossy by design, never blocks the UI.
+  const endpoint = '/.netlify/functions/save-commerce-event';
+  const buyBox = document.getElementById('buy-box');
+  const productId = buyBox?.dataset.productId ?? '';
+
+  const sendEvent = (type: string) => {
+    if (!productId) return;
+    const body = JSON.stringify({
+      type,
+      product_id: productId,
+      path: window.location.pathname,
+      referrer: document.referrer || undefined,
+    });
+    try {
+      if (navigator.sendBeacon) {
+        const queued = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+        if (queued) return;
+      }
+      fetch(endpoint, {
+        body,
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        method: 'POST',
+      }).catch(() => undefined);
+    } catch {
+      // best-effort only
+    }
+  };
+
+  // One view event per page load (no per-session dedupe in v1 — the log is
+  // lossy/duplicative by contract and consumers dedupe).
+  sendEvent('product_viewed');
+
+  const buyButton = buyBox?.querySelector<HTMLButtonElement>('[data-role="buy"]');
+  const buyError = buyBox?.querySelector('[data-role="buy-error"]');
+  buyButton?.addEventListener('click', async () => {
+    buyButton.disabled = true;
+    buyError?.classList.add('hidden');
+    try {
+      const response = await fetch('/.netlify/functions/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId }),
+      });
+      const payload = (await response.json()) as { url?: string };
+      if (!response.ok || !payload.url) throw new Error('no checkout url');
+      sendEvent('checkout_started');
+      window.location.assign(payload.url);
+    } catch {
+      buyError?.classList.remove('hidden');
+      buyButton.disabled = false;
+    }
+  });
+</script>

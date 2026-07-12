@@ -220,7 +220,24 @@ export const siteDrillOps = (body) => {
   };
 };
 
-/** Dispatch: build the drill for one seed (page, section, template, taxonomy, or site). */
+/**
+ * Drill a `product` object (S2): `set_product_fields` is the type's ONLY
+ * permitted op — poke the presentation title and restore it, the siteDrillOps
+ * shape. NEVER touches commerce.price/stripe/stripe_test (the §3 canonicality
+ * funnel refuses those keys at the grammar).
+ */
+export const productDrillOps = (body) => {
+  const title = body.presentation.title;
+  return {
+    expected: ['set_product_fields'],
+    ops: [
+      { op: 'set_product_fields', fields: { presentation: { title: `${title} [probe]` } } },
+      { op: 'set_product_fields', fields: { presentation: { title } } },
+    ],
+  };
+};
+
+/** Dispatch: build the drill for one seed (page, section, template, taxonomy, site, or product). */
 export const drillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
@@ -244,6 +261,9 @@ export const drillOpsForSeed = (seed) => {
   }
   if (seed.objectType === 'site') {
     return siteDrillOps(seed.body);
+  }
+  if (seed.objectType === 'product') {
+    return productDrillOps(seed.body);
   }
   return sectionDrillOps(seed.body.section);
 };

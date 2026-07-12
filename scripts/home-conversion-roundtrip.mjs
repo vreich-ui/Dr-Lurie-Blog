@@ -14,7 +14,7 @@
  *   SEED_SITE         the owning site id (e.g. 'site_drlurie').
  * (The home module's PAGE_HOME_SEEDS / PAGE_HOME_SEED_SITE names are accepted
  * as a fallback.) The driver drills page, section, template, taxonomy, and
- * site types — extend drillOps/reconcileOps/materialize dispatch when another
+ * site/product types — extend drillOps/reconcileOps/materialize dispatch when another
  * type's family converts. Template families additionally get an instantiate proof: an
  * object_instantiate_template dry_run per template (W2.5), which builds and
  * validates the would-be page WITHOUT persisting — so production runs leave no
@@ -108,11 +108,11 @@ if (!Array.isArray(PAGE_HOME_SEEDS) || PAGE_HOME_SEEDS.length === 0 || !PAGE_HOM
   console.error(`[roundtrip] ${seedsPath} must export CONVERSION_SEEDS (non-empty array) and SEED_SITE.`);
   process.exit(2);
 }
-const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy', 'site']);
+const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy', 'site', 'product']);
 const unsupported = PAGE_HOME_SEEDS.filter((seed) => !SUPPORTED_SEED_TYPES.has(seed.objectType));
 if (unsupported.length > 0) {
   console.error(
-    `[roundtrip] the driver drills page/section/template/taxonomy/site objects only; extend drillOps for: ${unsupported
+    `[roundtrip] the driver drills page/section/template/taxonomy/site/product objects only; extend drillOps for: ${unsupported
       .map((seed) => `${seed.objectId} (${seed.objectType})`)
       .join(', ')}`
   );
@@ -378,6 +378,17 @@ const publishOutcome = async (seed, lockToken) => {
   if (!production && text.includes('export_commit_failed')) {
     return { ok: true, detail: 'blocked at export_commit_failed — the expected sandbox boundary' };
   }
+  // Review-gated types (product, shop-plan §0.4): an agent-executed publish is
+  // DENIED until a human approves — that denial is the drill's expected
+  // terminal signal, in the sandbox AND in production. The human approves in
+  // /admin/objects and the approved publish is re-executed; the driver must
+  // never work around the gate.
+  if (text.includes('approval_required')) {
+    return {
+      ok: true,
+      detail: 'blocked at approval_required — the review-required gate; a human approves in /admin/objects',
+    };
+  }
   return { ok: false, detail: text };
 };
 
@@ -515,12 +526,14 @@ if (writeExports) {
     path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'taxonomy.js')
   );
   const { materializeSite } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'site.js'));
+  const { materializeProduct } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'product.js'));
   const materializerByType = {
     page: materializePage,
     section: materializeSection,
     template: materializeTemplate,
     taxonomy: materializeTaxonomy,
     site: materializeSite,
+    product: materializeProduct,
   };
   for (const seed of PAGE_HOME_SEEDS) {
     const record = await getRecord(seed.objectType, seed.objectId);

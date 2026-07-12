@@ -1,0 +1,14 @@
+{
+  "__generated": {
+    "at": "2026-07-12T13:26:49.900Z",
+    "from": "objects/page/by-id/page_product_detail.json",
+    "record_version": 12
+  },
+  "pageType": "content_detail",
+  "route": "/shop/[slug]",
+  "sections": [],
+  "seo": {
+    "description": "Science-first skincare guides and resources from Dr. Lurié."
+  },
+  "title": "Shop"
+}

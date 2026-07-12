@@ -380,6 +380,16 @@ export const checkReferenceIntegrity = (
       if (node.type === 'content_embed' && typeof data.contentItem === 'string') {
         requireObject('content_item', data.contentItem, 'content_embed.contentItem');
       }
+      // product_preview manual picks must resolve to existing products (S2 —
+      // the content_grid manual-item rule over the product keyspace).
+      if (node.type === 'product_preview' && isRecord(data.source)) {
+        const source = data.source;
+        if (source.kind === 'manual' && Array.isArray(source.items)) {
+          for (const item of source.items) {
+            if (typeof item === 'string') requireObject('product', item, 'product_preview manual item');
+          }
+        }
+      }
       if (node.type === 'content_grid' && isRecord(data.source)) {
         const source = data.source;
         const requireQueryTerms = (query: unknown, label: string) => {

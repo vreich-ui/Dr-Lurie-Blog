@@ -22,8 +22,19 @@
  */
 import type { NavTarget } from '../../schema/bodies/navigation-v1.js';
 import { pageBodySchema, type PageBody } from '../../schema/bodies/page-v1.js';
-import { sectionBodySchema, type ContentGridSource } from '../../schema/bodies/section-v1.js';
-import type { ContentEmbedCard, ContentGridCard, RenderCtx, SectionType } from '../registry/components/types.js';
+import {
+  sectionBodySchema,
+  type ContentGridSource,
+  type ProductPreviewSource,
+  type ProductQuery,
+} from '../../schema/bodies/section-v1.js';
+import type {
+  ContentEmbedCard,
+  ContentGridCard,
+  ProductPreviewCard,
+  RenderCtx,
+  SectionType,
+} from '../registry/components/types.js';
 import { resolveContentGridCards, type ContentGridResolvers } from './resolve-content-grid.js';
 
 /** A section ready for component-registry dispatch: `{data, resolved, ctx}` plus its stable page key. */
@@ -79,6 +90,12 @@ export type ResolvePageDeps = {
    * Required only when a page actually carries a content_embed section.
    */
   resolveContentEmbed?: (contentItemId: string) => ContentEmbedCard | undefined;
+  /**
+   * Resolvers for product_preview `manual`/`query` sources (S2 — the M-8
+   * pattern over product objects). Required only when a page actually carries
+   * a product-backed product_preview section.
+   */
+  productGrid?: ContentGridResolvers<ProductPreviewCardInternal, ProductQuery>;
 };
 
 // The audited homepage OG image is emitted at these fixed dimensions; page.v1
@@ -115,7 +132,9 @@ export const parseSharedSectionExport = (
 
 type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
 type LinkListLikeData = { links?: Array<{ target: NavTarget }> };
-type ProductPreviewLikeData = { products?: Array<{ action?: { target: NavTarget } }> };
+type ProductPreviewLikeData = { source: ProductPreviewSource; limit: number };
+/** Internal identity for de-duplicating product manual picks against fallback backfill. */
+type ProductPreviewCardInternal = ProductPreviewCard;
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
 
 const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): unknown => {
@@ -131,14 +150,22 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
       linkHrefs: ((data as LinkListLikeData).links ?? []).map((link) => deps.resolveActionHref(link.target)),
     };
   }
-  // product_preview resolves each product's optional action to an href, aligned
-  // by index (undefined where a product carries no action).
+  // product_preview (S2): the M-8 semantics over PRODUCT objects. `cards`
+  // renders curated cells (only their optional actions resolve); manual/query
+  // resolve to product cards via the injected resolvers.
   if (type === 'product_preview') {
-    return {
-      productActionHrefs: ((data as ProductPreviewLikeData).products ?? []).map((product) =>
-        product.action ? deps.resolveActionHref(product.action.target) : undefined
-      ),
-    };
+    const { source, limit } = data as ProductPreviewLikeData;
+    if (source.kind === 'cards') {
+      return {
+        cardHrefs: source.cards.map((card) => (card.action ? deps.resolveActionHref(card.action.target) : undefined)),
+      };
+    }
+    if (!deps.productGrid) {
+      throw new Error(
+        'index: a manual/query product_preview section requires productGrid resolvers to be supplied to resolvePage.'
+      );
+    }
+    return { cards: resolveContentGridCards(source, limit, deps.productGrid) };
   }
   if (type === 'content_embed') {
     if (!deps.resolveContentEmbed) {

@@ -7,7 +7,7 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
-## Session 2026-07-12 G (CANVAS SHIPPED: the site is the editing surface — admin inline Ask-AI, draft-in-place, publish/release tray)
+## Session 2026-07-12 H (CANVAS SHIPPED: the site is the editing surface — admin inline Ask-AI, draft-in-place, publish/release tray)
 
 Wolf approved the edit-mode canvas plan ("go on and start work on this,
 layering phases over preexisting conversion steps; stop at the article
@@ -48,6 +48,51 @@ feasibility/UX write-up + interactive mockup. Shipped in four commits on
   text itself (next conversion wave), and the credentialed production
   walk-through of one canvas edit (sandbox boundary — same as every
   conversion; suggest page_thank_you first).
+
+## Session 2026-07-12 G (S2 BUILT + SEEDED: /shop catalog + product pages, mock content — awaiting credentialed run)
+
+Same session (PR #413 merged; branch restarted). S2 per plan §4/§9, with
+Wolf's mockup-data directive applied:
+
+- **`product_preview` upgraded** from a dead static `ProductCard[]` (no live
+  usage) to the M-8 source union over PRODUCT objects: `query` (every
+  available product) / `manual` (+query fallback) / `cards` (curated cells).
+  `resolveContentGridCards` generalized over the query type (same semantics,
+  one owner); resolvers load available products from the new `productObject`
+  collection ONLY when a section needs them (the dynamic-import chunk rule);
+  mode decides the price badge ("$19" / "Pay what you want" / "Free").
+  Manual picks validate through reference integrity (`requireObject
+  'product'`).
+- **`/shop`** — NO route file: `page_shop` (standard) is the FIRST page
+  served by the object-page catch-all in production use (the zero-code
+  promise cashed in). Its grid is a `query` source, so newly published
+  products appear with no page edit (the design-principles litmus).
+- **`/shop/[slug]`** — the SinglePost-shaped loader: paths derive from
+  published + AVAILABLE product exports (never-render-private for
+  retired/coming_soon), buy box + hero from the product object, page_ref
+  sections via ObjectSections, SEO defaults from `page_product_detail`
+  (content_detail, the page_article idiom). Buy CTA posts to
+  create-checkout-session; PWYW/free products show a disabled "Coming soon"
+  until S3. `product_viewed` / `checkout_started` beacons use the
+  save-opt-in sendBeacon pattern.
+- **Seeds** (`pages-shop-seed-data.mjs`): three MOCK products covering all
+  three commerce modes + the two pages. Driver + drill extended for product
+  seeds (`productDrillOps` — set_product_fields poke/restore, never the §3
+  funnel keys; materialize dispatch). **Local rehearsal ALL GREEN**: every
+  permitted op drilled, contract 1/1 + 6/6, inventory 5/5, exports
+  materialized and committed. Build: /shop + 3 product pages emit (172
+  pages), dist carries the real copy/badges/wiring.
+- **The review gate met the driver**: product publishes stop at
+  `approval_required` — now recognized as the drill's expected terminal
+  signal for gated types (sandbox AND production; the driver never works
+  around the gate). The object-page-routes zero-paths pin was updated:
+  page_shop legitimately emits through the catch-all now.
+
+Suite 1051 + 49 green; astro check 0; eslint/prettier clean. **Next for the
+credentialed run**: driver `--production` creates + drills the five objects,
+products stop at approval_required → Wolf approves each in /admin/objects →
+publish + release. Then S3 (PWYW/free/unlock + product_set_price +
+order_reissue).
 
 ## Session 2026-07-12 F (S1c SHIPPED: checkout → webhook → token delivery → success page)
 

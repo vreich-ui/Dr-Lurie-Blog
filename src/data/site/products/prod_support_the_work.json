@@ -1,0 +1,31 @@
+{
+  "__generated": {
+    "at": "2026-07-12T13:26:49.891Z",
+    "from": "objects/product/by-id/prod_support_the_work.json",
+    "record_version": 5
+  },
+  "commerce": {
+    "availability": "available",
+    "mode": "pwyw",
+    "provider": "stripe",
+    "pwyw": {
+      "min_cents": 300,
+      "suggested_cents": 900
+    },
+    "stripe_test": {
+      "product_id": "prod_MockTip001"
+    }
+  },
+  "fulfillment": {
+    "kind": "none"
+  },
+  "presentation": {
+    "excerpt": "This education stays free and unsponsored. If it helped you, you can chip in whatever feels right.",
+    "notes": "MOCK product (Wolf 2026-07-12): PWYW tip; session path lands with S3.",
+    "seo": {
+      "description": "Support independent, science-first skincare education."
+    },
+    "title": "Support the Work"
+  },
+  "slug": "support-the-work"
+}
