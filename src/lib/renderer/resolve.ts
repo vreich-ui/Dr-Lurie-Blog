@@ -33,6 +33,13 @@ export type RenderableSection = {
   data: unknown;
   resolved: unknown;
   ctx: RenderCtx;
+  /**
+   * When the instance was a `shared_ref`, the target section OBJECT id
+   * (sec_*) it dereferenced to. Render output is unaffected; the edit-mode
+   * canvas annotation reads it so an in-place edit is routed to the shared
+   * object (where it belongs) instead of the referencing page.
+   */
+  sharedObjectId?: string;
 };
 
 /** The Layout `metadata` prop this page renders with. */
@@ -161,12 +168,19 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
   return {};
 };
 
-const renderable = (id: string, type: SectionType, data: unknown, deps: ResolvePageDeps): RenderableSection => ({
+const renderable = (
+  id: string,
+  type: SectionType,
+  data: unknown,
+  deps: ResolvePageDeps,
+  sharedObjectId?: string
+): RenderableSection => ({
   id,
   type,
   data,
   resolved: resolvedFor(type, data, deps),
   ctx: {},
+  ...(sharedObjectId ? { sharedObjectId } : {}),
 });
 
 /**
@@ -190,7 +204,7 @@ export const resolveSections = (sections: PageBody['sections'], deps: ResolvePag
         // page section id so React-style keys stay stable and unique per page.
         const target = deps.resolveSharedSection(section.data.section);
         if (target.visibility === 'hidden') return [];
-        return [renderable(section.id, target.type, target.data, deps)];
+        return [renderable(section.id, target.type, target.data, deps, section.data.section)];
       }
       return [renderable(section.id, section.type, section.data, deps)];
     });

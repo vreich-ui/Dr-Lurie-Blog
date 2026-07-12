@@ -242,3 +242,10 @@ test('parseSharedSectionExport surfaces the inner visibility; a public target st
     ['s_hero', 's_newsletter']
   );
 });
+
+test('a dereferenced shared_ref carries its target OBJECT id; inline sections carry none', () => {
+  const sections = resolvePageSections(parsePageExport(pageExport()), deps());
+  const [hero, newsletter] = sections;
+  assert.equal(hero.sharedObjectId, undefined, 'an inline section has no shared object');
+  assert.equal(newsletter.sharedObjectId, 'sec_newsletter_signup', 'the deref keeps the sec_* identity');
+});

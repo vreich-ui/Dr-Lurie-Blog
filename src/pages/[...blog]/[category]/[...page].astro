@@ -49,5 +49,5 @@ const metadata = {
     <BlogList posts={page.data} />
     <Pagination prevUrl={page.url.prev} nextUrl={page.url.next} />
   </section>
-  <ObjectSections sections={listing?.extraSections ?? []} />
+  <ObjectSections objectId="page_category" sections={listing?.extraSections ?? []} />
 </Layout>
