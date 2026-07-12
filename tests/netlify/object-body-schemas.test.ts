@@ -241,7 +241,29 @@ const sectionFixtures: SectionInstance[] = [
   {
     id: 's_products',
     type: 'product_preview',
-    data: { heading: 'Coming soon', products: [{ title: 'Barrier Serum', description: 'Age-aware formula.' }] },
+    data: { heading: 'Available now', source: { kind: 'query', query: {} }, limit: 6 },
+  },
+  {
+    id: 's_productpicks',
+    type: 'product_preview',
+    data: {
+      heading: 'Featured',
+      source: {
+        kind: 'manual',
+        items: ['prod_barrier_repair_guide'],
+        fallback: { kind: 'query', query: {} },
+      },
+      limit: 3,
+    },
+  },
+  {
+    id: 's_productcards',
+    type: 'product_preview',
+    data: {
+      heading: 'Coming soon',
+      source: { kind: 'cards', cards: [{ title: 'Barrier Serum', description: 'Age-aware formula.' }] },
+      limit: 3,
+    },
   },
   { id: 's_search', type: 'search', data: { placeholder: 'Search articles…', indexRoute: '/search.json' } },
   { id: 's_embed', type: 'content_embed', data: { contentItem: 'req_smoke_pdf_cta_20260630_01' } },

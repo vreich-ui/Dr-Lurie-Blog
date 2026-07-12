@@ -314,6 +314,31 @@ objects shipped with a byte-identical cutover, and Wolf's credentialed run
 the same day converted all six (see "Listing & article surfaces" above) —
 the biggest remaining MVP chunk is closed.
 
+### Shop surfaces (S2, BUILT + SEEDED 2026-07-12 — awaiting credentialed run)
+
+Three MOCK products (Wolf's mockup-data directive) + the two shop page
+objects. Rendering: `/shop` is served by the object-page catch-all from
+`page_shop` (the FIRST zero-code catch-all page); `/shop/<slug>` is the
+SinglePost-shaped loader (`src/pages/shop/[slug].astro`) deriving paths from
+published + available product exports, with the buy box/hero from the product
+object, `presentation.page_ref` sections via ObjectSections, SEO defaults from
+`page_product_detail`, and product_viewed/checkout_started beacons. The
+`product_preview` type was upgraded to the M-8 source union (query/manual/
+cards) over product objects — mode decides the price badge. Seeds:
+`scripts/lib/pages-shop-seed-data.mjs`; local rehearsal all-green (every op
+drilled incl. `set_product_fields`, contract 1/1 + 6/6, inventory 5/5,
+exports materialized). **Production-run wrinkle (new): products are
+review-required — the driver stops at `approval_required` by design; Wolf
+approves each product in /admin/objects, then the publish re-runs.**
+
+| Object                | Serves                       | Status    | Notes                                                                                        |
+| --------------------- | ---------------------------- | --------- | -------------------------------------------------------------------------------------------- |
+| `prod_barrier_repair_guide` | `/shop/barrier-repair-guide` | 🟣 SEEDED | MOCK fixed $19 download; placeholder stripe_test linkage + artifact ref (replace pre-launch). |
+| `prod_starter_checklist`    | `/shop/starter-checklist`    | 🟣 SEEDED | MOCK free lead magnet; claim path lands with S3 (buy box shows Coming soon).                  |
+| `prod_support_the_work`     | `/shop/support-the-work`     | 🟣 SEEDED | MOCK PWYW tip, fulfillment `none`; session path lands with S3.                                |
+| `page_shop`                 | `/shop`                      | 🟣 SEEDED | `standard`; lede + `query` product grid — new products appear with zero page edits.           |
+| `page_product_detail`       | every `/shop/<slug>` page    | 🟣 SEEDED | `content_detail` SEO defaults (the page_article idiom); zero sections + drillProbe.           |
+
 ### 6. Shop module (products + commerce) — S1 (a+b+c) BUILT (2026-07-12)
 
 The plan is [`06-shop-module-plan.md`](06-shop-module-plan.md) (Stripe-only v1,

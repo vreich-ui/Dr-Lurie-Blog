@@ -54,9 +54,9 @@ export const contentQuerySchema = z
   .strict();
 export type ContentQuery = z.infer<typeof contentQuerySchema>;
 
-// Minimally pinned: D§3.5 references ProductCard (shop-preview page, A§2.9)
-// without a field-level definition; refine when the P4 shop-preview migration
-// lands.
+// A curated product card — the `cards` escape hatch of product_preview's
+// source union (the content_grid `cards` precedent): hand-written cells for
+// a promo row that shouldn't be object-backed.
 export const productCardSchema = z
   .object({
     title: z.string().min(1),
@@ -66,6 +66,41 @@ export const productCardSchema = z
   })
   .strict();
 export type ProductCard = z.infer<typeof productCardSchema>;
+
+// Product query (S2, 06-shop-module-plan §4): v1 has exactly one query —
+// "every published product with availability 'available'" — so the shape is
+// an empty strict object; fields (mode, tag, sort) grow on demand, never
+// speculatively (design-principles rule 1).
+export const productQuerySchema = z.object({}).strict();
+export type ProductQuery = z.infer<typeof productQuerySchema>;
+
+/** Bounded composition, like CONTENT_GRID_MAX_CARDS. */
+export const PRODUCT_PREVIEW_MAX_CARDS = 12;
+
+// The M-8 source pattern over PRODUCT objects (manual-primary with query
+// fallback; resolution in src/lib/renderer/resolve.ts via the shared
+// resolveContentGridCards semantics). All three commerce modes render in one
+// grid; the resolved card's price badge comes from `commerce.mode`.
+export const productPreviewSourceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('query'), query: productQuerySchema }).strict(),
+  z
+    .object({
+      kind: z.literal('manual'),
+      items: z.array(z.string().min(1)), // product object ids (prod_…)
+      fallback: z
+        .object({ kind: z.literal('query'), query: productQuerySchema })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('cards'),
+      cards: z.array(productCardSchema).max(PRODUCT_PREVIEW_MAX_CARDS),
+    })
+    .strict(),
+]);
+export type ProductPreviewSource = z.infer<typeof productPreviewSourceSchema>;
 
 const sectionVariant = <TType extends string, TData extends z.ZodRawShape>(type: TType, data: TData) =>
   z
@@ -232,10 +267,13 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     heading: z.string().optional(),
     links: z.array(linkActionSchema),
   }),
-  // Shop-preview page (A§2.9).
+  // Product grid over product objects (S2, plan §4) — upgraded 2026-07-12
+  // from a static ProductCard[] to the M-8 resolved-source pattern; the old
+  // shape had no live usage (shop-preview is a hand-coded page).
   sectionVariant('product_preview', {
     heading: z.string().min(1),
-    products: z.array(productCardSchema),
+    source: productPreviewSourceSchema,
+    limit: z.number().int().positive().max(PRODUCT_PREVIEW_MAX_CARDS),
   }),
   // T3.13 extensibility drill: a reader/expert quote grid. No audited markup
   // on the live site — this exists to prove a NEW section type is insertable

@@ -1,0 +1,26 @@
+{
+  "__generated": {
+    "at": "2026-07-12T13:26:49.887Z",
+    "from": "objects/product/by-id/prod_starter_checklist.json",
+    "record_version": 5
+  },
+  "commerce": {
+    "availability": "available",
+    "mode": "free",
+    "provider": "none"
+  },
+  "fulfillment": {
+    "artifact_ref": "pdf/mockshop/0000000000000000000000000000000000000000000000000000000000000002.pdf",
+    "filename": "starter-checklist.pdf",
+    "kind": "download"
+  },
+  "presentation": {
+    "excerpt": "A one-page checklist to audit your current routine — free to download.",
+    "notes": "MOCK product (Wolf 2026-07-12): free lead magnet; claim path lands with S3.",
+    "seo": {
+      "description": "A free one-page checklist for auditing your skincare routine."
+    },
+    "title": "The Skincare Starter Checklist"
+  },
+  "slug": "starter-checklist"
+}
