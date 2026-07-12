@@ -8,7 +8,7 @@
  * everyone else pays nothing beyond this one dynamic import. Admin pages keep
  * their own tooling — the canvas never mounts under /admin.
  */
-import { currentUser, getAccessToken } from '../../utils/goTrueClient';
+import { getAccessToken } from '../../utils/goTrueClient';
 import { fetchAdminAuthState } from './verbs-client.js';
 import { mountEditMode, type MountOptions } from './ui.js';
 
@@ -24,10 +24,17 @@ export const bootEditMode = async (): Promise<void> => {
     return;
   }
   if (checked) return; // already verified this session: not an admin
+
+  // getAccessToken() refreshes a merely-lapsed access token (they expire
+  // ~hourly) via the stored refresh token, so an admin whose token expired
+  // between page loads is not mistaken for a signed-out visitor — currentUser()
+  // alone returns null on any expired token and would skip them. Only once we
+  // hold a live token do we spend the `checked` gate on the admin decision; a
+  // transient no-token simply retries on the next page-load.
+  const getToken = async (): Promise<string> => (await getAccessToken()) ?? '';
+  if (!(await getToken())) return;
   checked = true;
 
-  if (!currentUser()) return;
-  const getToken = async (): Promise<string> => (await getAccessToken()) ?? '';
   const state = await fetchAdminAuthState(getToken);
   if (!state.authenticated || !state.isAdmin) return;
 

@@ -3,7 +3,7 @@ import Layout from '~/layouts/PageLayout.astro';
 import ObjectSections from '~/components/cms/ObjectSections.astro';
 import { fetchPosts } from '~/utils/blog';
 import { getPermalink } from '~/utils/permalinks';
-import { loadRoutePageObject } from '~/utils/route-page-object';
+import { loadRoutePageObject, routeHeaderAnnotation } from '~/utils/route-page-object';
 
 const posts = await fetchPosts();
 const topicMap = new Map<string, { title: string; slug: string; count: number; excerpts: Array<string> }>();
@@ -56,10 +56,12 @@ const metadata = {
 
 <Layout metadata={metadata}>
   <section class="dl-section">
-    {header.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>}
-    <div class="dl-reading mt-3">
-      <h1 class="text-4xl font-bold sm:text-5xl" set:html={header.heading} />
-      {header.paragraphs.map((paragraph) => <p class="mt-5 text-lg text-muted" set:html={paragraph} />)}
+    <div style="display:contents" {...routeHeaderAnnotation('page_topics_index', hub?.header)}>
+      {header.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>}
+      <div class="dl-reading mt-3">
+        <h1 class="text-4xl font-bold sm:text-5xl" set:html={header.heading} />
+        {header.paragraphs.map((paragraph) => <p class="mt-5 text-lg text-muted" set:html={paragraph} />)}
+      </div>
     </div>
 
     <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">

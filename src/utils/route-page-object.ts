@@ -29,6 +29,7 @@ import { getEntry } from 'astro:content';
 
 import { applyListingTerm } from '~/lib/renderer/listing-term';
 import { parsePageExport } from '~/lib/renderer/resolve';
+import { sectionAnnotationAttrs, type SectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
 import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
 import type { PageBody } from '~/schema/bodies/page-v1';
 
@@ -37,6 +38,13 @@ export type RoutePageHeader = {
   heading: string;
   /** Inner-HTML of each body paragraph (allowlist inline tags only). */
   paragraphs: string[];
+  /**
+   * The header lede's stable section id — the edit-mode canvas annotation
+   * target, so a listing surface's primary object-backed copy gets a hover
+   * chip like any dispatched section. Absent on the pre-conversion literal
+   * fallback (no object backs it).
+   */
+  sectionId?: string;
 };
 
 export type RoutePageObject = {
@@ -63,6 +71,7 @@ export const loadRoutePageObject = async (objectId: string, term?: string): Prom
   const header: RoutePageHeader | undefined =
     headerSection && headerSection.type === 'lede'
       ? {
+          sectionId: headerSection.id,
           ...(headerSection.data.kicker !== undefined ? { kicker: headerSection.data.kicker } : {}),
           heading: headerSection.data.heading,
           paragraphs: splitRichTextParagraphs(headerSection.data.body ?? ''),
@@ -76,3 +85,16 @@ export const loadRoutePageObject = async (objectId: string, term?: string): Prom
     extraSections: visible.filter((_, index) => index !== headerIndex),
   };
 };
+
+/**
+ * The edit-mode canvas annotation for a listing route's header lede, so its
+ * object-backed heading/body carries a hover chip like any dispatched section.
+ * `undefined` when the header is the pre-conversion literal fallback (no
+ * object) — spreading it onto the wrapper then adds no attributes, and the
+ * canvas ignores an unannotated region.
+ */
+export const routeHeaderAnnotation = (
+  objectId: string,
+  header: RoutePageHeader | undefined
+): SectionAnnotationAttrs | undefined =>
+  header?.sectionId ? sectionAnnotationAttrs(objectId, { id: header.sectionId, type: 'lede' }) : undefined;
