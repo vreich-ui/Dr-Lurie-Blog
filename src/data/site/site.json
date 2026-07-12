@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-11T18:44:11.375Z",
+    "at": "2026-07-12T16:29:33.164Z",
     "from": "objects/site/by-id/site_drlurie.json",
-    "record_version": 8
+    "record_version": 12
   },
   "blog": {
     "categoryBase": "category",
@@ -47,15 +47,15 @@
     "header": "nav_header"
   },
   "logo": {
-    "text": "DR. LURIÉ SCIENCE"
+    "text": "LATE STARTER SKIN"
   },
   "metadataDefaults": {
-    "description": "Science-led education on aging skin, age-related scent changes, and future age-aware skincare solutions.",
+    "description": "A calm skin-care publishing space for people who arrived late, need help now, and mistrust the market.",
     "ogImage": "/Social/og-default.jpg",
-    "titleTemplate": "%s — Dr. Lurié",
+    "titleTemplate": "%s - Late Starter Skin",
     "twitterHandle": "@drlurie"
   },
-  "name": "Dr. Lurié",
+  "name": "Late Starter Skin",
   "urls": {
     "base": "/",
     "canonicalHost": "https://drluriescience.netlify.app"
