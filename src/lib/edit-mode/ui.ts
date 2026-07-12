@@ -66,7 +66,7 @@ type PanelState = {
 };
 
 /** Section types whose data carries an image the image tool should offer. */
-const IMAGE_SECTION_TYPES = new Set(['bio']);
+const IMAGE_SECTION_TYPES = new Set(['bio', 'content_split']);
 
 /**
  * Manual-edit field selection (client-side heuristic): copy fields only.
@@ -841,7 +841,13 @@ export const mountEditMode = (options: MountOptions): void => {
   // stays a separate act. The image tool is the DELIBERATE way to change an
   // image; the AI is schema-blocked from ever doing it.
   type FormFieldKind = 'text' | 'richtext' | 'lines' | 'image-src' | 'image-alt' | 'asset';
-  type FormField = { key: string; kind: FormFieldKind; imageField?: string };
+  type FormField = {
+    key: string;
+    kind: FormFieldKind;
+    imageField?: string;
+    /** For image ARRAYS (content_split `images: [{src,alt}]`): the item index. */
+    imageIndex?: number;
+  };
 
   const formFieldsFor = (data: Record<string, unknown>, mode: PanelMode): FormField[] => {
     const fields: FormField[] = [];
@@ -850,6 +856,12 @@ export const mountEditMode = (options: MountOptions): void => {
         if (isImageValue(value)) {
           fields.push({ key: `${key}.src`, kind: 'image-src', imageField: key });
           fields.push({ key: `${key}.alt`, kind: 'image-alt', imageField: key });
+        } else if (Array.isArray(value) && value.length > 0 && value.every(isImageValue)) {
+          // Image arrays (content_split): one src/alt pair per item, in order.
+          value.forEach((_, index) => {
+            fields.push({ key: `${key}.${index}.src`, kind: 'image-src', imageField: key, imageIndex: index });
+            fields.push({ key: `${key}.${index}.alt`, kind: 'image-alt', imageField: key, imageIndex: index });
+          });
         } else if (/assetref$|^ogimage$/i.test(key) && typeof value === 'string') {
           fields.push({ key, kind: 'asset' });
         }
@@ -866,9 +878,17 @@ export const mountEditMode = (options: MountOptions): void => {
     return fields;
   };
 
+  const imageEntryFor = (data: Record<string, unknown>, field: FormField): { src: string; alt?: string } => {
+    const holder = data[field.imageField as string];
+    if (field.imageIndex !== undefined) {
+      return (holder as Array<{ src: string; alt?: string }>)[field.imageIndex];
+    }
+    return holder as { src: string; alt?: string };
+  };
+
   const formValueFor = (data: Record<string, unknown>, field: FormField): string => {
-    if (field.kind === 'image-src') return (data[field.imageField as string] as { src: string }).src;
-    if (field.kind === 'image-alt') return ((data[field.imageField as string] as { alt?: string }).alt ?? '') as string;
+    if (field.kind === 'image-src') return imageEntryFor(data, field).src;
+    if (field.kind === 'image-alt') return imageEntryFor(data, field).alt ?? '';
     const value = data[field.key];
     if (field.kind === 'lines') return (value as string[]).join('\n');
     return (value as string) ?? '';
@@ -934,10 +954,22 @@ export const mountEditMode = (options: MountOptions): void => {
       if (raw === before) continue;
       if (field.kind === 'image-src' || field.kind === 'image-alt') {
         const imageKey = field.imageField as string;
-        const current = { ...(state.currentData[imageKey] as Record<string, unknown>) };
-        const merged = (changed[imageKey] as Record<string, unknown>) ?? current;
-        merged[field.kind === 'image-src' ? 'src' : 'alt'] = raw;
-        changed[imageKey] = merged;
+        const property = field.kind === 'image-src' ? 'src' : 'alt';
+        if (field.imageIndex !== undefined) {
+          // Image ARRAY (content_split): patch the whole array (deep-merge
+          // replaces arrays wholesale), editing only the touched item.
+          const merged =
+            (changed[imageKey] as Array<Record<string, unknown>>) ??
+            (state.currentData[imageKey] as Array<Record<string, unknown>>).map((item) => ({ ...item }));
+          merged[field.imageIndex][property] = raw;
+          changed[imageKey] = merged;
+        } else {
+          const merged =
+            (changed[imageKey] as Record<string, unknown>) ??
+            ({ ...(state.currentData[imageKey] as Record<string, unknown>) } as Record<string, unknown>);
+          merged[property] = raw;
+          changed[imageKey] = merged;
+        }
         if (field.kind === 'image-src') previews.push({ kind: 'image', before, after: raw });
       } else if (field.kind === 'lines') {
         changed[field.key] = raw
