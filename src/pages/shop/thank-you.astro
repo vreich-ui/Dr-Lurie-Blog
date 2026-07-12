@@ -1,0 +1,103 @@
+---
+/**
+ * Checkout success page (06-shop-module-plan §5) — /shop/thank-you?session_id=…
+ *
+ * Delivery does not depend on email in v1: this page verifies the session
+ * server-side (checkout-session-status) and renders the download link
+ * itself, polling with backoff while the webhook lands (§8.8). Hand-coded
+ * functional surface for S1c; the S2 shop conversion may objectify its copy.
+ */
+import Layout from '~/layouts/PageLayout.astro';
+
+const metadata = {
+  title: 'Thank you',
+  robots: { index: false, follow: false },
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="px-4 py-16 sm:px-6 mx-auto lg:px-8 lg:py-20 max-w-3xl">
+    <div class="text-center" id="purchase-status" data-state="loading">
+      <h1 class="text-4xl md:text-5xl font-bold leading-tighter tracking-tighter font-heading">Thank you!</h1>
+      <p class="mt-6 text-xl text-muted dark:text-slate-400" data-role="message">
+        Confirming your purchase — this usually takes a few seconds…
+      </p>
+      <div class="mt-8 hidden" data-role="download">
+        <a class="btn btn-primary" href="#" data-role="download-link" rel="nofollow noopener"> Download your file </a>
+        <p class="mt-4 text-sm text-muted dark:text-slate-400">
+          This link works for 72 hours. Stripe also emailed you a receipt.
+        </p>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  const root = document.getElementById('purchase-status');
+  const message = root?.querySelector('[data-role="message"]');
+  const downloadWrap = root?.querySelector('[data-role="download"]');
+  const downloadLink = root?.querySelector('[data-role="download-link"]');
+
+  const setMessage = (text: string) => {
+    if (message) message.textContent = text;
+  };
+
+  const sessionId = new URLSearchParams(window.location.search).get('session_id');
+
+  type StatusResponse = {
+    ok?: boolean;
+    paid?: boolean;
+    order_ready?: boolean;
+    download?: { url: string; filename: string } | null;
+  };
+
+  // §8.8: the success page must poll/retry — the webhook can land after the
+  // buyer does. Backoff: 0s, 2s, 4s, 8s, then every 10s up to ~2 minutes.
+  const delays = [0, 2000, 4000, 8000, ...Array(11).fill(10000)];
+
+  const poll = async () => {
+    if (!sessionId) {
+      setMessage('This page confirms purchases — no checkout session was provided.');
+      return;
+    }
+    for (const delay of delays) {
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        const response = await fetch(
+          `/.netlify/functions/checkout-session-status?session_id=${encodeURIComponent(sessionId)}`
+        );
+        if (response.status === 400 || response.status === 503) {
+          setMessage('We could not verify this checkout session.');
+          return;
+        }
+        if (!response.ok) continue; // transient — keep polling
+        const status = (await response.json()) as StatusResponse;
+        if (!status.order_ready) {
+          setMessage(
+            status.paid
+              ? 'Payment received! Preparing your order…'
+              : 'Confirming your purchase — this usually takes a few seconds…'
+          );
+          continue;
+        }
+        if (status.download && downloadWrap && downloadLink instanceof HTMLAnchorElement) {
+          downloadLink.href = status.download.url;
+          downloadLink.textContent = `Download ${status.download.filename}`;
+          downloadWrap.classList.remove('hidden');
+          setMessage('Your purchase is ready:');
+        } else {
+          setMessage('Your purchase is confirmed. Thank you for the support!');
+        }
+        return;
+      } catch {
+        // network hiccup — keep polling
+      }
+    }
+    setMessage(
+      'Your payment went through, but the order is taking longer than usual to prepare. ' +
+        'Check the receipt email from Stripe, or come back to this page in a few minutes.'
+    );
+  };
+
+  poll();
+</script>
