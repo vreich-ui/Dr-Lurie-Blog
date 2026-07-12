@@ -16,6 +16,7 @@
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
 import { materializeNavigation } from './materializers/navigation.js';
 import { materializePage } from './materializers/page.js';
+import { materializeProduct } from './materializers/product.js';
 import { materializeSection } from './materializers/section.js';
 import { materializeSite } from './materializers/site.js';
 import { materializeTaxonomy } from './materializers/taxonomy.js';
@@ -44,6 +45,8 @@ export function materialize(
       return materializeTemplate(objectId, body, meta);
     case 'section':
       return materializeSection(objectId, body, meta);
+    case 'product':
+      return materializeProduct(objectId, body, meta);
     default: {
       const exhaustive: never = objectType;
       throw new Error(`No materializer registered for object type: ${String(exhaustive)}`);

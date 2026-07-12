@@ -17,6 +17,7 @@ const cases: Array<[ObjectType, string, string]> = [
   ['navigation', 'nav_footer_home', 'objects/navigation/by-id/nav_footer_home.json'],
   ['taxonomy', 'tax_drlurie', 'objects/taxonomy/by-id/tax_drlurie.json'],
   ['template', 'tpl_home', 'objects/template/by-id/tpl_home.json'],
+  ['product', 'prod_barrier_repair_guide', 'objects/product/by-id/prod_barrier_repair_guide.json'],
   ['content_item', 'req_smoke_pdf_cta_20260630_01', 'objects/content_item/by-id/req_smoke_pdf_cta_20260630_01.json'],
 ];
 

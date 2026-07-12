@@ -35,7 +35,8 @@ import type { ObjectRecord, ObjectType, Principal, ReviewState } from '../../src
 //      layer (autonomous allows carry no approval, and the wiring tests in
 //      object-verbs-review.test.ts prove the history side),
 //   4. the committed config itself (parses; dev-stage default is
-//      all-autonomous with no overrides),
+//      all-autonomous with product pinned to require-approval — the §0.4
+//      commerce gate),
 //   5. config changes — and only config changes — flipping behavior.
 
 const AT = '2026-07-04T12:00:00.000Z';
@@ -58,6 +59,7 @@ const OBJECT_IDS: Record<GovernedObjectType, string> = {
   taxonomy: 'tax_drlurie',
   site: 'site_drlurie',
   template: 'tpl_home',
+  product: 'prod_barrier_repair_guide',
 };
 
 const approveDecision = (contentRevision: number, publishAction?: { published_time: string | null }) => ({
@@ -86,12 +88,20 @@ const baseRecord = (objectType: ObjectType, objectId: string, review?: ReviewSta
 
 // ─── the committed config: the dev-stage default posture, pinned ─────────────
 
-test('the committed config parses and is the dev-stage default: all-autonomous, no overrides', () => {
+test('the committed config parses and is the dev-stage default: all-autonomous, product pinned to require-approval', () => {
   const policy = resolveApprovalPolicy(approvalPolicyConfig);
-  assert.deepEqual(policy, { master: 'all-autonomous', overrides: {} });
+  // Commerce never publishes without a human eye (06-shop-module-plan §0.4)
+  // — the ONE deliberate exception to the autonomous dev posture.
+  assert.deepEqual(policy, { master: 'all-autonomous', overrides: { product: 'require-approval' } });
   assert.deepEqual(activeApprovalPolicy(), policy);
   for (const objectType of governedObjectTypes) {
-    assert.equal(publishRequiresApproval(objectType, policy), false, `${objectType} must default to autonomous`);
+    assert.equal(
+      publishRequiresApproval(objectType, policy),
+      objectType === 'product',
+      objectType === 'product'
+        ? 'product must require approval (the §0.4 commerce gate)'
+        : `${objectType} must default to autonomous`
+    );
   }
 });
 
@@ -327,7 +337,13 @@ for (const freeType of governedObjectTypes) {
 for (const policy of [ALL_AUTONOMOUS, ALL_REQUIRE]) {
   test(`content_item is refused by the generic gate under master ${policy.master}`, () => {
     for (const principalKey of Object.keys(PRINCIPALS) as PrincipalKey[]) {
-      const result = runCell('content_item', 'req_smoke_pdf_cta_20260630_01', principalKey, 'approved_current_pin_match', policy);
+      const result = runCell(
+        'content_item',
+        'req_smoke_pdf_cta_20260630_01',
+        principalKey,
+        'approved_current_pin_match',
+        policy
+      );
       assert.equal(result.allow, false);
       assert.equal(result.allow === false && result.code, 'content_item_not_gated', principalKey);
     }
@@ -351,7 +367,11 @@ test('adding and removing a per-type override changes the gate outcome for exact
   assert.equal(checkPublishGate({ ...input, policy: ALL_AUTONOMOUS }).allow, true);
   const withOverride = checkPublishGate({ ...input, policy: gateOne('navigation', 'require-approval') });
   assert.equal(withOverride.allow, false, 'adding the override gates navigation');
-  assert.equal(checkPublishGate({ ...input, policy: ALL_AUTONOMOUS }).allow, true, 'removing it frees navigation again');
+  assert.equal(
+    checkPublishGate({ ...input, policy: ALL_AUTONOMOUS }).allow,
+    true,
+    'removing it frees navigation again'
+  );
 });
 
 // ─── M-6 pin-matching exactness (gated types) ────────────────────────────────
@@ -422,7 +442,8 @@ test('lock checkout/checkin does NOT invalidate a pending approval (version-only
   assert.ok(afterCheckout.version > record.version, 'checkout must bump version');
   assert.equal(afterCheckout.content_revision, record.content_revision, 'checkout must not bump content_revision');
   assert.equal(
-    checkPublishGate({ record: afterCheckout, principal: agentActor, roles: [], requested: {}, policy: GATED_PAGE }).allow,
+    checkPublishGate({ record: afterCheckout, principal: agentActor, roles: [], requested: {}, policy: GATED_PAGE })
+      .allow,
     true,
     'approval must survive checkout'
   );
@@ -436,7 +457,8 @@ test('lock checkout/checkin does NOT invalidate a pending approval (version-only
   const afterCheckin = JSON.parse(map.get(key) as string) as ObjectRecord;
   assert.equal(afterCheckin.content_revision, record.content_revision);
   assert.equal(
-    checkPublishGate({ record: afterCheckin, principal: agentActor, roles: [], requested: {}, policy: GATED_PAGE }).allow,
+    checkPublishGate({ record: afterCheckin, principal: agentActor, roles: [], requested: {}, policy: GATED_PAGE })
+      .allow,
     true,
     'approval must survive checkin'
   );
@@ -466,7 +488,13 @@ test('a body write DOES invalidate the approval (content_revision moves past the
   );
   assert.equal(edited.content_revision, record.content_revision + 1);
 
-  const result = checkPublishGate({ record: edited, principal: agentActor, roles: [], requested: {}, policy: GATED_PAGE });
+  const result = checkPublishGate({
+    record: edited,
+    principal: agentActor,
+    roles: [],
+    requested: {},
+    policy: GATED_PAGE,
+  });
   assert.equal(result.allow, false);
   assert.equal(result.allow === false && result.code, 'approval_stale');
 
@@ -504,7 +532,13 @@ test('the publish stamp itself does NOT invalidate the approval (T1.3 writes ver
     version: record.version + 1,
     content_revision: record.content_revision,
   };
-  const result = checkPublishGate({ record: stamped, principal: agentActor, roles: [], requested: {}, policy: GATED_PAGE });
+  const result = checkPublishGate({
+    record: stamped,
+    principal: agentActor,
+    roles: [],
+    requested: {},
+    policy: GATED_PAGE,
+  });
   assert.equal(result.allow, true, 'publishing must consume, never invalidate, its approval');
 });
 

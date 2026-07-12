@@ -304,6 +304,7 @@ const seedForCreate = (objectType: ObjectType, body: unknown): string => {
     if (objectType === 'navigation' && typeof body.role === 'string') return body.role;
     if (objectType === 'site' && typeof body.name === 'string') return body.name;
     if (objectType === 'template' && typeof body.name === 'string') return body.name;
+    if (objectType === 'product' && typeof body.slug === 'string') return body.slug;
     if (objectType === 'taxonomy') return 'registry';
     if (objectType === 'section' && isRecord(body.section) && typeof body.section.type === 'string')
       return `shared_${body.section.type}`;

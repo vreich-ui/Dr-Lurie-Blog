@@ -346,6 +346,37 @@ const setSiteFieldsSchema = z.strictObject({
   ...guard,
 });
 
+// ——— Product (06-shop-module-plan §1/§3) ———
+
+// Deep-merge over the product body, like set_site_fields — with the §3
+// canonicality funnel enforced at the grammar: the price display cache and
+// the Stripe linkage (live + test mirror) are NOT agent-patchable. The ONLY
+// price-edit path is the `product_set_price` MCP tool (S3), which creates the
+// new Stripe Price server-side and writes linkage + cache in one governed
+// patch — so drift between what an agent set and what Stripe charges is
+// impossible by construction. Until that tool ships, price/linkage are set at
+// object_create only.
+const setProductFieldsSchema = z.strictObject({
+  op: z.literal('set_product_fields'),
+  fields: fieldsSchema.superRefine((value, ctx) => {
+    const commerce = value.commerce;
+    if (commerce === null) {
+      ctx.addIssue({ code: 'custom', message: "'commerce' cannot be unset (products always carry it)." });
+      return;
+    }
+    if (commerce === undefined || typeof commerce !== 'object' || Array.isArray(commerce)) return;
+    for (const key of ['price', 'stripe', 'stripe_test'] as const) {
+      if (key in commerce) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `'commerce.${key}' cannot be patched via set_product_fields — prices and Stripe linkage change only through product_set_price (§3).`,
+        });
+      }
+    }
+  }),
+  ...guard,
+});
+
 // ——— Template (C§2.0) ———
 
 const setTemplateMetaSchema = z.strictObject({
@@ -404,6 +435,7 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   reactivateTermSchema,
   removeTermSchema,
   setSiteFieldsSchema,
+  setProductFieldsSchema,
   setTemplateMetaSchema,
   upsertSlotSchema,
   moveSlotSchema,
@@ -493,6 +525,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
   taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
   site: ['set_site_fields'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
+  product: ['set_product_fields'],
   content_item: [],
 };
 

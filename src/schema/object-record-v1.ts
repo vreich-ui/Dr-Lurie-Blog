@@ -4,7 +4,16 @@ import { allowedAgentNames } from './workflow-contract.js';
 
 export type { WorkflowLockRecord } from './schema-v1.js';
 
-export const objectTypes = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'content_item'] as const;
+export const objectTypes = [
+  'page',
+  'section',
+  'navigation',
+  'taxonomy',
+  'site',
+  'template',
+  'product',
+  'content_item',
+] as const;
 export type ObjectType = (typeof objectTypes)[number];
 
 export const objectTypeSchema = z.enum(objectTypes);

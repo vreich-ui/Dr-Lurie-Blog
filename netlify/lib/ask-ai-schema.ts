@@ -23,6 +23,7 @@ import { z } from 'zod';
 
 import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
+import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
 import { sectionBodySchema } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
@@ -53,6 +54,7 @@ export const ASK_AI_BODY_SCHEMAS = {
   taxonomy: taxonomyBodySchema,
   site: siteBodySchema,
   template: templateBodySchema,
+  product: productBodySchema,
 } satisfies Record<AskAiObjectType, z.ZodType>;
 
 export const isAskAiObjectType = (value: string): value is AskAiObjectType =>

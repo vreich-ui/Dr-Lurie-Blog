@@ -30,11 +30,15 @@
  * trail (actor, patch + inverse, receipt); this switch changes who must say
  * yes, never what gets recorded.
  *
- * Dev-stage default: all-autonomous, no overrides.
+ * Dev-stage default: all-autonomous, with `product` pinned to
+ * require-approval (commerce never publishes without a human eye).
  */
 import type { ApprovalPolicyConfig } from '../lib/approval-policy.js';
 
 export const approvalPolicyConfig = {
   master: 'all-autonomous',
-  overrides: {},
+  // Commerce is the deliberate exception to the autonomous dev posture
+  // (06-shop-module-plan §0.4): an agent PROPOSING a product change is fine;
+  // a price/availability change going live without a human eye is not.
+  overrides: { product: 'require-approval' },
 } satisfies ApprovalPolicyConfig;

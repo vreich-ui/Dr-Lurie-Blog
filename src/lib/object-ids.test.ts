@@ -21,6 +21,7 @@ const validObjectIds: Array<[ObjectType, string]> = [
   ['navigation', 'nav_footer_home'],
   ['taxonomy', 'tax_drlurie'],
   ['template', 'tpl_home'],
+  ['product', 'prod_barrier_repair_guide'],
   ['content_item', 'req_smoke_pdf_cta_20260630_01'],
 ];
 
@@ -31,6 +32,7 @@ const invalidObjectIds: Array<[ObjectType, string]> = [
   ['navigation', 'nav_'],
   ['taxonomy', 'tax_drlurie!'],
   ['template', 'template_home'],
+  ['product', 'product_guide'],
   ['content_item', 'req_foo'],
 ];
 

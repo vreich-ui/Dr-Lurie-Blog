@@ -86,6 +86,17 @@ export const buildStoreValidationContext = async (
     return false;
   };
 
+  // The /shop/<slug> analogue of isRouteTaken (06-shop-module-plan §1),
+  // scanning product records instead of page routes.
+  const isSlugTaken: ObjectValidationContext['isSlugTaken'] = (slug) => {
+    for (const [key, record] of records) {
+      if (!key.startsWith('product:')) continue;
+      if (record.object_id === self.selfObjectId) continue;
+      if (isRecord(record.body) && record.body.slug === slug) return true;
+    }
+    return false;
+  };
+
   const resolvePageType: ObjectValidationContext['resolvePageType'] = (pageTypeId) => {
     const lookup = getPageTypeDefinition(pageTypeId);
     if (!lookup.ok) return undefined;
@@ -126,6 +137,7 @@ export const buildStoreValidationContext = async (
     resolveObject,
     resolveSharedSectionType,
     isRouteTaken,
+    isSlugTaken,
     resolvePageType,
     componentTypeExists,
     ...(resolveTaxonomyTerm ? { resolveTaxonomyTerm } : {}),

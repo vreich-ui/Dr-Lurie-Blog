@@ -929,6 +929,13 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_site_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // ——— product family ———
+    // Same deep-merge mechanics as set_site_fields; the grammar already
+    // refuses commerce.price / commerce.stripe / commerce.stripe_test
+    // payloads (the §3 canonicality funnel), so no engine-side key checks.
+    case 'set_product_fields':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— template family ———
     case 'set_template_meta':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
@@ -1087,6 +1094,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_page_meta':
     case 'set_nav_meta':
     case 'set_site_fields':
+    case 'set_product_fields':
     case 'set_template_meta': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });
