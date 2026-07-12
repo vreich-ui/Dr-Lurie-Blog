@@ -142,6 +142,53 @@ export const uploadImageArtifact = async (
   return { ok: true, publicPath: intent.publicPath };
 };
 
+export type EnsureBlobImageResult = { ok: true; publicPath: string; mirrored: boolean } | { ok: false; error: string };
+
+const MIRRORABLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+
+/**
+ * Guarantee an image has a blob-store copy with a public /img/* address, so
+ * agents and external image tooling can fetch and manipulate the exact bytes.
+ * Already blob-backed srcs pass through untouched; anything else (repo images
+ * like /images/…, hashed build assets) is fetched same-origin and pushed
+ * through the SAME intent → /api/artifacts/upload pipeline as a manual
+ * upload. Content-addressed keys make re-mirroring the same bytes a no-op
+ * (the store dedupes). Mirroring never changes the object — the section keeps
+ * its current src; the blob copy simply exists alongside it.
+ */
+export const ensureBlobBackedImage = async (
+  getToken: GetToken,
+  objectId: string,
+  src: string
+): Promise<EnsureBlobImageResult> => {
+  if (/^\/img\//.test(src)) return { ok: true, publicPath: src, mirrored: false };
+
+  let response: Response;
+  try {
+    response = await fetch(src, { credentials: 'omit' });
+  } catch {
+    return { ok: false, error: `Could not fetch ${src}` };
+  }
+  if (!response.ok) return { ok: false, error: `Could not fetch ${src} (HTTP ${response.status})` };
+
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase().split(';')[0]?.trim() ?? '';
+  if (!MIRRORABLE_IMAGE_TYPES.has(contentType)) {
+    return {
+      ok: false,
+      error: `Only JPEG/PNG/WebP images can be mirrored into blobs (got ${contentType || 'unknown'}).`,
+    };
+  }
+
+  const blob = await response.blob();
+  const upload = await uploadImageArtifact(getToken, objectId, {
+    arrayBuffer: () => blob.arrayBuffer(),
+    type: contentType,
+    size: blob.size,
+  });
+  if (!upload.ok) return upload;
+  return { ok: true, publicPath: upload.publicPath, mirrored: true };
+};
+
 export type ReleaseResult = { ok: boolean; status: number; result?: { status: string; detail?: string } };
 
 export const releaseToProduction = async (getToken: GetToken): Promise<ReleaseResult> => {

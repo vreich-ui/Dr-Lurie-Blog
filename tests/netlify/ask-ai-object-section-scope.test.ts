@@ -396,3 +396,74 @@ test('copy-only keeps string arrays (checklist/feature copy) but drops arrays of
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.suggestion, { heading: 'This is for you if…', items: ['clearer', 'calmer', 'kinder'] });
 });
+
+test('image_ref: the "Re:" clause with the public URL reaches the prompt; the guard still strips images', async () => {
+  const store = createStore();
+  const page: ObjectRecord = {
+    ...pageRecord(),
+    object_id: 'page_bio_demo',
+    body: {
+      route: '/bio-demo',
+      pageType: 'standard',
+      title: 'Bio demo',
+      seo: {},
+      sections: [
+        {
+          id: 's_bio',
+          type: 'bio',
+          data: {
+            heading: 'Dr. Lurie',
+            body: '<p>Bio copy.</p>',
+            portrait: { src: '/images/dr-lurie-portrait4.jpeg', alt: 'Portrait' },
+          },
+        },
+      ],
+    },
+  };
+  store.seed(page);
+  const imageRef = {
+    field: 'portrait',
+    name: 'dr-lurie-portrait4.jpeg',
+    url: 'https://drlurie.example/img/req_canvas_page_bio_demo_20260712_01/' + 'c'.repeat(64) + '.jpg',
+  };
+  // The model tries to "help" with the image anyway — the guard must drop it.
+  const openai = openAiMock({
+    body: '<p>Bio copy that mentions the new portrait.</p>',
+    portrait: { src: 'https://elsewhere.example/hallucinated.jpg', alt: 'Portrait' },
+  });
+
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    {
+      object_type: 'page',
+      object_id: 'page_bio_demo',
+      section_id: 's_bio',
+      image_ref: imageRef,
+      instruction: 'Update the bio to match the new portrait.',
+    },
+    deps(openai.fetchImpl)
+  );
+
+  assert.equal(result.status, 200);
+  const prompt = openai.calls[0].userMessage;
+  assert.match(prompt, /Re: dr-lurie-portrait4\.jpeg/);
+  assert.ok(prompt.includes(imageRef.url), 'prompt carries the public blob URL for external image tooling');
+  assert.match(prompt, /"portrait" field/);
+  assert.deepEqual(
+    result.body.suggestion,
+    { body: '<p>Bio copy that mentions the new portrait.</p>' },
+    'referencing an image never loosens the copy-only guard'
+  );
+});
+
+test('image_ref is optional and absent from the prompt when not sent', async () => {
+  const store = createStore();
+  store.seed(pageRecord());
+  const openai = openAiMock({ body: '<p>Copy.</p>' });
+  await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'page', object_id: 'page_canvas_demo', section_id: 's_prose', instruction: 'Tighten.' },
+    deps(openai.fetchImpl)
+  );
+  assert.doesNotMatch(openai.calls[0].userMessage, /Re: /);
+});

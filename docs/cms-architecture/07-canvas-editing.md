@@ -178,6 +178,28 @@ src row in the image form): hash the file with `crypto.subtle` → mint intent
 → POST bytes with the claim-echo `X-Artifact-*` headers → fill the src input
 with the returned public path → human hits Save draft.
 
+### 3d. AI image references — "Re: portrait.png" (2026-07-12, Wolf)
+
+Opening the AI chat on a section that carries images shows **image chips**
+(thumbnail + filename). Clicking one arms the reference:
+
+1. **Ensure blob-backed** (`ensureBlobBackedImage`, verbs-client): a src
+   already under `/img/*` passes through; an existing repo image
+   (`/images/…`, hashed build assets) is fetched same-origin and **mirrored
+   into the blobs artifacts store** through the same intent → upload pipeline
+   — so ANY referenced image ends up with a blob copy and a public URL agents
+   and external image tooling can fetch to manipulate the exact bytes.
+   Mirroring is storage-only: the section's src is untouched.
+2. **Armed chat**: the composer placeholder becomes `Re: <name> — …`, the
+   sent message renders a `Re: <name>` pill, and every ask carries
+   `image_ref { field, name, url }` (absolute public URL).
+3. **Server** (`ask-ai-object.ts` + wrapper zod): the section prompt gains a
+   "Re: `<name>` — publicly served at `<url>`" clause so the model knows
+   exactly which bytes "the image" means. **The copy-only guard is
+   unchanged** — image fields still never survive a suggestion; the reference
+   is context (and the handle downstream image-editing tools need), not a
+   write path. Actually re-pointing an image stays the image tool's job.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

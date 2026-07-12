@@ -57,6 +57,13 @@ export interface AskAiObjectRequest {
   selected_text?: string;
   /** Page-only: scope the request to one section instance (edit-mode canvas). */
   section_id?: string;
+  /**
+   * An image the editor is referring to ("Re: portrait.png" — canvas image
+   * chips). `url` is the image's PUBLIC address (blob-backed /img/* mirror,
+   * so external image tooling can fetch the exact bytes). Context only: the
+   * copy-only guard still strips every image field from the suggestion.
+   */
+  image_ref?: { field: string; name: string; url: string };
   instruction: string;
 }
 
@@ -108,6 +115,12 @@ const buildSectionUserMessage = (
   const selectionClause = request.selected_text
     ? `\nThe editor highlighted this specific span: """${request.selected_text}"""\n`
     : '';
+  const imageClause = request.image_ref
+    ? `\nRe: ${request.image_ref.name} — the editor is referring to the image in the "${request.image_ref.field}" ` +
+      `field, publicly served at ${request.image_ref.url}. You cannot change image fields (they are outside your ` +
+      `tool schema; image bytes are edited by external tools using that URL) — respond by updating the copy fields ` +
+      `the instruction asks for.\n`
+    : '';
   const framing =
     typeof page.title === 'string'
       ? `You are editing ONE SECTION of the page "${page.title}"` +
@@ -120,6 +133,7 @@ const buildSectionUserMessage = (
     JSON.stringify(section.data, null, 2),
     '```',
     selectionClause,
+    imageClause,
     `Editor's instruction: ${request.instruction}`,
     '',
     "Call the tool with ONLY this section's data fields that should change. Do not include fields that " +

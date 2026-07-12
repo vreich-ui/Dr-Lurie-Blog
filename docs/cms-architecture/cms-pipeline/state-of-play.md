@@ -7,7 +7,7 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
-## Session 2026-07-12 P (CANVAS image tool v2: array images + blob-backed uploads)
+## Session 2026-07-12 P (CANVAS image tool v2: array images, blob-backed uploads, AI image references)
 
 Wolf, on the Codex array-image finding + storage: "Close the gap. Also, those
 images also need to be stored in blobs for edits and other manipulation as
@@ -36,11 +36,20 @@ Shipped on the canvas branch (PR #425):
     (`uploadImageArtifact` in `verbs-client.ts`: crypto.subtle sha256 →
     intent → tokened byte POST → fill src). Upload is storage-only; the src
     change still walks checkout → patch → publish → release.
-- **Gates**: 13 new tests (intent mint/round-trip/rejections; public image
-  route incl. real underscored canvas keys + 404/405/allowlist), full suite
-  green, astro check 0, build 172 pages, drive extended to 34 assertions
-  (upload flow wire shapes: intent auth + body, X-Artifact-* claim echo, raw
-  bytes, /img/* src fill, draft patch). Docs: 07-canvas-editing.md §3c.
+- **AI image references ("Re: portrait.png", same session, Wolf)**: the AI
+  chat on an image-bearing section shows image chips; arming one (a) ensures
+  the image is blob-backed — existing repo images (`/images/…`) are
+  **mirrored into the artifacts store** via the same pipeline, storage-only,
+  src untouched — and (b) sends `image_ref {field, name, url}` with every
+  ask. The section prompt gains a "Re: <name> — publicly served at <url>"
+  clause (the public URL is the handle external image-editing tools need).
+  Copy-only guard unchanged: image fields still never survive a suggestion.
+- **Gates**: 15 new tests (intent mint/round-trip/rejections; public image
+  route incl. real underscored canvas keys + 404/405/allowlist; image_ref
+  prompt clause + guard-still-strips + optionality), full suite 1148+49
+  green, astro check 0, build 172 pages, drive extended to 42 assertions
+  (upload wire shapes; chip → mirror → armed pill → image_ref on the wire).
+  Docs: 07-canvas-editing.md §3c/§3d.
 - **Env note**: the intent endpoint needs `ARTIFACT_UPLOAD_TOKEN_SECRET` —
   already configured (the pdf-tool upload path uses it).
 

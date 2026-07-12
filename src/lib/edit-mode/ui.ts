@@ -36,6 +36,7 @@ import {
   askAiSuggestion,
   canExecutePublish,
   EditSession,
+  ensureBlobBackedImage,
   fetchPendingObjects,
   getObjectRecord,
   releaseToProduction,
@@ -61,6 +62,8 @@ type PanelState = {
   /** The instance id the PATCH scopes to (inner id for shared objects). */
   patchSectionId: string;
   selectedText?: string;
+  /** Armed "Re: <image>" reference (AI chat image chips) — sent with every ask. */
+  imageRef?: { field: string; name: string; url: string };
   suggestion?: Record<string, unknown>;
   changes?: FieldChange[];
   snapshot?: RegionSnapshot;
@@ -82,6 +85,23 @@ const isImageValue = (value: unknown): value is { src: string; alt?: string } =>
   typeof value === 'object' &&
   !Array.isArray(value) &&
   typeof (value as { src?: unknown }).src === 'string';
+
+const imageBasename = (src: string): string => src.split('/').pop()?.split('?')[0] || src;
+
+/** Every image a section's data carries, flattened (arrays → field.<index>). */
+const imageEntriesFor = (data: Record<string, unknown>): Array<{ field: string; src: string; name: string }> => {
+  const entries: Array<{ field: string; src: string; name: string }> = [];
+  for (const [key, value] of Object.entries(data)) {
+    if (isImageValue(value)) {
+      entries.push({ field: key, src: value.src, name: imageBasename(value.src) });
+    } else if (Array.isArray(value) && value.length > 0 && value.every(isImageValue)) {
+      value.forEach((item, index) =>
+        entries.push({ field: `${key}.${index}`, src: item.src, name: imageBasename(item.src) })
+      );
+    }
+  }
+  return entries;
+};
 
 // Locks survive view-transition remounts: sessions are module state, not mount state.
 const sessions = new Map<string, EditSession>();
@@ -189,6 +209,15 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-srcrow{display:flex;gap:6px;align-items:center}
 .dl-em-srcrow input{flex:1;min-width:0}
 .dl-em-upload{white-space:nowrap}
+.dl-em-imgrefs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.dl-em-imgref{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dlem-border);border-radius:8px;
+  background:transparent;color:var(--dlem-text);padding:3px 8px 3px 3px;font:600 11.5px var(--dlem-font);cursor:pointer}
+.dl-em-imgref img{width:26px;height:26px;object-fit:cover;border-radius:5px}
+.dl-em-imgref:hover{border-color:var(--dlem-accent);color:var(--dlem-accent)}
+.dl-em-imgref.dl-em-armed{border-color:var(--dlem-accent);outline:1.5px solid var(--dlem-accent)}
+.dl-em-repill{display:inline-block;background:color-mix(in srgb,var(--dlem-accent) 14%,transparent);
+  border:1px solid var(--dlem-accent);color:var(--dlem-accent);border-radius:999px;padding:0 8px;
+  font:700 10.5px ui-monospace,monospace}
 .dl-em-formfoot{display:flex;gap:8px;padding-top:2px}
 .dl-em-formfoot .dl-em-save{background:var(--dlem-ok);border-color:var(--dlem-ok);color:#fff}
 .dl-em-panel{position:fixed;top:46px;right:12px;bottom:12px;width:380px;max-width:calc(100vw - 24px);
@@ -829,14 +858,76 @@ export const mountEditMode = (options: MountOptions): void => {
     panelState = { target, region, mode, currentData, patchSectionId, selectedText: selected };
     logEl.innerHTML = '';
     if (mode === 'ai') {
+      inputEl.placeholder = 'Describe the change you want…';
       log(
         'sys',
         `Editing ${escapeHtml(target.sectionType)} on ${escapeHtml(target.objectId)}. ` +
           'Suggestions preview in place as a draft; nothing publishes from here.'
       );
+      renderImageRefChips(panelState);
     } else {
       renderForm(panelState);
     }
+  };
+
+  // ── AI image references ("Re: portrait.png") ─────────────────────────────
+  // A section that carries images gets clickable chips in the chat. Arming a
+  // chip guarantees the image has a blob-store copy with a public /img/* URL
+  // (existing repo images are mirrored through the same upload pipeline —
+  // storage only, the section's src is untouched) and every ask then carries
+  // `image_ref` so the model — and any external image tooling, which needs a
+  // public URL — knows exactly which bytes "the image" means. The copy-only
+  // guard is unchanged: the AI still cannot write image fields.
+  const renderImageRefChips = (state: PanelState): void => {
+    const entries = imageEntriesFor(state.currentData);
+    if (entries.length === 0) return;
+    const container = log(
+      'sys',
+      `This section carries ${entries.length === 1 ? 'an image' : 'images'} — click one to reference it in the chat:`
+    );
+    const row = document.createElement('div');
+    row.className = 'dl-em-imgrefs';
+    for (const entry of entries) {
+      const chipButton = document.createElement('button');
+      chipButton.type = 'button';
+      chipButton.className = 'dl-em-imgref';
+      chipButton.innerHTML = `<img src="${escapeHtml(entry.src)}" alt=""> ${escapeHtml(entry.name)}`;
+      chipButton.addEventListener('click', () => void armImageRef(state, entry, chipButton, row));
+      row.append(chipButton);
+    }
+    container.append(row);
+  };
+
+  const armImageRef = async (
+    state: PanelState,
+    entry: { field: string; src: string; name: string },
+    chipButton: HTMLButtonElement,
+    row: HTMLElement
+  ): Promise<void> => {
+    chipButton.disabled = true;
+    const note = /^\/img\//.test(entry.src) ? undefined : log('sys', 'Mirroring image into blobs…');
+    const result = await ensureBlobBackedImage(getToken, state.target.objectId, entry.src);
+    note?.remove();
+    chipButton.disabled = false;
+    if (!result.ok) {
+      log('sys', `Could not reference image: ${escapeHtml(result.error)}`);
+      return;
+    }
+    state.imageRef = {
+      field: entry.field,
+      name: entry.name,
+      url: new URL(result.publicPath, window.location.origin).href,
+    };
+    row.querySelectorAll('.dl-em-imgref').forEach((el) => el.classList.remove('dl-em-armed'));
+    chipButton.classList.add('dl-em-armed');
+    inputEl.placeholder = `Re: ${entry.name} — describe the change…`;
+    log(
+      'sys',
+      `<span class="dl-em-repill">Re: ${escapeHtml(entry.name)}</span> armed` +
+        `${result.mirrored ? ' — mirrored into blobs' : ''}: <code>${escapeHtml(result.publicPath)}</code>. ` +
+        'Requests now carry this image’s public URL.'
+    );
+    inputEl.focus();
   };
 
   // ── manual edit / image forms ─────────────────────────────────────────────
@@ -1101,7 +1192,11 @@ export const mountEditMode = (options: MountOptions): void => {
       state.changes = undefined;
       suggestionActions.hidden = true;
     }
-    log('user', escapeHtml(instruction));
+    log(
+      'user',
+      (state.imageRef ? `<span class="dl-em-repill">Re: ${escapeHtml(state.imageRef.name)}</span> ` : '') +
+        escapeHtml(instruction)
+    );
     inputEl.value = '';
     const working = log('sys', 'Thinking…');
 
@@ -1110,6 +1205,7 @@ export const mountEditMode = (options: MountOptions): void => {
       object_id: state.target.objectId,
       ...(state.target.objectType === 'page' ? { section_id: state.target.sectionId } : {}),
       ...(state.selectedText ? { selected_text: state.selectedText } : {}),
+      ...(state.imageRef ? { image_ref: state.imageRef } : {}),
       instruction,
     });
     working.remove();
