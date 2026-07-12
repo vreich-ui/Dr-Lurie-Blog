@@ -39,6 +39,7 @@ import {
   fetchPendingObjects,
   getObjectRecord,
   releaseToProduction,
+  uploadImageArtifact,
   type GetToken,
   type PendingObjectRow,
 } from './verbs-client.js';
@@ -185,6 +186,9 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-formrow input:focus,.dl-em-formrow textarea:focus{outline:2px solid var(--dlem-accent);outline-offset:1px;border-color:transparent}
 .dl-em-formrow .dl-em-fieldnote{font-size:10.5px;color:var(--dlem-muted)}
 .dl-em-imgthumb{max-width:100%;max-height:140px;border-radius:8px;border:1px solid var(--dlem-border);object-fit:cover}
+.dl-em-srcrow{display:flex;gap:6px;align-items:center}
+.dl-em-srcrow input{flex:1;min-width:0}
+.dl-em-upload{white-space:nowrap}
 .dl-em-formfoot{display:flex;gap:8px;padding-top:2px}
 .dl-em-formfoot .dl-em-save{background:var(--dlem-ok);border-color:var(--dlem-ok);color:#fff}
 .dl-em-panel{position:fixed;top:46px;right:12px;bottom:12px;width:380px;max-width:calc(100vw - 24px);
@@ -915,6 +919,16 @@ export const mountEditMode = (options: MountOptions): void => {
           (field.kind === 'lines'
             ? '<span class="dl-em-fieldnote">One item per line.</span>'
             : '<span class="dl-em-fieldnote">Allowed tags: p, br, strong, em, a, ul, ol, li, h2, h3.</span>');
+      } else if (field.kind === 'image-src') {
+        // src + Upload side by side: paste a path, or push a file into the
+        // blobs artifacts store (pdf-tool pattern) and get its /img/* path.
+        row.innerHTML =
+          label +
+          `<div class="dl-em-srcrow">` +
+          `<input type="text" data-em-field="${escapeHtml(field.key)}" value="${escapeHtml(value)}">` +
+          `<button type="button" class="dl-em-btn dl-em-upload" data-em-upload>Upload</button>` +
+          `<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-em-upload-file>` +
+          `</div>`;
       } else {
         row.innerHTML =
           label + `<input type="text" data-em-field="${escapeHtml(field.key)}" value="${escapeHtml(value)}">`;
@@ -926,8 +940,17 @@ export const mountEditMode = (options: MountOptions): void => {
         thumb.alt = 'Preview';
         thumb.src = value;
         row.append(thumb);
-        row.querySelector('input')?.addEventListener('input', (event) => {
-          thumb.src = (event.target as HTMLInputElement).value;
+        const srcInput = row.querySelector<HTMLInputElement>('[data-em-field]');
+        srcInput?.addEventListener('input', () => {
+          thumb.src = srcInput.value;
+        });
+        const uploadButton = row.querySelector<HTMLButtonElement>('[data-em-upload]');
+        const fileInput = row.querySelector<HTMLInputElement>('[data-em-upload-file]');
+        uploadButton?.addEventListener('click', () => fileInput?.click());
+        fileInput?.addEventListener('change', () => {
+          const file = fileInput.files?.[0];
+          if (file && uploadButton && srcInput) void uploadImage(state, file, srcInput, uploadButton);
+          fileInput.value = '';
         });
       }
     }
@@ -939,6 +962,36 @@ export const mountEditMode = (options: MountOptions): void => {
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveForm(state, fields));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
+  };
+
+  /**
+   * Upload → blobs artifacts store → fill the src input with the public
+   * /img/* path. Storage only: nothing changes on the object until the human
+   * hits Save draft, and nothing shows publicly until publish + release.
+   */
+  const uploadImage = async (
+    state: PanelState,
+    file: File,
+    srcInput: HTMLInputElement,
+    button: HTMLButtonElement
+  ): Promise<void> => {
+    button.disabled = true;
+    button.textContent = 'Uploading…';
+    try {
+      const result = await uploadImageArtifact(getToken, state.target.objectId, file);
+      if (!result.ok) {
+        log('sys', `Upload failed: ${escapeHtml(result.error)}`);
+        return;
+      }
+      srcInput.value = result.publicPath;
+      srcInput.dispatchEvent(new Event('input', { bubbles: true }));
+      log('sys', `Image stored in blobs at <code>${escapeHtml(result.publicPath)}</code> — Save draft to use it.`);
+    } catch (error) {
+      log('sys', `Upload failed: ${escapeHtml(error instanceof Error ? error.message : String(error))}`);
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Upload';
+    }
   };
 
   const saveForm = async (state: PanelState, fields: FormField[]): Promise<void> => {

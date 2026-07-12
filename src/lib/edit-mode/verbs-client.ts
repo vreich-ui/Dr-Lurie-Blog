@@ -14,6 +14,8 @@ import { requestObjectSuggestion, type ObjectSuggestionRequest } from '../admin/
 const OBJECT_ENDPOINT = '/.netlify/functions/admin-object';
 const RELEASE_ENDPOINT = '/.netlify/functions/admin-release';
 const AUTH_STATE_ENDPOINT = '/.netlify/functions/admin-auth-state';
+const UPLOAD_INTENT_ENDPOINT = '/.netlify/functions/admin-artifact-upload-intent';
+const ARTIFACT_UPLOAD_ENDPOINT = '/api/artifacts/upload';
 
 export type GetToken = () => Promise<string>;
 
@@ -79,6 +81,66 @@ export const askAiSuggestion = (
   getToken: GetToken,
   request: ObjectSuggestionRequest
 ): ReturnType<typeof requestObjectSuggestion> => requestObjectSuggestion(request, getToken);
+
+export type UploadImageResult = { ok: true; publicPath: string } | { ok: false; error: string };
+
+/**
+ * Push an image into the blobs `artifacts` store — the pdf-tool pattern for
+ * canvas images. Two steps, no new write path: (1) the admin-gated intent
+ * endpoint signs the upload claims (identity token proves the human), (2) the
+ * bytes go to the SAME /api/artifacts/upload the agents use, gated by that
+ * signed token. Returns the public /img/* path (get-public-image) to put in
+ * the section's `src` — storage only; the src change itself still goes
+ * through the reviewable draft path.
+ */
+export const uploadImageArtifact = async (
+  getToken: GetToken,
+  objectId: string,
+  file: { arrayBuffer(): Promise<ArrayBuffer>; type: string; size: number }
+): Promise<UploadImageResult> => {
+  const bytes = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const sha256 = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+  const token = await getToken();
+  const intentResponse = await fetch(UPLOAD_INTENT_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ object_id: objectId, content_type: file.type, size_bytes: file.size, sha256 }),
+  });
+  const intent = (await intentResponse.json().catch(() => ({}))) as {
+    token?: string;
+    claims?: { requestId: string; artifactKind: string; contentType: string; filename?: string };
+    publicPath?: string;
+    error?: string;
+  };
+  if (!intentResponse.ok || !intent.token || !intent.claims || !intent.publicPath) {
+    return { ok: false, error: intent.error ?? `Upload intent failed (${intentResponse.status})` };
+  }
+
+  const uploadResponse = await fetch(ARTIFACT_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${intent.token}`,
+      'Content-Type': 'application/octet-stream',
+      'X-Artifact-Request-Id': intent.claims.requestId,
+      'X-Artifact-Kind': intent.claims.artifactKind,
+      'X-Artifact-Content-Type': intent.claims.contentType,
+      'X-Artifact-Size': String(file.size),
+      'X-Artifact-Sha256': sha256,
+      ...(intent.claims.filename ? { 'X-Artifact-Filename': intent.claims.filename } : {}),
+    },
+    body: bytes,
+  });
+  const upload = (await uploadResponse.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  if (!uploadResponse.ok || !upload.ok) {
+    return { ok: false, error: upload.error ?? `Upload failed (${uploadResponse.status})` };
+  }
+
+  return { ok: true, publicPath: intent.publicPath };
+};
 
 export type ReleaseResult = { ok: boolean; status: number; result?: { status: string; detail?: string } };
 

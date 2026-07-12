@@ -7,6 +7,43 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 P (CANVAS image tool v2: array images + blob-backed uploads)
+
+Wolf, on the Codex array-image finding + storage: "Close the gap. Also, those
+images also need to be stored in blobs for edits and other manipulation as
+happens now with pdf-tool. Same goes for About image or any other image."
+Shipped on the canvas branch (PR #425):
+
+- **Array images (Codex gap closed)**: the image tool now renders image
+  ARRAYS (`content_split` `images: [{src,alt}]`) — one src/alt pair per item;
+  save copies the array and patches it wholesale (deep-merge replaces arrays),
+  editing only the touched item. `content_split` joins `bio` in
+  `IMAGE_SECTION_TYPES`.
+- **Blob-backed uploads (pdf-tool pattern, zero new write paths)**:
+  - `admin-artifact-upload-intent.ts` (+ pure core
+    `netlify/lib/canvas-upload-intent.ts`): admin-gated mint of the EXISTING
+    HMAC upload token; server controls the claims — `requestId =
+    req_canvas_<object>_<yyyymmdd>_01`, kind `image`, filename from content
+    type; JPEG/PNG/WebP only (what save-side sharp validation accepts).
+  - Bytes go to the same `/api/artifacts/upload` agents use (re-verifies
+    size/sha256/decodability against the signed claims); content-addressed
+    keys `image/<requestId>/<sha256>.<ext>`.
+  - **Public serving**: `/img/*` → new `get-public-image.ts`, the image
+    mirror of `get-public-pdf.ts` — extension allowlist, immutable cache
+    (content-addressed), CSP + nosniff. Sections carry the root-relative
+    `/img/…` path (deploy-safe; renders through existing components).
+  - Canvas: each src row gets an **Upload** button
+    (`uploadImageArtifact` in `verbs-client.ts`: crypto.subtle sha256 →
+    intent → tokened byte POST → fill src). Upload is storage-only; the src
+    change still walks checkout → patch → publish → release.
+- **Gates**: 13 new tests (intent mint/round-trip/rejections; public image
+  route incl. real underscored canvas keys + 404/405/allowlist), full suite
+  green, astro check 0, build 172 pages, drive extended to 34 assertions
+  (upload flow wire shapes: intent auth + body, X-Artifact-* claim echo, raw
+  bytes, /img/* src fill, draft patch). Docs: 07-canvas-editing.md §3c.
+- **Env note**: the intent endpoint needs `ARTIFACT_UPLOAD_TOKEN_SECRET` —
+  already configured (the pdf-tool upload path uses it).
+
 ## Session 2026-07-12 O (CANVAS manual tools: icon toolbar, field editor, image tool, gap "+" add)
 
 Wolf: "add text edit tools to each relevant object … remove the wording Ask AI

@@ -125,10 +125,11 @@ The chip is now an **icon toolbar** — no "Ask AI" wording. Right-to-left:
   per line). Structured values (actions, FAQ items, quotes) stay AI/admin
   work. **Save draft** goes through the same checkout → `update_section_data`
   path; in-place preview; publish stays separate.
-- **🖼 Image** (section types with image fields — `bio` today): src + alt
-  inputs with a live thumbnail. This is the DELIBERATE way to change an
-  image — the complement of the copy-only AI guard. (Real file upload is a
-  later slice; today it takes a path/URL.)
+- **🖼 Image** (section types with image fields — `bio` and `content_split`,
+  incl. image ARRAYS with one src/alt pair per item): src + alt inputs with a
+  live thumbnail. This is the DELIBERATE way to change an image — the
+  complement of the copy-only AI guard. Each src row has an **Upload** button
+  (see 3c) or takes a path/URL directly.
 
 **Gap "+" affordances**: in edit mode, a small round + sits above the first
 section, between sections of the same page object, and below the last. Click
@@ -142,6 +143,40 @@ at a RECORD-derived position (hidden sections still occupy indices; anchored
 by section id, never DOM order), id minted server-side; an honest draft
 placeholder appears in place (annotated — immediately editable with the same
 tools) until publish + release renders it for real.
+
+### 3c. Blob-backed image uploads (2026-07-12, Wolf: "stored in blobs … as happens now with pdf-tool")
+
+Canvas images live in the blobs `artifacts` store, exactly like pdf-tool
+PDFs — no new write path, the EXISTING tokened pipeline end to end:
+
+1. **Intent (new, admin-gated)**: `admin-artifact-upload-intent.ts` (pure core
+   `netlify/lib/canvas-upload-intent.ts`). The browser sends
+   `{ object_id, content_type, size_bytes, sha256 }` under the Identity token;
+   the server mints the standard short-lived HMAC upload token
+   (`createArtifactUploadToken`, 15 min TTL) with server-controlled claims:
+   `requestId = req_canvas_<object>_<yyyymmdd>_01` (canvas uploads are
+   traceable per object and can never write outside `image/req_canvas_*`),
+   `artifactKind: 'image'`, filename minted from the content type. Only
+   JPEG/PNG/WebP — the types the save-side sharp validation accepts — get a
+   token at all.
+2. **Bytes**: the client POSTs the raw file to the same `/api/artifacts/upload`
+   agents use; the endpoint re-verifies size/sha256/decodability (sharp)
+   against the signed claims. Content-addressed key:
+   `image/<requestId>/<sha256>.<ext>`.
+3. **Serving (new, public)**: `/img/*` → `get-public-image.ts`, the image
+   mirror of `get-public-pdf.ts` (same netlify.toml redirect pattern). Keys
+   are unguessable without the sha256 of the exact bytes; extension
+   allowlisted; immutable cache (`max-age=31536000`) because the key is
+   content-addressed; CSP + nosniff headers for defense in depth.
+4. **The section's `src`** gets the root-relative `/img/…` path — deploy-safe
+   (no external host) and rendered by the existing components untouched. The
+   src change itself still goes through checkout → patch → publish → release;
+   the upload alone changes nothing visible.
+
+Client flow (`uploadImageArtifact` in `verbs-client.ts`, Upload button per
+src row in the image form): hash the file with `crypto.subtle` → mint intent
+→ POST bytes with the claim-echo `X-Artifact-*` headers → fill the src input
+with the returned public path → human hits Save draft.
 
 ### 4. What is deliberately NOT in this slice
 
