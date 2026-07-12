@@ -120,22 +120,23 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │   │         target: product_preview (type exists; ProductCard[]) + prose/cta; needs the
 │   │         functional-equivalence gate (known-inert-diffs.md) for the scoped style
 │   │
-│   ├── LISTING SURFACES ─ 🟣 RENDERS + SEEDED (W6 built 2026-07-12; awaiting the
-│   │   │   credentialed run) ─ pageType 'listing'/'content_detail' are now DEFINED law:
-│   │   │   the page objects own headings/copy/SEO (first lede = the header block;
-│   │   │   extra sections render after the list via the registry), the query machinery
-│   │   │   stays the audited build-time derivation. Per-term surfaces are ONE object
-│   │   │   per route family with `%term%` pattern copy interpolated at build.
+│   ├── LISTING SURFACES ─ 🟢 CONVERTED (W6, credentialed run 2026-07-12; export
+│   │   │   commits 7956b13…b0f8d90, released:true, store === seed === export) ─
+│   │   │   pageType 'listing'/'content_detail' are DEFINED law: the page objects own
+│   │   │   headings/copy/SEO (first lede = the header block; extra sections render
+│   │   │   after the list via the registry), the query machinery stays the audited
+│   │   │   build-time derivation. Per-term surfaces are ONE object per route family
+│   │   │   with `%term%` pattern copy interpolated at build.
 │   │   │   Seeds: scripts/lib/pages-listing-seed-data.mjs · byte-identical cutover.
-│   │   ├── page_library ─ /learn/library ─ 🟣 [lede] ─ the blog index + pagination
-│   │   ├── page_category ─ /category/[category] ─ 🟣 [lede "%term%"] ─ per-category listing
-│   │   ├── page_tag ─ /tag/[tag] ─ 🟣 [lede "Tag: %term%"] ─ per-tag listing
-│   │   ├── page_article ─ /%slug% ─ 🟣 content_detail ─ SEO defaults for EVERY article +
+│   │   ├── page_library ─ /learn/library ─ 🟢 [lede] ─ the blog index + pagination
+│   │   ├── page_category ─ /category/[category] ─ 🟢 [lede "%term%"] ─ per-category listing
+│   │   ├── page_tag ─ /tag/[tag] ─ 🟢 [lede "Tag: %term%"] ─ per-tag listing
+│   │   ├── page_article ─ /%slug% ─ 🟢 content_detail ─ SEO defaults for EVERY article +
 │   │   │     optional sections below the post (publishes with ZERO sections —
 │   │   │     minVisibleSections 0; the SinglePost furniture is untouched)
-│   │   ├── page_topics_index ─ /learn/topics ─ 🟣 [lede] ─ topic cards stay computed
+│   │   ├── page_topics_index ─ /learn/topics ─ 🟢 [lede] ─ topic cards stay computed
 │   │   │     from category frontmatter (D§5.5 — no Topic entity)
-│   │   └── page_topic_detail ─ /learn/topics/[topic] ─ 🟣 [lede "%term%"]
+│   │   └── page_topic_detail ─ /learn/topics/[topic] ─ 🟢 [lede "%term%"]
 │   │
 │   ├── DEMO PAGES ─ ⛔ not conversion targets — deletion candidates
 │   │     /homes/mobile-app · /homes/personal · /homes/startup (Astrowind starter demos)
@@ -253,8 +254,8 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 | W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                                                                                                  | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles               | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | ✅ CONVERTED (credentialed run 2026-07-11): site_drlurie store-backed; brandTokens/logo/chrome/metadataDefaults/defaultNavigation render from the object; urls/blog carried (config.yaml authoritative for routing per B2) | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
-| W5         | RE-GROUNDED in the shop module (2026-07-12 — see [`06-shop-module-plan.md`](06-shop-module-plan.md)): /pricing renders pricing_table tiers FROM product objects; shop-preview → content_split; /services awaits Wolf's copy-or-delete call (its current text is Astrowind lorem, audit A§2.13). The ⚪ types mint with real content, after S1–S3 of the shop build. **S1a DONE 2026-07-12: `product` is the eighth object type** (schema, verbs, validation, contract, review-required flip, §3 price funnel — sandbox-proven); store empty until S2 seeds | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
-| W6         | 🟣 BUILT + SEEDED (2026-07-12): listing/content_detail PageTypes defined; 6 page objects (library, topics ×2, category, tag, article) seeded + wired, byte-identical cutover, local round-trip green — one credentialed run from CONVERTED | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
+| W5         | RE-GROUNDED in the shop module (2026-07-12 — see [`06-shop-module-plan.md`](06-shop-module-plan.md)): /pricing renders pricing_table tiers FROM product objects; shop-preview → content_split; /services + product content use MOCKUP data (Wolf, 2026-07-12 — supersedes the copy-or-delete wait). The ⚪ types mint after S1–S3 of the shop build. **S1a DONE 2026-07-12: `product` is the eighth object type** (schema, verbs, validation, contract, review-required flip, §3 price funnel — sandbox-proven); store empty until S2 seeds | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
+| W6         | ✅ CONVERTED (credentialed run 2026-07-12): listing/content_detail PageTypes defined; 6 page objects (library, topics ×2, category, tag, article) store-backed, round-tripped, published, released — byte-identical cutover held | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
 | W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                                                                                                      | Post-MVP by standing decision                                                        | L    |
 | any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted                                                                         | Independent, non-blocking                                                            | S    |
 

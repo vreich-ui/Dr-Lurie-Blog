@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-12T09:41:56.801Z",
+    "at": "2026-07-12T11:50:50.927Z",
     "from": "objects/page/by-id/page_category.json",
-    "record_version": 12
+    "record_version": 11
   },
   "pageType": "listing",
   "route": "/category/[category]",

@@ -20,7 +20,7 @@ five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.
 
 Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
 X passes all five); **after every session, update the documentation** (no written record
-= not converted). Reality as of 2026-07-11: **thirty-one objects converted** — the 3 nav
+= not converted). Reality as of 2026-07-12: **thirty-seven objects converted** — the 3 nav
 objects, all 12 page objects (home + about + 8 W1 interior/system pages + page_contact +
 page_thank_you), the 12 shared sections under home/about, the 3 templates, the
 `tax_drlurie` taxonomy registry (curated agent-editable vocabulary; resolveTaxonomyTerm is
@@ -39,16 +39,17 @@ publish → release → live, zero code. Write-time guardrails (2026-07-11, trap
 5+14 closed): validateObject blocks, at patch/create/publish, content that would
 break the deploy (protected env values in any encoding; repo-file hotlink URLs)
 or the build (per-component rich-text vocabulary via the real splitters).
-W6 BUILT + SEEDED (2026-07-12): `listing`/`content_detail` PageTypes are defined
-law (all five implemented; content_detail publishes with zero sections) and six
-page objects (library, topics ×2, category, tag, article) make listing
-headings/copy/SEO agent-editable — first lede = header block, extra sections
-render after the list/article, per-term objects carry `%term%` pattern copy —
-while query machinery stays the audited build-time derivation. Byte-identical
-cutover, local round-trip green; RENDERS + SEEDED, not CONVERTED until the
-credentialed `--production --release --seeds
-scripts/lib/pages-listing-seed-data.mjs` run (after merge + deploy). Still
-TODO: the W5 hand-coded pages (Wolf: separate session).
+W6 CONVERTED (2026-07-12, credentialed run same day): `listing`/`content_detail`
+PageTypes are defined law (all five implemented; content_detail publishes with
+zero sections) and six page objects (library, topics ×2, category, tag, article)
+make listing headings/copy/SEO agent-editable — first lede = header block, extra
+sections render after the list/article, per-term objects carry `%term%` pattern
+copy — while query machinery stays the audited build-time derivation.
+Byte-identical cutover; all six store-backed, round-tripped, published, released
+(store === seed === export). Hidden sections are filtered at the resolver on
+every render path (never-render-private). W5 was RE-GROUNDED in the shop module
+(`docs/cms-architecture/06-shop-module-plan.md`; the shop build runs in its own
+session; /services awaits a copy-or-delete call).
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

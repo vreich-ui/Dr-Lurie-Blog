@@ -7,7 +7,7 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
-## Session 2026-07-12 C (S1a SHIPPED: `product` is the eighth object type — review-required, price-funnel enforced)
+## Session 2026-07-12 D (S1a SHIPPED: `product` is the eighth object type — review-required, price-funnel enforced)
 
 Shop build sequence started per [`06-shop-module-plan.md`](../06-shop-module-plan.md)
 §9. **S1a is complete**: `product.v1` schema + object type + validation criteria
@@ -57,6 +57,33 @@ objects, which arrive with S2's seeds). NOT in S1a (deliberately, per §9):
 S1b stores/events, S1c checkout/webhook/delivery, the S3 tools
 (`product_set_price`, `order_reissue` — criterion-4 completeness for the
 type), roundtrip-drill support (parallelizable), and the W5 page conversions.
+
+## Session 2026-07-12 C (W6 CONVERTED: the six listing objects are #32–#37 — the credentialed run)
+
+Wolf's credentialed run (after one stale-checkout false start — the seed
+module wasn't in his working tree until `git pull`; the driver's error named
+the missing path correctly) came back **all-green in a single pass**: every
+`ensure` created the store record, all six drilled every permitted page op
+(page_article via its seed `drillProbe` — the section-less path working in
+production), validated, **published** (export commits `7956b13` `d460db0`
+`37dd040` `37fea10` `27a416c` `b0f8d90` on main, `[skip netlify]`), contract
+6/6, inventory 6/6, and `release_to_production` confirmed **`released:true`**
+(one poll). Byte-verified from this session against main: **store === seed
+=== export** for all six (marker-stripped; record_version 11 across the
+board).
+
+All five criteria met → `page_library`, `page_topics_index`,
+`page_topic_detail`, `page_category`, `page_tag`, `page_article` flipped to
+🟢 CONVERTED across inventory / conversion-map / playbook / CLAUDE.md /
+AGENTS.md in this change. **Converted count: 31 → 37.** W6 is closed: the
+listing surfaces' headings/copy/SEO are live agent levers (`%term%` pattern
+copy included), `page_article` governs every article page's SEO defaults and
+below-post sections, and the P6/T6.1 "biggest remaining chunk" is done.
+Remaining on the path: the shop module (own session, plan in
+`06-shop-module-plan.md` — its S-phases now carry the W5 pages) and W7 rich
+text (OQ-8, Wolf's checkpoint). Standing caveat repeated: `PUBLISH_SECRET`
+is a temp value pasted in chat again this run — rotation stays mandatory
+before real go-live (it is a named launch gate in the shop plan).
 
 ## Session 2026-07-12 B (SHOP MODULE PLAN: W5 re-grounded in commerce — plan, not code)
 
