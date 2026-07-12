@@ -20,9 +20,11 @@
  * `amount_mismatch` event — the charge is still correct (price_id is
  * canonical), the display lied.
  *
- * kind 'unlock' fulfillment is S3 scope (no unlock product can complete a
- * fixed-price checkout before its path exists); it records the order with
- * state 'none' so nothing is lost, and S3's issuance upgrades the path.
+ * kind 'unlock' (S3): the artifact was generated BEFORE payment under the
+ * product's unlock prefix; the session's metadata.unlock_key names it and
+ * payment only flips retrieval — the token is minted over that per-buyer
+ * artifact. A completed unlock session without a valid key records the order
+ * with state 'none' (support case), never a token over the wrong blob.
  */
 import { createHash } from 'node:crypto';
 import type Stripe from 'stripe';
@@ -140,18 +142,27 @@ const handleCompleted = async (event: LambdaEvent, stripeEvent: Stripe.Event) =>
   const amountMismatch = expectedCents !== undefined && expectedCents !== amountTotal;
 
   // Fulfillment is decided from the product's CURRENT record. download →
-  // mint an expiring token; none → nothing to deliver; unlock → S3 (recorded
-  // as 'none' so the order exists; no unlock path is sellable before S3).
+  // token over the product's artifact; unlock → token over the PRE-generated
+  // per-buyer artifact the session named at checkout (§5 inverted timing —
+  // metadata.unlock_key, prefix-checked at session creation AND here);
+  // none → nothing to deliver.
   const tokenSecret = purchaseTokenSecret();
   const fulfillmentKind = product?.body.fulfillment.kind;
+  let artifactRef: string | undefined;
+  if (product?.body.fulfillment.kind === 'download') {
+    artifactRef = product.body.fulfillment.artifact_ref;
+  } else if (product?.body.fulfillment.kind === 'unlock') {
+    const unlockKey = session.metadata?.unlock_key ?? '';
+    if (unlockKey.startsWith(product.body.fulfillment.unlock_prefix)) {
+      artifactRef = unlockKey;
+    } else {
+      console.error(`unlock session ${session.id} carries no valid unlock_key; order recorded unfulfilled.`);
+    }
+  }
   let token: string | undefined;
-  if (fulfillmentKind === 'download' && product && tokenSecret) {
+  if (artifactRef && tokenSecret) {
     token = mintPurchaseToken(
-      {
-        order_key: session.id,
-        artifact_ref: product.body.fulfillment.kind === 'download' ? product.body.fulfillment.artifact_ref : '',
-        exp: Date.now() + DEFAULT_PURCHASE_TOKEN_TTL_MS,
-      },
+      { order_key: session.id, artifact_ref: artifactRef, exp: Date.now() + DEFAULT_PURCHASE_TOKEN_TTL_MS },
       tokenSecret
     );
   }
@@ -167,7 +178,15 @@ const handleCompleted = async (event: LambdaEvent, stripeEvent: Stripe.Event) =>
     buyer_email: buyerEmail,
     created_at: createdAt,
     fulfillment: token
-      ? { state: 'issued', token_hash: purchaseTokenHash(token), issued_at: new Date().toISOString(), reissues: [] }
+      ? {
+          state: 'issued',
+          token_hash: purchaseTokenHash(token),
+          issued_at: new Date().toISOString(),
+          // Stored so fulfillment stays a pure function of the order record
+          // (order_reissue never needs Stripe or the product's CURRENT body).
+          ...(artifactRef ? { artifact_ref: artifactRef } : {}),
+          reissues: [],
+        }
       : { state: 'none', token_hash: null, issued_at: null, reissues: [] },
     flags: amountMismatch ? { amount_mismatch: true } : {},
   };

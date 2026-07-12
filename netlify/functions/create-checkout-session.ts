@@ -18,7 +18,7 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import { getArtifactBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { checkBuyability, loadPublishedProduct } from '../lib/commerce-products.js';
 import { getStripeClient } from '../lib/stripe-env.js';
 import { isObjectIdForType } from '../../src/lib/object-ids.js';
@@ -75,24 +75,69 @@ export const handler = async (event: LambdaEvent) => {
       const message =
         buyable.reason === 'not_available'
           ? 'This product is not currently available for purchase.'
-          : buyable.reason === 'mode_not_supported'
-            ? 'Only fixed-price checkout is supported right now.'
-            : 'This product has no Stripe price linked for the running mode.';
+          : buyable.reason === 'free_product'
+            ? 'Free products are claimed directly (claim-free), not through Checkout.'
+            : buyable.reason === 'mode_not_supported'
+              ? 'This commerce mode is not supported by Checkout.'
+              : 'This product has no Stripe linkage for the running mode.';
       return reply(409, { error: message, reason: buyable.reason });
     }
 
-    const eventId = randomUUID();
+    // Pay-what-you-want (§3): no Stripe Price exists — the buyer picks the
+    // amount and THIS function is the enforcement point for the minimum.
+    let lineItem: Record<string, unknown>;
+    if (buyable.mode === 'pwyw') {
+      const amountCents = typeof input.amount_cents === 'number' ? input.amount_cents : NaN;
+      if (!Number.isInteger(amountCents) || amountCents < buyable.minCents || amountCents > 500_000) {
+        return reply(400, {
+          error: `amount_cents must be an integer between ${buyable.minCents} and 500000.`,
+          min_cents: buyable.minCents,
+          ...(buyable.suggestedCents !== undefined ? { suggested_cents: buyable.suggestedCents } : {}),
+        });
+      }
+      lineItem = {
+        price_data: {
+          currency: 'usd',
+          unit_amount: amountCents,
+          ...(buyable.stripeProductId
+            ? { product: buyable.stripeProductId }
+            : { product_data: { name: product.body.presentation.title } }),
+        },
+        quantity: 1,
+      };
+    } else {
+      lineItem = { price: buyable.priceId, quantity: 1 };
+    }
+
+    // Pay-to-unlock (§5, inverted timing): the artifact was generated BEFORE
+    // payment under the product's unlock prefix; the buyer's session names it
+    // and the webhook only flips retrieval. The key must sit under the
+    // product's own prefix AND already exist — nobody pays for a ghost.
+    const metadata: Record<string, string> = { product_id: productId, event_id: randomUUID() };
+    if (product.body.fulfillment.kind === 'unlock') {
+      const unlockKey = typeof input.unlock_key === 'string' ? input.unlock_key.trim() : '';
+      const prefix = product.body.fulfillment.unlock_prefix;
+      if (!unlockKey || !unlockKey.startsWith(prefix)) {
+        return reply(400, { error: `unlock_key is required and must start with "${prefix}".` });
+      }
+      const artifacts = await getArtifactBlobStore(event);
+      if ((await artifacts.get(unlockKey)) === null) {
+        return reply(404, { error: 'The unlock artifact does not exist yet — generate it before checkout.' });
+      }
+      metadata.unlock_key = unlockKey;
+    }
+
     const origin = siteOrigin();
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      line_items: [{ price: buyable.priceId, quantity: 1 }],
+      line_items: [lineItem],
       success_url: `${origin}/shop/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shop/${product.body.slug}`,
-      metadata: { product_id: productId, event_id: eventId },
+      metadata,
     });
 
     if (!session.url) return reply(502, { error: 'Stripe did not return a Checkout URL.' });
-    return reply(200, { ok: true, url: session.url, session_id: session.id, event_id: eventId });
+    return reply(200, { ok: true, url: session.url, session_id: session.id, event_id: metadata.event_id });
   } catch (error) {
     console.error('Failed to create a Checkout Session.', error);
     return reply(502, { error: 'Checkout Session could not be created.' });

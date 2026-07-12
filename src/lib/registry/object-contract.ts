@@ -158,7 +158,7 @@ const MINTED_ID_FIELD: Partial<Record<PatchOpName, string>> = {
 
 // Ops (or op fields) that exist only for inverse/Discard derivation — agents
 // should not hand-author them; the engine emits them when reverting.
-const INTERNAL_OPS = new Set<PatchOpName>(['reactivate_term']);
+const INTERNAL_OPS = new Set<PatchOpName>(['reactivate_term', 'set_product_price']);
 
 const opArgSchema = (opName: PatchOpName): JsonSchema | undefined => {
   const option = patchOpUnionSchema.options.find(
@@ -357,8 +357,9 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           enforced_live: true,
           description:
             'commerce.price, commerce.stripe, and commerce.stripe_test cannot be patched via set_product_fields — ' +
-            'Stripe is canonical for charge amounts; the only price-edit path is the product_set_price tool ' +
-            '(ships with S3; until then price/linkage are set at object_create).',
+            'Stripe is canonical for charge amounts; the only price-edit path is the product_set_price tool, ' +
+            'which creates the new Stripe Price, archives the old one, and writes linkage + cache in one ' +
+            'governed set_product_price patch (that op is tool-authored — do not hand-author it).',
         },
         {
           id: 'product_linkage',

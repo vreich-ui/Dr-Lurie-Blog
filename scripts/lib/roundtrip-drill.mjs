@@ -228,13 +228,36 @@ export const siteDrillOps = (body) => {
  */
 export const productDrillOps = (body) => {
   const title = body.presentation.title;
-  return {
-    expected: ['set_product_fields'],
-    ops: [
-      { op: 'set_product_fields', fields: { presentation: { title: `${title} [probe]` } } },
-      { op: 'set_product_fields', fields: { presentation: { title } } },
-    ],
-  };
+  const expected = ['set_product_fields'];
+  const ops = [
+    { op: 'set_product_fields', fields: { presentation: { title: `${title} [probe]` } } },
+    { op: 'set_product_fields', fields: { presentation: { title } } },
+  ];
+  // set_product_price (the §3 funnel's writer, S3) is only coherent on a
+  // fixed-mode product that already carries a price + linkage: poke the cache
+  // one cent up and restore it exactly, re-writing the SAME linkage — two
+  // more real ops ending byte-identical. pwyw/free products cannot legally
+  // carry a price, so they drill set_product_fields only (the per-type
+  // contract check unions exercised ops across the family's seeds).
+  const commerce = body.commerce;
+  const linkageKey = commerce.stripe ? 'stripe' : commerce.stripe_test ? 'stripe_test' : undefined;
+  const linkage = commerce.stripe ?? commerce.stripe_test;
+  if (commerce.mode === 'fixed' && commerce.price && linkageKey && linkage) {
+    expected.push('set_product_price');
+    ops.push(
+      {
+        op: 'set_product_price',
+        fields: {
+          commerce: {
+            price: { amount_cents: commerce.price.amount_cents + 1, currency: commerce.price.currency },
+            [linkageKey]: linkage,
+          },
+        },
+      },
+      { op: 'set_product_price', fields: { commerce: { price: commerce.price, [linkageKey]: linkage } } }
+    );
+  }
+  return { expected, ops };
 };
 
 /** Dispatch: build the drill for one seed (page, section, template, taxonomy, site, or product). */

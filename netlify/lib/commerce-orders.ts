@@ -63,6 +63,15 @@ export const orderRecordSchema = z
         /** sha256:<hex> of the issued token — never the token itself. */
         token_hash: z.string().regex(TOKEN_HASH_RE).nullable(),
         issued_at: z.iso.datetime().nullable(),
+        /**
+         * The PRIVATE artifacts-store key this order's tokens unlock —
+         * stored so fulfillment stays a pure function of the order record
+         * (§5: order_reissue never needs Stripe or the product's CURRENT
+         * body, which may have changed since purchase). Optional: S1c-era
+         * orders predate it (additive evolution); reissue then falls back
+         * to the product's current fulfillment.
+         */
+        artifact_ref: z.string().min(1).optional(),
         reissues: z.array(reissueSchema),
       })
       .strict(),

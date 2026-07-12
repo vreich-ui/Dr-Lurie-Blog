@@ -13,7 +13,18 @@ import {
 } from '../lib/netlify-deploys.js';
 import { releaseToProduction } from '../lib/production-release.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore, getWorkflowBlobStore } from '../lib/blob-store.js';
+import {
+  getArtifactBlobStore,
+  getArtifactIndexBlobStore,
+  getCommerceBlobStore,
+  getCommerceEventsBlobStore,
+  getSiteObjectsBlobStore,
+  getWorkflowBlobStore,
+} from '../lib/blob-store.js';
+import { orderReissue } from '../lib/order-reissue.js';
+import { productSetPrice } from '../lib/product-set-price.js';
+import { getStripeClient } from '../lib/stripe-env.js';
+import type { ObjectVerbStore } from '../lib/object-verbs.js';
 import {
   createArtifactUploadToken,
   defaultArtifactUploadTokenTtlMs,
@@ -1512,6 +1523,33 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     inputSchema: objectSchema({ object_type: objectTypeEnumSchema('The CMS object type to describe.') }, [
       'object_type',
     ]),
+  },
+  {
+    name: 'product_set_price',
+    description:
+      'THE only price-edit path for a product (§3 canonicality): creates a NEW Stripe Price (prices are immutable) for the running STRIPE_MODE, archives the old one, and writes price_id + the display cache into the product record in ONE governed set_product_price patch (checkout → patch → checkin; audited; inverse = re-point to the archived price). A product with no Stripe linkage yet gets a Stripe Product created from its title. The change is an UNPUBLISHED revision — publishing stays review-required (§0.4): submit_review → a human approves → object_publish. Never edit commerce.price/stripe via set_product_fields; that op refuses those keys.',
+    inputSchema: objectSchema(
+      {
+        product_id: stringSchema('The product object id (prod_…).'),
+        amount_cents: { type: 'number', description: 'The new price in integer cents (positive).' },
+        currency: stringSchema("Lowercase ISO currency code; default 'usd'."),
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['product_id', 'amount_cents']
+    ),
+  },
+  {
+    name: 'order_reissue',
+    description:
+      'Regenerate a purchase download link from the stored ORDER record (§5 — fulfillment is a pure function of the order; no Stripe round trip). The support case this exists for: "customer lost the email / the link expired" (§8.4 — launch-critical, there are no customer accounts). Appends an audited reissue entry {at, token_hash, by} to the order plus a fulfillment_reissued event; old tokens are not revoked (they expire on their own). order_key is the Checkout session id (cs_…) for paid orders, or the ord_free_… id for free claims.',
+    inputSchema: objectSchema(
+      {
+        order_key: stringSchema('The order idempotency key: Checkout session id, or ord_… for free claims.'),
+        ttl_hours: { type: 'number', description: 'Link lifetime in hours (1–336); default 72.' },
+        agent_name: stringSchema('Optional self-declared agent name recorded on the reissue entry.'),
+      },
+      ['order_key']
+    ),
   },
   {
     name: 'registry_get',
@@ -3870,6 +3908,50 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         lock_token: input.lock_token,
         published_time: input.published_time,
       });
+    case 'product_set_price': {
+      const stripe = await getStripeClient();
+      if (!stripe) {
+        return toolError('Stripe is not configured for the running mode (no secret key).', {
+          error_code: 'not_configured',
+        });
+      }
+      const productId = toNonEmptyString(input.product_id);
+      if (!productId) return toolError('product_id is required.');
+      const store = (await getSiteObjectsBlobStore(event)) as unknown as ObjectVerbStore;
+      const principal = {
+        kind: 'agent' as const,
+        agent_name: toNonEmptyString(input.agent_name) ?? 'unattributed-agent',
+        auth: 'publish_key' as const,
+      };
+      const result = await productSetPrice(
+        {
+          product_id: productId,
+          amount_cents: typeof input.amount_cents === 'number' ? input.amount_cents : NaN,
+          currency: toNonEmptyString(input.currency) ?? undefined,
+        },
+        { stripe, store, principal }
+      );
+      if (!result.ok) return toolError(result.error, { statusCode: result.status });
+      return toolResult(result);
+    }
+    case 'order_reissue': {
+      const orderKeyInput = toNonEmptyString(input.order_key);
+      if (!orderKeyInput) return toolError('order_key is required.');
+      const result = await orderReissue(
+        {
+          order_key: orderKeyInput,
+          ttl_hours: typeof input.ttl_hours === 'number' ? input.ttl_hours : undefined,
+        },
+        {
+          commerce: await getCommerceBlobStore(event),
+          events: await getCommerceEventsBlobStore(event),
+          siteObjects: await getSiteObjectsBlobStore(event),
+          by: toNonEmptyString(input.agent_name) ?? 'unattributed-agent',
+        }
+      );
+      if (!result.ok) return toolError(result.error, { statusCode: result.status });
+      return toolResult(result);
+    }
     case 'object_contract': {
       const objectType = toNonEmptyString(input.object_type);
       if (!objectType || !OBJECT_CONTRACT_TYPES.includes(objectType as ObjectType)) {

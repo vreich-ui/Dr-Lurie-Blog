@@ -377,6 +377,50 @@ const setProductFieldsSchema = z.strictObject({
   ...guard,
 });
 
+// The §3 price-funnel WRITER — the exact complement of set_product_fields'
+// refusal: `fields` may touch ONLY commerce.price / commerce.stripe /
+// commerce.stripe_test, all shape-pinned. Constructed by the
+// `product_set_price` MCP tool (which creates the new Stripe Price and
+// archives the old one in the same move) and by inverse derivation (the
+// Discard path — "re-point to the archived price", §3); marked
+// agent_authored: false in the contract. Kept fields-shaped so its inverse
+// is this same op with the captured before-tree.
+const setProductPriceSchema = z.strictObject({
+  op: z.literal('set_product_price'),
+  fields: z.strictObject({
+    commerce: z.strictObject({
+      price: z
+        .union([
+          z.strictObject({
+            amount_cents: z.number().int().positive(),
+            currency: z.string().regex(/^[a-z]{3}$/),
+          }),
+          z.null(),
+        ])
+        .optional(),
+      stripe: z
+        .union([
+          z.strictObject({
+            product_id: z.string().regex(/^prod_[A-Za-z0-9]+$/),
+            price_id: z.union([z.string().regex(/^price_[A-Za-z0-9]+$/), z.null()]).optional(),
+          }),
+          z.null(),
+        ])
+        .optional(),
+      stripe_test: z
+        .union([
+          z.strictObject({
+            product_id: z.string().regex(/^prod_[A-Za-z0-9]+$/),
+            price_id: z.union([z.string().regex(/^price_[A-Za-z0-9]+$/), z.null()]).optional(),
+          }),
+          z.null(),
+        ])
+        .optional(),
+    }),
+  }),
+  ...guard,
+});
+
 // ——— Template (C§2.0) ———
 
 const setTemplateMetaSchema = z.strictObject({
@@ -436,6 +480,7 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   removeTermSchema,
   setSiteFieldsSchema,
   setProductFieldsSchema,
+  setProductPriceSchema,
   setTemplateMetaSchema,
   upsertSlotSchema,
   moveSlotSchema,
@@ -525,7 +570,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
   taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
   site: ['set_site_fields'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
-  product: ['set_product_fields'],
+  product: ['set_product_fields', 'set_product_price'],
   content_item: [],
 };
 
