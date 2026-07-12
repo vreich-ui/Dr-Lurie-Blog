@@ -67,37 +67,50 @@ const createStore = () => {
   };
 };
 
-const anthropicMock = (suggestion: Record<string, unknown>) => {
+const openAiMock = (suggestion: Record<string, unknown>) => {
   const calls: Array<{ toolName: string; toolSchema: Record<string, unknown>; userMessage: string }> = [];
   const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
     const payload = JSON.parse(String(init?.body)) as {
-      tools: Array<{ name: string; input_schema: Record<string, unknown> }>;
+      tools: Array<{ function: { name: string; parameters: Record<string, unknown> } }>;
       messages: Array<{ content: string }>;
     };
     calls.push({
-      toolName: payload.tools[0].name,
-      toolSchema: payload.tools[0].input_schema,
+      toolName: payload.tools[0].function.name,
+      toolSchema: payload.tools[0].function.parameters,
       userMessage: payload.messages[0].content,
     });
     return new Response(
-      JSON.stringify({ content: [{ type: 'tool_use', name: payload.tools[0].name, input: suggestion }] }),
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  type: 'function',
+                  function: { name: payload.tools[0].function.name, arguments: JSON.stringify(suggestion) },
+                },
+              ],
+            },
+          },
+        ],
+      }),
       { status: 200 }
     );
   }) as typeof fetch;
   return { fetchImpl, calls };
 };
 
-const deps = (fetchImpl: typeof fetch) => ({ apiKey: 'test-key', model: 'claude-test', fetchImpl });
+const deps = (fetchImpl: typeof fetch) => ({ apiKey: 'test-key', model: 'gpt-test', fetchImpl });
 
 test('section scope: the tool is the SECTION data grammar, not the page body', async () => {
   const store = createStore();
   store.seed(pageRecord());
-  const anthropic = anthropicMock({ body: '<p>Warmer, more direct copy.</p>' });
+  const openai = openAiMock({ body: '<p>Warmer, more direct copy.</p>' });
 
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'page', object_id: 'page_canvas_demo', section_id: 's_prose', instruction: 'Warmer voice.' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
 
   assert.equal(result.status, 200);
@@ -106,17 +119,17 @@ test('section scope: the tool is the SECTION data grammar, not the page body', a
   assert.equal(result.body.applied, false);
   assert.deepEqual(result.body.suggestion, { body: '<p>Warmer, more direct copy.</p>' });
 
-  assert.equal(anthropic.calls.length, 1);
-  assert.equal(anthropic.calls[0].toolName, 'propose_section_changes');
-  const properties = anthropic.calls[0].toolSchema.properties as Record<string, unknown>;
+  assert.equal(openai.calls.length, 1);
+  assert.equal(openai.calls[0].toolName, 'propose_section_changes');
+  const properties = openai.calls[0].toolSchema.properties as Record<string, unknown>;
   assert.ok('body' in properties, 'the prose data field is exposed');
   assert.equal('sections' in properties, false, 'the page body grammar must NOT leak into a section scope');
-  assert.equal(anthropic.calls[0].toolSchema.required, undefined, 'partial: nothing is required');
+  assert.equal(openai.calls[0].toolSchema.required, undefined, 'partial: nothing is required');
 
   // The prompt shows the SECTION, framed by its page — not the whole page body.
-  assert.match(anthropic.calls[0].userMessage, /ONE SECTION of the page "Canvas demo page"/);
-  assert.match(anthropic.calls[0].userMessage, /Skin behaves differently after 60/);
-  assert.doesNotMatch(anthropic.calls[0].userMessage, /s_lede/, 'sibling sections are not serialized');
+  assert.match(openai.calls[0].userMessage, /ONE SECTION of the page "Canvas demo page"/);
+  assert.match(openai.calls[0].userMessage, /Skin behaves differently after 60/);
+  assert.doesNotMatch(openai.calls[0].userMessage, /s_lede/, 'sibling sections are not serialized');
 });
 
 test('section scope round-trip: the suggestion applies as update_section_data under lock', async () => {
@@ -124,11 +137,11 @@ test('section scope round-trip: the suggestion applies as update_section_data un
   store.seed(pageRecord());
   const before = store.read({ object_type: 'page', object_id: 'page_canvas_demo' });
 
-  const anthropic = anthropicMock({ body: '<p>Warmer, more direct copy.</p>' });
+  const openai = openAiMock({ body: '<p>Warmer, more direct copy.</p>' });
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'page', object_id: 'page_canvas_demo', section_id: 's_prose', instruction: 'Warmer voice.' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(result.status, 200);
   assert.deepEqual(store.read({ object_type: 'page', object_id: 'page_canvas_demo' }), before, 'Ask-AI is read-only');
@@ -168,39 +181,39 @@ test('section scope round-trip: the suggestion applies as update_section_data un
 test('a shared_ref section is refused with the target object id — never edited through the page', async () => {
   const store = createStore();
   store.seed(pageRecord());
-  const anthropic = anthropicMock({});
+  const openai = openAiMock({});
 
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'page', object_id: 'page_canvas_demo', section_id: 's_news', instruction: 'x' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(result.status, 400);
   assert.equal(result.body.code, 'section_is_shared_ref');
   assert.equal(result.body.shared_object_id, 'sec_newsletter_signup');
-  assert.equal(anthropic.calls.length, 0, 'no AI call for a refused scope');
+  assert.equal(openai.calls.length, 0, 'no AI call for a refused scope');
 });
 
 test('a missing section 404s; a non-page type refuses section scope', async () => {
   const store = createStore();
   store.seed(pageRecord());
-  const anthropic = anthropicMock({});
+  const openai = openAiMock({});
 
   const missing = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'page', object_id: 'page_canvas_demo', section_id: 's_ghost', instruction: 'x' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(missing.status, 404);
 
   const wrongType = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'site', object_id: 'site_drlurie', section_id: 's_prose', instruction: 'x' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(wrongType.status, 400);
   assert.equal(wrongType.body.code, 'section_scope_unsupported');
-  assert.equal(anthropic.calls.length, 0);
+  assert.equal(openai.calls.length, 0);
 });
 
 test('sectionDataSchemaForType serves every registered union member and nothing else', () => {
@@ -233,12 +246,12 @@ test('a shared SECTION OBJECT auto-scopes to its inner instance — inner gramma
     content_revision: 1,
   };
   store.seed(sectionObject);
-  const anthropic = anthropicMock({ heading: 'One useful skin letter a month.' });
+  const openai = openAiMock({ heading: 'One useful skin letter a month.' });
 
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'section', object_id: 'sec_newsletter_signup', instruction: 'Friendlier heading.' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
 
   assert.equal(result.status, 200);
@@ -246,10 +259,10 @@ test('a shared SECTION OBJECT auto-scopes to its inner instance — inner gramma
   assert.equal(result.body.section_type, 'newsletter_signup');
   assert.deepEqual(result.body.suggestion, { heading: 'One useful skin letter a month.' });
 
-  assert.equal(anthropic.calls[0].toolName, 'propose_section_changes');
-  const properties = anthropic.calls[0].toolSchema.properties as Record<string, unknown>;
+  assert.equal(openai.calls[0].toolName, 'propose_section_changes');
+  const properties = openai.calls[0].toolSchema.properties as Record<string, unknown>;
   assert.ok('formName' in properties, 'the inner data grammar, not the wrapper');
   assert.equal('section' in properties, false, 'the wrapper must not leak');
-  assert.match(anthropic.calls[0].userMessage, /shared section object "sec_newsletter_signup"/);
-  assert.match(anthropic.calls[0].userMessage, /every page that references it/);
+  assert.match(openai.calls[0].userMessage, /shared section object "sec_newsletter_signup"/);
+  assert.match(openai.calls[0].userMessage, /every page that references it/);
 });

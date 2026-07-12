@@ -17,7 +17,7 @@
  * POST body: { object_type, object_id, section_id?, selected_text?, instruction }
  * (`section_id` scopes a PAGE request to one section instance — the edit-mode
  * canvas path; see netlify/lib/ask-ai-object.ts.)
- * Requires ANTHROPIC_API_KEY; model override via ANTHROPIC_MODEL.
+ * Requires OPENAI_API_KEY; model override via OPENAI_MODEL (default gpt-4o).
  */
 import { z } from 'zod';
 
@@ -57,9 +57,9 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
   if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return jsonResponse(500, { error: 'ANTHROPIC_API_KEY is not configured' });
-  const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6';
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return jsonResponse(500, { error: 'OPENAI_API_KEY is not configured' });
+  const model = process.env.OPENAI_MODEL ?? 'gpt-4o';
 
   let rawBody: unknown;
   try {

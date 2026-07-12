@@ -8,8 +8,10 @@
  *
  * Instead, the tool schema is DERIVED from the object type's own zod body
  * schema (the T0.2 modules) at request time. `deriveAskAiToolSchema` takes any
- * zod schema and produces the Anthropic tool descriptor — so adding a new
- * object type needs nothing here beyond its zod schema existing. The function
+ * zod schema and produces a provider-agnostic forced-tool descriptor
+ * (`{name, description, input_schema}` — plain JSON Schema, which the caller
+ * hands to OpenAI as a function's `parameters`) — so adding a new object type
+ * needs nothing here beyond its zod schema existing. The function
  * is deliberately type-agnostic; the only thing that knows the six concrete
  * types is the `ASK_AI_BODY_SCHEMAS` registry below, which simply re-exports
  * the T0.2 schemas (content_item is excluded — articles keep their own path).
@@ -91,7 +93,7 @@ const DEFAULT_DESCRIPTION =
   'Omit every field that stays the same. Preserve the existing voice, tone, and structure.';
 
 /**
- * Derive an Anthropic forced-tool descriptor from ANY zod schema. Generic by
+ * Derive a forced-tool descriptor from ANY zod schema. Generic by
  * construction: no per-type branching, so a new object type is served the
  * moment its zod schema exists (T1.6 acceptance property).
  */
@@ -103,8 +105,9 @@ export const deriveAskAiToolSchema = (bodySchema: z.ZodType, options: DeriveAskA
 
   const jsonSchema = z.toJSONSchema(source, { unrepresentable: 'any', io: 'input' }) as JsonSchema;
 
-  // Anthropic's tool input_schema is a plain JSON Schema object; the $schema
-  // dialect marker is noise there. Strip it and any residual top-level
+  // The tool input_schema is a plain JSON Schema object (used verbatim as an
+  // OpenAI function's `parameters`); the $schema dialect marker is noise
+  // there. Strip it and any residual top-level
   // `required` (belt-and-suspenders for the non-partial fallback).
   delete jsonSchema.$schema;
   delete jsonSchema.required;

@@ -23,6 +23,13 @@
  * content_item is refused here — articles keep the existing article Ask-AI
  * (admin-ask-ai-node.ts), which this task does not touch.
  *
+ * Provider: OpenAI Chat Completions function-calling (OPENAI_API_KEY /
+ * OPENAI_MODEL, injected by the wrapper). The zod-derived tool schema is plain
+ * JSON Schema, so it is OpenAI's function `parameters` verbatim; a forced
+ * `tool_choice` guarantees a structured reply. Read-only either way — swapping
+ * the provider changes only how the suggestion is produced, never that a human
+ * must Accept it through object_patch before anything is written.
+ *
  * Pure/testable like object-verbs.ts: auth, the real blob store, and env come
  * from the thin HTTP wrapper (admin-ask-ai-object.ts); this core takes an
  * injected store and fetch so it can be exercised without network or disk.
@@ -37,7 +44,7 @@ import {
 } from './ask-ai-schema.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
-const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const MAX_TOKENS = 1500;
 
 export type AskAiObjectStore = { get(key: string): Promise<string | null> };
@@ -119,41 +126,53 @@ const buildSectionUserMessage = (
     .join('\n');
 };
 
-const callAnthropic = async (
+const callOpenAI = async (
   userMessage: string,
   tool: AskAiTool,
   deps: AskAiObjectDeps
 ): Promise<{ ok: true; input: Record<string, unknown> } | { ok: false; status: number; error: string }> => {
   const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
-  const response = await fetchImpl(ANTHROPIC_ENDPOINT, {
+  const response = await fetchImpl(OPENAI_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': deps.apiKey,
-      'anthropic-version': '2023-06-01',
+      Authorization: `Bearer ${deps.apiKey}`,
     },
     body: JSON.stringify({
       model: deps.model,
-      max_tokens: MAX_TOKENS,
-      tools: [tool],
-      tool_choice: { type: 'tool', name: tool.name },
+      max_completion_tokens: MAX_TOKENS,
       messages: [{ role: 'user', content: userMessage }],
+      // The zod-derived JSON Schema IS OpenAI's function `parameters`; forcing
+      // this one function guarantees the reply is a structured tool call.
+      tools: [
+        {
+          type: 'function',
+          function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
+        },
+      ],
+      tool_choice: { type: 'function', function: { name: tool.name } },
     }),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
-    return { ok: false, status: 502, error: `Anthropic API ${response.status}: ${text.slice(0, 200)}` };
+    return { ok: false, status: 502, error: `OpenAI API ${response.status}: ${text.slice(0, 200)}` };
   }
 
   const payload = (await response.json()) as {
-    content?: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
+    choices?: Array<{ message?: { tool_calls?: Array<{ function?: { name?: string; arguments?: string } }> } }>;
   };
-  const toolUse = payload.content?.find((block) => block.type === 'tool_use' && block.name === tool.name);
-  if (!toolUse?.input) {
+  const call = payload.choices?.[0]?.message?.tool_calls?.find((entry) => entry.function?.name === tool.name);
+  if (!call?.function?.arguments) {
     return { ok: false, status: 502, error: 'AI did not return a structured suggestion' };
   }
-  return { ok: true, input: toolUse.input };
+  try {
+    // OpenAI returns function arguments as a JSON STRING (unlike Anthropic's
+    // parsed input object), so parse before handing back the partial body.
+    return { ok: true, input: JSON.parse(call.function.arguments) as Record<string, unknown> };
+  } catch {
+    return { ok: false, status: 502, error: 'AI returned malformed tool arguments' };
+  }
 };
 
 /**
@@ -254,7 +273,7 @@ export const askAiForObject = async (
     userMessage = buildUserMessage(record, request);
   }
 
-  const aiResult = await callAnthropic(userMessage, tool, deps);
+  const aiResult = await callOpenAI(userMessage, tool, deps);
   if (!aiResult.ok) return err(aiResult.status, { error: aiResult.error });
 
   // Strip null/undefined, exactly as the article version does before returning.

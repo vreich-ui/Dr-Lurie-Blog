@@ -57,33 +57,47 @@ const createStore = () => {
   };
 };
 
-/** A fake Anthropic that records the tool it was handed and returns a fixed forced-tool suggestion. */
-const anthropicMock = (suggestion: Record<string, unknown>) => {
+/** A fake OpenAI that records the forced function it was handed and returns a fixed structured suggestion. */
+const openAiMock = (suggestion: Record<string, unknown>) => {
   const calls: Array<{ toolName: string; toolSchema: unknown; userMessage: string }> = [];
   const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
     const payload = JSON.parse(String(init?.body)) as {
-      tools: Array<{ name: string; input_schema: unknown }>;
+      tools: Array<{ function: { name: string; parameters: unknown } }>;
       messages: Array<{ content: string }>;
     };
     calls.push({
-      toolName: payload.tools[0].name,
-      toolSchema: payload.tools[0].input_schema,
+      toolName: payload.tools[0].function.name,
+      toolSchema: payload.tools[0].function.parameters,
       userMessage: payload.messages[0].content,
     });
+    // OpenAI returns tool-call arguments as a JSON STRING.
     return new Response(
-      JSON.stringify({ content: [{ type: 'tool_use', name: payload.tools[0].name, input: suggestion }] }),
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  type: 'function',
+                  function: { name: payload.tools[0].function.name, arguments: JSON.stringify(suggestion) },
+                },
+              ],
+            },
+          },
+        ],
+      }),
       { status: 200 }
     );
   }) as typeof fetch;
   return { fetchImpl, calls };
 };
 
-const deps = (fetchImpl: typeof fetch) => ({ apiKey: 'test-key', model: 'claude-test', fetchImpl });
+const deps = (fetchImpl: typeof fetch) => ({ apiKey: 'test-key', model: 'gpt-test', fetchImpl });
 
 test('returns a null-stripped suggestion derived from the object body schema', async () => {
   const store = createStore();
   store.seed(siteRecord());
-  const anthropic = anthropicMock({
+  const openai = openAiMock({
     metadataDefaults: { titleTemplate: '%s', description: 'A calmer, clearer description.', ogImage: '/og.png' },
     name: null, // must be stripped
   });
@@ -91,7 +105,7 @@ test('returns a null-stripped suggestion derived from the object body schema', a
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'site', object_id: 'site_drlurie', instruction: 'Make the description calmer.' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
 
   assert.equal(result.status, 200);
@@ -102,8 +116,8 @@ test('returns a null-stripped suggestion derived from the object body schema', a
 
   // The forced tool schema was derived from site.v1's zod (partial): it exposes
   // the body fields and is not required.
-  assert.equal(anthropic.calls.length, 1);
-  const toolSchema = anthropic.calls[0].toolSchema as Record<string, unknown>;
+  assert.equal(openai.calls.length, 1);
+  const toolSchema = openai.calls[0].toolSchema as Record<string, unknown>;
   assert.equal((toolSchema.properties as Record<string, unknown>).metadataDefaults !== undefined, true);
   assert.equal(toolSchema.required, undefined);
 });
@@ -114,13 +128,13 @@ test('the Ask-AI call is read-only and its suggestion lands in review-state via 
   store.seed(siteRecord());
   const before = store.read({ object_type: 'site', object_id: 'site_drlurie' });
 
-  const anthropic = anthropicMock({
+  const openai = openAiMock({
     metadataDefaults: { titleTemplate: '%s', description: 'A calmer, clearer description.', ogImage: '/og.png' },
   });
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'site', object_id: 'site_drlurie', instruction: 'Calmer description.' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(result.status, 200);
 
@@ -179,7 +193,7 @@ test('selection UX: a highlighted span is forwarded; whole-object fallback omits
   const store = createStore();
   store.seed(siteRecord());
 
-  const withSelection = anthropicMock({ name: 'Dr. Lurié Science' });
+  const withSelection = openAiMock({ name: 'Dr. Lurié Science' });
   await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'site', object_id: 'site_drlurie', selected_text: 'Dr. Lurié', instruction: 'Add "Science".' },
@@ -188,7 +202,7 @@ test('selection UX: a highlighted span is forwarded; whole-object fallback omits
   assert.match(withSelection.calls[0].userMessage, /highlighted this specific span/);
   assert.match(withSelection.calls[0].userMessage, /Dr\. Lurié/);
 
-  const wholeObject = anthropicMock({ name: 'Dr. Lurié Science' });
+  const wholeObject = openAiMock({ name: 'Dr. Lurié Science' });
   await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'site', object_id: 'site_drlurie', instruction: 'Revise the whole object.' },
@@ -199,30 +213,30 @@ test('selection UX: a highlighted span is forwarded; whole-object fallback omits
 
 test('content_item is refused (Tier 1 keeps the article Ask-AI)', async () => {
   const store = createStore();
-  const anthropic = anthropicMock({});
+  const openai = openAiMock({});
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'content_item', object_id: 'req_smoke_pdf_cta_20260630_01', instruction: 'x' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(result.status, 400);
   assert.equal(result.body.code, 'unsupported_object_type');
-  assert.equal(anthropic.calls.length, 0, 'no AI call for a refused type');
+  assert.equal(openai.calls.length, 0, 'no AI call for a refused type');
 });
 
 test('a missing object 404s without calling the model', async () => {
   const store = createStore();
-  const anthropic = anthropicMock({});
+  const openai = openAiMock({});
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
     { object_type: 'navigation', object_id: 'nav_ghost', instruction: 'x' },
-    deps(anthropic.fetchImpl)
+    deps(openai.fetchImpl)
   );
   assert.equal(result.status, 404);
-  assert.equal(anthropic.calls.length, 0);
+  assert.equal(openai.calls.length, 0);
 });
 
-test('an Anthropic error surfaces as 502 and still writes nothing', async () => {
+test('an OpenAI error surfaces as 502 and still writes nothing', async () => {
   const store = createStore();
   store.seed(siteRecord());
   const before = store.read({ object_type: 'site', object_id: 'site_drlurie' });

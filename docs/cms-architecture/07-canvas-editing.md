@@ -16,7 +16,7 @@ The public site is now the editing surface for a signed-in admin. Everything
 below rides the standing verbs — there is **no new mutation path**: Ask-AI
 proposes (read-only), `object_patch` persists under lock, `publish_by_time`
 commits the export `[skip netlify]`, `release_to_production` fires the one
-build hook. The canvas is a *client* of the T1.4/T1.6 machinery, exactly as
+build hook. The canvas is a _client_ of the T1.4/T1.6 machinery, exactly as
 an agent is.
 
 ### 1. Section identity in the built HTML
@@ -26,11 +26,15 @@ Both dispatch sites — `PageObjectRenderer.astro` and `ObjectSections.astro`
 routes) — wrap every rendered section in a `display:contents` element:
 
 ```html
-<div style="display:contents"
-     data-cms-object-id="page_home"
-     data-cms-section-id="s_newsletter"
-     data-cms-section-type="newsletter_signup"
-     data-cms-shared-object="sec_newsletter_signup">  <!-- only when shared_ref -->
+<div
+  style="display:contents"
+  data-cms-object-id="page_home"
+  data-cms-section-id="s_newsletter"
+  data-cms-section-type="newsletter_signup"
+  data-cms-shared-object="sec_newsletter_signup"
+>
+  <!-- only when shared_ref -->
+</div>
 ```
 
 `display:contents` generates no box: layout, CSS, and the audited markup are
@@ -56,6 +60,14 @@ one `update_section_data` op. A `shared_ref` scope is refused with the target
 instance and returns the inner id — exactly what a patch on that object
 targets. Still suggestion-only: `applied: false`, no lock, no writes.
 `content_item` remains refused (the article Ask-AI keeps its own path).
+
+**Provider (2026-07-12):** the generic canvas Ask-AI runs on **OpenAI**
+(Chat Completions function-calling; `OPENAI_API_KEY`, model `OPENAI_MODEL`
+default `gpt-4o`). The zod-derived tool schema is plain JSON Schema, so it is
+OpenAI's function `parameters` verbatim and a forced `tool_choice` keeps the
+reply structured. The swap is provider-only — the read-only contract, section
+scoping, and the human Accept gate are unchanged. (The article Ask-AI,
+`admin-ask-ai-node.ts`, is a separate system and keeps its own provider.)
 
 ### 3. The overlay (`src/lib/edit-mode/`)
 
@@ -116,11 +128,12 @@ targets. Still suggestion-only: `applied: false`, no lock, no writes.
   release. One real bug found and fixed by the drive (chip re-render killed
   the button's click).
 - **Not yet proven**: the credentialed end-to-end run against production
-  (real Identity login, real Blobs, real Anthropic call, real release). Same
+  (real Identity login, real Blobs, real OpenAI call, real release). Same
   sandbox boundary as every conversion — first production session should
   walk one edit on a low-stakes page (e.g. page_thank_you) through
   draft → publish → release.
 
-No new env is required: `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`,
+No new env is required: `OPENAI_API_KEY` (already configured — ChatKit and the
+publisher agent use it) with an optional `OPENAI_MODEL` override,
 `ADMIN_EMAILS` / role lists, and the build hook are the ones already
 configured.
