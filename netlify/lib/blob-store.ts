@@ -189,3 +189,22 @@ export const getArtifactBlobStore = async (event: unknown): Promise<BlobStore> =
 export const getArtifactIndexBlobStore = async (event: unknown): Promise<BlobStore> => {
   return getNetlifyBlobStore({ name: 'artifact-index', consistency: 'strong' }, event);
 };
+
+/**
+ * Orders (06-shop-module-plan §5): orders/<idempotency-key>.json, written
+ * create-if-absent by the Stripe webhook. Strong consistency — the success
+ * page polls for the order the webhook just wrote, and fulfillment reissue
+ * reads must see the latest reissue entries.
+ */
+export const getCommerceBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore({ name: 'commerce', consistency: 'strong' }, event);
+};
+
+/**
+ * Append-only commerce event log (06-shop-module-plan §6): one JSON per
+ * event, never mutated or deleted. Eventual consistency is fine — nothing
+ * reads it in v1; a future consumer ETLs the store.
+ */
+export const getCommerceEventsBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore('commerce-events', event);
+};

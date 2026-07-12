@@ -1428,9 +1428,13 @@ const PROTECTED_ENV_KEYS = [
   'ARTIFACT_UPLOAD_TOKEN_SECRET',
   // Commerce (06-shop-module-plan §8.5): the keys are env-only; Stripe IDS in
   // content are fine (ids aren't secrets), but a pasted key would block every
-  // deploy exactly as the portrait URL did.
+  // deploy exactly as the portrait URL did. Both mode pairs (§8.7) plus the
+  // purchase-token signing secret.
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
+  'STRIPE_SECRET_KEY_TEST',
+  'STRIPE_WEBHOOK_SECRET_TEST',
+  'PURCHASE_TOKEN_SECRET',
 ] as const;
 
 export type ProtectedValue = { key: string; value: string };
