@@ -7,6 +7,56 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 F (S1c SHIPPED: checkout → webhook → token delivery → success page)
+
+Same session (PR #412 merged; branch restarted). S1c per plan §9 — the whole
+paid path for fixed-price downloads, built on S1b's substrate. The official
+`stripe` SDK is the one new dependency (§7: session creation + webhook
+signature verification; hand-rolling signature checks is malpractice).
+
+- **`purchase-tokens.ts`**: HMAC-SHA256 expiring bearer tokens (72h default)
+  embedding `{order_key, artifact_ref, exp}`, signed with
+  `PURCHASE_TOKEN_SECRET` (min 16 chars or the endpoints 503). Signature is
+  the authorization; order records keep only hashes (audit trail, not an
+  allowlist — a fresh status-page token is as valid as the issued one).
+- **`stripe-env.ts`** (§8.7): `STRIPE_MODE` picks the key pair (default
+  'test' — a missing flag must never charge real cards);
+  `stripeLinkageForMode` picks `commerce.stripe` vs `stripe_test`. All four
+  key envs + the token secret are in PROTECTED_ENV_KEYS (§8.5). Lazy client
+  + injectable test seam.
+- **`create-checkout-session.ts`**: buyability gated on STORE state
+  (published + active + available + linked); charges the linked `price_id`,
+  never the cache (§3); stamps `metadata {product_id, event_id}`;
+  success/cancel URLs from the server's own URL env, never a request header.
+  v1 = fixed mode only (PWYW/free are S3).
+- **`stripe-webhook.ts`**: signature-verified; `checkout.session.completed`
+  → `writeOrderIfAbsent` (replays/double-fires no-op) → token minted for
+  download kinds → authoritative events with DETERMINISTIC event ids + ts
+  derived from the Stripe event, so replayed webhooks collide on the same
+  store key and duplicate nothing (§8.2's window closes to true concurrent
+  double-fires). §3 amount cross-check flags `amount_mismatch` + event.
+  `checkout.session.expired` → idempotent `checkout_abandoned`. Non-2xx on
+  store failures so Stripe retries.
+- **`get-purchase.ts`**: token-gated streaming of the PRIVATE artifact
+  (attachment, no-store) — 401/410/404 ladder, expired = Gone with a
+  reissue hint; appends `download_succeeded` (best-effort).
+- **`checkout-session-status.ts` + `/shop/thank-you`** (§8.8): the page
+  verifies the session server-side and polls with backoff until the webhook
+  lands — delivery never depends on email; Stripe's receipt is enabled
+  Stripe-side.
+- Tests: 23 new — including **the exit-test mechanics in sandbox form**:
+  webhook delivered → replayed twice → ONE order, no duplicate events;
+  amount-mismatch flag; unpaid-completion skip; token tamper/expiry ladder;
+  status-poller transitions. (The REAL §9 exit test — a live Stripe
+  test-mode purchase end-to-end — needs Stripe keys and is the launch-gate
+  item, not runnable from this sandbox.) Suite 1044 green; astro check 0;
+  build 168 pages (the thank-you page is new).
+
+Env needed for production (all marked as secrets): STRIPE_MODE,
+STRIPE_SECRET_KEY[_TEST], STRIPE_WEBHOOK_SECRET[_TEST],
+PURCHASE_TOKEN_SECRET. NOT in S1c: PWYW/free/unlock paths + the two MCP
+tools (S3), the /shop surfaces (S2).
+
 ## Session 2026-07-12 E (S1b SHIPPED: commerce + commerce-events stores, order/event libs, capture beacon)
 
 Same session as S1a (PR #411 merged; branch restarted from main). S1b per
