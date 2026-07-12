@@ -5,8 +5,13 @@
  *
  *   1. `query` source: run the query, cap at `limit`.
  *   2. `manual` source: resolve every listed id — an id that does not
- *      resolve to a published content item is a HARD error (validation
- *      rejects it earlier; render refuses rather than shipping a gap).
+ *      resolve to a published content item is SKIPPED with a loud build-log
+ *      warning naming it, never silently and never fatally. (Changed
+ *      2026-07-11 under the no-pipeline-dead-ends rule: validation now
+ *      blocks bad refs at write time — trap 4's resolver — so an unresolved
+ *      ref here means TEMPORAL drift, e.g. a post deleted after the grid
+ *      published, and a content deletion must never kill every future
+ *      build. The declared fallback backfills the freed room.)
  *      Manual picks beyond `limit` are truncated (first `limit` win).
  *   3. Backfill: only when a `fallback` is declared and manual picks leave
  *      room — run the fallback query, drop anything already picked
@@ -27,22 +32,14 @@ export type ContentGridResolvers<TCard> = {
   idOf: (card: TCard) => string;
 };
 
-export class ContentGridResolutionError extends Error {
-  readonly unresolved: string[];
-  constructor(unresolved: string[]) {
-    super(
-      `content_grid: manual item(s) did not resolve to published content: ${unresolved.join(', ')} — ` +
-        'validation should have rejected this record; refusing to render a gap.'
-    );
-    this.name = 'ContentGridResolutionError';
-    this.unresolved = unresolved;
-  }
-}
+/** Injectable for tests; production uses console.warn (visible in build logs). */
+export type ContentGridWarn = (message: string) => void;
 
 export const resolveContentGridCards = <TCard>(
   source: Exclude<ContentGridSource, { kind: 'cards' }>,
   limit: number,
-  resolvers: ContentGridResolvers<TCard>
+  resolvers: ContentGridResolvers<TCard>,
+  warn: ContentGridWarn = console.warn
 ): TCard[] => {
   if (source.kind === 'query') {
     return resolvers.runQuery(source.query, limit).slice(0, limit);
@@ -56,7 +53,13 @@ export const resolveContentGridCards = <TCard>(
     if (card === undefined) unresolved.push(objectId);
     else cards.push(card);
   }
-  if (unresolved.length > 0) throw new ContentGridResolutionError(unresolved);
+  if (unresolved.length > 0) {
+    warn(
+      `[content_grid] manual item(s) no longer resolve to published content and were SKIPPED: ` +
+        `${unresolved.join(', ')} — likely deleted/unpublished after the grid was published. ` +
+        'Fix the grid (remove or replace the picks); the fallback query backfills meanwhile.'
+    );
+  }
 
   const room = limit - cards.length;
   if (room <= 0 || !source.fallback) return cards;

@@ -297,10 +297,17 @@ export const checkReferenceIntegrity = (
 
   const requireObject = (refType: ObjectType, id: string, label: string) => {
     if (!context.resolveObject) return; // not verifiable here (T0.8 wires it)
-    checkedAnyResolvable = true;
     const resolution = context.resolveObject(refType, id);
-    if (!resolution || !resolution.exists) {
+    if (resolution === undefined) {
+      // The documented contract: undefined = "cannot answer" — same as no
+      // resolver for this lookup (e.g. content_item ids with no GitHub env),
+      // NOT a failed reference. Before trap 4 closed this fell through to a
+      // hard failure, which is why manual grid picks always blocked.
       sawUnresolvableResolver = true;
+      return;
+    }
+    checkedAnyResolvable = true;
+    if (!resolution.exists) {
       problems.push(`${label} "${id}" does not resolve to an existing ${refType}.`);
     }
   };
