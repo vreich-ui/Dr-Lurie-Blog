@@ -7,6 +7,41 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 M (content_item resolver: manual article curation is agent-usable — trap 4 closed)
+
+The first real step toward the article object model, per the post-W4 path
+Wolf approved (resolver → W6 listings → OQ-8/W7):
+
+- **`netlify/lib/content-item-index.ts`** — the committed article ids
+  (filenames under src/data/post minus extension — exactly the renderer's
+  `post.id`), fetched via the GitHub contents API with the same env contract
+  as the object committer (the W3 ruling: committed frontmatter is the source
+  of truth, never the blob drafts). 60s cache + in-flight dedupe;
+  unconfigured/erroring → `undefined` = "cannot answer", stale-if-error after
+  a first success.
+- **Validation context** resolves `content_item` refs against that index:
+  real ids pass, ghosts are blockers — `content_grid` manual picks and
+  `content_embed.contentItem` validate against real articles at
+  patch/create/publish.
+- **Contract-conformance fix in `requireObject`**: the documented "resolver
+  returns undefined = cannot answer" contract was never implemented — every
+  undefined fell through to a hard failure, which is WHY trap 4 blocked
+  manual curation for everyone. Now undefined degrades to "not verified"
+  (local mode keeps working with no GitHub env); `{exists:false}` still
+  blocks.
+- **Render-side dead-end removed (no-pipeline-dead-ends rule)**: an
+  unresolvable manual pick at BUILD time (a post deleted after the grid
+  published — temporal drift validation can't prevent) is now SKIPPED with a
+  loud build-log warning naming the id, and the declared fallback backfills
+  the freed room. Previously it THREW (`ContentGridResolutionError`,
+  removed): one content deletion could kill every future build.
+
+Gates: 1012/1012 tests (7 new/updated) · astro 0 errors · build-diff EMPTY
+(no manual grids exist yet; behavior changes are server-side + drift-only).
+Agents can now curate: `update_section_data` switching a grid's source to
+`{kind:'manual', items:[<post ids>], fallback:{…}}` validates, publishes,
+renders. NEXT on the path: W6 listing surfaces.
+
 ## Session 2026-07-11 L (INCIDENT: agent content tripped the deploy secrets scanner — trap 14)
 
 Wolf's agent, working the /about intro through the MCP (record_version 25 —

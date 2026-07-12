@@ -193,8 +193,9 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │       Contentful Rich Text later, core-structure task 8)
 │     dependents: content_grid (query/manual) · content_embed · listings · rss.xml ·
 │       search.json · related posts
-│     ⚠ enabler gap: the content_item RESOLVER (playbook trap 4) — until built, grids
-│       cannot use manual article curation. Small, high-leverage, priority W1-enabler.
+│     ✅ enabler CLOSED (2026-07-11): the content_item resolver validates manual grid
+│       picks against committed content (trap 4); render skips+warns on temporal drift.
+│       Manual article curation in content_grid is agent-usable NOW.
 │
 ├── TEMPLATES ─ type: template ─ 🟢 CONVERTED (W2.5, batched run 2026-07-11)
 │     machinery LIVE end-to-end: template.v1 schema (name · appliesTo[pageTypes] ·
@@ -228,30 +229,30 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 
 ## Potential objects composable from existing objects (no new code, or nearly none)
 
-| ⚪ Potential object               | Composed of                                                                  | Unlocked by                                         |
-| --------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
-| Topics hub as a page object       | page + one `content_grid` (query source, per category)                       | W3 taxonomy (or now, with hardcoded category slugs) |
+| ⚪ Potential object               | Composed of                                                                  | Unlocked by                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Topics hub as a page object       | page + one `content_grid` (query source, per category)                       | W3 taxonomy (or now, with hardcoded category slugs)                                                 |
 | Any campaign/landing page         | page + hero + content_grid + cta_banner + shared newsletter section          | nothing — possible TODAY, and **served live automatically** (the object-page catch-all, 2026-07-11) |
-| Newsletter page with live signup  | page_newsletter + `shared_ref → sec_newsletter_signup`                       | W1                                                  |
-| Curated "start here" grid         | sec_home_start_grid switched `query → manual + fallback`                     | content_item resolver                               |
-| Related-content strip on any page | `content_grid` (query by tag/category) placed via `upsert_section`           | W3 taxonomy for term filters                        |
-| Shared CTA reused across pages    | new section object (cta_banner) + `shared_ref` from N pages                  | nothing — TODAY                                     |
-| Article with embedded objects     | content_item body as Rich Text with `embedded-entry-block → section objects` | W7 (rich text)                                      |
+| Newsletter page with live signup  | page_newsletter + `shared_ref → sec_newsletter_signup`                       | W1                                                                                                  |
+| Curated "start here" grid         | sec_home_start_grid switched `query → manual + fallback`                     | nothing — possible TODAY (resolver closed 2026-07-11)                                               |
+| Related-content strip on any page | `content_grid` (query by tag/category) placed via `upsert_section`           | W3 taxonomy for term filters                                                                        |
+| Shared CTA reused across pages    | new section object (cta_banner) + `shared_ref` from N pages                  | nothing — TODAY                                                                                     |
+| Article with embedded objects     | content_item body as Rich Text with `embedded-entry-block → section objects` | W7 (rich text)                                                                                      |
 
 ## PROPOSED conversion order (Wolf: edit this table — it is the queue)
 
-| Wave       | What                                                                                                                                               | Why this order                                                                       | Size |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
-| W1         | ✅ CONVERTED (batched run 2026-07-11): Lede family (5 pages) + system pages (3 pages) — store-backed, published, released                          | Everything but the store record already exists; pure driver work, proves the factory | S    |
-| W1-enabler | `content_item` resolver (validation + render already handle manual)                                                                                | Unblocks manual curation everywhere; small and high-leverage                         | S    |
-| W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
-| W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                          | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
-| W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles | Unlocks term-filtered grids, listings, topics hub                                    | M    |
+| Wave       | What                                                                                                                                                                                                                       | Why this order                                                                       | Size |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---- |
+| W1         | ✅ CONVERTED (batched run 2026-07-11): Lede family (5 pages) + system pages (3 pages) — store-backed, published, released                                                                                                  | Everything but the store record already exists; pure driver work, proves the factory | S    |
+| W1-enabler | ✅ DONE (2026-07-11): `content_item` resolver — manual grid curation validates against committed content; render skips+warns on drift                                                                                      | Unblocks manual curation everywhere; small and high-leverage                         | S    |
+| W2         | ✅ CONVERTED (batched run 2026-07-11): /contact → lede + contact_form + content_grid(icons); /thank-you → form_confirmation. Last bespoke types (`contact` retired, `thank_you`→`form_confirmation`) gone                  | Rendered stubs today; the last bespoke types retire with them                        | S-M  |
+| W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                                                                                                  | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
+| W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles               | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | ✅ CONVERTED (credentialed run 2026-07-11): site_drlurie store-backed; brandTokens/logo/chrome/metadataDefaults/defaultNavigation render from the object; urls/blog carried (config.yaml authoritative for routing per B2) | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
-| W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
-| W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                            | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
-| W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                              | Post-MVP by standing decision                                                        | L    |
-| any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted | Independent, non-blocking                                                            | S    |
+| W5         | pricing / services / shop-preview + the ⚪ reusable types they need                                                                                                                                                        | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
+| W6         | Listing surfaces (blog index, category/tag, content_detail, topics hub)                                                                                                                                                    | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
+| W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                                                                                                      | Post-MVP by standing decision                                                        | L    |
+| any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted                                                                         | Independent, non-blocking                                                            | S    |
 
 **Keep this file current:** whenever an object converts, flip its mark here AND
 in `object-inventory.md` in the same change (same rule, two views: the

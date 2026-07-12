@@ -18,6 +18,7 @@
  * re-saving its own route is not a false conflict.
  */
 import { collectBlobListItems } from './blob-list.js';
+import { loadContentItemIds } from './content-item-index.js';
 import type { ObjectValidationContext, PageTypeConstraint } from './object-validate.js';
 import type { ObjectVerbStore } from './object-verbs.js';
 import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
@@ -36,8 +37,9 @@ export const buildStoreValidationContext = async (
   store: ObjectVerbStore,
   self: SelfRef = {}
 ): Promise<ObjectValidationContext> => {
-  // key: `${objectType}:${objectId}` → record. content_item lives in a
-  // different store (the article pipeline) and is never referenced here.
+  // key: `${objectType}:${objectId}` → record. content_item lives OUTSIDE
+  // this store (committed frontmatter is its source of truth) — its ids come
+  // from the content-item index below (trap 4 closed 2026-07-11).
   const records = new Map<string, ObjectRecord>();
   for (const objectType of objectTypes) {
     if (objectType === 'content_item') continue;
@@ -54,7 +56,16 @@ export const buildStoreValidationContext = async (
     }
   }
 
+  // Committed article ids (filenames under src/data/post, via the GitHub
+  // contents API — the W3 source of truth). `undefined` when the lookup is
+  // unavailable (no GitHub env locally / transient error): the resolver then
+  // answers "cannot verify" for content_item refs instead of failing them.
+  const contentItemIds = await loadContentItemIds();
+
   const resolveObject: ObjectValidationContext['resolveObject'] = (objectType, objectId) => {
+    if (objectType === 'content_item') {
+      return contentItemIds ? { exists: contentItemIds.has(objectId) } : undefined;
+    }
     const record = records.get(`${objectType}:${objectId}`);
     if (!record) return { exists: false };
     return { exists: true, published: record.publication?.published_time != null };

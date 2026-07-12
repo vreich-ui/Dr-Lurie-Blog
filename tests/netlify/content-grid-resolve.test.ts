@@ -3,14 +3,17 @@
  * semantics (src/lib/renderer/resolve-content-grid.ts), pinned to the
  * brief's verify criteria: manual 5/limit 5 runs no query; manual 2/limit 5
  * backfills 3 without duplicates; manual 0 is pure fallback; an unresolved
- * manual ref is rejected. Plus: no fallback declared → short grid, no query;
- * validation rejects unknown fallback-query terms.
+ * manual ref is SKIPPED with a loud warning (changed 2026-07-11 under the
+ * no-pipeline-dead-ends rule — a post deleted after the grid published must
+ * never kill builds; write-time validation owns rejection). Plus: no
+ * fallback declared → short grid, no query; validation rejects unknown
+ * fallback-query terms.
  */
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { ContentGridResolutionError, resolveContentGridCards } from '../../src/lib/renderer/resolve-content-grid.js';
+import { resolveContentGridCards } from '../../src/lib/renderer/resolve-content-grid.js';
 import type { ContentQuery } from '../../src/schema/bodies/section-v1.js';
 
 type Card = { id: string; title: string };
@@ -93,15 +96,37 @@ test('no fallback declared: a short manual list stays short — no query runs', 
   assert.equal(queries.length, 0);
 });
 
-test('an unresolved manual ref is rejected loudly, naming the ids', () => {
+test('an unresolved manual ref is SKIPPED with a loud warning naming it — never fatal', () => {
   const { resolvers } = makeResolvers();
-  assert.throws(
-    () => resolveContentGridCards({ kind: 'manual', items: ['req_a', 'req_ghost'] }, 5, resolvers),
-    (error: unknown) =>
-      error instanceof ContentGridResolutionError &&
-      error.unresolved.length === 1 &&
-      error.unresolved[0] === 'req_ghost'
+  const warnings: string[] = [];
+  const cards = resolveContentGridCards({ kind: 'manual', items: ['req_a', 'req_ghost'] }, 5, resolvers, (message) =>
+    warnings.push(message)
   );
+  assert.deepEqual(
+    cards.map((item) => item.id),
+    ['req_a'],
+    'the resolvable pick still renders'
+  );
+  assert.equal(warnings.length, 1);
+  assert.ok(warnings[0].includes('req_ghost'), warnings[0]);
+});
+
+test('a skipped manual ref frees room the declared fallback backfills', () => {
+  const { resolvers, queries } = makeResolvers();
+  const warnings: string[] = [];
+  const cards = resolveContentGridCards(
+    { kind: 'manual', items: ['req_b', 'req_ghost'], fallback: { kind: 'query', query: {} } },
+    3,
+    resolvers,
+    (message) => warnings.push(message)
+  );
+  assert.deepEqual(
+    cards.map((item) => item.id),
+    ['req_b', 'req_a', 'req_q1'],
+    'ghost skipped, backfill fills to limit, no duplicates'
+  );
+  assert.equal(queries.length, 1);
+  assert.equal(warnings.length, 1);
 });
 
 test('plain query source: capped at limit, no manual machinery involved', () => {

@@ -49,16 +49,17 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-11, thirty objects are CONVERTED** (all via credentialed
+**As of 2026-07-11, thirty-one objects are CONVERTED** (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
 `sec_home_start_grid`, `sec_newsletter_signup`); the /about family (`page_about` +
 `sec_about_intro`/`_thinking`/`_products`/`_science`/`_research`/`_blog`/`_note`/`_cta`);
 **all 8 W1 interior/system pages + `page_contact` + `page_thank_you`; the 3
-templates (`tpl_interior`/`tpl_landing`/`tpl_legal`); and the `tax_drlurie`
-taxonomy registry** — the page + template backlog landed in one batched
-credentialed run on 2026-07-11, the taxonomy in its own run the same day. **All 12 page objects
+templates (`tpl_interior`/`tpl_landing`/`tpl_legal`); the `tax_drlurie`
+taxonomy registry; and the `site_drlurie` site singleton (W4)** — the page +
+template backlog landed in one batched credentialed run on 2026-07-11, the
+taxonomy and site singleton in their own runs the same day. **All 12 page objects
 are converted; no page renders from an unbacked export anymore** — the rendered-stub
 backlog is empty. See "Why only nav is converted" (historical root-cause analysis)
 at the bottom.
@@ -129,20 +130,20 @@ are refused with a build-log warning) live in `src/utils/object-page-routes.ts`.
 The 12 pages below keep their thin loader files, so the catch-all emits nothing
 for them.
 
-| Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                                      |
-| --------------------- | ------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `page_home`           | `/`                       | 🟢 CONVERTED | **All five criteria met 2026-07-10.** Hero + bio inline; grids + newsletter are `shared_ref`s to standalone section objects. The broken store record was healed via reconcile ops, every permitted op round-tripped in production, published (v44+, `4753ae7`), and released (`released:true`). Seed === store === export. |
-| `page_start_here`     | `/start-here`             | 🟢 CONVERTED | Lede interior page. Seed in the W1 batch (`pages-interior-seed-data.mjs`); store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                    |
-| `page_member_updates` | `/member-updates`         | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                 |
-| `page_newsletter`     | `/newsletter`             | 🟢 CONVERTED | Lede interior page (plain lede today — the shared newsletter section can be added later). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                           |
-| `page_free_guide`     | `/guides/free-guide`      | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                 |
-| `page_early_access`   | `/solutions/early-access` | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                 |
-| `page_thank_you`      | `/thank-you`              | 🟢 CONVERTED | **Decomposed 2026-07-11:** the bespoke `thank_you` type was RENAMED to the reusable `form_confirmation` (a `standard` page with one such section; the `?form=` swap script is unchanged furniture). Renders byte-identically; store-backed + round-tripped in production, published, released 2026-07-11.                                    |
-| `page_about`          | `/about`                  | 🟢 CONVERTED | **Decomposed 2026-07-10** off the bespoke `about` anti-pattern into EIGHT standalone shared sections (bio + prose ×6 + cta_banner) — a `standard` page of 8 `shared_ref`s. Store-backed (record_version 10), round-tripped in production, published, released. (The bespoke `about` TYPE was retired 2026-07-10.)          |
+| Object                | Route                     | Status       | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------- | ------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page_home`           | `/`                       | 🟢 CONVERTED | **All five criteria met 2026-07-10.** Hero + bio inline; grids + newsletter are `shared_ref`s to standalone section objects. The broken store record was healed via reconcile ops, every permitted op round-tripped in production, published (v44+, `4753ae7`), and released (`released:true`). Seed === store === export.                                                                                                                |
+| `page_start_here`     | `/start-here`             | 🟢 CONVERTED | Lede interior page. Seed in the W1 batch (`pages-interior-seed-data.mjs`); store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                    |
+| `page_member_updates` | `/member-updates`         | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                                                                 |
+| `page_newsletter`     | `/newsletter`             | 🟢 CONVERTED | Lede interior page (plain lede today — the shared newsletter section can be added later). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                           |
+| `page_free_guide`     | `/guides/free-guide`      | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                                                                 |
+| `page_early_access`   | `/solutions/early-access` | 🟢 CONVERTED | Lede interior page. W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                                                                 |
+| `page_thank_you`      | `/thank-you`              | 🟢 CONVERTED | **Decomposed 2026-07-11:** the bespoke `thank_you` type was RENAMED to the reusable `form_confirmation` (a `standard` page with one such section; the `?form=` swap script is unchanged furniture). Renders byte-identically; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                 |
+| `page_about`          | `/about`                  | 🟢 CONVERTED | **Decomposed 2026-07-10** off the bespoke `about` anti-pattern into EIGHT standalone shared sections (bio + prose ×6 + cta_banner) — a `standard` page of 8 `shared_ref`s. Store-backed (record_version 10), round-tripped in production, published, released. (The bespoke `about` TYPE was retired 2026-07-10.)                                                                                                                         |
 | `page_contact`        | `/contact`                | 🟢 CONVERTED | **Decomposed 2026-07-11** off the bespoke `contact` anti-pattern into reusable `lede` + `contact_form` (now carrying subtitle/description) + `content_grid` (`cards` source, cells gained an optional `icon`) — a `standard` page of 3 inline generic sections. Intentional scoped visual diff (rule 4); store-backed + round-tripped in production, published, released 2026-07-11. (The bespoke `contact` TYPE was retired 2026-07-11.) |
-| `page_privacy`        | `/privacy`                | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                              |
-| `page_terms`          | `/terms`                  | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                              |
-| `page_404`            | `/404`                    | 🟢 CONVERTED | `system` PageType, reusable `cta_banner` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                         |
+| `page_privacy`        | `/privacy`                | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                              |
+| `page_terms`          | `/terms`                  | 🟢 CONVERTED | `system` PageType, reusable `prose` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                              |
+| `page_404`            | `/404`                    | 🟢 CONVERTED | `system` PageType, reusable `cta_banner` section (PR #380). W1 batch; store-backed + round-tripped in production, published, released 2026-07-11.                                                                                                                                                                                                                                                                                         |
 
 ### Shared sections
 
@@ -215,11 +216,11 @@ blueprint instantiates from the registry defaultData of its first allowed type.
 Three starter recipes are store-backed in production (batched run 2026-07-11 —
 all 4 template ops round-tripped + instantiate `dry_run` proven, published, released):
 
-| Object         | appliesTo  | Status       | Notes                                                                                                                              |
-| -------------- | ---------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Object         | appliesTo  | Status       | Notes                                                                                                                                        |
+| -------------- | ---------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `tpl_interior` | `standard` | 🟢 CONVERTED | Lede open + prose body + optional cta close (the W1 interior shape). All 4 template ops + instantiate `dry_run` round-tripped in production. |
-| `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                        |
-| `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.        |
+| `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                                |
+| `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.               |
 
 ---
 
@@ -265,8 +266,8 @@ deliberately NOT a taxonomy prerequisite.
 
 `page_privacy`, `page_terms`, `page_404` are built (see the Pages table) via the
 process now written down in [`conversion-playbook.md`](conversion-playbook.md).
-Remaining from this batch as a follow-up: the `content_item` resolver gap
-(playbook trap 4, blocks manual grid curation). The `content_grid` `static`
+The `content_item` resolver gap from this batch is CLOSED (2026-07-11, trap 4):
+manual grid curation validates against committed content and is agent-usable. The `content_grid` `static`
 variant was retired 2026-07-10 (schema + seed script; the sanctioned `cards`
 source replaced it — playbook trap 9 is closed).
 
@@ -338,8 +339,11 @@ here is the honest why:
      [`block-tree.md`](block-tree.md) were designed but never built; only flat
      section ops (`upsert_section`, `update_section_data`, …) exist. Fine while
      sections stay flat; a hard blocker the moment nesting is real.
-   - **`content_item` reference resolution is stubbed** — so a `content_grid` `manual`
-     source can't validate against real articles (playbook trap 4).
+   - ~~**`content_item` reference resolution is stubbed** — so a `content_grid` `manual`
+     source can't validate against real articles (playbook trap 4).~~ **CLOSED
+     2026-07-11**: the validation context resolves content_item ids against
+     committed content (`netlify/lib/content-item-index.ts`); manual curation
+     is agent-usable.
 4. **No standing round-trip verification.** ~~Nothing repeatably proves an object is
    agent-editable; the one-off driver scripts were thrown away each session.~~
    **Closed for the home family 2026-07-10:** `scripts/home-conversion-roundtrip.mjs`
