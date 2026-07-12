@@ -80,6 +80,8 @@ const footerData = navigationToFooterProps(
   }
 
   <Fragment slot="footer">
-    <Footer {...footerData} />
+    <div style="display:contents" data-cms-nav-object={footerNavId} data-cms-nav-role="footer">
+      <Footer {...footerData} />
+    </div>
   </Fragment>
 </PageLayout>

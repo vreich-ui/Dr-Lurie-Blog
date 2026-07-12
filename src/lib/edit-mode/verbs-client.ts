@@ -14,6 +14,8 @@ import { requestObjectSuggestion, type ObjectSuggestionRequest } from '../admin/
 const OBJECT_ENDPOINT = '/.netlify/functions/admin-object';
 const RELEASE_ENDPOINT = '/.netlify/functions/admin-release';
 const AUTH_STATE_ENDPOINT = '/.netlify/functions/admin-auth-state';
+const UPLOAD_INTENT_ENDPOINT = '/.netlify/functions/admin-artifact-upload-intent';
+const ARTIFACT_UPLOAD_ENDPOINT = '/api/artifacts/upload';
 
 export type GetToken = () => Promise<string>;
 
@@ -79,6 +81,113 @@ export const askAiSuggestion = (
   getToken: GetToken,
   request: ObjectSuggestionRequest
 ): ReturnType<typeof requestObjectSuggestion> => requestObjectSuggestion(request, getToken);
+
+export type UploadImageResult = { ok: true; publicPath: string } | { ok: false; error: string };
+
+/**
+ * Push an image into the blobs `artifacts` store — the pdf-tool pattern for
+ * canvas images. Two steps, no new write path: (1) the admin-gated intent
+ * endpoint signs the upload claims (identity token proves the human), (2) the
+ * bytes go to the SAME /api/artifacts/upload the agents use, gated by that
+ * signed token. Returns the public /img/* path (get-public-image) to put in
+ * the section's `src` — storage only; the src change itself still goes
+ * through the reviewable draft path.
+ */
+export const uploadImageArtifact = async (
+  getToken: GetToken,
+  objectId: string,
+  file: { arrayBuffer(): Promise<ArrayBuffer>; type: string; size: number }
+): Promise<UploadImageResult> => {
+  const bytes = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const sha256 = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+
+  const token = await getToken();
+  const intentResponse = await fetch(UPLOAD_INTENT_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ object_id: objectId, content_type: file.type, size_bytes: file.size, sha256 }),
+  });
+  const intent = (await intentResponse.json().catch(() => ({}))) as {
+    token?: string;
+    claims?: { requestId: string; artifactKind: string; contentType: string; filename?: string };
+    publicPath?: string;
+    error?: string;
+  };
+  if (!intentResponse.ok || !intent.token || !intent.claims || !intent.publicPath) {
+    return { ok: false, error: intent.error ?? `Upload intent failed (${intentResponse.status})` };
+  }
+
+  const uploadResponse = await fetch(ARTIFACT_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${intent.token}`,
+      'Content-Type': 'application/octet-stream',
+      'X-Artifact-Request-Id': intent.claims.requestId,
+      'X-Artifact-Kind': intent.claims.artifactKind,
+      'X-Artifact-Content-Type': intent.claims.contentType,
+      'X-Artifact-Size': String(file.size),
+      'X-Artifact-Sha256': sha256,
+      ...(intent.claims.filename ? { 'X-Artifact-Filename': intent.claims.filename } : {}),
+    },
+    body: bytes,
+  });
+  const upload = (await uploadResponse.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  if (!uploadResponse.ok || !upload.ok) {
+    return { ok: false, error: upload.error ?? `Upload failed (${uploadResponse.status})` };
+  }
+
+  return { ok: true, publicPath: intent.publicPath };
+};
+
+export type EnsureBlobImageResult = { ok: true; publicPath: string; mirrored: boolean } | { ok: false; error: string };
+
+const MIRRORABLE_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp']);
+
+/**
+ * Guarantee an image has a blob-store copy with a public /img/* address, so
+ * agents and external image tooling can fetch and manipulate the exact bytes.
+ * Already blob-backed srcs pass through untouched; anything else (repo images
+ * like /images/…, hashed build assets) is fetched same-origin and pushed
+ * through the SAME intent → /api/artifacts/upload pipeline as a manual
+ * upload. Content-addressed keys make re-mirroring the same bytes a no-op
+ * (the store dedupes). Mirroring never changes the object — the section keeps
+ * its current src; the blob copy simply exists alongside it.
+ */
+export const ensureBlobBackedImage = async (
+  getToken: GetToken,
+  objectId: string,
+  src: string
+): Promise<EnsureBlobImageResult> => {
+  if (/^\/img\//.test(src)) return { ok: true, publicPath: src, mirrored: false };
+
+  let response: Response;
+  try {
+    response = await fetch(src, { credentials: 'omit' });
+  } catch {
+    return { ok: false, error: `Could not fetch ${src}` };
+  }
+  if (!response.ok) return { ok: false, error: `Could not fetch ${src} (HTTP ${response.status})` };
+
+  const contentType = (response.headers.get('content-type') ?? '').toLowerCase().split(';')[0]?.trim() ?? '';
+  if (!MIRRORABLE_IMAGE_TYPES.has(contentType)) {
+    return {
+      ok: false,
+      error: `Only JPEG/PNG/WebP images can be mirrored into blobs (got ${contentType || 'unknown'}).`,
+    };
+  }
+
+  const blob = await response.blob();
+  const upload = await uploadImageArtifact(getToken, objectId, {
+    arrayBuffer: () => blob.arrayBuffer(),
+    type: contentType,
+    size: blob.size,
+  });
+  if (!upload.ok) return upload;
+  return { ok: true, publicPath: upload.publicPath, mirrored: true };
+};
 
 export type ReleaseResult = { ok: boolean; status: number; result?: { status: string; detail?: string } };
 

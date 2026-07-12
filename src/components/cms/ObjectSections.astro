@@ -17,7 +17,7 @@
  * (section-annotations.ts) the admin edit-mode canvas reads. No box is
  * generated — visitor-facing layout is untouched.
  */
-import { buildSectionResolveDeps } from '~/components/cms/section-resolve-deps';
+import { buildSectionResolveDeps, type SectionResolveContext } from '~/components/cms/section-resolve-deps';
 import { getRegisteredComponent } from '~/lib/registry/components/index';
 import { resolveSections } from '~/lib/renderer/resolve';
 import { sectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
@@ -26,11 +26,13 @@ import type { SectionInstance } from '~/schema/bodies/section-v1';
 interface Props {
   objectId: string;
   sections: SectionInstance[];
+  /** Surface context for resolution (e.g. the article route's current post, anchoring `related` grids). */
+  context?: SectionResolveContext;
 }
-const { objectId, sections } = Astro.props;
+const { objectId, sections, context } = Astro.props;
 
 const visible = sections.filter((section) => section.visibility !== 'hidden');
-const deps = visible.length > 0 ? await buildSectionResolveDeps(visible) : undefined;
+const deps = visible.length > 0 ? await buildSectionResolveDeps(visible, context) : undefined;
 const renderables = deps ? resolveSections(visible, deps) : [];
 ---
 
@@ -43,4 +45,12 @@ const renderables = deps ? resolveSections(visible, deps) : [];
       </div>
     );
   })
+}
+{
+  /* Zero rendered sections: an inert zero-height anchor so the edit-mode
+     canvas can still offer its add-section "+" for this page object (a
+     display:contents element has no box to position against). Without it an
+     object-empty page has no gap mounts and an editor could never add the
+     FIRST section from the canvas. Visitors see nothing. */
+  renderables.length === 0 && <div style="height:0" data-cms-empty-object={objectId} />
 }

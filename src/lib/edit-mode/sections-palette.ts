@@ -70,6 +70,20 @@ export const SECTION_PALETTE: PaletteEntry[] = [
     hint: 'Email capture with consent copy.',
     starter: { heading: 'Get one useful letter a month', formName: 'newsletter' },
   },
+  // The one content_grid shape a quick-add CAN responsibly create: a
+  // `related` source needs no references — the algorithm selects posts at
+  // build time (anchored to the current article; newest-first elsewhere).
+  // The chip's inline dropdown switches the algorithm afterwards.
+  {
+    type: 'content_grid',
+    label: 'Related articles',
+    hint: 'Auto-selected posts; algorithm switchable.',
+    starter: {
+      heading: 'Related Posts',
+      source: { kind: 'related', algorithm: 'tag_similarity' },
+      limit: 4,
+    },
+  },
 ];
 
 export const paletteEntry = (type: string): PaletteEntry | undefined =>

@@ -42,7 +42,18 @@ const intro = splitRichTextParagraphs(data.body ?? '');
       articleCards.map((card, index) => (
         <article class="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-slate-900">
           <p class="text-sm font-medium text-accent">Article {index + 1}</p>
-          <h3 class="mt-3 text-xl font-semibold text-heading">{card.title}</h3>
+          {/* `related` grids (the "other articles" block) link their titles —
+              that block exists to be clicked through. query/manual grids keep
+              the audited unlinked markup (byte-identical cutover surfaces). */}
+          {data.source.kind === 'related' && card.href ? (
+            <h3 class="mt-3 text-xl font-semibold text-heading">
+              <a href={card.href} class="hover:text-accent">
+                {card.title}
+              </a>
+            </h3>
+          ) : (
+            <h3 class="mt-3 text-xl font-semibold text-heading">{card.title}</h3>
+          )}
           <p class="mt-3 text-muted">{card.description}</p>
         </article>
       ))

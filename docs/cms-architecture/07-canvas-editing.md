@@ -125,10 +125,11 @@ The chip is now an **icon toolbar** — no "Ask AI" wording. Right-to-left:
   per line). Structured values (actions, FAQ items, quotes) stay AI/admin
   work. **Save draft** goes through the same checkout → `update_section_data`
   path; in-place preview; publish stays separate.
-- **🖼 Image** (section types with image fields — `bio` today): src + alt
-  inputs with a live thumbnail. This is the DELIBERATE way to change an
-  image — the complement of the copy-only AI guard. (Real file upload is a
-  later slice; today it takes a path/URL.)
+- **🖼 Image** (section types with image fields — `bio` and `content_split`,
+  incl. image ARRAYS with one src/alt pair per item): src + alt inputs with a
+  live thumbnail. This is the DELIBERATE way to change an image — the
+  complement of the copy-only AI guard. Each src row has an **Upload** button
+  (see 3c) or takes a path/URL directly.
 
 **Gap "+" affordances**: in edit mode, a small round + sits above the first
 section, between sections of the same page object, and below the last. Click
@@ -142,6 +143,116 @@ at a RECORD-derived position (hidden sections still occupy indices; anchored
 by section id, never DOM order), id minted server-side; an honest draft
 placeholder appears in place (annotated — immediately editable with the same
 tools) until publish + release renders it for real.
+
+### 3c. Blob-backed image uploads (2026-07-12, Wolf: "stored in blobs … as happens now with pdf-tool")
+
+Canvas images live in the blobs `artifacts` store, exactly like pdf-tool
+PDFs — no new write path, the EXISTING tokened pipeline end to end:
+
+1. **Intent (new, admin-gated)**: `admin-artifact-upload-intent.ts` (pure core
+   `netlify/lib/canvas-upload-intent.ts`). The browser sends
+   `{ object_id, content_type, size_bytes, sha256 }` under the Identity token;
+   the server mints the standard short-lived HMAC upload token
+   (`createArtifactUploadToken`, 15 min TTL) with server-controlled claims:
+   `requestId = req_canvas_<object>_<yyyymmdd>_01` (canvas uploads are
+   traceable per object and can never write outside `image/req_canvas_*`),
+   `artifactKind: 'image'`, filename minted from the content type. Only
+   JPEG/PNG/WebP — the types the save-side sharp validation accepts — get a
+   token at all.
+2. **Bytes**: the client POSTs the raw file to the same `/api/artifacts/upload`
+   agents use; the endpoint re-verifies size/sha256/decodability (sharp)
+   against the signed claims. Content-addressed key:
+   `image/<requestId>/<sha256>.<ext>`.
+3. **Serving (new, public)**: `/img/*` → `get-public-image.ts`, the image
+   mirror of `get-public-pdf.ts` (same netlify.toml redirect pattern). Keys
+   are unguessable without the sha256 of the exact bytes; extension
+   allowlisted; immutable cache (`max-age=31536000`) because the key is
+   content-addressed; CSP + nosniff headers for defense in depth.
+4. **The section's `src`** gets the root-relative `/img/…` path — deploy-safe
+   (no external host) and rendered by the existing components untouched. The
+   src change itself still goes through checkout → patch → publish → release;
+   the upload alone changes nothing visible.
+
+Client flow (`uploadImageArtifact` in `verbs-client.ts`, Upload button per
+src row in the image form): hash the file with `crypto.subtle` → mint intent
+→ POST bytes with the claim-echo `X-Artifact-*` headers → fill the src input
+with the returned public path → human hits Save draft.
+
+### 3d. AI image references — "Re: portrait.png" (2026-07-12, Wolf)
+
+Opening the AI chat on a section that carries images shows **image chips**
+(thumbnail + filename). Clicking one arms the reference:
+
+1. **Ensure blob-backed** (`ensureBlobBackedImage`, verbs-client): a src
+   already under `/img/*` passes through; an existing repo image
+   (`/images/…`, hashed build assets) is fetched same-origin and **mirrored
+   into the blobs artifacts store** through the same intent → upload pipeline
+   — so ANY referenced image ends up with a blob copy and a public URL agents
+   and external image tooling can fetch to manipulate the exact bytes.
+   Mirroring is storage-only: the section's src is untouched.
+2. **Armed chat**: the composer placeholder becomes `Re: <name> — …`, the
+   sent message renders a `Re: <name>` pill, and every ask carries
+   `image_ref { field, name, url }` (absolute public URL).
+3. **Server** (`ask-ai-object.ts` + wrapper zod): the section prompt gains a
+   "Re: `<name>` — publicly served at `<url>`" clause so the model knows
+   exactly which bytes "the image" means. **The copy-only guard is
+   unchanged** — image fields still never survive a suggestion; the reference
+   is context (and the handle downstream image-editing tools need), not a
+   write path. Actually re-pointing an image stays the image tool's job.
+
+### 3e. Panel UI — icon-led collapsible accordion (2026-07-12, Wolf)
+
+The docked panel is one **accordion**: three icon-headed sections
+(✨ Ask AI / ✏️ Edit text / 🖼 Image), one expanded at a time (the open one
+grows; the rest are a single head with a chevron). A chip tool opens its
+section; the accordion heads switch between tools in place (no re-hover);
+clicking the open head collapses the body to a compact rail. The Image
+section only appears for image-bearing section types. Chrome is
+**iconography over prose**: identity is a `type` + monospace `id` with tiny
+shared/draft dots (no sentences), actions are icon buttons with tooltips
+(check = save, undo = discard, paper-plane = send, up-arrow = upload), and
+the sys/log lines are terse and glyph-prefixed. Every color is a
+project `--aw-*` design token (via the `--dlem-*` layer) — nothing bespoke;
+it flips light/dark with the site.
+
+### 3f. Tier-1 surfaces: article pages, chrome, the related-articles block (2026-07-12, Wolf)
+
+**Article pages.** `page_article`'s object sections already rendered through
+the annotated dispatcher — but the object was empty, so articles had no
+canvas. Now: (a) `ObjectSections` leaves a zero-height
+`data-cms-empty-object` marker when a page object has no sections, and the
+gap layer turns it into one add "+" — the FIRST section of an object-empty
+page is addable from the canvas (create → publish → release, no code);
+(b) the article route passes the current post into resolution, anchoring
+`related` grids. The article BODY (title/hero/prose) stays the Tier-1
+pipeline (OQ-8 stop line) — `/admin/publish` remains its editor.
+
+**"Other articles to read".** `content_grid` gained a `related` SOURCE KIND
+(design-principles: generalize, don't invent a bespoke type):
+`{ kind: 'related', algorithm: 'tag_similarity' | 'same_category' | 'latest' }`.
+`tag_similarity` is the site's existing scoring (same category +5, each
+shared tag +1 — now the pure `rankRelatedPosts`, single source of truth with
+the legacy furniture); anchored to the current post on article pages,
+newest-first anywhere else, so the section is legal on any page. The chip on
+a related grid grows a **compact algorithm dropdown inline with the AI
+button** — switching it patches `source.algorithm` through the normal draft
+path (checkout → `update_section_data` → publish stays separate). The
+palette offers "Related articles" (the one content_grid shape a quick-add
+can create: reference-free). When `page_article` carries a related grid, it
+REPLACES the hardcoded `RelatedPosts` furniture; until then the legacy block
+renders exactly as before. Related-grid titles link to their posts
+(query/manual grids keep the audited unlinked markup).
+
+**Chrome (header/footer).** `PageLayout` (and the per-page footer override)
+wrap Header/Footer in `data-cms-nav-object` annotations. Hovering chrome
+shows the chip (marked **site-wide**); the pencil opens a copy form of the
+NAVIGATION object — item labels (children included), group titles, brand
+text/descriptor, footer note — flattened by the pure `nav-editor.ts`, and
+saved through the nav grammar (`update_item`, `upsert_group` replace-by-id,
+`remove_action`+`upsert_action` for label-keyed renames, coalesced
+`set_nav_meta`), never page ops. Targets/hrefs/icons are deliberately not in
+the form — retargeting is structural work (the Ask-AI protected boundary),
+and chrome offers no AI chat (copy form only).
 
 ### 4. What is deliberately NOT in this slice
 

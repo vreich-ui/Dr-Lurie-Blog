@@ -38,11 +38,22 @@ const resolveActionHref = (target: NavTarget): string => {
 };
 
 /**
+ * Rendering context a surface can hand the resolver. `relatedToPostId` is the
+ * current content item (the article route passes it) — the anchor a `related`
+ * content_grid selects against. Surfaces without one leave it unset and a
+ * `related` grid degrades to newest-first.
+ */
+export type SectionResolveContext = { relatedToPostId?: string };
+
+/**
  * Build the ResolvePageDeps for the given section list. Loads every shared_ref
  * target export up front and the posts feed only when a section (inline or
  * dereferenced) actually needs it.
  */
-export const buildSectionResolveDeps = async (sections: readonly SectionInstance[]): Promise<ResolvePageDeps> => {
+export const buildSectionResolveDeps = async (
+  sections: readonly SectionInstance[],
+  context: SectionResolveContext = {}
+): Promise<ResolvePageDeps> => {
   // Pre-load every shared_ref target so the pure resolver gets a sync lookup.
   const sharedSectionCache = new Map<string, ReturnType<typeof parseSharedSectionExport>>();
   for (const section of sections) {
@@ -79,10 +90,15 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
   if (needsContentGrid || needsContentEmbed) {
     // fetchPosts() is already published-only (published_time <= now) and sorted
     // newest-first — exactly the "published content item" the schema requires.
-    const { fetchPosts } = await import('~/utils/blog');
+    const { fetchPosts, rankRelatedPosts } = await import('~/utils/blog');
     const posts = await fetchPosts();
     if (needsContentGrid) {
-      const toCard = (post: (typeof posts)[number]) => ({ id: post.id, title: post.title, description: post.excerpt });
+      const toCard = (post: (typeof posts)[number]) => ({
+        id: post.id,
+        title: post.title,
+        description: post.excerpt,
+        href: getPermalink(post.permalink, 'post'),
+      });
       const matchesQuery = (post: (typeof posts)[number], query: ContentQuery) => {
         if (query.category && post.category?.slug !== query.category) return false;
         if (query.tags && query.tags.length > 0) {
@@ -91,6 +107,8 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
         }
         return true;
       };
+      const newestFirst = (list: typeof posts) =>
+        [...list].sort((a, b) => b.publishDate.valueOf() - a.publishDate.valueOf());
       contentGrid = {
         resolveManualItem: (id) => {
           const post = posts.find((candidate) => candidate.id === id);
@@ -101,8 +119,29 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
           const sorted =
             query.sort === 'published_time_asc'
               ? [...filtered].sort((a, b) => a.publishDate.valueOf() - b.publishDate.valueOf())
-              : [...filtered].sort((a, b) => b.publishDate.valueOf() - a.publishDate.valueOf());
+              : newestFirst(filtered);
           return sorted.slice(0, limit).map(toCard);
+        },
+        // The `related` source (the "other articles" block). Anchored to the
+        // surface's current post; every algorithm excludes it. Without an
+        // anchor (this grid placed on a non-article page), newest-first.
+        runRelated: (algorithm, limit) => {
+          const current = context.relatedToPostId
+            ? posts.find((candidate) => candidate.id === context.relatedToPostId)
+            : undefined;
+          if (!current || algorithm === 'latest') {
+            return newestFirst(posts.filter((post) => post.id !== context.relatedToPostId))
+              .slice(0, limit)
+              .map(toCard);
+          }
+          if (algorithm === 'same_category') {
+            const inCategory = posts.filter(
+              (post) => post.id !== current.id && post.category?.slug === current.category?.slug
+            );
+            return newestFirst(inCategory).slice(0, limit).map(toCard);
+          }
+          // tag_similarity — the site's existing related-posts scoring.
+          return rankRelatedPosts(posts, current, limit).map(toCard);
         },
         idOf: (card) => card.id,
       };

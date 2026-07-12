@@ -23,10 +23,16 @@ for (const entry of SECTION_PALETTE) {
   });
 }
 
-test('the palette offers only copy-composable types (no reference/binding types)', () => {
+test('the palette offers only copy-composable types (no reference/binding starters)', () => {
   const offered = new Set(SECTION_PALETTE.map((entry) => entry.type));
-  for (const excluded of ['content_grid', 'product_preview', 'contact_form', 'search', 'content_embed', 'shared_ref']) {
+  for (const excluded of ['product_preview', 'contact_form', 'search', 'content_embed', 'shared_ref']) {
     assert.equal(offered.has(excluded), false, `${excluded} needs references/bindings a quick-add cannot invent`);
+  }
+  // content_grid IS offered, but ONLY as the reference-free `related` source
+  // (the algorithm selects posts at build time — nothing to invent). A
+  // manual/query/cards starter would need refs and stays excluded.
+  for (const entry of SECTION_PALETTE.filter((candidate) => candidate.type === 'content_grid')) {
+    assert.equal((entry.starter as { source?: { kind?: string } }).source?.kind, 'related');
   }
   assert.ok(offered.has('prose'), 'plain text is the first thing an editor reaches for');
 });
@@ -50,4 +56,8 @@ test('insertPositionFor places before/after the anchor by RECORD index', () => {
 
 test('an unknown anchor appends instead of throwing mid-edit', () => {
   assert.equal(insertPositionFor(sections, 's_gone', 'before'), 3);
+});
+
+test('the empty-page anchor case: anchorId "" on an empty record appends at 0', () => {
+  assert.equal(insertPositionFor([], '', 'after'), 0);
 });

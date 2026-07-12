@@ -22,3 +22,23 @@ test('a shared_ref-derived section additionally names the shared object it belon
   assert.equal(attrs['data-cms-section-id'], 's_newsletter');
   assert.equal(attrs['data-cms-shared-object'], 'sec_newsletter_signup');
 });
+
+test('a related content_grid announces its selection algorithm to the canvas', () => {
+  const attrs = sectionAnnotationAttrs('page_article', {
+    id: 's_related',
+    type: 'content_grid',
+    data: { heading: 'Related Posts', source: { kind: 'related', algorithm: 'tag_similarity' }, limit: 4 },
+  });
+  assert.equal(attrs['data-cms-related-algorithm'], 'tag_similarity');
+});
+
+test('query/manual/cards grids and other types carry NO algorithm annotation', () => {
+  const query = sectionAnnotationAttrs('page_home', {
+    id: 's_grid',
+    type: 'content_grid',
+    data: { source: { kind: 'query', query: {} }, limit: 4 },
+  });
+  assert.equal('data-cms-related-algorithm' in query, false);
+  const prose = sectionAnnotationAttrs('page_home', { id: 's_p', type: 'prose', data: { body: '<p>x</p>' } });
+  assert.equal('data-cms-related-algorithm' in prose, false);
+});

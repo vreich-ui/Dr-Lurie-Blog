@@ -23,6 +23,12 @@
   force = true
 
 [[redirects]]
+  from = "/img/*"
+  to = "/.netlify/functions/get-public-image?blobKey=image/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/mcp"
   to = "/.netlify/functions/mcp"
   status = 200

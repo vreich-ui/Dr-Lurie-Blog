@@ -123,7 +123,7 @@ export type EmptyResolved = Record<string, never>;
  * (undefined where a cell carries no link). Exactly one of the two fields is
  * populated per grid, keyed by the source kind.
  */
-export type ContentGridCard = { title: string; description?: string };
+export type ContentGridCard = { title: string; description?: string; href?: string };
 export type ContentGridResolved = { cards?: ContentGridCard[]; cardHrefs?: Array<string | undefined> };
 
 /** Read-only site context (D§4.2). Populated from the Site export in P5; opaque until then. */

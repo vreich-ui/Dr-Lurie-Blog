@@ -66,6 +66,8 @@ export interface ObjectSuggestionRequest {
   selected_text?: string;
   /** Page-only: scope the request to one section instance (edit-mode canvas). */
   section_id?: string;
+  /** "Re: <image>" — the section image the instruction refers to, with its public (blob-backed) URL. */
+  image_ref?: { field: string; name: string; url: string };
 }
 
 export interface ObjectSuggestionResponse {

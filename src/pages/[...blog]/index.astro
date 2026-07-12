@@ -39,6 +39,18 @@ const image =
 // stays in the content_item pipeline (OQ-8). Fallback = config.yaml robots.
 const articleObject = await loadRoutePageObject('page_article');
 
+// When page_article carries an object-backed `related` content_grid (the
+// canvas-editable "other articles" block, with its selection-algorithm
+// choice), it REPLACES the legacy hardcoded RelatedPosts furniture — one
+// related block, whichever owns it. No related grid on the object → the
+// legacy block renders exactly as before.
+const objectProvidesRelated = (articleObject?.extraSections ?? []).some(
+  (section) =>
+    section.type === 'content_grid' &&
+    (section.data as { source?: { kind?: string } }).source?.kind === 'related' &&
+    section.visibility !== 'hidden'
+);
+
 const metadata = merge(
   {
     title: post.title,
@@ -63,6 +75,10 @@ const metadata = merge(
     {post.Content ? <post.Content /> : <Fragment set:html={post.content || ''} />}
   </SinglePost>
   <ToBlogLink />
-  <RelatedPosts post={post} />
-  <ObjectSections objectId="page_article" sections={articleObject?.extraSections ?? []} />
+  {!objectProvidesRelated && <RelatedPosts post={post} />}
+  <ObjectSections
+    objectId="page_article"
+    sections={articleObject?.extraSections ?? []}
+    context={{ relatedToPostId: post.id }}
+  />
 </Layout>

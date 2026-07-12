@@ -7,6 +7,127 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 R (CANVAS Tier-1 surfaces: article pages, chrome, related-articles dropdown)
+
+Wolf: "Article publishing Tier 1 after conversion does not have canvas mode …
+apply the same treatment to the article and other tier one objects like
+headers, footers … A set of 'other articles to read' below an article can
+have an AI option and a simple choice of existing selection algorithms
+through a stylish dropdown … inline with AI action button." Shipped on the
+canvas branch (PR #425):
+
+- **`content_grid` `related` source kind** (generalize-don't-replicate):
+  `{kind:'related', algorithm: tag_similarity|same_category|latest}` —
+  tag_similarity = the existing related-posts scoring, extracted pure as
+  `rankRelatedPosts` (utils/blog.ts, single source of truth); anchored to
+  the current post via a new resolve context (article route passes
+  `relatedToPostId`), newest-first degradation elsewhere. Related-grid
+  titles link to posts; query/manual grids keep audited unlinked markup.
+- **Chip algorithm dropdown**: a related grid announces its algorithm via
+  `data-cms-related-algorithm`; the chip renders a compact chip-native
+  select inline with the sparkles; change → checkout →
+  `update_section_data {source:{kind:'related',algorithm}}` draft.
+- **Article pages get canvas**: `ObjectSections` leaves a zero-height
+  `data-cms-empty-object` marker on object-empty pages; the gap layer turns
+  it into one add "+" → the FIRST page_article section is addable from the
+  canvas ("Related articles" joined the palette — the one reference-free
+  content_grid starter). An object-backed related grid REPLACES the
+  hardcoded RelatedPosts furniture; absent one, byte-identical legacy. The
+  article BODY stays Tier-1 (OQ-8 line; /admin/publish).
+- **Chrome**: Header/Footer wrapped in `data-cms-nav-object` (PageLayout +
+  PageObjectRenderer footer override). Chip marked site-wide, pencil-only →
+  copy form (item labels incl. children, group titles, brand, footNote)
+  from pure `nav-editor.ts`; saves map to the NAV grammar — update_item,
+  upsert_group (replace-by-id, current group rides along),
+  remove_action+upsert_action renames, coalesced set_nav_meta — via
+  EditSession('navigation'). Local body kept in step
+  (`applyNavChangesToBody`) so sequential saves never resend stale groups.
+  Targets/hrefs/icons excluded (structural = protected boundary); no AI
+  chat on chrome.
+- **Gates**: 11 new tests (related resolver + degradation + schema-valid
+  page; annotation announces algorithm and only for related; nav-editor
+  flatten/ops/throw/apply incl. every-op-legal check; palette related-only
+  content_grid rule + empty-anchor append), suite 1159+49 green, astro
+  check 0, build 172 pages, drive 60 assertions (nav chip site-wide/no-AI,
+  nav grammar op on save, dropdown value + inline-with-AI + patch wire
+  shape + annotation update, empty-marker "+" → palette targets
+  page_article → upsert_section related grid). Docs: 07 §3f.
+- **To make it real on production**: enter edit mode on any article page,
+  click the "+" below the article, pick "Related articles", publish +
+  release (the store write happens through the verbs; no code or seed
+  needed). Header/footer copy edits work the same day-one.
+
+## Session 2026-07-12 Q (CANVAS panel UI: icon-led collapsible accordion)
+
+Wolf: "make the modal UI collapsible accordion. use less text and more
+representative iconography. be focused on style and UX … do not use colors
+that are outside of a current Astro schema." Shipped on the canvas branch
+(PR #425):
+
+- The docked panel is now one **accordion**: three icon-headed sections
+  (✨ Ask AI / ✏️ Edit text / 🖼 Image), one expanded at a time (open one
+  grows, rest collapse to a head + chevron). Chip tools open their section;
+  accordion heads switch tools in place; clicking the open head collapses to
+  a compact rail. Image section only shown for image-bearing types.
+- **Iconography over prose**: identity = type + monospace id + tiny
+  shared/draft dots (no sentences); actions are icon buttons w/ tooltips
+  (check=save, undo=discard, plane=send, up-arrow=upload); sys/log lines
+  terse + glyph-prefixed; field hints one-liners. Tray text trimmed too.
+- **Palette discipline**: every color is a project `--aw-*` token via the
+  `--dlem-*` layer — nothing bespoke; light/dark flips with the site.
+- Structure preserved: same modes/data-hooks (`data-em-*`, `.dl-em-mode-*`),
+  so the verbs/tests are untouched. Gates: astro check 0, eslint/prettier
+  clean, suite 1148+49 green, build 172 pages, drive extended to 49
+  assertions (3-section accordion, AI expanded/others collapsed, icon-only
+  send, head-switch collapses previous, open-head collapse). Docs:
+  07-canvas-editing.md §3e.
+
+## Session 2026-07-12 P (CANVAS image tool v2: array images, blob-backed uploads, AI image references)
+
+Wolf, on the Codex array-image finding + storage: "Close the gap. Also, those
+images also need to be stored in blobs for edits and other manipulation as
+happens now with pdf-tool. Same goes for About image or any other image."
+Shipped on the canvas branch (PR #425):
+
+- **Array images (Codex gap closed)**: the image tool now renders image
+  ARRAYS (`content_split` `images: [{src,alt}]`) — one src/alt pair per item;
+  save copies the array and patches it wholesale (deep-merge replaces arrays),
+  editing only the touched item. `content_split` joins `bio` in
+  `IMAGE_SECTION_TYPES`.
+- **Blob-backed uploads (pdf-tool pattern, zero new write paths)**:
+  - `admin-artifact-upload-intent.ts` (+ pure core
+    `netlify/lib/canvas-upload-intent.ts`): admin-gated mint of the EXISTING
+    HMAC upload token; server controls the claims — `requestId =
+    req_canvas_<object>_<yyyymmdd>_01`, kind `image`, filename from content
+    type; JPEG/PNG/WebP only (what save-side sharp validation accepts).
+  - Bytes go to the same `/api/artifacts/upload` agents use (re-verifies
+    size/sha256/decodability against the signed claims); content-addressed
+    keys `image/<requestId>/<sha256>.<ext>`.
+  - **Public serving**: `/img/*` → new `get-public-image.ts`, the image
+    mirror of `get-public-pdf.ts` — extension allowlist, immutable cache
+    (content-addressed), CSP + nosniff. Sections carry the root-relative
+    `/img/…` path (deploy-safe; renders through existing components).
+  - Canvas: each src row gets an **Upload** button
+    (`uploadImageArtifact` in `verbs-client.ts`: crypto.subtle sha256 →
+    intent → tokened byte POST → fill src). Upload is storage-only; the src
+    change still walks checkout → patch → publish → release.
+- **AI image references ("Re: portrait.png", same session, Wolf)**: the AI
+  chat on an image-bearing section shows image chips; arming one (a) ensures
+  the image is blob-backed — existing repo images (`/images/…`) are
+  **mirrored into the artifacts store** via the same pipeline, storage-only,
+  src untouched — and (b) sends `image_ref {field, name, url}` with every
+  ask. The section prompt gains a "Re: <name> — publicly served at <url>"
+  clause (the public URL is the handle external image-editing tools need).
+  Copy-only guard unchanged: image fields still never survive a suggestion.
+- **Gates**: 15 new tests (intent mint/round-trip/rejections; public image
+  route incl. real underscored canvas keys + 404/405/allowlist; image_ref
+  prompt clause + guard-still-strips + optionality), full suite 1148+49
+  green, astro check 0, build 172 pages, drive extended to 42 assertions
+  (upload wire shapes; chip → mirror → armed pill → image_ref on the wire).
+  Docs: 07-canvas-editing.md §3c/§3d.
+- **Env note**: the intent endpoint needs `ARTIFACT_UPLOAD_TOKEN_SECRET` —
+  already configured (the pdf-tool upload path uses it).
+
 ## Session 2026-07-12 O (CANVAS manual tools: icon toolbar, field editor, image tool, gap "+" add)
 
 Wolf: "add text edit tools to each relevant object … remove the wording Ask AI
