@@ -34,9 +34,7 @@ const hasImages = data.images.length > 0;
       {data.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{data.kicker}</p>}
       <h2 class="mt-4 max-w-3xl text-4xl font-bold sm:text-5xl">{data.heading}</h2>
       <div class="mt-7 max-w-2xl text-lg text-muted lg:max-w-xl">
-        {paragraphs.map((paragraph, index) => (
-          <p class:list={[index > 0 ? 'mt-4' : '']} set:html={paragraph} />
-        ))}
+        {paragraphs.map((paragraph, index) => <p class:list={[index > 0 ? 'mt-4' : '']} set:html={paragraph} />)}
       </div>
       {
         data.actions.length > 0 && (

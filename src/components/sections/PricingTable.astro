@@ -17,8 +17,9 @@ type Props = {
 const { data, resolved } = Astro.props;
 const tiers = data.tiers
   .map((tier, index) => ({ tier, product: resolved.tiers[index] }))
-  .filter((entry): entry is { tier: (typeof data.tiers)[number]; product: NonNullable<(typeof resolved.tiers)[number]> } =>
-    Boolean(entry.product)
+  .filter(
+    (entry): entry is { tier: (typeof data.tiers)[number]; product: NonNullable<(typeof resolved.tiers)[number]> } =>
+      Boolean(entry.product)
   );
 ---
 
@@ -31,12 +32,7 @@ const tiers = data.tiers
   <div class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
     {
       tiers.map(({ tier, product }) => (
-        <article
-          class:list={[
-            'dl-card flex flex-col',
-            tier.highlighted ? 'ring-2 ring-accent' : '',
-          ]}
-        >
+        <article class:list={['dl-card flex flex-col', tier.highlighted ? 'ring-2 ring-accent' : '']}>
           <h3 class="text-xl font-semibold text-heading">{tier.title ?? product.title}</h3>
           {tier.description && <p class="mt-2 text-muted">{tier.description}</p>}
           <p class="mt-4 text-3xl font-bold text-heading">{product.priceBadge}</p>
@@ -44,7 +40,9 @@ const tiers = data.tiers
             <ul class="mt-4 space-y-2 text-muted grow">
               {tier.features.map((feature) => (
                 <li class="flex gap-2">
-                  <span aria-hidden="true" class="text-accent">✓</span>
+                  <span aria-hidden="true" class="text-accent">
+                    ✓
+                  </span>
                   {feature}
                 </li>
               ))}
