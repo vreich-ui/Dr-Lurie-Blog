@@ -7,6 +7,47 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-11 L (INCIDENT: agent content tripped the deploy secrets scanner — trap 14)
+
+Wolf's agent, working the /about intro through the MCP (record_version 25 —
+real autonomous editing), set `portrait.src` to an images.weserv.nl proxy of
+`raw.githubusercontent.com/<repo>/…/dr-lurie-portrait4.jpeg`. That URL contains
+the repo slug — the VALUE of the secret-marked `GITHUB_REPOSITORY` env var —
+and Netlify's post-build secrets scan matches marked values (even URL-encoded)
+in repo files and build output, so **every production deploy failed** from that
+publish onward (the build itself compiled clean; the block is the scan).
+Everything published since the last good deploy (the agent's nav/home/site
+edits, the W4 record, the object-page catch-all) sat dark until healed.
+
+Resolution (final — zero operator actions; Wolf ruled against spending effort
+on a credentialed heal for one image):
+
+- **ENFORCEMENT, not advice — two new validation groups in `validateObject`**,
+  run on patch AND create AND publish, so agents get the named blocker at
+  write time: `deploy_safety` (no renderable string may contain a protected
+  env value — raw, URL-encoded, or double-encoded, matched case-insensitively;
+  the error names the KEY, never the value; the repo-file hotlink URL families
+  raw.githubusercontent/weserv are blocked outright) and `renderability`
+  (trap 5 closed: every field a component splits is checked with the REAL
+  splitters, so paragraph-only bodies carrying headings/lists — which pass the
+  global allowlist but throw at build — are blockers; FAQ answers per item).
+- **The committed export corrected in-repo** (one field: `portrait.src` →
+  `/images/dr-lurie-portrait4.jpeg`, the photo the agent wanted, shipped in
+  `public/images/` in the same change). Hand-editing an export is normally
+  the anti-pattern (the next publish clobbers it) — here it is safe BECAUSE of
+  the new guardrail: the store record still carries the bad URL and now CANNOT
+  republish until an agent fixes that field (the validation error tells it
+  exactly what and why). Quarantine + fix-forward; no credentialed run needed.
+- **Merging this change alone unblocks all deploys**: the slug no longer
+  appears anywhere in repo files or build output (repo-wide sweep clean), so
+  the scanner passes with the env config untouched. Unmarking
+  `GITHUB_REPOSITORY` as a secret remains OPTIONAL hardening.
+- Also shipped: the bio `portrait` editor hint names sanctioned image sources;
+  `scripts/fix-about-portrait.mjs` kept as the store-heal template (trap 14);
+  playbook trap 14 + refreshed reality-check; two lifecycle-test fixtures that
+  carried never-buildable bare-text prose bodies were themselves caught by the
+  new renderability check and fixed.
+
 ## Session 2026-07-11 K (object-page catch-all: agent-CREATED pages are now live end-to-end — B1 closed)
 
 The last plumbing between "agent creates a page" and "that page is on the
@@ -268,10 +309,10 @@ remains** (design-principles rule 1 fully satisfied):
     curated cards.
   - `contact_form` gained optional `subtitle`/`description`; ContactForm renders
     them (the name/email/message field set stays fixed furniture).
-  The bespoke `contact` type + `ContactPage.astro` + `contact.ts` are REMOVED
-  (compile-lockstep gate). Intentional **scoped rule-4 visual diff on /contact**
-  (build-diff: 1 changed page; all copy + 6 icons + the Netlify form preserved,
-  only the widget→generic-component markup changed).
+    The bespoke `contact` type + `ContactPage.astro` + `contact.ts` are REMOVED
+    (compile-lockstep gate). Intentional **scoped rule-4 visual diff on /contact**
+    (build-diff: 1 changed page; all copy + 6 icons + the Netlify form preserved,
+    only the widget→generic-component markup changed).
 - **/thank-you**: the `thank_you` type was RENAMED to the reusable
   `form_confirmation` (ThankYou.astro → FormConfirmation.astro, thank-you.ts →
   form-confirmation.ts; the `?form=` swap script is unchanged). It was already

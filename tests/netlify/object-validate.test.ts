@@ -353,14 +353,23 @@ test('check6 structure: a complete navigationOverrides.footer passes; an ordinar
 
 // ═══ pipeline composition + summary ══════════════════════════════════════════
 
-test('pipeline: validateObject returns the six-group readiness report in order', () => {
+test('pipeline: validateObject returns the eight-group readiness report in order', () => {
   const groups = validateObject(
     { objectType: 'page', objectId: 'page_home', body: validPageBody() },
     resolvingContext()
   );
   assert.deepEqual(
     groups.map((group) => group.id),
-    ['schema', 'identifiers', 'references', 'reader_safety', 'artifact_trust', 'structure']
+    [
+      'schema',
+      'identifiers',
+      'references',
+      'reader_safety',
+      'renderability',
+      'deploy_safety',
+      'artifact_trust',
+      'structure',
+    ]
   );
   // Report shape matches the readiness convention: every criterion has the status vocabulary.
   for (const criterion of flatten(groups)) {

@@ -48,6 +48,7 @@ import { validateObjectIdForType, validateSectionInstanceId } from '../../src/li
 import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
 import { navigationBodySchema, type NavigationBody } from '../../src/schema/bodies/navigation-v1.js';
 import { navActionCapacity, type CapacityRule } from '../../src/lib/registry/structural-capacity.js';
+import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
@@ -1073,6 +1074,145 @@ export const checkStructuralInvariants = (
   return criteria;
 };
 
+// ─── check 7: renderability (trap 5 — per-component rich-text vocabulary) ────
+//
+// The global RichText allowlist (check 1) permits h2/h3/ul/ol everywhere, but
+// most components render their `body` through splitRichTextParagraphs, which
+// THROWS at build time on anything but top-level <p> blocks — so a body could
+// pass validation and still kill the next release build. This check calls the
+// REAL splitters (never a re-implementation, so it cannot drift from what the
+// build actually does) on every field a component will split.
+
+const PARAGRAPH_BODY_TYPES = new Set(['hero', 'lede', 'bio', 'cta_banner', 'newsletter_signup', 'content_grid']);
+
+const splitterProblem = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error);
+  // The splitter appends the full body JSON — name the rule, not the payload.
+  return message.split(' Received:')[0];
+};
+
+export const checkRenderability = (objectType: ObjectType, body: unknown): ReadinessCriterion[] => {
+  const sections: SectionInstance[] = isRecord(body)
+    ? objectType === 'page'
+      ? collectSections(body)
+      : objectType === 'section' && isRecord(body.section) && typeof body.section.type === 'string'
+        ? [body.section as SectionInstance]
+        : []
+    : [];
+  if (sections.length === 0) {
+    return [crit('render_splitters', 'Component renderability', 'complete', '')];
+  }
+
+  const problems: string[] = [];
+  for (const section of sections) {
+    if (!isRecord(section.data)) continue;
+    const at = `section '${section.id}' (${section.type})`;
+    const data = section.data as Record<string, unknown>;
+    try {
+      if (section.type === 'prose' && typeof data.body === 'string') splitRichTextBlocks(data.body);
+      else if (PARAGRAPH_BODY_TYPES.has(section.type) && typeof data.body === 'string')
+        splitRichTextParagraphs(data.body);
+    } catch (error) {
+      const hint =
+        section.type === 'prose'
+          ? '(prose accepts only top-level <p>/<h2>/<h3>/<ul>/<ol> blocks — bare text must be wrapped in <p>)'
+          : "(this component is paragraph-only — headings/lists belong in a 'prose' section)";
+      problems.push(`${at} body would fail the site build: ${splitterProblem(error)} ${hint}.`);
+    }
+    if (section.type === 'faq' && Array.isArray(data.items)) {
+      data.items.forEach((item, index) => {
+        if (!isRecord(item) || typeof item.a !== 'string') return;
+        try {
+          splitRichTextParagraphs(item.a);
+        } catch (error) {
+          problems.push(
+            `${at} items[${index}].a would fail the site build: ${splitterProblem(error)} (FAQ answers are paragraph-only).`
+          );
+        }
+      });
+    }
+  }
+  return [
+    problems.length === 0
+      ? crit('render_splitters', 'Component renderability', 'complete', '')
+      : crit('render_splitters', 'Component renderability', 'missing', problems.slice(0, 3).join(' ')),
+  ];
+};
+
+// ─── check 8: deploy safety (trap 14 — content the secrets scanner blocks) ───
+//
+// Netlify's post-build secrets scan fails EVERY deploy when the value of a
+// secret-marked env var appears in repo files or build output — hit for real
+// 2026-07-11 when an agent set an image URL through a proxy of
+// raw.githubusercontent.com/<repo>/… (the repo slug is GITHUB_REPOSITORY's
+// value; the scanner matches even URL-encoded forms). Two rules, both
+// blockers, both checked on every string leaf (exports commit the WHOLE body
+// to the repo, `notes` included):
+//   1. no string may contain a protected env value (raw, URL-encoded, or
+//      double-encoded; matched case-insensitively) — the error names the KEY,
+//      never the value;
+//   2. no repo-file hotlinks: raw.githubusercontent.com / githubusercontent
+//      proxies (images.weserv.nl) are forbidden URL families — fragile AND
+//      the incident vector.
+
+const PROTECTED_ENV_KEYS = [
+  'GITHUB_REPOSITORY',
+  'GITHUB_CONTENT_TOKEN',
+  'PUBLISH_SECRET',
+  'NETLIFY_PUBLISH_SECRET',
+  'NETLIFY_AUTH_TOKEN',
+  'NETLIFY_BLOBS_TOKEN',
+  'NETLIFY_BUILD_HOOK_URL',
+  'OPENAI_API_KEY',
+  'ARTIFACT_UPLOAD_TOKEN_SECRET',
+] as const;
+
+export type ProtectedValue = { key: string; value: string };
+
+/** Values worth scanning for: present and long enough to never match innocent copy. */
+export const protectedEnvValues = (env: NodeJS.ProcessEnv = process.env): ProtectedValue[] =>
+  PROTECTED_ENV_KEYS.flatMap((key) => {
+    const value = (env[key] ?? '').trim();
+    return value.length >= 8 ? [{ key, value }] : [];
+  });
+
+const FORBIDDEN_URL_RE = /raw\.githubusercontent\.com|images\.weserv\.nl/i;
+
+export const checkDeploySafety = (
+  body: unknown,
+  protectedValues: ProtectedValue[] = protectedEnvValues()
+): ReadinessCriterion[] => {
+  const problems: string[] = [];
+  const needles = protectedValues.map(({ key, value }) => ({
+    key,
+    variants: [value, encodeURIComponent(value), encodeURIComponent(encodeURIComponent(value))].map((variant) =>
+      variant.toLowerCase()
+    ),
+  }));
+  walkStrings(body, (path, leaf) => {
+    const at = path.join('.') || '(root)';
+    if (FORBIDDEN_URL_RE.test(leaf)) {
+      problems.push(
+        `${at}: links a repository file (raw.githubusercontent.com / images.weserv.nl proxy) — use a site asset URL instead; this URL family blocks every production deploy.`
+      );
+    }
+    const lower = leaf.toLowerCase();
+    for (const needle of needles) {
+      if (needle.variants.some((variant) => lower.includes(variant))) {
+        problems.push(
+          `${at}: contains the value of protected env var ${needle.key} — the deploy secrets scanner blocks ALL production deploys while this is in published content.`
+        );
+        break;
+      }
+    }
+  });
+  return [
+    problems.length === 0
+      ? crit('deploy_safety', 'Deploy safety', 'complete', '')
+      : crit('deploy_safety', 'Deploy safety', 'missing', problems.slice(0, 3).join(' ')),
+  ];
+};
+
 // ─── pipeline composition ────────────────────────────────────────────────────
 
 export const validateObject = (
@@ -1094,6 +1234,12 @@ export const validateObject = (
       criteria: checkReferenceIntegrity(input.objectType, input.body, context),
     },
     { id: 'reader_safety', label: 'Reader safety', criteria: checkReaderSafety(input.body) },
+    {
+      id: 'renderability',
+      label: 'Component renderability',
+      criteria: checkRenderability(input.objectType, input.body),
+    },
+    { id: 'deploy_safety', label: 'Deploy safety', criteria: checkDeploySafety(input.body) },
     { id: 'artifact_trust', label: 'Media / artifact trust', criteria: checkArtifactTrust(input.body, context) },
     {
       id: 'structure',

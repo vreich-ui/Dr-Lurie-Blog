@@ -47,7 +47,12 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   live). **Agent-CREATED pages are live end-to-end (2026-07-11, B1 closed)**:
   the object-page catch-all (`src/pages/[...objectPage].astro` +
   `src/utils/object-page-routes.ts`) serves any published Page object whose
-  route no file owns — create → publish → release → live, zero code. Still
+  route no file owns — create → publish → release → live, zero code.
+  **Write-time guardrails (2026-07-11, traps 5+14 closed)**: `validateObject`
+  now blocks, at patch/create/publish, content that would break the deploy
+  (protected env values in any encoding; repo-file hotlink URLs) or the build
+  (per-component rich-text vocabulary, checked with the real splitters) — an
+  agent can no longer publish something that dead-ends the pipeline. Still
   TODO: the W5+ hand-coded pages (Wolf: separate session).
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
