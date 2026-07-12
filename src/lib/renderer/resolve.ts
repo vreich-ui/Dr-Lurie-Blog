@@ -31,6 +31,7 @@ import {
 import type {
   ContentEmbedCard,
   ContentGridCard,
+  PricingTierResolved,
   ProductPreviewCard,
   RenderCtx,
   SectionType,
@@ -96,6 +97,13 @@ export type ResolvePageDeps = {
    * a product-backed product_preview section.
    */
   productGrid?: ContentGridResolvers<ProductPreviewCardInternal, ProductQuery>;
+  /**
+   * Resolve one pricing_table tier's product reference from commerce data
+   * (W5). undefined = the product no longer resolves — the component skips
+   * the tier (temporal drift, never fatal). Required only when a page carries
+   * a pricing_table section.
+   */
+  resolvePricingTier?: (productId: string) => PricingTierResolved | undefined;
 };
 
 // The audited homepage OG image is emitted at these fixed dimensions; page.v1
@@ -133,6 +141,7 @@ export const parseSharedSectionExport = (
 type HeroLikeData = { actions?: Array<{ target: NavTarget }> };
 type LinkListLikeData = { links?: Array<{ target: NavTarget }> };
 type ProductPreviewLikeData = { source: ProductPreviewSource; limit: number };
+type PricingTableLikeData = { tiers?: Array<{ product: string }> };
 /** Internal identity for de-duplicating product manual picks against fallback backfill. */
 type ProductPreviewCardInternal = ProductPreviewCard;
 type ContentGridLikeData = { source: ContentGridSource; limit: number };
@@ -166,6 +175,20 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
       );
     }
     return { cards: resolveContentGridCards(source, limit, deps.productGrid) };
+  }
+  // content_split shares the action-hrefs policy.
+  if (type === 'content_split') {
+    return {
+      actionHrefs: ((data as HeroLikeData).actions ?? []).map((action) => deps.resolveActionHref(action.target)),
+    };
+  }
+  // pricing_table (W5): tiers resolve against commerce data, index-aligned.
+  if (type === 'pricing_table') {
+    const tiers = (data as PricingTableLikeData).tiers ?? [];
+    if (!deps.resolvePricingTier) {
+      throw new Error('index: a pricing_table section requires resolvePricingTier to be supplied to resolvePage.');
+    }
+    return { tiers: tiers.map((tier) => deps.resolvePricingTier?.(tier.product)) };
   }
   if (type === 'content_embed') {
     if (!deps.resolveContentEmbed) {

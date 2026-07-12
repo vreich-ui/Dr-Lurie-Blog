@@ -540,6 +540,12 @@ if (writeExports) {
   };
   for (const seed of PAGE_HOME_SEEDS) {
     const record = await getRecord(seed.objectType, seed.objectId);
+    if (!record) {
+      // An object that failed ensure was never created — report and keep
+      // materializing the rest instead of crashing the whole report.
+      step(`materialize ${seed.objectId}`, false, 'no record in the store (ensure failed?)');
+      continue;
+    }
     const meta = { at: new Date().toISOString(), record_version: record.version };
     const file = materializerByType[seed.objectType](seed.objectId, record.body, meta);
     fs.mkdirSync(path.dirname(path.join(repoRoot, file.path)), { recursive: true });

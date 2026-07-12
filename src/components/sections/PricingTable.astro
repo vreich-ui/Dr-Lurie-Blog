@@ -1,0 +1,64 @@
+---
+/**
+ * `pricing_table` section component (W5) — product-linked tier cards. Price
+ * badge, availability, and href arrive RESOLVED from commerce data (never
+ * typed into the section); tier copy is data. Unresolved tiers are skipped
+ * (temporal drift, the content_grid rule); unavailable products render a
+ * disabled "Coming soon" state instead of a buy CTA.
+ */
+import type { PricingTableResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'pricing_table'>;
+  resolved: PricingTableResolved;
+  ctx: RenderCtx;
+};
+
+const { data, resolved } = Astro.props;
+const tiers = data.tiers
+  .map((tier, index) => ({ tier, product: resolved.tiers[index] }))
+  .filter((entry): entry is { tier: (typeof data.tiers)[number]; product: NonNullable<(typeof resolved.tiers)[number]> } =>
+    Boolean(entry.product)
+  );
+---
+
+<section class="dl-section">
+  <div class="max-w-2xl text-center mx-auto">
+    {data.kicker && <p class="text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+    {data.heading && <h2 class="mt-3 text-3xl font-bold tracking-tight text-heading sm:text-4xl">{data.heading}</h2>}
+    {data.description && <p class="mt-4 text-lg text-muted">{data.description}</p>}
+  </div>
+  <div class="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      tiers.map(({ tier, product }) => (
+        <article
+          class:list={[
+            'dl-card flex flex-col',
+            tier.highlighted ? 'ring-2 ring-accent' : '',
+          ]}
+        >
+          <h3 class="text-xl font-semibold text-heading">{tier.title ?? product.title}</h3>
+          {tier.description && <p class="mt-2 text-muted">{tier.description}</p>}
+          <p class="mt-4 text-3xl font-bold text-heading">{product.priceBadge}</p>
+          {tier.features.length > 0 && (
+            <ul class="mt-4 space-y-2 text-muted grow">
+              {tier.features.map((feature) => (
+                <li class="flex gap-2">
+                  <span aria-hidden="true" class="text-accent">✓</span>
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          )}
+          {product.available ? (
+            <a class:list={['mt-6', tier.highlighted ? 'btn-primary' : 'btn-secondary']} href={product.href}>
+              {tier.actionLabel ?? 'View'}
+            </a>
+          ) : (
+            <span class="btn mt-6 cursor-not-allowed opacity-60">Coming soon</span>
+          )}
+        </article>
+      ))
+    }
+  </div>
+</section>

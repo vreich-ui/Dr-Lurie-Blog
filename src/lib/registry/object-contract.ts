@@ -34,17 +34,20 @@ import { checklistDefinition } from './components/checklist.js';
 import { contactFormDefinition } from './components/contact-form.js';
 import { contentEmbedDefinition } from './components/content-embed.js';
 import { contentGridDefinition } from './components/content-grid.js';
+import { contentSplitDefinition } from './components/content-split.js';
 import { ctaBannerDefinition } from './components/cta-banner.js';
 import { faqDefinition } from './components/faq.js';
 import { heroDefinition } from './components/hero.js';
 import { ledeDefinition } from './components/lede.js';
 import { linkListDefinition } from './components/link-list.js';
 import { newsletterSignupDefinition } from './components/newsletter-signup.js';
+import { pricingTableDefinition } from './components/pricing-table.js';
 import { productPreviewDefinition } from './components/product-preview.js';
 import { proseDefinition } from './components/prose.js';
 import { isRegisteredSectionType } from './components/registered-types.js';
 import { formConfirmationDefinition } from './components/form-confirmation.js';
 import { searchDefinition } from './components/search.js';
+import { stepsDefinition } from './components/steps.js';
 import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
@@ -99,6 +102,9 @@ const SECTION_EDITORS = {
   search: searchDefinition.editor,
   content_embed: contentEmbedDefinition.editor,
   form_confirmation: formConfirmationDefinition.editor,
+  steps: stepsDefinition.editor,
+  content_split: contentSplitDefinition.editor,
+  pricing_table: pricingTableDefinition.editor,
 } as const;
 
 /**

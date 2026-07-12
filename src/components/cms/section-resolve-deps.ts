@@ -73,6 +73,7 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
   const needsContentGrid = anySection(isPostBackedContentGrid);
   const needsContentEmbed = anySection((type) => type === 'content_embed');
   const needsProductGrid = anySection(isProductBackedPreview);
+  const needsPricingTiers = anySection((type) => type === 'pricing_table');
   let contentGrid: ResolvePageDeps['contentGrid'];
   let resolveContentEmbed: ResolvePageDeps['resolveContentEmbed'];
   if (needsContentGrid || needsContentEmbed) {
@@ -143,6 +144,31 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
     };
   }
 
+  // pricing_table tier resolution (W5): tiers reference products by id and
+  // resolve title/badge/availability/href from the SAME commerce data the
+  // shop renders — including coming_soon products (shown, not buyable), so
+  // the read is loadProductExports, not the availability-filtered catalog.
+  let resolvePricingTier: ResolvePageDeps['resolvePricingTier'];
+  if (needsPricingTiers) {
+    const { loadProductExports, productPriceBadge, productRoute } = await import('~/utils/products');
+    const allProducts = await loadProductExports();
+    resolvePricingTier = (productId) => {
+      const product = allProducts.find((candidate) => candidate.id === productId);
+      if (!product) {
+        console.warn(
+          `[pricing_table] tier product "${productId}" no longer resolves to a committed export and was SKIPPED.`
+        );
+        return undefined;
+      }
+      return {
+        title: product.body.presentation.title,
+        priceBadge: productPriceBadge(product.body.commerce),
+        available: product.body.commerce.availability === 'available',
+        href: getPermalink(productRoute(product.body)),
+      };
+    };
+  }
+
   return {
     resolveActionHref,
     resolveSharedSection: (sectionObjectId) => {
@@ -153,5 +179,6 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
     contentGrid,
     resolveContentEmbed,
     productGrid,
+    resolvePricingTier,
   };
 };

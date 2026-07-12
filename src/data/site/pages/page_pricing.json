@@ -1,0 +1,128 @@
+{
+  "__generated": {
+    "at": "2026-07-12T14:28:58.616Z",
+    "from": "objects/page/by-id/page_pricing.json",
+    "record_version": 12
+  },
+  "pageType": "standard",
+  "route": "/pricing",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>The library stays free. Paid guides fund the research time behind it — and two of the three options below cost exactly what you choose.</p>",
+        "heading": "Pay for depth, not access",
+        "kicker": "Pricing"
+      },
+      "id": "s_pricinglede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "description": "Prices come straight from the shop — this table never goes stale.",
+        "heading": "Guides and support",
+        "tiers": [
+          {
+            "actionLabel": "Get it free",
+            "description": "Start here: audit your current routine in one page.",
+            "features": [
+              "One-page routine audit",
+              "Instant download",
+              "No email required"
+            ],
+            "product": "prod_starter_checklist"
+          },
+          {
+            "actionLabel": "Buy the guide",
+            "description": "The full, referenced barrier repair plan.",
+            "features": [
+              "Complete repair protocol",
+              "Ingredient checklists",
+              "Free updates to this edition"
+            ],
+            "highlighted": true,
+            "product": "prod_barrier_repair_guide"
+          },
+          {
+            "actionLabel": "Support",
+            "description": "Keep the library free and unsponsored.",
+            "features": [
+              "Pay what you want",
+              "Every cent funds research time"
+            ],
+            "product": "prod_support_the_work"
+          }
+        ]
+      },
+      "id": "s_pricingtiers",
+      "type": "pricing_table"
+    },
+    {
+      "data": {
+        "heading": "How it works",
+        "items": [
+          {
+            "description": "Every product page shows exactly what is inside.",
+            "icon": "tabler:shopping-bag",
+            "title": "Pick a guide"
+          },
+          {
+            "description": "Checkout hands you the file immediately — no waiting on email.",
+            "icon": "tabler:download",
+            "title": "Instant download"
+          },
+          {
+            "description": "Each guide ends with a concrete routine you can start the same day.",
+            "icon": "tabler:checkup-list",
+            "title": "Put it to work"
+          }
+        ]
+      },
+      "id": "s_pricingsteps",
+      "type": "steps"
+    },
+    {
+      "data": {
+        "heading": "Common questions",
+        "items": [
+          {
+            "a": "<p>Yes — reply to your receipt within 14 days and we will refund the purchase, no questions asked.</p>",
+            "q": "Can I get a refund?"
+          },
+          {
+            "a": "<p>Links expire after 72 hours for safety. Reply to your receipt email and we will reissue a fresh one.</p>",
+            "q": "I lost my download link."
+          },
+          {
+            "a": "<p>Yes. Paid guides exist so the library never needs sponsors or paywalls.</p>",
+            "q": "Is the blog staying free?"
+          }
+        ]
+      },
+      "id": "s_pricingfaq",
+      "type": "faq"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Get the free checklist",
+            "style": "primary",
+            "target": {
+              "href": "/shop/starter-checklist",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>The free checklist takes five minutes and tells you which guide — if any — you actually need.</p>",
+        "heading": "Not sure where to start?"
+      },
+      "id": "s_pricingcta",
+      "type": "cta_banner"
+    }
+  ],
+  "seo": {
+    "description": "Simple pricing for science-first skincare guides — fixed, pay-what-you-want, and free."
+  },
+  "title": "Pricing"
+}

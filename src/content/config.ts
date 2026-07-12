@@ -130,7 +130,18 @@ const templateObjectCollection = defineCollection({
 });
 
 const productObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/products' }),
+  // generateId pins the entry id to the FILENAME (= object id). The glob
+  // loader's default prefers a top-level `slug` field when the data has one —
+  // and product bodies do (/shop/<slug>) — which silently made entry.id the
+  // slug, breaking every by-object-id lookup (pricing_table tiers, manual
+  // product_preview picks, the buy-box product_id the checkout functions
+  // resolve in the store). Every other object collection has no `slug` field,
+  // so their ids were already the filename.
+  loader: glob({
+    pattern: '*.json',
+    base: 'src/data/site/products',
+    generateId: ({ entry }) => entry.replace(/\.json$/, ''),
+  }),
   schema: derivedExportSchema,
 });
 

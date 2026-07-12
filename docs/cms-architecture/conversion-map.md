@@ -108,17 +108,18 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │   │         eyebrow · heading · message · formMessages[{form,heading,message}] · actions[].
 │   │         Renders byte-identically; local round-trip proven. Depended on by form redirects.
 │   │
-│   ├── HAND-CODED PAGES ─ 🔴 TODO ─ priority W5 (need NEW REUSABLE section types first —
-│   │   │   see PALETTE ⚪ nodes; per design-principles, no new per-page types)
-│   │   ├── page_pricing ─ /pricing ─ composes widgets: HeroText · Pricing · FAQs · Steps ·
-│   │   │     Features3 · CallToAction → target objects: hero + ⚪pricing_table + faq +
-│   │   │     ⚪steps + ⚪feature_grid + cta_banner
-│   │   ├── page_services ─ /services ─ widgets: Hero · Content · Features2 · Testimonials ·
-│   │   │     CallToAction → target objects: hero + ⚪content_split + ⚪feature_grid +
-│   │   │     testimonial + cta_banner
-│   │   └── page_shop_preview ─ /solutions/shop-preview ─ bespoke markup + scoped <style> →
-│   │         target: product_preview (type exists; ProductCard[]) + prose/cta; needs the
-│   │         functional-equivalence gate (known-inert-diffs.md) for the scoped style
+│   ├── HAND-CODED PAGES ─ 🟣 SEEDED (W5, 2026-07-12; route files DELETED, catch-all-served;
+│   │   │   awaiting the credentialed run) ─ seeds: scripts/lib/pages-w5-seed-data.mjs
+│   │   ├── page_pricing ─ /pricing ─ lede + pricing_table (tiers REFERENCE the 3 products;
+│   │   │     price/availability/CTA resolve from commerce data at build) + steps + faq +
+│   │   │     cta_banner. MOCK copy (Wolf 2026-07-12).
+│   │   ├── page_services ─ /services ─ lede + content_split + content_grid `cards`
+│   │   │     (feature_grid NOT minted — cards already covers icon grids) + cta_banner.
+│   │   │     MOCK copy (Wolf 2026-07-12).
+│   │   └── page_shop_preview ─ /solutions/shop-preview ─ REAL copy verbatim as ONE
+│   │         content_split (bespoke hero + scoped <style> generalized INTO the component —
+│   │         no equivalence gate needed; nav route-kind links unchanged, post-launch
+│   │         repoints to /shop with one op)
 │   │
 │   ├── LISTING SURFACES ─ 🟢 CONVERTED (W6, credentialed run 2026-07-12; export
 │   │   │   commits 7956b13…b0f8d90, released:true, store === seed === export) ─
@@ -165,10 +166,11 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │   ├── bespoke single-use types: NONE — the palette is fully generic as of 2026-07-11
 │   │     (`about` retired 2026-07-10; `contact` retired + `thank_you`→`form_confirmation` 2026-07-11)
 │   ├── wrapper: shared_ref (pointer, never rendered itself)
-│   └── ⚪ needed by W5 (design them REUSABLE, agent-configurable):
-│         pricing_table (tiers[] as card-like cells) · steps (ordered step cells) ·
-│         feature_grid (icon+title+text cells; covers Features2/Features3) ·
-│         content_split (Content widget: text + image/aside) ·
+│   └── W5 types MINTED 2026-07-12 (all reusable, agent-configurable):
+│         pricing_table (tiers[] referencing product objects — money data resolved at
+│           build, never typed into sections) · steps (ordered icon step cells) ·
+│         content_split (kicker/heading/rich body + actions + ≤2 staggered images) ·
+│         feature_grid NOT minted — content_grid `cards` already covers it ·
 │         (maybe) brand_row / stats if those widgets ever go live
 │
 ├── TAXONOMY ─ singleton (tax_drlurie) ─ 🟢 CONVERTED (W3, credentialed run 2026-07-11)
@@ -254,7 +256,7 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 | W2.5       | ✅ CONVERTED (batched run 2026-07-11): `object_instantiate_template` verb + 3 starter recipes, store-backed in production                                                                                                  | Machinery is built and dormant; makes new specialty pages a zero-code agent action   | M    |
 | W3         | ✅ DONE (credentialed run + step 2, 2026-07-11): tax_drlurie converted; publish-article enforcement hook + 93-post frontmatter normalization + registry display labels shipped — full §5.5 live for articles               | Unlocks term-filtered grids, listings, topics hub                                    | M    |
 | W4         | ✅ CONVERTED (credentialed run 2026-07-11): site_drlurie store-backed; brandTokens/logo/chrome/metadataDefaults/defaultNavigation render from the object; urls/blog carried (config.yaml authoritative for routing per B2) | Makes global config agent-editable; removes config.yaml as a second source of truth  | M    |
-| W5         | RE-GROUNDED in the shop module (2026-07-12 — see [`06-shop-module-plan.md`](06-shop-module-plan.md)): /pricing renders pricing_table tiers FROM product objects; shop-preview → content_split; /services + product content use MOCKUP data (Wolf, 2026-07-12 — supersedes the copy-or-delete wait). The ⚪ types mint after S1–S3 of the shop build. **S1+S2+S3 DONE 2026-07-12 (the full §9 critical path)**: `product` is the eighth object type (S1a), commerce/event stores + checkout→webhook→token delivery live (S1b/c, PRs #411–#413), /shop + /shop/[slug] render from 3 MOCK products + page_shop (first catch-all-served page) + page_product_detail — awaiting the credentialed run (products stop at approval_required → Wolf approves) | New reusable section types (pricing_table, steps, feature_grid, content_split)       | M-L  |
+| W5         | RE-GROUNDED in the shop module (2026-07-12 — see [`06-shop-module-plan.md`](06-shop-module-plan.md)): /pricing renders pricing_table tiers FROM product objects; shop-preview → content_split; /services + product content use MOCKUP data (Wolf, 2026-07-12 — supersedes the copy-or-delete wait). The ⚪ types mint after S1–S3 of the shop build. **S1+S2+S3 DONE 2026-07-12 (the full §9 critical path)**: `product` is the eighth object type (S1a), commerce/event stores + checkout→webhook→token delivery live (S1b/c, PRs #411–#413), /shop + /shop/[slug] render from 3 MOCK products + page_shop (first catch-all-served page) + page_product_detail. **W5 pages SEEDED same day**: pricing_table/steps/content_split minted; /pricing, /services, /solutions/shop-preview render from page objects, route files deleted; `commerce_orders` admin tool live — awaiting the credentialed run (products stop at approval_required → Wolf approves; same run publishes the W5 pages) | New reusable section types (pricing_table, steps, content_split) — DONE 2026-07-12       | M-L  |
 | W6         | ✅ CONVERTED (credentialed run 2026-07-12): listing/content_detail PageTypes defined; 6 page objects (library, topics ×2, category, tag, article) store-backed, round-tripped, published, released — byte-identical cutover held | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
 | W7         | Articles onto Contentful Rich Text (+ embeds, assets)                                                                                                                                                                      | Post-MVP by standing decision                                                        | L    |
 | any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted                                                                         | Independent, non-blocking                                                            | S    |

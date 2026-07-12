@@ -275,6 +275,58 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     source: productPreviewSourceSchema,
     limit: z.number().int().positive().max(PRODUCT_PREVIEW_MAX_CARDS),
   }),
+  // Ordered process strip (W5 /pricing "how it works", plan §4) — numbered
+  // steps, optionally iconed. Ordering is the semantic content_grid cards
+  // lack; grids of unordered icon+title+description cells stay content_grid.
+  sectionVariant('steps', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    items: z
+      .array(
+        z
+          .object({
+            title: z.string().min(1),
+            description: z.string().optional(),
+            icon: z.string().min(1).optional(), // Tabler icon name; numbered when absent
+          })
+          .strict()
+      )
+      .min(1),
+  }),
+  // Text + media split (W5 shop-preview conversion, plan §4): kicker/heading/
+  // paragraph body/actions beside 1–2 images. `reverse` flips the columns —
+  // the repointable generic the bespoke shop-hero markup becomes.
+  sectionVariant('content_split', {
+    kicker: z.string().optional(),
+    heading: z.string().min(1),
+    body: richTextSchema, // paragraph-only (renderability check)
+    actions: z.array(linkActionSchema),
+    images: z.array(z.object({ src: z.string().min(1), alt: z.string().min(1) }).strict()).max(2),
+    reverse: z.boolean().optional(),
+  }),
+  // Product-linked pricing tiers (W5 /pricing, plan §4): each tier REFERENCES
+  // a product object — price badge + availability resolve from the SAME
+  // commerce data at build (no copy drift; repointable; the design-principles
+  // litmus). Tier copy (features, description) is editorial; money is not.
+  sectionVariant('pricing_table', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    description: z.string().optional(),
+    tiers: z
+      .array(
+        z
+          .object({
+            product: z.string().min(1), // product object id (prod_…)
+            title: z.string().min(1).optional(), // defaults to the product's title
+            description: z.string().optional(),
+            features: z.array(z.string().min(1)),
+            highlighted: z.boolean().optional(),
+            actionLabel: z.string().min(1).optional(), // defaults to "View"
+          })
+          .strict()
+      )
+      .min(1),
+  }),
   // T3.13 extensibility drill: a reader/expert quote grid. No audited markup
   // on the live site — this exists to prove a NEW section type is insertable
   // through the registry pattern (one union member + one module + one

@@ -380,6 +380,15 @@ export const checkReferenceIntegrity = (
       if (node.type === 'content_embed' && typeof data.contentItem === 'string') {
         requireObject('content_item', data.contentItem, 'content_embed.contentItem');
       }
+      // pricing_table tiers must reference existing products (W5 — money data
+      // resolves from commerce objects, so a ghost tier is a hard failure).
+      if (node.type === 'pricing_table' && Array.isArray(data.tiers)) {
+        for (const tier of data.tiers) {
+          if (isRecord(tier) && typeof tier.product === 'string') {
+            requireObject('product', tier.product, 'pricing_table tier');
+          }
+        }
+      }
       // product_preview manual picks must resolve to existing products (S2 —
       // the content_grid manual-item rule over the product keyspace).
       if (node.type === 'product_preview' && isRecord(data.source)) {
@@ -1354,7 +1363,15 @@ export const checkStructuralInvariants = (
 // REAL splitters (never a re-implementation, so it cannot drift from what the
 // build actually does) on every field a component will split.
 
-const PARAGRAPH_BODY_TYPES = new Set(['hero', 'lede', 'bio', 'cta_banner', 'newsletter_signup', 'content_grid']);
+const PARAGRAPH_BODY_TYPES = new Set([
+  'hero',
+  'lede',
+  'bio',
+  'cta_banner',
+  'newsletter_signup',
+  'content_grid',
+  'content_split',
+]);
 
 const splitterProblem = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error);

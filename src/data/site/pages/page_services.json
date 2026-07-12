@@ -1,0 +1,96 @@
+{
+  "__generated": {
+    "at": "2026-07-12T14:28:58.620Z",
+    "from": "objects/page/by-id/page_services.json",
+    "record_version": 12
+  },
+  "pageType": "standard",
+  "route": "/services",
+  "sections": [
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>Most of this site is self-serve education. For questions a guide cannot answer, here is how we work together.</p>",
+        "heading": "Beyond the guides",
+        "kicker": "Services"
+      },
+      "id": "s_serviceslede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Join Early Access",
+            "style": "primary",
+            "target": {
+              "href": "/solutions/early-access",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>A structured one-to-one review of your current routine: what stays, what goes, and what the evidence says about the gaps — written up so you can act on it.</p><p>Consultation booking is not open yet; early-access members hear first.</p>",
+        "heading": "A routine review, grounded in your skin",
+        "images": [
+          {
+            "alt": "Skincare formulation texture close-up",
+            "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-product-texture.jpg"
+          }
+        ],
+        "kicker": "Consultations"
+      },
+      "id": "s_servicessplit",
+      "type": "content_split"
+    },
+    {
+      "data": {
+        "heading": "What we offer",
+        "limit": 3,
+        "source": {
+          "cards": [
+            {
+              "description": "One-to-one audits of what you use today, against the evidence.",
+              "icon": "tabler:user-check",
+              "title": "Routine reviews"
+            },
+            {
+              "description": "Science-first material for clinics and estheticians, without the sales pitch.",
+              "icon": "tabler:school",
+              "title": "Education partnerships"
+            },
+            {
+              "description": "Advisory work for brands building age-aware products honestly.",
+              "icon": "tabler:flask",
+              "title": "Formulation input"
+            }
+          ],
+          "kind": "cards"
+        }
+      },
+      "id": "s_servicesgrid",
+      "type": "content_grid"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Get in touch",
+            "style": "primary",
+            "target": {
+              "href": "/contact",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Tell us what you are trying to solve — we answer every serious inquiry.</p>",
+        "heading": "Work with Dr. Lurié"
+      },
+      "id": "s_servicescta",
+      "type": "cta_banner"
+    }
+  ],
+  "seo": {
+    "description": "Beyond the guides: how Dr. Lurié works with readers, clinics, and brands."
+  },
+  "title": "Services"
+}

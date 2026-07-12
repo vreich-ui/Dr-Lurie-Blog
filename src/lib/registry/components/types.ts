@@ -87,6 +87,26 @@ export type ProductPreviewResolved = {
   cards?: ProductPreviewCard[];
   cardHrefs?: Array<string | undefined>;
 };
+/** content_split: hrefs for data.actions, aligned by index (the hero policy). */
+export type ContentSplitResolved = {
+  actionHrefs: string[];
+};
+/**
+ * pricing_table (W5): each tier's product reference resolved from the SAME
+ * commerce data the shop renders — title (tier override wins), price badge by
+ * mode, availability, and the product page href. `undefined` where the
+ * product no longer resolves (skipped with a build warning, never fatal —
+ * the content_grid temporal-drift rule).
+ */
+export type PricingTierResolved = {
+  title: string;
+  priceBadge: string;
+  available: boolean;
+  href: string;
+};
+export type PricingTableResolved = {
+  tiers: Array<PricingTierResolved | undefined>;
+};
 /**
  * content_embed: the referenced content_item resolved to a link card. `card` is
  * absent when the article is missing or unpublished — an embed of a
