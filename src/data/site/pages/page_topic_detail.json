@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-12T09:41:56.797Z",
+    "at": "2026-07-12T11:50:27.031Z",
     "from": "objects/page/by-id/page_topic_detail.json",
-    "record_version": 12
+    "record_version": 11
   },
   "pageType": "listing",
   "route": "/learn/topics/[topic]",
