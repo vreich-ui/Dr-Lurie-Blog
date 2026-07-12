@@ -5,7 +5,7 @@ import GridItem from '~/components/blog/GridItem.astro';
 import ObjectSections from '~/components/cms/ObjectSections.astro';
 import { fetchPosts } from '~/utils/blog';
 import { getPermalink } from '~/utils/permalinks';
-import { loadRoutePageObject } from '~/utils/route-page-object';
+import { loadRoutePageObject, routeHeaderAnnotation } from '~/utils/route-page-object';
 
 export const prerender = true;
 
@@ -52,9 +52,11 @@ const metadata = {
       ← All topics
     </a>
     <div class="mt-4 rounded-3xl bg-gradient-to-br from-sky-50 via-amber-50 to-transparent p-6 sm:p-10">
-      {header.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>}
-      <h1 class="mt-3 text-4xl font-bold capitalize sm:text-5xl" set:html={header.heading} />
-      {header.paragraphs.map((paragraph) => <p class="dl-reading mt-5 text-muted" set:html={paragraph} />)}
+      <div style="display:contents" {...routeHeaderAnnotation('page_topic_detail', detail?.header)}>
+        {header.kicker && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{header.kicker}</p>}
+        <h1 class="mt-3 text-4xl font-bold capitalize sm:text-5xl" set:html={header.heading} />
+        {header.paragraphs.map((paragraph) => <p class="dl-reading mt-5 text-muted" set:html={paragraph} />)}
+      </div>
     </div>
 
     <div class="mt-10 grid gap-8 md:grid-cols-2">
