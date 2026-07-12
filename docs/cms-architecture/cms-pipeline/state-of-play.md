@@ -7,6 +7,48 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 H (CANVAS SHIPPED: the site is the editing surface — admin inline Ask-AI, draft-in-place, publish/release tray)
+
+Wolf approved the edit-mode canvas plan ("go on and start work on this,
+layering phases over preexisting conversion steps; stop at the article
+publishing engine; ignore the old admin editor in favor of this UX") after a
+feasibility/UX write-up + interactive mockup. Shipped in four commits on
+`claude/admin-inline-ai-editing-trkigv` — full doc:
+[`07-canvas-editing.md`](../07-canvas-editing.md).
+
+- **Section identity in the built HTML**: both dispatch sites wrap every
+  section in a `display:contents` element carrying
+  `data-cms-object-id/-section-id/-section-type` (+ `-shared-object` for
+  shared_ref derefs — `resolveSections` now keeps the `sec_*` id on
+  `RenderableSection`). No box, no layout change; ObjectSections gained a
+  required `objectId` prop (threaded from the 6 listing routes).
+- **Section-scoped Ask-AI (additive)**: `admin-ask-ai-object` takes
+  `section_id` (pages) — tool derived from the section type's own data
+  grammar (`sectionDataSchemaForType`, generic over the union), suggestion
+  maps 1:1 onto `update_section_data`; shared_ref scopes are refused with the
+  target id; section OBJECTS auto-scope to their inner instance. Read-only as
+  ever; content_item still refused (article Ask-AI untouched — the stop line).
+- **The overlay** (`src/lib/edit-mode/`): dormant 1.5KB loader in Layout →
+  GoTrue + server-side admin-auth-state gate → 27KB code-split editor for
+  admins only. Hover chips (✨ Ask AI, selection-aware, shared/draft flags),
+  docked panel diffing against the DRAFT record, conservative in-place
+  preview (real splitters; honest fallback to panel diff), Accept →
+  checkout → patch via shared LockManager (`EditSession`; 409-retry, 422
+  blockers surfaced, foreign locks named), pending tray fed by
+  `inventory {pending_changes:true}` with per-object Publish and Release.
+  Draft state survives reloads (amber framing on load).
+- **Gates**: 1071/1071 tests (+~45 new: annotations, scope, target routing),
+  astro check 0, build 167 pages, **headless-browser drive of the real built
+  site end-to-end** (dormant visitor path verified — zero admin calls/chunk;
+  full edit flow wire shapes asserted; one real bug found+fixed by the drive).
+  Build output now differs from pre-canvas builds by the inert data-cms-*
+  attributes only — sanctioned, one-time.
+- **NOT done (deliberate)**: articles on the canvas (W7/OQ-8 — Wolf's stop),
+  structural ops UI (add/move/remove/meta), OQ-9 SSR draft preview, W7 rich
+  text itself (next conversion wave), and the credentialed production
+  walk-through of one canvas edit (sandbox boundary — same as every
+  conversion; suggest page_thank_you first).
+
 ## Session 2026-07-12 G (S2 BUILT + SEEDED: /shop catalog + product pages, mock content — awaiting credentialed run)
 
 Same session (PR #413 merged; branch restarted). S2 per plan §4/§9, with

@@ -64,6 +64,8 @@ export interface ObjectSuggestionRequest {
   object_id: string;
   instruction: string;
   selected_text?: string;
+  /** Page-only: scope the request to one section instance (edit-mode canvas). */
+  section_id?: string;
 }
 
 export interface ObjectSuggestionResponse {
