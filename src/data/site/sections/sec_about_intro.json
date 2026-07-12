@@ -1,17 +1,17 @@
 {
   "__generated": {
-    "at": "2026-07-11T19:11:00.951Z",
+    "at": "2026-07-12T16:30:28.320Z",
     "from": "objects/section/by-id/sec_about_intro.json",
-    "record_version": 25
+    "record_version": 36
   },
   "section": {
     "data": {
-      "body": "<p>If you have tried products that promised everything and delivered very little, the problem may not be your effort. It may be that most skincare advice starts in the wrong place.</p><p>Dr. Leonid Lurie approaches skin health through a physician-scientist lens: what is happening in the body, how ingredients reach the right place, and why simpler decisions are often stronger than louder claims.</p><p>The goal of this site is to help you understand before you buy, so your next skincare step is clearer, calmer, and easier to trust.</p>",
-      "heading": "Dr. Leonid Lurie: the scientist behind the skin-health approach",
+      "body": "<p>If you have tried products that promised everything and delivered very little, the problem may not be your effort. It may be that most skincare advice starts in the wrong place.</p><p>Dr. Zeev Lurie approaches skin health through a physician-scientist lens: what is happening in the body, how ingredients reach the right place, and why simpler decisions are often stronger than louder claims.</p><p>The goal of this site is to help you understand before you buy, so your next skincare step is clearer, calmer, and easier to trust.</p>",
+      "heading": "Dr. Zeev Lurie, Ph.D: the scientist behind the skin-health approach",
       "kicker": "About the method",
       "portrait": {
         "alt": "Portrait of Dr. Leonid Lurie",
-        "src": "/images/dr-lurie-portrait4.jpeg"
+        "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg"
       },
       "trustNotes": [
         "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",

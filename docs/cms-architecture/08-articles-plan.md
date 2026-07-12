@@ -2,7 +2,7 @@
 
 > **Status: PLAN, not code** (Wolf directive 2026-07-12, the shop-module precedent:
 > plan first, build in bounded phases after approval). This document is the W7
-> deliverable of session 2026-07-12 K. Nothing in the article pipeline changes
+> deliverable of session 2026-07-12 L. Nothing in the article pipeline changes
 > until Wolf approves this plan and the phase sessions begin.
 
 ## 0. Mandate and decisions (Wolf, 2026-07-12 — GOVERNING for W7)

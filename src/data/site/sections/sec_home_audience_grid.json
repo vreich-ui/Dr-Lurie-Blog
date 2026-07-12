@@ -1,28 +1,28 @@
 {
   "__generated": {
-    "at": "2026-07-11T18:43:51.804Z",
+    "at": "2026-07-12T16:29:40.079Z",
     "from": "objects/section/by-id/sec_home_audience_grid.json",
-    "record_version": 19
+    "record_version": 23
   },
   "section": {
     "data": {
       "anchor": "audience",
-      "heading": "Four quick signals, with sharper card copy.",
-      "kicker": "For this visual pass",
+      "heading": "This is for people who need skin care now but do not trust the aisle.",
+      "kicker": "For late starters",
       "limit": 4,
       "source": {
         "cards": [
           {
-            "description": "New to skincare and looking for a calmer first step."
+            "description": "You came late to skin care because life, health, work, or plain skepticism got there first."
           },
           {
-            "description": "Trying to understand your skin before buying another product."
+            "description": "You want fewer claims and a clearer way to decide what is worth trying."
           },
           {
-            "description": "Choosing physician-led education over trend-driven routines."
+            "description": "You need a routine that can start small instead of becoming another crowded shelf."
           },
           {
-            "description": "Wanting simple explanations with a bit more visual contrast."
+            "description": "You prefer education, transparent offers, and time to think before buying."
           }
         ],
         "kind": "cards"

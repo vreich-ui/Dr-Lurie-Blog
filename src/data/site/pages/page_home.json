@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-11T18:44:04.612Z",
+    "at": "2026-07-12T16:29:19.503Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 80
+    "record_version": 87
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -14,25 +14,25 @@
       "data": {
         "actions": [
           {
-            "label": "Get the Bright Guide",
+            "label": "Download Starter PDF",
             "style": "primary",
             "target": {
-              "href": "/guides/free-guide",
-              "kind": "route"
+              "href": "pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
+              "kind": "asset"
             }
           },
           {
-            "label": "Explore First",
-            "style": "link",
+            "label": "See Small Offers",
+            "style": "secondary",
             "target": {
-              "href": "/start-here",
+              "href": "/solutions/shop-preview",
               "kind": "route"
             }
           }
         ],
-        "body": "<p>Most beginners are pushed toward more products before they understand what their skin is actually asking for. This test gives the home page a brighter first impression while keeping the same steady educational promise.</p><p>Dr. Lurié Skin Care still gives you a physician-led starting point: learn the basics, choose one clear next step, and build confidence before you buy more.</p>",
-        "heading": "A calmer skin-care start, with a brighter visual cue.",
-        "kicker": "Fresh visual test for skincare beginners"
+        "body": "<p>Late Starter Skin is a calm publishing space for people who skipped the skin-care boom, got burned by product noise, or only recently realized their skin needs attention.</p><p>Start with plain education, download the practical PDFs, join the newsletter if it helps, and consider the small offer shelf only when you feel oriented.</p>",
+        "heading": "Skin care for people who need it now and mistrust the market.",
+        "kicker": "For people who came late to skin care"
       },
       "id": "s_hero",
       "type": "hero"
@@ -54,14 +54,14 @@
     {
       "data": {
         "anchor": "about",
-        "body": "<p>Dr. Lurié brings medical training, biophysics, and pharmaceutical research experience to skin health education. This visible test gives the biography block a slightly more editorial rhythm without changing its purpose.</p>",
+        "body": "<p>The point is not to make late starters feel behind. Dr. Lurie brings medical training, biophysics, and pharmaceutical research experience to help readers separate durable skin-health ideas from whatever happens to be loud this month.</p>",
         "disclaimer": "Educational content only. Not medical advice.",
-        "heading": "Science-led guidance, set off with a clearer accent.",
-        "kicker": "Clinician context",
+        "heading": "A physician-scientist voice before a product pitch.",
+        "kicker": "Why this is different",
         "trustNotes": [
-          "Physician-led education for people who want clearer skin-health decisions.",
-          "MD, PhD in Biophysics with decades of pharmaceutical research and development experience.",
-          "Beginner-friendly explanations with a stronger visual accent for this field test."
+          "Education comes first; products are kept secondary and small.",
+          "Plain-language explanations for people who want to understand before buying.",
+          "Educational content only. Not medical advice."
         ]
       },
       "id": "s_bio",
@@ -69,48 +69,60 @@
     },
     {
       "data": {
-        "anchor": "choose-next-step",
-        "body": "<p>This test varies the card button treatments so the page has more visible hierarchy.</p>",
-        "heading": "Three routes, three visual weights.",
-        "kicker": "Choose a clear path",
-        "limit": 3,
+        "anchor": "offers",
+        "body": "<p>Choose the lightest useful next action: a free PDF, the newsletter, the library, or a preview of the first product direction.</p>",
+        "heading": "A few next steps, kept deliberately small.",
+        "kicker": "Small offer shelf",
+        "limit": 4,
         "source": {
           "cards": [
             {
-              "description": "Begin with a plain-language starting point before adding products or steps.",
+              "description": "A tiny starter map for observing your skin before buying more.",
               "link": {
-                "label": "Start Here",
+                "label": "Download PDF",
                 "style": "primary",
                 "target": {
-                  "href": "/start-here",
-                  "kind": "route"
+                  "href": "pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
+                  "kind": "asset"
                 }
               },
-              "title": "Start with one simple routine question."
+              "title": "7-Day Reset Map PDF"
             },
             {
-              "description": "Read the education library to understand the basics behind claims, routines, and results.",
+              "description": "A quick claim-reading checklist for shopping with more friction and less panic.",
               "link": {
-                "label": "Browse Library",
-                "style": "link",
+                "label": "Download Checklist",
+                "style": "secondary",
                 "target": {
-                  "kind": "listing",
-                  "list": "content_index"
+                  "href": "pdf/req_publish_late_starter_pdfs_20260712_01/f891888cf799080cdc78ca2d66370e714036009b2dca07d26331f53ae45315dc.pdf",
+                  "kind": "asset"
                 }
               },
-              "title": "Compare claims with calmer context."
+              "title": "Label Mistrust Checklist"
             },
             {
-              "description": "Use the newsletter as the low-pressure follow-up path for short, clear skin-health education.",
+              "description": "Short follow-up notes and occasional worksheets for people who want context over churn.",
               "link": {
-                "label": "Join Newsletter",
+                "label": "Subscribe",
                 "style": "secondary",
                 "target": {
                   "href": "/newsletter",
                   "kind": "route"
                 }
               },
-              "title": "Get the next step by email."
+              "title": "The calm newsletter"
+            },
+            {
+              "description": "A low-pressure look at the future offer shelf, without pretending one routine fits everyone.",
+              "link": {
+                "label": "Preview Offers",
+                "style": "link",
+                "target": {
+                  "href": "/solutions/shop-preview",
+                  "kind": "route"
+                }
+              },
+              "title": "Small product preview"
             }
           ],
           "kind": "cards"
@@ -128,13 +140,13 @@
     }
   ],
   "seo": {
-    "description": "A calmer, clearer way to begin caring for your skin without complicated routines, product pressure, or trend-led advice.",
+    "description": "A DTC skin-care publishing space for people who arrived late, need help now, and mistrust the industry.",
     "ogImage": "/Social/og-home.jpg",
     "robots": {
       "follow": true,
       "index": true
     },
-    "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
+    "title": "Late Starter Skin | Calm skin care for skeptical beginners"
   },
-  "title": "Dr. Lurié Skin Care | Healthy Skin for Skincare Newcomers"
+  "title": "Late Starter Skin | Calm skin care for skeptical beginners"
 }
