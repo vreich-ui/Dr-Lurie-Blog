@@ -7,7 +7,7 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
-## Session 2026-07-12 M (CANVAS manual tools: icon toolbar, field editor, image tool, gap "+" add)
+## Session 2026-07-12 O (CANVAS manual tools: icon toolbar, field editor, image tool, gap "+" add)
 
 Wolf: "add text edit tools to each relevant object … remove the wording Ask AI
 and replace it with an icon [stars slightly brighter] … other objects may
@@ -36,7 +36,7 @@ symbol." Shipped on the #423 branch (same canvas scope as the guard):
   edit patch shape, image tool patch shape incl. alt preservation, gap add
   upsert wire shape + placeholder) — all green in both themes.
 
-## Session 2026-07-12 L (CANVAS bug: copy-AI dropped an image — copy-only guard added)
+## Session 2026-07-12 N (CANVAS bug: copy-AI dropped an image — copy-only guard added)
 
 First real production incident from the canvas, reported by Wolf: an AI edit
 to the /about intro (heading → add "Ph.D") also **silently swapped the bio
@@ -66,6 +66,90 @@ eslint/prettier clean. **Follow-ups**: (1) restore the live portrait to
 needs the production key; (2) the canvas has no manual (non-AI) field editor,
 which is now the only sanctioned way to deliberately change an image — worth
 building next.
+
+## Session 2026-07-12 M (W7.1 BUILT: the rich_text.v1 substrate — schema + renderer + ProseMirror mapper, inert by design)
+
+Same session (PR #422 — the W7 plan — merged; branch restarted). Wolf's
+rulings recorded first: **articles keep Tier 1** (OQ-W7-4 resolved, plan §7
+updated on the PR before merge) and the expanded `strategy_drlurie` registry
+design shipped into plan §2.5 (go/no-go still open). Mid-session directive
+recorded: **canvas editing belongs to ANOTHER session** — articles are not
+canvas-wired yet (they aren't objects yet at all); W7.8 is reassigned to that
+session's owner when the wave gets there. Nothing canvas-adjacent was touched
+here.
+
+W7.1 per the plan, all three substrate pieces in `src/lib/richtext/`:
+
+- **`rich-text-v1.ts`** — the zod mirror of Contentful's node tree
+  (`@contentful/rich-text-types` constants are the name source), restricted
+  to the house universe: p / h2 / h3 / ul / ol / li / blockquote /
+  embedded-entry-block / embedded-asset-block; marks bold + italic;
+  hyperlink inline (uri pinned whitespace-free). Per-field narrowing is a
+  **`RichTextGrammar`** (enabledNodeTypes/enabledMarks — the D§3.5
+  allowlist-becomes-declaration), with the three presets that mirror today's
+  splitter vocabularies: INLINE_COPY (p-only fields), PROSE (prose.body),
+  ARTICLE_BODY (adds quotes + embeds, the W7.3 target). `data` on every node
+  is the annotation carrier — nothing writes to it in this phase.
+- **`render-html.ts`** — build-time renderer over
+  `@contentful/rich-text-html-renderer` (v17): marks emit the house
+  `<strong>`/`<em>` (not the lib's b/i), embeds REQUIRE injected resolvers
+  and throw naming the target when absent (never-silently-drop), input is
+  schema-validated first, `node.data` never reaches HTML (leak-rule test
+  greps the output), and `\n` in text values renders as `<br/>` via a
+  post-pass (v17 ignores `renderText`; safe because the lib emits no
+  formatting newlines and uris are whitespace-free by schema — verified
+  empirically, incl. default text/attribute escaping).
+- **`prosemirror.ts`** — the ONE TipTap/ProseMirror ↔ rich_text.v1 mapper
+  (W7.2 editors + W7.7 article editor share it): heading levels 2–3, lists,
+  blockquote, bold/italic; link MARKS ↔ hyperlink INLINE nodes (consecutive
+  same-href runs merge, split back on return); hardBreak ↔ '\n'-in-value;
+  everything outside the universe throws naming the type. Structural types
+  only — no editor package imports in the build graph.
+
+Gates: **1116 + 49 tests green** (27 new across three test files, incl. both
+round-trip directions and the leak rule) · astro check 0 errors ·
+eslint/prettier clean · **build-diff EMPTY (173/173 identical)** — the
+substrate is used by nothing, exactly as specified. New deps:
+`@contentful/rich-text-types`, `@contentful/rich-text-html-renderer`.
+NEXT: W7.2 (section body fields accept string | document; one-time export
+conversion; TipTap emits rich text) — DOM-equivalence gate, own session/PR.
+
+## Session 2026-07-12 L (W7 PLANNED: OQ-8 RESOLVED as one-time migration — articles onto the object model + Rich Text; plan doc, not code)
+
+Wolf opened the article wave ("let's move with articles W7. be careful, I
+need the functionality developed for article publishing") and answered the
+four forks in-session — **OQ-8 is resolved: (1) one-time MIGRATION to
+ObjectRecords** (adapter path retired), (2) **build the Contentful Rich Text
+substrate now** (core-structure tasks 1–5, confirmed never built — sections
+use TipTap-HTML strings + splitters today), (3) canvas-for-articles in-wave
+if it fits, (4) plan doc first per the shop precedent. His preservation
+directive is the wave's prime rule: the `article_body.v1` semantic layer
+(per-node `private.strategy`/`intent`, commercial metadata + disclosure,
+chat, opaque ids, input templates; envelope-level emotional_strategy/claims/
+sources/compliance/scoring slots) exists so "agents can judge, score and
+build variants quickly" — it must come out of W7 MORE agent-usable, never
+flattened.
+
+**The plan is [`08-articles-plan.md`](../08-articles-plan.md).** Spine:
+`content_item` = ninth object type keeping `req_*` ids verbatim (artifact
+trust/blobKeys survive unchanged); body = **node envelope outside, Rich Text
+inside** (a hook can span paragraphs — the node grouping IS the behavioral
+structure; `public.body` upgrades string → `rich_text.v1` document); one
+renderer for build/admin/canvas; `create_variant` + typed `scores[]` as the
+A/B substrate (serving/traffic-split explicitly out of v1); the ~31 article
+tool names live on as thin aliases over object verbs (external agent configs
+call them by name); 5-agent workflow state moves into `body.workflow`;
+per-article cutover flags + a DOM-equivalence harness (83 committed posts
+keep URLs and rendering); the `workflows` store retires read-only as the
+rollback source. Ten-bug register dispositioned (recon this session; nothing
+was in the issue tracker): ①⑦⑨ die structurally, ② becomes the renderer
+feature matrix (offers/adSlots/chatInvite/PDF media render for the first
+time), ③④⑤⑥⑧⑩ are named phase tasks. Phases W7.1–W7.9, each its own
+session/PR; six OQ-W7 checkpoints for Wolf (alias sunset, variant serving,
+strategy vocabulary as a `strategy_drlurie` registry vs code enums, Tier 1
+posture, `.md` retirement, credentialed workflows-store inventory). §3.10's
+freeze lifts only inside the approved phases. NOT in this session: any code —
+W7.1 (rich_text.v1 substrate) starts on Wolf's approval of the plan.
 
 ## Session 2026-07-12 K (CANVAS Ask-AI runs on OpenAI; retheme + review fixes landed)
 

@@ -1,25 +1,29 @@
 {
   "__generated": {
-    "at": "2026-07-11T18:44:24.130Z",
+    "at": "2026-07-12T16:29:47.414Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 56
+    "record_version": 67
   },
   "actions": [
     {
-      "label": "Get the Guide",
+      "label": "Download Starter PDF",
       "style": "primary",
       "target": {
-        "href": "/guides/free-guide",
-        "kind": "route"
+        "href": "pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
+        "kind": "asset"
       }
     }
   ],
+  "brand": {
+    "descriptor": "Skin care for skeptical beginners",
+    "text": "Late Starter Skin"
+  },
   "groups": [
     {
       "id": "g_start_here",
       "items": [
         {
-          "description": "A science-first overview of what changes in skin after 60.",
+          "description": "Start with the late-to-skincare overview and the free PDFs.",
           "id": "i_home",
           "label": "Home",
           "target": {
@@ -37,9 +41,9 @@
           }
         },
         {
-          "description": "Visible navigation field test published on 2026-07-08.",
+          "description": "A calmer first path before buying more products.",
           "id": "i_start_here_guide",
-          "label": "Start Here guide",
+          "label": "Start Here",
           "target": {
             "href": "/start-here",
             "kind": "route"
@@ -56,9 +60,9 @@
       "id": "g_learn",
       "items": [
         {
-          "description": "Browse all skin science articles and practical explainers.",
+          "description": "Read plain skin-health explainers before choosing a routine.",
           "id": "i_library",
-          "label": "Education Library",
+          "label": "Publishing Library",
           "target": {
             "kind": "listing",
             "list": "content_index"
@@ -74,9 +78,9 @@
           }
         },
         {
-          "description": "Get the structured guide to aging skin and body odor changes.",
+          "description": "Download the simple guide for late starters.",
           "id": "i_free_guide",
-          "label": "Free Guide",
+          "label": "Starter PDF",
           "target": {
             "href": "/guides/free-guide",
             "kind": "route"
@@ -93,18 +97,18 @@
       "id": "g_solutions",
       "items": [
         {
-          "description": "See the upcoming age-aware skincare product direction.",
+          "description": "Preview the deliberately limited product and guide direction.",
           "id": "i_shop_preview",
-          "label": "Shop Preview",
+          "label": "Small Offer Shelf",
           "target": {
             "href": "/solutions/shop-preview",
             "kind": "route"
           }
         },
         {
-          "description": "Request launch notes, previews, and member-only product updates.",
+          "description": "Get launch notes, preview updates, and new worksheets without pressure.",
           "id": "i_join_early_access",
-          "label": "Join Early Access",
+          "label": "Newsletter & Early Access",
           "target": {
             "href": "/solutions/early-access",
             "kind": "route"
@@ -115,7 +119,7 @@
         "href": "/solutions/shop-preview",
         "kind": "route"
       },
-      "title": "Solutions"
+      "title": "Offers"
     }
   ],
   "role": "header"
