@@ -7,6 +7,53 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 M (W7.1 BUILT: the rich_text.v1 substrate — schema + renderer + ProseMirror mapper, inert by design)
+
+Same session (PR #422 — the W7 plan — merged; branch restarted). Wolf's
+rulings recorded first: **articles keep Tier 1** (OQ-W7-4 resolved, plan §7
+updated on the PR before merge) and the expanded `strategy_drlurie` registry
+design shipped into plan §2.5 (go/no-go still open). Mid-session directive
+recorded: **canvas editing belongs to ANOTHER session** — articles are not
+canvas-wired yet (they aren't objects yet at all); W7.8 is reassigned to that
+session's owner when the wave gets there. Nothing canvas-adjacent was touched
+here.
+
+W7.1 per the plan, all three substrate pieces in `src/lib/richtext/`:
+
+- **`rich-text-v1.ts`** — the zod mirror of Contentful's node tree
+  (`@contentful/rich-text-types` constants are the name source), restricted
+  to the house universe: p / h2 / h3 / ul / ol / li / blockquote /
+  embedded-entry-block / embedded-asset-block; marks bold + italic;
+  hyperlink inline (uri pinned whitespace-free). Per-field narrowing is a
+  **`RichTextGrammar`** (enabledNodeTypes/enabledMarks — the D§3.5
+  allowlist-becomes-declaration), with the three presets that mirror today's
+  splitter vocabularies: INLINE_COPY (p-only fields), PROSE (prose.body),
+  ARTICLE_BODY (adds quotes + embeds, the W7.3 target). `data` on every node
+  is the annotation carrier — nothing writes to it in this phase.
+- **`render-html.ts`** — build-time renderer over
+  `@contentful/rich-text-html-renderer` (v17): marks emit the house
+  `<strong>`/`<em>` (not the lib's b/i), embeds REQUIRE injected resolvers
+  and throw naming the target when absent (never-silently-drop), input is
+  schema-validated first, `node.data` never reaches HTML (leak-rule test
+  greps the output), and `\n` in text values renders as `<br/>` via a
+  post-pass (v17 ignores `renderText`; safe because the lib emits no
+  formatting newlines and uris are whitespace-free by schema — verified
+  empirically, incl. default text/attribute escaping).
+- **`prosemirror.ts`** — the ONE TipTap/ProseMirror ↔ rich_text.v1 mapper
+  (W7.2 editors + W7.7 article editor share it): heading levels 2–3, lists,
+  blockquote, bold/italic; link MARKS ↔ hyperlink INLINE nodes (consecutive
+  same-href runs merge, split back on return); hardBreak ↔ '\n'-in-value;
+  everything outside the universe throws naming the type. Structural types
+  only — no editor package imports in the build graph.
+
+Gates: **1116 + 49 tests green** (27 new across three test files, incl. both
+round-trip directions and the leak rule) · astro check 0 errors ·
+eslint/prettier clean · **build-diff EMPTY (173/173 identical)** — the
+substrate is used by nothing, exactly as specified. New deps:
+`@contentful/rich-text-types`, `@contentful/rich-text-html-renderer`.
+NEXT: W7.2 (section body fields accept string | document; one-time export
+conversion; TipTap emits rich text) — DOM-equivalence gate, own session/PR.
+
 ## Session 2026-07-12 L (W7 PLANNED: OQ-8 RESOLVED as one-time migration — articles onto the object model + Rich Text; plan doc, not code)
 
 Wolf opened the article wave ("let's move with articles W7. be careful, I
