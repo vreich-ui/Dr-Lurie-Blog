@@ -50,6 +50,7 @@ import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
 import { navActionCapacity } from './structural-capacity.js';
 import { pageBodySchema } from '../../schema/bodies/page-v1.js';
+import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
 import { navigationBodySchema } from '../../schema/bodies/navigation-v1.js';
 import { siteBodySchema } from '../../schema/bodies/site-v1.js';
@@ -76,6 +77,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   site: siteBodySchema,
   taxonomy: taxonomyBodySchema,
   template: templateBodySchema,
+  product: productBodySchema,
 };
 
 // ─── section-type editor hints (only the component-bound types carry them) ───
@@ -331,6 +333,58 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'Deprecating a term with live usage requires merged_into. NOT enforced live yet (needs an article-usage scan).',
         },
       ];
+    case 'product':
+      return [
+        {
+          id: 'product_slug',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'slug must be lowercase-hyphen ([a-z0-9-]) and unique across products — it becomes /shop/<slug>.',
+        },
+        {
+          id: 'product_commerce',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            "mode↔fields coherence: 'fixed' requires the price display cache and forbids pwyw; 'pwyw' requires " +
+            "the pwyw block and has no price cache or Stripe price_id; 'free' requires provider 'none' and " +
+            'forbids price/pwyw/Stripe linkage.',
+        },
+        {
+          id: 'product_price_funnel',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'commerce.price, commerce.stripe, and commerce.stripe_test cannot be patched via set_product_fields — ' +
+            'Stripe is canonical for charge amounts; the only price-edit path is the product_set_price tool ' +
+            '(ships with S3; until then price/linkage are set at object_create).',
+        },
+        {
+          id: 'product_linkage',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            "An 'available' fixed-price product must carry stripe.price_id (or the pre-launch stripe_test mirror) " +
+            'to publish (warns while drafting); coming_soon/retired products publish without linkage.',
+        },
+        {
+          id: 'product_artifact',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'fulfillment.artifact_ref (kind download) must be a trusted Major-Key artifact ref in the PRIVATE ' +
+            'artifacts store ({image|pdf}/{id}/{sha256}.{ext}); URLs, data: URIs, and repo paths are rejected.',
+        },
+        {
+          id: 'commerce_price_sync',
+          severity: 'blocks_publish',
+          enforced_live: false,
+          description:
+            'The price display cache is compared to the live Stripe Price at publish (the backstop for direct ' +
+            'dashboard edits). Not enforced live yet — the resolver arrives with the Stripe server surface.',
+        },
+      ];
     case 'template':
       return [
         {
@@ -490,6 +544,20 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       when: 'links, navigationOverrides, defaultNavigation',
       how: 'Reference existing published objects by id; a route-kind target is the transitional escape hatch until the target page object exists.',
     });
+  }
+  if (objectType === 'product') {
+    inputs.push(
+      {
+        input: 'fulfillment artifact ref',
+        when: 'fulfillment.kind "download"',
+        how: 'Upload the deliverable to the PRIVATE artifacts store first (create_artifact_upload_intent), then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.',
+      },
+      {
+        input: 'long-form page',
+        when: 'presentation.page_ref (optional)',
+        how: 'Create an ordinary Page object (object_create or object_instantiate_template) carrying the long-form sections; the product page renders them after the buy box. Omit for a thin card+buy-box page.',
+      }
+    );
   }
   return inputs;
 };

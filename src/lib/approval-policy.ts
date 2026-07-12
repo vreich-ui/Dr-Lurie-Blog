@@ -37,7 +37,15 @@ import { approvalPolicyConfig } from '../config/approval-policy.js';
 import type { ObjectType } from '../schema/object-record-v1.js';
 
 /** Every object type the generic publish gate governs — all types except content_item. */
-export const governedObjectTypes = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template'] as const;
+export const governedObjectTypes = [
+  'page',
+  'section',
+  'navigation',
+  'taxonomy',
+  'site',
+  'template',
+  'product',
+] as const;
 export type GovernedObjectType = (typeof governedObjectTypes)[number];
 
 export const isGovernedObjectType = (objectType: ObjectType): objectType is GovernedObjectType =>
@@ -58,6 +66,7 @@ export const approvalPolicyConfigSchema = z.strictObject({
     taxonomy: z.enum(['require-approval', 'autonomous']).optional(),
     site: z.enum(['require-approval', 'autonomous']).optional(),
     template: z.enum(['require-approval', 'autonomous']).optional(),
+    product: z.enum(['require-approval', 'autonomous']).optional(),
   }),
 });
 

@@ -7,6 +7,57 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 D (S1a SHIPPED: `product` is the eighth object type — review-required, price-funnel enforced)
+
+Shop build sequence started per [`06-shop-module-plan.md`](../06-shop-module-plan.md)
+§9. **S1a is complete**: `product.v1` schema + object type + validation criteria
++ contract + the review-required approval flip — the seam everything else hangs
+on. What exists now:
+
+- **`product.v1` body schema** (`src/schema/bodies/product-v1.ts`): slug +
+  presentation (title/excerpt/images/seo/`page_ref`/notes) + commerce
+  (provider/mode/price/pwyw/stripe/stripe_test/availability, Stripe id shapes
+  pinned so keys can't sit where ids belong) + **fulfillment as THE
+  discriminated union** (`download` {artifact_ref, filename} / `unlock`
+  {unlock_prefix} / `none`), all strict.
+- **Type wiring end-to-end**: `objectTypes` + `prod_` id patterns/minting
+  (minted from `slug`), store keys, `object_create` seeding, materializer →
+  `src/data/site/products/{id}.json`, Ask-AI schema registry, admin
+  `prod_→product` prefix map.
+- **`set_product_fields`** patch op (deep-merge + exact inverse, the
+  set_site_fields mechanics) with the **§3 canonicality funnel in the
+  grammar**: `commerce.price` / `commerce.stripe` / `commerce.stripe_test`
+  payloads are refused at write with a pointer to `product_set_price` (S3) —
+  price drift is impossible by construction, not by discipline.
+- **Validation criteria** (standing engine): `product_slug` (shape + live
+  uniqueness via the new `isSlugTaken` store resolver — the isRouteTaken
+  analogue), `product_commerce` (mode↔fields coherence: fixed⇒price cache,
+  pwyw⇒pwyw block + NO Stripe Price, free⇒provider none + no linkage),
+  `product_linkage` (publish-gated: 'available' fixed products need price_id
+  or the pre-launch stripe_test mirror; coming_soon/retired publish without),
+  `product_artifact` (Major-Key trust for download refs), and
+  `commerce_price_sync` (§3 backstop; injected `resolveStripePrice`, optional
+  until the Stripe surface lands). `presentation.page_ref` resolves through
+  reference integrity like any object ref. `STRIPE_SECRET_KEY` /
+  `STRIPE_WEBHOOK_SECRET` pre-marked in the deploy-safety scanner (§8.5).
+- **The §0.4 flip**: `src/config/approval-policy.ts` pins
+  `product: 'require-approval'` under the all-autonomous master — the one
+  deliberate exception; publish-gate matrix tests updated to pin it.
+- **Proven, not assumed** (sandbox, real MCP handler against an isolated
+  store): contract → create (id minted `prod_barrier_repair_guide`) →
+  duplicate-slug create BLOCKED → checkout → validate → patch applies →
+  price-edit patch REFUSED (`product_set_price` pointer) → publish DENIED
+  `approval_required` → inventory row `requires_approval: true`. All gates
+  green: 1004 unit tests + 49 script tests, astro check 0 errors, eslint,
+  prettier, full build (167 pages).
+
+**Status: type BUILT, store empty by design** — no product records exist yet;
+nothing here is "converted" (that vocabulary applies to store-backed content
+objects, which arrive with S2's seeds). NOT in S1a (deliberately, per §9):
+S1b stores/events, S1c checkout/webhook/delivery, the S3 tools
+(`product_set_price`, `order_reissue` — criterion-4 completeness for the
+type), roundtrip-drill support (parallelizable), and the W5 page conversions.
+
 ## Session 2026-07-12 C (W6 CONVERTED: the six listing objects are #32–#37 — the credentialed run)
 
 Wolf's credentialed run (after one stale-checkout false start — the seed

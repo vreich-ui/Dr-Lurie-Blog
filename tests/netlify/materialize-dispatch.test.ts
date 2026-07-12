@@ -21,15 +21,51 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
     },
     'src/data/site/site.json',
   ],
-  ['page', 'page_home', { route: '/', pageType: 'home', title: 'Home', seo: {}, sections: [] }, 'src/data/site/pages/page_home.json'],
+  [
+    'page',
+    'page_home',
+    { route: '/', pageType: 'home', title: 'Home', seo: {}, sections: [] },
+    'src/data/site/pages/page_home.json',
+  ],
   ['navigation', 'nav_footer', { role: 'footer', groups: [] }, 'src/data/site/navigation/nav_footer.json'],
-  ['taxonomy', 'tax_drlurie', { kinds: { category: { terms: [] }, tag: { terms: [] } } }, 'src/data/site/taxonomy.json'],
-  ['template', 'tpl_home', { name: 'Home template', appliesTo: [], slots: [] }, 'src/data/site/templates/tpl_home.json'],
+  [
+    'taxonomy',
+    'tax_drlurie',
+    { kinds: { category: { terms: [] }, tag: { terms: [] } } },
+    'src/data/site/taxonomy.json',
+  ],
+  [
+    'template',
+    'tpl_home',
+    { name: 'Home template', appliesTo: [], slots: [] },
+    'src/data/site/templates/tpl_home.json',
+  ],
   [
     'section',
     'sec_cta',
     { section: { id: 's_cta1', type: 'prose', data: { body: 'Hello' } } },
     'src/data/site/sections/sec_cta.json',
+  ],
+  [
+    'product',
+    'prod_barrier_repair_guide',
+    {
+      slug: 'barrier-repair-guide',
+      presentation: { title: 'The Barrier Repair Guide' },
+      commerce: {
+        provider: 'stripe',
+        mode: 'fixed',
+        price: { amount_cents: 1900, currency: 'usd' },
+        stripe: { product_id: 'prod_Abc123', price_id: 'price_Abc123' },
+        availability: 'available',
+      },
+      fulfillment: {
+        kind: 'download',
+        artifact_ref: 'pdf/guides/0000000000000000000000000000000000000000000000000000000000000000.pdf',
+        filename: 'barrier-repair-guide.pdf',
+      },
+    },
+    'src/data/site/products/prod_barrier_repair_guide.json',
   ],
 ];
 

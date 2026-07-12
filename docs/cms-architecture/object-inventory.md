@@ -81,15 +81,17 @@ export byte-verified (record_version 11 across all six).
 
 ## The object types (use & boundaries)
 
-Seven object types exist. Six are "governed" (edited through the generic object
-verbs and the approval policy); articles are the seventh and keep their own,
+Eight object types exist. Seven are "governed" (edited through the generic object
+verbs and the approval policy); articles are the eighth and keep their own,
 older pipeline. **Boundaries below are the human summary — the machine-checked,
 always-current version is `object_contract('<type>')`.**
 
-Current publish posture (`src/config/approval-policy.ts`): **`all-autonomous`** —
-an agent proposes **and** publishes every governed type with no human gate (every
-publish still writes a full, revertible audit trail). Flip one file to require
-human approval per type.
+Current publish posture (`src/config/approval-policy.ts`): **`all-autonomous`,
+with `product` pinned to require-approval** (06-shop-module-plan §0.4: an agent
+proposing a product change is fine; a price change going live without a human
+eye is not). Every other governed type publishes autonomously; every publish
+still writes a full, revertible audit trail. Flip one file to change the
+posture per type.
 
 | Type                        | What it is / used for                                                                                                                                                                                 | Key boundaries (summarized)                                                                                                                                                                                            |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -99,6 +101,7 @@ human approval per type.
 | **taxonomy** (singleton)    | The controlled vocabulary — categories & tags — articles and listings draw from.                                                                                                                      | Slugs lowercase-hyphen, unique per kind; a deprecated term's `merged_into` must point at an active same-kind term and form no cycle. **Boundary caveat: not yet the real source of truth — see below.**                |
 | **site** (singleton)        | Global config: brand tokens, logo, chrome toggles, blog paths, and the default header/footer navigation.                                                                                              | One per site. **Boundary caveat: not yet wired to drive rendering — see below.**                                                                                                                                       |
 | **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
+| **product**                 | One sellable digital good (download / pay-to-unlock / tip-PWYW / free lead magnet): `slug` + presentation + commerce + a fulfillment union on `kind`. Long-form copy composes via `presentation.page_ref` → an ordinary Page (06-shop-module-plan §1–2). | Slug lowercase-hyphen + unique (→ `/shop/<slug>`); mode↔fields coherence enforced; **price cache + Stripe linkage are NOT agent-patchable** (`product_set_price` only, S3); `fulfillment.artifact_ref` must be a trusted private-store ref; **publishes review-required**. |
 | **content_item** (articles) | Blog posts / articles. **Outside** the generic object model — served by the older `save_json_blob_*` tools and its own review/publish flow.                                                           | Not creatable or patchable via the object verbs; has no generic body schema. Listed here only so the boundary is explicit.                                                                                             |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
@@ -310,6 +313,23 @@ PageTypeIds implemented), the listing loaders are formalized, the six page
 objects shipped with a byte-identical cutover, and Wolf's credentialed run
 the same day converted all six (see "Listing & article surfaces" above) —
 the biggest remaining MVP chunk is closed.
+
+### 6. Shop module (products + commerce) — S1a BUILT (2026-07-12)
+
+The plan is [`06-shop-module-plan.md`](06-shop-module-plan.md) (Stripe-only v1,
+digital goods). **S1a is done**: the `product` object type is live end-to-end in
+the sandbox — `product.v1` body schema (fulfillment discriminated union),
+`prod_` ids, the `set_product_fields` patch op (with the §3 canonicality funnel:
+price cache + Stripe linkage refuse agent patches), the product validation
+criteria (slug shape/uniqueness via the live `isSlugTaken` resolver, mode↔fields
+coherence, publish-gated Stripe linkage, artifact trust, `commerce_price_sync`
+backstop), the materializer (`src/data/site/products/{id}.json`),
+`object_contract('product')`, and the **review-required approval flip** (§0.4).
+Stripe env keys are pre-marked in the deploy-safety scanner (§8.5). **No product
+records exist yet** — the store is empty by design until S2 seeds the shop
+surfaces. Next on the critical path: S1b (commerce + commerce-events stores,
+event lib) and S1c (checkout session → webhook → token delivery), then the two
+S3 MCP tools (`product_set_price`, `order_reissue`) that complete criterion 4.
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 

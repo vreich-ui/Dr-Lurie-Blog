@@ -16,6 +16,7 @@ import {
   sectionTypes,
   type SectionInstance,
 } from '../../src/schema/bodies/section-v1.js';
+import { PRODUCT_SCHEMA_VERSION, productBodySchema, type ProductBody } from '../../src/schema/bodies/product-v1.js';
 import { SITE_SCHEMA_VERSION, siteBodySchema, type SiteBody } from '../../src/schema/bodies/site-v1.js';
 import { TAXONOMY_SCHEMA_VERSION, taxonomyBodySchema, type TaxonomyBody } from '../../src/schema/bodies/taxonomy-v1.js';
 import { TEMPLATE_SCHEMA_VERSION, templateBodySchema, type TemplateBody } from '../../src/schema/bodies/template-v1.js';
@@ -602,5 +603,129 @@ test('taxonomy: malformed term ids, statuses, and kinds are rejected', () => {
     taxonomyBodySchema.safeParse({ kinds: { category: { terms: [] }, collection: { terms: [] } } }).success,
     false,
     'term kinds are fixed to category/tag in v1'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Product ('product.v1', 06-shop-module-plan §1)
+// ---------------------------------------------------------------------------
+
+const productFixture: ProductBody = {
+  slug: 'barrier-repair-guide',
+  presentation: {
+    title: 'The Barrier Repair Guide',
+    excerpt: 'A practical, science-first repair plan.',
+    images: [{ src: 'https://kugelmedia.example/covers/barrier.jpg', alt: 'Guide cover' }],
+    seo: { description: 'Repair your skin barrier.', ogImage: '/images/og/barrier.jpg' },
+    page_ref: 'page_prod_barrier_guide',
+  },
+  commerce: {
+    provider: 'stripe',
+    mode: 'fixed',
+    price: { amount_cents: 1900, currency: 'usd' },
+    stripe: { product_id: 'prod_Abc123', price_id: 'price_Abc123' },
+    availability: 'available',
+  },
+  fulfillment: {
+    kind: 'download',
+    artifact_ref: 'pdf/guides/2f4d1b6f9d1e4c1a8e1b3c5d7f9a1b2c3d4e5f60718293a4b5c6d7e8f9012345.pdf',
+    filename: 'barrier-repair-guide.pdf',
+  },
+};
+
+test('product: fixed-download fixture parses cleanly; strictness rejects stray keys', () => {
+  const parsed = productBodySchema.parse(productFixture);
+  assert.equal(PRODUCT_SCHEMA_VERSION, 'product.v1');
+  assert.deepEqual(parsed, productFixture);
+
+  assert.equal(productBodySchema.safeParse({ ...productFixture, sku: 'X1' }).success, false);
+  assert.equal(
+    productBodySchema.safeParse({
+      ...productFixture,
+      presentation: { ...productFixture.presentation, body: '<p>long form belongs in the page_ref page</p>' },
+    }).success,
+    false
+  );
+});
+
+test('product: every fulfillment kind parses; half-filled variants are rejected', () => {
+  // Tip/PWYW support — nothing to deliver.
+  const tip: ProductBody = {
+    slug: 'leave-a-tip',
+    presentation: { title: 'Leave a tip' },
+    commerce: {
+      provider: 'stripe',
+      mode: 'pwyw',
+      pwyw: { min_cents: 300, suggested_cents: 900 },
+      stripe: { product_id: 'prod_Tip1' },
+      availability: 'available',
+    },
+    fulfillment: { kind: 'none' },
+  };
+  assert.deepEqual(productBodySchema.parse(tip), tip);
+
+  // Pay-to-unlock names the PRE-generated artifact's key prefix (§5).
+  const unlock: ProductBody = {
+    ...productFixture,
+    slug: 'quiz-deep-dive',
+    fulfillment: { kind: 'unlock', unlock_prefix: 'unlock/quiz-results/' },
+  };
+  assert.deepEqual(productBodySchema.parse(unlock), unlock);
+
+  // Free lead magnet — no Stripe anywhere.
+  const free: ProductBody = {
+    slug: 'starter-checklist',
+    presentation: { title: 'Starter checklist' },
+    commerce: { provider: 'none', mode: 'free', availability: 'available' },
+    fulfillment: {
+      kind: 'download',
+      artifact_ref: 'pdf/guides/2f4d1b6f9d1e4c1a8e1b3c5d7f9a1b2c3d4e5f60718293a4b5c6d7e8f9012345.pdf',
+      filename: 'starter.pdf',
+    },
+  };
+  assert.deepEqual(productBodySchema.parse(free), free);
+
+  // Discriminated union: a download without its file, an unlock without its
+  // prefix, and cross-variant leftovers (the trap-2 deep-merge residue) all fail.
+  assert.equal(
+    productBodySchema.safeParse({ ...productFixture, fulfillment: { kind: 'download', filename: 'x.pdf' } }).success,
+    false
+  );
+  assert.equal(productBodySchema.safeParse({ ...productFixture, fulfillment: { kind: 'unlock' } }).success, false);
+  assert.equal(
+    productBodySchema.safeParse({
+      ...productFixture,
+      fulfillment: { kind: 'none', artifact_ref: 'pdf/guides/x.pdf', filename: 'x.pdf' },
+    }).success,
+    false
+  );
+  assert.equal(productBodySchema.safeParse({ ...productFixture, fulfillment: { kind: 'shipment' } }).success, false);
+});
+
+test('product: Stripe id shapes are pinned so keys can never sit where ids belong', () => {
+  const withStripe = (stripe: Record<string, unknown>) => ({
+    ...productFixture,
+    commerce: { ...productFixture.commerce, stripe },
+  });
+  assert.equal(productBodySchema.safeParse(withStripe({ product_id: 'sk_live_abc' })).success, false);
+  assert.equal(
+    productBodySchema.safeParse(withStripe({ product_id: 'prod_Abc123', price_id: 'whsec_abc' })).success,
+    false
+  );
+  assert.equal(
+    productBodySchema.safeParse({
+      ...productFixture,
+      commerce: { ...productFixture.commerce, price: { amount_cents: 19.5, currency: 'usd' } },
+    }).success,
+    false,
+    'amounts are integer cents'
+  );
+  assert.equal(
+    productBodySchema.safeParse({
+      ...productFixture,
+      commerce: { ...productFixture.commerce, price: { amount_cents: 1900, currency: 'USD' } },
+    }).success,
+    false,
+    'currency is a lowercase ISO code'
   );
 });

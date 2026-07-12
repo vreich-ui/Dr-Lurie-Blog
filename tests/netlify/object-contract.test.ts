@@ -12,7 +12,7 @@ import { sectionTypes } from '../../src/schema/bodies/section-v1.js';
 import { patchOpNamesByObjectType } from '../../src/schema/object-patch-ops.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
 
-const GOVERNED: ObjectType[] = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template'];
+const GOVERNED: ObjectType[] = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'product'];
 
 // Building every contract exercises z.toJSONSchema over the recursive navItem
 // (z.lazy), the section discriminated union, and the patch-op refinements — so
@@ -108,6 +108,8 @@ test('requires_approval is computed from the policy, not hardcoded', () => {
 test('anti-drift coverage guard: contract types match objectTypes exactly', () => {
   assert.deepEqual(
     [...OBJECT_CONTRACT_TYPES].sort(),
-    [...(['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'content_item'] as ObjectType[])].sort()
+    [
+      ...(['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'product', 'content_item'] as ObjectType[]),
+    ].sort()
   );
 });

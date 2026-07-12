@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   checkArtifactTrust,
   checkIdDiscipline,
+  checkProduct,
   checkReaderSafety,
   checkReferenceIntegrity,
   checkSchema,
@@ -763,4 +764,157 @@ test('template: component-registry membership is optional until a resolver is su
   assert.equal(statusOf(checkTemplate(body, {}), 'template_registry'), 'optional');
   const enforced = checkTemplate(body, { componentTypeExists: (t) => t === 'hero' });
   assert.equal(statusOf(enforced, 'template_registry'), 'missing');
+});
+
+// ═══ check 6d: product commerce/fulfillment invariants (06-shop-module-plan §1/§3) ═══
+
+const PRODUCT_ARTIFACT_REF = 'pdf/guides/2f4d1b6f9d1e4c1a8e1b3c5d7f9a1b2c3d4e5f60718293a4b5c6d7e8f9012345.pdf';
+
+const validProductBody = () => ({
+  slug: 'barrier-repair-guide',
+  presentation: { title: 'The Barrier Repair Guide', page_ref: 'page_prod_barrier_guide' },
+  commerce: {
+    provider: 'stripe',
+    mode: 'fixed',
+    price: { amount_cents: 1900, currency: 'usd' },
+    stripe: { product_id: 'prod_Abc123', price_id: 'price_Abc123' },
+    availability: 'available',
+  },
+  fulfillment: { kind: 'download', artifact_ref: PRODUCT_ARTIFACT_REF, filename: 'barrier-repair-guide.pdf' },
+});
+
+const productContext: ObjectValidationContext = {
+  isSlugTaken: () => false,
+  trustedAssetRefs: new Set([PRODUCT_ARTIFACT_REF]),
+  resolveStripePrice: (priceId) => (priceId === 'price_Abc123' ? { amount_cents: 1900, currency: 'usd' } : undefined),
+};
+
+test('product: a coherent fixed-download product passes every criterion', () => {
+  const criteria = checkProduct(validProductBody(), productContext, true);
+  for (const id of ['product_slug', 'product_commerce', 'product_linkage', 'product_artifact', 'commerce_price_sync']) {
+    assert.equal(statusOf(criteria, id), 'complete', id);
+  }
+});
+
+test('product slug REJECTION: shape and uniqueness are hard write failures; no resolver → optional', () => {
+  const body = { ...validProductBody(), slug: 'Not A Slug' };
+  assert.equal(statusOf(checkProduct(body, productContext, false), 'product_slug'), 'missing');
+
+  const taken = checkProduct(validProductBody(), { ...productContext, isSlugTaken: () => true }, false);
+  assert.equal(statusOf(taken, 'product_slug'), 'missing');
+
+  const noResolver = checkProduct(validProductBody(), { trustedAssetRefs: productContext.trustedAssetRefs }, false);
+  assert.equal(statusOf(noResolver, 'product_slug'), 'optional');
+});
+
+test('product commerce REJECTION: mode↔fields incoherence is a hard write failure', () => {
+  const base = validProductBody();
+
+  // free forbids Stripe linkage and requires provider 'none'.
+  const free = { ...base, commerce: { ...base.commerce, mode: 'free' } };
+  assert.equal(statusOf(checkProduct(free, productContext, false), 'product_commerce'), 'missing');
+
+  // fixed requires the price display cache.
+  const noPrice = { ...base, commerce: { ...base.commerce, price: undefined } };
+  assert.equal(statusOf(checkProduct(noPrice, productContext, false), 'product_commerce'), 'missing');
+
+  // pwyw has no Stripe Price and no fixed cache; suggested must cover min.
+  const pwyw = {
+    ...base,
+    commerce: {
+      provider: 'stripe',
+      mode: 'pwyw',
+      pwyw: { min_cents: 900, suggested_cents: 300 },
+      stripe: { product_id: 'prod_Abc123', price_id: 'price_Abc123' },
+      price: { amount_cents: 900, currency: 'usd' },
+      availability: 'available',
+    },
+  };
+  const criteria = checkProduct(pwyw, productContext, false);
+  assert.equal(statusOf(criteria, 'product_commerce'), 'missing');
+
+  // …and the coherent PWYW tip passes.
+  const tip = {
+    slug: 'leave-a-tip',
+    presentation: { title: 'Leave a tip' },
+    commerce: {
+      provider: 'stripe',
+      mode: 'pwyw',
+      pwyw: { min_cents: 300, suggested_cents: 900 },
+      stripe: { product_id: 'prod_Tip1' },
+      availability: 'available',
+    },
+    fulfillment: { kind: 'none' },
+  };
+  assert.equal(statusOf(checkProduct(tip, productContext, true), 'product_commerce'), 'complete');
+});
+
+test('product linkage is PUBLISH-gated and only binds available fixed-price products', () => {
+  const base = validProductBody();
+  const unlinked = { ...base, commerce: { ...base.commerce, stripe: undefined } };
+  assert.equal(statusOf(checkProduct(unlinked, productContext, false), 'product_linkage'), 'warning');
+  assert.equal(statusOf(checkProduct(unlinked, productContext, true), 'product_linkage'), 'missing');
+
+  // The pre-launch stripe_test mirror satisfies it (§8.7)…
+  const testLinked = {
+    ...base,
+    commerce: { ...base.commerce, stripe: undefined, stripe_test: { product_id: 'prod_T1', price_id: 'price_T1' } },
+  };
+  assert.equal(statusOf(checkProduct(testLinked, productContext, true), 'product_linkage'), 'complete');
+
+  // …and a coming_soon product publishes without linkage.
+  const comingSoon = { ...base, commerce: { ...base.commerce, stripe: undefined, availability: 'coming_soon' } };
+  assert.equal(statusOf(checkProduct(comingSoon, productContext, true), 'product_linkage'), 'complete');
+});
+
+test('product artifact REJECTION: URLs and untrusted refs are hard write failures; non-download kinds are exempt', () => {
+  const base = validProductBody();
+  const url = { ...base, fulfillment: { ...base.fulfillment, artifact_ref: 'https://example.com/x.pdf' } };
+  assert.equal(statusOf(checkProduct(url, productContext, false), 'product_artifact'), 'missing');
+
+  const untrusted = {
+    ...base,
+    fulfillment: { ...base.fulfillment, artifact_ref: PRODUCT_ARTIFACT_REF.replace('2f4d', 'ffff') },
+  };
+  assert.equal(statusOf(checkProduct(untrusted, productContext, false), 'product_artifact'), 'missing');
+
+  const tipLike = { ...base, fulfillment: { kind: 'none' } };
+  assert.equal(statusOf(checkProduct(tipLike, productContext, false), 'product_artifact'), 'optional');
+});
+
+test('commerce_price_sync (§3 backstop): mismatch is publish-gated; no resolver → optional, never a false failure', () => {
+  const body = validProductBody();
+  const drifted: ObjectValidationContext = {
+    ...productContext,
+    resolveStripePrice: () => ({ amount_cents: 2400, currency: 'usd' }),
+  };
+  assert.equal(statusOf(checkProduct(body, drifted, false), 'commerce_price_sync'), 'warning');
+  assert.equal(statusOf(checkProduct(body, drifted, true), 'commerce_price_sync'), 'missing');
+
+  const { resolveStripePrice, ...noResolver } = productContext;
+  void resolveStripePrice;
+  assert.equal(statusOf(checkProduct(body, noResolver, true), 'commerce_price_sync'), 'optional');
+
+  const unknownId: ObjectValidationContext = { ...productContext, resolveStripePrice: () => undefined };
+  assert.equal(statusOf(checkProduct(body, unknownId, true), 'commerce_price_sync'), 'optional');
+});
+
+test('product refs: presentation.page_ref resolves through check 3 like any object reference', () => {
+  const resolves: ObjectValidationContext = {
+    resolveObject: (type, id) => ({ exists: type === 'page' && id === 'page_prod_barrier_guide' }),
+  };
+  assert.equal(statusOf(checkReferenceIntegrity('product', validProductBody(), resolves), 'references'), 'complete');
+
+  const ghost: ObjectValidationContext = { resolveObject: () => ({ exists: false }) };
+  assert.equal(statusOf(checkReferenceIntegrity('product', validProductBody(), ghost), 'references'), 'missing');
+});
+
+test('product: validateObject dispatches the product criteria through the structure group', () => {
+  const groups = validateObject(
+    { objectType: 'product', objectId: 'prod_barrier_repair_guide', body: validProductBody() },
+    productContext
+  );
+  const structure = groups.find((group) => group.id === 'structure');
+  assert.ok(structure && statusOf(structure.criteria, 'product_slug') === 'complete');
+  assert.equal(summarizeValidation(groups).eligible, true);
 });

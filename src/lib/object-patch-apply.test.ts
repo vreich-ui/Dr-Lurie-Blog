@@ -27,7 +27,9 @@ const makeRecord = (objectType: ObjectType, body: unknown): ObjectRecord<unknown
               ? 'site_drlurie'
               : objectType === 'template'
                 ? 'tpl_standard'
-                : 'req_agent_topic_20260704_01',
+                : objectType === 'product'
+                  ? 'prod_barrier_repair_guide'
+                  : 'req_agent_topic_20260704_01',
   object_type: objectType,
   schema_version: `${objectType}.v1`,
   site: 'site_drlurie',
@@ -132,6 +134,23 @@ const templateBody = () => ({
     { slotId: 'main', allowed: ['hero', 'prose'], required: true, repeatable: false },
     { slotId: 'aside', allowed: ['bio'], required: false, repeatable: true },
   ],
+});
+
+const productBody = () => ({
+  slug: 'barrier-repair-guide',
+  presentation: {
+    title: 'The Barrier Repair Guide',
+    excerpt: 'Card copy.',
+    seo: { description: 'A guide.' },
+  },
+  commerce: {
+    provider: 'stripe',
+    mode: 'fixed',
+    price: { amount_cents: 1900, currency: 'usd' },
+    stripe: { product_id: 'prod_Abc123', price_id: 'price_Abc123' },
+    availability: 'available',
+  },
+  fulfillment: { kind: 'download', artifact_ref: 'pdf/guides/abc.pdf', filename: 'barrier-repair-guide.pdf' },
 });
 
 // ——— property-style round-trips: apply(op) then apply(inverse(op)) restores
@@ -420,6 +439,19 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
     op: {
       op: 'set_site_fields',
       fields: { brandTokens: { colors: { primary: '#000000', tertiary: '#abcdef' } }, chrome: null },
+    },
+  },
+  // product family
+  {
+    name: 'set_product_fields deep-merges presentation, unsets excerpt, and flips availability',
+    objectType: 'product',
+    body: productBody,
+    op: {
+      op: 'set_product_fields',
+      fields: {
+        presentation: { title: 'The Barrier Repair Guide (2nd ed.)', excerpt: null },
+        commerce: { availability: 'coming_soon' },
+      },
     },
   },
   // template family
@@ -808,6 +840,36 @@ describe('apply mechanics', () => {
     const record = makeRecord('section', sharedSectionBody());
     assert.throws(
       () => apply(record, [{ op: 'remove_section', section_id: 's_signup' }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'op_not_applicable'
+    );
+  });
+
+  it('refuses price/linkage writes through set_product_fields (the §3 canonicality funnel)', () => {
+    const record = makeRecord('product', productBody());
+    for (const fields of [
+      { commerce: { price: { amount_cents: 100, currency: 'usd' } } },
+      { commerce: { stripe: { product_id: 'prod_X1', price_id: 'price_X1' } } },
+      { commerce: { stripe_test: { product_id: 'prod_T1' } } },
+      { commerce: null }, // products always carry a commerce block
+    ]) {
+      assert.throws(
+        () => apply(record, [{ op: 'set_product_fields', fields }]),
+        (error: unknown) => error instanceof PatchApplyError && error.code === 'invalid_op',
+        JSON.stringify(fields)
+      );
+    }
+    // …while sibling commerce fields stay patchable in the same op shape.
+    const result = apply(record, [{ op: 'set_product_fields', fields: { commerce: { availability: 'retired' } } }]);
+    assert.strictEqual((result.record.body as { commerce: { availability: string } }).commerce.availability, 'retired');
+  });
+
+  it('set_product_fields applies only to product objects', () => {
+    assert.throws(
+      () => apply(makeRecord('site', siteBody()), [{ op: 'set_product_fields', fields: { slug: 'x' } }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'op_not_applicable'
+    );
+    assert.throws(
+      () => apply(makeRecord('product', productBody()), [{ op: 'set_site_fields', fields: { name: 'X' } }]),
       (error: unknown) => error instanceof PatchApplyError && error.code === 'op_not_applicable'
     );
   });

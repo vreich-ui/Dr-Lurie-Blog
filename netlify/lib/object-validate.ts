@@ -50,6 +50,7 @@ import { navigationBodySchema, type NavigationBody } from '../../src/schema/bodi
 import { navActionCapacity, type CapacityRule } from '../../src/lib/registry/structural-capacity.js';
 import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
+import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
@@ -101,6 +102,20 @@ export type ObjectValidationContext = {
    * excludes the object under validation). Absent → uniqueness not verified.
    */
   isRouteTaken?: (route: string) => boolean;
+  /**
+   * Whether a product `slug` is already taken by a DIFFERENT product — the
+   * /shop/<slug> analogue of isRouteTaken (06-shop-module-plan §1). Excludes
+   * the object under validation. Absent → uniqueness not verified.
+   */
+  isSlugTaken?: (slug: string) => boolean;
+  /**
+   * Resolve a Stripe Price id to its live amount (the §3 canonicality
+   * backstop for direct dashboard edits): the display cache is compared to
+   * the live Price at publish. Return undefined for "cannot answer" (unknown
+   * id, Stripe unreachable). Absent → cache sync not verified here — wired
+   * when the Stripe server surface lands (S1c/S3).
+   */
+  resolveStripePrice?: (priceId: string) => { amount_cents: number; currency: string } | undefined;
   /** Major-Key blobKeys trusted for this object's asset refs (A§2.12). */
   trustedAssetRefs?: Set<string>;
   /** The PageType definition for a page's `pageType` (registry is code, D§3.4/OQ-4). */
@@ -175,6 +190,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     template: templateBodySchema,
     site: siteBodySchema,
     taxonomy: taxonomyBodySchema,
+    product: productBodySchema,
   };
 
 // Mirrors node-renderer.ts TIPTAP_ALLOWED (A§1.5): the only tags TipTap emits.
@@ -397,6 +413,16 @@ export const checkReferenceIntegrity = (
         const ref = body.navigationOverrides[role];
         if (typeof ref === 'string') requireObject('navigation', ref, `navigationOverrides.${role}`);
       }
+    }
+  }
+
+  // Product-level references: the OPTIONAL long-form Page a product composes
+  // with (06-shop-module-plan §2 — /shop/[slug] renders buy box + hero from
+  // the product, then the referenced page's sections).
+  if (objectType === 'product' && isRecord(body)) {
+    const presentation = body.presentation;
+    if (isRecord(presentation) && typeof presentation.page_ref === 'string') {
+      requireObject('page', presentation.page_ref, 'presentation.page_ref');
     }
   }
 
@@ -926,6 +952,215 @@ export const checkNavigationStructure = (
   return criteria;
 };
 
+// ─── check 6d: product commerce/fulfillment invariants (06-shop-module-plan §1/§3) ───
+
+// The /shop/<slug> segment shape — same vocabulary as taxonomy slugs.
+const PRODUCT_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Product rules the product-v1 schema explicitly defers here (plan §1):
+ *
+ * - slug shape + uniqueness across products (`isSlugTaken`, the route
+ *   analogue) — hard write failures;
+ * - mode↔fields coherence — `fixed` needs the price cache and forbids pwyw;
+ *   `pwyw` needs the pwyw block, has no Stripe Price (§3: Checkout
+ *   `custom_unit_amount` enforces the minimum) and no fixed cache; `free`
+ *   never touches Stripe (`provider: 'none'`, no price/pwyw/linkage) — hard
+ *   write failures, all body-local;
+ * - an 'available' fixed-price product must carry Stripe linkage to publish
+ *   (`stripe.price_id`, or the pre-launch `stripe_test` mirror, §8.7) —
+ *   publish-gated so drafts can exist before `product_set_price` links them;
+ * - `fulfillment.artifact_ref` must be a trusted Major-Key artifact ref
+ *   (the private-store download, §5) — hard write failure;
+ * - `commerce_price_sync` (§3 backstop): the display cache is compared to
+ *   the live Stripe Price via the injected resolver — publish-gated;
+ *   without a resolver it reports `optional`, never a false failure.
+ */
+export const checkProduct = (
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish: boolean
+): ReadinessCriterion[] => {
+  if (!isRecord(body)) {
+    return [
+      crit(
+        'product_structure',
+        'Product structure',
+        'optional',
+        'Product body shape not recognized (see schema check).'
+      ),
+    ];
+  }
+  const criteria: ReadinessCriterion[] = [];
+
+  // Slug shape + uniqueness (§1: /shop/<slug>; unique like isRouteTaken).
+  const slug = typeof body.slug === 'string' ? body.slug : '';
+  if (!slug) {
+    criteria.push(crit('product_slug', 'Slug shape', 'missing', 'slug is required.'));
+  } else if (!PRODUCT_SLUG_RE.test(slug)) {
+    criteria.push(
+      crit('product_slug', 'Slug shape', 'missing', `slug "${slug}" must match ^[a-z0-9]+(?:-[a-z0-9]+)*$.`)
+    );
+  } else if (context.isSlugTaken) {
+    criteria.push(
+      context.isSlugTaken(slug)
+        ? crit('product_slug', 'Slug uniqueness', 'missing', `slug "${slug}" is already used by another product.`)
+        : crit('product_slug', 'Slug uniqueness', 'complete', '')
+    );
+  } else {
+    criteria.push(
+      crit('product_slug', 'Slug uniqueness', 'optional', 'No slug resolver — uniqueness not verified here.')
+    );
+  }
+
+  const commerce = isRecord(body.commerce) ? body.commerce : undefined;
+  const stripe = commerce && isRecord(commerce.stripe) ? commerce.stripe : undefined;
+  const stripeTest = commerce && isRecord(commerce.stripe_test) ? commerce.stripe_test : undefined;
+
+  // Mode↔fields coherence (§1) — body-local, so always verifiable.
+  if (!commerce) {
+    criteria.push(
+      crit(
+        'product_commerce',
+        'Commerce mode coherence',
+        'optional',
+        'Commerce block not recognized (see schema check).'
+      )
+    );
+  } else {
+    const problems: string[] = [];
+    const mode = commerce.mode;
+    if (mode === 'free') {
+      if (commerce.provider !== 'none') {
+        problems.push("mode 'free' never touches Stripe — provider must be 'none'.");
+      }
+      for (const key of ['price', 'pwyw', 'stripe', 'stripe_test'] as const) {
+        if (commerce[key] !== undefined) problems.push(`mode 'free' forbids commerce.${key}.`);
+      }
+    }
+    if ((mode === 'fixed' || mode === 'pwyw') && commerce.provider !== 'stripe') {
+      problems.push(`mode '${String(mode)}' charges through Stripe — provider must be 'stripe'.`);
+    }
+    if (mode === 'fixed') {
+      if (commerce.price === undefined) {
+        problems.push(
+          "mode 'fixed' requires the price display cache (set at create, or via product_set_price once it ships)."
+        );
+      }
+      if (commerce.pwyw !== undefined) problems.push("mode 'fixed' forbids the pwyw block.");
+    }
+    if (mode === 'pwyw') {
+      const pwyw = isRecord(commerce.pwyw) ? commerce.pwyw : undefined;
+      if (!pwyw) problems.push("mode 'pwyw' requires the pwyw block (min_cents at least).");
+      if (commerce.price !== undefined) problems.push("mode 'pwyw' has no fixed amount — remove the price cache.");
+      // §3: PWYW uses Checkout custom_unit_amount; no Stripe Price exists.
+      if (stripe?.price_id !== undefined) {
+        problems.push("mode 'pwyw' uses custom_unit_amount, not a Stripe Price — remove stripe.price_id.");
+      }
+      if (stripeTest?.price_id !== undefined) {
+        problems.push("mode 'pwyw' uses custom_unit_amount, not a Stripe Price — remove stripe_test.price_id.");
+      }
+      if (
+        typeof pwyw?.min_cents === 'number' &&
+        typeof pwyw?.suggested_cents === 'number' &&
+        pwyw.suggested_cents < pwyw.min_cents
+      ) {
+        problems.push('pwyw.suggested_cents must be at least pwyw.min_cents.');
+      }
+    }
+    criteria.push(
+      problems.length === 0
+        ? crit('product_commerce', 'Commerce mode coherence', 'complete', '')
+        : crit('product_commerce', 'Commerce mode coherence', 'missing', problems.slice(0, 5).join(' '))
+    );
+  }
+
+  // Stripe linkage for a sellable product — publish-gated so drafts can exist
+  // before product_set_price links them (§9-S3); only 'available' products
+  // must be buyable (coming_soon/retired publish without linkage).
+  if (commerce && commerce.mode === 'fixed' && commerce.availability === 'available') {
+    const priceId =
+      (typeof stripe?.price_id === 'string' && stripe.price_id) ||
+      (typeof stripeTest?.price_id === 'string' && stripeTest.price_id) ||
+      '';
+    criteria.push(
+      priceId
+        ? crit('product_linkage', 'Stripe linkage', 'complete', '')
+        : crit(
+            'product_linkage',
+            'Stripe linkage',
+            atPublish ? 'missing' : 'warning',
+            "An 'available' fixed-price product needs stripe.price_id (or the pre-launch stripe_test mirror) " +
+              'before it can publish — link it via product_set_price.'
+          )
+    );
+  } else {
+    criteria.push(crit('product_linkage', 'Stripe linkage', 'complete', ''));
+  }
+
+  // Fulfillment artifact trust (§1/§5): the download lives in the PRIVATE
+  // artifacts store, addressed by a Major-Key ref — same reject rules as
+  // every *AssetRef (no URLs, no data:, no repo paths; index-trusted when
+  // the trust set is supplied).
+  const fulfillment = isRecord(body.fulfillment) ? body.fulfillment : undefined;
+  if (fulfillment?.kind === 'download' && typeof fulfillment.artifact_ref === 'string') {
+    const err = validateAssetRef('fulfillment.artifact_ref', fulfillment.artifact_ref, context.trustedAssetRefs);
+    criteria.push(
+      err
+        ? crit('product_artifact', 'Fulfillment artifact trust', 'missing', err)
+        : crit('product_artifact', 'Fulfillment artifact trust', 'complete', '')
+    );
+  } else {
+    criteria.push(
+      crit('product_artifact', 'Fulfillment artifact trust', 'optional', 'No fulfillment artifact for this kind.')
+    );
+  }
+
+  // §3 backstop for direct Stripe-dashboard edits: compare the display cache
+  // to the live Price on publish. The site renders the cache; Checkout
+  // charges the price_id — so a mismatch is cosmetic, but worth catching at
+  // the next publish rather than never.
+  const cache = commerce && isRecord(commerce.price) ? commerce.price : undefined;
+  const syncPriceId =
+    (typeof stripe?.price_id === 'string' && stripe.price_id) ||
+    (typeof stripeTest?.price_id === 'string' && stripeTest.price_id) ||
+    '';
+  if (!context.resolveStripePrice) {
+    criteria.push(
+      crit('commerce_price_sync', 'Price cache sync', 'optional', 'No Stripe resolver — cache sync not verified here.')
+    );
+  } else if (!cache || !syncPriceId) {
+    criteria.push(crit('commerce_price_sync', 'Price cache sync', 'optional', 'No cache/linkage pair to compare.'));
+  } else {
+    const live = context.resolveStripePrice(syncPriceId);
+    if (!live) {
+      criteria.push(
+        crit(
+          'commerce_price_sync',
+          'Price cache sync',
+          'optional',
+          `Stripe Price "${syncPriceId}" not resolvable — not verified here.`
+        )
+      );
+    } else if (live.amount_cents !== cache.amount_cents || live.currency !== cache.currency) {
+      criteria.push(
+        crit(
+          'commerce_price_sync',
+          'Price cache sync',
+          atPublish ? 'missing' : 'warning',
+          `Display cache (${String(cache.amount_cents)} ${String(cache.currency)}) does not match the live Stripe ` +
+            `Price ${syncPriceId} (${live.amount_cents} ${live.currency}) — re-sync via product_set_price ` +
+            'or fix the Price in Stripe.'
+        )
+      );
+    } else {
+      criteria.push(crit('commerce_price_sync', 'Price cache sync', 'complete', ''));
+    }
+  }
+
+  return criteria;
+};
+
 export const checkStructuralInvariants = (
   objectType: ObjectType,
   objectId: string,
@@ -940,6 +1175,7 @@ export const checkStructuralInvariants = (
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
   if (objectType === 'template') return checkTemplate(body, context);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
+  if (objectType === 'product') return checkProduct(body, context, atPublish);
 
   // content_grid card/limit sanity applies to any body that can carry a grid —
   // a page's inline sections OR a shared `section` wrapper. Emits nothing when
@@ -1190,6 +1426,11 @@ const PROTECTED_ENV_KEYS = [
   'NETLIFY_BUILD_HOOK_URL',
   'OPENAI_API_KEY',
   'ARTIFACT_UPLOAD_TOKEN_SECRET',
+  // Commerce (06-shop-module-plan §8.5): the keys are env-only; Stripe IDS in
+  // content are fine (ids aren't secrets), but a pasted key would block every
+  // deploy exactly as the portrait URL did.
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
 ] as const;
 
 export type ProtectedValue = { key: string; value: string };
