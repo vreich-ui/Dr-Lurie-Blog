@@ -279,7 +279,7 @@ test('Scenario 1+2 (page overridden to require-approval): propose â†’ approve â†
           { op: 'update_section_data', section_id: 's_drillhero', fields: { heading: 'Agent-proposed heading' } },
           {
             op: 'upsert_section',
-            section: { id: 's_drillnew', type: 'prose', data: { body: 'New structural section.' } },
+            section: { id: 's_drillnew', type: 'prose', data: { body: '<p>New structural section.</p>' } },
           },
         ],
       },
@@ -682,7 +682,7 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
     const store = createMemoryStore();
 
     const originalBody = {
-      section: { id: 's_drillcta', type: 'prose', data: { body: 'Original prose body.' } },
+      section: { id: 's_drillcta', type: 'prose', data: { body: '<p>Original prose body.</p>' } },
     };
     const created = await call(
       store,
@@ -717,7 +717,7 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
           {
             op: 'update_section_data',
             section_id: 's_drillcta',
-            fields: { body: 'Agent-proposed prose that will be rejected.' },
+            fields: { body: '<p>Agent-proposed prose that will be rejected.</p>' },
           },
         ],
       },
@@ -773,7 +773,7 @@ test('Scenario 4 (Discard): a rejected proposal cleanly reverts via the T0.6 inv
     assert.deepEqual(record.body, preProposalBody, 'the object must cleanly revert to its pre-proposal body');
     assert.equal(
       (record.body as typeof originalBody).section.data.body,
-      'Original prose body.',
+      '<p>Original prose body.</p>',
       'the rejected prose must NOT survive'
     );
     assert.equal(

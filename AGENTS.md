@@ -35,8 +35,11 @@ frontmatter normalization (93 posts) + registry display labels. The 28-invisible
 caveat is CLOSED (2026-07-11: 10 junk posts deleted, 18 stamped with `published_time`).
 Agent-CREATED pages are live end-to-end (2026-07-11, B1 closed): the object-page
 catch-all serves any published Page object whose route no file owns — create →
-publish → release → live, zero code. Still TODO: the W5+ hand-coded pages (Wolf:
-separate session).
+publish → release → live, zero code. Write-time guardrails (2026-07-11, traps
+5+14 closed): validateObject blocks, at patch/create/publish, content that would
+break the deploy (protected env values in any encoding; repo-file hotlink URLs)
+or the build (per-component rich-text vocabulary via the real splitters). Still
+TODO: the W5+ hand-coded pages (Wolf: separate session).
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 
