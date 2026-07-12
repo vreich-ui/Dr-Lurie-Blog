@@ -482,8 +482,12 @@ export const mountEditMode = (options: MountOptions): void => {
   let selectionRegion: HTMLElement | undefined;
   document.addEventListener(
     'mouseup',
-    () => {
+    (event) => {
       if (!document.body.classList.contains('dl-em-on')) return;
+      // A mouseup on the chip itself must not re-render it: the click event
+      // dispatches AFTER mouseup, and re-rendering would replace the Ask-AI
+      // button before its click listener ever fires.
+      if (chip.contains(event.target as Node)) return;
       const selection = window.getSelection();
       const anchor = selection?.anchorNode;
       const anchorElement =
