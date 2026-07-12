@@ -95,6 +95,10 @@ const buildUserMessage = (record: ObjectRecord, request: AskAiObjectRequest): st
 /** A section instance as it sits in a page body — the minimal shape the scope path reads. */
 type PageSectionInstance = { id: string; type: string; data: unknown };
 
+/** Plain-text copy: a string, or an array whose every element is a string. */
+const isCopyTextValue = (value: unknown): boolean =>
+  typeof value === 'string' || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
+
 const buildSectionUserMessage = (
   record: ObjectRecord,
   section: PageSectionInstance,
@@ -282,16 +286,20 @@ export const askAiForObject = async (
   if (!aiResult.ok) return err(aiResult.status, { error: aiResult.error });
 
   // Strip null/undefined (as the article version does) AND, on the copy-only
-  // section path, any protected field the model returned anyway — media/asset/
-  // reference/structure keys are off-limits there (ask-ai-schema.ts). The tool
-  // schema already excludes them; this is the defensive backstop so a
-  // hallucinated image/link URL can never reach object_patch (the About-
-  // portrait incident, 2026-07-12). Whole-object admin asks keep every field.
+  // section path, anything that is not PLAIN TEXT. A copy edit keeps only a
+  // string or an array of strings; every protected key AND every structured
+  // value (nested objects, arrays of objects) is dropped. Top-level checks
+  // alone are not enough — a structured field like pricing_table `tiers`
+  // carries `tiers[].product` commerce references, and content_split `images`
+  // carries media, inside a container whose own key isn't protected. Dropping
+  // non-text values means a copy edit can never repoint a nested reference or
+  // swap buried media (the About-portrait class of bug). Structured fields are
+  // agent/admin/manual work. Whole-object admin asks keep every field.
   const copyOnly = scopedSection !== undefined;
   const suggestion: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(aiResult.input)) {
     if (value === undefined || value === null) continue;
-    if (copyOnly && isProtectedAskAiField(key)) continue;
+    if (copyOnly && (isProtectedAskAiField(key) || !isCopyTextValue(value))) continue;
     suggestion[key] = value;
   }
 

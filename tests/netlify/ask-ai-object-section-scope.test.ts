@@ -325,3 +325,74 @@ test('a hallucinated image field is dropped — a copy edit can never change the
   assert.equal('portrait' in properties, false, 'the model was never offered the portrait field');
   assert.equal('portraitAssetRef' in properties, false, 'nor the asset ref');
 });
+
+test('copy-only drops STRUCTURED fields (arrays of objects) so a copy edit cannot repoint nested references', async () => {
+  // A pricing_table stores product refs inside tiers[].product — a container
+  // key ("tiers") that is not itself protected. A copy edit must not be able
+  // to return it (Codex #423): text survives, structure is dropped.
+  const store = createStore();
+  const pageWithTable: ObjectRecord = {
+    ...pageRecord(),
+    object_id: 'page_pricing_demo',
+    body: {
+      route: '/pricing-demo',
+      pageType: 'standard',
+      title: 'Pricing demo',
+      seo: {},
+      sections: [
+        {
+          id: 's_pricing',
+          type: 'pricing_table',
+          data: { heading: 'Plans', tiers: [{ product: 'prod_a', features: ['x'] }] },
+        },
+      ],
+    },
+  };
+  store.seed(pageWithTable);
+
+  const openai = openAiMock({
+    heading: 'Simple, honest pricing',
+    tiers: [{ product: 'prod_HALLUCINATED', features: ['x'] }],
+  });
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    {
+      object_type: 'page',
+      object_id: 'page_pricing_demo',
+      section_id: 's_pricing',
+      instruction: 'Warmer pricing copy.',
+    },
+    deps(openai.fetchImpl)
+  );
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(
+    result.body.suggestion,
+    { heading: 'Simple, honest pricing' },
+    'only the heading text survives — the tiers container (with its product ref) is dropped'
+  );
+});
+
+test('copy-only keeps string arrays (checklist/feature copy) but drops arrays of objects', async () => {
+  const store = createStore();
+  const page: ObjectRecord = {
+    ...pageRecord(),
+    object_id: 'page_list_demo',
+    body: {
+      route: '/list-demo',
+      pageType: 'standard',
+      title: 'List demo',
+      seo: {},
+      sections: [{ id: 's_check', type: 'checklist', data: { heading: 'For you if', items: ['a', 'b'] } }],
+    },
+  };
+  store.seed(page);
+  const openai = openAiMock({ heading: 'This is for you if…', items: ['clearer', 'calmer', 'kinder'] });
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'page', object_id: 'page_list_demo', section_id: 's_check', instruction: 'Punch up the list.' },
+    deps(openai.fetchImpl)
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.suggestion, { heading: 'This is for you if…', items: ['clearer', 'calmer', 'kinder'] });
+});
