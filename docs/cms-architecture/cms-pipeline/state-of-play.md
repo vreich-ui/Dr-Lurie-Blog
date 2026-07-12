@@ -7,6 +7,48 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 E (S1b SHIPPED: commerce + commerce-events stores, order/event libs, capture beacon)
+
+Same session as S1a (PR #411 merged; branch restarted from main). S1b per
+plan §9: the substrate the checkout path (S1c) writes into. Wolf directive
+recorded this session: **products/services content uses MOCKUP data** — this
+supersedes the plan's "/services awaits Wolf's copy-or-delete call" wait; S2
+seeds mock products and the W5 conversions may seed mock copy (no longer
+"silent lorem" — it is now sanctioned).
+
+- **Stores** (`netlify/lib/blob-store.ts`, the one env-contract place):
+  `commerce` (strong consistency — the success page polls the order the
+  webhook just wrote) and `commerce-events` (eventual; append-only).
+- **`commerce_order.v1`** (`netlify/lib/commerce-orders.ts`):
+  `orders/<idempotency-key>.json` — Checkout Session id for paid orders, the
+  minted order_id for free claims (§5). `writeOrderIfAbsent` is THE webhook
+  idempotency mechanism: pre-read + `onlyIfNew` atomic write; replays and
+  race-losers return the ORIGINAL record so fulfillment stays a pure
+  function of first-write state. Raw buyer email lives ONLY here; tokens are
+  never stored — only `sha256:` hashes (a store dump can't mint download
+  links). Zod-strict, `reissues[]` ready for order_reissue (S3).
+- **`commerce_event.v1`** (`netlify/lib/commerce-events.ts`): the §6
+  substrate contract — 8 event types, one immutable JSON per event at
+  `events/<yyyy-mm-dd>/<digits-ts>-<uuid>.json` (opt-ins layout; timestamp
+  compacted to digits for local-FS key safety, still time-sorted).
+  `appendCommerceEvent` is create-if-absent (immutable, replays no-op);
+  `hashEmail` emits `sha256:<hex>` of the normalized address and the schema
+  REJECTS anything in `actor.email_hash` that isn't that shape. Additive-only
+  evolution documented in the module header.
+- **Capture beacon** (`netlify/functions/save-commerce-event.ts`, the
+  save-opt-in sibling): accepts ONLY the client-authored types
+  (`product_viewed`, `checkout_started`) — authoritative types cannot be
+  forged through the public endpoint; no email field accepted (hashed or
+  raw); `data` is allowlisted (amount_cents/currency/mode), never
+  passthrough; JSON parsed regardless of content-type (sendBeacon reality).
+- Tests: 17 new (schema envelopes, PII rejections, idempotency + race
+  paths, endpoint forgery/PII/allowlist) — suite 1021 green, astro check 0,
+  eslint/prettier clean.
+
+NOT in S1b: nothing reads these stores (by design, §6 — Blobs is not a
+queryable database); S1c wires the writers (checkout session → webhook →
+token delivery + success page), which is next on the critical path.
+
 ## Session 2026-07-12 D (S1a SHIPPED: `product` is the eighth object type — review-required, price-funnel enforced)
 
 Shop build sequence started per [`06-shop-module-plan.md`](../06-shop-module-plan.md)

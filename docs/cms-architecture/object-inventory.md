@@ -314,7 +314,7 @@ objects shipped with a byte-identical cutover, and Wolf's credentialed run
 the same day converted all six (see "Listing & article surfaces" above) —
 the biggest remaining MVP chunk is closed.
 
-### 6. Shop module (products + commerce) — S1a BUILT (2026-07-12)
+### 6. Shop module (products + commerce) — S1a + S1b BUILT (2026-07-12)
 
 The plan is [`06-shop-module-plan.md`](06-shop-module-plan.md) (Stripe-only v1,
 digital goods). **S1a is done**: the `product` object type is live end-to-end in
@@ -325,10 +325,17 @@ criteria (slug shape/uniqueness via the live `isSlugTaken` resolver, mode↔fiel
 coherence, publish-gated Stripe linkage, artifact trust, `commerce_price_sync`
 backstop), the materializer (`src/data/site/products/{id}.json`),
 `object_contract('product')`, and the **review-required approval flip** (§0.4).
-Stripe env keys are pre-marked in the deploy-safety scanner (§8.5). **No product
-records exist yet** — the store is empty by design until S2 seeds the shop
-surfaces. Next on the critical path: S1b (commerce + commerce-events stores,
-event lib) and S1c (checkout session → webhook → token delivery), then the two
+Stripe env keys are pre-marked in the deploy-safety scanner (§8.5). **S1b is
+done too** (same day): the `commerce` (orders, strong consistency) and
+`commerce-events` (append-only, immutable) blob stores, the
+`commerce_order.v1` record lib (`writeOrderIfAbsent` — the webhook idempotency
+mechanism; raw email lives only here; only token HASHES are stored), the
+`commerce_event.v1` event lib (8 types, PII-minimized `sha256:` actor hashes),
+and the public `save-commerce-event` sendBeacon endpoint (client-authored
+types only — authoritative events cannot be forged). **No product records
+exist yet** — the store is empty by design until S2 seeds the shop surfaces
+(with MOCKUP content — Wolf, 2026-07-12). Next on the critical path: S1c
+(checkout session → webhook → token delivery + success page), then the two
 S3 MCP tools (`product_set_price`, `order_reissue`) that complete criterion 4.
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
