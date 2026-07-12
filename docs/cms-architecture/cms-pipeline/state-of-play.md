@@ -7,6 +7,35 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 B (SHOP MODULE PLAN: W5 re-grounded in commerce — plan, not code)
+
+W6 merged (PR #408) and Wolf redirected W5: "do the pricing pages and the
+rest of the W5 pages which were passed over — but add the payment system,"
+with a Stripe-only v1 shop brief whose deliverable is **a development plan,
+not code**. Survey findings that shaped it: /pricing and /services are
+audit-confirmed Astrowind lorem leftovers (A§2.13, unlinked — nothing on the
+site links to them), /solutions/shop-preview is real content, there is NO
+Stripe surface or customer identity anywhere yet, and the commerce-relevant
+prior art is the artifacts store + get-public-pdf delivery, the opt-ins
+append-only capture, crypto.ts HMAC, and the object model itself.
+
+**The plan is [`06-shop-module-plan.md`](../06-shop-module-plan.md).** Spine:
+`product` as a governed OBJECT type (not an article-pipeline clone — pushback
+recorded), fulfillment as the only discriminated union
+(download/unlock/none), Stripe canonical for charge amounts with a
+display-cache + `product_set_price` tool making drift structurally
+impossible, product pages = product object + `page_ref` Page rendered by the
+W6 section machinery (product-vs-article answered: different object, same
+renderer), an append-only `commerce_event.v1` log designed for an unknown
+consumer, Checkout Sessions only (Payment Links rejected in v1), idempotent
+webhook→order→signed-token fulfillment with `order_reissue` as
+launch-critical, and the W5 pages sequenced AFTER products exist so
+pricing_table/steps/feature_grid/content_split mint with real content
+(/services still needs Wolf's copy-or-delete call; seeding lorem refused).
+Commerce publishes flip to review-required; PUBLISH_SECRET rotation +
+SITE_NOT_YET_LIVE flip named as launch gates. Next session starts at S1a
+(product.v1 schema) per the build sequence.
+
 ## Session 2026-07-12 (W6 BUILT + SEEDED: listing surfaces — the last unimplemented PageTypes are formalized)
 
 Wolf: "Move to W6 on the conversion to CMS path." The T6.1 batch, built the
