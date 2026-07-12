@@ -1,10 +1,10 @@
 {
   "__generated": {
-    "at": "2026-07-07T19:06:56.011Z",
+    "at": "2026-07-12T20:08:59.614Z",
     "from": "objects/navigation/by-id/nav_footer.json",
-    "record_version": 81
+    "record_version": 85
   },
-  "footNote": "\n    Educational content only — not medical advice. © Dr. Lurié.\n  ",
+  "footNote": "    Educational content only — not medical advice. © Dr. Lurié Skincare.  ",
   "groups": [
     {
       "id": "g_explore",
