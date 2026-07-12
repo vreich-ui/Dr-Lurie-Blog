@@ -68,10 +68,20 @@ criteria 2/3 need the credentialed run after merge + deploy:
 PageType definitions before the run). After it, 37 objects are converted and
 the P6 exit criterion "every object type in the C§2.2 matrix exists in
 production" is met for pages. Remaining waves: W5 hand-coded pages (Wolf:
-separate session), W7 rich text (OQ-8). Pre-existing gap flagged, untouched:
-the renderer never filters `visibility: 'hidden'` sections on CONVERTED pages
-(PageObjectRenderer renders whatever the export carries; the new
-ObjectSections path does filter) — worth its own small pass.
+separate session), W7 rich text (OQ-8).
+
+**Follow-up in the same PR (Wolf: "address visibility: 'hidden' in the earlier
+converted scope"): the never-render-private gap is CLOSED at the resolver.**
+`resolveSections` (the pure layer BOTH render paths share — PageObjectRenderer
+for the 12 converted pages + the object-page catch-all, and ObjectSections for
+the listing surfaces) now skips a section when its page instance is hidden
+(including a hidden `shared_ref`, which is not even dereferenced) OR when a
+`shared_ref` target's own section object is hidden
+(`parseSharedSectionExport` surfaces the inner `visibility`) — so
+`set_section_visibility` on a shared section hides it on every page that
+references it, matching the validator's `structure_visible` semantics. No
+committed export carries `visibility` today, so the change is render-neutral:
+build-diff EMPTY again. 4 new resolver tests pin all four cases.
 
 ## Session 2026-07-11 M (content_item resolver: manual article curation is agent-usable — trap 4 closed)
 
