@@ -14,7 +14,9 @@
  * selection-based UX, the forced-tool call, null-stripping — is reused via the
  * core, not by modifying the article file.
  *
- * POST body: { object_type, object_id, selected_text?, instruction }
+ * POST body: { object_type, object_id, section_id?, selected_text?, instruction }
+ * (`section_id` scopes a PAGE request to one section instance — the edit-mode
+ * canvas path; see netlify/lib/ask-ai-object.ts.)
  * Requires ANTHROPIC_API_KEY; model override via ANTHROPIC_MODEL.
  */
 import { z } from 'zod';
@@ -29,6 +31,7 @@ const bodySchema = z
   .object({
     object_type: z.string().min(1),
     object_id: z.string().min(1),
+    section_id: z.string().min(1).optional(),
     selected_text: z.string().max(4000).optional(),
     instruction: z.string().min(1).max(2000),
   })
