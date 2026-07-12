@@ -195,9 +195,7 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-newsec-inner{border-radius:10px;margin:18px auto;max-width:720px;
   padding:18px 22px;font:12.5px/1.5 var(--dlem-font);color:var(--dlem-muted);background:var(--dlem-surface-2)}
 .dl-em-newsec-inner strong{color:var(--dlem-heading);font-size:13px}
-.dl-em-form{padding:12px 14px;overflow-y:auto;display:none;flex-direction:column;gap:10px}
-.dl-em-panel.dl-em-mode-edit .dl-em-form,.dl-em-panel.dl-em-mode-image .dl-em-form{display:flex}
-.dl-em-panel.dl-em-mode-edit .dl-em-composer,.dl-em-panel.dl-em-mode-image .dl-em-composer{display:none}
+.dl-em-form{padding:12px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0}
 .dl-em-formrow{display:flex;flex-direction:column;gap:4px}
 .dl-em-formrow label{font:700 10.5px ui-monospace,monospace;color:var(--dlem-muted)}
 .dl-em-formrow input,.dl-em-formrow textarea{border:1px solid var(--dlem-border);border-radius:8px;
@@ -208,7 +206,10 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-imgthumb{max-width:100%;max-height:140px;border-radius:8px;border:1px solid var(--dlem-border);object-fit:cover}
 .dl-em-srcrow{display:flex;gap:6px;align-items:center}
 .dl-em-srcrow input{flex:1;min-width:0}
-.dl-em-upload{white-space:nowrap}
+.dl-em-upload{width:36px;height:36px;padding:0;flex:none}
+.dl-em-upload.dl-em-loading{opacity:.5;pointer-events:none}
+.dl-em-upload.dl-em-loading svg{animation:dl-em-spin .8s linear infinite}
+@keyframes dl-em-spin{to{transform:rotate(360deg)}}
 .dl-em-imgrefs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .dl-em-imgref{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dlem-border);border-radius:8px;
   background:transparent;color:var(--dlem-text);padding:3px 8px 3px 3px;font:600 11.5px var(--dlem-font);cursor:pointer}
@@ -218,39 +219,70 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-repill{display:inline-block;background:color-mix(in srgb,var(--dlem-accent) 14%,transparent);
   border:1px solid var(--dlem-accent);color:var(--dlem-accent);border-radius:999px;padding:0 8px;
   font:700 10.5px ui-monospace,monospace}
-.dl-em-formfoot{display:flex;gap:8px;padding-top:2px}
-.dl-em-formfoot .dl-em-save{background:var(--dlem-ok);border-color:var(--dlem-ok);color:#fff}
-.dl-em-panel{position:fixed;top:46px;right:12px;bottom:12px;width:380px;max-width:calc(100vw - 24px);
+.dl-em-formfoot{display:flex;gap:8px;padding:10px 0 2px;position:sticky;bottom:0;background:var(--dlem-surface)}
+.dl-em-formfoot .dl-em-save{flex:1;background:var(--dlem-ok);border-color:var(--dlem-ok);color:#fff}
+.dl-em-formfoot .dl-em-ghost{width:38px;padding:0;flex:none}
+.dl-em-panel{position:fixed;top:46px;right:12px;bottom:12px;width:372px;max-width:calc(100vw - 24px);
   z-index:99992;display:none;flex-direction:column;background:var(--dlem-surface);color:var(--dlem-text);
-  border:1px solid var(--dlem-border);border-radius:12px;box-shadow:var(--dlem-shadow);font:13px/1.5 var(--dlem-font)}
+  border:1px solid var(--dlem-border);border-radius:14px;box-shadow:var(--dlem-shadow);font:13px/1.5 var(--dlem-font);
+  overflow:hidden}
 .dl-em-panel.dl-em-open{display:flex}
-.dl-em-panel header{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--dlem-border)}
-.dl-em-panel header .dl-em-t{flex:1;min-width:0}
-.dl-em-panel header .dl-em-title{font:700 14px var(--dlem-font-head);color:var(--dlem-heading)}
-.dl-em-panel header .dl-em-title svg{display:inline-block;vertical-align:-2px;margin-right:3px}
-.dl-em-panel header .dl-em-scope{font-size:11.5px;color:var(--dlem-muted);margin-top:2px;overflow-wrap:anywhere}
-.dl-em-close{border:none;background:none;color:inherit;font-size:15px;cursor:pointer;padding:2px 6px}
+.dl-em-panel header{display:flex;gap:8px;align-items:center;padding:9px 8px 9px 13px;border-bottom:1px solid var(--dlem-border);
+  background:var(--dlem-surface-2)}
+.dl-em-ident{flex:1;min-width:0;display:flex;align-items:center;gap:7px;font:600 12px var(--dlem-font)}
+.dl-em-ident .dl-em-itype{color:var(--dlem-heading);white-space:nowrap}
+.dl-em-ident .dl-em-iid{font:400 10.5px ui-monospace,monospace;color:var(--dlem-muted);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.dl-em-ident .dl-em-idot{width:6px;height:6px;border-radius:50%;flex:none}
+.dl-em-ident .dl-em-idot.dl-em-shd{background:var(--dlem-accent)}
+.dl-em-ident .dl-em-idot.dl-em-drf{background:var(--dlem-draft)}
+.dl-em-close{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;flex:none;
+  border:none;background:transparent;color:var(--dlem-muted);border-radius:7px;cursor:pointer}
+.dl-em-close:hover{background:color-mix(in srgb,var(--dlem-text) 10%,transparent);color:var(--dlem-text)}
+/* accordion: icon-led sections, one open at a time; the open one grows */
+.dl-em-accstack{flex:1;min-height:0;display:flex;flex-direction:column}
+.dl-em-acc{display:flex;flex-direction:column;min-height:0;border-bottom:1px solid var(--dlem-border)}
+.dl-em-acc:last-child{border-bottom:none}
+.dl-em-acc.dl-em-open{flex:1;min-height:0}
+.dl-em-acc-head{display:flex;align-items:center;gap:10px;width:100%;padding:11px 13px;border:none;
+  background:transparent;color:var(--dlem-text);font:600 12.5px var(--dlem-font);cursor:pointer;text-align:left}
+.dl-em-acc-head:hover{background:var(--dlem-surface-2)}
+.dl-em-acc-head .dl-em-ic{display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;
+  color:var(--dlem-accent)}
+.dl-em-acc-head .dl-em-lbl{flex:1;color:var(--dlem-heading)}
+.dl-em-acc-head .dl-em-chev{color:var(--dlem-muted);transition:transform .16s ease}
+.dl-em-acc.dl-em-open>.dl-em-acc-head{border-bottom:1px solid var(--dlem-border);background:var(--dlem-surface-2)}
+.dl-em-acc.dl-em-open>.dl-em-acc-head .dl-em-chev{transform:rotate(180deg);color:var(--dlem-accent)}
+.dl-em-acc-body{display:none;flex-direction:column;min-height:0;flex:1}
+.dl-em-acc.dl-em-open>.dl-em-acc-body{display:flex}
+.dl-em-panel:not(.dl-em-has-image) .dl-em-acc[data-em-acc="image"]{display:none}
 .dl-em-log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-.dl-em-msg{max-width:92%;padding:8px 11px;border-radius:9px;font-size:12.5px}
+.dl-em-msg{max-width:92%;padding:8px 11px;border-radius:10px;font-size:12.5px}
 .dl-em-msg.dl-em-user{align-self:flex-end;background:var(--dlem-accent);color:var(--dlem-accent-ink);border-bottom-right-radius:3px}
 .dl-em-msg.dl-em-ai{align-self:flex-start;background:var(--dlem-surface-2);border:1px solid var(--dlem-border);border-bottom-left-radius:3px}
-.dl-em-msg.dl-em-sys{align-self:center;background:none;color:var(--dlem-muted);font-size:11px;text-align:center}
+.dl-em-msg.dl-em-sys{align-self:stretch;background:none;color:var(--dlem-muted);font-size:11px;text-align:center}
+.dl-em-msg.dl-em-sys svg{vertical-align:-2px;margin-right:3px;opacity:.8}
 .dl-em-diff{border:1px solid var(--dlem-border);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:6px}
 .dl-em-diff .dl-em-field{font:700 10.5px ui-monospace,monospace;margin-bottom:2px;color:var(--dlem-muted)}
 .dl-em-diff del{background:color-mix(in srgb,var(--dlem-danger) 14%,transparent);color:var(--dlem-danger);text-decoration:line-through;border-radius:2px}
 .dl-em-diff ins{background:color-mix(in srgb,var(--dlem-ok) 16%,transparent);color:var(--dlem-ok);text-decoration:none;border-radius:2px}
 .dl-em-diff .dl-em-noprev{color:var(--dlem-draft);font-size:10.5px}
+.dl-em-btn svg{display:block}
+.dl-em-btn.dl-em-ico{display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .dl-em-actions{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--dlem-border)}
 .dl-em-actions[hidden]{display:none}
 .dl-em-actions .dl-em-btn{border-color:var(--dlem-accent);background:var(--dlem-accent);color:var(--dlem-accent-ink)}
-.dl-em-actions .dl-em-accept{background:var(--dlem-ok);border-color:var(--dlem-ok)}
+.dl-em-actions .dl-em-accept{flex:1;background:var(--dlem-ok);border-color:var(--dlem-ok)}
 .dl-em-actions .dl-em-btn.dl-em-ghost{background:transparent;color:var(--dlem-text);border-color:var(--dlem-border)}
-.dl-em-composer{padding:10px 14px 12px;border-top:1px solid var(--dlem-border)}
-.dl-em-composer .dl-em-row{display:flex;gap:8px}
-.dl-em-composer textarea{flex:1;height:58px;resize:none;border:1px solid var(--dlem-border);border-radius:8px;
-  padding:7px 9px;font:12.5px/1.45 var(--dlem-font);background:var(--dlem-surface);color:var(--dlem-text)}
+.dl-em-composer{padding:9px 12px 11px;border-top:1px solid var(--dlem-border)}
+.dl-em-composer .dl-em-row{display:flex;gap:8px;align-items:flex-end}
+.dl-em-composer textarea{flex:1;height:52px;resize:none;border:1px solid var(--dlem-border);border-radius:9px;
+  padding:8px 10px;font:12.5px/1.45 var(--dlem-font);background:var(--dlem-surface);color:var(--dlem-text)}
 .dl-em-composer textarea:focus{outline:2px solid var(--dlem-accent);outline-offset:1px;border-color:transparent}
-.dl-em-hint{font-size:10.5px;color:var(--dlem-muted);margin-top:6px}
+.dl-em-composer .dl-em-send{width:40px;height:40px;flex:none;padding:0;border-radius:9px}
+.dl-em-hint{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--dlem-muted);margin-top:7px}
+.dl-em-hint kbd{font:600 10px ui-monospace,monospace;border:1px solid var(--dlem-border);border-radius:4px;
+  padding:0 4px;color:var(--dlem-text)}
 .dl-em-tray{position:fixed;top:44px;right:12px;width:420px;max-width:calc(100vw - 24px);z-index:99992;display:none;
   flex-direction:column;background:var(--dlem-surface);color:var(--dlem-text);border:1px solid var(--dlem-border);
   border-radius:12px;box-shadow:var(--dlem-shadow);font:12.5px/1.5 var(--dlem-font)}
@@ -287,6 +319,27 @@ const ICON_IMAGE =
 const ICON_PLUS =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
   'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const ICON_CHEVRON =
+  '<svg class="dl-em-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+const ICON_CHECK =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const ICON_CLOSE =
+  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+  'stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+const ICON_UPLOAD =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6"/>' +
+  '<path d="M4 20h16"/></svg>';
+const ICON_UNDO =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/>' +
+  '<path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>';
+const ICON_SEND =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/>' +
+  '<path d="M22 2 15 22l-4-9-9-4Z"/></svg>';
 
 const escapeHtml = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -360,21 +413,39 @@ export const mountEditMode = (options: MountOptions): void => {
   panel.className = 'dl-em-panel';
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', 'Edit section');
+  // The panel is one accordion: icon-led sections (Ask AI / Edit / Image),
+  // one expanded at a time (the expanded one grows; the rest are just a head).
+  // A chip tool opens its section; the heads switch between them; clicking the
+  // open head collapses the body to a compact rail. Identity lives in the
+  // header as a type + monospace id with tiny shared/draft dots — no prose.
+  const accHead = (mode: string, icon: string, label: string): string =>
+    `<button class="dl-em-acc-head" data-em-acc-head="${mode}" aria-label="${label}">` +
+    `<span class="dl-em-ic">${icon}</span><span class="dl-em-lbl">${label}</span>${ICON_CHEVRON}</button>`;
   panel.innerHTML =
-    `<header><div class="dl-em-t"><div class="dl-em-title" data-em-title>${ICON_SPARKLES} Ask AI</div>` +
-    `<div class="dl-em-scope" data-em-scope></div></div>` +
-    `<button class="dl-em-close" data-em-panel-close aria-label="Close">✕</button></header>` +
-    `<div class="dl-em-form" data-em-form></div>` +
+    `<header><div class="dl-em-ident" data-em-ident></div>` +
+    `<button class="dl-em-close" data-em-panel-close aria-label="Close">${ICON_CLOSE}</button></header>` +
+    `<div class="dl-em-accstack">` +
+    `<section class="dl-em-acc" data-em-acc="ai">${accHead('ai', ICON_SPARKLES, 'Ask AI')}` +
+    `<div class="dl-em-acc-body">` +
     `<div class="dl-em-log" data-em-log></div>` +
     `<div class="dl-em-actions" data-em-suggestion-actions hidden>` +
-    `<button class="dl-em-btn dl-em-accept" data-em-accept>Accept → save draft</button>` +
-    `<button class="dl-em-btn dl-em-ghost" data-em-discard>Discard</button></div>` +
+    `<button class="dl-em-btn dl-em-accept dl-em-ico" data-em-accept>${ICON_CHECK} Save draft</button>` +
+    `<button class="dl-em-btn dl-em-ghost dl-em-ico" data-em-discard title="Discard" aria-label="Discard">${ICON_UNDO}</button></div>` +
     `<div class="dl-em-composer"><div class="dl-em-row">` +
-    `<textarea data-em-input placeholder="Describe the change you want…"></textarea>` +
-    `<button class="dl-em-btn dl-em-primary" data-em-send>Send</button></div>` +
-    `<div class="dl-em-hint">Select text on the page first to scope the request to that passage. ` +
-    `Accept saves a draft — publishing stays a separate step.</div></div>`;
+    `<textarea data-em-input placeholder="Describe the change…"></textarea>` +
+    `<button class="dl-em-btn dl-em-primary dl-em-send dl-em-ico" data-em-send aria-label="Send">${ICON_SEND}</button></div>` +
+    `<div class="dl-em-hint">${ICON_SPARKLES}<span>Select text to scope · <kbd>⌘↵</kbd> send</span></div></div>` +
+    `</div></section>` +
+    `<section class="dl-em-acc" data-em-acc="edit">${accHead('edit', ICON_PENCIL, 'Edit text')}` +
+    `<div class="dl-em-acc-body" data-em-acc-body="edit"></div></section>` +
+    `<section class="dl-em-acc" data-em-acc="image">${accHead('image', ICON_IMAGE, 'Image')}` +
+    `<div class="dl-em-acc-body" data-em-acc-body="image"></div></section>` +
+    `</div>`;
   document.body.append(panel);
+  // Single reusable form node, moved into whichever section (edit/image) is open.
+  const formEl = document.createElement('div');
+  formEl.className = 'dl-em-form';
+  formEl.setAttribute('data-em-form', '');
 
   // Gap layer: the small "+" affordances between/around sections (edit mode
   // only — CSS hides the layer otherwise). Document-absolute so scrolling
@@ -392,19 +463,17 @@ export const mountEditMode = (options: MountOptions): void => {
   const tray = document.createElement('div');
   tray.className = 'dl-em-tray';
   tray.innerHTML =
-    `<header>Pending changes — drafts and unreleased publishes</header>` +
+    `<header>Pending changes</header>` +
     `<div class="dl-em-rows" data-em-rows></div>` +
-    `<footer><span class="dl-em-deploy" data-em-deploy>Publish commits to the repo without deploying; Release runs one deploy for everything.</span>` +
+    `<footer><span class="dl-em-deploy" data-em-deploy>Publish commits; Release deploys everything once.</span>` +
     `<button class="dl-em-btn dl-em-primary" data-em-tray-release ${allowPublish ? '' : 'disabled'}>Release</button></footer>`;
   document.body.append(tray);
 
   const q = <T extends HTMLElement>(root: ParentNode, selector: string): T => root.querySelector(selector) as T;
   const statusEl = q<HTMLElement>(bar, '[data-em-status]');
   const countEl = q<HTMLElement>(bar, '[data-em-count]');
-  const titleEl = q<HTMLElement>(panel, '[data-em-title]');
-  const formEl = q<HTMLElement>(panel, '[data-em-form]');
+  const identEl = q<HTMLElement>(panel, '[data-em-ident]');
   const logEl = q<HTMLElement>(panel, '[data-em-log]');
-  const scopeEl = q<HTMLElement>(panel, '[data-em-scope]');
   const inputEl = q<HTMLTextAreaElement>(panel, '[data-em-input]');
   const suggestionActions = q<HTMLElement>(panel, '[data-em-suggestion-actions]');
   const rowsEl = q<HTMLElement>(tray, '[data-em-rows]');
@@ -791,51 +860,77 @@ export const mountEditMode = (options: MountOptions): void => {
 
   // ── panel ─────────────────────────────────────────────────────────────────
   let panelState: PanelState | undefined;
+  let panelTarget: EditTarget | undefined;
+  let panelRegion: HTMLElement | undefined;
 
   const closePanel = (): void => {
-    panel.classList.remove('dl-em-open', 'dl-em-mode-edit', 'dl-em-mode-image');
+    panel.classList.remove('dl-em-open', 'dl-em-mode-edit', 'dl-em-mode-image', 'dl-em-has-image');
+    panel.querySelectorAll('.dl-em-acc').forEach((section) => section.classList.remove('dl-em-open'));
     panelState?.region.classList.remove('dl-em-focus');
     panelState = undefined;
+    panelTarget = undefined;
+    panelRegion = undefined;
+    formEl.remove();
     formEl.innerHTML = '';
   };
   q<HTMLButtonElement>(panel, '[data-em-panel-close]').addEventListener('click', closePanel);
 
-  const PANEL_TITLES: Record<PanelMode, string> = {
-    ai: `${ICON_SPARKLES} Ask AI`,
-    edit: `${ICON_PENCIL} Edit text`,
-    image: `${ICON_IMAGE} Image`,
+  /** Expand one accordion section (collapse the rest); null collapses all. */
+  const setActiveSection = (mode: PanelMode | null): void => {
+    panel.querySelectorAll<HTMLElement>('.dl-em-acc').forEach((section) => {
+      section.classList.toggle('dl-em-open', section.dataset.emAcc === mode);
+    });
+    panel.classList.toggle('dl-em-mode-edit', mode === 'edit');
+    panel.classList.toggle('dl-em-mode-image', mode === 'image');
   };
+
+  // Accordion heads switch tools on the SAME section; clicking the open head
+  // collapses the panel body to the compact icon rail.
+  panel.querySelectorAll<HTMLButtonElement>('[data-em-acc-head]').forEach((head) => {
+    head.addEventListener('click', () => {
+      const mode = head.dataset.emAccHead as PanelMode;
+      const section = panel.querySelector(`.dl-em-acc[data-em-acc="${mode}"]`);
+      if (section?.classList.contains('dl-em-open')) {
+        setActiveSection(null);
+      } else if (panelTarget && panelRegion) {
+        void openPanel(panelTarget, panelRegion, mode);
+      }
+    });
+  });
 
   const openPanel = async (target: EditTarget, region: HTMLElement, mode: PanelMode): Promise<void> => {
     if (panelState?.snapshot) restoreRegion(panelState.snapshot);
     closePanel();
     tray.classList.remove('dl-em-open');
     region.classList.add('dl-em-focus');
+    panelTarget = target;
+    panelRegion = region;
     logEl.innerHTML = '';
     suggestionActions.hidden = true;
-    titleEl.innerHTML = PANEL_TITLES[mode];
-    panel.classList.toggle('dl-em-mode-edit', mode === 'edit');
-    panel.classList.toggle('dl-em-mode-image', mode === 'image');
+
+    // Header identity: type + monospace id, with tiny shared/draft dots (no prose).
+    const isDraft = region.classList.contains('dl-em-draft');
+    identEl.innerHTML =
+      `<span class="dl-em-itype">${escapeHtml(target.sectionType)}</span>` +
+      `<span class="dl-em-iid">${escapeHtml(target.objectId)}</span>` +
+      (target.shared ? `<span class="dl-em-idot dl-em-shd" title="Shared — affects every page using it"></span>` : '') +
+      (isDraft ? `<span class="dl-em-idot dl-em-drf" title="Unpublished draft"></span>` : '');
+    panel.classList.toggle('dl-em-has-image', IMAGE_SECTION_TYPES.has(target.sectionType));
+    setActiveSection(mode);
+    if (mode !== 'ai') panel.querySelector(`[data-em-acc-body="${mode}"]`)?.append(formEl);
 
     const selected = mode === 'ai' && selectionRegion === region ? currentSelectionText : undefined;
-    scopeEl.textContent =
-      `${target.sectionType} · ${target.objectId}` +
-      (target.shared ? ' (shared — edits affect every page using it)' : '') +
-      (mode === 'ai'
-        ? selected
-          ? ` · selection: “${selected.slice(0, 60)}${selected.length > 60 ? '…' : ''}”`
-          : ' · whole section'
-        : '');
     panel.classList.add('dl-em-open');
     if (mode === 'ai') {
       inputEl.value = '';
       inputEl.focus();
     }
 
-    log('sys', 'Reading the object record…');
+    const loading = log('sys', 'Loading…');
     const { status, record } = await getObjectRecord(getToken, target.objectType, target.objectId);
+    loading.remove();
     if (status !== 200 || !record) {
-      log('sys', `Could not load ${escapeHtml(target.objectId)} (HTTP ${status}). Is it store-backed?`);
+      log('sys', `Could not load ${escapeHtml(target.objectId)} (HTTP ${status}).`);
       return;
     }
     const body = record.body as Record<string, unknown>;
@@ -852,17 +947,16 @@ export const mountEditMode = (options: MountOptions): void => {
       patchSectionId = inner?.id;
     }
     if (!currentData || !patchSectionId) {
-      log('sys', 'This section is not in the draft record — it may be newer than the store. Edit via /admin/objects.');
+      log('sys', 'Not in the draft record yet — edit via /admin/objects.');
       return;
     }
     panelState = { target, region, mode, currentData, patchSectionId, selectedText: selected };
     logEl.innerHTML = '';
     if (mode === 'ai') {
-      inputEl.placeholder = 'Describe the change you want…';
+      inputEl.placeholder = selected ? 'Refine the selection…' : 'Describe the change…';
       log(
         'sys',
-        `Editing ${escapeHtml(target.sectionType)} on ${escapeHtml(target.objectId)}. ` +
-          'Suggestions preview in place as a draft; nothing publishes from here.'
+        `${ICON_SPARKLES} Editing ${escapeHtml(target.sectionType)}${selected ? ' · selection' : ''} — previews as a draft.`
       );
       renderImageRefChips(panelState);
     } else {
@@ -883,7 +977,7 @@ export const mountEditMode = (options: MountOptions): void => {
     if (entries.length === 0) return;
     const container = log(
       'sys',
-      `This section carries ${entries.length === 1 ? 'an image' : 'images'} — click one to reference it in the chat:`
+      `${ICON_IMAGE} Reference ${entries.length === 1 ? 'this image' : 'an image'} in the chat:`
     );
     const row = document.createElement('div');
     row.className = 'dl-em-imgrefs';
@@ -1008,8 +1102,8 @@ export const mountEditMode = (options: MountOptions): void => {
           label +
           `<textarea data-em-field="${escapeHtml(field.key)}">${escapeHtml(value)}</textarea>` +
           (field.kind === 'lines'
-            ? '<span class="dl-em-fieldnote">One item per line.</span>'
-            : '<span class="dl-em-fieldnote">Allowed tags: p, br, strong, em, a, ul, ol, li, h2, h3.</span>');
+            ? '<span class="dl-em-fieldnote">One per line</span>'
+            : '<span class="dl-em-fieldnote">p · b · i · link · lists · h2–h3</span>');
       } else if (field.kind === 'image-src') {
         // src + Upload side by side: paste a path, or push a file into the
         // blobs artifacts store (pdf-tool pattern) and get its /img/* path.
@@ -1017,7 +1111,8 @@ export const mountEditMode = (options: MountOptions): void => {
           label +
           `<div class="dl-em-srcrow">` +
           `<input type="text" data-em-field="${escapeHtml(field.key)}" value="${escapeHtml(value)}">` +
-          `<button type="button" class="dl-em-btn dl-em-upload" data-em-upload>Upload</button>` +
+          `<button type="button" class="dl-em-btn dl-em-upload dl-em-ico" data-em-upload ` +
+          `title="Upload image" aria-label="Upload image">${ICON_UPLOAD}</button>` +
           `<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-em-upload-file>` +
           `</div>`;
       } else {
@@ -1048,8 +1143,8 @@ export const mountEditMode = (options: MountOptions): void => {
     const foot = document.createElement('div');
     foot.className = 'dl-em-formfoot';
     foot.innerHTML =
-      `<button class="dl-em-btn dl-em-save" data-em-form-save>Save draft</button>` +
-      `<button class="dl-em-btn dl-em-ghost" data-em-form-cancel>Cancel</button>`;
+      `<button class="dl-em-btn dl-em-save dl-em-ico" data-em-form-save>${ICON_CHECK} Save draft</button>` +
+      `<button class="dl-em-btn dl-em-ghost dl-em-ico" data-em-form-cancel title="Cancel" aria-label="Cancel">${ICON_CLOSE}</button>`;
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveForm(state, fields));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
@@ -1067,7 +1162,7 @@ export const mountEditMode = (options: MountOptions): void => {
     button: HTMLButtonElement
   ): Promise<void> => {
     button.disabled = true;
-    button.textContent = 'Uploading…';
+    button.classList.add('dl-em-loading');
     try {
       const result = await uploadImageArtifact(getToken, state.target.objectId, file);
       if (!result.ok) {
@@ -1076,12 +1171,15 @@ export const mountEditMode = (options: MountOptions): void => {
       }
       srcInput.value = result.publicPath;
       srcInput.dispatchEvent(new Event('input', { bubbles: true }));
-      log('sys', `Image stored in blobs at <code>${escapeHtml(result.publicPath)}</code> — Save draft to use it.`);
+      log(
+        'sys',
+        `${ICON_CHECK} Image stored in blobs — <code>${escapeHtml(result.publicPath)}</code>. Save draft to use it.`
+      );
     } catch (error) {
       log('sys', `Upload failed: ${escapeHtml(error instanceof Error ? error.message : String(error))}`);
     } finally {
       button.disabled = false;
-      button.textContent = 'Upload';
+      button.classList.remove('dl-em-loading');
     }
   };
 
@@ -1129,7 +1227,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', 'No changes to save.');
       return;
     }
-    const working = log('sys', 'Saving draft (checkout → patch)…');
+    const working = log('sys', 'Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
@@ -1156,7 +1254,7 @@ export const mountEditMode = (options: MountOptions): void => {
     }
     Object.assign(state.currentData, changed);
     state.region.classList.add('dl-em-draft');
-    log('sys', 'Draft saved — <strong>not published</strong>. Publish from the Pending tray when ready.');
+    log('sys', `${ICON_CHECK} Draft saved — <strong>not published</strong>.`);
     setStatus(`${state.target.objectId}: draft saved.`);
     await refreshPending();
     scheduleGapRebuild();
@@ -1215,7 +1313,7 @@ export const mountEditMode = (options: MountOptions): void => {
     }
     const changes = summarizeFieldChanges(state.currentData, response.suggestion);
     if (changes.length === 0) {
-      log('ai', 'No changes proposed — the current content already satisfies that instruction.');
+      log('ai', 'No changes — the content already satisfies that.');
       return;
     }
     state.suggestion = changedFieldsOnly(changes);
@@ -1226,10 +1324,7 @@ export const mountEditMode = (options: MountOptions): void => {
       previewed.set(change.field, previewFieldChange(state.region, change.kind, change.before, change.after));
     }
     state.region.classList.add('dl-em-draft');
-    log(
-      'ai',
-      `Proposed ${changes.length} field change${changes.length > 1 ? 's' : ''} — previewing in place as a draft.`
-    );
+    log('ai', `Previewing ${changes.length} change${changes.length > 1 ? 's' : ''} in place.`);
     renderDiff(changes, previewed);
     suggestionActions.hidden = false;
     scheduleGapRebuild(); // previewed content can change section heights
@@ -1243,7 +1338,7 @@ export const mountEditMode = (options: MountOptions): void => {
     const state = panelState;
     if (!state?.suggestion) return;
     suggestionActions.hidden = true;
-    const working = log('sys', 'Saving draft (checkout → patch)…');
+    const working = log('sys', 'Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
@@ -1265,7 +1360,7 @@ export const mountEditMode = (options: MountOptions): void => {
     state.suggestion = undefined;
     state.changes = undefined;
     state.snapshot = undefined; // the preview is now the draft — keep it on screen
-    log('sys', 'Draft saved — <strong>not published</strong>. Publish from the Pending tray when ready.');
+    log('sys', `${ICON_CHECK} Draft saved — <strong>not published</strong>.`);
     setStatus(`${state.target.objectId}: draft saved.`);
     await refreshPending();
   });
@@ -1279,7 +1374,7 @@ export const mountEditMode = (options: MountOptions): void => {
     state.changes = undefined;
     markDraftRegions(); // restore the true draft flags after the preview styling
     suggestionActions.hidden = true;
-    log('sys', 'Suggestion discarded — nothing was saved.');
+    log('sys', 'Discarded — nothing saved.');
   });
 
   // ── activation ────────────────────────────────────────────────────────────

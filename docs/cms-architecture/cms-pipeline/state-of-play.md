@@ -7,6 +7,31 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 Q (CANVAS panel UI: icon-led collapsible accordion)
+
+Wolf: "make the modal UI collapsible accordion. use less text and more
+representative iconography. be focused on style and UX … do not use colors
+that are outside of a current Astro schema." Shipped on the canvas branch
+(PR #425):
+
+- The docked panel is now one **accordion**: three icon-headed sections
+  (✨ Ask AI / ✏️ Edit text / 🖼 Image), one expanded at a time (open one
+  grows, rest collapse to a head + chevron). Chip tools open their section;
+  accordion heads switch tools in place; clicking the open head collapses to
+  a compact rail. Image section only shown for image-bearing types.
+- **Iconography over prose**: identity = type + monospace id + tiny
+  shared/draft dots (no sentences); actions are icon buttons w/ tooltips
+  (check=save, undo=discard, plane=send, up-arrow=upload); sys/log lines
+  terse + glyph-prefixed; field hints one-liners. Tray text trimmed too.
+- **Palette discipline**: every color is a project `--aw-*` token via the
+  `--dlem-*` layer — nothing bespoke; light/dark flips with the site.
+- Structure preserved: same modes/data-hooks (`data-em-*`, `.dl-em-mode-*`),
+  so the verbs/tests are untouched. Gates: astro check 0, eslint/prettier
+  clean, suite 1148+49 green, build 172 pages, drive extended to 49
+  assertions (3-section accordion, AI expanded/others collapsed, icon-only
+  send, head-switch collapses previous, open-head collapse). Docs:
+  07-canvas-editing.md §3e.
+
 ## Session 2026-07-12 P (CANVAS image tool v2: array images, blob-backed uploads, AI image references)
 
 Wolf, on the Codex array-image finding + storage: "Close the gap. Also, those

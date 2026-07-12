@@ -200,6 +200,21 @@ Opening the AI chat on a section that carries images shows **image chips**
    is context (and the handle downstream image-editing tools need), not a
    write path. Actually re-pointing an image stays the image tool's job.
 
+### 3e. Panel UI — icon-led collapsible accordion (2026-07-12, Wolf)
+
+The docked panel is one **accordion**: three icon-headed sections
+(✨ Ask AI / ✏️ Edit text / 🖼 Image), one expanded at a time (the open one
+grows; the rest are a single head with a chevron). A chip tool opens its
+section; the accordion heads switch between tools in place (no re-hover);
+clicking the open head collapses the body to a compact rail. The Image
+section only appears for image-bearing section types. Chrome is
+**iconography over prose**: identity is a `type` + monospace `id` with tiny
+shared/draft dots (no sentences), actions are icon buttons with tooltips
+(check = save, undo = discard, paper-plane = send, up-arrow = upload), and
+the sys/log lines are terse and glyph-prefixed. Every color is a
+project `--aw-*` design token (via the `--dlem-*` layer) — nothing bespoke;
+it flips light/dark with the site.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The
