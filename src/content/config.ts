@@ -129,6 +129,11 @@ const templateObjectCollection = defineCollection({
   schema: derivedExportSchema,
 });
 
+const productObjectCollection = defineCollection({
+  loader: glob({ pattern: '*.json', base: 'src/data/site/products' }),
+  schema: derivedExportSchema,
+});
+
 // Exported so Phase 3+ consumers (and tests) share one derived-export shape.
 export type DerivedExport = z.infer<typeof derivedExportSchema>;
 
@@ -140,4 +145,5 @@ export const collections = {
   navigationObject: navigationObjectCollection,
   sectionObject: sectionObjectCollection,
   templateObject: templateObjectCollection,
+  productObject: productObjectCollection,
 };

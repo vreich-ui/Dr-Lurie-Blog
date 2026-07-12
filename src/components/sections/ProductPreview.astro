@@ -1,12 +1,11 @@
 ---
 /**
- * `product_preview` section component — a heading over a card grid of products
- * (A§2.9, shop-preview). Each product action's href arrives resolved by the
- * renderer (ProductPreviewResolved.productActionHrefs, aligned by index). The
- * product `imageAssetRef` is a trusted-artifact reference the render path does
- * not resolve yet (same posture as bio's portraitAssetRef), so no image is
- * emitted until that resolver exists — the card renders title/description/CTA.
- * The component owns only layout.
+ * `product_preview` section component (S2) — a heading over a card grid of
+ * PRODUCTS. `manual`/`query` sources arrive resolved to product cards
+ * (title/excerpt/image/price badge/href → /shop/<slug>); a `cards` source
+ * renders its curated cells from data with per-cell action hrefs. The
+ * component owns only layout; which products appear (and never a retired or
+ * coming_soon one) is the resolver's contract.
  */
 import type { ProductPreviewResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
 
@@ -17,6 +16,7 @@ type Props = {
 };
 
 const { data, resolved } = Astro.props;
+const curated = data.source.kind === 'cards' ? data.source.cards : [];
 const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
   style === 'secondary' ? 'btn-secondary' : style === 'link' ? 'btn-link' : 'btn-primary';
 ---
@@ -25,15 +25,39 @@ const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
   <h2 class="text-3xl font-bold tracking-tight text-heading sm:text-4xl">{data.heading}</h2>
   <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
     {
-      data.products.map((product, index) => (
+      (resolved.cards ?? []).map((card) => (
         <article class="dl-card flex flex-col">
-          <h3 class="text-xl font-semibold text-heading">{product.title}</h3>
-          {product.description && <p class="mt-2 text-muted">{product.description}</p>}
-          {product.action && resolved.productActionHrefs[index] && (
+          {card.image && (
+            <img
+              class="mb-4 aspect-video w-full rounded-md object-cover"
+              src={card.image.src}
+              alt={card.image.alt}
+              loading="lazy"
+            />
+          )}
+          <h3 class="text-xl font-semibold text-heading">
+            <a href={card.href}>{card.title}</a>
+          </h3>
+          {card.excerpt && <p class="mt-2 text-muted grow">{card.excerpt}</p>}
+          <p class="mt-4 flex items-center justify-between">
+            <span class="font-bold text-heading">{card.priceBadge}</span>
+            <a class="btn-secondary" href={card.href}>
+              View
+            </a>
+          </p>
+        </article>
+      ))
+    }
+    {
+      curated.map((cell, index) => (
+        <article class="dl-card flex flex-col">
+          <h3 class="text-xl font-semibold text-heading">{cell.title}</h3>
+          {cell.description && <p class="mt-2 text-muted">{cell.description}</p>}
+          {cell.action && resolved.cardHrefs?.[index] && (
             <a
-              class:list={['mt-6', actionClass(product.action.style)]}
-              href={resolved.productActionHrefs[index]}
-              set:text={product.action.label}
+              class:list={['mt-6', actionClass(cell.action.style)]}
+              href={resolved.cardHrefs[index]}
+              set:text={cell.action.label}
             />
           )}
         </article>

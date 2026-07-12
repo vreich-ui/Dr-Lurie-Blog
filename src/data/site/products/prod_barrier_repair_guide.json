@@ -1,0 +1,34 @@
+{
+  "__generated": {
+    "at": "2026-07-12T13:26:49.883Z",
+    "from": "objects/product/by-id/prod_barrier_repair_guide.json",
+    "record_version": 5
+  },
+  "commerce": {
+    "availability": "available",
+    "mode": "fixed",
+    "price": {
+      "amount_cents": 1900,
+      "currency": "usd"
+    },
+    "provider": "stripe",
+    "stripe_test": {
+      "price_id": "price_MockBarrier001",
+      "product_id": "prod_MockBarrier001"
+    }
+  },
+  "fulfillment": {
+    "artifact_ref": "pdf/mockshop/0000000000000000000000000000000000000000000000000000000000000001.pdf",
+    "filename": "barrier-repair-guide.pdf",
+    "kind": "download"
+  },
+  "presentation": {
+    "excerpt": "A practical, science-first plan for rebuilding a compromised skin barrier — routines, ingredients, and what to skip.",
+    "notes": "MOCK product (Wolf 2026-07-12): placeholder Stripe test linkage + artifact ref; replace before launch.",
+    "seo": {
+      "description": "A downloadable, science-first guide to repairing your skin barrier after 60."
+    },
+    "title": "The Barrier Repair Guide"
+  },
+  "slug": "barrier-repair-guide"
+}

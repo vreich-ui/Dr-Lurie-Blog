@@ -180,13 +180,16 @@ test('the real committed exports emit ZERO paths today — every page object is 
     postPermalinks: [],
     reservedPrefixes: RESERVED,
   });
-  assert.deepEqual(paths, [], JSON.stringify(paths));
-  assert.equal(skipped.length, pageExports.length);
-  // Every committed export is served by a dedicated file: the 12 originally
-  // converted pages by their thin loaders (file_route), and the W6 listing/
-  // content_detail objects by the formalized listing loaders that read them
-  // (loader_owned_page_type). Any OTHER reason means a committed export is
-  // unreachable — that must fail here.
+  // S2 (2026-07-12): `page_shop` is the FIRST committed export served by the
+  // object-page catch-all — /shop has no route file on purpose (zero-code
+  // agent-served page). Everything else stays file-owned/loader-owned.
+  assert.deepEqual(paths, [{ objectId: 'page_shop', route: '/shop', param: 'shop' }], JSON.stringify(paths));
+  assert.equal(skipped.length, pageExports.length - paths.length);
+  // Every other committed export is served by a dedicated file: the 12
+  // originally converted pages by their thin loaders (file_route), and the
+  // W6 listing/content_detail objects (+ S2's page_product_detail) by the
+  // formalized loaders that read them (loader_owned_page_type). Any OTHER
+  // reason means a committed export is unreachable — that must fail here.
   const servedElsewhere = new Set(['file_route', 'loader_owned_page_type']);
   assert.ok(
     skipped.every((skip) => servedElsewhere.has(skip.reason)),

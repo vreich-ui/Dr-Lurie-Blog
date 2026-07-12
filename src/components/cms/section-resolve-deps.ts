@@ -65,11 +65,14 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
   // from data and needs no posts.
   const isPostBackedContentGrid = (type: string, data: unknown) =>
     type === 'content_grid' && (data as { source: { kind: string } }).source.kind !== 'cards';
+  const isProductBackedPreview = (type: string, data: unknown) =>
+    type === 'product_preview' && (data as { source: { kind: string } }).source.kind !== 'cards';
   const anySection = (predicate: (type: string, data: unknown) => boolean) =>
     sections.some((section) => predicate(section.type, section.data)) ||
     [...sharedSectionCache.values()].some((target) => predicate(target.type, target.data));
   const needsContentGrid = anySection(isPostBackedContentGrid);
   const needsContentEmbed = anySection((type) => type === 'content_embed');
+  const needsProductGrid = anySection(isProductBackedPreview);
   let contentGrid: ResolvePageDeps['contentGrid'];
   let resolveContentEmbed: ResolvePageDeps['resolveContentEmbed'];
   if (needsContentGrid || needsContentEmbed) {
@@ -113,6 +116,33 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
     }
   }
 
+  // product_preview manual/query resolution (S2 — the M-8 pattern over
+  // product objects). Loaded only when a section actually needs it, same as
+  // the posts feed; the product-export module stays a dynamic import for the
+  // same shared-CSS-chunk reason as the blog module.
+  let productGrid: ResolvePageDeps['productGrid'];
+  if (needsProductGrid) {
+    const { loadAvailableProducts, productPriceBadge, productRoute } = await import('~/utils/products');
+    const products = await loadAvailableProducts();
+    const toCard = (product: (typeof products)[number]) => ({
+      id: product.id,
+      title: product.body.presentation.title,
+      ...(product.body.presentation.excerpt !== undefined ? { excerpt: product.body.presentation.excerpt } : {}),
+      ...(product.body.presentation.images?.[0] ? { image: product.body.presentation.images[0] } : {}),
+      href: getPermalink(productRoute(product.body)),
+      priceBadge: productPriceBadge(product.body.commerce),
+    });
+    productGrid = {
+      resolveManualItem: (id) => {
+        const product = products.find((candidate) => candidate.id === id);
+        return product ? toCard(product) : undefined;
+      },
+      // v1's one query: every available product, title-sorted (loadAvailableProducts).
+      runQuery: (_query, limit) => products.slice(0, limit).map(toCard),
+      idOf: (card) => card.id,
+    };
+  }
+
   return {
     resolveActionHref,
     resolveSharedSection: (sectionObjectId) => {
@@ -122,5 +152,6 @@ export const buildSectionResolveDeps = async (sections: readonly SectionInstance
     },
     contentGrid,
     resolveContentEmbed,
+    productGrid,
   };
 };

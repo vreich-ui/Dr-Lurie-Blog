@@ -21,13 +21,23 @@
  * `cards` never reaches here: its curated cells live in the section data and
  * the component renders them directly (only cell links resolve, in resolve.ts).
  */
-import type { ContentGridSource, ContentQuery } from '../../schema/bodies/section-v1.js';
+import type { ContentQuery } from '../../schema/bodies/section-v1.js';
 
-export type ContentGridResolvers<TCard> = {
+// The structural source shape shared by every M-8 grid (content_grid over
+// posts, product_preview over products — S2): the query type is generic, the
+// manual/fallback semantics are identical.
+export type GridQuerySource<TQuery> = { kind: 'query'; query: TQuery };
+export type GridManualSource<TQuery> = {
+  kind: 'manual';
+  items: string[];
+  fallback?: GridQuerySource<TQuery>;
+};
+
+export type ContentGridResolvers<TCard, TQuery = ContentQuery> = {
   /** Published content summary for a manual item id; undefined = does not resolve. */
   resolveManualItem: (objectId: string) => TCard | undefined;
   /** Run a content query, best-first, at most `limit` results. */
-  runQuery: (query: ContentQuery, limit: number) => TCard[];
+  runQuery: (query: TQuery, limit: number) => TCard[];
   /** Stable identity for de-duplication between manual picks and query results. */
   idOf: (card: TCard) => string;
 };
@@ -35,10 +45,10 @@ export type ContentGridResolvers<TCard> = {
 /** Injectable for tests; production uses console.warn (visible in build logs). */
 export type ContentGridWarn = (message: string) => void;
 
-export const resolveContentGridCards = <TCard>(
-  source: Exclude<ContentGridSource, { kind: 'cards' }>,
+export const resolveContentGridCards = <TCard, TQuery = ContentQuery>(
+  source: GridQuerySource<TQuery> | GridManualSource<TQuery>,
   limit: number,
-  resolvers: ContentGridResolvers<TCard>,
+  resolvers: ContentGridResolvers<TCard, TQuery>,
   warn: ContentGridWarn = console.warn
 ): TCard[] => {
   if (source.kind === 'query') {

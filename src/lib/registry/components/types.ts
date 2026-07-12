@@ -68,13 +68,24 @@ export type LinkListResolved = {
   linkHrefs: string[];
 };
 /**
- * product_preview: one action href per product, aligned by index (undefined
- * where a product carries no action). `imageAssetRef` is deliberately NOT
- * resolved here — asset refs render only once a trusted-artifact resolver
- * exists on the render path (same posture as bio's portraitAssetRef).
+ * product_preview (S2): `manual`/`query` sources resolve to product `cards`
+ * from published + available product objects; the price badge is derived from
+ * `commerce.mode` ("$19" / "Pay what you want" / "Free"). A `cards` source
+ * renders its curated cells from data — only each cell's optional action
+ * resolves, to `cardHrefs` aligned by index. Exactly one of the two fields is
+ * populated per grid (the ContentGridResolved pattern).
  */
+export type ProductPreviewCard = {
+  id: string; // product object id (prod_…)
+  title: string;
+  excerpt?: string;
+  image?: { src: string; alt: string };
+  href: string; // /shop/<slug>
+  priceBadge: string;
+};
 export type ProductPreviewResolved = {
-  productActionHrefs: Array<string | undefined>;
+  cards?: ProductPreviewCard[];
+  cardHrefs?: Array<string | undefined>;
 };
 /**
  * content_embed: the referenced content_item resolved to a link card. `card` is
