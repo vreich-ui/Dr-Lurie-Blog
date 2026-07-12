@@ -265,19 +265,23 @@ What still has to become a real object for Dr. Lurié to function as a full CMS 
 i.e. for an agent (or a human via the admin UI) to edit **every meaningful part**
 of the live site through the one governed workflow. Roughly in priority order.
 
-### 1. Remaining hand-coded pages → page objects 🔴
+### 1. Remaining hand-coded pages → page objects 🔵 SEEDED (W5, 2026-07-12) — awaiting the credentialed run
 
-The last three hand-coded routes. **Do NOT repeat the about/contact bespoke-per-page
-pattern** — per [`design-principles.md`](design-principles.md), build these from
-**reusable, agent-configurable components** (generalize existing ones or add reusable
-types), accepting an intentional non-empty `build-diff` where the flexible result
-isn't byte-identical.
+The last three hand-coded route files are DELETED; all three pages render from
+committed page-object exports via the object-page catch-all. Built per
+[`design-principles.md`](design-principles.md) from three NEW REUSABLE section
+types (`steps`, `content_split`, `pricing_table`) + existing generics — no
+bespoke per-page types (`feature_grid` deliberately not minted: `content_grid`
+`cards` already covers icon grids). **Rendered + seeded, NOT yet converted:**
+store records exist only in the local rehearsal; the credentialed
+`--production --release` run with `scripts/lib/pages-w5-seed-data.mjs` flips
+these to CONVERTED.
 
-| TODO object         | Route                     | Shape / gotcha                                                                                                                                                                                                                                 |
-| ------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `page_pricing`      | `/pricing`                | Widget-composition (`HeroText`/`Pricing`/`FAQs`/`Steps`/`Features3`/`CallToAction`). `CallToAction` has link actions → needs the action-hrefs resolved shape + a `resolve.ts` entry (like `about`), plus pricing-tier/steps/FAQ data modeling. |
-| `page_services`     | `/services`               | Widget-composition (`Hero`/`Content`/`Features2`/`Testimonials`/`CallToAction`). Also has link actions.                                                                                                                                        |
-| `page_shop_preview` | `/solutions/shop-preview` | Bespoke markup **+ a scoped `<style>`** → uses the functional-equivalence gate + a `known-inert-diffs.md` entry (like thank-you).                                                                                                              |
+| Object              | Route                     | Status / composition                                                                                                                                                              |
+| ------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page_pricing`      | `/pricing`                | SEEDED — lede + `pricing_table` (tiers REFERENCE the three products; price/availability/CTA resolve from commerce data at build) + `steps` + faq + cta_banner. MOCK copy (Wolf 2026-07-12). |
+| `page_services`     | `/services`               | SEEDED — lede + `content_split` + `content_grid` cards (icon grid) + cta_banner. MOCK copy (Wolf 2026-07-12).                                                                       |
+| `page_shop_preview` | `/solutions/shop-preview` | SEEDED — REAL copy verbatim as one `content_split` (the bespoke shop-hero + scoped styles generalized into the component). Nav route-kind links unchanged.                          |
 
 ### 2. Real `site` object 🟢 CONVERTED (W4, credentialed run 2026-07-11)
 
@@ -374,11 +378,19 @@ session creation), and the two MCP tools — `product_set_price` (Stripe
 Price create/archive + one governed `set_product_price` patch; publish
 stays human-gated) and `order_reissue` (regenerates links from the order
 record alone; orders now store `fulfillment.artifact_ref`). **Criterion 4
-is closed for the product type** (contract 2/2 ops drilled). Remaining:
-the credentialed production run (products stop at `approval_required` →
-Wolf approves in /admin/objects), the LIVE Stripe exit test (launch gate),
-and the after-S3 page conversions (/pricing, /services, shop-preview —
-mockup copy sanctioned).
+is closed for the product type** (contract 2/2 ops drilled). **W5 (same
+day) shipped the after-S3 page conversions** (see §1 above) plus the
+`commerce_orders` MCP tool (netlify/lib/commerce-admin.ts) — read-only
+order list/detail by email/product/order_key, the support-lookup half of
+store administration that makes `order_reissue` operable from "customer
+lost the email". W5 also fixed a latent S2 bug: the productObject
+collection's entry ids were the product SLUG (Astro's glob loader prefers
+a top-level `slug` field), so the buy box embedded a product_id the
+checkout functions could never resolve — `generateId` now pins ids to the
+filename (= object id). Remaining: the credentialed production run
+(products stop at `approval_required` → Wolf approves in /admin/objects;
+same run publishes the three W5 pages) and the LIVE Stripe exit test
+(launch gate).
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 

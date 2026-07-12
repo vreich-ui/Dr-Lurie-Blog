@@ -265,6 +265,39 @@ const sectionFixtures: SectionInstance[] = [
       limit: 3,
     },
   },
+  {
+    id: 's_steps',
+    type: 'steps',
+    data: {
+      heading: 'How it works',
+      items: [
+        { title: 'Pick a guide', icon: 'tabler:shopping-bag' },
+        { title: 'Instant download', description: 'No waiting on email.' },
+      ],
+    },
+  },
+  {
+    id: 's_split',
+    type: 'content_split',
+    data: {
+      kicker: 'Aging skin needs focused care.',
+      heading: 'Age-aware skincare is coming.',
+      body: '<p>Copy beside media.</p>',
+      actions: [{ label: 'Join Early Access', target: { kind: 'route', href: '/solutions/early-access' } }],
+      images: [{ src: 'https://kugelmedia.netlify.app/drlurieblog/hero.jpg', alt: 'Product preview' }],
+    },
+  },
+  {
+    id: 's_tiers',
+    type: 'pricing_table',
+    data: {
+      heading: 'Pricing',
+      tiers: [
+        { product: 'prod_barrier_repair_guide', features: ['Full protocol'], highlighted: true },
+        { product: 'prod_starter_checklist', features: [] },
+      ],
+    },
+  },
   { id: 's_search', type: 'search', data: { placeholder: 'Search articles…', indexRoute: '/search.json' } },
   { id: 's_embed', type: 'content_embed', data: { contentItem: 'req_smoke_pdf_cta_20260630_01' } },
   {
@@ -301,6 +334,7 @@ test('sections: every union member parses from a seed fixture', () => {
     'contact_form',
     'content_embed',
     'content_grid',
+    'content_split',
     'cta_banner',
     'faq',
     'form_confirmation',
@@ -308,10 +342,12 @@ test('sections: every union member parses from a seed fixture', () => {
     'lede',
     'link_list',
     'newsletter_signup',
+    'pricing_table',
     'product_preview',
     'prose',
     'search',
     'shared_ref',
+    'steps',
     'testimonial',
   ]);
 });

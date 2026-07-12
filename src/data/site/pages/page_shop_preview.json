@@ -1,0 +1,53 @@
+{
+  "__generated": {
+    "at": "2026-07-12T14:28:58.613Z",
+    "from": "objects/page/by-id/page_shop_preview.json",
+    "record_version": 12
+  },
+  "pageType": "standard",
+  "route": "/solutions/shop-preview",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Join Early Access",
+            "style": "primary",
+            "target": {
+              "href": "/solutions/early-access",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Explore the Science",
+            "style": "secondary",
+            "target": {
+              "href": "/learn/topics",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Dr. Lurié products are being shaped around the biology of aging skin: barrier changes, lipid shifts, comfort, and ingredients that respect a changing skin environment.</p><p>The first releases are not live yet. Join early access to receive research notes, product previews, and launch updates.</p>",
+        "heading": "Age-aware skincare is coming.",
+        "images": [
+          {
+            "alt": "Dr. Lurié age-aware skincare product bottle preview",
+            "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-product-hero.jpg"
+          },
+          {
+            "alt": "Dr. Lurié skincare texture preview",
+            "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-product-texture.jpg"
+          }
+        ],
+        "kicker": "Aging skin needs focused care."
+      },
+      "id": "s_shopsplit",
+      "type": "content_split"
+    }
+  ],
+  "seo": {
+    "description": "Preview the age-aware skincare direction from Dr. Lurié and join early access for product updates.",
+    "ogImage": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-shop-social-preview.jpg"
+  },
+  "title": "Shop Preview"
+}

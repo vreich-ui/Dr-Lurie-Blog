@@ -21,6 +21,7 @@ import {
   getSiteObjectsBlobStore,
   getWorkflowBlobStore,
 } from '../lib/blob-store.js';
+import { getOrderDetail, listOrders } from '../lib/commerce-admin.js';
 import { orderReissue } from '../lib/order-reissue.js';
 import { productSetPrice } from '../lib/product-set-price.js';
 import { getStripeClient } from '../lib/stripe-env.js';
@@ -1550,6 +1551,19 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
       ['order_key']
     ),
+  },
+  {
+    name: 'commerce_orders',
+    description:
+      'Read-only order administration over the commerce store (support lookups — the front half of order_reissue). Without order_key: a bounded list, newest first (limit default 20, cap 100), filterable by buyer email (exact, case-insensitive) and/or product_id — "customer X lost their email" starts here. With order_key: the full order record (raw buyer email lives in orders by design, §6; the event log carries only hashes). NOT a reporting surface: Blobs is not a queryable database (§8.6) — aggregation waits for the external consumer.',
+    inputSchema: objectSchema({
+      order_key: stringSchema(
+        'Return ONE full order by its idempotency key (cs_… session id, or ord_… for free claims).'
+      ),
+      email: stringSchema('List filter: exact buyer email (case-insensitive).'),
+      product_id: stringSchema('List filter: only orders for this product object id (prod_…).'),
+      limit: { type: 'number', description: 'List cap, newest first (default 20, max 100).' },
+    }),
   },
   {
     name: 'registry_get',
@@ -3933,6 +3947,21 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       );
       if (!result.ok) return toolError(result.error, { statusCode: result.status });
       return toolResult(result);
+    }
+    case 'commerce_orders': {
+      const commerce = await getCommerceBlobStore(event);
+      const orderKeyLookup = toNonEmptyString(input.order_key);
+      if (orderKeyLookup) {
+        const detail = await getOrderDetail(commerce, orderKeyLookup);
+        if (!detail) return toolError(`No order found for key "${orderKeyLookup}".`, { statusCode: 404 });
+        return toolResult(detail);
+      }
+      const orders = await listOrders(commerce, {
+        email: toNonEmptyString(input.email) ?? undefined,
+        product_id: toNonEmptyString(input.product_id) ?? undefined,
+        limit: typeof input.limit === 'number' ? input.limit : undefined,
+      });
+      return toolResult({ count: orders.length, orders });
     }
     case 'order_reissue': {
       const orderKeyInput = toNonEmptyString(input.order_key);

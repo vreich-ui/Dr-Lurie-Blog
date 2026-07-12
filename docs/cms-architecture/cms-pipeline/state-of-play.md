@@ -7,6 +7,57 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-12 J (W5 PAGES SEEDED: /pricing, /services, shop-preview — zero hand-coded page routes left; commerce_orders admin tool)
+
+Same session (PR #416 merged; branch restarted). The plan's "after S2/S3"
+page conversions, per Wolf's directive ("convert W5 pricing and the other
+passed-over pages; agents get full store administration"):
+
+- **Three new REUSABLE section types** (schema → registry → component →
+  resolver → validation → editors, the full wiring): `steps` (numbered
+  icon cards), `content_split` (kicker/heading/rich body + actions + up to
+  2 staggered images — the bespoke shop-preview hero generalized, its
+  scoped styles absorbed), `pricing_table` (tiers REFERENCE product
+  objects; title/price badge/availability/CTA href resolve from commerce
+  data at build — copy never drifts from the store; unavailable products
+  render "Coming soon", ghost refs are skipped with a build warning and
+  BLOCKED at write by reference integrity).
+- **Three page objects, three route files DELETED** (importers verified):
+  `page_shop_preview` (/solutions/shop-preview — REAL copy verbatim;
+  nav's route-kind links unchanged, same route now object-served),
+  `page_pricing` + `page_services` (previously unlinked Astrowind lorem —
+  MOCK copy per Wolf's 2026-07-12 directive). All standard pages on the
+  object-page catch-all: **the hand-coded-page backlog is EMPTY — every
+  routable page on the site now renders from a page object.**
+  (`feature_grid` deliberately not minted: content_grid `cards` already
+  covers icon grids — design-principles rule 1.)
+- **`commerce_orders` MCP tool** (netlify/lib/commerce-admin.ts): the
+  support-lookup half of store administration — list orders by
+  email/product (newest-first, capped) or fetch full detail by order_key;
+  what order_reissue needed to be operable from "customer lost the email".
+  Read-only; raw buyer email visible by design (§6 — publish-key surface).
+- **BUG FOUND + FIXED (latent since S2)**: Astro's glob loader prefers a
+  top-level `slug` field for the entry id — product exports HAVE one, so
+  `getCollection('productObject')` ids were the slug, not the object id.
+  Every by-object-id lookup against the collection silently failed: the
+  BUY BOX embedded the wrong product_id (live checkout would have 404'd
+  product_not_found), and pricing_table tiers/manual product_preview picks
+  never resolved. Pinned `generateId` to the filename (= object id) in
+  content/config.ts; /shop buy flow and tiers verified in dist.
+- Seed module prepends the S2 product seeds as reference targets
+  (playbook trap 3 — imported from the shop module, one catalog source);
+  driver materialize no longer crashes on a never-created object.
+
+Local rehearsal: full lifecycle SUCCESS (ensure/drill/contract/inventory/
+materialize ×6; pages block only at export_commit_failed, products at
+approval_required — both expected terminals). Suite 1089 + 49 green; astro
+check 0; eslint/prettier clean; build 172 pages — /pricing, /services,
+/solutions/shop-preview all render from objects with resolved tiers
+($19/Free/Pay-what-you-want badges live). **Rendered + seeded, NOT yet
+converted**: the three pages await the credentialed `--production
+--release` run (same run can approve the three products stuck at
+approval_required). W5 empties the hand-coded backlog for good.
+
 ## Session 2026-07-12 I (S3 SHIPPED: PWYW + free + unlock paths; the two commerce MCP tools — criterion 4 closes)
 
 Same session (PR #414 merged; branch restarted). S3 per plan §9 — the

@@ -18,6 +18,7 @@ import Checklist from '~/components/sections/Checklist.astro';
 import ContactForm from '~/components/sections/ContactForm.astro';
 import ContentEmbed from '~/components/sections/ContentEmbed.astro';
 import ContentGrid from '~/components/sections/ContentGrid.astro';
+import ContentSplit from '~/components/sections/ContentSplit.astro';
 import CtaBanner from '~/components/sections/CtaBanner.astro';
 import Faq from '~/components/sections/Faq.astro';
 import Hero from '~/components/sections/Hero.astro';
@@ -25,9 +26,11 @@ import Lede from '~/components/sections/Lede.astro';
 import LinkList from '~/components/sections/LinkList.astro';
 import NewsletterSignup from '~/components/sections/NewsletterSignup.astro';
 import ProductPreview from '~/components/sections/ProductPreview.astro';
+import PricingTable from '~/components/sections/PricingTable.astro';
 import Prose from '~/components/sections/Prose.astro';
 import FormConfirmation from '~/components/sections/FormConfirmation.astro';
 import Search from '~/components/sections/Search.astro';
+import Steps from '~/components/sections/Steps.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 
 import { bioDefinition } from './bio.js';
@@ -35,6 +38,7 @@ import { checklistDefinition } from './checklist.js';
 import { contactFormDefinition } from './contact-form.js';
 import { contentEmbedDefinition } from './content-embed.js';
 import { contentGridDefinition } from './content-grid.js';
+import { contentSplitDefinition } from './content-split.js';
 import { ctaBannerDefinition } from './cta-banner.js';
 import { faqDefinition } from './faq.js';
 import { heroDefinition } from './hero.js';
@@ -42,9 +46,11 @@ import { ledeDefinition } from './lede.js';
 import { linkListDefinition } from './link-list.js';
 import { newsletterSignupDefinition } from './newsletter-signup.js';
 import { productPreviewDefinition } from './product-preview.js';
+import { pricingTableDefinition } from './pricing-table.js';
 import { proseDefinition } from './prose.js';
 import { formConfirmationDefinition } from './form-confirmation.js';
 import { searchDefinition } from './search.js';
+import { stepsDefinition } from './steps.js';
 import { testimonialDefinition } from './testimonial.js';
 import type { RegisteredSectionType } from './registered-types.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
@@ -81,6 +87,9 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   search: bind(searchDefinition, Search),
   content_embed: bind(contentEmbedDefinition, ContentEmbed),
   form_confirmation: bind(formConfirmationDefinition, FormConfirmation),
+  steps: bind(stepsDefinition, Steps),
+  content_split: bind(contentSplitDefinition, ContentSplit),
+  pricing_table: bind(pricingTableDefinition, PricingTable),
 };
 
 export const getRegisteredComponent = (type: SectionType): RegisteredComponent => {
