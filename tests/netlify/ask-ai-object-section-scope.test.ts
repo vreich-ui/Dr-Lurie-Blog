@@ -261,8 +261,138 @@ test('a shared SECTION OBJECT auto-scopes to its inner instance — inner gramma
 
   assert.equal(openai.calls[0].toolName, 'propose_section_changes');
   const properties = openai.calls[0].toolSchema.properties as Record<string, unknown>;
-  assert.ok('formName' in properties, 'the inner data grammar, not the wrapper');
+  assert.ok('heading' in properties, 'the inner copy grammar, not the wrapper');
   assert.equal('section' in properties, false, 'the wrapper must not leak');
+  assert.equal('formName' in properties, false, 'formName is a form binding (protected), not copy');
   assert.match(openai.calls[0].userMessage, /shared section object "sec_newsletter_signup"/);
   assert.match(openai.calls[0].userMessage, /every page that references it/);
+});
+
+test('a hallucinated image field is dropped — a copy edit can never change the portrait (About-portrait incident)', async () => {
+  const store = createStore();
+  const bioObject: ObjectRecord = {
+    object_id: 'sec_about_intro',
+    object_type: 'section',
+    schema_version: 'section.v1',
+    site: 'site_drlurie',
+    created_at: '2026-07-10T00:00:00.000Z',
+    updated_at: '2026-07-10T00:00:00.000Z',
+    status: 'active',
+    body: {
+      section: {
+        id: 's_bio',
+        type: 'bio',
+        data: {
+          heading: 'Dr. Leonid Lurie: the scientist behind the approach',
+          body: '<p>Physician-scientist lens.</p>',
+          trustNotes: ['MD, PhD in Biophysics.'],
+          portrait: { alt: 'Portrait of Dr. Leonid Lurie', src: '/images/dr-lurie-portrait4.jpeg' },
+        },
+      },
+    },
+    publication: { published_time: null },
+    history: [{ at: '2026-07-10T00:00:00.000Z', action: 'create', actor: AGENT }],
+    version: 1,
+    content_revision: 1,
+  };
+  store.seed(bioObject);
+
+  // The model over-reaches: asked to tweak the heading, it ALSO returns a
+  // hallucinated portrait URL (exactly the real incident). The tool schema
+  // excludes portrait, and the defensive strip drops it if returned anyway.
+  const openai = openAiMock({
+    heading: 'Dr. Leonid Lurie, Ph.D: the scientist behind the approach',
+    portrait: {
+      alt: 'Portrait of Dr. Leonid Lurie',
+      src: 'https://kugelmedia.netlify.app/drlurieblog/dr-lurie-portrait.jpg',
+    },
+    portraitAssetRef: 'made-up-ref',
+  });
+
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'section', object_id: 'sec_about_intro', instruction: 'Add Ph.D to the heading.' },
+    deps(openai.fetchImpl)
+  );
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(
+    result.body.suggestion,
+    { heading: 'Dr. Leonid Lurie, Ph.D: the scientist behind the approach' },
+    'only the heading survives — the image fields are stripped'
+  );
+  const properties = openai.calls[0].toolSchema.properties as Record<string, unknown>;
+  assert.equal('portrait' in properties, false, 'the model was never offered the portrait field');
+  assert.equal('portraitAssetRef' in properties, false, 'nor the asset ref');
+});
+
+test('copy-only drops STRUCTURED fields (arrays of objects) so a copy edit cannot repoint nested references', async () => {
+  // A pricing_table stores product refs inside tiers[].product — a container
+  // key ("tiers") that is not itself protected. A copy edit must not be able
+  // to return it (Codex #423): text survives, structure is dropped.
+  const store = createStore();
+  const pageWithTable: ObjectRecord = {
+    ...pageRecord(),
+    object_id: 'page_pricing_demo',
+    body: {
+      route: '/pricing-demo',
+      pageType: 'standard',
+      title: 'Pricing demo',
+      seo: {},
+      sections: [
+        {
+          id: 's_pricing',
+          type: 'pricing_table',
+          data: { heading: 'Plans', tiers: [{ product: 'prod_a', features: ['x'] }] },
+        },
+      ],
+    },
+  };
+  store.seed(pageWithTable);
+
+  const openai = openAiMock({
+    heading: 'Simple, honest pricing',
+    tiers: [{ product: 'prod_HALLUCINATED', features: ['x'] }],
+  });
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    {
+      object_type: 'page',
+      object_id: 'page_pricing_demo',
+      section_id: 's_pricing',
+      instruction: 'Warmer pricing copy.',
+    },
+    deps(openai.fetchImpl)
+  );
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(
+    result.body.suggestion,
+    { heading: 'Simple, honest pricing' },
+    'only the heading text survives — the tiers container (with its product ref) is dropped'
+  );
+});
+
+test('copy-only keeps string arrays (checklist/feature copy) but drops arrays of objects', async () => {
+  const store = createStore();
+  const page: ObjectRecord = {
+    ...pageRecord(),
+    object_id: 'page_list_demo',
+    body: {
+      route: '/list-demo',
+      pageType: 'standard',
+      title: 'List demo',
+      seo: {},
+      sections: [{ id: 's_check', type: 'checklist', data: { heading: 'For you if', items: ['a', 'b'] } }],
+    },
+  };
+  store.seed(page);
+  const openai = openAiMock({ heading: 'This is for you if…', items: ['clearer', 'calmer', 'kinder'] });
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'page', object_id: 'page_list_demo', section_id: 's_check', instruction: 'Punch up the list.' },
+    deps(openai.fetchImpl)
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.suggestion, { heading: 'This is for you if…', items: ['clearer', 'calmer', 'kinder'] });
 });

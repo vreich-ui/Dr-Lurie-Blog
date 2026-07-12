@@ -39,6 +39,7 @@ import {
   bodySchemaForObjectType,
   deriveAskAiToolSchema,
   isAskAiObjectType,
+  isProtectedAskAiField,
   sectionDataSchemaForType,
   type AskAiTool,
 } from './ask-ai-schema.js';
@@ -93,6 +94,10 @@ const buildUserMessage = (record: ObjectRecord, request: AskAiObjectRequest): st
 
 /** A section instance as it sits in a page body — the minimal shape the scope path reads. */
 type PageSectionInstance = { id: string; type: string; data: unknown };
+
+/** Plain-text copy: a string, or an array whose every element is a string. */
+const isCopyTextValue = (value: unknown): boolean =>
+  typeof value === 'string' || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
 
 const buildSectionUserMessage = (
   record: ObjectRecord,
@@ -242,7 +247,9 @@ export const askAiForObject = async (
       toolName: 'propose_section_changes',
       description:
         "Return ONLY the fields of this section's data that should change to satisfy the instruction. " +
-        'Omit every field that stays the same. Preserve the existing voice, tone, and structure.',
+        'Omit every field that stays the same. Preserve the existing voice, tone, and structure. ' +
+        'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
+      protectFields: true,
     });
     userMessage = buildSectionUserMessage(record, section, request);
   } else if (request.object_type === 'section') {
@@ -264,7 +271,9 @@ export const askAiForObject = async (
       toolName: 'propose_section_changes',
       description:
         "Return ONLY the fields of this section's data that should change to satisfy the instruction. " +
-        'Omit every field that stays the same. Preserve the existing voice, tone, and structure.',
+        'Omit every field that stays the same. Preserve the existing voice, tone, and structure. ' +
+        'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
+      protectFields: true,
     });
     userMessage = buildSectionUserMessage(record, inner, request);
   } else {
@@ -276,10 +285,22 @@ export const askAiForObject = async (
   const aiResult = await callOpenAI(userMessage, tool, deps);
   if (!aiResult.ok) return err(aiResult.status, { error: aiResult.error });
 
-  // Strip null/undefined, exactly as the article version does before returning.
+  // Strip null/undefined (as the article version does) AND, on the copy-only
+  // section path, anything that is not PLAIN TEXT. A copy edit keeps only a
+  // string or an array of strings; every protected key AND every structured
+  // value (nested objects, arrays of objects) is dropped. Top-level checks
+  // alone are not enough — a structured field like pricing_table `tiers`
+  // carries `tiers[].product` commerce references, and content_split `images`
+  // carries media, inside a container whose own key isn't protected. Dropping
+  // non-text values means a copy edit can never repoint a nested reference or
+  // swap buried media (the About-portrait class of bug). Structured fields are
+  // agent/admin/manual work. Whole-object admin asks keep every field.
+  const copyOnly = scopedSection !== undefined;
   const suggestion: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(aiResult.input)) {
-    if (value !== undefined && value !== null) suggestion[key] = value;
+    if (value === undefined || value === null) continue;
+    if (copyOnly && (isProtectedAskAiField(key) || !isCopyTextValue(value))) continue;
+    suggestion[key] = value;
   }
 
   return {
