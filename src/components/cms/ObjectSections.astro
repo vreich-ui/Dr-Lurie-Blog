@@ -11,16 +11,23 @@
  * sections (loadRoutePageObject applies the `%term%` token before handing
  * them over). Renders nothing for an empty list, so wiring this into a route
  * is byte-identical until an agent actually adds a section.
+ *
+ * `objectId` names the page object that owns `sections`; every dispatched
+ * section is wrapped in a display:contents identity annotation
+ * (section-annotations.ts) the admin edit-mode canvas reads. No box is
+ * generated — visitor-facing layout is untouched.
  */
 import { buildSectionResolveDeps } from '~/components/cms/section-resolve-deps';
 import { getRegisteredComponent } from '~/lib/registry/components/index';
 import { resolveSections } from '~/lib/renderer/resolve';
+import { sectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
 import type { SectionInstance } from '~/schema/bodies/section-v1';
 
 interface Props {
+  objectId: string;
   sections: SectionInstance[];
 }
-const { sections } = Astro.props;
+const { objectId, sections } = Astro.props;
 
 const visible = sections.filter((section) => section.visibility !== 'hidden');
 const deps = visible.length > 0 ? await buildSectionResolveDeps(visible) : undefined;
@@ -30,6 +37,10 @@ const renderables = deps ? resolveSections(visible, deps) : [];
 {
   renderables.map((section) => {
     const { component: SectionComponent } = getRegisteredComponent(section.type);
-    return <SectionComponent data={section.data} resolved={section.resolved} ctx={section.ctx} />;
+    return (
+      <div style="display:contents" {...sectionAnnotationAttrs(objectId, section)}>
+        <SectionComponent data={section.data} resolved={section.resolved} ctx={section.ctx} />
+      </div>
+    );
   })
 }

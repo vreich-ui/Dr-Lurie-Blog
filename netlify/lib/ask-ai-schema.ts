@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
-import { sectionBodySchema } from '../../src/schema/bodies/section-v1.js';
+import { sectionBodySchema, sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -62,6 +62,18 @@ export const isAskAiObjectType = (value: string): value is AskAiObjectType =>
 
 export const bodySchemaForObjectType = (objectType: string): z.ZodType | undefined =>
   isAskAiObjectType(objectType) ? ASK_AI_BODY_SCHEMAS[objectType] : undefined;
+
+/**
+ * The `data` schema of one section-instance union member (section.v1), for
+ * SECTION-SCOPED Ask-AI: when the editor asks about one section of a page,
+ * the forced tool is derived from that section type's own data shape instead
+ * of the whole page body — the model sees a small, exact grammar and its
+ * partial answer maps 1:1 onto an `update_section_data` patch op. Generic by
+ * construction: reads the discriminated union, never enumerates types, so a
+ * new section type is served the moment its union member exists.
+ */
+export const sectionDataSchemaForType = (sectionType: string): z.ZodType | undefined =>
+  sectionInstanceSchema.options.find((option) => option.shape.type.value === sectionType)?.shape.data;
 
 const hasPartial = (schema: z.ZodType): schema is z.ZodType & { partial: () => z.ZodType } =>
   typeof (schema as { partial?: unknown }).partial === 'function';

@@ -9,9 +9,11 @@
  * carries navigationOverrides.footer (the homepage does, via S-4); every other
  * page falls through to PageLayout's default footer slot.
  *
- * The proven section markup is unchanged — this component adds no wrapper
- * element, so a page delegating to it renders byte-identically to the inline
- * loader it replaces.
+ * The proven section markup is unchanged inside each section. Since the
+ * edit-mode canvas landed, every dispatched section is wrapped in a
+ * `display:contents` element carrying its object/section identity
+ * (section-annotations.ts) — no box is generated, so layout is untouched;
+ * the attributes are inert for visitors and read only by the admin overlay.
  */
 import { getEntry } from 'astro:content';
 
@@ -20,6 +22,7 @@ import Footer from '~/components/widgets/Footer.astro';
 import { buildSectionResolveDeps } from '~/components/cms/section-resolve-deps';
 import { getRegisteredComponent } from '~/lib/registry/components/index';
 import { parsePageExport, resolvePage } from '~/lib/renderer/resolve';
+import { sectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
 import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
 import { getBlogPermalink } from '~/utils/permalinks';
 import { getSiteObject } from '~/utils/site-object';
@@ -68,7 +71,11 @@ const footerData = navigationToFooterProps(
   {
     sections.map((section) => {
       const { component: SectionComponent } = getRegisteredComponent(section.type);
-      return <SectionComponent data={section.data} resolved={section.resolved} ctx={section.ctx} />;
+      return (
+        <div style="display:contents" {...sectionAnnotationAttrs(objectId, section)}>
+          <SectionComponent data={section.data} resolved={section.resolved} ctx={section.ctx} />
+        </div>
+      );
     })
   }
 
