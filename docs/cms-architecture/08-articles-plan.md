@@ -1,16 +1,21 @@
 # 08 — Articles Plan (W7): `content_item` onto the object model, bodies onto Rich Text
 
-> **Status (2026-07-13): W7.1 + W7.3 + W7.8 BUILT; W7.4/W7.6 WAIVED.**
-> Wolf's 2026-07-13 directives supersede parts of this plan (see §0.5): the
-> committed legacy posts are NOT migrated ("mostly junk, not worth the
-> effort") — they stay on the old pipeline; new articles are content_item
-> objects end-to-end (schema, node ops + inverses, create_variant,
-> validation, materializer, render path, canvas node editing). Local
-> rehearsal all-green; the credentialed `--production --release` run
-> (seeds: `scripts/lib/articles-seed-data.mjs`) flips the type to CONVERTED.
-> Still open: W7.2 (sections onto rich text), W7.5 (publish unification +
-> aliases — the legacy tools are untouched), W7.7 (admin editor + annotation
-> panel + rich-text editing), OQ-W7-3 (strategy registry go/no-go).
+> **Status (2026-07-13): W7.1 + W7.3 + W7.8 BUILT; W7.9 RUN — `content_item`
+> is CONVERTED; W7.4/W7.6 WAIVED.** Wolf's 2026-07-13 directives supersede
+> parts of this plan (see §0.5): the committed legacy posts are NOT migrated
+> ("mostly junk, not worth the effort") — they stay on the old pipeline; new
+> articles are content_item objects end-to-end (schema, node ops + inverses,
+> create_variant, validation, materializer, render path, canvas node
+> editing). The credentialed run happened 2026-07-13 over the session MCP
+> connection: the demo article is live at /object-model-demo, all five
+> playbook criteria hold (seed taxonomy fixed to registry terms en route).
+> **OQ-W7-1 is RESOLVED (Wolf, 2026-07-13): reverse support is NOT
+> required** — no alias layer; MCP tools and functions may be updated,
+> changed, or retired, provided functionality survives on the object
+> substrate. Still open: W7.2 (sections onto rich text), W7.5 (re-point
+> internal surfaces + retire-or-repoint legacy tools — reduced scope, no
+> aliases), W7.7 (admin editor + annotation panel + rich-text editing),
+> OQ-W7-3 (strategy registry go/no-go).
 
 ## 0. Mandate and decisions (Wolf, 2026-07-12 — GOVERNING for W7)
 
@@ -71,6 +76,10 @@ survive and become MORE agent-usable?"
    against committed post ids).
 2. **Canvas for articles is mandatory in-wave** (W7.8 confirmed, not
    severable): object-backed article bodies carry per-node chips.
+   _Addendum (2026-07-13, second directive):_ **reverse support is not
+   required** — resolves OQ-W7-1 (no alias layer; legacy tools/functions may
+   be updated or retired); the end goal is articles AND article publishing
+   fully on the project-wide object schema without losing functionality.
 3. **The annotation layer is the point** (re-affirmed): every block carries
    its context attributes (hook/agitation/resolution + intent etc.) exactly
    as the original architecture defined them — imported from
@@ -354,7 +363,7 @@ Also inherited: the shared publish-key self-approval TODO (review-state.ts:135)
 | **W7.6** | ~~Full migration, `.md` retirement, `workflows` store read-only.~~ | — | ❌ WAIVED (§0.5) |
 | **W7.7** | Admin editor on rich text + annotation panel; single renderer everywhere; bugs ⑥⑩. | Suite; editor drive | OPEN (the canvas panel edits plain-text copy + AI today; document bodies and a visible annotation editor need this phase) |
 | **W7.8** | Canvas for articles (stop line lifts): per-node chips, Ask-AI node scope, same EditSession/publish path. | Suite (wire-shape tests) + probe-build drive | ✅ BUILT (2026-07-13 S) |
-| **W7.9** | Credentialed conversion run for the type + records; inventory/state-of-play flips; W7 exit. | All five playbook criteria for the type | READY — `--production --release --seeds scripts/lib/articles-seed-data.mjs` (note: unpublish unsupported, OQ-2 — the demo article goes live on release) |
+| **W7.9** | Credentialed conversion run for the type + records; inventory/state-of-play flips; W7 exit. | All five playbook criteria for the type | ✅ RUN (2026-07-13, op-by-op over the session MCP connection): create → 6/6 node ops byte-identical → validate → create_variant dry-run → publish `60cd213` → released (deploy ready). Demo live at /object-model-demo (OQ-2: stays live until edited). Seed taxonomy fixed to registry terms. |
 
 Rough shape: W7.1–W7.3 are the heavy engineering; W7.4–W7.6 are careful but
 mechanical; W7.7–W7.8 are UX payoff. Canvas (W7.8) is in-wave per Wolf's
@@ -362,9 +371,15 @@ ruling 3 but severable if the wave runs long.
 
 ## 7. Open questions for Wolf (checkpoints — answer before the named phase)
 
-- **OQ-W7-1 (before W7.5):** tool-name aliases — permanent, or sunset once
-  external agents re-point? Recommendation: permanent until you explicitly
-  retire them; they're thin.
+- **OQ-W7-1: ✅ RESOLVED (Wolf, 2026-07-13): reverse support is NOT
+  required.** No alias layer over the legacy tool names; MCP tools and
+  functions may be updated, changed, or retired as the remaining phases
+  land. The constraint that stands is functional, not nominal: the drafting
+  workflow, the publish-time safety stack, and the admin editor must survive
+  on the object substrate ("new architecture and implementation need to be
+  the same in principle and follow data management principles and logic").
+  External agent configs pointed at old tool names get re-pointed, not
+  aliased. §3.3's alias policy is superseded accordingly.
 - **OQ-W7-2 (anytime):** variant serving / traffic splitting — confirm out of
   scope for W7 (records + scoring only).
 - **OQ-W7-3 (before W7.3):** strategy/intent vocabulary as a governed registry

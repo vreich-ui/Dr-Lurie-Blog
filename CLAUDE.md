@@ -25,7 +25,9 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-12: **thirty-seven objects are converted** — the 3 nav
+- Reality as of 2026-07-13: **forty-one objects are converted** (the 37 below
+  + the 3 W5 pages, credentialed run 2026-07-13 + the FIRST ARTICLE OBJECT,
+  W7.9 run 2026-07-13) — the 3 nav
   objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
   page_contact + page_thank_you), the 12 shared sections under home/about, the
   3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
@@ -68,8 +70,9 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   (`docs/cms-architecture/06-shop-module-plan.md` — Stripe-only v1 plan;
   /pricing renders from product objects, /services awaits a copy-or-delete
   call; the shop build runs in its own session).
-  **W7.3 + W7.8 BUILT (2026-07-13, local rehearsal green — awaiting the
-  credentialed run)**: `content_item` is the NINTH governed type — the
+  **W7 CONVERTED (2026-07-13: W7.3 + W7.8 built; W7.9 credentialed run the
+  same day via the session MCP connection — the type's five criteria all
+  hold)**: `content_item` is the NINTH governed type — the
   annotated-node article model (every block carries `private.strategy`
   hook/agitation/…/resolution + `intent`, the original architecture's
   semantic layer, imported verbatim; envelope claims/sources/compliance/
@@ -84,7 +87,21 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   committed .md posts are NOT migrated** (legacy pipeline untouched;
   W7.4/W7.6 waived — `docs/cms-architecture/08-articles-plan.md` §0.5).
   Seeds: `scripts/lib/articles-seed-data.mjs`. Unpublish remains
-  unsupported (OQ-2) — a released article stays live until edited.
+  unsupported (OQ-2) — a released article stays live until edited. The W7.9
+  run (2026-07-13): create → all six node ops drilled byte-identical →
+  validate clean → `create_variant` dry-run → publish (export commit
+  `60cd213`) → release (deploy ready) — the demo article is LIVE at
+  `/object-model-demo` with per-node canvas chips; found+fixed en route: the
+  seed's taxonomy terms didn't exist in the production registry (now
+  `reflections`/`reflections`). **Wolf's 2026-07-13 ruling (supersedes
+  OQ-W7-1): reverse support is NOT required** — the legacy article tools
+  need no alias layer; MCP tools and functions may be updated, changed, or
+  retired as the remaining W7 phases land, provided the functionality
+  (drafting workflow, publish safety stack, admin editor) survives on the
+  object substrate. Still open: W7.2 (sections onto rich text), W7.5
+  (re-point internal surfaces; reduced — no aliases), W7.7 (admin editor +
+  annotation panel + document-body canvas editing), OQ-W7-3 (strategy
+  registry go/no-go).
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
