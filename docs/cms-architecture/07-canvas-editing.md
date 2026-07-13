@@ -388,6 +388,29 @@ drive; the A/B/W7.7 drives re-run green):
   section in place — no re-morph, no jump. Universal by construction: every
   target kind (sections, article blocks, chrome) shares this one path.
 
+### 3k. Related-grid options + save-button dirty state (2026-07-13, Slice D)
+
+- **`random` related algorithm**: a DETERMINISTIC seeded shuffle
+  (`src/utils/seeded-shuffle.ts` — xmur3→mulberry32→Fisher–Yates), seeded by
+  the anchor post id when present (varied per article) and a fixed salt
+  otherwise. Stable across builds (no build-diff churn — a static site has no
+  per-request randomness); joins `tag_similarity` / `same_category` /
+  `latest` in the schema, resolver, and the chip dropdown.
+- **Tile count + columns**: `content_grid` gains an optional `columns` (1–4,
+  renderer default 2 → unset grids stay byte-identical). The related-grid
+  chip now carries, inline with the algorithm dropdown, a **tiles** stepper
+  (the `limit`) and a **columns** stepper — each patches `update_section_data`
+  through the normal draft path (`applyRelated`; `limit` / `columns` /
+  `source.algorithm` deep-merge, source re-sent key-stable). The grid
+  announces all three via `data-cms-related-algorithm/-limit/-columns` so the
+  chip renders them without a record round-trip. (Manual curation of an
+  explicit article list already existed via the `manual` source.)
+- **Save-button dirty state**: a form's Save draft is **disabled when the
+  fields match the last-saved baseline** (nothing to save); any edit enables
+  it; a successful save shows "✓ Saved" briefly then **re-baselines to the
+  saved values → disabled again**. One serializer + one delegated listener
+  cover the edit / image / role / nav forms.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

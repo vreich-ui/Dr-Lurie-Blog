@@ -32,6 +32,25 @@ test('a related content_grid announces its selection algorithm to the canvas', (
   assert.equal(attrs['data-cms-related-algorithm'], 'tag_similarity');
 });
 
+test('a related content_grid announces its tile count and columns (Slice D)', () => {
+  const attrs = sectionAnnotationAttrs('page_article', {
+    id: 's_related',
+    type: 'content_grid',
+    data: { source: { kind: 'related', algorithm: 'random' }, limit: 6, columns: 3 },
+  });
+  assert.equal(attrs['data-cms-related-algorithm'], 'random');
+  assert.equal(attrs['data-cms-related-limit'], '6');
+  assert.equal(attrs['data-cms-related-columns'], '3');
+  // columns is optional — an unset grid carries no columns annotation.
+  const noCols = sectionAnnotationAttrs('page_article', {
+    id: 's_related2',
+    type: 'content_grid',
+    data: { source: { kind: 'related', algorithm: 'latest' }, limit: 4 },
+  });
+  assert.equal('data-cms-related-columns' in noCols, false);
+  assert.equal(noCols['data-cms-related-limit'], '4');
+});
+
 test('query/manual/cards grids and other types carry NO algorithm annotation', () => {
   const query = sectionAnnotationAttrs('page_home', {
     id: 's_grid',

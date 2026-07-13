@@ -29,6 +29,11 @@ const curatedCells =
     ? data.source.cards.map((cell, index) => ({ ...cell, href: resolved.cardHrefs?.[index] })).slice(0, data.limit)
     : [];
 const intro = splitRichTextParagraphs(data.body ?? '');
+// Tiles per row (2026-07-13): default 2 → unset grids stay byte-identical.
+// Literal class strings so Tailwind's JIT emits them (no dynamic interpolation).
+const gridColsClass =
+  { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[data.columns ?? 2] ??
+  'md:grid-cols-2';
 ---
 
 <section id={data.anchor} class="mx-auto max-w-5xl border-t border-gray-200 px-4 py-14 sm:px-6 dark:border-gray-800">
@@ -37,7 +42,7 @@ const intro = splitRichTextParagraphs(data.body ?? '');
     {data.heading && <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">{data.heading}</h2>}
     {intro.map((paragraph) => <p class="mt-4 text-muted" set:html={paragraph} />)}
   </div>
-  <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+  <div class:list={['mt-8 grid grid-cols-1 gap-4', gridColsClass]}>
     {
       articleCards.map((card, index) => (
         <article class="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-slate-900">

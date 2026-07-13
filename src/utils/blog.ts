@@ -6,6 +6,7 @@ import { APP_BLOG } from 'astrowind:config';
 import { cleanSlug, trimSlash, BLOG_BASE, POST_PERMALINK_PATTERN, CATEGORY_BASE, TAG_BASE } from './permalinks';
 import { contentItemBodySchema } from '~/schema/bodies/content-item-v1';
 import { renderArticleNodes } from '~/lib/article-object/render-nodes';
+import { seededShuffle } from './seeded-shuffle';
 
 /**
  * Display labels for category/tag slugs, from the taxonomy registry export
@@ -394,4 +395,20 @@ export function rankRelatedPosts(allPosts: Post[], originalPost: Post, maxResult
 export async function getRelatedPosts(originalPost: Post, maxResults: number = 4): Promise<Post[]> {
   const allPosts = await fetchPosts();
   return rankRelatedPosts(allPosts, originalPost, maxResults);
+}
+
+/**
+ * A DETERMINISTIC "random" pick (the `random` related algorithm): a stable
+ * shuffle seeded by `seed` (seededShuffle), so the built output never churns
+ * between deploys yet each article shows a different-looking set.
+ * `excludeSlug` drops the anchor post.
+ */
+export function pickRandomPosts(
+  allPosts: Post[],
+  excludeSlug: string | undefined,
+  seed: string,
+  maxResults: number
+): Post[] {
+  const pool = allPosts.filter((post) => post.slug !== excludeSlug);
+  return seededShuffle(pool, seed).slice(0, maxResults);
 }
