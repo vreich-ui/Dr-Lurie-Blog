@@ -254,6 +254,37 @@ saved through the nav grammar (`update_item`, `upsert_group` replace-by-id,
 the form — retargeting is structural work (the Ask-AI protected boundary),
 and chrome offers no AI chat (copy form only).
 
+### 3g. Field-test refinements (2026-07-13, Wolf's first live canvas session on the article)
+
+Six fixes from Wolf's field test of /object-model-demo, all verified by a
+16-assertion headless-Chromium drive of the built site (mocked admin
+endpoints):
+
+- **Block ROLE replaces the req\_\* id** (chip + panel header): an article
+  block's identity slot shows its strategy — `Hook · educate`,
+  `Resolution · reassure` — never the object id (kept in the header tooltip).
+  Roles come from the draft record (one cached fetch per article) because the
+  leak rule keeps strategy OUT of the built HTML; sections keep their ids
+  (short and meaningful there). Wolf's rule recorded: **what's on screen must
+  be what an editor needs at the moment of action.**
+- **Image tool ADD path**: a content node with no `public.media` now offers
+  empty src/alt rows + Upload (before: "no image fields", dead end). Save
+  seeds `{ type: 'image' }` on the new media object (content_item only —
+  section image objects stay `{src,alt}`-strict).
+- **Panel is content-sized**: no longer pinned top-bar→viewport-bottom; grows
+  with content, capped (`max-height`), bodies scroll internally
+  (log ≤44vh, form ≤52vh). One-section-at-a-time accordion unchanged.
+- **Busy dots**: every wait (Ask-AI round trip, record load, save, mirror)
+  shows animated dots; the send button disables while a request is in flight.
+- **Article CTA renders like a real site button**: `not-prose` + `font-sans`
+  on the action-node CTA — inside `editorial-prose` the typography plugin's
+  `prose-a` color beat `.btn-primary`'s `text-white` (invisible label on the
+  filled button) and the serif font leaked into it. Renderer-owned classes;
+  agents can't reintroduce it (they only write ctaText/ctaLink data).
+- **Print/share fixed under view transitions**: SinglePost's inline script
+  registered once per hard load; a ClientRouter-swapped article page had
+  unwired buttons. Now re-wires on `astro:page-load` with a data-wired guard.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

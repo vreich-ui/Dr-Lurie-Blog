@@ -7,6 +7,41 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 E (CANVAS Slice A: six field-test fixes from Wolf's first live article-canvas session)
+
+Wolf field-tested the canvas on /object-model-demo and filed the first live
+feedback (screenshots). Slice A = the six small fixes, shipped same-day; the
+structural asks are queued as W7.7 (node palette incl. commercial
+blocks + adSlot mockup bank + annotation panel; multi-image block approved)
+and the related-grid options slice (manual/random/latest + tile counts).
+Wolf's UI rule recorded in 07 §3g: **on-screen information must be what an
+editor needs at the moment of action** — a req\_\* id is worthless there; the
+block's marketing role is the point. Also ruled: the 83 legacy posts get
+WIPED after ~10 are converted as test corpus (own session; no git-history
+rewrite), pending Wolf's keeper shortlist.
+
+- **Role chips**: article-block chip + panel header show `Hook · educate`
+  instead of the object id — roles read from the draft record (cached fetch;
+  the leak rule keeps strategy out of built HTML, so the DOM can't carry it).
+- **Image ADD on nodes**: media-less content nodes get src/alt + Upload rows;
+  save seeds `{type:'image'}` (content_item only). Before: dead-end "no
+  image fields".
+- **Panel content-sized** (was pinned to viewport bottom = "opens to max");
+  log/form bodies capped + scroll internally.
+- **Busy dots** on every wait; send disabled in flight.
+- **CTA button**: `not-prose` + `font-sans` — prose-a color had made the
+  label invisible (teal-on-teal) and the serif leaked; render-nodes test pins
+  the new classes.
+- **Print/share under ClientRouter**: re-wire on `astro:page-load`
+  (data-wired guard) — swapped-in article pages had dead buttons.
+- **Gates**: 1198 + 49 tests green · astro check 0 · build 173 pages ·
+  eslint/prettier clean · **16/16-assertion headless-Chromium drive of the
+  built site** (mocked admin endpoints): print/share AFTER a view-transition
+  nav, CTA computed white-on-teal in Inter, chip/header role text with no
+  req\_\* anywhere, media.src/alt + Upload on an empty node, busy dots
+  visible-in-flight → removed after reply + send re-enabled, panel bottom
+  edge 421/900.
+
 ## Session 2026-07-13 D (W7.9 CREDENTIALED RUN: content_item is CONVERTED — the first article object is LIVE with node chips; OQ-W7-1 resolved)
 
 Wolf: "Nothing allows me to see article elements with node chips and edit
@@ -340,7 +375,7 @@ Shipped on the canvas branch (PR #425):
   - `admin-artifact-upload-intent.ts` (+ pure core
     `netlify/lib/canvas-upload-intent.ts`): admin-gated mint of the EXISTING
     HMAC upload token; server controls the claims — `requestId =
-    req_canvas_<object>_<yyyymmdd>_01`, kind `image`, filename from content
+req_canvas_<object>_<yyyymmdd>_01`, kind `image`, filename from content
     type; JPEG/PNG/WebP only (what save-side sharp validation accepts).
   - Bytes go to the same `/api/artifacts/upload` agents use (re-verifies
     size/sha256/decodability against the signed claims); content-addressed
@@ -388,9 +423,9 @@ symbol." Shipped on the #423 branch (same canvas scope as the guard):
   also Wolf's in-canvas fix for the About portrait. Upload = later slice.
 - **Gap "+"**: subtle round + above/between/below a page object's sections →
   compact palette (`sections-palette.ts`, pure; starters proven schema-valid
-  + splitter-safe in tests) → `upsert_section` at a record-derived position
-  (hidden-section safe, anchored by id), server-minted id, honest annotated
-  draft placeholder in place until publish + release.
+  - splitter-safe in tests) → `upsert_section` at a record-derived position
+    (hidden-section safe, anchored by id), server-minted id, honest annotated
+    draft placeholder in place until publish + release.
 - Fixed en route: `.dl-em-actions[hidden]` was overridden by its own
   display:flex (the Accept row showed empty on fresh panels).
 - **Gates**: 1104 + 49 tests (palette starters validated against the REAL

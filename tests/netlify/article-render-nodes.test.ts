@@ -54,7 +54,9 @@ test('renders public nodes with canvas identity; internal/hidden nodes never rea
   assert.match(html, /<h2>The myth<\/h2>/);
   assert.match(html, /<p>First paragraph\.<\/p><p>Second paragraph\.<\/p>/);
   assert.match(html, /<ul><li>One<\/li><li>Two<\/li><\/ul>/);
-  assert.match(html, /class="btn btn-primary" href="\/start-here"/);
+  // The CTA renders as a real site button: not-prose blocks the prose anchor
+  // color (text-white must win) and font-sans blocks the serif leak.
+  assert.match(html, /class="article-node-cta not-prose"><a class="btn btn-primary font-sans" href="\/start-here"/);
   // never-render-private: the internal node is absent ENTIRELY (no wrapper).
   assert.equal(html.includes('n_a3'), false);
   assert.equal(html.includes('Internal working notes'), false);

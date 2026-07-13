@@ -213,7 +213,8 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-newsec-inner{border-radius:10px;margin:18px auto;max-width:720px;
   padding:18px 22px;font:12.5px/1.5 var(--dlem-font);color:var(--dlem-muted);background:var(--dlem-surface-2)}
 .dl-em-newsec-inner strong{color:var(--dlem-heading);font-size:13px}
-.dl-em-form{padding:12px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0}
+.dl-em-form{padding:12px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;flex:1;min-height:0;
+  max-height:52vh}
 .dl-em-formrow{display:flex;flex-direction:column;gap:4px}
 .dl-em-formrow label{font:700 10.5px ui-monospace,monospace;color:var(--dlem-muted)}
 .dl-em-formrow input,.dl-em-formrow textarea{border:1px solid var(--dlem-border);border-radius:8px;
@@ -228,6 +229,13 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-upload.dl-em-loading{opacity:.5;pointer-events:none}
 .dl-em-upload.dl-em-loading svg{animation:dl-em-spin .8s linear infinite}
 @keyframes dl-em-spin{to{transform:rotate(360deg)}}
+/* Busy dots: every wait (AI round trip, record load, save) shows motion. */
+.dl-em-busy{display:inline-flex;align-items:center;gap:3px;margin-right:6px;vertical-align:middle}
+.dl-em-busy i{width:4px;height:4px;border-radius:50%;background:var(--dlem-accent);opacity:.25;
+  animation:dl-em-pulse 1s infinite}
+.dl-em-busy i:nth-child(2){animation-delay:.16s}
+.dl-em-busy i:nth-child(3){animation-delay:.32s}
+@keyframes dl-em-pulse{0%,80%,100%{opacity:.25}40%{opacity:1}}
 .dl-em-imgrefs{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .dl-em-imgref{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--dlem-border);border-radius:8px;
   background:transparent;color:var(--dlem-text);padding:3px 8px 3px 3px;font:600 11.5px var(--dlem-font);cursor:pointer}
@@ -240,7 +248,10 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-formfoot{display:flex;gap:8px;padding:10px 0 2px;position:sticky;bottom:0;background:var(--dlem-surface)}
 .dl-em-formfoot .dl-em-save{flex:1;background:var(--dlem-ok);border-color:var(--dlem-ok);color:#fff}
 .dl-em-formfoot .dl-em-ghost{width:38px;padding:0;flex:none}
-.dl-em-panel{position:fixed;top:46px;right:12px;bottom:12px;width:372px;max-width:calc(100vw - 24px);
+/* Content-sized, never viewport-pinned: the panel grows with what's in it
+   (capped), instead of always spanning top bar → bottom of the screen. */
+.dl-em-panel{position:fixed;top:46px;right:12px;width:372px;max-width:calc(100vw - 24px);
+  max-height:calc(100vh - 58px);
   z-index:99992;display:none;flex-direction:column;background:var(--dlem-surface);color:var(--dlem-text);
   border:1px solid var(--dlem-border);border-radius:14px;box-shadow:var(--dlem-shadow);font:13px/1.5 var(--dlem-font);
   overflow:hidden}
@@ -276,7 +287,8 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-panel:not(.dl-em-has-image) .dl-em-acc[data-em-acc="image"]{display:none}
 /* Chrome (navigation objects): copy form only — AI/Image sections don't apply. */
 .dl-em-panel.dl-em-nav .dl-em-acc[data-em-acc="ai"],.dl-em-panel.dl-em-nav .dl-em-acc[data-em-acc="image"]{display:none}
-.dl-em-log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.dl-em-log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;
+  min-height:72px;max-height:44vh}
 .dl-em-msg{max-width:92%;padding:8px 11px;border-radius:10px;font-size:12.5px}
 .dl-em-msg.dl-em-user{align-self:flex-end;background:var(--dlem-accent);color:var(--dlem-accent-ink);border-bottom-right-radius:3px}
 .dl-em-msg.dl-em-ai{align-self:flex-start;background:var(--dlem-surface-2);border:1px solid var(--dlem-border);border-bottom-left-radius:3px}
@@ -511,6 +523,10 @@ export const mountEditMode = (options: MountOptions): void => {
     logEl.scrollTop = logEl.scrollHeight;
     return message;
   };
+
+  /** A sys log line with animated dots — remove() it when the wait ends. */
+  const busy = (label: string): HTMLElement =>
+    log('sys', `<span class="dl-em-busy"><i></i><i></i><i></i></span>${escapeHtml(label)}`);
 
   const session = (objectType: string, objectId: string): EditSession => {
     const key = `${objectType}:${objectId}`;
@@ -819,6 +835,51 @@ export const mountEditMode = (options: MountOptions): void => {
     latest: 'Latest',
   };
 
+  // ── article-block roles (Wolf, 2026-07-13): what an editor needs at the
+  // moment of action is the block's STRATEGY (Hook, Proof, Resolution…), not
+  // a req_* id. Strategy is deliberately absent from the built HTML (the leak
+  // rule protects readers), so the roles come from the draft record — one
+  // cached fetch per article, admin-gated like every canvas read.
+  const STRATEGY_LABELS: Record<string, string> = {
+    hook: 'Hook',
+    agitation: 'Agitation',
+    context: 'Context',
+    explanation: 'Explanation',
+    proof: 'Proof',
+    example: 'Example',
+    comparison: 'Comparison',
+    myth: 'Myth',
+    step: 'Step',
+    recommendation: 'Recommendation',
+    resolution: 'Resolution',
+    summary: 'Summary',
+  };
+  const roleOf = (node: { private?: { strategy?: string; intent?: string } } | undefined): string | undefined => {
+    const strategy = node?.private?.strategy;
+    if (!strategy) return undefined;
+    const label = STRATEGY_LABELS[strategy] ?? strategy;
+    return node?.private?.intent ? `${label} · ${node.private.intent}` : label;
+  };
+  const nodeRoleCache = new Map<string, Promise<Map<string, string>>>();
+  const nodeRoles = (objectId: string): Promise<Map<string, string>> => {
+    let cached = nodeRoleCache.get(objectId);
+    if (!cached) {
+      cached = getObjectRecord(getToken, 'content_item', objectId).then(({ record }) => {
+        const roles = new Map<string, string>();
+        const nodes =
+          (record?.body as { nodes?: Array<{ id: string; private?: { strategy?: string; intent?: string } }> })
+            ?.nodes ?? [];
+        for (const node of nodes) {
+          const role = roleOf(node);
+          if (role) roles.set(node.id, role);
+        }
+        return roles;
+      });
+      nodeRoleCache.set(objectId, cached);
+    }
+    return cached;
+  };
+
   const renderChip = (region: HTMLElement): void => {
     const isNav = region.dataset.cmsNavObject !== undefined;
     const isNode = region.dataset.cmsNodeId !== undefined;
@@ -837,9 +898,14 @@ export const mountEditMode = (options: MountOptions): void => {
     // A `related` content_grid announces its algorithm — the chip offers the
     // selection dropdown inline with the AI tool (small footprint, no panel).
     const algorithm = region.dataset.cmsRelatedAlgorithm;
+    // Article blocks show their ROLE where sections show their object id — a
+    // req_* id is worthless to an editor; Hook/Proof/Resolution is the point.
+    const idSlot = isNode
+      ? `<span class="dl-em-id" data-em-role>${escapeHtml(region.dataset.cmsNodeKind ?? 'block')}</span>`
+      : `<span class="dl-em-id">${escapeHtml(target.objectId)}</span>`;
     chip.innerHTML =
       `<span>${escapeHtml(target.sectionType)}</span>` +
-      `<span class="dl-em-id">${escapeHtml(target.objectId)}</span>` +
+      idSlot +
       (target.shared ? `<span class="dl-em-shared">${isNav ? 'site-wide' : 'shared'}</span>` : '') +
       (isDraft ? `<span class="dl-em-draftflag">draft</span>` : '') +
       `<span class="dl-em-tools">` +
@@ -868,6 +934,15 @@ export const mountEditMode = (options: MountOptions): void => {
       void applyAlgorithm(target, region, (event.target as HTMLSelectElement).value);
     });
     positionChip(region);
+    if (isNode && target.nodeId) {
+      const nodeId = target.nodeId;
+      void nodeRoles(target.objectId).then((roles) => {
+        if (hotRegion !== region) return; // the hover moved on — stale fill
+        const role = roles.get(nodeId);
+        const roleEl = chip.querySelector('[data-em-role]');
+        if (role && roleEl) roleEl.textContent = role;
+      });
+    }
   };
 
   /**
@@ -1030,11 +1105,18 @@ export const mountEditMode = (options: MountOptions): void => {
     logEl.innerHTML = '';
     suggestionActions.hidden = true;
 
-    // Header identity: type + monospace id, with tiny shared/draft dots (no prose).
+    // Header identity: type + monospace id, with tiny shared/draft dots (no
+    // prose). Article blocks show their ROLE instead of the req_* id (the id
+    // survives in the tooltip for provenance).
     const isDraft = region.classList.contains('dl-em-draft');
+    const isNodeTarget = target.objectType === 'content_item' && Boolean(target.nodeId);
     identEl.innerHTML =
       `<span class="dl-em-itype">${escapeHtml(target.sectionType)}</span>` +
-      `<span class="dl-em-iid">${escapeHtml(target.objectId)}</span>` +
+      (isNodeTarget
+        ? `<span class="dl-em-iid" data-em-role title="${escapeHtml(target.objectId)}">${escapeHtml(
+            region.dataset.cmsNodeKind ?? 'block'
+          )}</span>`
+        : `<span class="dl-em-iid">${escapeHtml(target.objectId)}</span>`) +
       (target.shared ? `<span class="dl-em-idot dl-em-shd" title="Shared — affects every page using it"></span>` : '') +
       (isDraft ? `<span class="dl-em-idot dl-em-drf" title="Unpublished draft"></span>` : '');
     panel.classList.toggle(
@@ -1058,7 +1140,7 @@ export const mountEditMode = (options: MountOptions): void => {
       inputEl.focus();
     }
 
-    const loading = log('sys', 'Loading…');
+    const loading = busy('Loading…');
     const { status, record } = await getObjectRecord(getToken, target.objectType, target.objectId);
     loading.remove();
     if (status !== 200 || !record) {
@@ -1089,10 +1171,17 @@ export const mountEditMode = (options: MountOptions): void => {
       // Article node (W7.8): the editable unit is the node's PUBLIC fields —
       // update_node scopes by target.nodeId (patchSectionId is unused there
       // but kept non-empty for the shared panel state shape).
-      const nodes = (body.nodes as Array<{ id: string; public?: Record<string, unknown> }> | undefined) ?? [];
+      const nodes =
+        (body.nodes as
+          | Array<{ id: string; public?: Record<string, unknown>; private?: { strategy?: string; intent?: string } }>
+          | undefined) ?? [];
       const node = nodes.find((entry) => entry.id === target.nodeId);
       currentData = node?.public;
       patchSectionId = node?.id;
+      // The record is in hand — fill the header role synchronously.
+      const role = roleOf(node);
+      const roleEl = identEl.querySelector('[data-em-role]');
+      if (role && roleEl) roleEl.textContent = role;
     } else {
       const inner = body.section as { id: string; data: Record<string, unknown> } | undefined;
       currentData = inner?.data;
@@ -1151,7 +1240,7 @@ export const mountEditMode = (options: MountOptions): void => {
     row: HTMLElement
   ): Promise<void> => {
     chipButton.disabled = true;
-    const note = /^\/img\//.test(entry.src) ? undefined : log('sys', 'Mirroring image into blobs…');
+    const note = /^\/img\//.test(entry.src) ? undefined : busy('Mirroring image into blobs…');
     const result = await ensureBlobBackedImage(getToken, state.target.objectId, entry.src);
     note?.remove();
     chipButton.disabled = false;
@@ -1224,7 +1313,8 @@ export const mountEditMode = (options: MountOptions): void => {
     if (field.imageIndex !== undefined) {
       return (holder as Array<{ src: string; alt?: string }>)[field.imageIndex];
     }
-    return holder as { src: string; alt?: string };
+    // A not-yet-created image (the node-media ADD path) edits an empty entry.
+    return (holder as { src: string; alt?: string }) ?? { src: '' };
   };
 
   const formValueFor = (data: Record<string, unknown>, field: FormField): string => {
@@ -1237,6 +1327,15 @@ export const mountEditMode = (options: MountOptions): void => {
 
   const renderForm = (state: PanelState): void => {
     const fields = formFieldsFor(state.currentData, state.mode);
+    // Article content nodes without media yet: offer the ADD path — empty
+    // src/alt rows (with Upload) that create `public.media` on save. Without
+    // this, a node that has no image shows nothing and can never gain one.
+    if (state.mode === 'image' && state.target.objectType === 'content_item' && fields.length === 0) {
+      fields.push(
+        { key: 'media.src', kind: 'image-src', imageField: 'media' },
+        { key: 'media.alt', kind: 'image-alt', imageField: 'media' }
+      );
+    }
     formEl.innerHTML = '';
     if (fields.length === 0) {
       formEl.innerHTML = `<div class="dl-em-fieldnote">No ${
@@ -1361,7 +1460,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', escapeHtml(error instanceof Error ? error.message : String(error)));
       return;
     }
-    const working = log('sys', 'Saving…');
+    const working = busy('Saving…');
     const objectSession = session('navigation', state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
@@ -1443,9 +1542,16 @@ export const mountEditMode = (options: MountOptions): void => {
           merged[field.imageIndex][property] = raw;
           changed[imageKey] = merged;
         } else {
-          const merged =
-            (changed[imageKey] as Record<string, unknown>) ??
-            ({ ...(state.currentData[imageKey] as Record<string, unknown>) } as Record<string, unknown>);
+          // A brand-new node media entry must carry its discriminant: the
+          // content_item media schema requires `type` (sections' image
+          // objects are {src,alt}-strict — never add type there).
+          const existing = state.currentData[imageKey] as Record<string, unknown> | undefined;
+          const seed = existing
+            ? ({ ...existing } as Record<string, unknown>)
+            : state.target.objectType === 'content_item'
+              ? ({ type: 'image' } as Record<string, unknown>)
+              : ({} as Record<string, unknown>);
+          const merged = (changed[imageKey] as Record<string, unknown>) ?? seed;
           merged[property] = raw;
           changed[imageKey] = merged;
         }
@@ -1464,7 +1570,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', 'No changes to save.');
       return;
     }
-    const working = log('sys', 'Saving…');
+    const working = busy('Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
@@ -1533,7 +1639,9 @@ export const mountEditMode = (options: MountOptions): void => {
         escapeHtml(instruction)
     );
     inputEl.value = '';
-    const working = log('sys', 'Thinking…');
+    const sendButton = q<HTMLButtonElement>(panel, '[data-em-send]');
+    sendButton.disabled = true;
+    const working = busy('Thinking…');
 
     const response = await askAiSuggestion(getToken, {
       object_type: state.target.objectType,
@@ -1545,6 +1653,7 @@ export const mountEditMode = (options: MountOptions): void => {
       instruction,
     });
     working.remove();
+    sendButton.disabled = false;
     if (!response.ok || !response.suggestion) {
       log('sys', escapeHtml(response.error ?? `Ask-AI failed (HTTP ${response.status})`));
       return;
@@ -1576,7 +1685,7 @@ export const mountEditMode = (options: MountOptions): void => {
     const state = panelState;
     if (!state?.suggestion) return;
     suggestionActions.hidden = true;
-    const working = log('sys', 'Saving…');
+    const working = busy('Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {

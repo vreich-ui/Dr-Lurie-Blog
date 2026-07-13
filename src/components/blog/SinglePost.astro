@@ -159,13 +159,15 @@ const heroImageAspect = (() => {
     const shareButton = document.querySelector('[data-immersive-share]');
     const printButton = document.querySelector('[data-immersive-print]');
 
-    if (printButton instanceof HTMLButtonElement) {
+    if (printButton instanceof HTMLButtonElement && !printButton.dataset.wired) {
+      printButton.dataset.wired = '1';
       printButton.addEventListener('click', () => {
         window.print();
       });
     }
 
-    if (!(shareButton instanceof HTMLButtonElement)) return;
+    if (!(shareButton instanceof HTMLButtonElement) || shareButton.dataset.wired) return;
+    shareButton.dataset.wired = '1';
 
     shareButton.addEventListener('click', async () => {
       const shareUrl = shareButton.dataset.shareUrl || window.location.href;
@@ -199,6 +201,12 @@ const heroImageAspect = (() => {
   const registerPostEnhancements = () => {
     registerArticleActions();
   };
+
+  // The site navigates with Astro's ClientRouter: a swapped-in article page
+  // re-runs neither idle callbacks nor once-registered listeners, so the
+  // buttons must re-wire on every astro:page-load (fires on the initial load
+  // too; the data-wired guard makes double registration harmless).
+  document.addEventListener('astro:page-load', registerPostEnhancements);
 
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(registerPostEnhancements);

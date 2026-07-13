@@ -71,8 +71,12 @@ const ctaHtml = (node: ContentItemNode, prominent: boolean): string => {
   if (!ctaText) return '';
   const href = safeHref(ctaLink);
   if (!href) return `<p><strong>${escapeHtml(ctaText)}</strong></p>`;
-  const cls = prominent ? 'btn btn-primary' : 'btn';
-  return `<p class="article-node-cta"><a class="${cls}" href="${escapeHtml(href)}"${relAttr(node)}>${escapeHtml(ctaText)}</a></p>`;
+  // `not-prose` + `font-sans`: inside the article's editorial-prose wrap the
+  // typography plugin's prose-a color beats .btn-primary's text-white (an
+  // invisible label on the filled button) and the serif body font leaks into
+  // the label — buttons must render exactly like the site's own.
+  const cls = prominent ? 'btn btn-primary font-sans' : 'btn font-sans';
+  return `<p class="article-node-cta not-prose"><a class="${cls}" href="${escapeHtml(href)}"${relAttr(node)}>${escapeHtml(ctaText)}</a></p>`;
 };
 
 const mediaHtml = (node: ContentItemNode): string => {
