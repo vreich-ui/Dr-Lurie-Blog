@@ -5,6 +5,21 @@ import { isArtifactReference } from './artifacts.js';
 export const MAJOR_KEY_ARTIFACT_REF_RE = /^(image|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
 
 /**
+ * The PUBLIC, servable path for a raw Major Key artifact ref — the inverse of
+ * the netlify redirects (`/img/* → get-public-image?blobKey=image/:splat`,
+ * `/pdf/* → get-public-pdf?blobKey=pdf/:splat`). A raw blob key
+ * (`image/<id>/<sha>.ext`) is NOT servable as-is; the browser resolves it as a
+ * relative path (404) and Astro's `<Image>`/`getImage` throws
+ * `LocalImageUsedWrongly`. Renderable `src`/`ogImage`/`portrait.src` fields
+ * must carry THIS path — only the trusted `*AssetRef` fields hold the raw ref.
+ * Returns the input unchanged when it is not a raw Major Key ref.
+ */
+export const publicPathForArtifactRef = (ref: string): string => {
+  if (!MAJOR_KEY_ARTIFACT_REF_RE.test(ref)) return ref;
+  return ref.startsWith('pdf/') ? `/pdf/${ref.slice('pdf/'.length)}` : `/img/${ref.slice('image/'.length)}`;
+};
+
+/**
  * The trust state for one workflow record's artifact references.
  *
  * `trusted` is the authoritative allow-list for canonical-input image/PDF references:

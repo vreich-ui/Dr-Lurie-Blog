@@ -32,11 +32,11 @@
         "images": [
           {
             "alt": "Dr. Lurié Barrier Reset Serum product bottle and carton mockup",
-            "src": "image/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png"
+            "src": "/img/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png"
           },
           {
             "alt": "Dr. Lurié Night Recovery Cream jar and carton mockup",
-            "src": "image/req_publish_premium_skus_20260713_01/0cd395f888b74ce08560a8d88c44dc35d3fbf50bebb35b9fd0b487ca7fb822cd.png"
+            "src": "/img/req_publish_premium_skus_20260713_01/0cd395f888b74ce08560a8d88c44dc35d3fbf50bebb35b9fd0b487ca7fb822cd.png"
           }
         ],
         "kicker": "Two calm products. No 14-step ritual."
@@ -182,7 +182,7 @@
   ],
   "seo": {
     "description": "Preview the first two premium Dr. Lurié Skincare products: a barrier reset serum and night recovery cream for skeptical late starters.",
-    "ogImage": "image/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png"
+    "ogImage": "/img/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png"
   },
   "title": "Dr. Lurié Skincare Shop Preview"
 }

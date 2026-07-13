@@ -68,7 +68,7 @@ import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import type { ObjectRecord, ObjectType, Principal } from '../../src/schema/object-record-v1.js';
-import { MAJOR_KEY_ARTIFACT_REF_RE } from './artifact-trust.js';
+import { MAJOR_KEY_ARTIFACT_REF_RE, publicPathForArtifactRef } from './artifact-trust.js';
 
 export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
 
@@ -610,6 +610,48 @@ export const checkArtifactTrust = (body: unknown, context: ObjectValidationConte
   if (!sawAssetRef)
     return [crit('artifact_trust', 'Media / artifact trust', 'optional', 'No asset references present.')];
   return [crit('artifact_trust', 'Media / artifact trust', 'complete', '')];
+};
+
+// ─── check 5b: raw artifact refs in RENDERABLE fields (build-breaker guard) ───
+//
+// A raw Major Key artifact key (`image/<id>/<sha>.ext`) is servable ONLY as its
+// public path `/img/<id>/<sha>.ext` (the netlify `/img/*` redirect). It is the
+// correct stored value ONLY in a `*AssetRef` field, which the renderers resolve
+// / don't render. In any OTHER string field the value is passed to a renderer
+// verbatim — a plain `<img src>` (content_split images, bio portrait, product
+// card) 404s, and `seo.ogImage` reaches Astro's `getImage`, which THROWS
+// `LocalImageUsedWrongly` and fails the ENTIRE build (hit for real 2026-07-13:
+// an agent set page_shop_preview's images[].src + seo.ogImage to raw
+// `image/req_publish_premium_skus_…` keys). The article pipeline already blocks
+// this (publish-article.ts rawImageArtifactReferencePattern); this is the
+// object-pipeline analogue. `*AssetRef` fields and private `notes` are exempt.
+
+// Fields that LEGITIMATELY hold a raw Major-Key artifact ref (resolved or
+// token-delivered, never passed to an image renderer): the `*AssetRef`
+// convention (imageAssetRef/portraitAssetRef — resolved/unrendered) and the
+// product download `fulfillment.artifact_ref` (delivered through token-gated
+// links, its trust checked by the product_artifact criterion). Everything
+// else that carries a raw ref is a rendered field and needs the /img|/pdf path.
+const RAW_REF_CARRIER_KEY_RE = /(assetref|artifact_ref)$/i;
+
+export const checkRenderableImageRefs = (body: unknown): ReadinessCriterion[] => {
+  const problems: string[] = [];
+  walkStrings(body, (path, value) => {
+    const key = path[path.length - 1] ?? '';
+    if (RAW_REF_CARRIER_KEY_RE.test(key)) return; // trusted-ref fields legitimately hold raw refs
+    if (path.includes('notes')) return; // private, never rendered
+    if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return;
+    problems.push(
+      `${path.join('.')} is a raw artifact key ("${value}"), which is not servable and breaks the site build ` +
+        `(Astro's <Image>/getImage throws on it). Use its public path "${publicPathForArtifactRef(value)}" instead ` +
+        `(only *AssetRef fields hold the raw ref).`
+    );
+  });
+  return [
+    problems.length === 0
+      ? crit('render_image_ref', 'Renderable image refs', 'complete', '')
+      : crit('render_image_ref', 'Renderable image refs', 'missing', problems.slice(0, 3).join(' ')),
+  ];
 };
 
 // ─── check 6: structural invariants ──────────────────────────────────────────
@@ -1723,7 +1765,7 @@ export const validateObject = (
     {
       id: 'renderability',
       label: 'Component renderability',
-      criteria: checkRenderability(input.objectType, input.body),
+      criteria: [...checkRenderability(input.objectType, input.body), ...checkRenderableImageRefs(input.body)],
     },
     { id: 'deploy_safety', label: 'Deploy safety', criteria: checkDeploySafety(input.body) },
     { id: 'artifact_trust', label: 'Media / artifact trust', criteria: checkArtifactTrust(input.body, context) },

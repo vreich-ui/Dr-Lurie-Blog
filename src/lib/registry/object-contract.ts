@@ -234,6 +234,13 @@ const COMMON_CONSTRAINTS: Constraint[] = [
       'Any *AssetRef must be a trusted Major-Key artifact ref (image|pdf/{id}/{sha256}.{ext}); URLs, data: URIs, and src/assets paths are rejected.',
   },
   {
+    id: 'render_image_ref',
+    severity: 'blocks_write',
+    enforced_live: true,
+    description:
+      'A raw Major-Key artifact key (image|pdf/{id}/{sha256}.{ext}) is NOT servable and breaks the build (Astro getImage throws) if it lands in a rendered field. Renderable image fields (src, ogImage, portrait.src, …) must carry the PUBLIC path — /img/{id}/{sha256}.{ext} for images, /pdf/… for pdfs. Only *AssetRef fields hold the raw ref.',
+  },
+  {
     id: 'schema_richtext',
     severity: 'blocks_write',
     enforced_live: true,
