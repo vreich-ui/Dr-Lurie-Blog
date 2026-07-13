@@ -58,9 +58,11 @@ hook/agitation/…/resolution + `intent`; envelope claims/scores/lineage;
 plain-text or rich_text.v1 bodies), six node ops with exact inverses,
 `create_variant`, one slug space with the committed posts, the
 reader-projection leak rule, and per-node canvas chips on the standard
-EditSession → `update_node` → publish path. The 83 committed .md posts are
-NOT migrated (Wolf 2026-07-13; legacy pipeline untouched — 08-articles-plan
-§0.5). Seeds: `scripts/lib/articles-seed-data.mjs`. Wolf 2026-07-13 (resolves
+EditSession → `update_node` → publish path. The 83 committed .md posts were
+WIPED (Wolf 2026-07-13: "mostly junk … needs rewriting") and replaced by a
+ten-article corpus (content_item objects, two per registry category;
+`scripts/lib/articles-corpus-seed-data.mjs`) — the `post` collection is now
+permanently empty. Wolf 2026-07-13 (resolves
 OQ-W7-1): reverse support NOT required — no alias layer; legacy article
 tools/functions may be updated or retired as W7.2/W7.5/W7.7 land, preserving
 functionality on the object substrate.

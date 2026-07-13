@@ -66,14 +66,17 @@ survive and become MORE agent-usable?"
 
 ### §0.5 Supersessions by Wolf, 2026-07-13 (GOVERNING over the phase table)
 
-1. **The committed posts are ignored.** "The committed posts can be ignored,
-   they are mostly junk and are not worth the effort." W7.4 (pilot
-   migration), W7.6 (full migration + `.md` retirement), the 83-post
-   DOM-equivalence harness, and the credentialed `workflows`-store inventory
-   are **waived**; §1.5's preservation item and OQ-W7-5/OQ-W7-6 are moot.
-   The legacy pipeline keeps serving the committed posts unchanged; the two
-   families share one permalink space (article-object slugs are validated
-   against committed post ids).
+1. **The committed posts are ignored → WIPED (superseded 2026-07-13 PM).**
+   Wolf first said "mostly junk and not worth the effort" (keep on the legacy
+   pipeline), then — same day — "wipe it … convert up to ten for testing to
+   the new schema. you be the judge. It doesn't really matter. needs to be
+   rewritten." So all 83 `src/data/post/*.md` were DELETED and replaced by a
+   ten-article corpus of genuine content_item objects (two per registry
+   category; `scripts/lib/articles-corpus-seed-data.mjs`, fresh slugs, full
+   annotation layer). The `post` collection is now permanently empty (benign
+   build warning). W7.4/W7.6 stay waived (no migration of the old prose — it
+   was rewritten, not ported); OQ-W7-5/OQ-W7-6 moot. The permalink space is
+   now object-slugs only.
 2. **Canvas for articles is mandatory in-wave** (W7.8 confirmed, not
    severable): object-backed article bodies carry per-node chips.
    _Addendum (2026-07-13, second directive):_ **reverse support is not

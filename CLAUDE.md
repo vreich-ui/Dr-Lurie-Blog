@@ -83,10 +83,16 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   `src/data/site/articles/`, and the render path: published article objects
   join `fetchPosts()` as first-class posts with per-node canvas chips
   (pencil + node-scoped Ask-AI) on the standard EditSession →
-  `update_node` → publish/release path. **Wolf's 2026-07-13 ruling: the 83
-  committed .md posts are NOT migrated** (legacy pipeline untouched;
-  W7.4/W7.6 waived — `docs/cms-architecture/08-articles-plan.md` §0.5).
-  Seeds: `scripts/lib/articles-seed-data.mjs`. Unpublish remains
+  `update_node` → publish/release path. **Wolf's 2026-07-13 ruling
+  (SUPERSEDED same day): the 83 committed .md posts were "mostly junk … needs
+  rewriting" — WIPED, not kept.** All 83 `src/data/post/*.md` deleted; the
+  `post` collection is now permanently empty (a benign build-log warning; all
+  articles are content_item OBJECTS). Replaced by a TEN-ARTICLE corpus (two
+  per registry category — skin-health/skincare/skin-after-40/ingredients/
+  reflections; `scripts/lib/articles-corpus-seed-data.mjs`) created via the
+  credentialed run. The first-article W7.9 seed
+  (`scripts/lib/articles-seed-data.mjs`) remains as the demo at
+  `/object-model-demo`. Unpublish remains
   unsupported (OQ-2) — a released article stays live until edited. The W7.9
   run (2026-07-13): create → all six node ops drilled byte-identical →
   validate clean → `create_variant` dry-run → publish (export commit

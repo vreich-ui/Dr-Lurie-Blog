@@ -211,7 +211,13 @@ const loadArticleObjectPosts = async (takenSlugs: Set<string>): Promise<Post[]> 
 };
 
 const load = async function (): Promise<Array<Post>> {
-  const posts = await getCollection('post');
+  // The legacy .md `post` collection was retired 2026-07-13 (all articles are
+  // content_item OBJECTS now). The collection is intentionally empty — Astro
+  // logs a benign "collection 'post' … is empty" line at build (same class as
+  // the pre-seed articleObject warning); the build is unaffected. The `.catch`
+  // keeps the read robust and lets committed .md posts merge back seamlessly
+  // if they ever return.
+  const posts = await getCollection('post').catch(() => []);
   const normalizedPosts = await Promise.all(posts.map(async (post) => await getNormalizedPost(post)));
   const articleObjectPosts = await loadArticleObjectPosts(new Set(normalizedPosts.map((post) => post.slug)));
 
