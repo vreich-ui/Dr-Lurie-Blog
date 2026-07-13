@@ -17,10 +17,12 @@
 
 export type EditTarget = {
   /** The object the verbs edit. */
-  objectType: 'page' | 'section' | 'navigation';
+  objectType: 'page' | 'section' | 'navigation' | 'content_item';
   objectId: string;
   /** Page targets: the section instance the request scopes to. */
   sectionId?: string;
+  /** content_item targets (W7.8): the article node the request scopes to. */
+  nodeId?: string;
   sectionType: string;
   /** The page object the region renders on (context/labels). */
   hostObjectId: string;
@@ -35,6 +37,27 @@ export type SectionAnnotationDataset = Partial<
 
 /** Camel-cased dataset keys of the data-cms-nav-* chrome annotation. */
 export type NavAnnotationDataset = Partial<Record<'cmsNavObject' | 'cmsNavRole', string>>;
+
+/** Camel-cased dataset keys of the data-cms-node-* article-body annotation (W7.8). */
+export type NodeAnnotationDataset = Partial<Record<'cmsObjectId' | 'cmsNodeId' | 'cmsNodeKind', string>>;
+
+/**
+ * Object-backed article bodies (W7.3 render-nodes.ts) annotate every rendered
+ * node. Edits target the content_item OBJECT, scoped by node id — the exact
+ * analogue of a page section, riding the same EditSession/lock/publish path.
+ */
+export const deriveNodeTarget = (dataset: NodeAnnotationDataset): EditTarget | undefined => {
+  const { cmsObjectId, cmsNodeId, cmsNodeKind } = dataset;
+  if (!cmsObjectId || !cmsNodeId) return undefined;
+  return {
+    objectType: 'content_item',
+    objectId: cmsObjectId,
+    nodeId: cmsNodeId,
+    sectionType: `article ${cmsNodeKind ?? 'node'}`,
+    hostObjectId: cmsObjectId,
+    shared: false,
+  };
+};
 
 /**
  * Chrome (header/footer) regions target the NAVIGATION object they render
@@ -76,15 +99,21 @@ export const deriveEditTarget = (dataset: SectionAnnotationDataset): EditTarget 
 };
 
 /**
- * The reviewable ops an accepted suggestion persists — always
- * `update_section_data`, scoped by the page instance id (page targets) or the
- * inner instance id the scoped Ask-AI response named (shared targets).
+ * The reviewable ops an accepted suggestion persists — `update_section_data`
+ * scoped by the page instance id (page targets) or the inner instance id the
+ * scoped Ask-AI response named (shared targets); article-node targets persist
+ * as `update_node` with the suggestion under the node's PUBLIC fields (the
+ * copy surface — annotations are edited deliberately, never by copy tools).
  */
 export const suggestionToOps = (
   target: EditTarget,
   suggestion: Record<string, unknown>,
   respondedSectionId?: string
 ): Array<Record<string, unknown>> => {
+  if (target.objectType === 'content_item') {
+    if (!target.nodeId) throw new Error('suggestionToOps: no node id to scope the patch to');
+    return [{ op: 'update_node', node_id: target.nodeId, fields: { public: suggestion } }];
+  }
   const sectionId = target.objectType === 'page' ? target.sectionId : respondedSectionId;
   if (!sectionId) {
     throw new Error('suggestionToOps: no section instance id to scope the patch to');

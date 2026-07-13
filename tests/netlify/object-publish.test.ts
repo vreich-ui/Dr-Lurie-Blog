@@ -417,7 +417,7 @@ test('a retried publish (after either failure point) lands the same end state as
   });
 });
 
-test('scheduling is immediate-or-reject, unpublish and content_item are refused loudly, all before any side effect', async () => {
+test('scheduling is immediate-or-reject and unpublish is refused loudly, all before any side effect', async () => {
   await withGitHubEnv(async () => {
     const events: PublishEvent[] = [];
     const github = createGitHubApiMock(events);
@@ -436,12 +436,14 @@ test('scheduling is immediate-or-reject, unpublish and content_item are refused 
     assert.equal(garbage.status, 400);
     assert.equal(garbage.body.code, 'invalid_published_time');
 
+    // content_item publishes through this path since W7.3 — a missing record
+    // is an ordinary 404, no longer an unsupported-type refusal.
     const article = await publishNav(store, github.fetchImpl, {
       object_type: 'content_item',
       object_id: 'req_smoke_pdf_cta_20260630_01',
     });
-    assert.equal(article.status, 400);
-    assert.equal(article.body.code, 'unsupported_object_type');
+    assert.equal(article.status, 404);
+    assert.equal(article.body.code, 'not_found');
 
     assert.equal(events.length, 0, 'rejections must not touch git or the store');
     assert.deepEqual(store.read({ object_type: 'navigation', object_id: 'nav_footer' }), navRecord());

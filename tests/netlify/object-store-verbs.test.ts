@@ -119,10 +119,28 @@ test('create rejects an invalid body (422) and never persists it', async () => {
   assert.equal(store.blobs.get(objectRecordKey('page', 'page_bad')), undefined);
 });
 
-test('create rejects content_item (not reachable via the generic verbs)', async () => {
+test('create accepts content_item since W7.3, minting a dated req_* id from the slug', async () => {
   const store = createMemoryStore();
-  const res = await call(store, { action: 'create', object_type: 'content_item', site: 'site_drlurie', body: {} });
-  assert.equal(res.status, 400);
+  const res = await call(store, {
+    action: 'create',
+    object_type: 'content_item',
+    site: 'site_drlurie',
+    body: {
+      slug: 'barrier-myths',
+      title: 'Barrier myths',
+      nodes: [
+        { id: 'n_a1', kind: 'content', public: { body: 'Opening.' }, private: { strategy: 'hook' } },
+        { id: 'n_a2', kind: 'content', public: { body: 'Close.' }, private: { strategy: 'resolution' } },
+      ],
+    },
+  });
+  assert.equal(res.status, 200);
+  const record = (res.body as { record: { object_id: string; schema_version: string } }).record;
+  assert.match(record.object_id, /^req_agent_barrier_myths_\d{8}_01$/);
+  assert.equal(record.schema_version, 'content_item.v1');
+  // A garbage body is still refused by validation, exactly like any type.
+  const bad = await call(store, { action: 'create', object_type: 'content_item', site: 'site_drlurie', body: {} });
+  assert.equal(bad.status, 422);
 });
 
 test('create rejects a duplicate object id (409)', async () => {

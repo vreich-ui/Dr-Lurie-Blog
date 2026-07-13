@@ -54,10 +54,10 @@ for (const objectType of Object.keys(ASK_AI_BODY_SCHEMAS)) {
   });
 }
 
-test('content_item is not an Ask-AI object type (Tier 1 keeps the article path)', () => {
-  assert.equal(isAskAiObjectType('content_item'), false);
-  assert.equal(bodySchemaForObjectType('content_item'), undefined);
-  assert.equal(deriveAskAiToolForObjectType('content_item'), undefined);
+test('content_item is an Ask-AI object type since W7.8 (articles are governed objects)', () => {
+  assert.equal(isAskAiObjectType('content_item'), true);
+  assert.notEqual(bodySchemaForObjectType('content_item'), undefined);
+  assert.notEqual(deriveAskAiToolForObjectType('content_item'), undefined);
 });
 
 test('unknown object types resolve to no schema and no tool', () => {

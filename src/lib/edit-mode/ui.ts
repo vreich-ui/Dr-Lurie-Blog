@@ -9,9 +9,11 @@
  * draft → publish → release lifecycle every agent follows, driven by a human
  * on the live page.
  *
- * Article bodies are NOT edited here (OQ-8: the article pipeline is its own
- * system); only object-backed sections carry annotations, so article prose
- * simply never grows a chip.
+ * Article bodies: OBJECT-BACKED articles (content_item, W7.3) render each
+ * node with data-cms-node-* identity, so article prose grows chips too —
+ * node edits ride the SAME EditSession → update_node → publish path (the
+ * OQ-8 stop line lifted at W7.8). Legacy .md posts carry no annotations and
+ * stay read-only on the canvas.
  *
  * Remount-safe for Astro view transitions: a body swap removes the injected
  * chrome, so boot calls mountEditMode again — the previous mount's
@@ -27,6 +29,7 @@ import {
   changedFieldsOnly,
   deriveEditTarget,
   deriveNavTarget,
+  deriveNodeTarget,
   suggestionToOps,
   summarizeFieldChanges,
   type EditTarget,
@@ -50,6 +53,7 @@ import {
 
 const REGION_SELECTOR = '[data-cms-section-id]';
 const NAV_SELECTOR = '[data-cms-nav-object]';
+const NODE_SELECTOR = '[data-cms-node-id]';
 const EMPTY_OBJECT_SELECTOR = '[data-cms-empty-object]';
 const MODE_KEY = 'dl-edit-mode';
 
@@ -528,11 +532,14 @@ export const mountEditMode = (options: MountOptions): void => {
   };
 
   const targetObjectIdOf = (region: HTMLElement): string | undefined =>
-    deriveEditTarget(region.dataset as Record<string, string>)?.objectId;
+    (region.dataset.cmsNodeId !== undefined
+      ? deriveNodeTarget(region.dataset as Record<string, string>)
+      : deriveEditTarget(region.dataset as Record<string, string>)
+    )?.objectId;
 
   const markDraftRegions = (): void => {
     const draftIds = new Set(pendingRows.filter((row) => row.unpublished_changes).map((row) => row.object_id));
-    document.querySelectorAll<HTMLElement>(REGION_SELECTOR).forEach((region) => {
+    document.querySelectorAll<HTMLElement>(`${REGION_SELECTOR}, ${NODE_SELECTOR}`).forEach((region) => {
       const objectId = targetObjectIdOf(region);
       region.classList.toggle('dl-em-draft', Boolean(objectId && draftIds.has(objectId)));
     });
@@ -814,13 +821,19 @@ export const mountEditMode = (options: MountOptions): void => {
 
   const renderChip = (region: HTMLElement): void => {
     const isNav = region.dataset.cmsNavObject !== undefined;
+    const isNode = region.dataset.cmsNodeId !== undefined;
     const target = isNav
       ? deriveNavTarget(region.dataset as Record<string, string>)
-      : deriveEditTarget(region.dataset as Record<string, string>);
+      : isNode
+        ? deriveNodeTarget(region.dataset as Record<string, string>)
+        : deriveEditTarget(region.dataset as Record<string, string>);
     if (!target) return;
     const hasSelection = !isNav && Boolean(currentSelectionText && selectionRegion === region);
     const isDraft = region.classList.contains('dl-em-draft');
-    const hasImage = !isNav && IMAGE_SECTION_TYPES.has(target.sectionType);
+    // Article content nodes carry an optional media image (public.media).
+    const hasImage = isNode
+      ? region.dataset.cmsNodeKind === 'content'
+      : !isNav && IMAGE_SECTION_TYPES.has(target.sectionType);
     // A `related` content_grid announces its algorithm — the chip offers the
     // selection dropdown inline with the AI tool (small footprint, no panel).
     const algorithm = region.dataset.cmsRelatedAlgorithm;
@@ -912,9 +925,13 @@ export const mountEditMode = (options: MountOptions): void => {
         window.clearTimeout(chipHideTimer);
         return;
       }
-      // Sections first (they sit inside <main>), then chrome (header/footer
-      // wrap a nav object) — a hover matches exactly one editable region.
-      const region = element.closest<HTMLElement>(REGION_SELECTOR) ?? element.closest<HTMLElement>(NAV_SELECTOR);
+      // Article nodes first (innermost, inside the post body), then sections
+      // (inside <main>), then chrome (header/footer wrap a nav object) — a
+      // hover matches exactly one editable region.
+      const region =
+        element.closest<HTMLElement>(NODE_SELECTOR) ??
+        element.closest<HTMLElement>(REGION_SELECTOR) ??
+        element.closest<HTMLElement>(NAV_SELECTOR);
       if (!region) {
         clearChipSoon();
         return;
@@ -952,7 +969,10 @@ export const mountEditMode = (options: MountOptions): void => {
       const anchor = selection?.anchorNode;
       const anchorElement =
         anchor && anchor.nodeType === Node.ELEMENT_NODE ? (anchor as HTMLElement) : (anchor?.parentElement ?? null);
-      const region = anchorElement?.closest<HTMLElement>(REGION_SELECTOR) ?? undefined;
+      const region =
+        anchorElement?.closest<HTMLElement>(NODE_SELECTOR) ??
+        anchorElement?.closest<HTMLElement>(REGION_SELECTOR) ??
+        undefined;
       currentSelectionText = region ? captureObjectSelection(region) : undefined;
       selectionRegion = currentSelectionText ? region : undefined;
       if (hotRegion) renderChip(hotRegion);
@@ -1017,7 +1037,12 @@ export const mountEditMode = (options: MountOptions): void => {
       `<span class="dl-em-iid">${escapeHtml(target.objectId)}</span>` +
       (target.shared ? `<span class="dl-em-idot dl-em-shd" title="Shared — affects every page using it"></span>` : '') +
       (isDraft ? `<span class="dl-em-idot dl-em-drf" title="Unpublished draft"></span>` : '');
-    panel.classList.toggle('dl-em-has-image', IMAGE_SECTION_TYPES.has(target.sectionType));
+    panel.classList.toggle(
+      'dl-em-has-image',
+      target.objectType === 'content_item'
+        ? region.dataset.cmsNodeKind === 'content'
+        : IMAGE_SECTION_TYPES.has(target.sectionType)
+    );
     // Chrome (navigation objects) is a copy form only: no section grammar for
     // AI scoping, no images — the accordion shows just the Edit section.
     const isNav = target.objectType === 'navigation';
@@ -1060,6 +1085,14 @@ export const mountEditMode = (options: MountOptions): void => {
       const instance = sectionList.find((entry) => entry.id === target.sectionId);
       currentData = instance?.data;
       patchSectionId = instance?.id;
+    } else if (target.objectType === 'content_item') {
+      // Article node (W7.8): the editable unit is the node's PUBLIC fields —
+      // update_node scopes by target.nodeId (patchSectionId is unused there
+      // but kept non-empty for the shared panel state shape).
+      const nodes = (body.nodes as Array<{ id: string; public?: Record<string, unknown> }> | undefined) ?? [];
+      const node = nodes.find((entry) => entry.id === target.nodeId);
+      currentData = node?.public;
+      patchSectionId = node?.id;
     } else {
       const inner = body.section as { id: string; data: Record<string, unknown> } | undefined;
       currentData = inner?.data;
@@ -1217,12 +1250,16 @@ export const mountEditMode = (options: MountOptions): void => {
       const value = formValueFor(state.currentData, field);
       const label = `<label>${escapeHtml(field.key)}</label>`;
       if (field.kind === 'richtext' || field.kind === 'lines') {
+        // Article node bodies are PLAIN TEXT (escaped at render; blank line =
+        // new paragraph) — the HTML-tag hint belongs to section fields only.
+        const richNote =
+          state.target.objectType === 'content_item'
+            ? '<span class="dl-em-fieldnote">Plain text — blank line starts a new paragraph</span>'
+            : '<span class="dl-em-fieldnote">p · b · i · link · lists · h2–h3</span>';
         row.innerHTML =
           label +
           `<textarea data-em-field="${escapeHtml(field.key)}">${escapeHtml(value)}</textarea>` +
-          (field.kind === 'lines'
-            ? '<span class="dl-em-fieldnote">One per line</span>'
-            : '<span class="dl-em-fieldnote">p · b · i · link · lists · h2–h3</span>');
+          (field.kind === 'lines' ? '<span class="dl-em-fieldnote">One per line</span>' : richNote);
       } else if (field.kind === 'image-src') {
         // src + Upload side by side: paste a path, or push a file into the
         // blobs artifacts store (pdf-tool pattern) and get its /img/* path.
@@ -1502,6 +1539,7 @@ export const mountEditMode = (options: MountOptions): void => {
       object_type: state.target.objectType,
       object_id: state.target.objectId,
       ...(state.target.objectType === 'page' ? { section_id: state.target.sectionId } : {}),
+      ...(state.target.objectType === 'content_item' ? { node_id: state.target.nodeId } : {}),
       ...(state.selectedText ? { selected_text: state.selectedText } : {}),
       ...(state.imageRef ? { image_ref: state.imageRef } : {}),
       instruction,

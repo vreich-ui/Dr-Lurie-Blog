@@ -23,8 +23,9 @@
  * after the approval invalidates it (content_revision moves) and the change
  * waits again. There is no separate "human executes the publish" step.
  *
- * Articles (content_item) are NOT governed by this config — they keep their
- * own pipeline, and the schema rejects them as an override key.
+ * Articles (content_item) joined the governed set at W7.3 and stay Tier 1
+ * (OQ-W7-4, Wolf 2026-07-12): autonomous under the master — agents publish
+ * articles directly, exactly the trust posture the article pipeline had.
  *
  * Every publish — autonomous or approved — still writes the full audit
  * trail (actor, patch + inverse, receipt); this switch changes who must say

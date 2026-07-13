@@ -4,6 +4,8 @@ import type { CollectionEntry } from 'astro:content';
 import type { Post } from '~/types';
 import { APP_BLOG } from 'astrowind:config';
 import { cleanSlug, trimSlash, BLOG_BASE, POST_PERMALINK_PATTERN, CATEGORY_BASE, TAG_BASE } from './permalinks';
+import { contentItemBodySchema } from '~/schema/bodies/content-item-v1';
+import { renderArticleNodes } from '~/lib/article-object/render-nodes';
 
 /**
  * Display labels for category/tag slugs, from the taxonomy registry export
@@ -138,11 +140,81 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
   };
 };
 
+/**
+ * Object-backed articles (W7.3): published content_item objects materialize
+ * to src/data/site/articles/*.json and join the SAME post list as the
+ * committed .md posts — one list, so listings, categories, tags, related
+ * scoring, RSS, and search cover both families with no per-surface wiring.
+ * The export's __generated.at is the effective published_time (T1.3), so the
+ * standing published-time gate below applies unchanged. The body renders
+ * through the one node renderer (render-nodes.ts) into `post.content` — the
+ * article route's set:html branch — with per-node canvas identity attached.
+ */
+const loadArticleObjectPosts = async (takenSlugs: Set<string>): Promise<Post[]> => {
+  const entries = await getCollection('articleObject');
+  if (entries.length === 0) return [];
+  const labels = await getTaxonomyLabels();
+  const posts: Post[] = [];
+
+  for (const entry of entries) {
+    const { __generated, ...body } = entry.data as { __generated: { at: string } } & Record<string, unknown>;
+    const parsed = contentItemBodySchema.safeParse(body);
+    if (!parsed.success) {
+      // Loud skip, never a build failure: a bad export is healed store-side.
+      console.warn(`[articleObject] ${entry.id}: export does not parse as content_item.v1 — skipped.`);
+      continue;
+    }
+    const article = parsed.data;
+    if (takenSlugs.has(article.slug)) {
+      // Validation blocks this at write; a legacy .md post added later can
+      // still collide. The committed post wins — objects never shadow it.
+      console.warn(`[articleObject] ${entry.id}: slug "${article.slug}" is taken by a committed post — skipped.`);
+      continue;
+    }
+
+    const publishDate = new Date(__generated.at);
+    const rendered = renderArticleNodes(entry.id, article);
+    const category = article.taxonomy?.category
+      ? {
+          slug: cleanSlug(article.taxonomy.category),
+          title: labels.category.get(cleanSlug(article.taxonomy.category)) ?? article.taxonomy.category,
+        }
+      : undefined;
+    const tags = (article.taxonomy?.tags ?? []).map((tag) => ({
+      slug: cleanSlug(tag),
+      title: labels.tag.get(cleanSlug(tag)) ?? tag,
+    }));
+
+    posts.push({
+      id: entry.id,
+      slug: article.slug,
+      permalink: await generatePermalink({ id: entry.id, slug: article.slug, publishDate, category: category?.slug }),
+      publishDate,
+      title: article.title,
+      excerpt: article.description ?? article.deck,
+      image: article.image?.src,
+      category,
+      tags,
+      draft: false,
+      published_time: publishDate,
+      metadata: {
+        ...(article.seo?.meta_title ? { title: article.seo.meta_title } : {}),
+        ...(article.seo?.meta_description ? { description: article.seo.meta_description } : {}),
+        ...(article.seo?.canonical_url ? { canonical: article.seo.canonical_url } : {}),
+      },
+      content: rendered.html,
+      readingTime: rendered.readingTime,
+    });
+  }
+  return posts;
+};
+
 const load = async function (): Promise<Array<Post>> {
   const posts = await getCollection('post');
-  const normalizedPosts = posts.map(async (post) => await getNormalizedPost(post));
+  const normalizedPosts = await Promise.all(posts.map(async (post) => await getNormalizedPost(post)));
+  const articleObjectPosts = await loadArticleObjectPosts(new Set(normalizedPosts.map((post) => post.slug)));
 
-  const results = (await Promise.all(normalizedPosts))
+  const results = [...normalizedPosts, ...articleObjectPosts]
     .sort((a, b) => b.publishDate.valueOf() - a.publishDate.valueOf())
     .filter((post) => {
       const publishedTime = post.published_time instanceof Date ? post.published_time.getTime() : Number.NaN;

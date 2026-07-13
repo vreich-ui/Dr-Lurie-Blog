@@ -108,11 +108,11 @@ if (!Array.isArray(PAGE_HOME_SEEDS) || PAGE_HOME_SEEDS.length === 0 || !PAGE_HOM
   console.error(`[roundtrip] ${seedsPath} must export CONVERSION_SEEDS (non-empty array) and SEED_SITE.`);
   process.exit(2);
 }
-const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy', 'site', 'product']);
+const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy', 'site', 'product', 'content_item']);
 const unsupported = PAGE_HOME_SEEDS.filter((seed) => !SUPPORTED_SEED_TYPES.has(seed.objectType));
 if (unsupported.length > 0) {
   console.error(
-    `[roundtrip] the driver drills page/section/template/taxonomy/site/product objects only; extend drillOps for: ${unsupported
+    `[roundtrip] the driver drills page/section/template/taxonomy/site/product/content_item objects only; extend drillOps for: ${unsupported
       .map((seed) => `${seed.objectId} (${seed.objectType})`)
       .join(', ')}`
   );
@@ -493,6 +493,46 @@ for (const seed of PAGE_HOME_SEEDS) {
   );
 }
 
+// ─── variant proof (content_item only): clone → valid draft, dry-run ─────────
+// create_variant is a VERB, not a patch op, so the drill above cannot cover
+// it. dry_run builds the would-be variant (node ids re-minted, lineage set),
+// validates it through the full create pipeline, and persists NOTHING — safe
+// against production (no probe variants left behind). W7.3, plan §2.4.
+
+for (const seed of PAGE_HOME_SEEDS) {
+  if (seed.objectType !== 'content_item') continue;
+  if (ensureFailed.has(seed.objectId)) {
+    step(`create_variant ${seed.objectId} (dry_run)`, false, 'skipped — ensure failed');
+    continue;
+  }
+  const result = await callTool('object_create_variant', {
+    source_object_id: seed.objectId,
+    slug: `${seed.body.slug}-rt-variant-probe`,
+    dry_run: true,
+  });
+  const payload = structured(result);
+  const eligible = payload?.summary?.eligible === true;
+  const lineage = payload?.body?.lineage?.parent_content_id === seed.objectId;
+  const sourceNodeIds = new Set((seed.body.nodes ?? []).map((node) => node.id));
+  const reminted =
+    Array.isArray(payload?.body?.nodes) &&
+    payload.body.nodes.length === (seed.body.nodes ?? []).length &&
+    payload.body.nodes.every((node) => !sourceNodeIds.has(node.id));
+  step(
+    `create_variant ${seed.objectId}: dry_run builds a valid draft variant (lineage + re-minted nodes)`,
+    !isToolError(result) && eligible && lineage && reminted,
+    isToolError(result)
+      ? JSON.stringify(payload).slice(0, 300)
+      : !eligible
+        ? `validation blockers: ${JSON.stringify(payload?.summary?.blockers ?? payload).slice(0, 300)}`
+        : !lineage
+          ? 'lineage.parent_content_id does not point back at the source'
+          : !reminted
+            ? 'node ids were not re-minted'
+            : ''
+  );
+}
+
 // ─── contract: advertised ops === exercised ops (criterion 4) ────────────────
 
 for (const [objectType, exercised] of exercisedByType) {
@@ -530,6 +570,9 @@ if (writeExports) {
   );
   const { materializeSite } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'site.js'));
   const { materializeProduct } = await import(path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'product.js'));
+  const { materializeContentItem } = await import(
+    path.join(compiledRoot, 'netlify', 'lib', 'materializers', 'content-item.js')
+  );
   const materializerByType = {
     page: materializePage,
     section: materializeSection,
@@ -537,6 +580,7 @@ if (writeExports) {
     taxonomy: materializeTaxonomy,
     site: materializeSite,
     product: materializeProduct,
+    content_item: materializeContentItem,
   };
   for (const seed of PAGE_HOME_SEEDS) {
     const record = await getRecord(seed.objectType, seed.objectId);

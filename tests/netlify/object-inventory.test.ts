@@ -120,12 +120,14 @@ test('requires_approval derives from the approval policy; content_item is never 
     inventoryRowFromRecord(baseRecord({ object_type: 'page' }), NOW, gateNavigation).requires_approval,
     false
   );
-  // content_item stays outside the policy under every posture.
+  // content_item follows the policy like every governed type (W7.3); the
+  // committed dev default keeps it autonomous (Tier 1, OQ-W7-4).
   const allRequire: ApprovalPolicy = { master: 'all-require-approval', overrides: {} };
   assert.equal(
     inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW, allRequire).requires_approval,
-    false
+    true
   );
+  assert.equal(inventoryRowFromRecord(baseRecord({ object_type: 'content_item' }), NOW).requires_approval, false);
 });
 
 test('a published record with the receipt at the current revision reports no pending changes', () => {

@@ -50,6 +50,11 @@ import type { ObjectType } from './object-record-v1.js';
 // schema; T0.3 owns object-level ids — term ids are body-internal).
 export const TERM_ID_RE = /^t_[a-z0-9]+$/;
 
+// Article node ids (article_body.v1 / content_item.v1) — opaque `n_*` ids,
+// body-internal like term ids. The forbidden-strategy-words rule lives in the
+// body schema (deep validation is T0.2/T0.7's job); the grammar pins shape.
+export const NODE_ID_RE = /^n_[a-z0-9]+$/i;
+
 // ——— shared primitives ———
 
 export type PatchJsonValue = string | number | boolean | null | PatchJsonValue[] | { [key: string]: PatchJsonValue };
@@ -95,6 +100,9 @@ const sectionPayloadSchema = z.looseObject({
   id: z.string().regex(SECTION_INSTANCE_ID_RE, { message: 'Section ids must match s_<lowercase alphanumerics>' }),
 });
 const navItemPayloadSchema = z.looseObject({ id: z.string().min(1) });
+const nodePayloadSchema = z.looseObject({
+  id: z.string().regex(NODE_ID_RE, { message: 'Node ids must match n_<alphanumerics>' }),
+});
 const navGroupPayloadSchema = z.looseObject({ id: z.string().min(1) });
 const linkActionPayloadSchema = z.looseObject({ label: z.string().min(1) });
 const templateSlotPayloadSchema = z.looseObject({ slotId: z.string().min(1) });
@@ -421,6 +429,64 @@ const setProductPriceSchema = z.strictObject({
   ...guard,
 });
 
+// ——— Content items / articles (08-articles-plan §2.2, W7.3) ———
+//
+// The node family mirrors the section family exactly: an article body is an
+// ordered list of annotated nodes keyed by opaque `n_*` ids, and every op is
+// invertible with the same element/fields/move capture mechanics. The
+// annotation layer (private.strategy/intent, commercial, rendering, chat) is
+// ordinary node data — `update_node` deep-merges over the WHOLE node, so
+// "mark this block a hook" is one op: {fields: {private: {strategy: 'hook'}}}.
+
+const setArticleMetaSchema = z
+  .strictObject({
+    op: z.literal('set_article_meta'),
+    fields: fieldsSchema.superRefine(forbidKeys(['nodes'], 'set_article_meta (use the node ops)')),
+    ...guard,
+  })
+  .describe('Merge article meta fields (title/slug/taxonomy/seo/scores/…); nodes are edited only via node ops.');
+
+const upsertNodeSchema = z.strictObject({
+  op: z.literal('upsert_node'),
+  node: nodePayloadSchema,
+  // Insert position; ignored when a node with the same id already exists
+  // (replace happens in place). Clamped to the array bounds.
+  position: positionSchema.optional(),
+  ...guard,
+});
+
+const updateNodeSchema = z.strictObject({
+  op: z.literal('update_node'),
+  node_id: z.string().regex(NODE_ID_RE),
+  // Deep-merges over the node envelope itself (public/private/commercial/
+  // rendering/chat/visibility) — null unsets, per the grammar rules above.
+  fields: fieldsSchema.superRefine(forbidKeys(['id'], 'update_node (node ids are stable)')),
+  ...guard,
+});
+
+const moveNodeSchema = z.strictObject({
+  op: z.literal('move_node'),
+  node_id: z.string().regex(NODE_ID_RE),
+  to_index: positionSchema,
+  ...guard,
+});
+
+const setNodeVisibilitySchema = z.strictObject({
+  op: z.literal('set_node_visibility'),
+  node_id: z.string().regex(NODE_ID_RE),
+  // Article nodes have THREE visibility states (public/internal/hidden,
+  // article-content-v1); null restores the unset default (= public), so the
+  // inverse of setting visibility on a bare node is exact.
+  visibility: z.union([z.enum(['public', 'internal', 'hidden']), z.null()]),
+  ...guard,
+});
+
+const removeNodeSchema = z.strictObject({
+  op: z.literal('remove_node'),
+  node_id: z.string().regex(NODE_ID_RE),
+  ...guard,
+});
+
 // ——— Template (C§2.0) ———
 
 const setTemplateMetaSchema = z.strictObject({
@@ -481,6 +547,12 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   setSiteFieldsSchema,
   setProductFieldsSchema,
   setProductPriceSchema,
+  setArticleMetaSchema,
+  upsertNodeSchema,
+  updateNodeSchema,
+  moveNodeSchema,
+  setNodeVisibilitySchema,
+  removeNodeSchema,
   setTemplateMetaSchema,
   upsertSlotSchema,
   moveSlotSchema,
@@ -542,9 +614,9 @@ export const patchOpsSchema = z.array(patchOpSchema);
 // the payload/visibility ops and whole-section replacement, but not
 // move/remove (there is no list) and no page meta.
 //
-// content_item is deliberately empty: the article tool surface is unchanged
-// (C§2.0); generic envelope-level access arrives with the adapter (D§1),
-// which is out of T0.6's scope.
+// content_item accepts the node family (W7.3, 08-articles-plan §2.2): the
+// article body is an ordered list of annotated nodes, edited exactly the way
+// a page's sections are — set_article_meta owns everything except `nodes`.
 export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]> = {
   page: [
     'set_page_meta',
@@ -571,7 +643,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
   site: ['set_site_fields'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
   product: ['set_product_fields', 'set_product_price'],
-  content_item: [],
+  content_item: ['set_article_meta', 'upsert_node', 'update_node', 'move_node', 'set_node_visibility', 'remove_node'],
 };
 
 export const isPatchOpAllowedForObjectType = (objectType: ObjectType, opName: PatchOpName): boolean =>

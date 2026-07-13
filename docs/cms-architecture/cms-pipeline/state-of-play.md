@@ -7,6 +7,109 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 S (W7.3 + W7.8 BUILT: content_item is the ninth governed type; article bodies on the canvas — awaiting the credentialed run)
+
+Wolf: "Finish W7 rich text with article migration. The committed posts can be
+ignored, they are mostly junk and are not worth the effort. The article
+section has to have canvas edit-mode overlay. Articles and human engagement
+is of the most value, so they need to be converted in full … it is important
+that not only basic attributes are attached to every article block but
+context attributes related to it being a hook, agitation or a resolution.
+Like in the original architecture." Three plan supersessions recorded (plan
+§0 updated): **W7.4/W7.6 are WAIVED** (no migration of the 83 committed .md
+posts, no DOM-equivalence harness over them — they stay on the legacy
+pipeline untouched, OQ-W7-5 moot); **W7.8 canvas is mandatory in-wave**; the
+node annotation layer is non-negotiable (already the plan's prime rule).
+Recon first (Wolf suspected doc drift): main had gained canvas sessions P/Q/R
+(#425 put chips on article-page SECTIONS + chrome, explicitly stopping at the
+body) and W7.1's substrate — but `content_item` was still refused by every
+verb. That gap is what this session built:
+
+- **`content_item.v1` body schema** (`src/schema/bodies/content-item-v1.ts`):
+  node envelope OUTSIDE, rich text INSIDE (plan §2.2). The semantic layer is
+  IMPORTED from `article-content-v1.ts`, not copied — `private.strategy`
+  (hook/agitation/context/…/resolution/summary), `intent`, `commercial`
+  (offers/disclosure/rel/adSlot), `rendering`, `chat`, 3-state `visibility`,
+  opaque `n_*` ids (forbidden-word rule kept). `public.body` is
+  `string | rich_text.v1 document` (string = plain text, escaped; blank line
+  = paragraph). Envelope: slug/title/deck/description/image/taxonomy/seo +
+  the judge/score substrate — editorial, emotional_strategy, sources, claims
+  (node_ids-wired), compliance, lineage {parent_content_id}, typed
+  `scores[]` {scored_by, at, framework, dimension, score, rationale} (§2.4).
+- **Ninth governed type end-to-end**: `governedObjectTypes` + approval config
+  (Tier 1 = autonomous under the master, OQ-W7-4 — gate it any time with one
+  config pin), create (dated `req_agent_<topic>_<yyyymmdd>_01` minting —
+  req\_\* ids keep artifact trust intact §1.6), the **node op family**
+  (set_article_meta + upsert/update/move/remove_node + set_node_visibility;
+  exact inverses via the section-family mechanics; "mark this block a hook"
+  is ONE op: `update_node {fields:{private:{strategy:'hook'}}}`),
+  **`create_variant`** verb + `object_create_variant` MCP tool (node ids
+  re-minted deterministically, claims/compliance node_ids re-pointed,
+  lineage set, scores reset, slug uniqueness enforced; `dry_run` for
+  zero-residue production proofs), materializer →
+  `src/data/site/articles/{req_id}.json`, publish/release through the
+  standard pipeline, full contract (annotations contract-visible).
+- **Validation**: schema; taxonomy category/tags resolve as REGISTRY SLUGS
+  (store resolver now matches slug or term_id, aliases followed;
+  registry-gated like the W3 hook); article slug unique across article
+  objects AND committed posts (one permalink space; `isArticleSlugTaken`);
+  node-id uniqueness; ≥1 public content node publish-gated; rich-text bodies
+  restricted to the RENDERABLE grammar (prose + quotes; embeds blocked until
+  their resolvers exist — trap-5 discipline) + https-only hyperlinks;
+  **reader safety runs on the READER PROJECTION** (public fields of public
+  nodes) so the annotation layer is legal record data while a strategy word
+  in public copy still blocks; deploy-safety walks everything incl. notes
+  (the export commits to the repo).
+- **Render path**: published article exports join `fetchPosts()` as
+  first-class posts (listings, categories, tags, related scoring, RSS,
+  search — no per-surface wiring) via a new `articleObject` collection
+  (generateId pinned: bodies carry `slug`, the S2 lesson) and ONE node
+  renderer (`src/lib/article-object/render-nodes.ts`) into the article
+  route's dormant `set:html` branch — SinglePost furniture, SEO merge, and
+  page_article extras all unchanged. Never-render-private: internal/hidden
+  nodes emit NOTHING; the leak rule is test-grepped (no strategy vocabulary
+  in output). Offers render with disclosure + rel (bug ② partially paid);
+  unsafe hrefs degrade to text; hero image via `body.image` (bug ③);
+  reading time computed to the md convention.
+- **W7.8 canvas (the OQ-8 stop line lifts)**: every rendered node carries
+  `data-cms-node-*` identity; node chips (pencil + sparkles; image tool on
+  content nodes) ride the SAME EditSession → `update_node` → pending tray →
+  publish/release path as sections. Ask-AI gains NODE SCOPE
+  (`ask-ai-object.ts`): tool = the node's PUBLIC copy grammar with
+  protected-field strip (+`ctaLink`), a document body is excluded (no
+  flattening), and the node's strategy/intent flow INTO the prompt ("write
+  copy for a hook") but never into the suggestion. The legacy article Ask-AI
+  (admin-ask-ai-node, workflow records) is untouched.
+- **Driver + seeds**: `articleDrillOps` (probe node cloned/poked — copy AND
+  annotation — hidden/moved/removed, byte-identical end), create_variant
+  dry-run proof (the instantiate pattern), content_item materializer
+  dispatch, and `scripts/lib/articles-seed-data.mjs` — one honest
+  demonstration article (full PAS-ish arc of annotated nodes + a
+  node-wired claim) at slug `object-model-demo`.
+- **Gates**: 1195 + 49 tests green (~60 new; 8 old posture pins deliberately
+  flipped) · astro check 0 errors · eslint/prettier clean · **build-diff
+  EMPTY (173/173 identical)** — with no article exports the change is
+  render-inert · probe-export build verified in dist (article page + node
+  wrappers + zero leaks + listing/RSS inclusion), then removed · **local
+  rehearsal ALL GREEN** (ensure → 6/6 ops → validate → publish blocked at
+  the expected sandbox boundary → variant dry-run → contract 6/6 advertised
+  ≡ exercised → inventory).
+
+**Status: BUILT + REHEARSED, not converted.** The credentialed run flips it:
+`node scripts/home-conversion-roundtrip.mjs --production --release --seeds scripts/lib/articles-seed-data.mjs`
+(schema-vintage gate applies — merge + deploy main first). Standing caveats,
+named honestly: (1) **unpublish is still unsupported (OQ-2)** — once the demo
+article publishes + releases it is live at /object-model-demo until edited;
+the run may stop at the drill (criteria 1–4 proven, record stays draft) if
+that's unwanted. (2) Rich-text DOCUMENT bodies exist end-to-end but have no
+canvas/TipTap editor yet — plain-text bodies are the editable v1 surface;
+W7.2/W7.7 (sections onto rich text; the admin editor + annotation panel +
+embeds) remain open, as does the OQ-W7-3 strategy-registry go/no-go and the
+W7.5 alias layer (legacy tools untouched this session; the ~31 article tool
+names still serve only the .md pipeline). (3) A locally deleted article
+export needs `node_modules/.astro` cleared (dev-cache only; CI/Netlify build
+clean).
+
 ## Session 2026-07-12 R (CANVAS Tier-1 surfaces: article pages, chrome, related-articles dropdown)
 
 Wolf: "Article publishing Tier 1 after conversion does not have canvas mode …

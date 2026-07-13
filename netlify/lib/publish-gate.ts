@@ -25,9 +25,9 @@
  *     constrained by the pin — the pin constrains delegated execution
  *     (C§2.2).
  *
- *   content_item: outside this gate entirely, as always — the article
- *     pipeline is its own system (OQ-8) and the policy config cannot even
- *     name it.
+ *   content_item: governed since W7.3 (08-articles-plan; OQ-8 resolved as
+ *     migration) — Tier 1 preserved as 'autonomous' under the committed
+ *     policy. The non-governed deny branch below is defensive only.
  *
  * Approval currency (D§3.9, via effectiveApproval — the twice-hardened
  * invariant, preserved verbatim): an approval is invalidated the moment
@@ -121,11 +121,9 @@ export const checkPublishGate = (input: PublishGateInput): PublishGateResult => 
   const objectType = input.record.object_type;
 
   if (!isGovernedObjectType(objectType)) {
-    return deny(
-      false,
-      'content_item_not_gated',
-      'content_item publishes through the existing article pipeline; the generic gate does not serve it (OQ-8).'
-    );
+    // Unreachable since W7.3 (all nine types are governed); kept so a future
+    // ungoverned type fails closed instead of publishing ungated.
+    return deny(false, 'content_item_not_gated', `${objectType} is not governed by the generic publish gate.`);
   }
 
   const policy = input.policy ?? activeApprovalPolicy();

@@ -29,15 +29,17 @@ test('every object type produces a well-formed contract without throwing', () =>
   }
 });
 
-test('governed types carry a non-empty body JSON-schema; content_item points at the article tools', () => {
-  for (const type of GOVERNED) {
+test('every governed type — content_item included since W7.3 — carries a non-empty body JSON-schema', () => {
+  for (const type of [...GOVERNED, 'content_item' as ObjectType]) {
     const body = buildObjectContract(type).body_schema as Record<string, unknown>;
     assert.equal(body.type, 'object', `${type} body_schema should be a JSON-schema object`);
     assert.ok(body.properties && Object.keys(body.properties).length > 0, `${type} body_schema has properties`);
   }
-  const contentItem = buildObjectContract('content_item').body_schema as { note?: string };
-  assert.match(contentItem.note ?? '', /save_json_blob/);
-  assert.equal(buildObjectContract('content_item').creatable, false);
+  const contentItem = buildObjectContract('content_item');
+  assert.equal(contentItem.creatable, true);
+  assert.equal(contentItem.governed, true);
+  // The annotation layer is contract-visible: the node schema carries private.strategy.
+  assert.match(JSON.stringify(contentItem.body_schema), /"strategy"/);
 });
 
 test('section_types covers every variant; the component-bound ones carry editor hints', () => {
@@ -81,8 +83,13 @@ test('patch_ops covers exactly the per-type allowlist, with arg schemas + minted
   assert.equal(taxOps.find((o) => o.op === 'reactivate_term')?.agent_authored, false);
 });
 
-test('content_item has no allowlisted patch ops (served by the article surface)', () => {
-  assert.deepEqual(buildObjectContract('content_item').patch_ops, []);
+test('content_item carries the node op family (W7.3 — articles are governed objects)', () => {
+  assert.deepEqual(
+    buildObjectContract('content_item')
+      .patch_ops.map((o) => o.op)
+      .sort(),
+    ['move_node', 'remove_node', 'set_article_meta', 'set_node_visibility', 'update_node', 'upsert_node']
+  );
 });
 
 test('requires_approval is computed from the policy, not hardcoded', () => {

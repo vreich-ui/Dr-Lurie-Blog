@@ -114,3 +114,36 @@ test('blockText strips markup down to comparable text', () => {
   assert.equal(blockText('One <strong>two</strong>&nbsp; three.'.replace('&nbsp;', ' ')), 'One two three.');
   assert.equal(blockText('<em>  spaced  </em>'), 'spaced');
 });
+
+// ── article node targets (W7.8) ──────────────────────────────────────────────
+
+test('an annotated article node routes to its content_item object, scoped by node id', async () => {
+  const { deriveNodeTarget } = await import('../../src/lib/edit-mode/targets.js');
+  const target = deriveNodeTarget({
+    cmsObjectId: 'req_agent_barrier_myths_20260713_01',
+    cmsNodeId: 'n_a1',
+    cmsNodeKind: 'content',
+  });
+  assert.deepEqual(target, {
+    objectType: 'content_item',
+    objectId: 'req_agent_barrier_myths_20260713_01',
+    nodeId: 'n_a1',
+    sectionType: 'article content',
+    hostObjectId: 'req_agent_barrier_myths_20260713_01',
+    shared: false,
+  });
+  assert.equal(deriveNodeTarget({ cmsObjectId: 'req_x' }), undefined, 'no node id → no target');
+});
+
+test('a node suggestion persists as update_node with fields under public', async () => {
+  const { deriveNodeTarget } = await import('../../src/lib/edit-mode/targets.js');
+  const target = deriveNodeTarget({
+    cmsObjectId: 'req_agent_barrier_myths_20260713_01',
+    cmsNodeId: 'n_a1',
+    cmsNodeKind: 'content',
+  });
+  assert.ok(target);
+  assert.deepEqual(suggestionToOps(target, { title: 'Sharper', body: 'New copy.' }), [
+    { op: 'update_node', node_id: 'n_a1', fields: { public: { title: 'Sharper', body: 'New copy.' } } },
+  ]);
+});

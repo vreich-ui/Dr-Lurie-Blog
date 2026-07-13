@@ -60,6 +60,7 @@ const OBJECT_IDS: Record<GovernedObjectType, string> = {
   site: 'site_drlurie',
   template: 'tpl_home',
   product: 'prod_barrier_repair_guide',
+  content_item: 'req_agent_probe_20260713_01',
 };
 
 const approveDecision = (contentRevision: number, publishAction?: { published_time: string | null }) => ({
@@ -114,10 +115,11 @@ test('a malformed config THROWS instead of silently resolving to the permissive 
     /Invalid approval-policy config/,
     'a typo in an override key must fail the parse, never silently do nothing'
   );
-  assert.throws(
-    () => resolveApprovalPolicy({ master: 'all-autonomous', overrides: { content_item: 'require-approval' } }),
-    /Invalid approval-policy config/,
-    'content_item is structurally not governable by this config'
+  // content_item is governable since W7.3 — a pin on it is a VALID config.
+  assert.equal(
+    resolveApprovalPolicy({ master: 'all-autonomous', overrides: { content_item: 'require-approval' } }).overrides
+      .content_item,
+    'require-approval'
   );
   assert.throws(
     () => resolveApprovalPolicy({ master: 'all-autonomous', overrides: { page: 'gated' } }),
@@ -332,23 +334,24 @@ for (const freeType of governedObjectTypes) {
   });
 }
 
-// content_item: outside the gate under EVERY posture — the article pipeline
-// is its own system (OQ-8), and no config can pull it in.
-for (const policy of [ALL_AUTONOMOUS, ALL_REQUIRE]) {
-  test(`content_item is refused by the generic gate under master ${policy.master}`, () => {
-    for (const principalKey of Object.keys(PRINCIPALS) as PrincipalKey[]) {
-      const result = runCell(
-        'content_item',
-        'req_smoke_pdf_cta_20260630_01',
-        principalKey,
-        'approved_current_pin_match',
-        policy
-      );
-      assert.equal(result.allow, false);
-      assert.equal(result.allow === false && result.code, 'content_item_not_gated', principalKey);
-    }
-  });
-}
+// content_item: governed like every type since W7.3 (OQ-8 resolved). Tier 1
+// is a POLICY posture (autonomous under the committed default), not a
+// structural exemption — all-require-approval gates articles too.
+test('content_item follows the gate matrix under both masters (W7.3; Tier 1 = policy, not exemption)', () => {
+  const autonomous = runCell(
+    'content_item',
+    'req_smoke_pdf_cta_20260630_01',
+    'agent',
+    'approved_current_pin_match',
+    ALL_AUTONOMOUS
+  );
+  assert.equal(autonomous.allow, true);
+  assert.equal(autonomous.requires_approval, false);
+
+  const gated = runCell('content_item', 'req_smoke_pdf_cta_20260630_01', 'agent', 'none', ALL_REQUIRE);
+  assert.equal(gated.allow, false);
+  assert.equal(gated.allow === false && gated.code, 'approval_required');
+});
 
 // ─── config changes change behavior immediately, with no code changes ────────
 

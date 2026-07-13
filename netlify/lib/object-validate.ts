@@ -49,6 +49,18 @@ import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply
 import { navigationBodySchema, type NavigationBody } from '../../src/schema/bodies/navigation-v1.js';
 import { navActionCapacity, type CapacityRule } from '../../src/lib/registry/structural-capacity.js';
 import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
+import {
+  PROSE_GRAMMAR,
+  richTextV1Schema,
+  validateRichTextGrammar,
+  type RichTextGrammar,
+} from '../../src/lib/richtext/rich-text-v1.js';
+import { BLOCKS, INLINES } from '@contentful/rich-text-types';
+import {
+  contentItemBodySchema,
+  type ContentItemBody,
+  type ContentItemNode,
+} from '../../src/schema/bodies/content-item-v1.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
@@ -82,7 +94,12 @@ export type ObjectValidationContext = {
    * that lookup).
    */
   resolveObject?: (objectType: ObjectType, objectId: string) => ObjectResolution | undefined;
-  /** Resolve a taxonomy term_id, following merged_into aliases (D§5.5). */
+  /**
+   * Resolve a taxonomy term_id OR slug, following merged_into aliases
+   * (D§5.5). Slugs cannot collide with term ids (t_* ids carry underscores,
+   * slugs are hyphen-only), so one resolver serves both callers: nav targets
+   * pass term ids; article taxonomy (W7.3) passes the W3 frontmatter slugs.
+   */
   resolveTaxonomyTerm?: (kind: 'category' | 'tag', termId: string) => TaxonomyResolution | undefined;
   /**
    * Whether a taxonomy term has live usage on published content (frontmatter
@@ -108,6 +125,13 @@ export type ObjectValidationContext = {
    * the object under validation. Absent → uniqueness not verified.
    */
   isSlugTaken?: (slug: string) => boolean;
+  /**
+   * Whether an article `slug` is already taken by a DIFFERENT content_item
+   * object OR a committed legacy post (src/data/post filename stem) — both
+   * families share the blog permalink space (W7.3). Excludes the object under
+   * validation. Absent → uniqueness not verified.
+   */
+  isArticleSlugTaken?: (slug: string) => boolean;
   /**
    * Resolve a Stripe Price id to its live amount (the §3 canonicality
    * backstop for direct dashboard edits): the display cache is compared to
@@ -180,8 +204,9 @@ const walkObjects = (value: unknown, visit: (node: Record<string, unknown>) => v
 
 // ─── check 1: per-type zod + RichText allowlist ──────────────────────────────
 
-// A body schema per object type. content_item is validated by the existing
-// article pipeline (A§1.6/A§1.8), not re-implemented here.
+// A body schema per object type — all nine since W7.3 (content_item.v1 is the
+// article as a governed object; the legacy committed posts stay on their own
+// pipeline and never pass through this engine).
 const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { success: boolean; error?: unknown } }>> =
   {
     navigation: navigationBodySchema,
@@ -191,6 +216,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     site: siteBodySchema,
     taxonomy: taxonomyBodySchema,
     product: productBodySchema,
+    content_item: contentItemBodySchema,
   };
 
 // Mirrors node-renderer.ts TIPTAP_ALLOWED (A§1.5): the only tags TipTap emits.
@@ -339,6 +365,22 @@ export const checkReferenceIntegrity = (
       problems.push(`${label} term "${termId}" does not resolve to an active ${kind} term.`);
     }
   };
+
+  // Article taxonomy (W7.3): category/tags are registry SLUGS (the W3
+  // frontmatter convention — the store resolver also matches slugs, following
+  // merged_into aliases). Registry-gated exactly like the publish-article
+  // hook: no resolver → not verified, never a false failure.
+  if (objectType === 'content_item' && isRecord(body) && isRecord(body.taxonomy)) {
+    const taxonomy = body.taxonomy;
+    if (typeof taxonomy.category === 'string' && taxonomy.category) {
+      requireTerm('category', taxonomy.category, 'taxonomy.category');
+    }
+    if (Array.isArray(taxonomy.tags)) {
+      for (const tag of taxonomy.tags) {
+        if (typeof tag === 'string' && tag) requireTerm('tag', tag, 'taxonomy.tags');
+      }
+    }
+  }
 
   walkObjects(body, (node) => {
     // NavTarget (in nav items/groups/actions and page-body LinkActions).
@@ -490,10 +532,37 @@ const stripNotes = (value: unknown): unknown => {
   return value;
 };
 
-export const checkReaderSafety = (body: unknown): ReadinessCriterion[] => {
+/**
+ * The reader projection of a content_item body: exactly what the article
+ * renderer emits (public-visibility nodes' `public` fields + the envelope's
+ * rendered copy). The annotation layer (private/commercial/chat internals,
+ * claims/sources/scores/…) is the POINT of the type — it must never be
+ * scanned as reader content, and equally must never be part of this
+ * projection. Kept in lockstep with src/lib/article-object/render-nodes.ts.
+ */
+const contentItemReaderProjection = (body: unknown): unknown => {
+  const parsed = contentItemBodySchema.safeParse(body);
+  if (!parsed.success) return {}; // schema check owns this failure
+  const article: ContentItemBody = parsed.data;
+  return {
+    title: article.title,
+    deck: article.deck,
+    description: article.description,
+    image: article.image,
+    seo: article.seo,
+    nodes: article.nodes
+      .filter((node) => (node.visibility ?? 'public') === 'public')
+      .map((node) => ({ id: node.id, public: node.public })),
+  };
+};
+
+export const checkReaderSafety = (body: unknown, objectType?: ObjectType): ReadinessCriterion[] => {
   // Generalizes assert-reader-safe (A§1.1): private/internal markers must never
   // appear in RENDERABLE fields. `notes` is excluded — it is the private field.
-  const renderable = stripNotes(body);
+  // content_item scans its READER PROJECTION (the annotation layer is
+  // legitimate body data there, never rendered — the leak rule guards the
+  // rendered surface, not the record).
+  const renderable = objectType === 'content_item' ? contentItemReaderProjection(body) : stripNotes(body);
   try {
     assertReaderSafe(renderable);
     return [crit('reader_safety', 'Reader-safe content', 'complete', '')];
@@ -1180,6 +1249,74 @@ export const checkProduct = (
   return criteria;
 };
 
+/**
+ * content_item structural invariants (W7.3): node-id uniqueness, slug
+ * uniqueness across article objects AND committed legacy posts (one permalink
+ * space), and the article-side ≥1-public-content-node rule (A§1.1, carried
+ * over) — publish-gated like a page's visible-section minimum.
+ */
+const checkContentItemStructure = (
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish: boolean
+): ReadinessCriterion[] => {
+  const parsed = contentItemBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return [crit('structure', 'Structural invariants', 'optional', 'Body does not parse; see the schema group.')];
+  }
+  const article = parsed.data;
+  const criteria: ReadinessCriterion[] = [];
+
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const node of article.nodes) {
+    if (seen.has(node.id)) duplicates.add(node.id);
+    seen.add(node.id);
+  }
+  criteria.push(
+    duplicates.size === 0
+      ? crit('article_node_ids', 'Node id uniqueness', 'complete', '')
+      : crit('article_node_ids', 'Node id uniqueness', 'missing', `Duplicate node ids: ${[...duplicates].join(', ')}.`)
+  );
+
+  if (context.isArticleSlugTaken) {
+    criteria.push(
+      context.isArticleSlugTaken(article.slug)
+        ? crit(
+            'article_slug',
+            'Article slug uniqueness',
+            'missing',
+            `slug "${article.slug}" is already used by another article or a committed post.`
+          )
+        : crit('article_slug', 'Article slug uniqueness', 'complete', '')
+    );
+  } else {
+    criteria.push(
+      crit('article_slug', 'Article slug uniqueness', 'optional', 'No slug resolver — uniqueness not verified here.')
+    );
+  }
+
+  const publicContentNodes = article.nodes.filter(
+    (node: ContentItemNode) => node.kind === 'content' && (node.visibility ?? 'public') === 'public'
+  ).length;
+  if (publicContentNodes >= 1) {
+    criteria.push(crit('article_visible_nodes', 'At least one public content node', 'complete', ''));
+  } else {
+    criteria.push(
+      crit(
+        'article_visible_nodes',
+        'At least one public content node',
+        atPublish ? 'missing' : 'warning',
+        atPublish
+          ? 'A published article must keep at least one public content node.'
+          : 'No public content nodes yet — required before this article can publish.'
+      )
+    );
+  }
+
+  return criteria;
+};
+
 export const checkStructuralInvariants = (
   objectType: ObjectType,
   objectId: string,
@@ -1188,13 +1325,14 @@ export const checkStructuralInvariants = (
   atPublish: boolean
 ): ReadinessCriterion[] => {
   // Structural invariants are type-specific. Pages carry the ≥1-visible-section
-  // + PageType rules below; taxonomy, template, and navigation carry their own
-  // rules (dispatched here so the pipeline keeps its single 'structure' group).
-  // content_item keeps its own ≥1-public-node rule on the article side (A§1.1).
+  // + PageType rules below; taxonomy, template, navigation, product and
+  // content_item carry their own rules (dispatched here so the pipeline keeps
+  // its single 'structure' group).
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
   if (objectType === 'template') return checkTemplate(body, context);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
   if (objectType === 'product') return checkProduct(body, context, atPublish);
+  if (objectType === 'content_item') return checkContentItemStructure(body, context, atPublish);
 
   // content_grid card/limit sanity applies to any body that can carry a grid —
   // a page's inline sections OR a shared `section` wrapper. Emits nothing when
@@ -1379,7 +1517,58 @@ const splitterProblem = (error: unknown): string => {
   return message.split(' Received:')[0];
 };
 
+// What the W7.3 article renderer can actually turn into HTML today: the full
+// prose vocabulary plus quotes. Embeds (embedded-entry/asset blocks) are in
+// the rich_text.v1 universe but have NO resolver on the article render path
+// yet — a document carrying one would throw at build (the renderer's
+// never-silently-drop contract), so it is blocked at write instead (trap 5's
+// rule: what would kill the build is a blocker, not a surprise).
+const ARTICLE_RENDERABLE_GRAMMAR: RichTextGrammar = {
+  enabledNodeTypes: [...PROSE_GRAMMAR.enabledNodeTypes, BLOCKS.QUOTE],
+  enabledMarks: PROSE_GRAMMAR.enabledMarks,
+};
+
+const SAFE_RICH_TEXT_HREF_RE = /^https?:\/\//i;
+
+/** Grammar + link-safety problems for one rich_text.v1 node body. */
+const richTextDocumentProblems = (at: string, doc: unknown): string[] => {
+  const parsed = richTextV1Schema.safeParse(doc);
+  if (!parsed.success) return []; // the schema group owns shape failures
+  const problems = validateRichTextGrammar(parsed.data, ARTICLE_RENDERABLE_GRAMMAR).map(
+    (violation) => `${at}: ${violation} (embeds arrive with their resolvers; use prose blocks and quotes).`
+  );
+  const walkLinks = (node: { nodeType?: string; data?: Record<string, unknown>; content?: unknown[] }): void => {
+    if (node.nodeType === INLINES.HYPERLINK) {
+      const uri = isRecord(node.data) && typeof node.data.uri === 'string' ? node.data.uri : '';
+      if (!SAFE_RICH_TEXT_HREF_RE.test(uri)) problems.push(`${at}: hyperlink uri "${uri}" must be http(s).`);
+    }
+    for (const child of node.content ?? []) {
+      if (isRecord(child)) walkLinks(child as { nodeType?: string });
+    }
+  };
+  walkLinks(parsed.data as { nodeType?: string });
+  return problems;
+};
+
+const checkContentItemRenderability = (body: unknown): ReadinessCriterion[] => {
+  const parsed = contentItemBodySchema.safeParse(body);
+  if (!parsed.success) return [crit('render_splitters', 'Component renderability', 'complete', '')];
+  const problems: string[] = [];
+  for (const node of parsed.data.nodes) {
+    const nodeBody = node.public.body;
+    if (nodeBody !== undefined && typeof nodeBody !== 'string') {
+      problems.push(...richTextDocumentProblems(`node '${node.id}' body`, nodeBody));
+    }
+  }
+  return [
+    problems.length === 0
+      ? crit('render_splitters', 'Component renderability', 'complete', '')
+      : crit('render_splitters', 'Component renderability', 'missing', problems.slice(0, 3).join(' ')),
+  ];
+};
+
 export const checkRenderability = (objectType: ObjectType, body: unknown): ReadinessCriterion[] => {
+  if (objectType === 'content_item') return checkContentItemRenderability(body);
   const sections: SectionInstance[] = isRecord(body)
     ? objectType === 'page'
       ? collectSections(body)
@@ -1530,7 +1719,7 @@ export const validateObject = (
       label: 'Reference integrity',
       criteria: checkReferenceIntegrity(input.objectType, input.body, context),
     },
-    { id: 'reader_safety', label: 'Reader safety', criteria: checkReaderSafety(input.body) },
+    { id: 'reader_safety', label: 'Reader safety', criteria: checkReaderSafety(input.body, input.objectType) },
     {
       id: 'renderability',
       label: 'Component renderability',

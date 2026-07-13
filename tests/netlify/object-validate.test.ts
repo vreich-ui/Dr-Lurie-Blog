@@ -79,9 +79,19 @@ test('check1 schema REJECTION: disallowed RichText tags and non-http links are r
   assert.equal(statusOf(checkSchema('page', badLink), 'schema_richtext'), 'missing');
 });
 
-test('check1 schema: content_item body is delegated (optional), not hard-failed', () => {
-  const criteria = checkSchema('content_item', { anything: true });
-  assert.equal(statusOf(criteria, 'schema_zod'), 'optional');
+test('check1 schema: content_item bodies validate against content_item.v1 (W7.3)', () => {
+  assert.equal(statusOf(checkSchema('content_item', { anything: true }), 'schema_zod'), 'missing');
+  assert.equal(
+    statusOf(
+      checkSchema('content_item', {
+        slug: 'probe-article',
+        title: 'Probe',
+        nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' } }],
+      }),
+      'schema_zod'
+    ),
+    'complete'
+  );
 });
 
 // ═══ check 2: ID discipline ══════════════════════════════════════════════════

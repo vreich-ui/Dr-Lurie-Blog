@@ -164,16 +164,10 @@ export const publishObject = async (
 ): Promise<ObjectPublishResult> => {
   const ts = deps.nowMs ?? Date.now();
 
-  // content_item keeps its own publish pipeline (A§1.6 mechanism 2); it is
-  // deliberately unreachable here until the OQ-8 adapter decision. This is
-  // the "no completed export dependency" guard: there is no T1.1
-  // materializer for articles, so failing loudly beats a broken publish.
-  if (input.object_type === 'content_item') {
-    return err(400, 'unsupported_object_type', {
-      error:
-        'content_item publishes through the existing article pipeline; the generic operation has no materializer for it (OQ-8).',
-    });
-  }
+  // content_item publishes through this generic path since W7.3 (OQ-8
+  // resolved as migration): article objects materialize to JSON exports like
+  // every other type. The legacy article pipeline continues to serve the
+  // committed .md posts and is untouched by this operation.
   const objectType = input.object_type as MaterializableObjectType;
 
   // ── scheduling gate: immediate-or-reject (OQ-2 deferred) ──────────────────

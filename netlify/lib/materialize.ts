@@ -9,11 +9,13 @@
  * byte-identical output). No git commit logic here (T1.2); this module only
  * produces the content to be committed.
  *
- * `content_item` is deliberately excluded: articles keep their existing
- * materializer (src/lib/article-content/to-markdown.ts → src/data/post/{slug}.md),
- * read for pattern here but not imported from or modified (non-goal).
+ * `content_item` joined at W7.3 (08-articles-plan §2.3): article OBJECTS
+ * materialize to JSON exports under src/data/site/articles/. The legacy
+ * committed posts (src/data/post/*.md) and their to-markdown materializer are
+ * untouched — the two families coexist; only object-backed articles flow here.
  */
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import { materializeContentItem } from './materializers/content-item.js';
 import { materializeNavigation } from './materializers/navigation.js';
 import { materializePage } from './materializers/page.js';
 import { materializeProduct } from './materializers/product.js';
@@ -24,7 +26,7 @@ import { materializeTemplate } from './materializers/template.js';
 import type { MaterializeMeta, MaterializedFile } from './materializers/shared.js';
 
 export type { MaterializeMeta, MaterializedFile, GeneratedMarker } from './materializers/shared.js';
-export type MaterializableObjectType = Exclude<ObjectType, 'content_item'>;
+export type MaterializableObjectType = ObjectType;
 
 export function materialize(
   objectType: MaterializableObjectType,
@@ -47,6 +49,8 @@ export function materialize(
       return materializeSection(objectId, body, meta);
     case 'product':
       return materializeProduct(objectId, body, meta);
+    case 'content_item':
+      return materializeContentItem(objectId, body, meta);
     default: {
       const exhaustive: never = objectType;
       throw new Error(`No materializer registered for object type: ${String(exhaustive)}`);
