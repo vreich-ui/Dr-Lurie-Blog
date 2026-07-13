@@ -153,6 +153,34 @@ const productBody = () => ({
   fulfillment: { kind: 'download', artifact_ref: 'pdf/guides/abc.pdf', filename: 'barrier-repair-guide.pdf' },
 });
 
+const articleBody = () => ({
+  slug: 'barrier-myths',
+  title: 'Five barrier myths',
+  deck: 'What the research actually says.',
+  taxonomy: { category: 'skin-science', tags: ['barrier-repair'] },
+  nodes: [
+    {
+      id: 'n_a1',
+      kind: 'content',
+      public: { title: 'The myth', body: 'Everyone repeats it.' },
+      private: { strategy: 'hook', intent: 'persuade' },
+    },
+    {
+      id: 'n_a2',
+      kind: 'content',
+      public: { body: 'Here is why it spread.' },
+      private: { strategy: 'agitation' },
+    },
+    {
+      id: 'n_a3',
+      kind: 'content',
+      public: { body: 'And here is the fix.' },
+      private: { strategy: 'resolution' },
+      visibility: 'public',
+    },
+  ],
+});
+
 // ——— property-style round-trips: apply(op) then apply(inverse(op)) restores
 //     the prior body exactly, for every op in every family (T0.6 acceptance) ———
 
@@ -487,6 +515,67 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
     op: { op: 'move_slot', slot_id: 'aside', to_index: 0 },
   },
   { name: 'remove_slot', objectType: 'template', body: templateBody, op: { op: 'remove_slot', slot_id: 'main' } },
+
+  // content_item / article node family (W7.3)
+  {
+    name: 'set_article_meta merges, unsets, and adds fields',
+    objectType: 'content_item',
+    body: articleBody,
+    op: { op: 'set_article_meta', fields: { title: 'Six barrier myths', deck: null, seo: { meta_title: 'Myths' } } },
+  },
+  {
+    name: 'upsert_node inserts at a position',
+    objectType: 'content_item',
+    body: articleBody,
+    op: {
+      op: 'upsert_node',
+      node: { id: 'n_b1', kind: 'content', public: { body: 'A new middle.' }, private: { strategy: 'proof' } },
+      position: 1,
+    },
+  },
+  {
+    name: 'upsert_node replaces an existing node',
+    objectType: 'content_item',
+    body: articleBody,
+    op: {
+      op: 'upsert_node',
+      node: { id: 'n_a2', kind: 'content', public: { body: 'Rewritten.' }, private: { strategy: 'context' } },
+    },
+  },
+  {
+    name: 'update_node merges annotation and copy fields, unsets with null',
+    objectType: 'content_item',
+    body: articleBody,
+    op: {
+      op: 'update_node',
+      node_id: 'n_a1',
+      fields: { public: { body: 'A sharper opening.', title: null }, private: { intent: 'convert' } },
+    },
+  },
+  {
+    name: 'move_node',
+    objectType: 'content_item',
+    body: articleBody,
+    op: { op: 'move_node', node_id: 'n_a3', to_index: 0 },
+  },
+  {
+    name: 'set_node_visibility on a bare node (inverse restores unset)',
+    objectType: 'content_item',
+    body: articleBody,
+    op: { op: 'set_node_visibility', node_id: 'n_a2', visibility: 'internal' },
+  },
+  {
+    name: 'set_node_visibility overwriting an explicit value',
+    objectType: 'content_item',
+    body: articleBody,
+    op: { op: 'set_node_visibility', node_id: 'n_a3', visibility: 'hidden' },
+  },
+  {
+    name: 'remove_node (inverse restores position)',
+    objectType: 'content_item',
+    body: articleBody,
+    op: { op: 'remove_node', node_id: 'n_a2' },
+  },
 ];
 
 describe('apply(op) then apply(inverse(op)) restores the prior body exactly', () => {
@@ -1132,5 +1221,43 @@ describe('removal inverses pin the container order (C§2.4 applied to restores)'
       () => apply(grown.record, [inverse]),
       (error: unknown) => error instanceof PatchApplyError && error.code === 'blind_revert_refused'
     );
+  });
+});
+
+describe('article node family mechanics (W7.3)', () => {
+  it('set_article_meta refuses a nodes payload at the grammar (use the node ops)', () => {
+    assert.throws(() => patchOpSchema.parse({ op: 'set_article_meta', fields: { nodes: [] } }));
+  });
+
+  it('update_node refuses id (node ids are stable)', () => {
+    assert.throws(() => patchOpSchema.parse({ op: 'update_node', node_id: 'n_a1', fields: { id: 'n_zz' } }));
+  });
+
+  it('node ops are not applicable to other object types', () => {
+    const record = makeRecord('page', pageBody());
+    assert.throws(
+      () => apply(record, [{ op: 'update_node', node_id: 'n_a1', fields: { public: { body: 'x' } } }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'op_not_applicable'
+    );
+  });
+
+  it('update_node on a missing node is target_not_found', () => {
+    const record = makeRecord('content_item', articleBody());
+    assert.throws(
+      () => apply(record, [{ op: 'update_node', node_id: 'n_zz', fields: { public: { body: 'x' } } }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'target_not_found'
+    );
+  });
+
+  it('"mark this block a hook" is one op and inverts exactly', () => {
+    const record = makeRecord('content_item', articleBody());
+    const forward = apply(record, [
+      { op: 'update_node', node_id: 'n_a2', fields: { private: { strategy: 'hook', intent: 'convert' } } },
+    ]);
+    const node = (forward.record.body as { nodes: Array<{ id: string; private?: Record<string, unknown> }> }).nodes[1];
+    assert.deepStrictEqual(node.private, { strategy: 'hook', intent: 'convert' });
+    const inverse = derivePatchInverse(forward.applied[0].op, forward.applied[0].capture);
+    const reverted = apply(forward.record, [inverse]);
+    assert.deepStrictEqual(reverted.record.body, articleBody());
   });
 });

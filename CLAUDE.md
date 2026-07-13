@@ -68,6 +68,23 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   (`docs/cms-architecture/06-shop-module-plan.md` — Stripe-only v1 plan;
   /pricing renders from product objects, /services awaits a copy-or-delete
   call; the shop build runs in its own session).
+  **W7.3 + W7.8 BUILT (2026-07-13, local rehearsal green — awaiting the
+  credentialed run)**: `content_item` is the NINTH governed type — the
+  annotated-node article model (every block carries `private.strategy`
+  hook/agitation/…/resolution + `intent`, the original architecture's
+  semantic layer, imported verbatim; envelope claims/sources/compliance/
+  scores/lineage; `public.body` = plain text or `rich_text.v1`), six node
+  ops with exact inverses, `create_variant` (+ MCP tool, `dry_run`),
+  validation (one slug space with committed posts; the reader-projection
+  leak scan; renderable rich-text grammar), materializer →
+  `src/data/site/articles/`, and the render path: published article objects
+  join `fetchPosts()` as first-class posts with per-node canvas chips
+  (pencil + node-scoped Ask-AI) on the standard EditSession →
+  `update_node` → publish/release path. **Wolf's 2026-07-13 ruling: the 83
+  committed .md posts are NOT migrated** (legacy pipeline untouched;
+  W7.4/W7.6 waived — `docs/cms-architecture/08-articles-plan.md` §0.5).
+  Seeds: `scripts/lib/articles-seed-data.mjs`. Unpublish remains
+  unsupported (OQ-2) — a released article stays live until edited.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

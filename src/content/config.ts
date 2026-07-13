@@ -145,6 +145,18 @@ const productObjectCollection = defineCollection({
   schema: derivedExportSchema,
 });
 
+const articleObjectCollection = defineCollection({
+  // Article bodies carry a top-level `slug` (the blog permalink) — the same
+  // glob-loader preference that bit products would silently make entry.id the
+  // slug; the pin keeps entry.id = filename = the req_* object id (W7.3).
+  loader: glob({
+    pattern: '*.json',
+    base: 'src/data/site/articles',
+    generateId: ({ entry }) => entry.replace(/\.json$/, ''),
+  }),
+  schema: derivedExportSchema,
+});
+
 // Exported so Phase 3+ consumers (and tests) share one derived-export shape.
 export type DerivedExport = z.infer<typeof derivedExportSchema>;
 
@@ -157,4 +169,5 @@ export const collections = {
   sectionObject: sectionObjectCollection,
   templateObject: templateObjectCollection,
   productObject: productObjectCollection,
+  articleObject: articleObjectCollection,
 };

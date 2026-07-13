@@ -52,6 +52,7 @@ import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
 import { navActionCapacity } from './structural-capacity.js';
+import { contentItemBodySchema } from '../../schema/bodies/content-item-v1.js';
 import { pageBodySchema } from '../../schema/bodies/page-v1.js';
 import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
@@ -71,7 +72,7 @@ type JsonSchema = Record<string, unknown>;
 // structural shape is what an agent needs from the schema.
 const toJson = (schema: z.ZodType): JsonSchema => z.toJSONSchema(schema, { unrepresentable: 'any' }) as JsonSchema;
 
-// ─── body schema per governed object type (content_item is out of scope) ─────
+// ─── body schema per governed object type (all nine since W7.3) ──────────────
 
 const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   page: pageBodySchema,
@@ -81,6 +82,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   taxonomy: taxonomyBodySchema,
   template: templateBodySchema,
   product: productBodySchema,
+  content_item: contentItemBodySchema,
 };
 
 // ─── section-type editor hints (only the component-bound types carry them) ───
@@ -160,6 +162,7 @@ const MINTED_ID_FIELD: Partial<Record<PatchOpName, string>> = {
   upsert_item: 'item.id',
   upsert_group: 'group.id',
   upsert_slot: 'slot.slotId',
+  upsert_node: 'node.id',
 };
 
 // Ops (or op fields) that exist only for inverse/Discard derivation — agents
@@ -214,7 +217,7 @@ const COMMON_CONSTRAINTS: Constraint[] = [
     severity: 'blocks_write',
     enforced_live: true,
     description:
-      'The object id must match its type’s id pattern (page_ / sec_ / nav_ / tax_ / site_ / tpl_ + lowercase). Omit requested_id on create to have it minted.',
+      'The object id must match its type’s id pattern (page_ / sec_ / nav_ / tax_ / site_ / tpl_ / prod_ + lowercase; content_item keeps the article req_<flow>_<topic>_<yyyymmdd>_<nn> shape). Omit requested_id on create to have it minted.',
   },
   {
     id: 'reader_safety',
@@ -392,6 +395,59 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'dashboard edits). Not enforced live yet — the resolver arrives with the Stripe server surface.',
         },
       ];
+    case 'content_item':
+      return [
+        {
+          id: 'article_slug',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'slug must be lowercase-hyphen and unique across article objects AND the committed legacy posts ' +
+            '(src/data/post) — it becomes the article URL through the blog permalink pattern.',
+        },
+        {
+          id: 'article_node_ids',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'Node ids are opaque n_* ids, unique within the article, and must never contain strategy or ' +
+            'commercial vocabulary (hook, agitation, cta, …) — reader-visible ids must not leak intent. Omit ' +
+            'node.id on upsert_node to have one minted.',
+        },
+        {
+          id: 'article_visible_nodes',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            'At least one public (non-internal, non-hidden) content node is required to publish (warns while drafting).',
+        },
+        {
+          id: 'article_rich_text',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'A rich_text.v1 node body must satisfy the ARTICLE_BODY grammar (p, h2, h3, lists, quotes, embeds; ' +
+            'bold/italic marks; https hyperlinks). String node bodies are PLAIN TEXT — escaped at render, blank ' +
+            'lines split paragraphs; use a rich_text document for formatting.',
+        },
+        {
+          id: 'article_taxonomy',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'taxonomy.category and taxonomy.tags resolve against the tax_drlurie registry when it exists ' +
+            '(merged_into aliases followed); unknown terms are blockers.',
+        },
+        {
+          id: 'article_annotation_privacy',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'node.private (strategy/intent/agentNotes), node.commercial internals, and every envelope-level ' +
+            'judge/score field (emotional_strategy, claims, scores, editorial, …) are NEVER serialized into ' +
+            'reader HTML — the renderer emits public fields only. Annotate freely; readers cannot see it.',
+        },
+      ];
     case 'template':
       return [
         {
@@ -431,7 +487,7 @@ const capacityDescription = (): string => {
 // Mirrors netlify/lib/publish-gate.ts PublishGateDenialCode (that union lives in
 // netlify/lib and can't be imported here; this is a documentation catalog).
 const PUBLISH_DENIAL_CODES: Record<string, string> = {
-  content_item_not_gated: 'content_item publishes via the article pipeline, not this gate.',
+  content_item_not_gated: 'Defensive only since W7.3 (every type is governed): the type is outside the gate.',
   approval_required: 'The type requires approval and none is current/approved.',
   changes_requested: 'A reviewer requested changes; resubmit before publishing.',
   approval_stale: 'The approval was pinned to an older content_revision; re-approve.',
@@ -450,13 +506,6 @@ export type PublishPolicyContract = {
 };
 
 const publishPolicy = (objectType: ObjectType, policy: ApprovalPolicy): PublishPolicyContract => {
-  if (objectType === 'content_item') {
-    return {
-      gated: false,
-      requires_approval: false,
-      note: 'Articles use the save_json_blob_* tools and their own publish flow.',
-    };
-  }
   if (!isGovernedObjectType(objectType)) {
     return { gated: false, requires_approval: false, note: 'Not governed by the approval gate.' };
   }
@@ -496,7 +545,12 @@ const PATCH_ERROR_CODES: Record<PatchApplyErrorCode, { http: number; meaning: st
 const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
   sequence: [
     'object_contract (this call) → read the schema, ops, constraints',
-    ...(objectType === 'content_item' ? [] : ['object_create (omit requested_id to mint one) — for a new object']),
+    'object_create (omit requested_id to mint one) — for a new object',
+    ...(objectType === 'content_item'
+      ? [
+          'object_create_variant (source_object_id [+ requested_id]) — alternative create: clone an article as a draft variant (lineage.parent_content_id set, node ids re-minted, annotations carried) for judge/score/A-B work',
+        ]
+      : []),
     // W2.5, design-principles rule 5: templates are recipes — instantiation
     // copies slot blueprints into a NEW page via the standard create path.
     ...(objectType === 'page'
@@ -534,8 +588,20 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       how: 'From object_checkout; also gives record_version for expected_record_version.',
     },
   ];
-  if (objectType !== 'content_item') {
-    inputs.push({ input: 'site', when: 'object_create', how: 'The owning site object id, e.g. site_drlurie.' });
+  inputs.push({ input: 'site', when: 'object_create', how: 'The owning site object id, e.g. site_drlurie.' });
+  if (objectType === 'content_item') {
+    inputs.push(
+      {
+        input: 'taxonomy terms',
+        when: 'taxonomy.category / taxonomy.tags',
+        how: 'Slugs from the tax_drlurie registry (registry_get / object_contract("taxonomy")); merged_into aliases resolve, unknown terms block.',
+      },
+      {
+        input: 'strategy annotations',
+        when: 'every node (strongly recommended)',
+        how: 'Set node.private.strategy (hook/agitation/context/explanation/proof/example/comparison/myth/step/recommendation/resolution/summary) and node.private.intent (educate/persuade/reassure/convert/navigate) so agents can judge, score, and build variants. Never rendered to readers.',
+      }
+    );
   }
   const schema = BODY_SCHEMA[objectType];
   if (schema && JSON.stringify(toJson(schema)).includes('AssetRef')) {
@@ -598,21 +664,16 @@ export const buildObjectContract = (
   return {
     object_type: objectType,
     governed: isGovernedObjectType(objectType),
-    creatable: objectType !== 'content_item',
+    creatable: true,
     summary:
       objectType === 'content_item'
-        ? 'Articles are outside the generic object verbs — use the save_json_blob_* tools.'
+        ? 'Articles as governed objects (W7.3): an annotated node list (private.strategy/intent per block — the behavioral framework) with rich_text.v1 or plain-text bodies, plus the envelope-level judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). Committed legacy posts stay on their own pipeline.'
         : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
-    body_schema: schema
-      ? toJson(schema)
-      : { note: 'content_item has no generic body schema; use the save_json_blob_* article tools.' },
+    body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),
     ...(objectType === 'page' ? { page_types: listPageTypeDefinitions() } : {}),
     patch_ops: patchOpContracts(objectType),
-    constraints: [...COMMON_CONSTRAINTS, ...perTypeConstraints(objectType)].filter(
-      // content_item has no governed body; only the workflow/publish notes apply.
-      () => objectType !== 'content_item'
-    ),
+    constraints: [...COMMON_CONSTRAINTS, ...perTypeConstraints(objectType)],
     publish_policy: publishPolicy(objectType, policy),
     workflow: workflow(objectType, policy),
     auxiliary_inputs: auxiliaryInputs(objectType),

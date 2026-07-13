@@ -59,11 +59,18 @@ const snakeSegments = (seed: string): string =>
 /**
  * The mint targets. Object types mint envelope-level ids (`page_…`, `sec_…`,
  * `tax_…`, …); the others mint the body-internal ids the patch grammar carries.
- * `content_item` is intentionally unmintable here — it keeps `validateRequestId`
- * and is not reachable through the generic verbs (D§1).
+ * `content_item` keeps the article pipeline's `req_*` request-id shape
+ * verbatim (08-articles-plan §1.6 — artifact blobKeys embed the owning id),
+ * so its mint is a dedicated target carrying the date segment the shape
+ * requires; determinism is per (seed, date) — same-day retries are idempotent.
+ * `article_node` mints the opaque `n_*` node ids (W7.3): a hex hash can never
+ * contain the forbidden strategy words (hook/agitation/cta/… all need letters
+ * outside a–f), so minted node ids satisfy the leak rule by construction.
  */
 export type MintTarget =
   | { kind: 'object'; objectType: Exclude<ObjectType, 'content_item'> }
+  | { kind: 'content_item'; yyyymmdd: string }
+  | { kind: 'article_node' }
   | { kind: 'section_instance' }
   | { kind: 'taxonomy_term' }
   | { kind: 'nav_item' }
@@ -104,6 +111,23 @@ export const mintId = (target: MintTarget, seed: string): string => {
       if (!check.ok) throw new MintIdError(`Minted ${target.objectType} id "${id}" is invalid: ${check.error}`);
       return id;
     }
+    case 'content_item': {
+      // req_<flow>_<topic>_<yyyymmdd>_<nn> (validateRequestId, D§3.1). Flow is
+      // pinned to 'agent' — the generic-verb creation path; the topic segments
+      // come from the seed (slug/title). Deterministic in (seed, date); a
+      // same-day duplicate collides on the store's existence check and the
+      // caller retries with an explicit requested_id.
+      if (!/^\d{8}$/.test(target.yyyymmdd)) {
+        throw new MintIdError(`content_item mint needs a yyyymmdd date (got "${target.yyyymmdd}").`);
+      }
+      const topic = snakeSegments(trimmed) || shortHash(trimmed);
+      const id = `req_agent_${topic}_${target.yyyymmdd}_01`;
+      const check = validateObjectIdForType('content_item', id);
+      if (!check.ok) throw new MintIdError(`Minted content_item id "${id}" is invalid: ${check.error}`);
+      return id;
+    }
+    case 'article_node':
+      return `n_${shortHash(trimmed)}`;
     case 'taxonomy_term': {
       const suffix = alnum(trimmed) || shortHash(trimmed);
       const id = `t_${suffix}`;

@@ -76,12 +76,25 @@ test('materialize routes each object type to its per-type materializer and path 
   }
 });
 
-test('materialize rejects an unregistered object type at runtime', () => {
-  assert.throws(() => {
-    // @ts-expect-error - content_item is excluded from MaterializableObjectType; check the runtime guard
-    materialize('content_item', 'req_x', {}, meta);
-  }, /No materializer registered/);
+test('materialize routes content_item to the article export path (W7.3)', () => {
+  const result = materialize(
+    'content_item',
+    'req_agent_probe_20260713_01',
+    {
+      slug: 'probe-article',
+      title: 'Probe',
+      nodes: [
+        { id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' }, private: { strategy: 'summary' } },
+      ],
+    },
+    meta
+  );
+  assert.equal(result.path, 'src/data/site/articles/req_agent_probe_20260713_01.json');
+  // The annotation layer is exported verbatim (the leak rule lives at the renderer).
+  assert.match(result.content, /"strategy": "summary"/);
+});
 
+test('materialize rejects an unregistered object type at runtime', () => {
   assert.throws(() => {
     // @ts-expect-error - deliberately passing an unknown type to check the runtime guard
     materialize('widget', 'widget_x', {}, meta);

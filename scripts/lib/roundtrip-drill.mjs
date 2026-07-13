@@ -260,7 +260,41 @@ export const productDrillOps = (body) => {
   return { expected, ops };
 };
 
-/** Dispatch: build the drill for one seed (page, section, template, taxonomy, site, or product). */
+/**
+ * Drill a `content_item` object (W7.3): exercise all six article ops via a
+ * probe NODE cloned from the article's own first node (already schema-legal),
+ * mirroring pageDrillOps exactly — added, poked (copy AND annotation, the
+ * strategy re-labeling that IS the semantic layer's own op path), hidden,
+ * moved, and removed, so the final body is byte-identical to the seed.
+ * (create_variant is a VERB, not a patch op — the driver proves it with an
+ * object_create_variant dry_run after the drill, the instantiate pattern.)
+ */
+export const articleDrillOps = (body, probeNodeId) => {
+  const nodes = Array.isArray(body.nodes) ? body.nodes : [];
+  const source = nodes.find((node) => isRecord(node) && isRecord(node.public));
+  if (!source) {
+    throw new Error('articleDrillOps: article has no node to clone as a probe.');
+  }
+  const probe = { ...clone(source), id: probeNodeId };
+  const count = nodes.length;
+  const title = body.title;
+  return {
+    expected: ['set_article_meta', 'upsert_node', 'update_node', 'move_node', 'set_node_visibility', 'remove_node'],
+    ops: [
+      { op: 'set_article_meta', fields: { title: `${title} [probe]` } },
+      { op: 'set_article_meta', fields: { title } },
+      { op: 'upsert_node', node: probe, position: count },
+      { op: 'update_node', node_id: probeNodeId, fields: { public: { title: 'RT probe [poked]' } } },
+      { op: 'update_node', node_id: probeNodeId, fields: { private: { strategy: 'summary' } } },
+      { op: 'set_node_visibility', node_id: probeNodeId, visibility: 'internal' },
+      { op: 'move_node', node_id: probeNodeId, to_index: 0 },
+      { op: 'move_node', node_id: probeNodeId, to_index: count },
+      { op: 'remove_node', node_id: probeNodeId },
+    ],
+  };
+};
+
+/** Dispatch: build the drill for one seed (page, section, template, taxonomy, site, product, or content_item). */
 export const drillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
@@ -287,6 +321,12 @@ export const drillOpsForSeed = (seed) => {
   }
   if (seed.objectType === 'product') {
     return productDrillOps(seed.body);
+  }
+  if (seed.objectType === 'content_item') {
+    const existingNodeIds = (Array.isArray(seed.body.nodes) ? seed.body.nodes : [])
+      .map((node) => node?.id)
+      .filter((id) => typeof id === 'string');
+    return articleDrillOps(seed.body, deriveProbeId(existingNodeIds, 'n_rtprobe'));
   }
   return sectionDrillOps(seed.body.section);
 };

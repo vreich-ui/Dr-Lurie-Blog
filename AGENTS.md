@@ -49,7 +49,16 @@ Byte-identical cutover; all six store-backed, round-tripped, published, released
 (store === seed === export). Hidden sections are filtered at the resolver on
 every render path (never-render-private). W5 was RE-GROUNDED in the shop module
 (`docs/cms-architecture/06-shop-module-plan.md`; the shop build runs in its own
-session; /services awaits a copy-or-delete call).
+session; /services awaits a copy-or-delete call). **W7.3 + W7.8 BUILT
+(2026-07-13, awaiting the credentialed run)**: `content_item` is the ninth
+governed type — annotated-node articles (per-block `private.strategy`
+hook/agitation/…/resolution + `intent`; envelope claims/scores/lineage;
+plain-text or rich_text.v1 bodies), six node ops with exact inverses,
+`create_variant`, one slug space with the committed posts, the
+reader-projection leak rule, and per-node canvas chips on the standard
+EditSession → `update_node` → publish path. The 83 committed .md posts are
+NOT migrated (Wolf 2026-07-13; legacy pipeline untouched — 08-articles-plan
+§0.5). Seeds: `scripts/lib/articles-seed-data.mjs`.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

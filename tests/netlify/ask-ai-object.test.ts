@@ -211,17 +211,134 @@ test('selection UX: a highlighted span is forwarded; whole-object fallback omits
   assert.doesNotMatch(wholeObject.calls[0].userMessage, /highlighted this specific span/);
 });
 
-test('content_item is refused (Tier 1 keeps the article Ask-AI)', async () => {
+// ── article node scope (W7.8): the canvas asks one node at a time ────────────
+
+const articleRecord = (): ObjectRecord => ({
+  object_id: 'req_agent_barrier_myths_20260713_01',
+  object_type: 'content_item',
+  schema_version: 'content_item.v1',
+  site: 'site_drlurie',
+  created_at: '2026-07-13T00:00:00.000Z',
+  updated_at: '2026-07-13T00:00:00.000Z',
+  status: 'active',
+  body: {
+    slug: 'barrier-myths',
+    title: 'Five barrier myths',
+    nodes: [
+      {
+        id: 'n_a1',
+        kind: 'content',
+        public: { title: 'The myth', body: 'Everyone repeats it.', ctaText: 'Read on', ctaLink: '/start-here' },
+        private: { strategy: 'hook', intent: 'persuade' },
+      },
+      {
+        id: 'n_a2',
+        kind: 'content',
+        public: {
+          body: {
+            nodeType: 'document',
+            data: {},
+            content: [
+              {
+                nodeType: 'paragraph',
+                data: {},
+                content: [{ nodeType: 'text', value: 'Rich body.', marks: [], data: {} }],
+              },
+            ],
+          },
+        },
+      },
+    ],
+  },
+  publication: { published_time: null },
+  history: [{ at: '2026-07-13T00:00:00.000Z', action: 'object_create', actor: AGENT }],
+  version: 2,
+  content_revision: 1,
+});
+
+test('node-scoped ask: tool is the node PUBLIC copy grammar; role flows into the prompt, never the suggestion', async () => {
   const store = createStore();
-  const openai = openAiMock({});
+  store.seed(articleRecord());
+  const openai = openAiMock({
+    title: 'The myth everyone repeats',
+    body: 'A sharper opening.',
+    ctaLink: 'https://evil.example/phish', // protected — must be stripped
+    media: { type: 'image', src: 'https://made-up.example/x.png' }, // non-copy — must be stripped
+  });
+
   const result = await askAiForObject(
     store as unknown as AskAiObjectStore,
-    { object_type: 'content_item', object_id: 'req_smoke_pdf_cta_20260630_01', instruction: 'x' },
+    {
+      object_type: 'content_item',
+      object_id: 'req_agent_barrier_myths_20260713_01',
+      node_id: 'n_a1',
+      instruction: 'Sharpen the hook.',
+    },
     deps(openai.fetchImpl)
   );
-  assert.equal(result.status, 400);
-  assert.equal(result.body.code, 'unsupported_object_type');
-  assert.equal(openai.calls.length, 0, 'no AI call for a refused type');
+
+  assert.equal(result.status, 200);
+  assert.equal(result.body.node_id, 'n_a1');
+  assert.equal(result.body.node_kind, 'content');
+  const suggestion = result.body.suggestion as Record<string, unknown>;
+  assert.deepEqual(suggestion, { title: 'The myth everyone repeats', body: 'A sharper opening.' });
+
+  // The forced tool: node public grammar with protected fields removed.
+  assert.equal(openai.calls[0].toolName, 'propose_node_changes');
+  const properties = (openai.calls[0].toolSchema as { properties: Record<string, unknown> }).properties;
+  assert.ok('title' in properties && 'body' in properties);
+  assert.equal('media' in properties, false, 'media is protected out of the tool schema');
+  assert.equal('ctaLink' in properties, false, 'ctaLink is protected out of the tool schema');
+  // The node's editorial role is prompt CONTEXT (write copy for a hook)...
+  assert.match(openai.calls[0].userMessage, /hook/);
+  // ...and annotations are never part of the copy the model may return.
+  assert.equal('private' in properties, false);
+});
+
+test('node-scoped ask: a rich_text document body is excluded from the tool (no flattening)', async () => {
+  const store = createStore();
+  store.seed(articleRecord());
+  const openai = openAiMock({ body: 'flattened!' });
+  const result = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    {
+      object_type: 'content_item',
+      object_id: 'req_agent_barrier_myths_20260713_01',
+      node_id: 'n_a2',
+      instruction: 'Rewrite.',
+    },
+    deps(openai.fetchImpl)
+  );
+  assert.equal(result.status, 200);
+  const properties = (openai.calls[0].toolSchema as { properties: Record<string, unknown> }).properties;
+  assert.equal('body' in properties, false, 'a document body is not plain-text editable');
+});
+
+test('node scope pairing rules: node_id needs content_item; ghost nodes 404', async () => {
+  const store = createStore();
+  store.seed(siteRecord());
+  store.seed(articleRecord());
+  const openai = openAiMock({});
+  const wrongType = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    { object_type: 'site', object_id: 'site_drlurie', node_id: 'n_a1', instruction: 'x' },
+    deps(openai.fetchImpl)
+  );
+  assert.equal(wrongType.status, 400);
+  assert.equal(wrongType.body.code, 'node_scope_unsupported');
+
+  const ghost = await askAiForObject(
+    store as unknown as AskAiObjectStore,
+    {
+      object_type: 'content_item',
+      object_id: 'req_agent_barrier_myths_20260713_01',
+      node_id: 'n_zz',
+      instruction: 'x',
+    },
+    deps(openai.fetchImpl)
+  );
+  assert.equal(ghost.status, 404);
+  assert.equal(openai.calls.length, 0, 'no AI call for refused requests');
 });
 
 test('a missing object 404s without calling the model', async () => {

@@ -362,6 +362,9 @@ interface TermLike extends UnknownRecord {
 interface TemplateSlotLike extends UnknownRecord {
   slotId: string;
 }
+interface ArticleNodeLike extends UnknownRecord {
+  id: string;
+}
 
 const expectPlainObject = (value: unknown, what: string): UnknownRecord => {
   if (!isPlainObject(value)) {
@@ -380,6 +383,7 @@ const expectArray = <T>(value: unknown, what: string): T[] => {
 const getSections = (body: UnknownRecord): SectionLike[] => expectArray<SectionLike>(body.sections, 'body.sections');
 const getGroups = (body: UnknownRecord): NavGroupLike[] => expectArray<NavGroupLike>(body.groups, 'body.groups');
 const getSlots = (body: UnknownRecord): TemplateSlotLike[] => expectArray<TemplateSlotLike>(body.slots, 'body.slots');
+const getNodes = (body: UnknownRecord): ArticleNodeLike[] => expectArray<ArticleNodeLike>(body.nodes, 'body.nodes');
 const getTerms = (body: UnknownRecord, kind: PatchTaxonomyKind): TermLike[] => {
   const kinds = expectPlainObject(body.kinds, 'body.kinds');
   const registry = expectPlainObject(kinds[kind], `body.kinds.${kind}`);
@@ -703,6 +707,53 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       const index = sections.findIndex((section) => section.id === op.section_id);
       if (index === -1) throw targetMissing(op, `section '${op.section_id}'`);
       return applyRemoveFromList(op, sections, index, (section) => section.id);
+    }
+
+    // ——— content-item / article node family (W7.3) ———
+    // Mirrors the section family: an article body owns an ordered `nodes`
+    // list keyed by opaque n_* ids (08-articles-plan §2.2).
+    case 'set_article_meta':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
+    case 'upsert_node': {
+      assertNoNullValues(op.node, 'upsert_node payload');
+      const nodes = getNodes(body);
+      const index = nodes.findIndex((node) => node.id === op.node.id);
+      return applyUpsertIntoList(op, nodes, index, op.node as ArticleNodeLike, op.position, (node) => node.id);
+    }
+
+    case 'update_node': {
+      const nodes = getNodes(body);
+      const node = nodes.find((candidate) => candidate.id === op.node_id);
+      if (!node) throw targetMissing(op, `node '${op.node_id}'`);
+      return applyFieldsOp(op, node, op.fields as UnknownRecord);
+    }
+
+    case 'move_node': {
+      const nodes = getNodes(body);
+      const index = nodes.findIndex((node) => node.id === op.node_id);
+      if (index === -1) throw targetMissing(op, `node '${op.node_id}'`);
+      return applyMoveInList(op, nodes, index, op.to_index);
+    }
+
+    case 'set_node_visibility': {
+      const nodes = getNodes(body);
+      const node = nodes.find((candidate) => candidate.id === op.node_id);
+      if (!node) throw targetMissing(op, `node '${op.node_id}'`);
+      const snapshot: FieldsTree = {
+        visibility: node.visibility === undefined ? null : (node.visibility as PatchJsonValue),
+      };
+      checkGuard(op, snapshot);
+      if (op.visibility === null) delete node.visibility;
+      else node.visibility = op.visibility;
+      return { kind: 'fields', before: snapshot, after: { visibility: op.visibility } };
+    }
+
+    case 'remove_node': {
+      const nodes = getNodes(body);
+      const index = nodes.findIndex((node) => node.id === op.node_id);
+      if (index === -1) throw targetMissing(op, `node '${op.node_id}'`);
+      return applyRemoveFromList(op, nodes, index, (node) => node.id);
     }
 
     // ——— navigation family ———
@@ -1105,9 +1156,51 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_site_fields':
     case 'set_product_fields':
     case 'set_product_price':
+    case 'set_article_meta':
     case 'set_template_meta': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });
+    }
+
+    case 'update_node': {
+      const fieldsCapture = expectCaptureKind(op, capture, 'fields');
+      return patchOpSchema.parse({
+        op: op.op,
+        node_id: op.node_id,
+        fields: fieldsCapture.before,
+        ...guardOf(fieldsCapture.after),
+      });
+    }
+
+    case 'set_node_visibility': {
+      const fieldsCapture = expectCaptureKind(op, capture, 'fields');
+      return patchOpSchema.parse({
+        op: op.op,
+        node_id: op.node_id,
+        visibility: fieldsCapture.before.visibility ?? null,
+        ...guardOf(fieldsCapture.after),
+      });
+    }
+
+    case 'upsert_node': {
+      const elementCapture = expectCaptureKind(op, capture, 'element');
+      return patchOpSchema.parse(
+        inverseOfUpsert(
+          elementCapture,
+          (value) => ({ op: 'upsert_node', node: value }) as unknown as PatchOp,
+          () => ({ op: 'remove_node', node_id: op.node.id }) as unknown as PatchOp
+        )
+      );
+    }
+
+    case 'remove_node': {
+      const elementCapture = expectCaptureKind(op, capture, 'element');
+      return patchOpSchema.parse(
+        inverseOfRemove(
+          elementCapture,
+          (before) => ({ op: 'upsert_node', node: before.value, position: before.index }) as unknown as PatchOp
+        )
+      );
     }
 
     case 'update_section_data': {
@@ -1267,6 +1360,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'move_section':
     case 'move_group':
     case 'move_item':
+    case 'move_node':
     case 'move_slot': {
       const moveCapture = expectCaptureKind(op, capture, 'move');
       return patchOpSchema.parse({ ...op, to_index: moveCapture.before.index, ...guardOf(moveCapture.after) });

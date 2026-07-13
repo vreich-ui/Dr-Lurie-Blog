@@ -1312,7 +1312,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_create',
     description:
-      'Create a CMS object from object_type, site, and the per-type body. requested_id is optional — omit it to have a valid id minted server-side. content_item is not creatable via this verb (articles keep their own tools).',
+      'Create a CMS object from object_type, site, and the per-type body. requested_id is optional — omit it to have a valid id minted server-side. content_item (articles) is creatable since W7.3: the body is the annotated node list (per-node private.strategy/intent — hook/agitation/resolution etc. — plus commercial/rendering/chat metadata) with plain-text or rich_text.v1 node bodies; read object_contract("content_item") first. Committed legacy posts stay on the old article tools.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -1348,6 +1348,24 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
       },
       ['template_id', 'site', 'route', 'title']
+    ),
+  },
+  {
+    name: 'object_create_variant',
+    description:
+      'Clone a content_item (article) object as a DRAFT variant for judge/score/A-B work (W7.3): node ids are re-minted (annotations that reference them — claims/compliance node_ids — are re-pointed), lineage.parent_content_id is set to the source, scores reset, and the clone flows through the standard create validation. Variants need their own slug (defaults to "<source-slug>-variant"; pass slug when creating a second variant). Serving/traffic-splitting is out of scope — publishing a winner is an ordinary object_publish.',
+    inputSchema: objectSchema(
+      {
+        source_object_id: stringSchema('The source article object id (req_*).'),
+        slug: stringSchema('Optional slug for the variant; defaults to "<source-slug>-variant".'),
+        requested_id: stringSchema('Optional explicit object id; a dated req_* id is minted when omitted.'),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the built variant body, would-be id, and validation; persist nothing.',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['source_object_id']
     ),
   },
   {
@@ -1481,7 +1499,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_publish',
     description:
-      'Publish a CMS object (page | section | navigation | taxonomy | site | template) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item is not served here — articles keep their own pipeline. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out.',
+      'Publish a CMS object (any of the nine governed types) through the generic publish operation: run the approval-policy publish gate, then validate → materialize → commit the export to git → stamp the record, in that order (the record is never stamped before the export commits). Requires a held lock_token. Omit published_time to publish now; null (unpublish) and future timestamps are rejected in this phase. The gate is identical to the admin UI: autonomous object types publish directly with no human; approval-gated types require a current human approval pinned (M-6) to the exact action being attempted. content_item (article objects) publishes here too since W7.3 — Tier 1 stays autonomous under the committed policy. The export commit carries [skip netlify], so a successful publish does NOT deploy — the change commits to main and goes live only on an explicit release (release_to_production); the response "production" block spells this out.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -3821,6 +3839,16 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         site: input.site,
         body: input.body,
         requested_id: input.requested_id,
+        agent_name: input.agent_name,
+      });
+    case 'object_create_variant':
+      return callObjectAction(event, {
+        action: 'create_variant',
+        object_type: 'content_item',
+        source_object_id: input.source_object_id,
+        slug: input.slug,
+        requested_id: input.requested_id,
+        dry_run: input.dry_run,
         agent_name: input.agent_name,
       });
     case 'object_instantiate_template':

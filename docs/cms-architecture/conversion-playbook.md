@@ -157,6 +157,30 @@ The same factory converts `template` objects, with three differences:
 Starter set: `scripts/lib/templates-seed-data.mjs` (`tpl_interior`,
 `tpl_landing`, `tpl_legal`).
 
+### Article families (W7.3 — content_item as the ninth type)
+
+The same factory converts `content_item` objects, with three differences:
+
+- **The route is the blog permalink** (`/<slug>` via the posts pattern) —
+  criterion 1 is "the published export joins `fetchPosts()` and renders
+  through the SinglePost furniture" (listings/tags/RSS included). One slug
+  space with the committed .md posts: a colliding slug is a validation
+  blocker, and the loader loudly skips (committed post wins) if one ever
+  materializes.
+- **The driver drills the six node ops** (`set_article_meta`, `upsert_node`,
+  `update_node` — copy AND `private.strategy` annotation — `move_node`,
+  `set_node_visibility`, `remove_node`) via a probe node cloned from the
+  article's own first node, then proves `object_create_variant` with
+  **`dry_run: true`** (no probe variants persist).
+- **Annotations round-trip, never render.** `private`/`commercial`/scores are
+  body data the drill exercises; the renderer emits only `public` fields of
+  public-visibility nodes (the leak rule — test-grepped). String bodies are
+  PLAIN TEXT; rich_text.v1 documents are limited to the renderable grammar
+  (no embeds yet). **Unpublish is unsupported (OQ-2): a released article is
+  live until edited** — a run may stop after the drill if that matters.
+
+Seed: `scripts/lib/articles-seed-data.mjs` (`req_agent_object_model_demo_20260713_01`).
+
 ## Exact call/response field names (do not guess these)
 
 | Call                          | Send                                                                                      | Read from `structuredContent`                                                                 |

@@ -23,6 +23,7 @@
  */
 import { z } from 'zod';
 
+import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.js';
 import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
@@ -40,14 +41,16 @@ export interface AskAiTool {
   input_schema: JsonSchema;
 }
 
-/** Object types the generic Ask-AI serves — every type except content_item (article pipeline, OQ-8). */
-export type AskAiObjectType = Exclude<ObjectType, 'content_item'>;
+/** Object types the generic Ask-AI serves — all nine since W7.3/W7.8. */
+export type AskAiObjectType = ObjectType;
 
 /**
  * Registry of T0.2 body schemas keyed by object type. This is the ONLY place a
  * concrete type list appears; `deriveAskAiToolSchema` itself never enumerates
- * types. A seventh type is registered here once its T0.2 schema exists — the
- * derivation code is untouched (the T1.6 acceptance property).
+ * types. A new type is registered here once its T0.2 schema exists — the
+ * derivation code is untouched (the T1.6 acceptance property). content_item
+ * joined at W7.8: whole-object asks serve the admin surface; the canvas asks
+ * node-scoped (ask-ai-object.ts) against the node PUBLIC grammar.
  */
 export const ASK_AI_BODY_SCHEMAS = {
   page: pageBodySchema,
@@ -57,6 +60,7 @@ export const ASK_AI_BODY_SCHEMAS = {
   site: siteBodySchema,
   template: templateBodySchema,
   product: productBodySchema,
+  content_item: contentItemBodySchema,
 } satisfies Record<AskAiObjectType, z.ZodType>;
 
 export const isAskAiObjectType = (value: string): value is AskAiObjectType =>
@@ -145,6 +149,10 @@ const PROTECTED_FIELD_NAMES = new Set([
   'slug',
   'anchor',
   'robots',
+  // Article node public fields (W7.8): the CTA destination is a link, and the
+  // node list is structure — copy asks never touch either.
+  'ctaLink',
+  'nodes',
 ]);
 
 /** True when a field must not be rewritten by the copy-editing Ask-AI (see above). */

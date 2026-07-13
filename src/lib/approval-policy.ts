@@ -15,10 +15,12 @@
  *     default 'autonomous'. An unconfigured type in an unconfigured system
  *     is fully autonomous.
  *
- * `content_item` (articles) is deliberately NOT governable here: it stays
- * outside the generic publish gate entirely (OQ-8, the existing article
- * pipeline), and the config schema rejects it as an override key so a
- * config edit cannot even appear to reach it.
+ * `content_item` (articles) joined the governed set at W7.3 (08-articles-plan
+ * — OQ-8 resolved as migration; OQ-W7-4: articles keep Tier 1 direct
+ * publish). Under the autonomous master this preserves the article
+ * pipeline's trust posture exactly: agents publish articles directly, every
+ * publish still writes the full audit trail. Gate articles like any other
+ * type by pinning `content_item: 'require-approval'` in the config.
  *
  * This module is client-safe on purpose (no env, no server imports): the
  * admin objects UI reads the same committed config to decide which buttons
@@ -36,7 +38,7 @@ import { z } from 'zod';
 import { approvalPolicyConfig } from '../config/approval-policy.js';
 import type { ObjectType } from '../schema/object-record-v1.js';
 
-/** Every object type the generic publish gate governs — all types except content_item. */
+/** Every object type the generic publish gate governs — all nine (W7.3). */
 export const governedObjectTypes = [
   'page',
   'section',
@@ -45,6 +47,7 @@ export const governedObjectTypes = [
   'site',
   'template',
   'product',
+  'content_item',
 ] as const;
 export type GovernedObjectType = (typeof governedObjectTypes)[number];
 
@@ -56,8 +59,8 @@ export const approvalPolicyConfigSchema = z.strictObject({
   master: z.enum(['all-autonomous', 'all-require-approval']),
   /**
    * Explicit per-type pins that beat the master switch. Keys are governed
-   * object types only — content_item is structurally unrepresentable, and
-   * an unknown/typo'd key fails the parse instead of silently doing nothing.
+   * object types only — an unknown/typo'd key fails the parse instead of
+   * silently doing nothing.
    */
   overrides: z.strictObject({
     page: z.enum(['require-approval', 'autonomous']).optional(),
@@ -67,6 +70,7 @@ export const approvalPolicyConfigSchema = z.strictObject({
     site: z.enum(['require-approval', 'autonomous']).optional(),
     template: z.enum(['require-approval', 'autonomous']).optional(),
     product: z.enum(['require-approval', 'autonomous']).optional(),
+    content_item: z.enum(['require-approval', 'autonomous']).optional(),
   }),
 });
 

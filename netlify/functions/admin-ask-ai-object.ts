@@ -14,8 +14,9 @@
  * selection-based UX, the forced-tool call, null-stripping — is reused via the
  * core, not by modifying the article file.
  *
- * POST body: { object_type, object_id, section_id?, selected_text?, image_ref?, instruction }
- * (`section_id` scopes a PAGE request to one section instance; `image_ref`
+ * POST body: { object_type, object_id, section_id?, node_id?, selected_text?, image_ref?, instruction }
+ * (`section_id` scopes a PAGE request to one section instance; `node_id`
+ * scopes a content_item request to one article node (W7.8); `image_ref`
  * carries a "Re: <image>" reference with its public URL — the edit-mode
  * canvas paths; see netlify/lib/ask-ai-object.ts.)
  * Requires OPENAI_API_KEY; model override via OPENAI_MODEL (default gpt-4o).
@@ -33,6 +34,7 @@ const bodySchema = z
     object_type: z.string().min(1),
     object_id: z.string().min(1),
     section_id: z.string().min(1).optional(),
+    node_id: z.string().min(1).optional(),
     selected_text: z.string().max(4000).optional(),
     // Canvas image chips ("Re: portrait.png"): prompt context only — the
     // copy-only guard still strips image fields from every suggestion.

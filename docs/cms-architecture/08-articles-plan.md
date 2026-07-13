@@ -1,9 +1,16 @@
 # 08 — Articles Plan (W7): `content_item` onto the object model, bodies onto Rich Text
 
-> **Status: PLAN, not code** (Wolf directive 2026-07-12, the shop-module precedent:
-> plan first, build in bounded phases after approval). This document is the W7
-> deliverable of session 2026-07-12 L. Nothing in the article pipeline changes
-> until Wolf approves this plan and the phase sessions begin.
+> **Status (2026-07-13): W7.1 + W7.3 + W7.8 BUILT; W7.4/W7.6 WAIVED.**
+> Wolf's 2026-07-13 directives supersede parts of this plan (see §0.5): the
+> committed legacy posts are NOT migrated ("mostly junk, not worth the
+> effort") — they stay on the old pipeline; new articles are content_item
+> objects end-to-end (schema, node ops + inverses, create_variant,
+> validation, materializer, render path, canvas node editing). Local
+> rehearsal all-green; the credentialed `--production --release` run
+> (seeds: `scripts/lib/articles-seed-data.mjs`) flips the type to CONVERTED.
+> Still open: W7.2 (sections onto rich text), W7.5 (publish unification +
+> aliases — the legacy tools are untouched), W7.7 (admin editor + annotation
+> panel + rich-text editing), OQ-W7-3 (strategy registry go/no-go).
 
 ## 0. Mandate and decisions (Wolf, 2026-07-12 — GOVERNING for W7)
 
@@ -51,6 +58,24 @@ and implemented in `src/schema/article-content-v1.ts`:
 **W7's prime rule: this layer is extended, never flattened.** Every migration
 step below is judged first by "does the strategy/commercial/scoring metadata
 survive and become MORE agent-usable?"
+
+### §0.5 Supersessions by Wolf, 2026-07-13 (GOVERNING over the phase table)
+
+1. **The committed posts are ignored.** "The committed posts can be ignored,
+   they are mostly junk and are not worth the effort." W7.4 (pilot
+   migration), W7.6 (full migration + `.md` retirement), the 83-post
+   DOM-equivalence harness, and the credentialed `workflows`-store inventory
+   are **waived**; §1.5's preservation item and OQ-W7-5/OQ-W7-6 are moot.
+   The legacy pipeline keeps serving the committed posts unchanged; the two
+   families share one permalink space (article-object slugs are validated
+   against committed post ids).
+2. **Canvas for articles is mandatory in-wave** (W7.8 confirmed, not
+   severable): object-backed article bodies carry per-node chips.
+3. **The annotation layer is the point** (re-affirmed): every block carries
+   its context attributes (hook/agitation/resolution + intent etc.) exactly
+   as the original architecture defined them — imported from
+   `article-content-v1.ts`, never flattened. Vocabulary stays code enums
+   ("like in the original architecture") pending OQ-W7-3's registry go/no-go.
 
 ### Supersessions this plan enacts (on Wolf's approval)
 
@@ -319,17 +344,17 @@ Also inherited: the shared publish-key self-approval TODO (review-state.ts:135)
 
 ## 6. Phase sequence (each its own session; sized like the shop S-phases)
 
-| Phase | Delivers | Gate |
-| --- | --- | --- |
-| **W7.1** | `rich_text.v1` schema + `@contentful/rich-text-*` deps + build-time renderer + ProseMirror↔RichText mapper. Used by nothing. | Suite + build-diff EMPTY |
-| **W7.2** | Section `body` fields accept string **or** document (union); one-time export conversion; TipTap emits rich text; splitters retire behind the renderer. | DOM-equivalence on all 172 pages; canvas preview drive |
-| **W7.3** | `content_item.v1` object type end-to-end (schema incl. verbatim strategy/commercial/claims sub-schemas, `reference` kind, contract, patch ops incl. node ops + `create_variant`, validation, materializer, approval policy Tier 1) + object render path behind flag. Bugs ③④⑧. Optional: `strategy_drlurie` registry (OQ-W7-3). | Suite; sandbox lifecycle drill; equivalence harness on probe articles |
-| **W7.4** | Migration tooling + credentialed inventory of the `workflows` store; convert + cut over a **pilot batch** (~5 articles incl. one structured, one legacy-markdown, one with PDF/CTA). | Pilot equivalence green in production |
-| **W7.5** | Publish unification: object publish/release for articles; alias layer over the 31 tool names; `toggle-article-publish` + admin patch paths re-pointed; taxonomy hook folded into standard validation; blob-backed image fallback (bug ⑤). CLAUDE.md freeze line updated. | All 27 legacy test files pass against aliases; publish semantics matrix pinned |
-| **W7.6** | Full migration: remaining ~78 articles converted, cut over, `.md` files retired (OQ-W7-5); `workflows` store read-only. | Equivalence 83/83; credentialed run; store === seed === export |
-| **W7.7** | Admin editor on rich text + annotation panel; single renderer everywhere; bugs ⑥⑩. | Suite; editor drive |
-| **W7.8** | Canvas for articles (stop line lifts): per-node chips, Ask-AI scope, annotation editing on the live site. | Headless drive of the built site (the 07 gate) |
-| **W7.9** | Credentialed conversion run for the type + records; inventory/conversion-map/state-of-play flips; W7 exit. | All five playbook criteria, every article |
+| Phase | Delivers | Gate | Status (2026-07-13) |
+| --- | --- | --- | --- |
+| **W7.1** | `rich_text.v1` schema + `@contentful/rich-text-*` deps + build-time renderer + ProseMirror↔RichText mapper. Used by nothing. | Suite + build-diff EMPTY | ✅ BUILT (2026-07-12 M) |
+| **W7.2** | Section `body` fields accept string **or** document (union); one-time export conversion; TipTap emits rich text; splitters retire behind the renderer. | DOM-equivalence on all 172 pages; canvas preview drive | OPEN (own session) |
+| **W7.3** | `content_item.v1` object type end-to-end (schema incl. verbatim strategy/commercial/claims sub-schemas, contract, patch ops incl. node ops + `create_variant`, validation, materializer, approval policy Tier 1) + object render path. Bugs ③④⑧. Optional: `strategy_drlurie` registry (OQ-W7-3). | Suite; sandbox lifecycle drill; probe-build verification | ✅ BUILT (2026-07-13 S; `reference` kind deferred — a kind that can't render yet would be a trap-5 regression; bug ④ moot on this path — the endpoint mints validated ids) |
+| **W7.4** | ~~Migration tooling + credentialed inventory of the `workflows` store; pilot batch.~~ | — | ❌ WAIVED (§0.5: committed posts ignored) |
+| **W7.5** | Publish unification: alias layer over the 31 tool names; `toggle-article-publish` + admin patch paths re-pointed; blob-backed image fallback (bug ⑤). CLAUDE.md freeze line updated. | All 27 legacy test files pass against aliases | OPEN — reduced scope: object articles already publish through object_publish; aliases matter only for external agent configs still pointed at the old tools (OQ-W7-1) |
+| **W7.6** | ~~Full migration, `.md` retirement, `workflows` store read-only.~~ | — | ❌ WAIVED (§0.5) |
+| **W7.7** | Admin editor on rich text + annotation panel; single renderer everywhere; bugs ⑥⑩. | Suite; editor drive | OPEN (the canvas panel edits plain-text copy + AI today; document bodies and a visible annotation editor need this phase) |
+| **W7.8** | Canvas for articles (stop line lifts): per-node chips, Ask-AI node scope, same EditSession/publish path. | Suite (wire-shape tests) + probe-build drive | ✅ BUILT (2026-07-13 S) |
+| **W7.9** | Credentialed conversion run for the type + records; inventory/state-of-play flips; W7 exit. | All five playbook criteria for the type | READY — `--production --release --seeds scripts/lib/articles-seed-data.mjs` (note: unpublish unsupported, OQ-2 — the demo article goes live on release) |
 
 Rough shape: W7.1–W7.3 are the heavy engineering; W7.4–W7.6 are careful but
 mechanical; W7.7–W7.8 are UX payoff. Canvas (W7.8) is in-wave per Wolf's

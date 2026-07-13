@@ -49,7 +49,7 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-12, thirty-seven objects are CONVERTED** (all via credentialed
+**As of 2026-07-13, forty objects are CONVERTED** (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
@@ -66,7 +66,10 @@ at the bottom. **W6 (2026-07-12) added six CONVERTED listing/article page
 objects** (see "Listing & article surfaces") — Wolf's credentialed run the same
 day went all-green: store-backed, every permitted op round-tripped, published
 (export commits `7956b13`…`b0f8d90`), `released:true`; store === seed ===
-export byte-verified (record_version 11 across all six).
+export byte-verified (record_version 11 across all six). **W5's credentialed
+run (2026-07-13) added the three previously hand-coded pages**
+(`page_shop_preview`, `page_pricing`, `page_services` — see §1): the
+hand-coded-page backlog is empty for good.
 
 ### Status legend
 
@@ -81,17 +84,20 @@ export byte-verified (record_version 11 across all six).
 
 ## The object types (use & boundaries)
 
-Eight object types exist. Seven are "governed" (edited through the generic object
-verbs and the approval policy); articles are the eighth and keep their own,
-older pipeline. **Boundaries below are the human summary — the machine-checked,
-always-current version is `object_contract('<type>')`.**
+Nine object types exist, and **all nine are governed** (edited through the
+generic object verbs and the approval policy) since W7.3 (2026-07-13) brought
+`content_item` into the model. The COMMITTED legacy posts (src/data/post/\*.md)
+stay on the older article pipeline untouched — Wolf's ruling: not worth
+migrating; new articles are objects. **Boundaries below are the human summary —
+the machine-checked, always-current version is `object_contract('<type>')`.**
 
 Current publish posture (`src/config/approval-policy.ts`): **`all-autonomous`,
 with `product` pinned to require-approval** (06-shop-module-plan §0.4: an agent
 proposing a product change is fine; a price change going live without a human
-eye is not). Every other governed type publishes autonomously; every publish
-still writes a full, revertible audit trail. Flip one file to change the
-posture per type.
+eye is not). `content_item` is autonomous under the master — Tier 1 preserved
+(OQ-W7-4); gate it any time with one config pin. Every other governed type
+publishes autonomously; every publish still writes a full, revertible audit
+trail. Flip one file to change the posture per type.
 
 | Type                        | What it is / used for                                                                                                                                                                                 | Key boundaries (summarized)                                                                                                                                                                                            |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -102,7 +108,7 @@ posture per type.
 | **site** (singleton)        | Global config: brand tokens, logo, chrome toggles, blog paths, and the default header/footer navigation.                                                                                              | One per site. **Boundary caveat: not yet wired to drive rendering — see below.**                                                                                                                                       |
 | **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
 | **product**                 | One sellable digital good (download / pay-to-unlock / tip-PWYW / free lead magnet): `slug` + presentation + commerce + a fulfillment union on `kind`. Long-form copy composes via `presentation.page_ref` → an ordinary Page (06-shop-module-plan §1–2). | Slug lowercase-hyphen + unique (→ `/shop/<slug>`); mode↔fields coherence enforced; **price cache + Stripe linkage are NOT agent-patchable** (`product_set_price` only, S3); `fulfillment.artifact_ref` must be a trusted private-store ref; **publishes review-required**. |
-| **content_item** (articles) | Blog posts / articles. **Outside** the generic object model — served by the older `save_json_blob_*` tools and its own review/publish flow.                                                           | Not creatable or patchable via the object verbs; has no generic body schema. Listed here only so the boundary is explicit.                                                                                             |
+| **content_item** (articles) | An article as an annotated NODE LIST (W7.3): every block carries `private.strategy` (hook/agitation/…/resolution) + `intent` plus commercial/rendering/chat metadata; `public.body` is plain text or a `rich_text.v1` document. Envelope carries the judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). `create_variant` clones a draft for A/B judging. Renders through the blog furniture at `/<slug>`, joining listings/tags/RSS automatically. | `req_*` ids (artifact trust preserved); slug lowercase-hyphen + unique across articles AND committed posts; ≥1 public content node to publish; node ids opaque (no strategy words); annotations NEVER render (leak rule); rich-text bodies limited to the renderable grammar (embeds blocked until resolvers exist). **Legacy committed posts stay on the old `save_json_blob_*` pipeline — not migrated (Wolf 2026-07-13).** |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
@@ -397,10 +403,33 @@ store-backed → CONVERTED (§1).** The three MOCK products stopped at
 approves each in /admin/objects and re-runs the same command (idempotent).
 Remaining launch gate: the LIVE Stripe exit test (needs keys).
 
+### Articles as objects (W7.3 + W7.8, BUILT 2026-07-13 — awaiting the credentialed run)
+
+`content_item` is the ninth governed type: the annotated-node article model
+(per-block strategy/intent — the behavioral framework — plus the envelope
+judge/score substrate), the six node ops with exact inverses, `create_variant`
+(+ `object_create_variant` MCP tool with `dry_run`), validation (taxonomy
+slugs, one slug space with the committed posts, renderable rich-text grammar,
+the reader-projection leak scan), the materializer →
+`src/data/site/articles/`, and the render path: published article objects
+join `fetchPosts()` as first-class posts (listings/tags/RSS included) with
+per-node canvas chips (pencil + node-scoped Ask-AI) riding the standard
+EditSession → `update_node` → publish/release path. Local rehearsal all-green
+(every op drilled byte-identical, variant dry-run, contract 6/6, inventory);
+**not yet CONVERTED** — the credentialed
+`--production --release --seeds scripts/lib/articles-seed-data.mjs` run flips
+the seed article (`req_agent_object_model_demo_20260713_01`,
+/object-model-demo) and with it the type. Note: unpublish is still
+unsupported (OQ-2) — publishing the demo makes it live until edited; the run
+may stop after the drill if that is unwanted. The LEGACY committed posts stay
+on the `save_json_blob_*` pipeline by ruling (2026-07-13): mostly junk, not
+worth migrating.
+
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 
-- **`content_item` / articles** — already functional via the `save_json_blob_*`
-  pipeline; intentionally outside the object model.
+- **Legacy committed posts (src/data/post/\*.md)** — stay on the
+  `save_json_blob_*` pipeline; deliberately NOT migrated to objects
+  (Wolf 2026-07-13). New articles are content_item objects.
 - **Real `template` objects** — ACTIVATED + CONVERTED at W2.5 (see "Singletons &
   templates"): three starter recipes store-backed in production + the instantiate
   tool live. Agents can create and evolve more freely.

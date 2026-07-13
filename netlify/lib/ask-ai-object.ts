@@ -20,8 +20,12 @@
  *     an `update_section_data` op. A shared_ref is refused with the target's
  *     sec_* id — the caller must ask the shared OBJECT, never the reference.
  *
- * content_item is refused here — articles keep the existing article Ask-AI
- * (admin-ask-ai-node.ts), which this task does not touch.
+ *   - NODE SCOPE (W7.8 canvas): `node_id` narrows a content_item request to
+ *     one article node. The tool schema is the node's PUBLIC copy grammar
+ *     (annotations, media, and links are outside it), and the suggestion maps
+ *     1:1 onto an `update_node` op's `fields.public`. The LEGACY article
+ *     Ask-AI (admin-ask-ai-node.ts, workflow records) is untouched — it keeps
+ *     serving the committed .md pipeline.
  *
  * Provider: OpenAI Chat Completions function-calling (OPENAI_API_KEY /
  * OPENAI_MODEL, injected by the wrapper). The zod-derived tool schema is plain
@@ -43,6 +47,7 @@ import {
   sectionDataSchemaForType,
   type AskAiTool,
 } from './ask-ai-schema.js';
+import { contentItemNodePublicSchema, type ContentItemNode } from '../../src/schema/bodies/content-item-v1.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
@@ -57,6 +62,8 @@ export interface AskAiObjectRequest {
   selected_text?: string;
   /** Page-only: scope the request to one section instance (edit-mode canvas). */
   section_id?: string;
+  /** content_item-only: scope the request to one article node (W7.8 canvas). */
+  node_id?: string;
   /**
    * An image the editor is referring to ("Re: portrait.png" — canvas image
    * chips). `url` is the image's PUBLIC address (blob-backed /img/* mirror,
@@ -145,6 +152,39 @@ const buildSectionUserMessage = (
     .join('\n');
 };
 
+const buildNodeUserMessage = (record: ObjectRecord, node: ContentItemNode, request: AskAiObjectRequest): string => {
+  const article = record.body as { title?: unknown };
+  const selectionClause = request.selected_text
+    ? `\nThe editor highlighted this specific span: """${request.selected_text}"""\n`
+    : '';
+  // The node's declared ROLE is context the model should write FOR (a hook
+  // reads differently from a resolution) — it flows one way: into the prompt,
+  // never into the suggestion (the tool schema has no annotation fields).
+  const strategy = node.private?.strategy;
+  const intent = node.private?.intent;
+  const roleClause =
+    strategy || intent
+      ? `\nThis block's editorial role: ${[strategy, intent && `intent: ${intent}`].filter(Boolean).join(', ')}. ` +
+        'Write copy that serves that role.\n'
+      : '';
+  return [
+    `You are editing ONE BLOCK of the article "${typeof article.title === 'string' ? article.title : record.object_id}".`,
+    `The block is a "${node.kind}" node (id ${node.id}). Its current public copy:`,
+    '```json',
+    JSON.stringify(node.public, null, 2),
+    '```',
+    roleClause,
+    selectionClause,
+    `Editor's instruction: ${request.instruction}`,
+    '',
+    "Call the tool with ONLY this node's public copy fields that should change. Do not include fields that " +
+      'stay the same. Body text is PLAIN TEXT (no HTML): blank lines separate paragraphs. ' +
+      'Preserve the voice, tone, and structure of the surrounding content.',
+  ]
+    .filter((line) => line !== '')
+    .join('\n');
+};
+
 const callOpenAI = async (
   userMessage: string,
   tool: AskAiTool,
@@ -204,13 +244,6 @@ export const askAiForObject = async (
   request: AskAiObjectRequest,
   deps: AskAiObjectDeps
 ): Promise<AskAiObjectResult> => {
-  if (request.object_type === 'content_item') {
-    return err(400, {
-      error:
-        'content_item uses the existing article Ask-AI (admin-ask-ai-node); the generic endpoint does not serve it.',
-      code: 'unsupported_object_type',
-    });
-  }
   if (!isAskAiObjectType(request.object_type)) {
     return err(400, { error: `Unknown object type: ${request.object_type}`, code: 'unknown_object_type' });
   }
@@ -220,12 +253,18 @@ export const askAiForObject = async (
     return err(400, { error: `No body schema registered for ${request.object_type}`, code: 'no_schema' });
   }
 
-  // Section scope is a request-shape rule, independent of the record: refuse
-  // a non-page pairing before any store read.
+  // Scope pairings are request-shape rules, independent of the record: refuse
+  // an invalid pairing before any store read.
   if (request.section_id && request.object_type !== 'page') {
     return err(400, {
       error: 'section_id scoping applies to page objects only (a section object IS one section).',
       code: 'section_scope_unsupported',
+    });
+  }
+  if (request.node_id && request.object_type !== 'content_item') {
+    return err(400, {
+      error: 'node_id scoping applies to content_item objects only.',
+      code: 'node_scope_unsupported',
     });
   }
 
@@ -233,11 +272,37 @@ export const askAiForObject = async (
   if (!raw) return err(404, { error: 'Object record not found', not_found: true });
   const record = JSON.parse(raw) as ObjectRecord;
 
-  // ── section scope (edit-mode canvas) ──────────────────────────────────────
+  // ── section / node scope (edit-mode canvas) ───────────────────────────────
   let tool: AskAiTool;
   let userMessage: string;
   let scopedSection: PageSectionInstance | undefined;
-  if (request.section_id) {
+  let scopedNode: ContentItemNode | undefined;
+  if (request.node_id) {
+    // Article node scope (W7.8): the tool is the node's PUBLIC copy grammar —
+    // annotations (private/commercial) are not in it, media/links are
+    // protected out, and a rich_text document body is excluded so a copy ask
+    // can never flatten formatting into a plain string.
+    const nodes = (record.body as { nodes?: ContentItemNode[] }).nodes;
+    const node = Array.isArray(nodes) ? nodes.find((entry) => entry.id === request.node_id) : undefined;
+    if (!node) {
+      return err(404, { error: `Node ${request.node_id} not found on ${request.object_id}`, not_found: true });
+    }
+    scopedNode = node;
+    tool = deriveAskAiToolSchema(contentItemNodePublicSchema, {
+      toolName: 'propose_node_changes',
+      description:
+        "Return ONLY the fields of this article node's public copy that should change to satisfy the " +
+        'instruction. Omit every field that stays the same. Preserve the existing voice, tone, and structure. ' +
+        'Edit text/copy ONLY — never change or invent images, assets, links, or references.',
+      protectFields: true,
+    });
+    if (typeof node.public.body !== 'string') {
+      // The body is a rich_text.v1 document (or absent): editing it as plain
+      // text would destroy its structure — keep it out of the model's reach.
+      delete (tool.input_schema.properties as Record<string, unknown> | undefined)?.body;
+    }
+    userMessage = buildNodeUserMessage(record, node, request);
+  } else if (request.section_id) {
     const sections = (record.body as { sections?: PageSectionInstance[] }).sections;
     const section = Array.isArray(sections) ? sections.find((entry) => entry.id === request.section_id) : undefined;
     if (!section) {
@@ -309,7 +374,7 @@ export const askAiForObject = async (
   // non-text values means a copy edit can never repoint a nested reference or
   // swap buried media (the About-portrait class of bug). Structured fields are
   // agent/admin/manual work. Whole-object admin asks keep every field.
-  const copyOnly = scopedSection !== undefined;
+  const copyOnly = scopedSection !== undefined || scopedNode !== undefined;
   const suggestion: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(aiResult.input)) {
     if (value === undefined || value === null) continue;
@@ -324,6 +389,7 @@ export const askAiForObject = async (
       object_type: request.object_type,
       object_id: request.object_id,
       ...(scopedSection ? { section_id: scopedSection.id, section_type: scopedSection.type } : {}),
+      ...(scopedNode ? { node_id: scopedNode.id, node_kind: scopedNode.kind } : {}),
       // Read-only marker: this endpoint proposes; it does not persist. The
       // reviewer applies `suggestion` via object_patch (the T1.4 review path).
       applied: false,

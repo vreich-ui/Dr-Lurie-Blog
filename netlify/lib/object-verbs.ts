@@ -46,7 +46,9 @@ import {
 import { validateObjectIdForType } from '../../src/lib/object-ids.js';
 import { mintId, MintIdError } from '../../src/lib/object-ids-mint.js';
 import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
+import { buildVariantBody } from '../../src/lib/article-object/variant.js';
 import { buildPageBodyFromTemplate } from '../../src/lib/template-instantiate.js';
+import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.js';
 import { pageBodySchema, pageTypeIdSchema } from '../../src/schema/bodies/page-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import {
@@ -107,6 +109,21 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     site: z.string().min(1),
     body: z.unknown(),
     requested_id: z.string().min(1).optional(),
+  }),
+  // ─── W7.3: clone an article as a draft variant (08-articles-plan §2.4).
+  // Node ids re-mint, node-id-referencing annotations re-point, lineage sets;
+  // the built body is handed to the `create` case — one write path.
+  z.object({
+    action: z.literal('create_variant'),
+    object_type: z.literal('content_item'),
+    source_object_id: objectId,
+    /** Variants may not share the source's permalink; defaults to <slug>-variant. */
+    slug: z.string().min(1).optional(),
+    requested_id: z.string().min(1).optional(),
+    // Preview mode: build + validate the would-be variant, persist NOTHING —
+    // how the round-trip driver proves the verb in production without leaving
+    // probe variants behind (the instantiate dry_run pattern).
+    dry_run: z.boolean().optional(),
   }),
   // ─── W2.5: create a page FROM a template recipe (design-principles rule 5).
   // Builds the body from the template's slots (src/lib/template-instantiate.ts)
@@ -305,6 +322,8 @@ const seedForCreate = (objectType: ObjectType, body: unknown): string => {
     if (objectType === 'site' && typeof body.name === 'string') return body.name;
     if (objectType === 'template' && typeof body.name === 'string') return body.name;
     if (objectType === 'product' && typeof body.slug === 'string') return body.slug;
+    if (objectType === 'content_item' && typeof body.slug === 'string') return body.slug;
+    if (objectType === 'content_item' && typeof body.title === 'string') return body.title;
     if (objectType === 'taxonomy') return 'registry';
     if (objectType === 'section' && isRecord(body.section) && typeof body.section.type === 'string')
       return `shared_${body.section.type}`;
@@ -390,9 +409,6 @@ export const handleObjectVerb = async (
 
     case 'create': {
       const objectType = request.object_type;
-      if (objectType === 'content_item') {
-        return err(400, { error: 'content_item is not creatable through the generic verbs (D§1).' });
-      }
 
       let objectIdValue: string;
       if (request.requested_id) {
@@ -401,7 +417,15 @@ export const handleObjectVerb = async (
         objectIdValue = request.requested_id;
       } else {
         try {
-          objectIdValue = mintId({ kind: 'object', objectType }, seedForCreate(objectType, request.body));
+          // content_item ids keep the article req_* shape (W7.3), which
+          // carries a date segment — minted from the request timestamp.
+          objectIdValue =
+            objectType === 'content_item'
+              ? mintId(
+                  { kind: 'content_item', yyyymmdd: timestamp.slice(0, 10).replaceAll('-', '') },
+                  seedForCreate(objectType, request.body)
+                )
+              : mintId({ kind: 'object', objectType }, seedForCreate(objectType, request.body));
         } catch (error) {
           if (error instanceof MintIdError)
             return err(400, { error: 'Could not mint an object id', detail: error.message });
@@ -440,6 +464,83 @@ export const handleObjectVerb = async (
       await store.setJSON(key, record);
       await store.setJSON(objectStatusIndexKey(objectType, 'active', objectIdValue), OBJECT_STORE_MARKER_VALUE);
       return ok({ record });
+    }
+
+    case 'create_variant': {
+      // W7.3 (§2.4): clone an article as a draft variant. The source must
+      // exist and parse as content_item.v1; the built body flows through the
+      // standard `create` path so every rule (slug uniqueness, taxonomy,
+      // renderability, deploy safety) applies to variants too.
+      const sourceKey = objectRecordKey('content_item', request.source_object_id);
+      const sourceRecord = await loadRecord(store, sourceKey);
+      if (!sourceRecord) {
+        return err(404, { error: 'Source article not found', not_found: true, object_id: request.source_object_id });
+      }
+      const parsedSource = contentItemBodySchema.safeParse(sourceRecord.body);
+      if (!parsedSource.success) {
+        return err(422, {
+          error: 'Source article body does not parse as content_item.v1 — heal it before creating variants.',
+          object_id: request.source_object_id,
+          issues: parsedSource.error.issues,
+        });
+      }
+
+      let objectIdValue: string;
+      if (request.requested_id) {
+        const check = validateObjectIdForType('content_item', request.requested_id);
+        if (!check.ok) return err(400, { error: 'Invalid requested_id', detail: check.error });
+        objectIdValue = request.requested_id;
+      } else {
+        try {
+          objectIdValue = mintId(
+            { kind: 'content_item', yyyymmdd: timestamp.slice(0, 10).replaceAll('-', '') },
+            `${request.slug ?? `${parsedSource.data.slug} variant`}`
+          );
+        } catch (error) {
+          if (error instanceof MintIdError)
+            return err(400, { error: 'Could not mint an object id', detail: error.message });
+          throw error;
+        }
+      }
+
+      const variantBody = buildVariantBody(parsedSource.data, {
+        sourceObjectId: request.source_object_id,
+        newObjectId: objectIdValue,
+        ...(request.slug ? { slug: request.slug } : {}),
+      });
+
+      if (request.dry_run) {
+        const groups = validateObject(
+          { objectType: 'content_item', objectId: objectIdValue, body: variantBody },
+          context
+        );
+        const summary = summarizeValidation(groups);
+        const idTaken = Boolean(await store.get(objectRecordKey('content_item', objectIdValue)));
+        return ok({
+          dry_run: true,
+          variant_of: request.source_object_id,
+          object_id: objectIdValue,
+          id_available: !idTaken,
+          body: variantBody,
+          validation: groups,
+          summary,
+        });
+      }
+
+      const result = await handleObjectVerb(
+        store,
+        {
+          action: 'create',
+          object_type: 'content_item',
+          site: sourceRecord.site,
+          body: variantBody,
+          requested_id: objectIdValue,
+        },
+        principal,
+        options
+      );
+      if (result.status !== 200) return result;
+      return ok({ ...result.body, variant_of: request.source_object_id });
     }
 
     case 'instantiate': {

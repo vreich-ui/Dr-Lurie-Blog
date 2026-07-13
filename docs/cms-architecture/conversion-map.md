@@ -195,12 +195,18 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │       query terms now validate against the real registry.
 │     dependents: content_grid queries · listing pages · learn/topics · rss categories
 │
-├── CONTENT_ITEM (articles) ─ separate pipeline ─ 🔵 OUTSIDE the object model TODAY; migration
-│     PLANNED (W7, Wolf 2026-07-12 — OQ-8 resolved: one-time migration to the ninth object
-│     type; see [`08-articles-plan.md`](08-articles-plan.md))
-│     attributes (frontmatter today): title · slug · excerpt · publishDate/published_time ·
-│       category? · tags[] · metadata{description} · image? · body (markdown today →
-│       Contentful Rich Text later, core-structure task 8)
+├── CONTENT_ITEM (articles) ─ type: content_item ─ 🔵 the NINTH governed type, BUILT (W7.3+W7.8,
+│     2026-07-13) — awaiting the credentialed run to flip 🟢 CONVERTED. NEW articles are objects;
+│     the COMMITTED .md posts stay on the legacy pipeline (Wolf 2026-07-13: not worth migrating —
+│     W7.4/W7.6 waived; see [`08-articles-plan.md`](08-articles-plan.md) §0.5)
+│     attributes: slug · title · deck? · description? · image? · taxonomy{category?,tags[]} · seo ·
+│       nodes[] (the ANNOTATED node list — every block carries private.strategy hook/agitation/…/
+│       resolution + intent, plus commercial/rendering/chat/visibility; public.body = plain text |
+│       rich_text.v1) · envelope judge/score substrate: claims/sources/compliance/emotional_strategy/
+│       scores[]/lineage. Legacy .md frontmatter (title/slug/excerpt/category/tags/…) unchanged.
+│     ops: set_article_meta · upsert/update/move/remove_node · set_node_visibility (exact inverses) +
+│       create_variant verb (A/B substrate). Materializes → src/data/site/articles/{req_id}.json,
+│       joins fetchPosts() as first-class posts; per-node canvas chips (W7.8).
 │     dependents: content_grid (query/manual) · content_embed · listings · rss.xml ·
 │       search.json · related posts
 │     ✅ enabler CLOSED (2026-07-11): the content_item resolver validates manual grid

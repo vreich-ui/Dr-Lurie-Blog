@@ -28,7 +28,7 @@ import type { SectionType } from '../../src/schema/bodies/section-v1.js';
 
 type SelfRef = { selfObjectId?: string; selfObjectType?: ObjectType };
 
-type TaxonomyTerm = { term_id: string; status?: string; merged_into?: string };
+type TaxonomyTerm = { term_id: string; slug?: string; status?: string; merged_into?: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -37,12 +37,12 @@ export const buildStoreValidationContext = async (
   store: ObjectVerbStore,
   self: SelfRef = {}
 ): Promise<ObjectValidationContext> => {
-  // key: `${objectType}:${objectId}` → record. content_item lives OUTSIDE
-  // this store (committed frontmatter is its source of truth) — its ids come
-  // from the content-item index below (trap 4 closed 2026-07-11).
+  // key: `${objectType}:${objectId}` → record. content_item records live in
+  // this store since W7.3 (articles as governed objects); the COMMITTED legacy
+  // posts additionally resolve via the content-item index below (trap 4) —
+  // both families answer content_item references and share the slug space.
   const records = new Map<string, ObjectRecord>();
   for (const objectType of objectTypes) {
-    if (objectType === 'content_item') continue;
     const listResult = await store.list({ prefix: `objects/${objectType}/by-id/`, directories: false, paginate: true });
     for (const item of await collectBlobListItems(listResult)) {
       const raw = await store.get(item.key);
@@ -64,7 +64,11 @@ export const buildStoreValidationContext = async (
 
   const resolveObject: ObjectValidationContext['resolveObject'] = (objectType, objectId) => {
     if (objectType === 'content_item') {
-      return contentItemIds ? { exists: contentItemIds.has(objectId) } : undefined;
+      // A store record (W7.3 article object) or a committed legacy post id.
+      const record = records.get(`content_item:${objectId}`);
+      if (record) return { exists: true, published: record.publication?.published_time != null };
+      if (contentItemIds?.has(objectId)) return { exists: true };
+      return contentItemIds ? { exists: false } : undefined;
     }
     const record = records.get(`${objectType}:${objectId}`);
     if (!record) return { exists: false };
@@ -97,6 +101,17 @@ export const buildStoreValidationContext = async (
     return false;
   };
 
+  // Article slugs share ONE permalink space across content_item objects and
+  // the committed legacy posts (their filename stems ARE their slugs). W7.3.
+  const isArticleSlugTaken: ObjectValidationContext['isArticleSlugTaken'] = (slug) => {
+    for (const [key, record] of records) {
+      if (!key.startsWith('content_item:')) continue;
+      if (record.object_id === self.selfObjectId) continue;
+      if (isRecord(record.body) && record.body.slug === slug) return true;
+    }
+    return contentItemIds?.has(slug) ?? false;
+  };
+
   const resolvePageType: ObjectValidationContext['resolvePageType'] = (pageTypeId) => {
     const lookup = getPageTypeDefinition(pageTypeId);
     if (!lookup.ok) return undefined;
@@ -121,7 +136,10 @@ export const buildStoreValidationContext = async (
           const kindNode = kinds && isRecord(kinds[kind]) ? (kinds[kind] as Record<string, unknown>) : undefined;
           const terms = (Array.isArray(kindNode?.terms) ? kindNode.terms : []) as TaxonomyTerm[];
           const seen = new Set<string>();
-          let term = terms.find((candidate) => candidate.term_id === termId);
+          // Match by term_id OR slug (the shapes cannot collide: ids carry
+          // underscores, slugs are hyphen-only) — nav targets pass ids,
+          // article taxonomy passes the W3 frontmatter slugs (W7.3).
+          let term = terms.find((candidate) => candidate.term_id === termId || candidate.slug === termId);
           // Follow merged_into aliases to the canonical term (D§5.5).
           while (term?.merged_into && !seen.has(term.term_id)) {
             seen.add(term.term_id);
@@ -138,6 +156,7 @@ export const buildStoreValidationContext = async (
     resolveSharedSectionType,
     isRouteTaken,
     isSlugTaken,
+    isArticleSlugTaken,
     resolvePageType,
     componentTypeExists,
     ...(resolveTaxonomyTerm ? { resolveTaxonomyTerm } : {}),
