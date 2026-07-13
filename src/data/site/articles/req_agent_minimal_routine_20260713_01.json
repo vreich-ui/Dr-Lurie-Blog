@@ -1,0 +1,86 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:11:53.768Z",
+    "from": "objects/content_item/by-id/req_agent_minimal_routine_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "Cleanse, moisturize, protect. Everything else is optional.",
+  "description": "A minimal, evidence-aligned skincare routine — three steps that do most of the work.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "persuade",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "A routine you actually follow beats a perfect one you abandon by Thursday. For most skin, three steps carry the load.",
+        "eyebrow": "Routines"
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "step"
+      },
+      "public": {
+        "items": [
+          "Cleanse at night to remove the day; rinse with water in the morning.",
+          "Moisturize twice a day to hold water in the barrier.",
+          "Sunscreen every morning — the single most effective anti-aging step there is."
+        ],
+        "title": "The three steps"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "comparison"
+      },
+      "public": {
+        "body": "Serums, acids, and retinoids solve specific problems — texture, pigment, breakouts. They are worth adding one at a time, once the three basics are automatic. Added before that, they mostly add irritation.",
+        "title": "What the extras are for"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Master the three, and your skin will be better than most ten-step routines deliver. Then, if a specific concern remains, add one thing and give it six weeks."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "See the guides"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "A minimal, evidence-aligned skincare routine — three steps that do most of the work."
+  },
+  "slug": "the-three-step-routine",
+  "taxonomy": {
+    "category": "skincare",
+    "tags": [
+      "skincare-basics",
+      "skincare-routine"
+    ]
+  },
+  "title": "The three-step routine that is genuinely enough"
+}
