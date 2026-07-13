@@ -299,6 +299,13 @@ const mintOpsIds = (rawOps: readonly unknown[]): { ops: unknown[]; minted: Minte
       const id = mintId({ kind: 'template_slot' }, stableStringify(op.slot));
       op.slot.slotId = id;
       note('slot.slotId', id);
+    } else if (op.op === 'upsert_node' && isRecord(op.node) && !op.node.id) {
+      // The contract has always advertised minted_id_field node.id — this
+      // branch was missing (the W7.9 drill's probe carried an explicit id, so
+      // the gap never fired until the canvas palette omitted the id).
+      const id = mintId({ kind: 'article_node' }, stableStringify(op.node));
+      op.node.id = id;
+      note('node.id', id);
     }
     return op;
   });

@@ -254,6 +254,73 @@ saved through the nav grammar (`update_item`, `upsert_group` replace-by-id,
 the form — retargeting is structural work (the Ask-AI protected boundary),
 and chrome offers no AI chat (copy form only).
 
+### 3g. Field-test refinements (2026-07-13, Wolf's first live canvas session on the article)
+
+Six fixes from Wolf's field test of /object-model-demo, all verified by a
+16-assertion headless-Chromium drive of the built site (mocked admin
+endpoints):
+
+- **Block ROLE replaces the req\_\* id** (chip + panel header): an article
+  block's identity slot shows its strategy — `Hook · educate`,
+  `Resolution · reassure` — never the object id (kept in the header tooltip).
+  Roles come from the draft record (one cached fetch per article) because the
+  leak rule keeps strategy OUT of the built HTML; sections keep their ids
+  (short and meaningful there). Wolf's rule recorded: **what's on screen must
+  be what an editor needs at the moment of action.**
+- **Image tool ADD path**: a content node with no `public.media` now offers
+  empty src/alt rows + Upload (before: "no image fields", dead end). Save
+  seeds `{ type: 'image' }` on the new media object (content_item only —
+  section image objects stay `{src,alt}`-strict).
+- **Panel is content-sized**: no longer pinned top-bar→viewport-bottom; grows
+  with content, capped (`max-height`), bodies scroll internally
+  (log ≤44vh, form ≤52vh). One-section-at-a-time accordion unchanged.
+- **Busy dots**: every wait (Ask-AI round trip, record load, save, mirror)
+  shows animated dots; the send button disables while a request is in flight.
+- **Article CTA renders like a real site button**: `not-prose` + `font-sans`
+  on the action-node CTA — inside `editorial-prose` the typography plugin's
+  `prose-a` color beat `.btn-primary`'s `text-white` (invisible label on the
+  filled button) and the serif font leaked into it. Renderer-owned classes;
+  agents can't reintroduce it (they only write ctaText/ctaLink data).
+- **Print/share fixed under view transitions**: SinglePost's inline script
+  registered once per hard load; a ClientRouter-swapped article page had
+  unwired buttons. Now re-wires on `astro:page-load` with a data-wired guard.
+
+### 3h. W7.7 canvas capability slice (2026-07-13): the node palette, the ad bank, the annotation panel, multi-image
+
+The article body becomes fully composable from the canvas — 19-assertion
+headless drive of the built probe page, all green:
+
+- **Node palette** (`nodes-palette.ts`, pure + tested): a "+" before/between/
+  after article blocks (label: "Add an article block" — never the req\_\* id)
+  offering nine starters: Text, Heading+text, Checklist, Image, **Image
+  gallery**, **Call to action**, **Offer/affiliate** (disclosure + `nofollow
+sponsored` pre-filled — an editor cannot insert an undisclosed unit), **Ad
+  slot (mock)**, **Chat invite**. Every starter is schema-valid with the
+  semantic annotation from birth; insert = `upsert_node` at a RECORD-derived
+  position, id minted server-side (the missing `mintOpsIds` branch for
+  `node.id` was found and fixed — the contract had advertised it since W7.3),
+  honest draft placeholder until publish + release.
+- **The adSlot mockup bank** (render-nodes.ts): three renderer-owned units —
+  native in-feed card, leaderboard, medium rectangle — rendered ONLY for
+  `adSlot.provider: 'mock'` (a real provider config still renders nothing:
+  mockups never masquerade as live inventory). Honestly labeled
+  Advertisement/Sponsored + "Ad" chip like real served units; fictional
+  advertiser; self-contained (no external assets); overridable via node
+  public copy + `commercial.sponsorName`/`destinationUrl`; switch creative
+  via `commercial.creativeId` (`mock-native` / `mock-leaderboard` /
+  `mock-rectangle`).
+- **Role & intent panel**: a fourth accordion section (🏷, article blocks
+  only) — strategy dropdown (the 12 values), intent dropdown (5), agent
+  notes. Saves ride `update_node` on `private` fields; '' clears via null;
+  chip + header roles refresh from the record (cache invalidated). The
+  semantic layer is now HUMAN-editable, not JSON-only.
+- **Multi-image**: content nodes gain optional `public.images[]` (each entry
+  a full media object, rendered in order as figures). The image tool renders
+  a src/alt row per image with Upload, plus **Add image** to grow the
+  gallery; an emptied src removes that image on save. One-image-per-node
+  stays the norm (the node is the annotation unit) — the gallery is the
+  sanctioned multi-image option (Wolf, 2026-07-13).
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

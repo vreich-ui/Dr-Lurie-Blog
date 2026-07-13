@@ -83,6 +83,12 @@ export const contentItemNodePublicSchema = z
     ctaLink: z.string().optional(),
     label: z.string().optional(),
     media: contentItemNodeMediaSchema.optional(),
+    /**
+     * Multi-image block (Wolf, 2026-07-13): one image per node stays the
+     * norm (the node is the annotation unit), `images` is the sanctioned
+     * gallery option — each entry is a full media object, rendered in order.
+     */
+    images: z.array(contentItemNodeMediaSchema).optional(),
   })
   .strict();
 export type ContentItemNodePublic = z.infer<typeof contentItemNodePublicSchema>;
