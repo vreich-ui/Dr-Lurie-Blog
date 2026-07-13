@@ -7,6 +7,61 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 K (CREDENTIALED CORPUS RUN: the ten-article content_item corpus is CONVERTED + LIVE; `page_article` gets a related grid; `/object-showcase` QA page built)
+
+Follows Session J (the wipe + seed). Wolf: "Related-grid options do them …
+[the corpus] needs to be rewritten" and, separately, "make me a page object
+with every possible existing object added to it … one below another … Let's
+call it /object_list or something technical so it never gets wired in." Both
+executed this session over the live session MCP connection (fighting
+intermittent api.anthropic.com 502s — publishes/checkins frequently applied
+server-side despite a client-side 60s timeout, so every step was verified via
+`object_inventory` rather than trusted from the call return).
+
+- **Ten-article corpus CONVERTED.** All 10 `req_agent_*_20260713_01` articles
+  (skin_barrier_basics, reactive_skin, minimal_routine, reading_labels,
+  skin_after_40, retinoids_after_40, niacinamide, sunscreen, ten_step_myth,
+  not_self_worth) created in the production store, validated clean, and
+  published (export commits accumulate on main with `[skip netlify]`; last
+  publish `514cb778` = retinoids_after_40). Parallel `object_create` overwhelmed
+  the gateway (1 of 4 landed) → switched to strictly sequential; that held.
+  Each is a real record `object_inventory` returns, `unpublished_changes:false`,
+  Tier-1 autonomous. All five conversion criteria hold per article.
+- **`page_article` related grid.** Added a `content_grid` section
+  (`s_related`, `source:{kind:"related",algorithm:"tag_similarity"}`, `limit:3`,
+  `columns:3`, heading "More to read") at position 0 of `page_article`
+  (`content_detail`, publishes autonomously — the pageType review policy gates
+  only human-executed publishes). Dry-run clean → checkout → patch → publish
+  (`c69b5cfa`) → checkin. Every article now renders a selectable "More to read"
+  tile block (Slice D options apply to it).
+- **Single release.** `release_to_production` fired once (client timed out at
+  60s; the build hook POSTed server-side) — deploy `6a553f5260cc650008f4363b`
+  for `c69b5cfa` reached **ready** (finished 19:42:06Z), confirmed via
+  `deploy_status`. Production now reflects: 10 corpus articles + the demo
+  article + the `page_article` grid + `/object-showcase`, all in one build.
+- **`/object-showcase` QA page built** (`page_object_showcase`, route
+  `/object-showcase`, `pageType:standard`, `seo.robots.index:false` — a
+  technical surface deliberately not wired into any nav). 21 sections, one
+  below another, every placeable section type populated with throwaway data so
+  each block can be hovered and canvas-tested for bugs one by one. Store-backed,
+  published (export `fa2abbdb`), released.
+  - **VALIDATION-GAP FINDING (logged, not yet fixed): a standalone `card`
+    section passes `object_validate` but breaks the production build.** The
+    first showcase build failed (exit 2, "No component registered for section
+    type 'card'"): `card` is a grid *leaf* (rendered only inside a
+    `content_grid` via its `cards` source) and has no standalone component, yet
+    validation admitted it as a top-level page section. Fixed the page by
+    replacing the standalone `s_card` with an `s_cards` `content_grid`
+    (`source.kind:"cards"`), re-published, re-released (green). The engine gap
+    stands: `validateObject` should reject a leaf-only section type placed
+    directly on a page, at patch/create time, the same way it already blocks
+    disallowed section types. Candidate follow-up (own task) — not bundled here.
+
+- **Docs**: this entry; `object-inventory.md` articles section flipped to record
+  the corpus + related grid + the showcase QA surface + the wipe truth-up;
+  `conversion-map.md` article count updated. No code in this PR — the conversion
+  itself lives in the production store + the export commits already on main.
+
 ## Session 2026-07-13 J (LEGACY WIPE: 83 smoke-test .md posts deleted; ten-article content_item corpus seeded — awaiting the credentialed run)
 
 Wolf: "Old legacy articles can actually be wiped if it helps. I say wipe it.

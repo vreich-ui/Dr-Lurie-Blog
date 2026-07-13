@@ -108,7 +108,7 @@ trail. Flip one file to change the posture per type.
 | **site** (singleton)        | Global config: brand tokens, logo, chrome toggles, blog paths, and the default header/footer navigation.                                                                                              | One per site. **Boundary caveat: not yet wired to drive rendering — see below.**                                                                                                                                       |
 | **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
 | **product**                 | One sellable digital good (download / pay-to-unlock / tip-PWYW / free lead magnet): `slug` + presentation + commerce + a fulfillment union on `kind`. Long-form copy composes via `presentation.page_ref` → an ordinary Page (06-shop-module-plan §1–2). | Slug lowercase-hyphen + unique (→ `/shop/<slug>`); mode↔fields coherence enforced; **price cache + Stripe linkage are NOT agent-patchable** (`product_set_price` only, S3); `fulfillment.artifact_ref` must be a trusted private-store ref; **publishes review-required**. |
-| **content_item** (articles) | An article as an annotated NODE LIST (W7.3): every block carries `private.strategy` (hook/agitation/…/resolution) + `intent` plus commercial/rendering/chat metadata; `public.body` is plain text or a `rich_text.v1` document. Envelope carries the judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). `create_variant` clones a draft for A/B judging. Renders through the blog furniture at `/<slug>`, joining listings/tags/RSS automatically. | `req_*` ids (artifact trust preserved); slug lowercase-hyphen + unique across articles AND committed posts; ≥1 public content node to publish; node ids opaque (no strategy words); annotations NEVER render (leak rule); rich-text bodies limited to the renderable grammar (embeds blocked until resolvers exist). **Legacy committed posts stay on the old `save_json_blob_*` pipeline — not migrated (Wolf 2026-07-13).** |
+| **content_item** (articles) | An article as an annotated NODE LIST (W7.3): every block carries `private.strategy` (hook/agitation/…/resolution) + `intent` plus commercial/rendering/chat metadata; `public.body` is plain text or a `rich_text.v1` document. Envelope carries the judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). `create_variant` clones a draft for A/B judging. Renders through the blog furniture at `/<slug>`, joining listings/tags/RSS automatically. | `req_*` ids (artifact trust preserved); slug lowercase-hyphen + unique across articles AND committed posts; ≥1 public content node to publish; node ids opaque (no strategy words); annotations NEVER render (leak rule); rich-text bodies limited to the renderable grammar (embeds blocked until resolvers exist). **The 83 legacy committed posts were WIPED (Wolf 2026-07-13); the live corpus is 10 `content_item` objects + the demo, all store-backed.** Slug uniqueness still spans any committed posts should they return. |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
@@ -403,7 +403,7 @@ store-backed → CONVERTED (§1).** The three MOCK products stopped at
 approves each in /admin/objects and re-runs the same command (idempotent).
 Remaining launch gate: the LIVE Stripe exit test (needs keys).
 
-### Articles as objects (W7.3 + W7.8 + W7.9, 🟢 CONVERTED 2026-07-13)
+### Articles as objects (W7.3 + W7.8 + W7.9 + corpus, 🟢 CONVERTED 2026-07-13)
 
 `content_item` is the ninth governed type: the annotated-node article model
 (per-block strategy/intent — the behavioral framework — plus the envelope
@@ -431,15 +431,37 @@ taxonomy terms (`skin-science` category / `skincare-education` tag) don't
 exist in the production registry — the seed now carries
 `reflections`/`reflections` (the article_taxonomy check is registry-gated, so
 local rehearsals can't catch this class). Note: unpublish is still
-unsupported (OQ-2) — the demo stays live until edited. The LEGACY committed
-posts stay on the `save_json_blob_*` pipeline by ruling (2026-07-13): mostly
-junk, not worth migrating.
+unsupported (OQ-2) — the demo stays live until edited.
+
+**Corpus CONVERTED + LIVE (2026-07-13, credentialed run):** after the legacy
+wipe (all 83 `src/data/post/*.md` deleted — the `post` collection is now
+permanently empty), a **ten-article corpus** was seeded
+(`scripts/lib/articles-corpus-seed-data.mjs`, two per registry category) and
+run through `create → publish → release` over the session MCP connection. All
+ten `req_agent_*_20260713_01` articles (skin_barrier_basics, reactive_skin,
+minimal_routine, reading_labels, skin_after_40, retinoids_after_40,
+niacinamide, sunscreen, ten_step_myth, not_self_worth) are real production-store
+records (`object_inventory` returns them, `unpublished_changes:false`),
+published, and released — one build (deploy ready, 2026-07-13T19:42Z). Creates
+were run **strictly sequentially** — parallel `object_create` overwhelmed the
+MCP gateway. `page_article` (`content_detail`) gained a `content_grid`
+`s_related` (`source:{kind:"related",algorithm:"tag_similarity"}`, limit 3,
+columns 3, "More to read") at position 0, so every article renders a selectable
+related-tile block. The demo (`req_agent_object_model_demo_20260713_01`) stays
+LIVE at `/object-model-demo` as the annotation showcase.
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 
-- **Legacy committed posts (src/data/post/\*.md)** — stay on the
-  `save_json_blob_*` pipeline; deliberately NOT migrated to objects
-  (Wolf 2026-07-13). New articles are content_item objects.
+- **Legacy committed posts (src/data/post/\*.md)** — WIPED (Wolf 2026-07-13):
+  all 83 smoke-test `.md` deleted, the `post` collection is permanently empty
+  (`.gitkeep` holds the glob base; a benign Astro "empty collection" warning).
+  Every article is now a `content_item` object.
+- **`/object-showcase` (`page_object_showcase`)** — a QA/dev surface, not real
+  content: 21 sections covering every placeable section type, populated with
+  throwaway data, one below another, so each block can be hovered and
+  canvas-tested for bugs. `seo.robots.index:false`, deliberately unwired from
+  nav. Store-backed + released, but not part of the site IA — do not treat its
+  presence as a content gap.
 - **Real `template` objects** — ACTIVATED + CONVERTED at W2.5 (see "Singletons &
   templates"): three starter recipes store-backed in production + the instantiate
   tool live. Agents can create and evolve more freely.
