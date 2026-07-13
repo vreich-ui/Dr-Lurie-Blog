@@ -7,6 +7,43 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 J (LEGACY WIPE: 83 smoke-test .md posts deleted; ten-article content_item corpus seeded — awaiting the credentialed run)
+
+Wolf: "Old legacy articles can actually be wiped if it helps. I say wipe it.
+Perhaps we can convert up to ten for testing to the new schema. … you be the
+judge. It doesn't really matter. needs to be rewritten. GitHub needs to be
+cleaned too then." Recon confirmed the 83 `src/data/post/*.md` were
+smoke-test/SEO filler ("smoke-test article" literally in the excerpts; only
+10 even carried a category) — so this is a rewrite, not a migration.
+
+- **All 83 .md deleted** (`git rm`); a `.gitkeep` keeps the `post` collection
+  glob base. No page/section export or component referenced any post slug
+  (verified: no manual-grid picks, no content_embed, no hardcoded slugs) — the
+  deletion is reference-safe. The `post` collection is now permanently empty;
+  `load()` in utils/blog.ts guards the read (`.catch(() => [])`) and Astro logs
+  a benign "collection 'post' … is empty" line (same class as the pre-seed
+  articleObject warning) — build unaffected.
+- **Ten-article corpus** (`scripts/lib/articles-corpus-seed-data.mjs`): genuine
+  content_item articles, TWO per registry category
+  (skin-health / skincare / skin-after-40 / ingredients / reflections), fresh
+  slugs, full annotation layer (PAS-ish arc of hook→…→recommendation; a couple
+  carry node-wired claims). All 10 bodies validate against the live
+  content_item schema; taxonomy uses registry slugs only.
+- **Local full-state build proven**: the 10 exports materialized to
+  `src/data/site/articles/` + the demo = 11 articles → build 67 pages, all 5
+  category pages, 12 tag pages, the topics hub, and RSS (11 items) render; then
+  the temp exports were REMOVED (they must arrive store-backed via the run, not
+  committed). Committed-state build (demo only) = 37 pages, green.
+- **Gates**: 1210 + 49 tests green · astro check 0 · eslint/prettier clean.
+- **Status: DELETION + SEED READY, corpus NOT yet converted.** Next: merge +
+  deploy this PR, then the credentialed run —
+  `create → publish → release` each of the 10 content_item objects (fresh
+  slugs = no collision with anything), plus add a `related` content_grid to
+  `page_article` so the article "other articles" block becomes a selectable
+  tile (Slice D options apply). Records flip to CONVERTED after the run. Brief
+  pre-launch window between deploy and run where the blog shows only the demo
+  article — acceptable behind the SITE_NOT_YET_LIVE gate.
+
 ## Session 2026-07-13 I (CANVAS Slice D: related-grid options — random/tiles/columns — + save-button dirty state)
 
 Wolf: "Related-grid options do them. and also buttons like save draft need to

@@ -1,0 +1,4 @@
+# The legacy .md blog posts were retired 2026-07-13 (Wolf: "mostly junk,
+needs rewriting"). New articles are content_item OBJECTS — see
+docs/cms-architecture/08-articles-plan.md and scripts/lib/articles-corpus-seed-data.mjs.
+This directory is kept so the `post` content collection glob base always exists.
