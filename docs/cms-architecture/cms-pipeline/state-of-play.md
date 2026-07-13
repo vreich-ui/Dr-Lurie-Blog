@@ -7,6 +7,43 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 G (CANVAS Slice B: second field-test round — preload, human tray, image placeholders, button states, bullets)
+
+Wolf's second live round (screenshots) + three rulings: **W7.7 remainder ON
+HOLD** ("that UI is stale now. I need to rethink what the admin area is
+supposed to be like" — no TipTap panel or /admin/publish re-wire until his
+ruling); **metadata row = category + tags**; the rest shipped same-day
+(07-canvas §3i):
+
+- Metadata row: category + tag links on every article header (both
+  families, registry labels).
+- Record cache + preload (pay the wait up front): edit-mode entry warms one
+  get per visible object; chips/panels/tray/role editor open from memory;
+  writes invalidate; failures don't stick.
+- Pending tray humanized — "object · verb · location": object TITLE + a
+  history-derived summary of unpublished ops ("Image added to Resolution",
+  "Text edited in Hook · +1 more"); req\_\* ids demoted to tooltips.
+- Chip identity is the ROLE alone ("Hook · educate") — "article content"
+  boilerplate dropped from chip and panel header.
+- Image tool: thumbnails never show the broken-image glyph (load-gated +
+  neutral placeholder); a NEW image previews in place as an appended figure
+  on save; an emptied src removes its element.
+- Buttons: Save draft on the accent token (green was off-palette), full
+  hover/active/focus-visible/disabled states, "Saving…" in flight +
+  "✓ Saved" confirmation (restores on failure) — saveForm/roleForm/navForm.
+- Bullets (the "lists dropped, not editable" report): items[] is ALWAYS
+  offered on content blocks ("Bullet points", one per line) — the gap was
+  that the form only listed EXISTING fields, so a text block could never
+  gain a list; lists now also preview in place on save. Editor-facing field
+  labels throughout (Text/Heading/Kicker/Button text…).
+- **Gates**: 1205 + 49 tests green · astro check 0 · eslint/prettier clean ·
+  build 173 pages · **15-assertion Slice-B drive** on the built demo page
+  (metadata links; warm-cache proof — zero re-fetch before first save;
+  tray title + "Text edited in Hook · +1 more"; placeholder-not-broken;
+  accent save button; Saving…/Saved states; items wire + in-place <ul>) +
+  the 19-assertion W7.7 drive and 16-assertion Slice-A drive re-run green
+  (probe export recreated for the run, then removed).
+
 ## Session 2026-07-13 F (W7.7 CANVAS CAPABILITY SLICE: node palette + adSlot mockup bank + role panel + multi-image; upsert_node id-mint gap fixed)
 
 Same session as E, on Wolf's "continue to W7.7". The article body is now

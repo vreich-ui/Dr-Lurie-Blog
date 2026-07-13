@@ -4,6 +4,7 @@ import { Icon } from 'astro-icon/components';
 import Image from '~/components/common/Image.astro';
 
 import { getFormattedMonthYear } from '~/utils/utils';
+import { getPermalink } from '~/utils/permalinks';
 
 import type { Post } from '~/types';
 
@@ -47,6 +48,31 @@ const heroImageAspect = (() => {
           {post.readingTime && <span>{post.readingTime} min read</span>}
           {post.readingTime && <span aria-hidden="true">·</span>}
           <time datetime={String(post.publishDate)}>{getFormattedMonthYear(post.publishDate)}</time>
+          {
+            post.category && (
+              <>
+                <span aria-hidden="true">·</span>
+                <a
+                  class="capitalize hover:text-primary hover:underline"
+                  href={getPermalink(post.category.slug, 'category')}
+                >
+                  {post.category.title}
+                </a>
+              </>
+            )
+          }
+          {
+            post.tags && post.tags.length > 0 && (
+              <>
+                <span aria-hidden="true">·</span>
+                {post.tags.map((tag) => (
+                  <a class="hover:text-primary hover:underline" href={getPermalink(tag.slug, 'tag')}>
+                    #{tag.title}
+                  </a>
+                ))}
+              </>
+            )
+          }
         </p>
       </div>
 

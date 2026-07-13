@@ -321,6 +321,43 @@ sponsored` pre-filled — an editor cannot insert an undisclosed unit), **Ad
   stays the norm (the node is the annotation unit) — the gallery is the
   sanctioned multi-image option (Wolf, 2026-07-13).
 
+### 3i. Field-test refinements, round two (2026-07-13, Slice B)
+
+Eight fixes from Wolf's second live session (15-assertion drive + the two
+earlier drives re-run green):
+
+- **Metadata row**: category + tag links join "N min read · date" in the
+  SinglePost header (registry labels; both article families).
+- **Record preload**: entering edit mode warms a shared record cache for
+  every object on the page (one parallel get each) — chips, panels, the tray
+  and the role editor open from memory; writes invalidate their entry;
+  failed fetches never stick.
+- **Pending tray speaks human** ("object · verb · location"): rows show the
+  object's TITLE and a change summary derived from the record's history
+  since its last publish — "Image added to Resolution", "Text edited in
+  Hook · +2 more". The req\_\* id survives only as a tooltip.
+- **Chip/panel identity de-boilerplated**: an article block's chip is just
+  its role ("Hook · educate") — no "article content", no ids.
+- **Image placeholder**: the thumbnail never shows the browser's
+  broken-image glyph — hidden until an image actually loads; a neutral
+  "no image yet" box otherwise.
+- **In-place image preview**: a newly-added image previews as an appended
+  figure on the block immediately after save; an emptied src removes its
+  element (matching the text tools' behavior).
+- **Button system**: Save draft uses the accent (the green was off-palette),
+  full state set (hover/active/focus-visible/disabled), and is informative —
+  "Saving…" while in flight, "✓ Saved" confirmation, restore on failure.
+- **Bullet points**: ALWAYS offered on a content block ("Bullet points",
+  one per line) — text blocks can gain a list from the canvas (before,
+  lists were only editable where they already existed) — and the list
+  previews in place on save (create/update/remove the block's <ul>).
+  Field labels are editor-facing throughout (Text, Heading, Kicker,
+  Button text…).
+
+**Ruling recorded (Wolf, same session): the W7.7 remainder is ON HOLD** —
+the old admin-editor UI is stale and the admin area is being rethought; no
+TipTap panel work or /admin/publish re-wire until that lands.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The
