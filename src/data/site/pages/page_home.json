@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-12T16:29:19.503Z",
+    "at": "2026-07-13T07:36:20.525Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 87
+    "record_version": 92
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -30,8 +30,8 @@
             }
           }
         ],
-        "body": "<p>Late Starter Skin is a calm publishing space for people who skipped the skin-care boom, got burned by product noise, or only recently realized their skin needs attention.</p><p>Start with plain education, download the practical PDFs, join the newsletter if it helps, and consider the small offer shelf only when you feel oriented.</p>",
-        "heading": "Skin care for people who need it now and mistrust the market.",
+        "body": "<p>This is a calm publishing space for people who skipped the skin-care boom, got burned by product noise, or only recently realized their skin needs attention.</p><p>Start with plain education, download the practical PDFs, join the newsletter if it helps, and consider the small offer shelf only when you feel oriented.</p>",
+        "heading": "Dr. Lurié Skincare for people who need help now and mistrust the market.",
         "kicker": "For people who came late to skin care"
       },
       "id": "s_hero",
@@ -140,13 +140,13 @@
     }
   ],
   "seo": {
-    "description": "A DTC skin-care publishing space for people who arrived late, need help now, and mistrust the industry.",
+    "description": "A DTC skin-care publishing space from Dr. Lurié Skincare for people who arrived late, need help now, and mistrust the industry.",
     "ogImage": "/Social/og-home.jpg",
     "robots": {
       "follow": true,
       "index": true
     },
-    "title": "Late Starter Skin | Calm skin care for skeptical beginners"
+    "title": "Dr. Lurié Skincare | Calm skin care for skeptical late starters"
   },
-  "title": "Late Starter Skin | Calm skin care for skeptical beginners"
+  "title": "Dr. Lurié Skincare | Calm skin care for skeptical late starters"
 }
