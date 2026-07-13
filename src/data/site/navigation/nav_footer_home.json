@@ -1,14 +1,14 @@
 {
   "__generated": {
-    "at": "2026-07-07T19:06:49.046Z",
+    "at": "2026-07-13T08:49:52.780Z",
     "from": "objects/navigation/by-id/nav_footer_home.json",
-    "record_version": 35
+    "record_version": 39
   },
   "brand": {
     "descriptor": "Healthy Skin for Skincare Newcomers",
     "text": "Dr. Lurié Skin Care"
   },
-  "footNote": "\n    Educational content only — not medical advice. © Dr. Lurié.\n  ",
+  "footNote": "    Educational content only — not medical advice. © Dr. Lurié Skincare.  ",
   "groups": [
     {
       "id": "g_start_learning",
