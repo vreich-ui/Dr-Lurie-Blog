@@ -1,0 +1,81 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:18:55.464Z",
+    "from": "objects/content_item/by-id/req_agent_ten_step_myth_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "More steps sell more product. They do not make better skin.",
+  "description": "A short reflection on why elaborate routines persist, and what skin actually needs.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "persuade",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "The ten-step routine is a marketing achievement, not a dermatological one. Each step is another product to sell — and another chance to irritate skin that was fine with three.",
+        "eyebrow": "Reflections"
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "persuade",
+        "strategy": "agitation"
+      },
+      "public": {
+        "body": "The promise is control: do more, and skin will behave. But skin does not reward effort linearly. Past a point, more steps mean more ingredients competing, more irritation, and more money spent chasing a result the basics already delivered."
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "Elaborate routines spread as a lifestyle aesthetic — satisfying to perform, easy to photograph. That is a fine hobby. It is not a requirement for healthy skin, and it should not feel like one.",
+        "title": "Where it came from"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "If you enjoy a long routine, enjoy it. But if it has started to feel like a chore or a cost, know that subtracting is allowed — and your skin will very likely thank you."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Read more reflections"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "A short reflection on why elaborate routines persist, and what skin actually needs."
+  },
+  "slug": "the-ten-step-myth",
+  "taxonomy": {
+    "category": "reflections",
+    "tags": [
+      "reflections",
+      "marketing-claims"
+    ]
+  },
+  "title": "The myth of the ten-step routine"
+}
