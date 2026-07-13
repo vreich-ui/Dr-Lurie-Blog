@@ -199,6 +199,12 @@ body.dl-em-on [data-cms-section-id].dl-em-draft>*,body.dl-em-on [data-cms-nav-ob
   color:var(--dlem-text);font:600 10.5px var(--dlem-font)}
 .dl-em-alg:hover{border-color:var(--dlem-text)}
 .dl-em-alg option{color:var(--dlem-text);background:var(--dlem-surface)}
+/* Compact tile-count / columns steppers (related grids). */
+.dl-em-num{width:38px;height:24px;padding:2px 2px 2px 6px;border-radius:5px;
+  border:1px solid color-mix(in srgb,var(--dlem-text) 30%,transparent);
+  background:color-mix(in srgb,var(--dlem-text) 8%,transparent);color:var(--dlem-text);
+  font:600 10.5px var(--dlem-font)}
+.dl-em-num:hover,.dl-em-num:focus{border-color:var(--dlem-text);outline:none}
 .dl-em-gaplayer{position:absolute;top:0;left:0;width:100%;height:0;z-index:99989;display:none;pointer-events:none}
 body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-gap{position:absolute;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;
@@ -574,7 +580,42 @@ export const mountEditMode = (options: MountOptions): void => {
   const busy = (label: string): HTMLElement =>
     log('sys', `<span class="dl-em-busy"><i></i><i></i><i></i></span>${escapeHtml(label)}`);
 
-  /** Busy → brief success-confirmation state for a save-style button. */
+  // ── save-button dirty state (Slice D) ─────────────────────────────────────
+  // A form's Save draft is disabled when the fields match the last-saved
+  // baseline (nothing to save). Any edit enables it; a successful save
+  // re-baselines to the just-saved values → disabled again (after a brief
+  // "✓ Saved"). One serializer covers every form field kind.
+  const serializeForm = (): string => {
+    const parts: string[] = [];
+    formEl
+      .querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >('[data-em-field],[data-em-role-field],[data-em-nav-field]')
+      .forEach((el) => {
+        const key =
+          el.getAttribute('data-em-field') ??
+          el.getAttribute('data-em-role-field') ??
+          el.getAttribute('data-em-nav-field');
+        parts.push(`${key}${el.value}`);
+      });
+    return parts.join('');
+  };
+  let saveBaseline = '';
+  const saveButtonEl = (): HTMLButtonElement | null => formEl.querySelector('[data-em-form-save]');
+  const refreshSaveState = (): void => {
+    const button = saveButtonEl();
+    if (!button || button.classList.contains('dl-em-busybtn')) return;
+    button.disabled = serializeForm() === saveBaseline;
+  };
+  const captureSaveBaseline = (): void => {
+    saveBaseline = serializeForm();
+    refreshSaveState();
+  };
+  // One delegated listener (formEl outlives every re-render).
+  formEl.addEventListener('input', refreshSaveState);
+  formEl.addEventListener('change', refreshSaveState);
+
+  /** Busy → brief "✓ Saved" → re-baseline (disabled) on success; restore on failure. */
   const buttonBusy = (button: HTMLButtonElement | null): { done: (ok: boolean) => void } => {
     if (!button) return { done: () => {} };
     const original = button.innerHTML;
@@ -586,13 +627,14 @@ export const mountEditMode = (options: MountOptions): void => {
         button.classList.remove('dl-em-busybtn');
         if (!ok) {
           button.innerHTML = original;
-          button.disabled = false;
+          refreshSaveState();
           return;
         }
         button.innerHTML = `${ICON_CHECK} Saved`;
         window.setTimeout(() => {
           button.innerHTML = original;
-          button.disabled = false;
+          // The fields now equal what was saved → re-baseline → disabled.
+          captureSaveBaseline();
         }, 900);
       },
     };
@@ -1258,6 +1300,7 @@ export const mountEditMode = (options: MountOptions): void => {
     tag_similarity: 'Similar',
     same_category: 'Same category',
     latest: 'Latest',
+    random: 'Random',
   };
 
   // ── article-block roles (Wolf, 2026-07-13): what an editor needs at the
@@ -1342,7 +1385,12 @@ export const mountEditMode = (options: MountOptions): void => {
               ([value, label]) => `<option value="${value}"${value === algorithm ? ' selected' : ''}>${label}</option>`
             )
             .join('') +
-          `</select>`
+          `</select>` +
+          // Tiles (limit) + columns — how many articles, how many per row.
+          `<input class="dl-em-num" data-em-tiles type="number" min="1" max="12" ` +
+          `value="${escapeHtml(region.dataset.cmsRelatedLimit ?? '4')}" title="Tiles" aria-label="Tiles">` +
+          `<input class="dl-em-num" data-em-cols type="number" min="1" max="4" ` +
+          `value="${escapeHtml(region.dataset.cmsRelatedColumns ?? '2')}" title="Columns" aria-label="Columns">`
         : '') +
       `<button class="dl-em-tool dl-em-edit" title="Edit text" aria-label="Edit text">${ICON_PENCIL}</button>` +
       (hasImage
@@ -1365,7 +1413,22 @@ export const mountEditMode = (options: MountOptions): void => {
     chip.querySelector('.dl-em-ask')?.addEventListener('click', () => void openPanel(target, region, 'ai'));
     chip.querySelector('.dl-em-del')?.addEventListener('click', () => void deleteRegion(target, region));
     chip.querySelector<HTMLSelectElement>('[data-em-alg]')?.addEventListener('change', (event) => {
-      void applyAlgorithm(target, region, (event.target as HTMLSelectElement).value);
+      void applyRelated(
+        target,
+        region,
+        { source: { kind: 'related', algorithm: (event.target as HTMLSelectElement).value } },
+        `selection “${ALGORITHM_LABELS[(event.target as HTMLSelectElement).value] ?? 'updated'}”`
+      );
+    });
+    chip.querySelector<HTMLInputElement>('[data-em-tiles]')?.addEventListener('change', (event) => {
+      const limit = Math.max(1, Math.min(12, Number((event.target as HTMLInputElement).value) || 4));
+      region.dataset.cmsRelatedLimit = String(limit);
+      void applyRelated(target, region, { limit }, `${limit} tiles`);
+    });
+    chip.querySelector<HTMLInputElement>('[data-em-cols]')?.addEventListener('change', (event) => {
+      const columns = Math.max(1, Math.min(4, Number((event.target as HTMLInputElement).value) || 2));
+      region.dataset.cmsRelatedColumns = String(columns);
+      void applyRelated(target, region, { columns }, `${columns} columns`);
     });
     positionChip(region);
     if (isNode && target.nodeId) {
@@ -1380,13 +1443,20 @@ export const mountEditMode = (options: MountOptions): void => {
   };
 
   /**
-   * Chip dropdown → draft: patch the related grid's selection algorithm
-   * through the normal reviewable path (checkout → update_section_data).
-   * Only `source.algorithm` changes — the source keeps kind 'related', so the
-   * deep-merge is key-stable. Shared grids route to their sec_* object.
+   * Chip control → draft: patch a related grid's config (algorithm / tile
+   * count / columns) through the normal reviewable path (checkout →
+   * update_section_data). Fields deep-merge; `source` always re-sends
+   * kind:'related' so the union stays key-stable. Shared grids route to their
+   * sec_* object. `algorithm` mirrors to the data attribute so the algorithm
+   * still renders on a re-hover without a record round-trip.
    */
-  const applyAlgorithm = async (target: EditTarget, region: HTMLElement, algorithm: string): Promise<void> => {
-    setStatus(`Switching selection to “${ALGORITHM_LABELS[algorithm] ?? algorithm}”…`);
+  const applyRelated = async (
+    target: EditTarget,
+    region: HTMLElement,
+    fields: Record<string, unknown>,
+    label: string
+  ): Promise<void> => {
+    setStatus(`Setting ${label}…`);
     const objectSession = session(target.objectType, target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
@@ -1403,17 +1473,16 @@ export const mountEditMode = (options: MountOptions): void => {
       setStatus('Could not resolve the section instance to patch.');
       return;
     }
-    const outcome = await objectSession.patch([
-      { op: 'update_section_data', section_id: sectionId, fields: { source: { kind: 'related', algorithm } } },
-    ]);
+    const outcome = await objectSession.patch([{ op: 'update_section_data', section_id: sectionId, fields }]);
     if (!outcome.ok) {
       setStatus(`Not saved: ${outcome.error}`);
       return;
     }
-    region.dataset.cmsRelatedAlgorithm = algorithm;
+    const source = fields.source as { algorithm?: string } | undefined;
+    if (source?.algorithm) region.dataset.cmsRelatedAlgorithm = source.algorithm;
     invalidateRecord(target.objectType, target.objectId);
     region.classList.add('dl-em-draft');
-    setStatus(`Selection set to “${ALGORITHM_LABELS[algorithm] ?? algorithm}” — draft saved, not published.`);
+    setStatus(`Set ${label} — draft saved, not published.`);
     await refreshPending();
   };
 
@@ -1970,6 +2039,7 @@ export const mountEditMode = (options: MountOptions): void => {
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveForm(state, fields));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
+    captureSaveBaseline(); // starts disabled — nothing to save until an edit
   };
 
   // ── role / annotation editor (W7.7) ───────────────────────────────────────
@@ -2010,6 +2080,7 @@ export const mountEditMode = (options: MountOptions): void => {
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveRoleForm(state));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
+    captureSaveBaseline();
   };
 
   const saveRoleForm = async (state: PanelState): Promise<void> => {
@@ -2090,6 +2161,7 @@ export const mountEditMode = (options: MountOptions): void => {
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveNavForm(state, fields));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
+    captureSaveBaseline();
   };
 
   const saveNavForm = async (state: PanelState, fields: NavEditField[]): Promise<void> => {

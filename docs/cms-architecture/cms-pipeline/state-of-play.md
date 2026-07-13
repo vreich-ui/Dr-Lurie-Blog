@@ -7,6 +7,35 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 I (CANVAS Slice D: related-grid options — random/tiles/columns — + save-button dirty state)
+
+Wolf: "Related-grid options do them. and also buttons like save draft need to
+show have inactive state when there's nothing to save. After save 'Saved'
+should appear for a relatively short time and then button should become
+inactive." (07-canvas §3k.)
+
+- **`random` algorithm**: deterministic seeded shuffle
+  (src/utils/seeded-shuffle.ts, pure + unit-tested — same seed → same order,
+  no build-diff churn; seeded by the anchor post, salt otherwise). Wired
+  through schema → resolver (section-resolve-deps) → chip dropdown.
+- **Tiles + columns**: content_grid gains optional `columns` (1–4, default 2
+  → byte-identical unset; ContentGrid.astro uses literal grid-cols classes so
+  Tailwind JIT emits them). The related chip grows inline `tiles` (limit) +
+  `columns` steppers next to the algorithm dropdown; all three patch
+  update_section_data (applyRelated, key-stable deep-merge). Annotations
+  emit -limit/-columns alongside -algorithm.
+- **Save-button dirty state**: disabled when the form matches the last-saved
+  baseline; enabled on edit; "✓ Saved" briefly then re-baseline → disabled.
+  One serializer + delegated input/change listener over edit/image/role/nav
+  forms.
+- **Gates**: 1210 + 49 tests (seeded-shuffle determinism/permutation/purity;
+  annotations emit tile+columns) · astro check 0 · eslint/prettier clean ·
+  **build-diff EMPTY (174/174 identical — columns default is byte-identical)**
+  · **13-assertion Slice-D drive** (pristine-disabled → edit-enabled →
+  revert-disabled → Saving…/Saved/disabled + one update_node; Random in the
+  dropdown; tiles/columns steppers show current values and patch
+  limit/columns/source.algorithm) + the A/B/C drives re-run green.
+
 ## Session 2026-07-13 H (CANVAS Slice C: delete on every tile + glass restyle + right-rail anchor + tile→accordion morph)
 
 Wolf's third field-test round, same session: the tile becomes an interaction

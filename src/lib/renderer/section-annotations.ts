@@ -23,27 +23,35 @@ export type SectionAnnotationAttrs = {
   'data-cms-section-type': string;
   'data-cms-shared-object'?: string;
   'data-cms-related-algorithm'?: string;
+  'data-cms-related-limit'?: string;
+  'data-cms-related-columns'?: string;
 };
 
-/** The current algorithm of a `related` content_grid, or undefined. */
-const relatedAlgorithmOf = (type: string, data: unknown): string | undefined => {
+/** The current `related` config of a content_grid — algorithm + layout knobs. */
+const relatedConfigOf = (
+  type: string,
+  data: unknown
+): { algorithm: string; limit?: number; columns?: number } | undefined => {
   if (type !== 'content_grid') return undefined;
-  const source = (data as { source?: { kind?: string; algorithm?: string } }).source;
-  return source?.kind === 'related' ? source.algorithm : undefined;
+  const grid = data as { source?: { kind?: string; algorithm?: string }; limit?: number; columns?: number };
+  if (grid.source?.kind !== 'related' || !grid.source.algorithm) return undefined;
+  return { algorithm: grid.source.algorithm, limit: grid.limit, columns: grid.columns };
 };
 
 export const sectionAnnotationAttrs = (
   pageObjectId: string,
   section: Pick<RenderableSection, 'id' | 'type' | 'sharedObjectId'> & Partial<Pick<RenderableSection, 'data'>>
 ): SectionAnnotationAttrs => {
-  // A `related` grid announces its CURRENT algorithm so the canvas chip can
-  // offer the selection dropdown without a record round-trip.
-  const relatedAlgorithm = relatedAlgorithmOf(section.type, section.data);
+  // A `related` grid announces its CURRENT algorithm + tile count + columns so
+  // the canvas chip can offer the controls without a record round-trip.
+  const related = relatedConfigOf(section.type, section.data);
   return {
     'data-cms-object-id': pageObjectId,
     'data-cms-section-id': section.id,
     'data-cms-section-type': section.type,
     ...(section.sharedObjectId ? { 'data-cms-shared-object': section.sharedObjectId } : {}),
-    ...(relatedAlgorithm ? { 'data-cms-related-algorithm': relatedAlgorithm } : {}),
+    ...(related ? { 'data-cms-related-algorithm': related.algorithm } : {}),
+    ...(related?.limit !== undefined ? { 'data-cms-related-limit': String(related.limit) } : {}),
+    ...(related?.columns !== undefined ? { 'data-cms-related-columns': String(related.columns) } : {}),
   };
 };

@@ -147,7 +147,11 @@ export const CONTENT_GRID_MAX_CARDS = 8;
  * the rendering surface provides one (the article route passes it); without
  * one they degrade to `latest`, so the same section is legal on any page.
  */
-export const relatedAlgorithmSchema = z.enum(['tag_similarity', 'same_category', 'latest']);
+// `random` (2026-07-13) is a DETERMINISTIC seeded shuffle — seeded by the
+// anchor post id when present (varied per article, stable across builds so it
+// never churns the build-diff) and by a fixed salt otherwise. A static site
+// has no per-request randomness; this is "a different-looking set per page."
+export const relatedAlgorithmSchema = z.enum(['tag_similarity', 'same_category', 'latest', 'random']);
 export type RelatedAlgorithm = z.infer<typeof relatedAlgorithmSchema>;
 
 export const contentGridSourceSchema = z.discriminatedUnion('kind', [
@@ -244,6 +248,10 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     body: richTextSchema.optional(),
     source: contentGridSourceSchema,
     limit: z.number().int().positive(),
+    // Tiles per row (2026-07-13). Optional; the renderer defaults to 2, so an
+    // unset grid is byte-identical to before. `limit` sets the tile count;
+    // rows follow as ceil(limit / columns).
+    columns: z.number().int().min(1).max(4).optional(),
     anchor: z.string().optional(),
   }),
   sectionVariant('newsletter_signup', {

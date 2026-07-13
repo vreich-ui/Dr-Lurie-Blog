@@ -90,7 +90,7 @@ export const buildSectionResolveDeps = async (
   if (needsContentGrid || needsContentEmbed) {
     // fetchPosts() is already published-only (published_time <= now) and sorted
     // newest-first — exactly the "published content item" the schema requires.
-    const { fetchPosts, rankRelatedPosts } = await import('~/utils/blog');
+    const { fetchPosts, rankRelatedPosts, pickRandomPosts } = await import('~/utils/blog');
     const posts = await fetchPosts();
     if (needsContentGrid) {
       const toCard = (post: (typeof posts)[number]) => ({
@@ -129,6 +129,12 @@ export const buildSectionResolveDeps = async (
           const current = context.relatedToPostId
             ? posts.find((candidate) => candidate.id === context.relatedToPostId)
             : undefined;
+          if (algorithm === 'random') {
+            // Deterministic seeded shuffle — varies per article, never churns
+            // the build. Works with or without an anchor (see pickRandomPosts).
+            const seed = current ? `related:${current.id}` : 'related:site';
+            return pickRandomPosts(posts, current?.slug, seed, limit).map(toCard);
+          }
           if (!current || algorithm === 'latest') {
             return newestFirst(posts.filter((post) => post.id !== context.relatedToPostId))
               .slice(0, limit)
