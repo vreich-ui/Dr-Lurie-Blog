@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-13T11:41:00.737Z",
+    "at": "2026-07-13T14:56:07.354Z",
     "from": "objects/content_item/by-id/req_agent_object_model_demo_20260713_01.json",
-    "record_version": 11
+    "record_version": 16
   },
   "claims": {
     "claim_list": [
@@ -44,6 +44,11 @@
       },
       "public": {
         "body": "Each block carries its own job: one opens the story, one carries the evidence, one closes with a next step. Editors see the text; the system also knows each block’s role, so suggestions and reviews respect the structure instead of flattening it.",
+        "media": {
+          "alt": "Tying shoes ",
+          "src": "/img/req_canvas_req_agent_object_model_demo_20260713_01_20260713_01/902a10e83ad178715fe2fb100918cc0e69ccfb318f5787df3ceafedd28820bf5.jpg",
+          "type": "image"
+        },
         "title": "Why blocks instead of one big page?"
       }
     },
