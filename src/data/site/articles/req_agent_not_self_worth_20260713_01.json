@@ -1,0 +1,79 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:20:09.024Z",
+    "from": "objects/content_item/by-id/req_agent_not_self_worth_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "Caring for your skin is fine. Tying your value to it is not the same thing.",
+  "description": "A short reflection on the line between skin care and self-worth.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Somewhere along the way, clear skin became shorthand for discipline, health, even virtue. It is none of those. It is skin."
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "agitation"
+      },
+      "public": {
+        "body": "The pressure is quiet but constant: a breakout reads as a failure, a wrinkle as neglect. That framing sells product, and it borrows your self-worth as collateral. You can decline the loan."
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "Skin responds to genes, hormones, sleep, stress, and age — most of which you do not control. A good routine helps at the margins. It does not, and cannot, measure whether you are trying hard enough as a person.",
+        "title": "What skin actually reflects"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Care for your skin the way you would care for a houseplant: attentively, kindly, and without moral stakes. It will do better, and so will you."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Browse the library"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "A short reflection on the line between skin care and self-worth."
+  },
+  "slug": "skincare-is-not-self-worth",
+  "taxonomy": {
+    "category": "reflections",
+    "tags": [
+      "reflections"
+    ]
+  },
+  "title": "Skincare is not self-worth"
+}
