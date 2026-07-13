@@ -49,7 +49,7 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-12, thirty-seven objects are CONVERTED** (all via credentialed
+**As of 2026-07-13, forty objects are CONVERTED** (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
@@ -66,7 +66,10 @@ at the bottom. **W6 (2026-07-12) added six CONVERTED listing/article page
 objects** (see "Listing & article surfaces") — Wolf's credentialed run the same
 day went all-green: store-backed, every permitted op round-tripped, published
 (export commits `7956b13`…`b0f8d90`), `released:true`; store === seed ===
-export byte-verified (record_version 11 across all six).
+export byte-verified (record_version 11 across all six). **W5's credentialed
+run (2026-07-13) added the three previously hand-coded pages**
+(`page_shop_preview`, `page_pricing`, `page_services` — see §1): the
+hand-coded-page backlog is empty for good.
 
 ### Status legend
 
@@ -268,23 +271,26 @@ What still has to become a real object for Dr. Lurié to function as a full CMS 
 i.e. for an agent (or a human via the admin UI) to edit **every meaningful part**
 of the live site through the one governed workflow. Roughly in priority order.
 
-### 1. Remaining hand-coded pages → page objects 🔵 SEEDED (W5, 2026-07-12) — awaiting the credentialed run
+### 1. Remaining hand-coded pages → page objects 🟢 CONVERTED (W5, credentialed run 2026-07-13)
 
-The last three hand-coded route files are DELETED; all three pages render from
-committed page-object exports via the object-page catch-all. Built per
+The last three hand-coded route files are DELETED; all three pages are
+store-backed page objects served by the object-page catch-all. Built per
 [`design-principles.md`](design-principles.md) from three NEW REUSABLE section
 types (`steps`, `content_split`, `pricing_table`) + existing generics — no
 bespoke per-page types (`feature_grid` deliberately not minted: `content_grid`
-`cards` already covers icon grids). **Rendered + seeded, NOT yet converted:**
-store records exist only in the local rehearsal; the credentialed
-`--production --release` run with `scripts/lib/pages-w5-seed-data.mjs` flips
-these to CONVERTED.
+`cards` already covers icon grids). The credentialed `--production --release`
+run drilled every permitted op, published, and released all three (store ===
+export; `object_inventory` returns them). **This empties the hand-coded-page
+backlog for good — every routable page on the site now renders from a page
+object.** (The three MOCK products the pricing tiers reference stay at
+`approval_required` — see §6; the pages render from the already-committed
+product exports regardless.)
 
 | Object              | Route                     | Status / composition                                                                                                                                                              |
 | ------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `page_pricing`      | `/pricing`                | SEEDED — lede + `pricing_table` (tiers REFERENCE the three products; price/availability/CTA resolve from commerce data at build) + `steps` + faq + cta_banner. MOCK copy (Wolf 2026-07-12). |
-| `page_services`     | `/services`               | SEEDED — lede + `content_split` + `content_grid` cards (icon grid) + cta_banner. MOCK copy (Wolf 2026-07-12).                                                                       |
-| `page_shop_preview` | `/solutions/shop-preview` | SEEDED — REAL copy verbatim as one `content_split` (the bespoke shop-hero + scoped styles generalized into the component). Nav route-kind links unchanged.                          |
+| `page_pricing`      | `/pricing`                | 🟢 CONVERTED — lede + `pricing_table` (tiers REFERENCE the three products; price/availability/CTA resolve from commerce data at build) + `steps` + faq + cta_banner. MOCK copy (Wolf 2026-07-12). |
+| `page_services`     | `/services`               | 🟢 CONVERTED — lede + `content_split` + `content_grid` cards (icon grid) + cta_banner. MOCK copy (Wolf 2026-07-12).                                                                       |
+| `page_shop_preview` | `/solutions/shop-preview` | 🟢 CONVERTED — REAL copy verbatim as one `content_split` (the bespoke shop-hero + scoped styles generalized into the component). Nav route-kind links unchanged.                          |
 
 ### 2. Real `site` object 🟢 CONVERTED (W4, credentialed run 2026-07-11)
 
@@ -390,10 +396,12 @@ lost the email". W5 also fixed a latent S2 bug: the productObject
 collection's entry ids were the product SLUG (Astro's glob loader prefers
 a top-level `slug` field), so the buy box embedded a product_id the
 checkout functions could never resolve — `generateId` now pins ids to the
-filename (= object id). Remaining: the credentialed production run
-(products stop at `approval_required` → Wolf approves in /admin/objects;
-same run publishes the three W5 pages) and the LIVE Stripe exit test
-(launch gate).
+filename (= object id). **The credentialed `--production --release` run
+happened 2026-07-13: the three W5 PAGES are published + released +
+store-backed → CONVERTED (§1).** The three MOCK products stopped at
+`approval_required` as designed — they flip to converted once Wolf
+approves each in /admin/objects and re-runs the same command (idempotent).
+Remaining launch gate: the LIVE Stripe exit test (needs keys).
 
 ### Articles as objects (W7.3 + W7.8, BUILT 2026-07-13 — awaiting the credentialed run)
 

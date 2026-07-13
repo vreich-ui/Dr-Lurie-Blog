@@ -7,7 +7,7 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
-## Session 2026-07-13 S (W7.3 + W7.8 BUILT: content_item is the ninth governed type; article bodies on the canvas — awaiting the credentialed run)
+## Session 2026-07-13 B (W7.3 + W7.8 BUILT: content_item is the ninth governed type; article bodies on the canvas — awaiting the credentialed run)
 
 Wolf: "Finish W7 rich text with article migration. The committed posts can be
 ignored, they are mostly junk and are not worth the effort. The article
@@ -109,6 +109,33 @@ W7.5 alias layer (legacy tools untouched this session; the ~31 article tool
 names still serve only the .md pipeline). (3) A locally deleted article
 export needs `node_modules/.astro` cleared (dev-cache only; CI/Netlify build
 clean).
+
+## Session 2026-07-13 (W5 CREDENTIALED RUN: the three hand-coded pages are CONVERTED — the hand-coded-page backlog is EMPTY)
+
+Wolf ran the credentialed `--production --release` driver against the live
+MCP endpoint with `scripts/lib/pages-w5-seed-data.mjs`. Result (verbatim
+from the run): `page_shop_preview`, `page_pricing`, `page_services` each
+`ensure created → drill every permitted op → published`, then
+`contract page 6/6`, `inventory` returns all three, and
+`release_to_production — live at commit`. **All five conversion criteria now
+hold for the three pages** (rendering was proven in `dist` at build time —
+172 pages, tiers showing $19/Free/Pay-what-you-want — the public URL is
+still 403 behind the pre-launch `SITE_NOT_YET_LIVE` gate, so store-side
+proof is the driver's own published+released+inventory, not a public
+fetch). The server committed the page exports to main
+(`Publish page: page_{shop_preview,pricing,services}`). This closes the
+plan's "after S2/S3" conversions — **every routable page on the site now
+renders from a page object; zero hand-coded page routes remain.**
+
+Still open (unchanged, all Wolf-side): the three MOCK products
+(`prod_barrier_repair_guide`, `prod_starter_checklist`,
+`prod_support_the_work`) stopped at `approval_required` exactly as the
+review-required gate intends — approve each in /admin/objects and re-run
+the same idempotent command to convert them too. Launch gates: the LIVE
+Stripe test-mode exit run (needs STRIPE_MODE + both key pairs +
+PURCHASE_TOKEN_SECRET), PUBLISH_SECRET rotation, and the
+`SITE_NOT_YET_LIVE` flip. Docs flipped in this same change: object-inventory
+§1 (SEEDED → CONVERTED) and conversion-map (HAND-CODED PAGES node + W5 row).
 
 ## Session 2026-07-12 R (CANVAS Tier-1 surfaces: article pages, chrome, related-articles dropdown)
 
