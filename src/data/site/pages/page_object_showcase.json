@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-13T18:21:07.190Z",
+    "at": "2026-07-13T18:25:11.944Z",
     "from": "objects/page/by-id/page_object_showcase.json",
-    "record_version": 2
+    "record_version": 7
   },
   "pageType": "standard",
   "route": "/object-showcase",
@@ -328,18 +328,31 @@
     },
     {
       "data": {
-        "description": "The reusable leaf a grid holds — shown standalone here.",
-        "link": {
-          "label": "Open",
-          "target": {
-            "href": "/learn/library",
-            "kind": "route"
-          }
-        },
-        "title": "A single card"
+        "columns": 3,
+        "heading": "A grid of curated cards",
+        "kicker": "Cards",
+        "limit": 3,
+        "source": {
+          "cards": [
+            {
+              "description": "A curated card cell — the reusable leaf a grid holds.",
+              "icon": "tabler:check",
+              "title": "First card"
+            },
+            {
+              "description": "Another cell, no icon.",
+              "title": "Second card"
+            },
+            {
+              "description": "A third cell.",
+              "title": "Third card"
+            }
+          ],
+          "kind": "cards"
+        }
       },
-      "id": "s_card",
-      "type": "card"
+      "id": "s_cards",
+      "type": "content_grid"
     },
     {
       "data": {
