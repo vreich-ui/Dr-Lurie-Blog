@@ -1,0 +1,361 @@
+{
+  "__generated": {
+    "at": "2026-07-13T18:21:07.190Z",
+    "from": "objects/page/by-id/page_object_showcase.json",
+    "record_version": 2
+  },
+  "pageType": "standard",
+  "route": "/object-showcase",
+  "sections": [
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Primary action",
+            "style": "primary",
+            "target": {
+              "href": "https://example.com",
+              "kind": "external"
+            }
+          },
+          {
+            "label": "Secondary",
+            "style": "secondary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>A hero block with a heading, intro copy, and two buttons.</p>",
+        "heading": "Hero section",
+        "kicker": "Showcase"
+      },
+      "id": "s_hero",
+      "type": "hero"
+    },
+    {
+      "data": {
+        "body": "<h2>Prose block</h2><p>A paragraph with <strong>bold</strong>, <em>italic</em>, and a <a href=\"https://example.com\">link</a>.</p><h3>A subheading</h3><ul><li>List item one</li><li>List item two</li></ul>"
+      },
+      "id": "s_prose",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Continue",
+            "style": "primary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>Lead-in copy for an interior page section.</p>",
+        "heading": "Lede header",
+        "kicker": "Interior"
+      },
+      "id": "s_lede",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "heading": "This is for you if…",
+        "items": [
+          "You want to test the canvas on every block",
+          "You are hunting for bugs",
+          "You like fully populated demo data"
+        ],
+        "kicker": "For you"
+      },
+      "id": "s_check",
+      "type": "checklist"
+    },
+    {
+      "data": {
+        "body": "<p>A short bio paragraph introducing the person behind the site.</p>",
+        "disclaimer": "Educational content only. Not medical advice.",
+        "heading": "Dr. Lurié",
+        "kicker": "About",
+        "portrait": {
+          "alt": "Portrait of Dr. Lurié",
+          "src": "/images/dr-lurie-portrait4.jpeg"
+        },
+        "trustNotes": [
+          "Board-certified dermatologist",
+          "Twenty years in practice"
+        ]
+      },
+      "id": "s_bio",
+      "type": "bio"
+    },
+    {
+      "data": {
+        "body": "<p>A related-articles grid with the Slice D options.</p>",
+        "columns": 3,
+        "heading": "Related articles grid",
+        "kicker": "Reading",
+        "limit": 3,
+        "source": {
+          "algorithm": "latest",
+          "kind": "related"
+        }
+      },
+      "id": "s_grid",
+      "type": "content_grid"
+    },
+    {
+      "data": {
+        "body": "<p>No spam, unsubscribe anytime.</p>",
+        "consentText": "I agree to receive occasional emails.",
+        "formName": "newsletter-showcase",
+        "heading": "Get one useful letter a month"
+      },
+      "id": "s_news",
+      "type": "newsletter_signup"
+    },
+    {
+      "data": {
+        "description": "Fill in the form and we will get back to you.",
+        "formName": "contact-showcase",
+        "heading": "Contact us",
+        "subtitle": "We usually reply within a day."
+      },
+      "id": "s_contact",
+      "type": "contact_form"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Start here",
+            "style": "primary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>One sentence on why you should act.</p>",
+        "heading": "Ready for the next step?"
+      },
+      "id": "s_cta",
+      "type": "cta_banner"
+    },
+    {
+      "data": {
+        "heading": "Frequently asked questions",
+        "items": [
+          {
+            "a": "<p>It is a QA showcase, not linked in navigation.</p>",
+            "q": "Is this a real page?"
+          },
+          {
+            "a": "<p>Yes — hover any block in edit mode.</p>",
+            "q": "Can I edit every block?"
+          }
+        ]
+      },
+      "id": "s_faq",
+      "type": "faq"
+    },
+    {
+      "data": {
+        "heading": "A list of links",
+        "links": [
+          {
+            "label": "The library",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "An external link",
+            "target": {
+              "href": "https://example.com",
+              "kind": "external"
+            }
+          }
+        ]
+      },
+      "id": "s_links",
+      "type": "link_list"
+    },
+    {
+      "data": {
+        "heading": "Product preview",
+        "limit": 3,
+        "source": {
+          "items": [
+            "prod_barrier_repair_guide",
+            "prod_starter_checklist",
+            "prod_support_the_work"
+          ],
+          "kind": "manual"
+        }
+      },
+      "id": "s_products",
+      "type": "product_preview"
+    },
+    {
+      "data": {
+        "heading": "How it works",
+        "items": [
+          {
+            "description": "Do the first thing.",
+            "title": "First step"
+          },
+          {
+            "description": "Then the second.",
+            "title": "Second step"
+          },
+          {
+            "description": "Finally, the third.",
+            "title": "Third step"
+          }
+        ],
+        "kicker": "Process"
+      },
+      "id": "s_steps",
+      "type": "steps"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Learn more",
+            "style": "primary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>A paragraph of copy beside one or two images.</p>",
+        "heading": "Text and media, side by side",
+        "images": [
+          {
+            "alt": "A demo image",
+            "src": "/images/dr-lurie-portrait4.jpeg"
+          }
+        ],
+        "kicker": "Feature"
+      },
+      "id": "s_split",
+      "type": "content_split"
+    },
+    {
+      "data": {
+        "description": "Product-linked pricing tiers.",
+        "heading": "Pricing",
+        "kicker": "Plans",
+        "tiers": [
+          {
+            "features": [
+              "The barrier repair guide",
+              "Instant download"
+            ],
+            "highlighted": true,
+            "product": "prod_barrier_repair_guide"
+          },
+          {
+            "features": [
+              "The starter checklist",
+              "Free"
+            ],
+            "product": "prod_starter_checklist"
+          }
+        ]
+      },
+      "id": "s_pricing",
+      "type": "pricing_table"
+    },
+    {
+      "data": {
+        "heading": "What people say",
+        "kicker": "Readers",
+        "quotes": [
+          {
+            "attribution": "A happy tester",
+            "quote": "This showcase helped me find three bugs."
+          },
+          {
+            "attribution": "Another one",
+            "quote": "Every block, populated. Perfect."
+          }
+        ]
+      },
+      "id": "s_quotes",
+      "type": "testimonial"
+    },
+    {
+      "data": {
+        "indexRoute": "/search.json",
+        "placeholder": "Search the site…"
+      },
+      "id": "s_search",
+      "type": "search"
+    },
+    {
+      "data": {
+        "contentItem": "req_agent_object_model_demo_20260713_01"
+      },
+      "id": "s_embed",
+      "type": "content_embed"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Back to library",
+            "style": "primary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ],
+        "eyebrow": "Thank you",
+        "formMessages": [],
+        "heading": "You are all set",
+        "message": "Your submission was received."
+      },
+      "id": "s_confirm",
+      "type": "form_confirmation"
+    },
+    {
+      "data": {
+        "description": "The reusable leaf a grid holds — shown standalone here.",
+        "link": {
+          "label": "Open",
+          "target": {
+            "href": "/learn/library",
+            "kind": "route"
+          }
+        },
+        "title": "A single card"
+      },
+      "id": "s_card",
+      "type": "card"
+    },
+    {
+      "data": {
+        "section": "sec_newsletter_signup"
+      },
+      "id": "s_shared",
+      "type": "shared_ref"
+    }
+  ],
+  "seo": {
+    "description": "Every section type, populated, for canvas QA.",
+    "robots": {
+      "follow": false,
+      "index": false
+    },
+    "title": "Object showcase"
+  },
+  "title": "Object showcase (QA)"
+}
