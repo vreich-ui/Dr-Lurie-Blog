@@ -195,8 +195,12 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │       query terms now validate against the real registry.
 │     dependents: content_grid queries · listing pages · learn/topics · rss categories
 │
-├── CONTENT_ITEM (articles) ─ type: content_item ─ 🔵 the NINTH governed type, BUILT (W7.3+W7.8,
-│     2026-07-13) — awaiting the credentialed run to flip 🟢 CONVERTED. NEW articles are objects;
+├── CONTENT_ITEM (articles) ─ type: content_item ─ 🟢 CONVERTED (W7.3+W7.8 built; W7.9
+│     credentialed run 2026-07-13 via the session MCP connection: create → 6/6 node ops drilled
+│     byte-identical → validate → create_variant dry-run → publish 60cd213 → released, deploy
+│     ready — the demo article req_agent_object_model_demo_20260713_01 is LIVE at
+│     /object-model-demo with per-node canvas chips; seed taxonomy fixed to registry terms).
+│     NEW articles are objects;
 │     the COMMITTED .md posts stay on the legacy pipeline (Wolf 2026-07-13: not worth migrating —
 │     W7.4/W7.6 waived; see [`08-articles-plan.md`](08-articles-plan.md) §0.5)
 │     attributes: slug · title · deck? · description? · image? · taxonomy{category?,tags[]} · seo ·

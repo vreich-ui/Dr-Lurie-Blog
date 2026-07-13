@@ -33,7 +33,13 @@ const ARTICLE_SEEDS = [
       deck: 'This post is itself the demonstration: every block below is an editable object.',
       description:
         'A short demonstration article published through the Dr. Lurié object model — every block is agent- and canvas-editable.',
-      taxonomy: { category: 'skin-science', tags: ['skincare-education'] },
+      // Registry-valid terms only (fixed by the 2026-07-13 credentialed run):
+      // the production tax_drlurie registry has NO 'skin-science' CATEGORY (it
+      // exists only as a tag) and no 'skincare-education' tag at all — the
+      // original values blocked object_create at the article_taxonomy
+      // constraint. The local rehearsal never caught it because that check is
+      // registry-gated and the isolated local store has no registry.
+      taxonomy: { category: 'reflections', tags: ['reflections'] },
       seo: {
         meta_description:
           'A demonstration article published through the Dr. Lurié content object model.',

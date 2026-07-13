@@ -403,7 +403,7 @@ store-backed → CONVERTED (§1).** The three MOCK products stopped at
 approves each in /admin/objects and re-runs the same command (idempotent).
 Remaining launch gate: the LIVE Stripe exit test (needs keys).
 
-### Articles as objects (W7.3 + W7.8, BUILT 2026-07-13 — awaiting the credentialed run)
+### Articles as objects (W7.3 + W7.8 + W7.9, 🟢 CONVERTED 2026-07-13)
 
 `content_item` is the ninth governed type: the annotated-node article model
 (per-block strategy/intent — the behavioral framework — plus the envelope
@@ -414,16 +414,26 @@ the reader-projection leak scan), the materializer →
 `src/data/site/articles/`, and the render path: published article objects
 join `fetchPosts()` as first-class posts (listings/tags/RSS included) with
 per-node canvas chips (pencil + node-scoped Ask-AI) riding the standard
-EditSession → `update_node` → publish/release path. Local rehearsal all-green
-(every op drilled byte-identical, variant dry-run, contract 6/6, inventory);
-**not yet CONVERTED** — the credentialed
-`--production --release --seeds scripts/lib/articles-seed-data.mjs` run flips
-the seed article (`req_agent_object_model_demo_20260713_01`,
-/object-model-demo) and with it the type. Note: unpublish is still
-unsupported (OQ-2) — publishing the demo makes it live until edited; the run
-may stop after the drill if that is unwanted. The LEGACY committed posts stay
-on the `save_json_blob_*` pipeline by ruling (2026-07-13): mostly junk, not
-worth migrating.
+EditSession → `update_node` → publish/release path. **CONVERTED 2026-07-13:
+the credentialed run happened the same day, executed op-by-op over the
+session MCP connection** — `req_agent_object_model_demo_20260713_01` created
+in the production store, all six node ops drilled in one batch ending
+byte-identical (history carries the exact-inverse captures), validate clean
+(slug unique across the 83 committed posts), `create_variant` dry-run proven
+(node ids re-minted, claims re-pointed, lineage set, nothing persisted),
+published (export commit `60cd213`,
+`src/data/site/articles/req_agent_object_model_demo_20260713_01.json`),
+released (deploy `6a54cf0d…` ready 11:42:57Z). The demo article is LIVE at
+/object-model-demo — 173 pages, node wrappers + canvas identity verified in
+dist, zero strategy-vocabulary leaks, listed in library + RSS. All five
+conversion criteria hold for the type. Found + fixed by the run: the seed's
+taxonomy terms (`skin-science` category / `skincare-education` tag) don't
+exist in the production registry — the seed now carries
+`reflections`/`reflections` (the article_taxonomy check is registry-gated, so
+local rehearsals can't catch this class). Note: unpublish is still
+unsupported (OQ-2) — the demo stays live until edited. The LEGACY committed
+posts stay on the `save_json_blob_*` pipeline by ruling (2026-07-13): mostly
+junk, not worth migrating.
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 

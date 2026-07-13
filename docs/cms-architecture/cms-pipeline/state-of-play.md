@@ -7,6 +7,72 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 D (W7.9 CREDENTIALED RUN: content_item is CONVERTED — the first article object is LIVE with node chips; OQ-W7-1 resolved)
+
+Wolf: "Nothing allows me to see article elements with node chips and edit
+options — finish what's opened, recheck W7.8, make sure the MCP connections
+are updated … the end goal is to have articles and article publishing
+converted from old schema to the new project-wide schema without losing
+functionality. Reverse support is not required." Root cause of "nothing to
+see" confirmed first: `object_inventory {content_item}` returned **empty** —
+the W7.8 canvas machinery was built and merged but had no article to act on
+(W7.9 had never run). This session ran it, op-by-op over the session's live
+MCP connection (the same verbs the driver calls):
+
+- **MCP endpoint check**: ping OK; `object_contract('content_item')` serves
+  the full W7.3 contract (all six node ops advertised, create_variant in the
+  workflow, Tier-1 autonomous publish) — the deployed server needed no
+  update; only the store record was missing.
+- **SEED BUG found + fixed (the run's one surprise)**: `object_create` was
+  blocked by `article_taxonomy` — the seed's `skin-science` category doesn't
+  exist in the production `tax_drlurie` registry (it's a TAG there) and
+  `skincare-education` exists nowhere. The local rehearsal couldn't catch it:
+  the check is registry-gated and the isolated local store has no registry.
+  Seed now carries `reflections`/`reflections` (playbook reality-check gained
+  the trap note). Store ≡ seed ≡ export holds.
+- **The run**: create `req_agent_object_model_demo_20260713_01` → checkout →
+  ONE batch patch drilling all six ops (set_article_meta ×2, upsert_node,
+  update_node on copy AND `private.strategy` hook→summary, set_node_visibility,
+  move_node ×2, remove_node) ending **byte-identical** (history carries every
+  exact-inverse capture; the client timed out mid-patch but the server had
+  applied — object_get confirmed before proceeding) → validate: eligible,
+  zero blockers (slug unique across the 83 committed posts) →
+  `create_variant` dry-run: eligible, node ids re-minted, claims node_ids
+  re-pointed, lineage set, nothing persisted → publish: export commit
+  `60cd213` (`src/data/site/articles/…01.json`) → checkin → inventory returns
+  it (published_content_revision 10, no unpublished changes) → release:
+  build fired once, confirmed `released: true`, deploy `6a54cf0d…` ready at
+  11:42:57Z. **All five conversion criteria hold — content_item, the ninth
+  and final governed type, is CONVERTED. Forty-one objects converted total.**
+- **W7.8 RECHECKED on the real export** (main fast-forwarded into the
+  branch): build 173 pages (was 172); `/object-model-demo` carries all five
+  `data-cms-node-id` wrappers + the object id (the chip anchors are in the
+  shipped HTML); zero strategy vocabulary in output (leak rule); the article
+  joined library + RSS automatically; edit-mode `targets.ts` maps
+  `data-cms-node-id` → `update_node` scoped patches. Suite 1198 + 49 green ·
+  astro check 0 errors. **What Wolf sees now**: enter edit mode on
+  /object-model-demo → every block has a chip (pencil + node-scoped ✨);
+  legacy .md articles still have body chips NOWHERE by ruling (only
+  page_article furniture + chrome) — that is design, not drift.
+- **Rulings recorded (plan §0.5 + §7)**: **OQ-W7-1 RESOLVED — reverse
+  support is NOT required.** No alias layer; MCP tools/functions may be
+  updated, changed, or retired as the remaining phases land; what must
+  survive is FUNCTIONALITY on the object substrate (drafting workflow,
+  publish safety stack, admin editor). W7.5's scope is re-pointing internal
+  surfaces + retiring/re-pointing the ~31 legacy tools, not aliasing them.
+
+**Still open (each its own session per the phase discipline)**: W7.2
+(sections onto rich text, DOM-equivalence gate), W7.5 (reduced: re-point
+`/admin/library` toggle + admin patch paths to object verbs; retire or
+re-point the legacy `save_json_blob_*`/publish-article tool surface — the
+5-agent workflow state moves into `body.workflow` per plan §3.4), W7.7
+(admin editor on rich text + visible annotation panel + document-body
+canvas/TipTap editing — today plain-text node bodies are the editable
+canvas surface), OQ-W7-3 (strategy registry go/no-go, design in plan §2.5).
+Standing caveats: unpublish unsupported (OQ-2 — the demo article stays live
+until edited); the three shop products still await Wolf's approval in
+/admin/objects.
+
 ## Session 2026-07-13 C (INCIDENT: agent images broke the production build — raw artifact keys in render fields; guardrail + heal)
 
 Wolf: an agent-triggered build failed — "It had an image as part of its work.

@@ -20,7 +20,8 @@ five hold (full definition + recipe: `docs/cms-architecture/conversion-playbook.
 
 Hard rules: no half measures / no unfinished work (a "convert X" task is done only when
 X passes all five); **after every session, update the documentation** (no written record
-= not converted). Reality as of 2026-07-12: **thirty-seven objects converted** — the 3 nav
+= not converted). Reality as of 2026-07-13: **forty-one objects converted** (the 37 below
++ the 3 W5 pages + the first article object, both credentialed 2026-07-13) — the 3 nav
 objects, all 12 page objects (home + about + 8 W1 interior/system pages + page_contact +
 page_thank_you), the 12 shared sections under home/about, the 3 templates, the
 `tax_drlurie` taxonomy registry (curated agent-editable vocabulary; resolveTaxonomyTerm is
@@ -49,8 +50,9 @@ Byte-identical cutover; all six store-backed, round-tripped, published, released
 (store === seed === export). Hidden sections are filtered at the resolver on
 every render path (never-render-private). W5 was RE-GROUNDED in the shop module
 (`docs/cms-architecture/06-shop-module-plan.md`; the shop build runs in its own
-session; /services awaits a copy-or-delete call). **W7.3 + W7.8 BUILT
-(2026-07-13, awaiting the credentialed run)**: `content_item` is the ninth
+session; /services awaits a copy-or-delete call). **W7 CONVERTED (2026-07-13:
+W7.3+W7.8 built, W7.9 credentialed run same day — demo article live at
+/object-model-demo; seed taxonomy fixed to registry terms)**: `content_item` is the ninth
 governed type — annotated-node articles (per-block `private.strategy`
 hook/agitation/…/resolution + `intent`; envelope claims/scores/lineage;
 plain-text or rich_text.v1 bodies), six node ops with exact inverses,
@@ -58,7 +60,10 @@ plain-text or rich_text.v1 bodies), six node ops with exact inverses,
 reader-projection leak rule, and per-node canvas chips on the standard
 EditSession → `update_node` → publish path. The 83 committed .md posts are
 NOT migrated (Wolf 2026-07-13; legacy pipeline untouched — 08-articles-plan
-§0.5). Seeds: `scripts/lib/articles-seed-data.mjs`.
+§0.5). Seeds: `scripts/lib/articles-seed-data.mjs`. Wolf 2026-07-13 (resolves
+OQ-W7-1): reverse support NOT required — no alias layer; legacy article
+tools/functions may be updated or retired as W7.2/W7.5/W7.7 land, preserving
+functionality on the object substrate.
 
 ## Core structure — read `docs/cms-architecture/core-structure.md` FIRST
 

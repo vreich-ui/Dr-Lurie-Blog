@@ -39,23 +39,30 @@ credit:
 > passes all five. Rendering-only work must be labelled "rendered, not converted"
 > — never "done."
 
-**Current reality check (be honest about it):** as of 2026-07-12,
-**thirty-seven objects are converted**: the three navigation objects, all
+**Current reality check (be honest about it):** as of 2026-07-13,
+**forty-one objects are converted**: the three navigation objects, all
 twelve original page objects (home + about + the 8 W1 interior/system pages +
 page_contact + page_thank_you), the twelve shared sections under home/about,
 the three templates, the `tax_drlurie` taxonomy registry (W3), the
-`site_drlurie` site singleton (W4), and the six W6 listing/article page
+`site_drlurie` site singleton (W4), the six W6 listing/article page
 objects (library, topics ×2, category, tag, article — credentialed run
-2026-07-12, store === seed === export) — all proven end-to-end by credentialed
-`scripts/home-conversion-roundtrip.mjs --production --release` runs (store-backed,
-every permitted op round-tripped, published, released). **No page renders from an
-unbacked export anymore — the rendered-stub backlog is empty**, and agent-CREATED
-pages are served live by the object-page catch-all (2026-07-11). Two W6 family
+2026-07-12, store === seed === export), the three W5 pages
+(shop_preview/pricing/services — credentialed run 2026-07-13), and the FIRST
+ARTICLE OBJECT (`req_agent_object_model_demo_20260713_01`, W7.9 credentialed
+run 2026-07-13 — live at /object-model-demo with per-node canvas chips; the
+`content_item` type's five criteria all hold) — all proven end-to-end by
+credentialed runs (store-backed, every permitted op round-tripped, published,
+released). **No page renders from an unbacked export anymore — the
+rendered-stub backlog is empty**, and agent-CREATED pages are served live by
+the object-page catch-all (2026-07-11). Two W6 family
 quirks worth knowing: per-term listing objects carry `%term%` pattern copy (one
 object serves a whole route family), and `page_article` (content_detail)
 publishes with ZERO sections — its drill probe comes from the seed's
-`drillProbe`, not a page section. Remaining: the shop module (its own session;
-plan in `06-shop-module-plan.md`) and W7 rich text (OQ-8).
+`drillProbe`, not a page section. W7.9 trap worth knowing: seed taxonomy must
+use REGISTRY terms — the article_taxonomy check is registry-gated, so a local
+rehearsal (no registry in the isolated store) passes terms production blocks.
+Remaining: the three shop products (awaiting Wolf's approval in
+/admin/objects) and the open W7 phases (W7.2/W7.5/W7.7).
 
 ## The recipe — the conversion factory (proven end-to-end on the home page, 2026-07-10)
 
