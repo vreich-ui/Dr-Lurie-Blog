@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-12T15:30:16.301Z",
+    "at": "2026-07-13T08:00:32.943Z",
     "from": "objects/page/by-id/page_shop_preview.json",
-    "record_version": 11
+    "record_version": 20
   },
   "pageType": "standard",
   "route": "/solutions/shop-preview",
@@ -19,35 +19,170 @@
             }
           },
           {
-            "label": "Explore the Science",
+            "label": "See the Two SKUs",
             "style": "secondary",
             "target": {
-              "href": "/learn/topics",
+              "href": "/solutions/shop-preview#premium-skus",
               "kind": "route"
             }
           }
         ],
-        "body": "<p>Dr. Lurié products are being shaped around the biology of aging skin: barrier changes, lipid shifts, comfort, and ingredients that respect a changing skin environment.</p><p>The first releases are not live yet. Join early access to receive research notes, product previews, and launch updates.</p>",
-        "heading": "Age-aware skincare is coming.",
+        "body": "<p>The first Dr. Lurié Skincare shelf is deliberately small: one daytime barrier serum, one night cream, and a few practical supports around them.</p><p>This is a mock storefront for pre-launch testing. The promise is not miracle language. It is fewer decisions, clearer labels, and a plain path for people who came to skin care late and do not want to be manipulated.</p>",
+        "heading": "Premium skin care for late starters who are tired of being sold confusion.",
         "images": [
           {
-            "alt": "Dr. Lurié age-aware skincare product bottle preview",
-            "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-product-hero.jpg"
+            "alt": "Dr. Lurié Barrier Reset Serum product bottle and carton mockup",
+            "src": "image/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png"
           },
           {
-            "alt": "Dr. Lurié skincare texture preview",
-            "src": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-product-texture.jpg"
+            "alt": "Dr. Lurié Night Recovery Cream jar and carton mockup",
+            "src": "image/req_publish_premium_skus_20260713_01/0cd395f888b74ce08560a8d88c44dc35d3fbf50bebb35b9fd0b487ca7fb822cd.png"
           }
         ],
-        "kicker": "Aging skin needs focused care."
+        "kicker": "Two calm products. No 14-step ritual."
       },
       "id": "s_shopsplit",
       "type": "content_split"
+    },
+    {
+      "data": {
+        "heading": "The two-SKU launch shelf",
+        "limit": 6,
+        "source": {
+          "cards": [
+            {
+              "action": {
+                "label": "Join serum waitlist",
+                "style": "primary",
+                "target": {
+                  "href": "/solutions/early-access",
+                  "kind": "route"
+                }
+              },
+              "description": "A premium daytime serum concept for barrier comfort, visible label clarity, and a routine that starts with restraint instead of panic.",
+              "imageAssetRef": "image/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png",
+              "title": "Barrier Reset Serum - $128"
+            },
+            {
+              "action": {
+                "label": "Join cream waitlist",
+                "style": "primary",
+                "target": {
+                  "href": "/solutions/early-access",
+                  "kind": "route"
+                }
+              },
+              "description": "A rich evening cream concept for people who want comfort, simplicity, and no fragrance-first theater on the label.",
+              "imageAssetRef": "image/req_publish_premium_skus_20260713_01/0cd395f888b74ce08560a8d88c44dc35d3fbf50bebb35b9fd0b487ca7fb822cd.png",
+              "title": "Night Recovery Cream - $148"
+            },
+            {
+              "action": {
+                "label": "Reserve the pair",
+                "style": "secondary",
+                "target": {
+                  "href": "/solutions/early-access",
+                  "kind": "route"
+                }
+              },
+              "description": "The two premium SKUs together, framed as the complete starter shelf: one morning product, one evening product, fewer chances to overbuy.",
+              "title": "The Skeptic's Pair - $248"
+            },
+            {
+              "action": {
+                "label": "Preview PDF",
+                "style": "secondary",
+                "target": {
+                  "href": "/pricing",
+                  "kind": "route"
+                }
+              },
+              "description": "A short paid download that helps buyers decide whether they need products at all before they buy them.",
+              "title": "Barrier Audit PDF - $19"
+            },
+            {
+              "action": {
+                "label": "Get updates",
+                "style": "secondary",
+                "target": {
+                  "href": "/solutions/early-access",
+                  "kind": "route"
+                }
+              },
+              "description": "A plain tracking sheet for comfort, irritation, texture, sleep, weather, and product changes. Boring on purpose.",
+              "title": "30-Day Skin Diary Refill - $12"
+            },
+            {
+              "action": {
+                "label": "Watch for launch",
+                "style": "secondary",
+                "target": {
+                  "href": "/solutions/early-access",
+                  "kind": "route"
+                }
+              },
+              "description": "Mock stock for later: small-format routine support for people who lose consistency when their schedule changes.",
+              "title": "Travel Calibration Kit - $44"
+            }
+          ],
+          "kind": "cards"
+        }
+      },
+      "id": "s_premiumskus",
+      "type": "product_preview"
+    },
+    {
+      "data": {
+        "anchor": "premium-skus",
+        "heading": "How this shelf earns trust before it asks for money",
+        "items": [
+          "A two-product core shelf first, not a maze of bundles.",
+          "Large, readable packaging and plain product names.",
+          "No miracle claims, fear copy, or invented urgency.",
+          "Paid PDFs stay separate from product sales so education can challenge the offer.",
+          "Mock pricing is visible early, because mistrust grows in the dark."
+        ],
+        "kicker": "Store rule"
+      },
+      "id": "s_storepromise",
+      "type": "checklist"
+    },
+    {
+      "data": {
+        "heading": "Questions a skeptical buyer should ask",
+        "items": [
+          {
+            "a": "<p>Because the late starter does not need a wall of choices. The first offer should prove the discipline of the brand before the brand earns permission to expand.</p>",
+            "q": "Why only two premium products?"
+          },
+          {
+            "a": "<p>No. This is pre-launch mock stock for testing the site, offer shape, and audience fit before go-live.</p>",
+            "q": "Are these products live?"
+          },
+          {
+            "a": "<p>The audience mistrusts the industry. A strong education layer lets Dr. Lurié Skincare sell with receipts, not pressure.</p>",
+            "q": "Why include PDFs beside skin care?"
+          }
+        ]
+      },
+      "id": "s_offerfaq",
+      "type": "faq"
+    },
+    {
+      "data": {
+        "body": "<p>Short updates on the two-SKU launch, ingredient reasoning, testing notes, and the PDFs that explain when not to buy.</p>",
+        "consentText": "No sponsor blasts, no daily deals, no panic copy.",
+        "formName": "early-access",
+        "heading": "Get the plain-language launch notes before anything is sold.",
+        "kicker": "Early access"
+      },
+      "id": "s_earlyaccess",
+      "type": "newsletter_signup"
     }
   ],
   "seo": {
-    "description": "Preview the age-aware skincare direction from Dr. Lurié and join early access for product updates.",
-    "ogImage": "https://kugelmedia.netlify.app/drlurieblog/dr-lurie-shop-social-preview.jpg"
+    "description": "Preview the first two premium Dr. Lurié Skincare products: a barrier reset serum and night recovery cream for skeptical late starters.",
+    "ogImage": "image/req_publish_premium_skus_20260713_01/6d8531c845bbe8a32401f3b8d4c1e4a4886be2e922c9bc7740a7b62f98b29627.png"
   },
-  "title": "Shop Preview"
+  "title": "Dr. Lurié Skincare Shop Preview"
 }
