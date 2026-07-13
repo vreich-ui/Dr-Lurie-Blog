@@ -7,6 +7,51 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 F (W7.7 CANVAS CAPABILITY SLICE: node palette + adSlot mockup bank + role panel + multi-image; upsert_node id-mint gap fixed)
+
+Same session as E, on Wolf's "continue to W7.7". The article body is now
+COMPOSABLE from the canvas — full doc: 07-canvas-editing.md §3h.
+
+- **Node palette** (`nodes-palette.ts`, pure + tested): "+" before/between/
+  after blocks ("Add an article block" — req\_\* ids banned from UI copy) →
+  nine schema-valid starters, each annotated from birth: Text, Heading+text,
+  Checklist, Image, Image gallery, CTA, **Offer/affiliate** (disclosure +
+  nofollow-sponsored pre-filled), **Ad slot (mock)**, Chat invite. Insert =
+  `upsert_node` at a record-derived position, server-minted id, honest draft
+  placeholder.
+- **SERVER GAP FOUND + FIXED**: `mintOpsIds` never handled `upsert_node`
+  though the contract advertised `minted_id_field: node.id` since W7.3 (the
+  W7.9 drill's probe carried an explicit id, so it never fired). Id-less
+  upsert*node now mints `n*<hex>` (leak-safe by construction) + test.
+- **adSlot MOCKUP BANK** (Wolf: "make them look real like served by google
+  or a native ads provider"): native in-feed / leaderboard / med-rectangle,
+  rendered ONLY for `adSlot.provider:'mock'` (real providers still render
+  nothing — mockups never fake live inventory), honestly labeled
+  Advertisement/Sponsored + Ad chip, fictional advertiser, no external
+  assets, copy overridable per node, creative switched via
+  `commercial.creativeId`. Screenshots delivered to Wolf.
+- **ROLE & INTENT PANEL**: fourth accordion section (article blocks only) —
+  strategy (12) + intent (5) dropdowns + agent notes → `update_node` on
+  `private` fields; '' clears (null); chip/header roles refresh (cache
+  invalidated). The semantic layer is human-editable — was JSON-only.
+- **MULTI-IMAGE** (Wolf-approved): `public.images[]` on content nodes (full
+  media objects, rendered as figures in order); image tool grows the gallery
+  ("Add image"; empty src removes on save); one-image-per-node stays the
+  norm.
+- **Gates**: 1205 + 49 tests green (nodes-palette starters validated against
+  the REAL node schema + render; ad bank + gallery render tests; the
+  upsert_node mint test) · astro check 0 · eslint/prettier clean · build 173
+  pages (probe export used for verification, then removed) · **19-assertion
+  headless-Chromium drive on the built probe page** (3 ad units + gallery +
+  offer + chat render; node gaps; palette wire: upsert_node id-less at
+  position 0 → minted placeholder; role editor: hook→proof +
+  agentNotes wire + header refresh; gallery rows + Add image + uploads) +
+  the 16-assertion Slice-A drive re-run green.
+- **Still open in W7.7**: TipTap/rich-text DOCUMENT editing in the panel,
+  the /admin/publish re-wire decision (reduced by the legacy-wipe ruling),
+  bugs ⑥⑩. NOTE the schema-vintage gate: canvas inserts against production
+  need this merged + deployed first.
+
 ## Session 2026-07-13 E (CANVAS Slice A: six field-test fixes from Wolf's first live article-canvas session)
 
 Wolf field-tested the canvas on /object-model-demo and filed the first live

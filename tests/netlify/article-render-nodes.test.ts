@@ -177,3 +177,69 @@ test('reading time matches the md pipeline convention (ceil, min 1)', () => {
   );
   assert.equal(longer, 3);
 });
+
+// ═══ W7.7: adSlot mockup bank + multi-image blocks ═══════════════════════════
+
+test('a mock adSlot renders its bank unit, honestly labeled; real providers render nothing', () => {
+  const withAd = (adSlot: Record<string, unknown>, creativeId?: string) =>
+    article({
+      nodes: [
+        {
+          id: 'n_c1',
+          kind: 'placement',
+          public: {},
+          commercial: { type: 'adSlot', source: 'programmatic', ...(creativeId ? { creativeId } : {}), adSlot },
+          rendering: { presentation: 'adSlot' },
+        },
+      ],
+    });
+
+  const native = renderArticleNodes('req_x', withAd({ provider: 'mock' })).html;
+  assert.match(native, /article-node-ad/);
+  assert.match(native, /Sponsored · Golden Hour Botanicals/);
+  assert.match(native, /rel="nofollow sponsored"/);
+
+  const leaderboard = renderArticleNodes('req_x', withAd({ provider: 'mock' }, 'mock-leaderboard')).html;
+  assert.match(leaderboard, /Advertisement/);
+  assert.match(leaderboard, /btn-primary font-sans/);
+
+  const rectangle = renderArticleNodes('req_x', withAd({ provider: 'mock' }, 'mock-rectangle')).html;
+  assert.match(rectangle, /w-\[300px\]/);
+
+  // A REAL provider config renders nothing (no runtime — never fake it):
+  // the wrapper emits (canvas-addressable), the box does not.
+  const real = renderArticleNodes('req_x', withAd({ provider: 'gpt', adUnitPath: '/123/slot' })).html;
+  assert.ok(real.includes('data-cms-node-id="n_c1"'));
+  assert.equal(real.includes('article-node-ad'), false);
+
+  // Leak rule holds for ad units too.
+  for (const forbidden of ['hook', 'agitation', 'agentNotes', 'strategy']) {
+    assert.equal(native.toLowerCase().includes(forbidden.toLowerCase()), false);
+  }
+});
+
+test('a multi-image block renders each image in order; empty srcs render nothing', () => {
+  const { html } = renderArticleNodes(
+    'req_x',
+    article({
+      nodes: [
+        {
+          id: 'n_g1',
+          kind: 'content',
+          public: {
+            images: [
+              { type: 'image', src: '/img/one.webp', alt: 'One' },
+              { type: 'image', src: '', alt: 'Placeholder' },
+              { type: 'image', src: '/img/two.webp', alt: 'Two', caption: 'Second' },
+            ],
+          },
+        },
+      ],
+    })
+  );
+  const first = html.indexOf('/img/one.webp');
+  const second = html.indexOf('/img/two.webp');
+  assert.ok(first >= 0 && second > first, 'images render in order');
+  assert.match(html, /<figcaption>Second<\/figcaption>/);
+  assert.equal(html.includes('Placeholder'), false, 'an empty src renders nothing, not a broken img');
+});

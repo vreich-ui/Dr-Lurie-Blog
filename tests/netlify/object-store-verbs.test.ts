@@ -376,3 +376,56 @@ test('a {slug,label} add_term is minted a valid term_id server-side (C§2.5-C)',
   assert.equal(terms[0].term_id, 't_sunscreen');
   assert.equal(terms[0].status, 'active');
 });
+
+// ═══ ID minting: id-less upsert_node → minted opaque n_* id (W7.7) ═══════════
+// The contract has always advertised minted_id_field node.id; the canvas node
+// palette is the first caller that actually omits the id.
+
+test('an id-less upsert_node is minted a valid opaque node id server-side (W7.7)', async () => {
+  const store = createMemoryStore();
+  const created = await call(store, {
+    action: 'create',
+    object_type: 'content_item',
+    site: 'site_drlurie',
+    requested_id: 'req_agent_mint_probe_20260713_01',
+    body: {
+      slug: 'mint-probe',
+      title: 'Mint probe',
+      nodes: [{ id: 'n_first', kind: 'content', public: { body: 'First.' }, private: { strategy: 'hook' } }],
+    },
+  });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const checkout = await call(store, {
+    action: 'checkout',
+    object_type: 'content_item',
+    object_id: 'req_agent_mint_probe_20260713_01',
+  });
+  const lockToken = checkout.body.lockToken as string;
+  const version = checkout.body.record_version as number;
+
+  const patch = await call(store, {
+    action: 'patch',
+    object_type: 'content_item',
+    object_id: 'req_agent_mint_probe_20260713_01',
+    lock_token: lockToken,
+    expected_record_version: version,
+    ops: [
+      {
+        op: 'upsert_node',
+        node: { kind: 'content', public: { body: 'Added from the palette.' }, private: { strategy: 'context' } },
+        position: 1,
+      }, // NO node.id supplied
+    ],
+  });
+  assert.equal(patch.status, 200, JSON.stringify(patch.body));
+
+  const minted = patch.body.minted as { index: number; field: string; id: string }[];
+  assert.equal(minted.length, 1);
+  assert.equal(minted[0].field, 'node.id');
+  assert.match(minted[0].id, /^n_[a-f0-9]+$/); // opaque hex — leak-safe by construction
+
+  const nodes = (stored(store, 'content_item', 'req_agent_mint_probe_20260713_01').body as { nodes: { id: string }[] })
+    .nodes;
+  assert.equal(nodes.length, 2);
+  assert.equal(nodes[1].id, minted[0].id);
+});

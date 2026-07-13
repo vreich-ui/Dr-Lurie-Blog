@@ -285,6 +285,42 @@ endpoints):
   registered once per hard load; a ClientRouter-swapped article page had
   unwired buttons. Now re-wires on `astro:page-load` with a data-wired guard.
 
+### 3h. W7.7 canvas capability slice (2026-07-13): the node palette, the ad bank, the annotation panel, multi-image
+
+The article body becomes fully composable from the canvas — 19-assertion
+headless drive of the built probe page, all green:
+
+- **Node palette** (`nodes-palette.ts`, pure + tested): a "+" before/between/
+  after article blocks (label: "Add an article block" — never the req\_\* id)
+  offering nine starters: Text, Heading+text, Checklist, Image, **Image
+  gallery**, **Call to action**, **Offer/affiliate** (disclosure + `nofollow
+sponsored` pre-filled — an editor cannot insert an undisclosed unit), **Ad
+  slot (mock)**, **Chat invite**. Every starter is schema-valid with the
+  semantic annotation from birth; insert = `upsert_node` at a RECORD-derived
+  position, id minted server-side (the missing `mintOpsIds` branch for
+  `node.id` was found and fixed — the contract had advertised it since W7.3),
+  honest draft placeholder until publish + release.
+- **The adSlot mockup bank** (render-nodes.ts): three renderer-owned units —
+  native in-feed card, leaderboard, medium rectangle — rendered ONLY for
+  `adSlot.provider: 'mock'` (a real provider config still renders nothing:
+  mockups never masquerade as live inventory). Honestly labeled
+  Advertisement/Sponsored + "Ad" chip like real served units; fictional
+  advertiser; self-contained (no external assets); overridable via node
+  public copy + `commercial.sponsorName`/`destinationUrl`; switch creative
+  via `commercial.creativeId` (`mock-native` / `mock-leaderboard` /
+  `mock-rectangle`).
+- **Role & intent panel**: a fourth accordion section (🏷, article blocks
+  only) — strategy dropdown (the 12 values), intent dropdown (5), agent
+  notes. Saves ride `update_node` on `private` fields; '' clears via null;
+  chip + header roles refresh from the record (cache invalidated). The
+  semantic layer is now HUMAN-editable, not JSON-only.
+- **Multi-image**: content nodes gain optional `public.images[]` (each entry
+  a full media object, rendered in order as figures). The image tool renders
+  a src/alt row per image with Upload, plus **Add image** to grow the
+  gallery; an emptied src removes that image on save. One-image-per-node
+  stays the norm (the node is the annotation unit) — the gallery is the
+  sanctioned multi-image option (Wolf, 2026-07-13).
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

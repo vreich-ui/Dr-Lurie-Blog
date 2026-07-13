@@ -25,6 +25,7 @@
  */
 import { captureObjectSelection } from '../admin/ask-ai-object-selection.js';
 import { SECTION_PALETTE, insertPositionFor } from './sections-palette.js';
+import { NODE_PALETTE } from './nodes-palette.js';
 import {
   changedFieldsOnly,
   deriveEditTarget,
@@ -59,8 +60,8 @@ const MODE_KEY = 'dl-edit-mode';
 
 export type MountOptions = { email: string; roles: string[]; getToken: GetToken };
 
-/** What the panel is doing: AI chat, manual text form, or the image tool. */
-type PanelMode = 'ai' | 'edit' | 'image';
+/** What the panel is doing: AI chat, manual text form, the image tool, or the role/annotation editor. */
+type PanelMode = 'ai' | 'edit' | 'image' | 'role';
 
 type PanelState = {
   target: EditTarget;
@@ -75,6 +76,8 @@ type PanelState = {
   imageRef?: { field: string; name: string; url: string };
   /** Navigation targets: the object body the copy form edits (nav grammar ops). */
   navBody?: NavigationBody;
+  /** Article-node targets: the node's current annotations (the role editor's before-state). */
+  nodePrivate?: { strategy?: string; intent?: string; agentNotes?: string };
   suggestion?: Record<string, unknown>;
   changes?: FieldChange[];
   snapshot?: RegionSnapshot;
@@ -285,6 +288,11 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-acc-body{display:none;flex-direction:column;min-height:0;flex:1}
 .dl-em-acc.dl-em-open>.dl-em-acc-body{display:flex}
 .dl-em-panel:not(.dl-em-has-image) .dl-em-acc[data-em-acc="image"]{display:none}
+/* The role/annotation editor applies to article blocks only. */
+.dl-em-panel:not(.dl-em-article) .dl-em-acc[data-em-acc="role"]{display:none}
+.dl-em-rolefoot{display:flex;gap:8px;align-items:center}
+.dl-em-form select{background:var(--dlem-surface-2);color:var(--dlem-text);border:1px solid var(--dlem-border);
+  border-radius:8px;padding:7px 9px;font:12.5px var(--dlem-font)}
 /* Chrome (navigation objects): copy form only — AI/Image sections don't apply. */
 .dl-em-panel.dl-em-nav .dl-em-acc[data-em-acc="ai"],.dl-em-panel.dl-em-nav .dl-em-acc[data-em-acc="image"]{display:none}
 .dl-em-log{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;
@@ -351,6 +359,11 @@ const ICON_IMAGE =
 const ICON_PLUS =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
   'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const ICON_TAG =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M12.6 2.9 21 11.3a2 2 0 0 1 0 2.8l-6.9 6.9a2 2 0 0 1-2.8 0L2.9 12.6A2 2 0 0 1 2.3 11V4.3a2 2 0 0 1 2-2H11a2 2 0 0 1 1.6.6Z"/>' +
+  '<circle cx="7.5" cy="7.5" r="1.4"/></svg>';
 const ICON_CHEVRON =
   '<svg class="dl-em-chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
   'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
@@ -472,6 +485,8 @@ export const mountEditMode = (options: MountOptions): void => {
     `<div class="dl-em-acc-body" data-em-acc-body="edit"></div></section>` +
     `<section class="dl-em-acc" data-em-acc="image">${accHead('image', ICON_IMAGE, 'Image')}` +
     `<div class="dl-em-acc-body" data-em-acc-body="image"></div></section>` +
+    `<section class="dl-em-acc" data-em-acc="role">${accHead('role', ICON_TAG, 'Role & intent')}` +
+    `<div class="dl-em-acc-body" data-em-acc-body="role"></div></section>` +
     `</div>`;
   document.body.append(panel);
   // Single reusable form node, moved into whichever section (edit/image) is open.
@@ -658,8 +673,15 @@ export const mountEditMode = (options: MountOptions): void => {
   fab.addEventListener('click', () => setEditMode(true));
   q<HTMLButtonElement>(bar, '[data-em-exit]').addEventListener('click', () => setEditMode(false));
 
-  // ── gap "+" affordances: add a section between/around existing ones ───────
-  type Gap = { host: string; anchorId: string; where: 'before' | 'after'; x: number; y: number };
+  // ── gap "+" affordances: add a section (pages) or a block (articles) ──────
+  type Gap = {
+    kind: 'section' | 'node';
+    host: string;
+    anchorId: string;
+    where: 'before' | 'after';
+    x: number;
+    y: number;
+  };
 
   const gapsFromRegions = (): Gap[] => {
     const regions = Array.from(document.querySelectorAll<HTMLElement>(REGION_SELECTOR))
@@ -685,12 +707,19 @@ export const mountEditMode = (options: MountOptions): void => {
       const next = regions[i + 1];
       const x = rect.left + rect.width / 2;
       if (!previous || previous.target.hostObjectId !== host) {
-        gaps.push({ host, anchorId, where: 'before', x, y: rect.top + scrollY - 12 });
+        gaps.push({ kind: 'section', host, anchorId, where: 'before', x, y: rect.top + scrollY - 12 });
       }
       if (next && next.target.hostObjectId === host) {
-        gaps.push({ host, anchorId, where: 'after', x, y: (rect.bottom + next.rect.top) / 2 + scrollY });
+        gaps.push({
+          kind: 'section',
+          host,
+          anchorId,
+          where: 'after',
+          x,
+          y: (rect.bottom + next.rect.top) / 2 + scrollY,
+        });
       } else {
-        gaps.push({ host, anchorId, where: 'after', x, y: rect.bottom + scrollY + 12 });
+        gaps.push({ kind: 'section', host, anchorId, where: 'after', x, y: rect.bottom + scrollY + 12 });
       }
     }
     // Object-EMPTY pages (e.g. page_article before its first section): the
@@ -702,6 +731,7 @@ export const mountEditMode = (options: MountOptions): void => {
       if (regions.some((entry) => entry.target.hostObjectId === host)) continue; // no longer empty (draft added)
       const rect = marker.getBoundingClientRect();
       gaps.push({
+        kind: 'section',
         host,
         anchorId: '',
         where: 'after',
@@ -712,14 +742,50 @@ export const mountEditMode = (options: MountOptions): void => {
     return gaps;
   };
 
+  // Article bodies (W7.7): a "+" before the first block, between blocks of the
+  // same article, and after the last — the node palette's anchor points.
+  // Position math stays RECORD-based at insert time (internal/hidden nodes
+  // occupy indices the DOM never shows) — the gap only names the anchor id.
+  const nodeGapsFromRegions = (): Gap[] => {
+    const regions = Array.from(document.querySelectorAll<HTMLElement>(NODE_SELECTOR))
+      .map((region) => ({
+        region,
+        target: deriveNodeTarget(region.dataset as Record<string, string>),
+        rect: regionRect(region),
+      }))
+      .filter((entry): entry is { region: HTMLElement; target: EditTarget; rect: DOMRect } =>
+        Boolean(entry.target && entry.rect)
+      );
+    const gaps: Gap[] = [];
+    const scrollY = window.scrollY;
+    for (let i = 0; i < regions.length; i += 1) {
+      const { target, rect } = regions[i];
+      const host = target.objectId;
+      const anchorId = target.nodeId as string;
+      const previous = regions[i - 1];
+      const next = regions[i + 1];
+      const x = rect.left + rect.width / 2;
+      if (!previous || previous.target.objectId !== host) {
+        gaps.push({ kind: 'node', host, anchorId, where: 'before', x, y: rect.top + scrollY - 12 });
+      }
+      if (next && next.target.objectId === host) {
+        gaps.push({ kind: 'node', host, anchorId, where: 'after', x, y: (rect.bottom + next.rect.top) / 2 + scrollY });
+      } else {
+        gaps.push({ kind: 'node', host, anchorId, where: 'after', x, y: rect.bottom + scrollY + 12 });
+      }
+    }
+    return gaps;
+  };
+
   const buildGaps = (): void => {
     gapLayer.innerHTML = '';
     if (!document.body.classList.contains('dl-em-on')) return;
-    for (const gap of gapsFromRegions()) {
+    for (const gap of [...gapsFromRegions(), ...nodeGapsFromRegions()]) {
       const button = document.createElement('button');
       button.className = 'dl-em-gap';
-      button.title = `Add a section to ${gap.host}`;
-      button.setAttribute('aria-label', 'Add a section here');
+      // Node gaps never surface the req_* id — worthless to an editor.
+      button.title = gap.kind === 'node' ? 'Add an article block' : `Add a section to ${gap.host}`;
+      button.setAttribute('aria-label', gap.kind === 'node' ? 'Add an article block here' : 'Add a section here');
       button.innerHTML = ICON_PLUS;
       button.style.left = `${gap.x}px`;
       button.style.top = `${gap.y}px`;
@@ -740,13 +806,16 @@ export const mountEditMode = (options: MountOptions): void => {
   window.addEventListener('load', scheduleGapRebuild, { signal });
 
   const openPalette = (gap: Gap, anchor: HTMLElement): void => {
+    const entries: Array<{ label: string; hint: string }> = gap.kind === 'node' ? NODE_PALETTE : SECTION_PALETTE;
     palette.innerHTML =
-      `<div class="dl-em-palhead">Add to ${escapeHtml(gap.host)}</div>` +
-      SECTION_PALETTE.map(
-        (entry, index) =>
-          `<button data-em-pal="${index}"><span class="dl-em-pallabel">${escapeHtml(entry.label)}</span>` +
-          `<div class="dl-em-palhint">${escapeHtml(entry.hint)}</div></button>`
-      ).join('');
+      `<div class="dl-em-palhead">${gap.kind === 'node' ? 'Add an article block' : `Add to ${escapeHtml(gap.host)}`}</div>` +
+      entries
+        .map(
+          (entry, index) =>
+            `<button data-em-pal="${index}"><span class="dl-em-pallabel">${escapeHtml(entry.label)}</span>` +
+            `<div class="dl-em-palhint">${escapeHtml(entry.hint)}</div></button>`
+        )
+        .join('');
     const rect = anchor.getBoundingClientRect();
     palette.style.display = 'block';
     palette.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
@@ -754,7 +823,9 @@ export const mountEditMode = (options: MountOptions): void => {
     palette.querySelectorAll<HTMLButtonElement>('[data-em-pal]').forEach((button) => {
       button.addEventListener('click', () => {
         palette.style.display = 'none';
-        void insertSection(gap, SECTION_PALETTE[Number(button.dataset.emPal)]);
+        const index = Number(button.dataset.emPal);
+        if (gap.kind === 'node') void insertNode(gap, NODE_PALETTE[index]);
+        else void insertSection(gap, SECTION_PALETTE[index]);
       });
     });
   };
@@ -812,6 +883,47 @@ export const mountEditMode = (options: MountOptions): void => {
       else anchorRegion.after(placeholder);
     }
     setStatus(`${entry.label} added to ${gap.host} as a draft.`);
+    await refreshPending();
+    scheduleGapRebuild();
+  };
+
+  // Article blocks (W7.7): the node-palette insert — same shape as sections
+  // (checkout → record-derived position → upsert, id minted server-side →
+  // honest draft placeholder), riding update-family verbs on the article.
+  const insertNode = async (gap: Gap, entry: (typeof NODE_PALETTE)[number]): Promise<void> => {
+    setStatus(`Adding ${entry.label.toLowerCase()} to the article…`);
+    const objectSession = session('content_item', gap.host);
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      setStatus(`Locked by ${checkout.heldBy ?? 'another editor'} — try again later.`);
+      return;
+    }
+    // Position from the CURRENT record (internal/hidden nodes occupy indices).
+    const { record } = await getObjectRecord(getToken, 'content_item', gap.host);
+    const nodes = ((record?.body as Record<string, unknown> | undefined)?.nodes ?? []) as Array<{ id: string }>;
+    const position = insertPositionFor(nodes, gap.anchorId, gap.where);
+    const outcome = await objectSession.patch([{ op: 'upsert_node', node: entry.node, position }]);
+    if (!outcome.ok) {
+      setStatus(`Could not add: ${outcome.error}`);
+      return;
+    }
+    const mintedId = outcome.minted.find((mint) => mint.field === 'node.id')?.id;
+    nodeRoleCache.delete(gap.host); // the new block's role must show on its chip
+    const anchorRegion = document.querySelector<HTMLElement>(`[data-cms-node-id="${CSS.escape(gap.anchorId)}"]`);
+    if (anchorRegion && mintedId) {
+      const placeholder = document.createElement('div');
+      placeholder.dataset.cmsObjectId = gap.host;
+      placeholder.dataset.cmsNodeId = mintedId;
+      placeholder.dataset.cmsNodeKind = (entry.node.kind as string) ?? 'content';
+      placeholder.className = 'dl-em-draft';
+      placeholder.innerHTML =
+        `<div class="dl-em-newsec-inner"><strong>${escapeHtml(entry.label)}</strong> — draft block<br>` +
+        `${escapeHtml(entry.hint)}<br>` +
+        `Hover to edit, set its role, or ask the AI. Renders on the live page after publish + release.</div>`;
+      if (gap.where === 'before') anchorRegion.before(placeholder);
+      else anchorRegion.after(placeholder);
+    }
+    setStatus(`${entry.label} added to the article as a draft.`);
     await refreshPending();
     scheduleGapRebuild();
   };
@@ -922,6 +1034,9 @@ export const mountEditMode = (options: MountOptions): void => {
       (hasImage
         ? `<button class="dl-em-tool dl-em-img" title="Image" aria-label="Edit image">${ICON_IMAGE}</button>`
         : '') +
+      (isNode
+        ? `<button class="dl-em-tool dl-em-role" title="Role & intent" aria-label="Edit role and intent">${ICON_TAG}</button>`
+        : '') +
       (isNav
         ? ''
         : `<button class="dl-em-tool dl-em-ask${hasSelection ? ' dl-em-sel' : ''}" ` +
@@ -929,6 +1044,7 @@ export const mountEditMode = (options: MountOptions): void => {
       `</span>`;
     chip.querySelector('.dl-em-edit')?.addEventListener('click', () => void openPanel(target, region, 'edit'));
     chip.querySelector('.dl-em-img')?.addEventListener('click', () => void openPanel(target, region, 'image'));
+    chip.querySelector('.dl-em-role')?.addEventListener('click', () => void openPanel(target, region, 'role'));
     chip.querySelector('.dl-em-ask')?.addEventListener('click', () => void openPanel(target, region, 'ai'));
     chip.querySelector<HTMLSelectElement>('[data-em-alg]')?.addEventListener('change', (event) => {
       void applyAlgorithm(target, region, (event.target as HTMLSelectElement).value);
@@ -1061,7 +1177,15 @@ export const mountEditMode = (options: MountOptions): void => {
   let panelRegion: HTMLElement | undefined;
 
   const closePanel = (): void => {
-    panel.classList.remove('dl-em-open', 'dl-em-mode-edit', 'dl-em-mode-image', 'dl-em-has-image', 'dl-em-nav');
+    panel.classList.remove(
+      'dl-em-open',
+      'dl-em-mode-edit',
+      'dl-em-mode-image',
+      'dl-em-mode-role',
+      'dl-em-has-image',
+      'dl-em-nav',
+      'dl-em-article'
+    );
     panel.querySelectorAll('.dl-em-acc').forEach((section) => section.classList.remove('dl-em-open'));
     panelState?.region.classList.remove('dl-em-focus');
     panelState = undefined;
@@ -1079,6 +1203,7 @@ export const mountEditMode = (options: MountOptions): void => {
     });
     panel.classList.toggle('dl-em-mode-edit', mode === 'edit');
     panel.classList.toggle('dl-em-mode-image', mode === 'image');
+    panel.classList.toggle('dl-em-mode-role', mode === 'role');
   };
 
   // Accordion heads switch tools on the SAME section; clicking the open head
@@ -1125,6 +1250,7 @@ export const mountEditMode = (options: MountOptions): void => {
         ? region.dataset.cmsNodeKind === 'content'
         : IMAGE_SECTION_TYPES.has(target.sectionType)
     );
+    panel.classList.toggle('dl-em-article', target.objectType === 'content_item' && Boolean(target.nodeId));
     // Chrome (navigation objects) is a copy form only: no section grammar for
     // AI scoping, no images — the accordion shows just the Edit section.
     const isNav = target.objectType === 'navigation';
@@ -1162,6 +1288,7 @@ export const mountEditMode = (options: MountOptions): void => {
     }
     let currentData: Record<string, unknown> | undefined;
     let patchSectionId: string | undefined;
+    let nodePrivate: PanelState['nodePrivate'];
     if (target.objectType === 'page') {
       const sectionList = (body.sections as Array<{ id: string; data: Record<string, unknown> }> | undefined) ?? [];
       const instance = sectionList.find((entry) => entry.id === target.sectionId);
@@ -1173,11 +1300,16 @@ export const mountEditMode = (options: MountOptions): void => {
       // but kept non-empty for the shared panel state shape).
       const nodes =
         (body.nodes as
-          | Array<{ id: string; public?: Record<string, unknown>; private?: { strategy?: string; intent?: string } }>
+          | Array<{
+              id: string;
+              public?: Record<string, unknown>;
+              private?: { strategy?: string; intent?: string; agentNotes?: string };
+            }>
           | undefined) ?? [];
       const node = nodes.find((entry) => entry.id === target.nodeId);
       currentData = node?.public;
       patchSectionId = node?.id;
+      nodePrivate = node?.private;
       // The record is in hand — fill the header role synchronously.
       const role = roleOf(node);
       const roleEl = identEl.querySelector('[data-em-role]');
@@ -1191,7 +1323,7 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', 'Not in the draft record yet — edit via /admin/objects.');
       return;
     }
-    panelState = { target, region, mode, currentData, patchSectionId, selectedText: selected };
+    panelState = { target, region, mode, currentData, patchSectionId, selectedText: selected, nodePrivate };
     logEl.innerHTML = '';
     if (mode === 'ai') {
       inputEl.placeholder = selected ? 'Refine the selection…' : 'Describe the change…';
@@ -1200,6 +1332,8 @@ export const mountEditMode = (options: MountOptions): void => {
         `${ICON_SPARKLES} Editing ${escapeHtml(target.sectionType)}${selected ? ' · selection' : ''} — previews as a draft.`
       );
       renderImageRefChips(panelState);
+    } else if (mode === 'role') {
+      renderRoleForm(panelState);
     } else {
       renderForm(panelState);
     }
@@ -1395,6 +1529,28 @@ export const mountEditMode = (options: MountOptions): void => {
         });
       }
     }
+    // Gallery blocks (W7.7): grow the images array from the canvas — a new
+    // empty row appears (upload or paste a path); an emptied src removes the
+    // image on save.
+    if (
+      state.mode === 'image' &&
+      state.target.objectType === 'content_item' &&
+      Array.isArray(state.currentData.images)
+    ) {
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'dl-em-btn dl-em-ico';
+      addButton.innerHTML = `${ICON_PLUS} Add image`;
+      addButton.addEventListener('click', () => {
+        (state.currentData.images as Array<Record<string, unknown>>).push({ type: 'image', src: '', alt: '' });
+        renderForm(state);
+      });
+      formEl.append(addButton);
+      const note = document.createElement('span');
+      note.className = 'dl-em-fieldnote';
+      note.textContent = 'Empty src removes that image on save.';
+      formEl.append(note);
+    }
     const foot = document.createElement('div');
     foot.className = 'dl-em-formfoot';
     foot.innerHTML =
@@ -1403,6 +1559,92 @@ export const mountEditMode = (options: MountOptions): void => {
     foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveForm(state, fields));
     foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
     formEl.append(foot);
+  };
+
+  // ── role / annotation editor (W7.7) ───────────────────────────────────────
+  // The semantic layer, editable where the block lives: strategy (the job the
+  // block does in the story), intent (what it does to the reader), and agent
+  // notes. Saves ride the SAME reviewable path (update_node on private
+  // fields); readers never see any of it (the leak rule) — this panel is why
+  // the vocabulary matters to a human, not just to agents.
+  const INTENT_VALUES = ['educate', 'persuade', 'reassure', 'convert', 'navigate'];
+
+  const renderRoleForm = (state: PanelState): void => {
+    const current = state.nodePrivate ?? {};
+    const options = (values: string[], selected: string | undefined, labels?: Record<string, string>): string =>
+      `<option value=""${selected ? '' : ' selected'}>—</option>` +
+      values
+        .map(
+          (value) =>
+            `<option value="${escapeHtml(value)}"${value === selected ? ' selected' : ''}>${escapeHtml(
+              labels?.[value] ?? value
+            )}</option>`
+        )
+        .join('');
+    formEl.innerHTML =
+      `<div class="dl-em-formrow"><label>Role (strategy)</label>` +
+      `<select data-em-role-field="strategy">${options(Object.keys(STRATEGY_LABELS), current.strategy, STRATEGY_LABELS)}</select>` +
+      `<span class="dl-em-fieldnote">The job this block does in the story.</span></div>` +
+      `<div class="dl-em-formrow"><label>Intent</label>` +
+      `<select data-em-role-field="intent">${options(INTENT_VALUES, current.intent)}</select>` +
+      `<span class="dl-em-fieldnote">What it should do to the reader.</span></div>` +
+      `<div class="dl-em-formrow"><label>Notes for agents</label>` +
+      `<textarea data-em-role-field="agentNotes">${escapeHtml(current.agentNotes ?? '')}</textarea>` +
+      `<span class="dl-em-fieldnote">Never shown to readers.</span></div>`;
+    const foot = document.createElement('div');
+    foot.className = 'dl-em-formfoot';
+    foot.innerHTML =
+      `<button class="dl-em-btn dl-em-save dl-em-ico" data-em-form-save>${ICON_CHECK} Save draft</button>` +
+      `<button class="dl-em-btn dl-em-ghost dl-em-ico" data-em-form-cancel title="Cancel" aria-label="Cancel">${ICON_CLOSE}</button>`;
+    foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveRoleForm(state));
+    foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
+    formEl.append(foot);
+  };
+
+  const saveRoleForm = async (state: PanelState): Promise<void> => {
+    const read = (key: string): string =>
+      formEl.querySelector<HTMLSelectElement | HTMLTextAreaElement>(`[data-em-role-field="${key}"]`)?.value ?? '';
+    const before = state.nodePrivate ?? {};
+    const fields: Record<string, unknown> = {};
+    for (const key of ['strategy', 'intent', 'agentNotes'] as const) {
+      const raw = read(key).trim();
+      if (raw === (before[key] ?? '')) continue;
+      fields[key] = raw === '' ? null : raw; // '' = clear the annotation (deep-merge null deletes)
+    }
+    if (Object.keys(fields).length === 0) {
+      log('sys', 'No changes to save.');
+      return;
+    }
+    const working = busy('Saving…');
+    const objectSession = session(state.target.objectType, state.target.objectId);
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      working.remove();
+      log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
+      return;
+    }
+    const outcome = await objectSession.patch([
+      { op: 'update_node', node_id: state.target.nodeId, fields: { private: fields } },
+    ]);
+    working.remove();
+    if (!outcome.ok) {
+      const blockers = outcome.blockers?.length ? `<br>${outcome.blockers.map(escapeHtml).join('<br>')}` : '';
+      log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
+      return;
+    }
+    state.nodePrivate = {
+      ...before,
+      ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value ?? undefined])),
+    };
+    // The chip/header roles come from the record — refresh both.
+    nodeRoleCache.delete(state.target.objectId);
+    const role = roleOf({ private: state.nodePrivate });
+    const roleEl = identEl.querySelector('[data-em-role]');
+    if (roleEl) roleEl.textContent = role ?? state.region.dataset.cmsNodeKind ?? 'block';
+    state.region.classList.add('dl-em-draft');
+    log('sys', `${ICON_CHECK} Role saved as a draft — <strong>not published</strong>. Readers never see annotations.`);
+    setStatus(`${state.target.objectId}: annotation draft saved.`);
+    await refreshPending();
   };
 
   // ── navigation copy form ──────────────────────────────────────────────────
@@ -1569,6 +1811,11 @@ export const mountEditMode = (options: MountOptions): void => {
     if (Object.keys(changed).length === 0) {
       log('sys', 'No changes to save.');
       return;
+    }
+    // Gallery discipline (content_item only): an entry whose src was emptied
+    // (or never filled) is REMOVED, not saved as a blank image.
+    if (state.target.objectType === 'content_item' && Array.isArray(changed.images)) {
+      changed.images = (changed.images as Array<{ src?: string }>).filter((entry) => (entry.src ?? '') !== '');
     }
     const working = busy('Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);

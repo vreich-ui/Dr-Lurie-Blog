@@ -79,9 +79,7 @@ const ctaHtml = (node: ContentItemNode, prominent: boolean): string => {
   return `<p class="article-node-cta not-prose"><a class="${cls}" href="${escapeHtml(href)}"${relAttr(node)}>${escapeHtml(ctaText)}</a></p>`;
 };
 
-const mediaHtml = (node: ContentItemNode): string => {
-  const media = node.public.media;
-  if (!media) return '';
+const oneMediaHtml = (node: ContentItemNode, media: NonNullable<ContentItemNode['public']['media']>): string => {
   const src = safeHref(media.src);
   if (!src) return '';
   const caption = media.caption ? `<figcaption>${escapeHtml(media.caption)}</figcaption>` : '';
@@ -92,6 +90,106 @@ const mediaHtml = (node: ContentItemNode): string => {
   // a silent drop.
   const label = media.title ?? media.src.split('/').pop() ?? media.type;
   return `<p><a href="${escapeHtml(src)}"${relAttr(node)}>${escapeHtml(label)}</a></p>${caption}`;
+};
+
+const mediaHtml = (node: ContentItemNode): string => {
+  const media = node.public.media;
+  return media ? oneMediaHtml(node, media) : '';
+};
+
+/** Multi-image block: each entry renders like a single media image, in order. */
+const imagesHtml = (node: ContentItemNode): string => {
+  const images = node.public.images;
+  if (!images || images.length === 0) return '';
+  return images.map((entry) => oneMediaHtml(node, entry)).join('');
+};
+
+/**
+ * The adSlot MOCKUP BANK (W7.7, Wolf 2026-07-13: "make them look real like
+ * served by google or a native ads provider"). Three renderer-owned units,
+ * selected by `commercial.creativeId`, rendered ONLY when
+ * `commercial.adSlot.provider === 'mock'` — a real provider config (gpt, …)
+ * still renders nothing until an actual ad runtime exists; mockups must never
+ * masquerade as live inventory. Every unit is honestly labeled Advertisement/
+ * Sponsored (exactly like real served units), self-contained (no external
+ * assets — deploy-safe), and overridable: node.public title/body/ctaText and
+ * commercial sponsorName/destinationUrl replace the canned creative.
+ */
+type MockAdCreative = { advertiser: string; headline: string; line: string; cta: string };
+
+const MOCK_AD_BANK: Record<string, MockAdCreative> = {
+  'mock-leaderboard': {
+    advertiser: 'Golden Hour Botanicals',
+    headline: 'Barrier-first skincare, formulated with dermatologists',
+    line: 'Clinically tested. Fragrance-free. Actually explained.',
+    cta: 'Learn more',
+  },
+  'mock-native': {
+    advertiser: 'Golden Hour Botanicals',
+    headline: 'The 3-step routine dermatologists keep recommending',
+    line: 'Why barrier repair beats 10-step routines — and what to use instead.',
+    cta: 'Learn more',
+  },
+  'mock-rectangle': {
+    advertiser: 'Golden Hour Botanicals',
+    headline: 'One serum. Four weeks. Visible calm.',
+    line: 'See the study results.',
+    cta: 'Shop now',
+  },
+};
+
+const adSlotHtml = (node: ContentItemNode): string => {
+  const commercial = node.commercial;
+  const slot = commercial?.adSlot;
+  if (!slot || slot.provider !== 'mock') return ''; // no ad runtime — wrapper only
+  const creativeKey =
+    commercial?.creativeId && MOCK_AD_BANK[commercial.creativeId] ? commercial.creativeId : 'mock-native';
+  const canned = MOCK_AD_BANK[creativeKey];
+  const advertiser = escapeHtml(commercial?.sponsorName ?? commercial?.advertiserName ?? canned.advertiser);
+  const headline = escapeHtml(node.public.title ?? canned.headline);
+  const line = escapeHtml(typeof node.public.body === 'string' && node.public.body ? node.public.body : canned.line);
+  const cta = escapeHtml(node.public.ctaText ?? canned.cta);
+  const href = escapeHtml(safeHref(commercial?.destinationUrl ?? node.public.ctaLink) ?? '#');
+  const rel = ` rel="${escapeHtml(commercial?.rel ?? 'nofollow sponsored')}"`;
+  const adChip =
+    '<span class="absolute top-1.5 right-1.5 rounded-sm border border-gray-300 dark:border-slate-600 px-1 text-[10px] leading-4 text-muted" aria-hidden="true">Ad</span>';
+  const microLabel = '<p class="mb-1 text-[10px] uppercase tracking-widest text-muted">Advertisement</p>';
+
+  if (creativeKey === 'mock-leaderboard') {
+    return (
+      `<aside class="article-node-ad not-prose font-sans my-8">${microLabel}` +
+      `<a href="${href}"${rel} class="relative block overflow-hidden rounded-md border border-gray-200 dark:border-slate-700 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-slate-800 dark:to-slate-900 px-5 py-4">${adChip}` +
+      `<div class="flex flex-wrap items-center gap-x-6 gap-y-2">` +
+      `<div class="min-w-0 flex-1"><p class="text-[11px] font-medium text-muted">${advertiser}</p>` +
+      `<p class="text-base font-semibold text-default leading-snug">${headline}</p>` +
+      `<p class="text-xs text-muted">${line}</p></div>` +
+      `<span class="btn-primary font-sans pointer-events-none px-4 py-2 text-sm">${cta}</span>` +
+      `</div></a></aside>`
+    );
+  }
+  if (creativeKey === 'mock-rectangle') {
+    return (
+      `<aside class="article-node-ad not-prose font-sans my-8 flex flex-col items-center">${microLabel}` +
+      `<a href="${href}"${rel} class="relative block w-[300px] max-w-full overflow-hidden rounded-md border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900">${adChip}` +
+      `<div class="h-[120px] bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900"></div>` +
+      `<div class="p-4"><p class="text-[11px] font-medium text-muted">${advertiser}</p>` +
+      `<p class="text-sm font-semibold text-default leading-snug">${headline}</p>` +
+      `<p class="mt-1 text-xs text-muted">${line}</p>` +
+      `<span class="btn-primary font-sans pointer-events-none mt-3 inline-block px-4 py-1.5 text-xs">${cta}</span>` +
+      `</div></a></aside>`
+    );
+  }
+  // mock-native: in-feed sponsored card, the native-provider idiom.
+  return (
+    `<aside class="article-node-ad not-prose font-sans my-8">` +
+    `<a href="${href}"${rel} class="relative flex gap-4 overflow-hidden rounded-md border border-gray-200 dark:border-slate-700 bg-surface dark:bg-slate-900 p-4">${adChip}` +
+    `<div class="h-20 w-28 flex-none rounded bg-gradient-to-br from-amber-100 via-orange-100 to-rose-100 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900"></div>` +
+    `<div class="min-w-0"><p class="text-[11px] font-medium uppercase tracking-wide text-muted">Sponsored · ${advertiser}</p>` +
+    `<p class="text-base font-semibold text-default leading-snug">${headline}</p>` +
+    `<p class="mt-0.5 text-xs text-muted">${line}</p>` +
+    `<span class="mt-1 inline-block text-xs font-medium text-primary">${cta} →</span>` +
+    `</div></a></aside>`
+  );
 };
 
 const disclosureHtml = (node: ContentItemNode): string => {
@@ -125,6 +223,7 @@ const nodeHtml = (node: ContentItemNode): string => {
         bodyHtml(node.public.body) +
         itemsHtml(node) +
         mediaHtml(node) +
+        imagesHtml(node) +
         ctaHtml(node, false)
       );
     case 'action':
@@ -138,9 +237,10 @@ const nodeHtml = (node: ContentItemNode): string => {
           ? `<aside class="article-node-offer not-prose border rounded-lg p-6 my-6">${inner}</aside>`
           : `<aside class="article-node-offer my-6">${inner}</aside>`;
       }
-      // adSlot and friends: no ad runtime exists — nothing renders (the
-      // wrapper still emits, so the canvas can address the node).
-      return '';
+      // adSlot: the MOCK provider renders a bank unit (W7.7); real provider
+      // configs still render nothing (no ad runtime — the wrapper still
+      // emits, so the canvas can address the node).
+      return adSlotHtml(node);
     }
     case 'interactive': {
       // No public chat runtime on articles yet; the invitation text is the
