@@ -17,7 +17,7 @@
             "label": "Download Starter PDF",
             "style": "primary",
             "target": {
-              "href": "pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
+              "href": "/pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
               "kind": "asset"
             }
           },
@@ -82,7 +82,7 @@
                 "label": "Download PDF",
                 "style": "primary",
                 "target": {
-                  "href": "pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
+                  "href": "/pdf/req_publish_late_starter_pdfs_20260712_01/8ef65ce7e75d6c5b64f9766e1e36ea3b49e23b63b5e875b0bc864749f68ab5b5.pdf",
                   "kind": "asset"
                 }
               },
@@ -94,7 +94,7 @@
                 "label": "Download Checklist",
                 "style": "secondary",
                 "target": {
-                  "href": "pdf/req_publish_late_starter_pdfs_20260712_01/f891888cf799080cdc78ca2d66370e714036009b2dca07d26331f53ae45315dc.pdf",
+                  "href": "/pdf/req_publish_late_starter_pdfs_20260712_01/f891888cf799080cdc78ca2d66370e714036009b2dca07d26331f53ae45315dc.pdf",
                   "kind": "asset"
                 }
               },

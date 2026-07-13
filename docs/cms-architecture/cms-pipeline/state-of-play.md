@@ -7,6 +7,52 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 C (INCIDENT: agent images broke the production build — raw artifact keys in render fields; guardrail + heal)
+
+Wolf: an agent-triggered build failed — "It had an image as part of its work.
+this image was saved correctly in the blob store but it might have failed at
+time of build." Root cause (Netlify log): the `Publish page: page_shop_preview`
+agent run set the page's `content_split.images[].src` AND `seo.ogImage` to the
+RAW artifact blob key `image/req_publish_premium_skus_20260713_01/<sha>.png`.
+A raw Major-Key key is servable ONLY at its public path
+`/img/<id>/<sha>.png` (the `/img/*` → `get-public-image?blobKey=image/:splat`
+redirect); the raw form is neither a URL nor an imported asset, so Astro's
+`getImage` on `ogImage` threw **`LocalImageUsedWrongly`** and failed the ENTIRE
+static build (a plain `<img src>` like content_split just 404s silently). The
+canvas image tool already stores the correct `/img/...` form; this agent used
+the raw artifact-upload key. **Not caused by the W7/shop conversions** — a
+standing gap: the OBJECT pipeline had no analogue of the ARTICLE pipeline's
+`rawImageArtifactReferencePattern` guard (`publish-article.ts` hard-throws on
+raw refs), and `checkArtifactTrust` only inspects `*AssetRef` fields (which
+LEGITIMATELY hold raw refs — resolved/unrendered), never `src`/`ogImage`/`href`.
+
+Fix (the trap-14 pattern — heal + guardrail):
+
+- **Guardrail** (`checkRenderableImageRefs`, wired into the `renderability`
+  group; contract constraint `render_image_ref`): a raw Major-Key artifact key
+  (`image|pdf/{id}/{sha}.{ext}`) in ANY string leaf that is NOT a raw-ref
+  carrier (`*AssetRef` or product `fulfillment.artifact_ref`) and not private
+  `notes` is a BLOCKER at patch/create/publish — the message names the field
+  AND the exact public path to use (`publicPathForArtifactRef`, the one
+  exported `image/→/img/`, `pdf/→/pdf/` helper in artifact-trust.ts). So the
+  broken store record CANNOT republish until fixed, and this class can't
+  recur through the store.
+- **Heal** (fix-forward, quarantine-safe because of the guardrail): the
+  committed exports corrected in-repo — `page_shop_preview` images+ogImage →
+  `/img/...`; the SAME scan also caught a PRE-EXISTING sibling bug the guard
+  now covers: `pdf/...` raw keys in `kind:'asset'` "Download Starter PDF" link
+  `target.href`s on `page_home` (×3) and `nav_header` — relative `pdf/...`
+  hrefs 404 from any non-root page (nav is everywhere) → healed to `/pdf/...`.
+  The store records still carry the raw values and now can't republish until
+  an agent fixes them (the validation error tells them exactly what/how) —
+  needs a store-side `object_patch` + publish per object (page_shop_preview,
+  page_home, nav_header), no credentialed heal spent on it here.
+- Gates: 1198 + 49 tests green (7 new: the helper + guard exemptions/blocks) ·
+  astro check 0 · eslint/prettier clean · **production build REPRODUCED green
+  (172 pages, the LocalImageUsedWrongly throw gone)**. Benign standing log
+  line: the empty `articleObject` collection warns until the first article
+  object export lands (W7 dir has only `.gitkeep`) — non-fatal.
+
 ## Session 2026-07-13 B (W7.3 + W7.8 BUILT: content_item is the ninth governed type; article bodies on the canvas — awaiting the credentialed run)
 
 Wolf: "Finish W7 rich text with article migration. The committed posts can be

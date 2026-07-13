@@ -7,6 +7,7 @@ import {
   checkProduct,
   checkReaderSafety,
   checkReferenceIntegrity,
+  checkRenderableImageRefs,
   checkSchema,
   checkStructuralInvariants,
   checkTaxonomyRegistry,
@@ -18,6 +19,7 @@ import {
   type ReadinessCriterion,
   type ReadinessGroup,
 } from '../../netlify/lib/object-validate.js';
+import { publicPathForArtifactRef } from '../../netlify/lib/artifact-trust.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
 // ── shared helpers ───────────────────────────────────────────────────────────
@@ -252,6 +254,56 @@ test('check5 artifact trust REJECTION: data URIs, remote URLs, legacy paths, and
     statusOf(checkArtifactTrust(body, { trustedAssetRefs: new Set([TRUSTED_REF]) }), 'artifact_trust'),
     'missing'
   );
+});
+
+// ═══ check 5b: raw artifact refs in renderable fields (build-breaker guard) ═══
+
+test('publicPathForArtifactRef maps raw keys to their servable path (inverse of the netlify redirect)', () => {
+  const sha = 'a'.repeat(64);
+  assert.equal(publicPathForArtifactRef(`image/req_x_20260713_01/${sha}.png`), `/img/req_x_20260713_01/${sha}.png`);
+  assert.equal(publicPathForArtifactRef(`pdf/req_x_20260713_01/${sha}.pdf`), `/pdf/req_x_20260713_01/${sha}.pdf`);
+  // Already-public paths and URLs pass through untouched.
+  assert.equal(publicPathForArtifactRef('/img/req_x/abc.png'), '/img/req_x/abc.png');
+  assert.equal(publicPathForArtifactRef('https://cdn.example/x.png'), 'https://cdn.example/x.png');
+  assert.equal(publicPathForArtifactRef('/images/portrait.jpg'), '/images/portrait.jpg');
+});
+
+test('check5b: a raw artifact key in seo.ogImage or images[].src is a blocker (naming the /img path)', () => {
+  const sha = 'c'.repeat(64);
+  const rawRef = `image/req_publish_premium_skus_20260713_01/${sha}.png`;
+
+  // seo.ogImage — the real 2026-07-13 build-breaker (getImage throws).
+  const ogBody = { ...validPageBody(), seo: { description: 'x', ogImage: rawRef } };
+  const og = checkRenderableImageRefs(ogBody);
+  assert.equal(statusOf(og, 'render_image_ref'), 'missing');
+  assert.match(og[0].message, new RegExp(`/img/req_publish_premium_skus_20260713_01/${sha}\\.png`));
+
+  // content_split images[].src — a plain <img> that would 404.
+  const splitBody = validPageBody();
+  splitBody.sections.push({
+    id: 's_split',
+    type: 'content_split',
+    data: { heading: 'H', body: '<p>b</p>', actions: [], images: [{ src: rawRef, alt: 'a' }] },
+  } as never);
+  assert.equal(statusOf(checkRenderableImageRefs(splitBody), 'render_image_ref'), 'missing');
+});
+
+test('check5b: *AssetRef fields, public /img paths, and notes are all exempt', () => {
+  const sha = 'd'.repeat(64);
+  // A raw ref in an *AssetRef field is CORRECT there — not flagged by this check.
+  const assetRefBody = validPageBody();
+  (assetRefBody.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef =
+    `image/req_x_20260713_01/${sha}.png`;
+  assert.equal(statusOf(checkRenderableImageRefs(assetRefBody), 'render_image_ref'), 'complete');
+
+  // The healed /img/ public path passes.
+  const healed = { ...validPageBody(), seo: { description: 'x', ogImage: `/img/req_x_20260713_01/${sha}.png` } };
+  assert.equal(statusOf(checkRenderableImageRefs(healed), 'render_image_ref'), 'complete');
+
+  // A raw ref buried in private `notes` is never rendered — exempt.
+  const notesBody = validPageBody();
+  (notesBody.sections[1].data as { notes?: string }).notes = `see image/req_x_20260713_01/${sha}.png`;
+  assert.equal(statusOf(checkRenderableImageRefs(notesBody), 'render_image_ref'), 'complete');
 });
 
 // ═══ check 6: structural invariants (the in-scope warn-vs-reject axis) ════════
