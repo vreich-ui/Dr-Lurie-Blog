@@ -1,0 +1,86 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:17:31.134Z",
+    "from": "objects/content_item/by-id/req_agent_niacinamide_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "A quiet, well-tolerated ingredient that does several small things well.",
+  "description": "A plain-language ingredient explainer for niacinamide — what it does, and realistic expectations.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Niacinamide rarely makes headlines because it does not promise miracles. It is a dependable multitasker — which is exactly why it belongs in most routines.",
+        "eyebrow": "Ingredients"
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "A form of vitamin B3, niacinamide supports the skin barrier, helps regulate oil, and can gently even out tone over time. It is well-tolerated, plays nicely with almost every other ingredient, and does not increase sun sensitivity.",
+        "title": "What it does"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "proof"
+      },
+      "public": {
+        "items": [
+          "Barrier support and less visible oil within a few weeks.",
+          "Gradual tone evening over a couple of months.",
+          "Not a spot treatment — its strength is steady, cumulative maintenance."
+        ],
+        "title": "Realistic expectations"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "A concentration around 4–5% covers most benefits; higher is not clearly better and can irritate. If you want one low-drama addition to a basic routine, this is a sensible one."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "More ingredient notes"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "A plain-language ingredient explainer for niacinamide — what it does, and realistic expectations."
+  },
+  "slug": "niacinamide-plainly",
+  "taxonomy": {
+    "category": "ingredients",
+    "tags": [
+      "ingredients",
+      "skin-science"
+    ]
+  },
+  "title": "Niacinamide, plainly"
+}
