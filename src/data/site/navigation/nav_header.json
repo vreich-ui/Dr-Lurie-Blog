@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-12T16:29:47.414Z",
+    "at": "2026-07-13T07:36:29.228Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 67
+    "record_version": 78
   },
   "actions": [
     {
@@ -15,15 +15,15 @@
     }
   ],
   "brand": {
-    "descriptor": "Skin care for skeptical beginners",
-    "text": "Late Starter Skin"
+    "descriptor": "Calm guidance for skeptical late starters",
+    "text": "Dr. Lurié Skincare"
   },
   "groups": [
     {
       "id": "g_start_here",
       "items": [
         {
-          "description": "Start with the late-to-skincare overview and the free PDFs.",
+          "description": "Start with the Dr. Lurié Skincare overview, free PDFs, and calm next steps.",
           "id": "i_home",
           "label": "Home",
           "target": {
@@ -32,7 +32,7 @@
           }
         },
         {
-          "description": "Meet the biophysicist behind the age-aware approach.",
+          "description": "Meet the biophysicist behind the careful, age-aware approach.",
           "id": "i_about",
           "label": "About Dr. Lurié",
           "target": {
@@ -62,7 +62,7 @@
         {
           "description": "Read plain skin-health explainers before choosing a routine.",
           "id": "i_library",
-          "label": "Publishing Library",
+          "label": "Library",
           "target": {
             "kind": "listing",
             "list": "content_index"
@@ -78,9 +78,9 @@
           }
         },
         {
-          "description": "Download the simple guide for late starters.",
+          "description": "Download the simple guides for late starters.",
           "id": "i_free_guide",
-          "label": "Starter PDF",
+          "label": "Starter PDFs",
           "target": {
             "href": "/guides/free-guide",
             "kind": "route"
@@ -99,7 +99,7 @@
         {
           "description": "Preview the deliberately limited product and guide direction.",
           "id": "i_shop_preview",
-          "label": "Small Offer Shelf",
+          "label": "Small Offers",
           "target": {
             "href": "/solutions/shop-preview",
             "kind": "route"
