@@ -1,0 +1,85 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:10:06.763Z",
+    "from": "objects/content_item/by-id/req_agent_reactive_skin_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "Reactive skin is usually a signal, not a diagnosis. Here is how to read it.",
+  "description": "What \"reactive skin\" means, why it happens, and the small changes that calm it down.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Skin that suddenly reacts to products it used to tolerate is rarely allergic. More often it is overwhelmed — and the fix is subtraction, not another product."
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "When the barrier thins, nerve endings sit closer to the surface and ordinary ingredients register as irritation. The skin has not changed its mind about a product; it has lost the buffer that made the product comfortable.",
+        "title": "What \"reactive\" really means"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "step"
+      },
+      "public": {
+        "items": [
+          "Cleanse once a day, at night, with a non-foaming cleanser.",
+          "Moisturize on damp skin, morning and night.",
+          "Pause every active for one week — no acids, no retinoid, no scrub."
+        ],
+        "title": "A calmer week"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "If skin settles within a week, you have your answer: it was doing too much. Reintroduce one active at a time, and only after the calm holds."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Browse the library"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "What \"reactive skin\" means, why it happens, and the small changes that calm it down."
+  },
+  "slug": "why-skin-turns-reactive",
+  "taxonomy": {
+    "category": "skin-health",
+    "tags": [
+      "sensitive-skin",
+      "skin-barrier"
+    ]
+  },
+  "title": "Why skin turns reactive — and what actually helps"
+}
