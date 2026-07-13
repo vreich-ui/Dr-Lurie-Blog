@@ -1,0 +1,99 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:04:53.436Z",
+    "from": "objects/content_item/by-id/req_agent_skin_barrier_basics_20260713_01.json",
+    "record_version": 2
+  },
+  "claims": {
+    "claim_list": [
+      {
+        "node_ids": [
+          "n_s2"
+        ],
+        "notes": "Established dermatology; barrier function and TEWL.",
+        "risk": "low",
+        "status": "verified",
+        "text": "A compromised skin barrier increases transepidermal water loss, which drives the sensation of tightness and stinging."
+      }
+    ]
+  },
+  "deck": "The outer layer of your skin is a working wall. Understanding it explains most of what your skin needs.",
+  "description": "A plain-language explanation of the skin barrier — what it is, what breaks it, and how to help it recover.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Most \"sensitive skin\" is not a skin type. It is a barrier that has been worn down — usually by doing too much, too often, to skin that was fine to begin with.",
+        "eyebrow": "Skin science"
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "The outermost layer of skin is built like a brick wall: flattened cells held together by a mortar of lipids. That wall keeps water in and irritants out. When it is intact, skin feels calm and looks even. When it is not, water escapes and everything stings.",
+        "title": "A wall, not a coating"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "proof"
+      },
+      "public": {
+        "items": [
+          "Cleansing too often, or with anything that leaves skin squeaky.",
+          "Stacking actives — an acid, a retinoid, and a scrub in the same week.",
+          "Chasing every new product before the last one had time to work."
+        ],
+        "title": "What wears it down"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "The repair is unglamorous and reliable: fewer steps, a gentle cleanser, and a moisturizer with lipids the wall recognizes. Give it two weeks before you judge it. Barriers rebuild on their own schedule, not ours."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Read the library"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "A plain-language explanation of the skin barrier — what it is, what breaks it, and how to help it recover."
+  },
+  "slug": "what-your-skin-barrier-does",
+  "taxonomy": {
+    "category": "skin-health",
+    "tags": [
+      "skin-barrier",
+      "skin-science"
+    ]
+  },
+  "title": "What your skin barrier actually does"
+}
