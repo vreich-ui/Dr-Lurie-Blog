@@ -321,6 +321,73 @@ sponsored` pre-filled — an editor cannot insert an undisclosed unit), **Ad
   stays the norm (the node is the annotation unit) — the gallery is the
   sanctioned multi-image option (Wolf, 2026-07-13).
 
+### 3i. Field-test refinements, round two (2026-07-13, Slice B)
+
+Eight fixes from Wolf's second live session (15-assertion drive + the two
+earlier drives re-run green):
+
+- **Metadata row**: category + tag links join "N min read · date" in the
+  SinglePost header (registry labels; both article families).
+- **Record preload**: entering edit mode warms a shared record cache for
+  every object on the page (one parallel get each) — chips, panels, the tray
+  and the role editor open from memory; writes invalidate their entry;
+  failed fetches never stick.
+- **Pending tray speaks human** ("object · verb · location"): rows show the
+  object's TITLE and a change summary derived from the record's history
+  since its last publish — "Image added to Resolution", "Text edited in
+  Hook · +2 more". The req\_\* id survives only as a tooltip.
+- **Chip/panel identity de-boilerplated**: an article block's chip is just
+  its role ("Hook · educate") — no "article content", no ids.
+- **Image placeholder**: the thumbnail never shows the browser's
+  broken-image glyph — hidden until an image actually loads; a neutral
+  "no image yet" box otherwise.
+- **In-place image preview**: a newly-added image previews as an appended
+  figure on the block immediately after save; an emptied src removes its
+  element (matching the text tools' behavior).
+- **Button system**: Save draft uses the accent (the green was off-palette),
+  full state set (hover/active/focus-visible/disabled), and is informative —
+  "Saving…" while in flight, "✓ Saved" confirmation, restore on failure.
+- **Bullet points**: ALWAYS offered on a content block ("Bullet points",
+  one per line) — text blocks can gain a list from the canvas (before,
+  lists were only editable where they already existed) — and the list
+  previews in place on save (create/update/remove the block's <ul>).
+  Field labels are editor-facing throughout (Text, Heading, Kicker,
+  Button text…).
+
+**Ruling recorded (Wolf, same session): the W7.7 remainder is ON HOLD** —
+the old admin-editor UI is stale and the admin area is being rethought; no
+TipTap panel work or /admin/publish re-wire until that lands.
+
+### 3j. The tile mechanic (2026-07-13, Slice C): delete everywhere, glass tiles, right rail, tile → accordion morph
+
+Wolf's third round — the tile becomes an interaction system (15-assertion
+drive; the A/B/W7.7 drives re-run green):
+
+- **Delete on every tile** (rightmost tool, little trash): article blocks →
+  `remove_node`; sections — inline OR shared_ref — → `remove_section` on the
+  HOST page instance (deleting a shared section removes this page's
+  REFERENCE; the sec\_\* object remains — the confirm copy says so). Chrome
+  is excepted (a menu is not an element). **Every delete confirms first**
+  (modal, token-styled, Escape/backdrop cancel) and lands as a reviewable
+  draft — the region disappears in place; publish + release make it real.
+  The tray already phrases it ("Block removed (Hook)").
+- **Glass tiles**: the heavy accent pill became near-transparent
+  (`backdrop-filter` blur + saturate over a 32% surface tint) with the text
+  and tools at full contrast — content sticks out, chrome recedes.
+- **Right rail**: the tile sits just right of the content column, top
+  aligned with the block's heading (`rect.right + 14`, clamped) — well clear
+  of the centered "+" gap buttons. Chip z-index sits ABOVE the open panel so
+  hovering a neighboring block always yields a clickable tile (found by the
+  drive: the anchored panel used to intercept those clicks).
+- **Tile → accordion (container transform)**: the panel now opens IN PLACE
+  of the tile — `position:absolute` at the same rail, top aligned with the
+  object it belongs to, scrolling with the page — and a FLIP morph plays the
+  tile expanding into the accordion (220ms, `cubic-bezier(.2,.8,.2,1)`;
+  `prefers-reduced-motion` gets an instant open; mobile keeps the bottom
+  sheet). Pressing another tool on the same tile switches the accordion
+  section in place — no re-morph, no jump. Universal by construction: every
+  target kind (sections, article blocks, chrome) shares this one path.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

@@ -175,26 +175,29 @@ body.dl-em-on .dl-em-fab{display:none}
 body.dl-em-on [data-cms-section-id].dl-em-hot>*,body.dl-em-on [data-cms-nav-object].dl-em-hot>*{outline:2px solid color-mix(in srgb,var(--dlem-accent) 60%,transparent);outline-offset:6px;border-radius:2px}
 body.dl-em-on [data-cms-section-id].dl-em-focus>*,body.dl-em-on [data-cms-nav-object].dl-em-focus>*{outline:2px solid var(--dlem-accent);outline-offset:6px}
 body.dl-em-on [data-cms-section-id].dl-em-draft>*,body.dl-em-on [data-cms-nav-object].dl-em-draft>*{outline:2px dashed var(--dlem-draft);outline-offset:6px}
-.dl-em-chip{position:fixed;z-index:99991;display:none;align-items:center;gap:7px;padding:4px 6px 4px 10px;
-  border-radius:7px;background:var(--dlem-accent);color:var(--dlem-accent-ink);font:600 11.5px var(--dlem-font);
-  box-shadow:var(--dlem-shadow)}
-.dl-em-chip .dl-em-id{font:400 10.5px ui-monospace,monospace;color:color-mix(in srgb,var(--dlem-accent-ink) 78%,transparent)}
-.dl-em-chip .dl-em-shared{background:color-mix(in srgb,var(--dlem-accent-ink) 22%,transparent);border-radius:4px;padding:1px 6px;font-size:10px}
+.dl-em-chip{position:fixed;z-index:99994;display:none;align-items:center;gap:7px;padding:4px 6px 4px 10px;
+  border-radius:9px;border:1px solid color-mix(in srgb,var(--dlem-text) 16%,transparent);
+  background:color-mix(in srgb,var(--dlem-surface) 32%,transparent);
+  -webkit-backdrop-filter:blur(9px) saturate(1.3);backdrop-filter:blur(9px) saturate(1.3);
+  color:var(--dlem-heading);font:700 11.5px var(--dlem-font);
+  box-shadow:0 2px 12px color-mix(in srgb,var(--dlem-text) 12%,transparent)}
+.dl-em-chip .dl-em-id{font:400 10.5px ui-monospace,monospace;color:var(--dlem-muted)}
+.dl-em-chip .dl-em-shared{background:color-mix(in srgb,var(--dlem-text) 12%,transparent);border-radius:4px;padding:1px 6px;font-size:10px;color:var(--dlem-text)}
 .dl-em-chip .dl-em-draftflag{background:var(--dlem-draft);border-radius:4px;padding:1px 6px;font-size:10px;color:#fff}
 .dl-em-chip .dl-em-tools{display:flex;gap:2px;margin-left:2px;padding-left:7px;
-  border-left:1px solid color-mix(in srgb,var(--dlem-accent-ink) 25%,transparent)}
+  border-left:1px solid color-mix(in srgb,var(--dlem-text) 18%,transparent)}
 .dl-em-chip .dl-em-tool{display:inline-flex;align-items:center;justify-content:center;width:26px;height:24px;
-  border:none;border-radius:5px;background:transparent;color:var(--dlem-accent-ink);cursor:pointer;padding:0}
-.dl-em-chip .dl-em-tool:hover{background:color-mix(in srgb,var(--dlem-accent-ink) 18%,transparent)}
+  border:none;border-radius:5px;background:transparent;color:var(--dlem-text);cursor:pointer;padding:0}
+.dl-em-chip .dl-em-tool:hover{background:color-mix(in srgb,var(--dlem-text) 14%,transparent);color:var(--dlem-heading)}
 .dl-em-chip .dl-em-tool svg{display:block}
 .dl-em-chip .dl-em-ask.dl-em-sel{background:color-mix(in srgb,var(--dlem-spark) 30%,transparent);
   box-shadow:0 0 0 1.5px var(--dlem-spark)}
 /* Selection-algorithm dropdown (related grids) — a chip-native compact select. */
 .dl-em-alg{appearance:none;-webkit-appearance:none;height:24px;padding:2px 18px 2px 8px;cursor:pointer;
-  border:1px solid color-mix(in srgb,var(--dlem-accent-ink) 35%,transparent);border-radius:5px;
-  background:color-mix(in srgb,var(--dlem-accent-ink) 12%,transparent) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center;
-  color:var(--dlem-accent-ink);font:600 10.5px var(--dlem-font)}
-.dl-em-alg:hover{border-color:var(--dlem-accent-ink)}
+  border:1px solid color-mix(in srgb,var(--dlem-text) 30%,transparent);border-radius:5px;
+  background:color-mix(in srgb,var(--dlem-text) 8%,transparent) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center;
+  color:var(--dlem-text);font:600 10.5px var(--dlem-font)}
+.dl-em-alg:hover{border-color:var(--dlem-text)}
 .dl-em-alg option{color:var(--dlem-text);background:var(--dlem-surface)}
 .dl-em-gaplayer{position:absolute;top:0;left:0;width:100%;height:0;z-index:99989;display:none;pointer-events:none}
 body.dl-em-on .dl-em-gaplayer{display:block}
@@ -232,6 +235,22 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-upload.dl-em-loading{opacity:.5;pointer-events:none}
 .dl-em-upload.dl-em-loading svg{animation:dl-em-spin .8s linear infinite}
 @keyframes dl-em-spin{to{transform:rotate(360deg)}}
+/* Anchored mode (desktop): the panel sits where the tile was — right rail,
+   top aligned with the object it belongs to — and scrolls with the page. */
+.dl-em-panel.dl-em-anchored{position:absolute;right:auto;bottom:auto}
+/* A deleted region disappears in place (draft — publish makes it real). */
+.dl-em-removed{display:none!important}
+/* Delete confirmation modal. */
+.dl-em-confirm{position:fixed;inset:0;z-index:99996;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--dlem-text) 26%,transparent)}
+.dl-em-confirmcard{width:340px;max-width:calc(100vw - 40px);background:var(--dlem-surface);color:var(--dlem-text);
+  border:1px solid var(--dlem-border);border-radius:12px;box-shadow:var(--dlem-shadow);padding:16px 16px 12px;
+  font:13px/1.5 var(--dlem-font)}
+.dl-em-confirmcard p{margin:0 0 12px}
+.dl-em-confirmrow{display:flex;gap:8px;justify-content:flex-end}
+.dl-em-btn.dl-em-danger{background:var(--dlem-draft);border-color:var(--dlem-draft);color:#fff;
+  display:inline-flex;align-items:center;gap:6px}
+.dl-em-btn.dl-em-danger:hover{filter:brightness(1.06);color:#fff}
 /* Busy dots: every wait (AI round trip, record load, save) shows motion. */
 .dl-em-busy{display:inline-flex;align-items:center;gap:3px;margin-right:6px;vertical-align:middle}
 .dl-em-busy i{width:4px;height:4px;border-radius:50%;background:var(--dlem-accent);opacity:.25;
@@ -249,7 +268,14 @@ body.dl-em-on .dl-em-gaplayer{display:block}
   border:1px solid var(--dlem-accent);color:var(--dlem-accent);border-radius:999px;padding:0 8px;
   font:700 10.5px ui-monospace,monospace}
 .dl-em-formfoot{display:flex;gap:8px;padding:10px 0 2px;position:sticky;bottom:0;background:var(--dlem-surface)}
-.dl-em-formfoot .dl-em-save{flex:1;background:var(--dlem-ok);border-color:var(--dlem-ok);color:#fff}
+.dl-em-formfoot .dl-em-save{flex:1;background:var(--dlem-accent);border-color:var(--dlem-accent);color:var(--dlem-accent-ink)}
+.dl-em-formfoot .dl-em-save:hover{filter:brightness(1.08);color:var(--dlem-accent-ink)}
+.dl-em-btn:active{transform:translateY(1px)}
+.dl-em-btn:focus-visible{outline:2px solid var(--dlem-accent);outline-offset:2px}
+.dl-em-btn.dl-em-busybtn{pointer-events:none;opacity:.75}
+.dl-em-imgphold{display:flex;align-items:center;justify-content:center;gap:6px;height:56px;margin-top:4px;
+  border:1px dashed var(--dlem-border);border-radius:8px;color:var(--dlem-muted);font-size:11px}
+.dl-em-imgpreview{margin:8px 0}
 .dl-em-formfoot .dl-em-ghost{width:38px;padding:0;flex:none}
 /* Content-sized, never viewport-pinned: the panel grows with what's in it
    (capped), instead of always spanning top bar → bottom of the screen. */
@@ -312,7 +338,7 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-actions{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--dlem-border)}
 .dl-em-actions[hidden]{display:none}
 .dl-em-actions .dl-em-btn{border-color:var(--dlem-accent);background:var(--dlem-accent);color:var(--dlem-accent-ink)}
-.dl-em-actions .dl-em-accept{flex:1;background:var(--dlem-ok);border-color:var(--dlem-ok)}
+.dl-em-actions .dl-em-accept{flex:1}
 .dl-em-actions .dl-em-btn.dl-em-ghost{background:transparent;color:var(--dlem-text);border-color:var(--dlem-border)}
 .dl-em-composer{padding:9px 12px 11px;border-top:1px solid var(--dlem-border)}
 .dl-em-composer .dl-em-row{display:flex;gap:8px;align-items:flex-end}
@@ -359,6 +385,11 @@ const ICON_IMAGE =
 const ICON_PLUS =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
   'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const ICON_TRASH =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>' +
+  '<path d="M10 11v6M14 11v6"/></svg>';
 const ICON_TAG =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -543,6 +574,104 @@ export const mountEditMode = (options: MountOptions): void => {
   const busy = (label: string): HTMLElement =>
     log('sys', `<span class="dl-em-busy"><i></i><i></i><i></i></span>${escapeHtml(label)}`);
 
+  /** Busy → brief success-confirmation state for a save-style button. */
+  const buttonBusy = (button: HTMLButtonElement | null): { done: (ok: boolean) => void } => {
+    if (!button) return { done: () => {} };
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.classList.add('dl-em-busybtn');
+    button.innerHTML = 'Saving…';
+    return {
+      done: (ok: boolean) => {
+        button.classList.remove('dl-em-busybtn');
+        if (!ok) {
+          button.innerHTML = original;
+          button.disabled = false;
+          return;
+        }
+        button.innerHTML = `${ICON_CHECK} Saved`;
+        window.setTimeout(() => {
+          button.innerHTML = original;
+          button.disabled = false;
+        }, 900);
+      },
+    };
+  };
+
+  /** Destructive actions confirm first — promise resolves true on confirm. */
+  const confirmDialog = (message: string, confirmLabel = 'Delete'): Promise<boolean> =>
+    new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'dl-em-confirm';
+      overlay.innerHTML =
+        `<div class="dl-em-confirmcard" role="alertdialog" aria-modal="true">` +
+        `<p>${escapeHtml(message)}</p><div class="dl-em-confirmrow">` +
+        `<button class="dl-em-btn" data-em-cancel>Cancel</button>` +
+        `<button class="dl-em-btn dl-em-danger" data-em-ok>${ICON_TRASH} ${escapeHtml(confirmLabel)}</button>` +
+        `</div></div>`;
+      const done = (value: boolean): void => {
+        overlay.remove();
+        resolve(value);
+      };
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) done(false);
+      });
+      overlay.addEventListener('keydown', (event) => {
+        if ((event as KeyboardEvent).key === 'Escape') done(false);
+      });
+      overlay.querySelector('[data-em-cancel]')?.addEventListener('click', () => done(false));
+      overlay.querySelector('[data-em-ok]')?.addEventListener('click', () => done(true));
+      document.body.append(overlay);
+      overlay.querySelector<HTMLButtonElement>('[data-em-cancel]')?.focus();
+    });
+
+  // ── record cache (B4): entering edit mode preloads every object visible on
+  // the page (one get per distinct object, in parallel) so panels and chips
+  // open from memory; any successful write invalidates its entry.
+  type RecordResult = { status: number; record?: Record<string, unknown> };
+  const recordCache = new Map<string, Promise<RecordResult>>();
+  const recordKey = (objectType: string, objectId: string): string => `${objectType}:${objectId}`;
+  const cachedRecord = (objectType: string, objectId: string): Promise<RecordResult> => {
+    const key = recordKey(objectType, objectId);
+    let cached = recordCache.get(key);
+    if (!cached) {
+      // A failed fetch must not stick: drop it so the next open retries.
+      cached = getObjectRecord(getToken, objectType, objectId).then(
+        (result) => {
+          if (result.status !== 200) recordCache.delete(key);
+          return result;
+        },
+        (error: unknown) => {
+          recordCache.delete(key);
+          throw error;
+        }
+      );
+      recordCache.set(key, cached);
+    }
+    return cached;
+  };
+  const invalidateRecord = (objectType: string, objectId: string): void => {
+    recordCache.delete(recordKey(objectType, objectId));
+    if (objectType === 'content_item') nodeRoleCache.delete(objectId);
+  };
+  const preloadRecords = (): void => {
+    const targets = new Map<string, { type: string; id: string }>();
+    const note = (target: EditTarget | undefined): void => {
+      if (target)
+        targets.set(recordKey(target.objectType, target.objectId), { type: target.objectType, id: target.objectId });
+    };
+    document
+      .querySelectorAll<HTMLElement>(REGION_SELECTOR)
+      .forEach((region) => note(deriveEditTarget(region.dataset as Record<string, string>)));
+    document
+      .querySelectorAll<HTMLElement>(NODE_SELECTOR)
+      .forEach((region) => note(deriveNodeTarget(region.dataset as Record<string, string>)));
+    document
+      .querySelectorAll<HTMLElement>(NAV_SELECTOR)
+      .forEach((region) => note(deriveNavTarget(region.dataset as Record<string, string>)));
+    for (const { type, id } of targets.values()) void cachedRecord(type, id);
+  };
+
   const session = (objectType: string, objectId: string): EditSession => {
     const key = `${objectType}:${objectId}`;
     let existing = sessions.get(key);
@@ -576,7 +705,135 @@ export const mountEditMode = (options: MountOptions): void => {
     });
   };
 
-  // ── tray ──────────────────────────────────────────────────────────────────
+  // ── tray (B5): rows say WHAT changed WHERE, not a req_* id ─────────────────
+  // "object · verb · location": the label is the object's human name (title/
+  // route/type) and the note summarizes the unpublished ops from the record's
+  // history — "Image added to Resolution", "Text edited in Hook · +2 more".
+  type HistoryEntry = {
+    action?: string;
+    details?: {
+      op?: Record<string, unknown> & {
+        node_id?: string;
+        section_id?: string;
+        fields?: Record<string, unknown>;
+        node?: { kind?: string; private?: { strategy?: string } };
+      };
+      capture?: { before?: { value?: { private?: { strategy?: string }; kind?: string } } };
+    };
+  };
+
+  const trayLabelFor = (row: PendingObjectRow, body: Record<string, unknown> | undefined): string => {
+    if (!body) return row.object_id;
+    if (row.object_type === 'content_item') return (body.title as string) ?? row.object_id;
+    if (row.object_type === 'page') return (body.title as string) ?? (body.route as string) ?? row.object_id;
+    if (row.object_type === 'section') {
+      const inner = body.section as { type?: string } | undefined;
+      return inner?.type ? `Shared section: ${inner.type}` : row.object_id;
+    }
+    if (row.object_type === 'navigation') {
+      const role = body.role as string | undefined;
+      return role ? `${role.charAt(0).toUpperCase()}${role.slice(1)} menu` : row.object_id;
+    }
+    if (row.object_type === 'product') {
+      const presentation = body.presentation as { title?: string } | undefined;
+      return presentation?.title ?? (body.slug as string) ?? row.object_id;
+    }
+    if (row.object_type === 'site') return 'Site settings';
+    if (row.object_type === 'taxonomy') return 'Categories & tags';
+    if (row.object_type === 'template') return (body.name as string) ?? row.object_id;
+    return row.object_id;
+  };
+
+  /** The role (Hook/Proof/…) or kind of a node, for "…in <location>" phrasing. */
+  const nodeLocation = (body: Record<string, unknown> | undefined, entry: HistoryEntry): string => {
+    const nodeId = entry.details?.op?.node_id;
+    const nodes = (body?.nodes ?? []) as Array<{ id: string; kind?: string; private?: { strategy?: string } }>;
+    const node = nodes.find((candidate) => candidate.id === nodeId);
+    const strategy =
+      node?.private?.strategy ??
+      entry.details?.op?.node?.private?.strategy ??
+      entry.details?.capture?.before?.value?.private?.strategy;
+    if (strategy) return STRATEGY_LABELS[strategy] ?? strategy;
+    return node?.kind ?? entry.details?.op?.node?.kind ?? entry.details?.capture?.before?.value?.kind ?? 'block';
+  };
+
+  const phraseForEntry = (
+    row: PendingObjectRow,
+    body: Record<string, unknown> | undefined,
+    entry: HistoryEntry
+  ): string | undefined => {
+    const action = entry.action ?? '';
+    if (row.object_type === 'content_item') {
+      const where = nodeLocation(body, entry);
+      if (action === 'upsert_node') return `Block added (${where})`;
+      if (action === 'remove_node') return `Block removed (${where})`;
+      if (action === 'move_node') return `Block moved (${where})`;
+      if (action === 'set_node_visibility') return `Block hidden/shown (${where})`;
+      if (action === 'set_article_meta') return 'Article details edited';
+      if (action === 'update_node') {
+        const fields = (entry.details?.op?.fields ?? {}) as { public?: Record<string, unknown>; private?: unknown };
+        const publicFields = fields.public ?? {};
+        if ('media' in publicFields) {
+          const media = publicFields.media as { src?: unknown } | null;
+          return media === null
+            ? `Image removed from ${where}`
+            : `Image ${media && media.src ? 'added to' : 'changed in'} ${where}`;
+        }
+        if ('images' in publicFields) return `Gallery edited in ${where}`;
+        if (fields.private && Object.keys(publicFields).length === 0) return `Role updated (${where})`;
+        return `Text edited in ${where}`;
+      }
+      return undefined;
+    }
+    if (action === 'update_section_data') {
+      const sectionId = entry.details?.op?.section_id;
+      const sections = (body?.sections ?? []) as Array<{ id: string; type?: string }>;
+      const type =
+        sections.find((section) => section.id === sectionId)?.type ??
+        (body?.section as { type?: string } | undefined)?.type;
+      return type ? `Text edited (${type})` : 'Text edited';
+    }
+    if (action === 'upsert_section') return 'Section added';
+    if (action === 'remove_section') return 'Section removed';
+    if (action === 'move_section') return 'Section moved';
+    if (action === 'set_page_meta') return 'Page details edited';
+    if (/^(update_item|upsert_group|remove_group|upsert_action|remove_action|set_nav_meta|move_item)$/.test(action))
+      return 'Menu copy edited';
+    if (action === 'set_site_fields') return 'Site settings edited';
+    if (/product/.test(action)) return 'Product details edited';
+    if (/term/.test(action)) return 'Vocabulary edited';
+    return undefined;
+  };
+
+  /** Unpublished changes, newest first: history entries after the last publish. */
+  const summarizeUnpublished = (row: PendingObjectRow, record: Record<string, unknown> | undefined): string => {
+    const fallback = row.published_time ? 'changed since last publish' : 'never published';
+    const history = (record?.history ?? []) as HistoryEntry[];
+    const body = record?.body as Record<string, unknown> | undefined;
+    const phrases: string[] = [];
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      const entry = history[index];
+      if (entry.action === 'publish') break;
+      if (entry.action === 'checkout' || entry.action === 'checkin' || entry.action === 'refresh_lock') continue;
+      if (entry.action === 'create') {
+        if (phrases.length === 0) phrases.push('New — never published');
+        break;
+      }
+      const phrase = phraseForEntry(row, body, entry);
+      if (phrase && !phrases.includes(phrase)) phrases.push(phrase);
+    }
+    if (phrases.length === 0) return fallback;
+    return phrases[0] + (phrases.length > 1 ? ` · +${phrases.length - 1} more` : '');
+  };
+
+  const fillTrayRow = async (metaEl: HTMLElement, row: PendingObjectRow, extraNote: string): Promise<void> => {
+    const { record } = await cachedRecord(row.object_type, row.object_id);
+    const labelEl = metaEl.querySelector('[data-em-traylabel]');
+    const noteEl = metaEl.querySelector('[data-em-traynote]');
+    if (labelEl) labelEl.textContent = trayLabelFor(row, record?.body as Record<string, unknown> | undefined);
+    if (noteEl) noteEl.textContent = `${summarizeUnpublished(row, record)}${extraNote}`;
+  };
+
   const renderTray = (): void => {
     rowsEl.innerHTML = '';
     if (pendingRows.length === 0) {
@@ -592,9 +849,14 @@ export const mountEditMode = (options: MountOptions): void => {
       rowEl.className = 'dl-em-row2';
       const gateNote = row.requires_approval && row.review_state !== 'approved' ? ' · needs review approval' : '';
       const lockNote = row.lock.held ? ` · locked by ${row.lock.owner_label ?? 'someone'}` : '';
+      // Render immediately with the id as a stopgap, then swap in the human
+      // label + change summary from the (usually preloaded) record. The raw
+      // id survives in the tooltip.
       rowEl.innerHTML =
-        `<div class="dl-em-meta"><div class="dl-em-oid">${escapeHtml(row.object_id)}</div>` +
-        `<div class="dl-em-note">${row.published_time ? 'changed since last publish' : 'never published'}${gateNote}${escapeHtml(lockNote)}</div></div>`;
+        `<div class="dl-em-meta" title="${escapeHtml(row.object_id)}">` +
+        `<div class="dl-em-oid" data-em-traylabel>${escapeHtml(row.object_id)}</div>` +
+        `<div class="dl-em-note" data-em-traynote>${row.published_time ? 'changed since last publish' : 'never published'}${gateNote}${escapeHtml(lockNote)}</div></div>`;
+      void fillTrayRow(rowEl, row, `${gateNote}${lockNote}`);
       const publishBtn = document.createElement('button');
       publishBtn.className = 'dl-em-btn';
       publishBtn.textContent = 'Publish';
@@ -613,6 +875,7 @@ export const mountEditMode = (options: MountOptions): void => {
         const result = await objectSession.publish();
         await objectSession.checkin();
         if (result.status === 200) {
+          invalidateRecord(row.object_type, row.object_id);
           setStatus(`${row.object_id} published — committed, not yet deployed. Release when ready.`);
           await refreshPending();
         } else {
@@ -661,6 +924,9 @@ export const mountEditMode = (options: MountOptions): void => {
     }
     if (on) {
       void refreshPending();
+      // Pay the wait up front (B4): warm the record cache for everything on
+      // the page so every chip/panel/tool opens from memory.
+      preloadRecords();
       scheduleGapRebuild();
     } else {
       chip.style.display = 'none';
@@ -860,6 +1126,7 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     const mintedId = outcome.minted.find((mint) => mint.field === 'section.id')?.id;
+    invalidateRecord('page', gap.host);
     // A draft placeholder in place: the static page can't render the new
     // section until publish+release, so show an honest, immediately-editable
     // stand-in (it carries the annotation, so the chip tools work on it).
@@ -908,7 +1175,7 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     const mintedId = outcome.minted.find((mint) => mint.field === 'node.id')?.id;
-    nodeRoleCache.delete(gap.host); // the new block's role must show on its chip
+    invalidateRecord('content_item', gap.host); // the new block's role must show on its chip
     const anchorRegion = document.querySelector<HTMLElement>(`[data-cms-node-id="${CSS.escape(gap.anchorId)}"]`);
     if (anchorRegion && mintedId) {
       const placeholder = document.createElement('div');
@@ -928,6 +1195,45 @@ export const mountEditMode = (options: MountOptions): void => {
     scheduleGapRebuild();
   };
 
+  // ── delete (Slice C): remove an element as a reviewable draft op ──────────
+  // Nodes → remove_node on the article. Sections — inline OR shared_ref — →
+  // remove_section on the HOST page instance: deleting a shared section from
+  // a page removes the page's REFERENCE; the sec_* object itself remains.
+  const deleteRegion = async (target: EditTarget, region: HTMLElement): Promise<void> => {
+    const isNode = target.objectType === 'content_item' && Boolean(target.nodeId);
+    const what = isNode ? 'this article block' : `this ${target.sectionType} section`;
+    const sharedNote = target.shared
+      ? ' This is a shared section — deleting removes it from this page only; the shared object remains.'
+      : '';
+    const confirmed = await confirmDialog(
+      `Delete ${what}? The removal is saved as a draft — nothing changes on the live site until you publish and release.${sharedNote}`
+    );
+    if (!confirmed) return;
+    const objectType = isNode ? 'content_item' : 'page';
+    const objectId = isNode ? target.objectId : (region.dataset.cmsObjectId as string);
+    const op = isNode
+      ? { op: 'remove_node', node_id: target.nodeId as string }
+      : { op: 'remove_section', section_id: region.dataset.cmsSectionId as string };
+    const objectSession = session(objectType, objectId);
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      setStatus(`Locked by ${checkout.heldBy ?? 'another editor'} — try again later.`);
+      return;
+    }
+    const outcome = await objectSession.patch([op]);
+    if (!outcome.ok) {
+      setStatus(`Could not delete: ${outcome.error}`);
+      return;
+    }
+    invalidateRecord(objectType, objectId);
+    region.classList.add('dl-em-removed');
+    chip.style.display = 'none';
+    if (panelRegion === region) closePanel();
+    setStatus('Deleted — saved as a draft. Publish + release to make it real.');
+    await refreshPending();
+    scheduleGapRebuild();
+  };
+
   // ── hover chip ────────────────────────────────────────────────────────────
   let hotRegion: HTMLElement | undefined;
   let chipHideTimer: number | undefined;
@@ -935,9 +1241,16 @@ export const mountEditMode = (options: MountOptions): void => {
   const positionChip = (region: HTMLElement): void => {
     const rect = regionRect(region);
     if (!rect) return;
+    // Right rail: just past the content column, top aligned with the object's
+    // first line (the heading) — well clear of the centered "+" gap buttons.
     chip.style.display = 'flex';
-    chip.style.left = `${Math.max(8, rect.left + 6)}px`;
-    chip.style.top = `${Math.max(42, rect.top - 14)}px`;
+    chip.style.visibility = 'hidden';
+    const width = chip.offsetWidth;
+    const rail = rect.right + 14;
+    const left = rail + width <= window.innerWidth - 8 ? rail : Math.max(8, window.innerWidth - width - 10);
+    chip.style.left = `${left}px`;
+    chip.style.top = `${Math.max(46, rect.top)}px`;
+    chip.style.visibility = 'visible';
   };
 
   /** Labels for the related-grid selection algorithms (chip dropdown). */
@@ -976,7 +1289,7 @@ export const mountEditMode = (options: MountOptions): void => {
   const nodeRoles = (objectId: string): Promise<Map<string, string>> => {
     let cached = nodeRoleCache.get(objectId);
     if (!cached) {
-      cached = getObjectRecord(getToken, 'content_item', objectId).then(({ record }) => {
+      cached = cachedRecord('content_item', objectId).then(({ record }) => {
         const roles = new Map<string, string>();
         const nodes =
           (record?.body as { nodes?: Array<{ id: string; private?: { strategy?: string; intent?: string } }> })
@@ -1010,13 +1323,14 @@ export const mountEditMode = (options: MountOptions): void => {
     // A `related` content_grid announces its algorithm — the chip offers the
     // selection dropdown inline with the AI tool (small footprint, no panel).
     const algorithm = region.dataset.cmsRelatedAlgorithm;
-    // Article blocks show their ROLE where sections show their object id — a
-    // req_* id is worthless to an editor; Hook/Proof/Resolution is the point.
-    const idSlot = isNode
-      ? `<span class="dl-em-id" data-em-role>${escapeHtml(region.dataset.cmsNodeKind ?? 'block')}</span>`
-      : `<span class="dl-em-id">${escapeHtml(target.objectId)}</span>`;
+    // Article blocks: the ROLE is the identity — no type boilerplate, no
+    // req_* id (worthless to an editor; Hook/Proof/Resolution is the point).
+    const typeSlot = isNode
+      ? `<span data-em-role>${escapeHtml(region.dataset.cmsNodeKind ?? 'block')}</span>`
+      : `<span>${escapeHtml(target.sectionType)}</span>`;
+    const idSlot = isNode ? '' : `<span class="dl-em-id">${escapeHtml(target.objectId)}</span>`;
     chip.innerHTML =
-      `<span>${escapeHtml(target.sectionType)}</span>` +
+      typeSlot +
       idSlot +
       (target.shared ? `<span class="dl-em-shared">${isNav ? 'site-wide' : 'shared'}</span>` : '') +
       (isDraft ? `<span class="dl-em-draftflag">draft</span>` : '') +
@@ -1041,11 +1355,15 @@ export const mountEditMode = (options: MountOptions): void => {
         ? ''
         : `<button class="dl-em-tool dl-em-ask${hasSelection ? ' dl-em-sel' : ''}" ` +
           `title="Ask AI${hasSelection ? ' about selection' : ''}" aria-label="Ask AI">${ICON_SPARKLES}</button>`) +
+      // Delete lives on every tile (chrome excepted — a menu is not an
+      // element), rightmost, always behind a confirmation modal.
+      (isNav ? '' : `<button class="dl-em-tool dl-em-del" title="Delete" aria-label="Delete">${ICON_TRASH}</button>`) +
       `</span>`;
     chip.querySelector('.dl-em-edit')?.addEventListener('click', () => void openPanel(target, region, 'edit'));
     chip.querySelector('.dl-em-img')?.addEventListener('click', () => void openPanel(target, region, 'image'));
     chip.querySelector('.dl-em-role')?.addEventListener('click', () => void openPanel(target, region, 'role'));
     chip.querySelector('.dl-em-ask')?.addEventListener('click', () => void openPanel(target, region, 'ai'));
+    chip.querySelector('.dl-em-del')?.addEventListener('click', () => void deleteRegion(target, region));
     chip.querySelector<HTMLSelectElement>('[data-em-alg]')?.addEventListener('change', (event) => {
       void applyAlgorithm(target, region, (event.target as HTMLSelectElement).value);
     });
@@ -1078,7 +1396,7 @@ export const mountEditMode = (options: MountOptions): void => {
     let sectionId = target.sectionId;
     if (!sectionId) {
       // Shared grid: the patch scopes to the inner instance id on the sec_* object.
-      const { record } = await getObjectRecord(getToken, target.objectType, target.objectId);
+      const { record } = await cachedRecord(target.objectType, target.objectId);
       sectionId = ((record?.body as { section?: { id?: string } })?.section?.id ?? '') || undefined;
     }
     if (!sectionId) {
@@ -1093,6 +1411,7 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     region.dataset.cmsRelatedAlgorithm = algorithm;
+    invalidateRecord(target.objectType, target.objectId);
     region.classList.add('dl-em-draft');
     setStatus(`Selection set to “${ALGORITHM_LABELS[algorithm] ?? algorithm}” — draft saved, not published.`);
     await refreshPending();
@@ -1184,8 +1503,11 @@ export const mountEditMode = (options: MountOptions): void => {
       'dl-em-mode-role',
       'dl-em-has-image',
       'dl-em-nav',
-      'dl-em-article'
+      'dl-em-article',
+      'dl-em-anchored'
     );
+    panel.style.left = '';
+    panel.style.top = '';
     panel.querySelectorAll('.dl-em-acc').forEach((section) => section.classList.remove('dl-em-open'));
     panelState?.region.classList.remove('dl-em-focus');
     panelState = undefined;
@@ -1220,7 +1542,49 @@ export const mountEditMode = (options: MountOptions): void => {
     });
   });
 
+  // The tile → accordion mechanic (Slice C): the panel opens IN PLACE OF the
+  // tile — right rail, top aligned with the object it belongs to — and a FLIP
+  // container-transform plays the tile expanding into the accordion (the
+  // material "container transform" idiom; reduced-motion users get an instant
+  // open). Universal: every target kind shares this path. Mobile keeps the
+  // bottom sheet.
+  const anchorPanel = (region: HTMLElement): void => {
+    if (window.innerWidth <= 720) return; // the bottom-sheet media query owns mobile
+    const rect = regionRect(region);
+    if (!rect) return;
+    panel.classList.add('dl-em-anchored');
+    const width = 372;
+    const rail = rect.right + 14;
+    const left = rail + width <= window.innerWidth - 8 ? rail : Math.max(8, window.innerWidth - width - 12);
+    panel.style.left = `${left + window.scrollX}px`;
+    panel.style.top = `${Math.max(50, rect.top + window.scrollY)}px`;
+  };
+
+  const morphFromTile = (): void => {
+    if (window.innerWidth <= 720) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (chip.style.display === 'none') return;
+    const source = chip.getBoundingClientRect();
+    const dest = panel.getBoundingClientRect();
+    if (source.width === 0 || dest.width === 0) return;
+    const dx = source.left - dest.left;
+    const dy = source.top - dest.top;
+    const sx = Math.max(source.width / dest.width, 0.05);
+    const sy = Math.max(source.height / dest.height, 0.05);
+    panel.style.transformOrigin = 'top left';
+    panel.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 0.4, borderRadius: '9px' },
+        { transform: 'none', opacity: 1, borderRadius: '14px' },
+      ],
+      { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)' }
+    );
+  };
+
   const openPanel = async (target: EditTarget, region: HTMLElement, mode: PanelMode): Promise<void> => {
+    // A tool press while the same tile's accordion is open just switches the
+    // section in place — the morph plays only on a fresh open.
+    const freshOpen = !panel.classList.contains('dl-em-open') || panelRegion !== region;
     if (panelState?.snapshot) restoreRegion(panelState.snapshot);
     closePanel();
     tray.classList.remove('dl-em-open');
@@ -1236,12 +1600,12 @@ export const mountEditMode = (options: MountOptions): void => {
     const isDraft = region.classList.contains('dl-em-draft');
     const isNodeTarget = target.objectType === 'content_item' && Boolean(target.nodeId);
     identEl.innerHTML =
-      `<span class="dl-em-itype">${escapeHtml(target.sectionType)}</span>` +
       (isNodeTarget
-        ? `<span class="dl-em-iid" data-em-role title="${escapeHtml(target.objectId)}">${escapeHtml(
+        ? `<span class="dl-em-itype" data-em-role title="${escapeHtml(target.objectId)}">${escapeHtml(
             region.dataset.cmsNodeKind ?? 'block'
           )}</span>`
-        : `<span class="dl-em-iid">${escapeHtml(target.objectId)}</span>`) +
+        : `<span class="dl-em-itype">${escapeHtml(target.sectionType)}</span>` +
+          `<span class="dl-em-iid">${escapeHtml(target.objectId)}</span>`) +
       (target.shared ? `<span class="dl-em-idot dl-em-shd" title="Shared — affects every page using it"></span>` : '') +
       (isDraft ? `<span class="dl-em-idot dl-em-drf" title="Unpublished draft"></span>` : '');
     panel.classList.toggle(
@@ -1261,13 +1625,18 @@ export const mountEditMode = (options: MountOptions): void => {
 
     const selected = mode === 'ai' && selectionRegion === region ? currentSelectionText : undefined;
     panel.classList.add('dl-em-open');
+    anchorPanel(region);
+    if (freshOpen) {
+      morphFromTile();
+      chip.style.display = 'none'; // the accordion replaces the tile
+    }
     if (mode === 'ai') {
       inputEl.value = '';
       inputEl.focus();
     }
 
     const loading = busy('Loading…');
-    const { status, record } = await getObjectRecord(getToken, target.objectType, target.objectId);
+    const { status, record } = await cachedRecord(target.objectType, target.objectId);
     loading.remove();
     if (status !== 200 || !record) {
       log('sys', `Could not load ${escapeHtml(target.objectId)} (HTTP ${status}).`);
@@ -1455,12 +1824,25 @@ export const mountEditMode = (options: MountOptions): void => {
     if (field.kind === 'image-src') return imageEntryFor(data, field).src;
     if (field.kind === 'image-alt') return imageEntryFor(data, field).alt ?? '';
     const value = data[field.key];
-    if (field.kind === 'lines') return (value as string[]).join('\n');
+    if (field.kind === 'lines') return ((value as string[]) ?? []).join('\n');
     return (value as string) ?? '';
+  };
+
+  /** Editor-facing field names — say what the field is, not its JSON key. */
+  const FIELD_LABELS: Record<string, string> = {
+    body: 'Text',
+    items: 'Bullet points',
+    title: 'Heading',
+    eyebrow: 'Kicker',
+    ctaText: 'Button text',
+    ctaLink: 'Button link',
+    'media.src': 'Image path',
+    'media.alt': 'Image alt text',
   };
 
   const renderForm = (state: PanelState): void => {
     const fields = formFieldsFor(state.currentData, state.mode);
+    const isContentNode = state.target.objectType === 'content_item' && state.region.dataset.cmsNodeKind === 'content';
     // Article content nodes without media yet: offer the ADD path — empty
     // src/alt rows (with Upload) that create `public.media` on save. Without
     // this, a node that has no image shows nothing and can never gain one.
@@ -1469,6 +1851,12 @@ export const mountEditMode = (options: MountOptions): void => {
         { key: 'media.src', kind: 'image-src', imageField: 'media' },
         { key: 'media.alt', kind: 'image-alt', imageField: 'media' }
       );
+    }
+    // Bullet points are ALWAYS offered on a content block (B8): a text block
+    // without items[] must be able to gain a list from the canvas — before
+    // this, lists were only editable where they already existed.
+    if (state.mode === 'edit' && isContentNode && !fields.some((field) => field.key === 'items')) {
+      fields.push({ key: 'items', kind: 'lines' });
     }
     formEl.innerHTML = '';
     if (fields.length === 0) {
@@ -1481,7 +1869,7 @@ export const mountEditMode = (options: MountOptions): void => {
       const row = document.createElement('div');
       row.className = 'dl-em-formrow';
       const value = formValueFor(state.currentData, field);
-      const label = `<label>${escapeHtml(field.key)}</label>`;
+      const label = `<label>${escapeHtml(FIELD_LABELS[field.key] ?? field.key)}</label>`;
       if (field.kind === 'richtext' || field.kind === 'lines') {
         // Article node bodies are PLAIN TEXT (escaped at render; blank line =
         // new paragraph) — the HTML-tag hint belongs to section fields only.
@@ -1510,14 +1898,37 @@ export const mountEditMode = (options: MountOptions): void => {
       }
       formEl.append(row);
       if (field.kind === 'image-src') {
+        // The thumbnail must never show the browser's broken-image glyph: it
+        // stays hidden until the image actually loads; empty/unloadable srcs
+        // show a neutral "no image yet" placeholder instead.
         const thumb = document.createElement('img');
         thumb.className = 'dl-em-imgthumb';
         thumb.alt = 'Preview';
-        thumb.src = value;
-        row.append(thumb);
+        thumb.style.display = 'none';
+        const placeholder = document.createElement('div');
+        placeholder.className = 'dl-em-imgphold';
+        placeholder.innerHTML = `${ICON_IMAGE}<span>No image yet — upload or paste a path</span>`;
+        row.append(thumb, placeholder);
+        thumb.addEventListener('load', () => {
+          thumb.style.display = 'block';
+          placeholder.style.display = 'none';
+        });
+        thumb.addEventListener('error', () => {
+          thumb.style.display = 'none';
+          placeholder.style.display = 'flex';
+        });
+        const syncThumb = (src: string): void => {
+          if (src.trim()) thumb.src = src;
+          else {
+            thumb.removeAttribute('src');
+            thumb.style.display = 'none';
+            placeholder.style.display = 'flex';
+          }
+        };
+        syncThumb(value);
         const srcInput = row.querySelector<HTMLInputElement>('[data-em-field]');
         srcInput?.addEventListener('input', () => {
-          thumb.src = srcInput.value;
+          syncThumb(srcInput.value);
         });
         const uploadButton = row.querySelector<HTMLButtonElement>('[data-em-upload]');
         const fileInput = row.querySelector<HTMLInputElement>('[data-em-upload-file]');
@@ -1615,11 +2026,13 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', 'No changes to save.');
       return;
     }
+    const saveButton = buttonBusy(formEl.querySelector<HTMLButtonElement>('[data-em-form-save]'));
     const working = busy('Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
       working.remove();
+      saveButton.done(false);
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
@@ -1627,6 +2040,7 @@ export const mountEditMode = (options: MountOptions): void => {
       { op: 'update_node', node_id: state.target.nodeId, fields: { private: fields } },
     ]);
     working.remove();
+    saveButton.done(outcome.ok);
     if (!outcome.ok) {
       const blockers = outcome.blockers?.length ? `<br>${outcome.blockers.map(escapeHtml).join('<br>')}` : '';
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
@@ -1637,7 +2051,7 @@ export const mountEditMode = (options: MountOptions): void => {
       ...Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, value ?? undefined])),
     };
     // The chip/header roles come from the record — refresh both.
-    nodeRoleCache.delete(state.target.objectId);
+    invalidateRecord(state.target.objectType, state.target.objectId);
     const role = roleOf({ private: state.nodePrivate });
     const roleEl = identEl.querySelector('[data-em-role]');
     if (roleEl) roleEl.textContent = role ?? state.region.dataset.cmsNodeKind ?? 'block';
@@ -1702,16 +2116,19 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', escapeHtml(error instanceof Error ? error.message : String(error)));
       return;
     }
+    const saveButton = buttonBusy(formEl.querySelector<HTMLButtonElement>('[data-em-form-save]'));
     const working = busy('Saving…');
     const objectSession = session('navigation', state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
       working.remove();
+      saveButton.done(false);
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
     const outcome = await objectSession.patch(ops);
     working.remove();
+    saveButton.done(outcome.ok);
     if (!outcome.ok) {
       const blockers = outcome.blockers?.length ? `<br>${outcome.blockers.map(escapeHtml).join('<br>')}` : '';
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
@@ -1721,6 +2138,7 @@ export const mountEditMode = (options: MountOptions): void => {
     // Keep the panel body in step with the draft record, then re-snapshot the
     // form (a later upsert_group resends whole groups — staleness reverts edits).
     state.navBody = applyNavChangesToBody(body, changes);
+    invalidateRecord('navigation', state.target.objectId);
     renderNavForm(state);
     state.region.classList.add('dl-em-draft');
     log('sys', `${ICON_CHECK} Draft saved — <strong>not published</strong>. Changes apply site-wide on release.`);
@@ -1763,7 +2181,7 @@ export const mountEditMode = (options: MountOptions): void => {
 
   const saveForm = async (state: PanelState, fields: FormField[]): Promise<void> => {
     const changed: Record<string, unknown> = {};
-    const previews: Array<{ kind: 'string' | 'html' | 'image'; before: unknown; after: unknown }> = [];
+    const previews: Array<{ kind: 'string' | 'html' | 'image' | 'list'; before: unknown; after: unknown }> = [];
     for (const field of fields) {
       const input = formEl.querySelector<HTMLInputElement | HTMLTextAreaElement>(
         `[data-em-field="${CSS.escape(field.key)}"]`
@@ -1799,10 +2217,12 @@ export const mountEditMode = (options: MountOptions): void => {
         }
         if (field.kind === 'image-src') previews.push({ kind: 'image', before, after: raw });
       } else if (field.kind === 'lines') {
-        changed[field.key] = raw
+        const lines = raw
           .split('\n')
           .map((line) => line.trim())
           .filter(Boolean);
+        changed[field.key] = lines;
+        previews.push({ kind: 'list', before: state.currentData[field.key], after: lines });
       } else {
         changed[field.key] = raw;
         previews.push({ kind: field.kind === 'richtext' ? 'html' : 'string', before, after: raw });
@@ -1817,16 +2237,19 @@ export const mountEditMode = (options: MountOptions): void => {
     if (state.target.objectType === 'content_item' && Array.isArray(changed.images)) {
       changed.images = (changed.images as Array<{ src?: string }>).filter((entry) => (entry.src ?? '') !== '');
     }
+    const saveButton = buttonBusy(formEl.querySelector<HTMLButtonElement>('[data-em-form-save]'));
     const working = busy('Saving…');
     const objectSession = session(state.target.objectType, state.target.objectId);
     const checkout = await objectSession.ensureCheckout();
     if (!checkout.ok) {
       working.remove();
+      saveButton.done(false);
       log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
       return;
     }
     const outcome = await objectSession.patch(suggestionToOps(state.target, changed, state.patchSectionId));
     working.remove();
+    saveButton.done(outcome.ok);
     if (!outcome.ok) {
       const blockers = outcome.blockers?.length ? `<br>${outcome.blockers.map(escapeHtml).join('<br>')}` : '';
       log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
@@ -1835,14 +2258,51 @@ export const mountEditMode = (options: MountOptions): void => {
     // Show the saved draft in place where we can do so unambiguously.
     for (const preview of previews) {
       if (preview.kind === 'image') {
+        // Swap a matching image in place; a NEW image (no match) previews as
+        // an appended figure, an emptied one removes its element — the block
+        // should never wait for publish+release to show what was saved.
+        let matched = false;
         state.region.querySelectorAll<HTMLImageElement>('img').forEach((img) => {
-          if (img.getAttribute('src') === preview.before) img.src = preview.after as string;
+          if (img.getAttribute('src') !== preview.before) return;
+          matched = true;
+          if ((preview.after as string).trim()) img.src = preview.after as string;
+          else (img.closest('figure') ?? img).remove();
         });
+        if (!matched && (preview.after as string).trim()) {
+          const figure = document.createElement('figure');
+          figure.className = 'dl-em-imgpreview';
+          const img = document.createElement('img');
+          img.src = preview.after as string;
+          img.alt = '';
+          figure.append(img);
+          state.region.append(figure);
+        }
+      } else if (preview.kind === 'list') {
+        // Bullet lists preview in place too (B8): update the block's <ul>,
+        // create it if the block never had one, remove it when emptied.
+        const after = (preview.after as string[]) ?? [];
+        let list = state.region.querySelector('ul');
+        if (after.length === 0) {
+          list?.remove();
+        } else {
+          if (!list) {
+            list = document.createElement('ul');
+            state.region.append(list);
+          }
+          list.replaceChildren(
+            ...after.map((item) => {
+              const li = document.createElement('li');
+              li.textContent = item;
+              return li;
+            })
+          );
+        }
       } else {
         previewFieldChange(state.region, preview.kind, preview.before, preview.after);
       }
     }
     Object.assign(state.currentData, changed);
+    invalidateRecord(state.target.objectType, state.target.objectId);
     state.region.classList.add('dl-em-draft');
     log('sys', `${ICON_CHECK} Draft saved — <strong>not published</strong>.`);
     setStatus(`${state.target.objectId}: draft saved.`);
@@ -1951,6 +2411,7 @@ export const mountEditMode = (options: MountOptions): void => {
       return;
     }
     Object.assign(state.currentData, state.suggestion);
+    invalidateRecord(state.target.objectType, state.target.objectId);
     state.suggestion = undefined;
     state.changes = undefined;
     state.snapshot = undefined; // the preview is now the draft — keep it on screen
