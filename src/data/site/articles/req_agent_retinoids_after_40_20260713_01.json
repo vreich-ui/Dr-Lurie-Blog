@@ -1,0 +1,85 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:36:53.858Z",
+    "from": "objects/content_item/by-id/req_agent_retinoids_after_40_20260713_01.json",
+    "record_version": 3
+  },
+  "deck": "The best-studied anti-aging ingredient, introduced the way that keeps skin comfortable.",
+  "description": "How to start a retinoid after 40 without irritation — frequency, buffering, and patience.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "persuade",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Retinoids are the most evidence-backed anti-aging ingredient available without a prescription conversation. Most people quit them not because they fail, but because they start too fast."
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "A retinoid speeds skin-cell turnover. Introduced abruptly, that shows up as flaking and redness — the \"retinoid uglies.\" Introduced gradually, skin adapts and the same product feels unremarkable.",
+        "title": "Why go slow"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "step"
+      },
+      "public": {
+        "items": [
+          "Twice a week for the first two weeks, at night.",
+          "A pea-sized amount for the whole face — more is not better.",
+          "Moisturizer before and after (\"sandwiching\") if you feel any tightness."
+        ],
+        "title": "A gentle start"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Build to every other night over a couple of months. Results in the mirror take twelve weeks or more, so judge it by the season, not the week."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Read the guides"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "How to start a retinoid after 40 without irritation — frequency, buffering, and patience."
+  },
+  "slug": "starting-retinoids-after-40",
+  "taxonomy": {
+    "category": "skin-after-40",
+    "tags": [
+      "retinoids",
+      "skin-after-40"
+    ]
+  },
+  "title": "Starting retinoids after 40, slowly"
+}
