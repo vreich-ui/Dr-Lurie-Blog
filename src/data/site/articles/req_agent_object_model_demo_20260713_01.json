@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-13T14:56:07.354Z",
+    "at": "2026-07-13T17:53:00.027Z",
     "from": "objects/content_item/by-id/req_agent_object_model_demo_20260713_01.json",
-    "record_version": 16
+    "record_version": 23
   },
   "claims": {
     "claim_list": [
@@ -65,6 +65,11 @@
           "Every change is recorded: who, what, and exactly how to undo it.",
           "AI suggestions are limited to copy — never images, links, or structure."
         ],
+        "media": {
+          "alt": "Calendar",
+          "src": "/img/req_canvas_req_agent_object_model_demo_20260713_01_20260713_01/4fdff8bd1ace61160dedd63adc74b100db1486a517f328be1afd9111180cf20a.jpg",
+          "type": "image"
+        },
         "title": "What that enables"
       }
     },
