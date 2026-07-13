@@ -1,0 +1,85 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:18:13.141Z",
+    "from": "objects/content_item/by-id/req_agent_sunscreen_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "The best sunscreen is the one that ends up on your face every morning.",
+  "description": "How to choose a daily sunscreen — SPF, texture, and the habit that matters more than the label.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "persuade",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Sunscreen prevents more visible aging than any serum reverses. And the fanciest formula is worthless in the drawer — the one you enjoy wearing wins."
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "SPF 30 blocks about 97% of UVB; SPF 50, about 98%. The jump is small, so choose the higher number if it helps you feel covered, but do not agonize. \"Broad spectrum\" — covering UVA too — matters more than chasing SPF 100.",
+        "title": "What the numbers mean"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "items": [
+          "Pick a texture you like — cream, gel, or fluid — so you reach for it daily.",
+          "Broad spectrum, SPF 30 or higher.",
+          "A visible amount: about two finger-lengths for the face and neck."
+        ],
+        "title": "How to choose"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "Consistency beats perfection. A pleasant SPF 30 worn every day protects far better than an SPF 50 you skip because it feels heavy."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Read the library"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "How to choose a daily sunscreen — SPF, texture, and the habit that matters more than the label."
+  },
+  "slug": "sunscreen-that-you-will-wear",
+  "taxonomy": {
+    "category": "ingredients",
+    "tags": [
+      "sun-protection",
+      "ingredients"
+    ]
+  },
+  "title": "The sunscreen you will actually wear"
+}
