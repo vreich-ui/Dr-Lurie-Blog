@@ -1,0 +1,85 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:12:33.550Z",
+    "from": "objects/content_item/by-id/req_agent_reading_labels_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "The front of the box is marketing. The back is closer to the truth.",
+  "description": "A short guide to reading skincare labels — ingredient order, meaningless claims, and what to ignore.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "persuade",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "\"Clinically proven,\" \"dermatologist tested,\" \"clean\" — most front-of-box phrases are unregulated. The ingredient list on the back tells you far more."
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "explanation"
+      },
+      "public": {
+        "body": "Ingredients are listed by amount, high to low. An active you came for that sits near the end of a long list is likely present in a token amount. The first five ingredients are most of what you are buying.",
+        "title": "Order is dose"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "myth"
+      },
+      "public": {
+        "items": [
+          "\"Chemical-free\" — everything is a chemical, including water.",
+          "\"Hypoallergenic\" — no legal definition; any brand may print it.",
+          "\"Natural\" — unregulated, and not a measure of safety or efficacy."
+        ],
+        "title": "Phrases that mean nothing"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "You do not need to memorize chemistry. Read the first few ingredients, check where the active you want sits, and treat the front of the box as advertising — because it is."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Read more"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "A short guide to reading skincare labels — ingredient order, meaningless claims, and what to ignore."
+  },
+  "slug": "reading-a-skincare-label",
+  "taxonomy": {
+    "category": "skincare",
+    "tags": [
+      "marketing-claims",
+      "ingredients"
+    ]
+  },
+  "title": "How to read a skincare label without the hype"
+}
