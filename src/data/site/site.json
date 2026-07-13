@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-12T16:29:33.164Z",
+    "at": "2026-07-13T07:36:11.950Z",
     "from": "objects/site/by-id/site_drlurie.json",
-    "record_version": 12
+    "record_version": 16
   },
   "blog": {
     "categoryBase": "category",
@@ -12,25 +12,25 @@
   },
   "brandTokens": {
     "colors": {
-      "accent": "rgb(64 133 92)",
-      "bg-page": "rgb(252 251 248)",
-      "bg-page-dark": "rgb(3 6 32)",
-      "bg-surface": "rgb(242 248 247)",
-      "dark:accent": "rgb(101 185 139)",
-      "dark:bg-page": "rgb(3 6 32)",
-      "dark:bg-surface": "rgb(19 30 46)",
-      "dark:gold": "rgb(232 190 112)",
-      "dark:primary": "rgb(67 176 193)",
-      "dark:secondary": "rgb(216 112 94)",
+      "accent": "rgb(76 121 83)",
+      "bg-page": "rgb(250 250 247)",
+      "bg-page-dark": "rgb(7 14 24)",
+      "bg-surface": "rgb(237 244 242)",
+      "dark:accent": "rgb(118 184 128)",
+      "dark:bg-page": "rgb(7 14 24)",
+      "dark:bg-surface": "rgb(21 35 43)",
+      "dark:gold": "rgb(222 181 105)",
+      "dark:primary": "rgb(94 176 190)",
+      "dark:secondary": "rgb(204 123 104)",
       "dark:text-default": "rgb(229 236 246)",
       "dark:text-heading": "rgb(247, 248, 248)",
-      "dark:text-muted": "rgb(229 236 246 / 66%)",
-      "gold": "rgb(212 158 72)",
-      "primary": "rgb(20 122 140)",
-      "secondary": "rgb(180 72 57)",
-      "text-default": "rgb(36 41 46)",
-      "text-heading": "rgb(18 33 38)",
-      "text-muted": "rgb(58 65 73 / 76%)"
+      "dark:text-muted": "rgb(229 236 246 / 72%)",
+      "gold": "rgb(168 129 62)",
+      "primary": "rgb(31 98 112)",
+      "secondary": "rgb(139 75 62)",
+      "text-default": "rgb(34 39 43)",
+      "text-heading": "rgb(20 28 31)",
+      "text-muted": "rgb(58 65 73 / 78%)"
     },
     "fonts": {
       "heading": "'Source Serif 4', Georgia, serif",
@@ -47,15 +47,15 @@
     "header": "nav_header"
   },
   "logo": {
-    "text": "LATE STARTER SKIN"
+    "text": "DR. LURIÉ SKINCARE"
   },
   "metadataDefaults": {
-    "description": "A calm skin-care publishing space for people who arrived late, need help now, and mistrust the market.",
+    "description": "A calm Dr. Lurié Skincare publishing space for people who arrived late, need help now, and mistrust the skin-care market.",
     "ogImage": "/Social/og-default.jpg",
-    "titleTemplate": "%s - Late Starter Skin",
+    "titleTemplate": "%s - Dr. Lurié Skincare",
     "twitterHandle": "@drlurie"
   },
-  "name": "Late Starter Skin",
+  "name": "Dr. Lurié Skincare",
   "urls": {
     "base": "/",
     "canonicalHost": "https://drluriescience.netlify.app"
