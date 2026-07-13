@@ -358,6 +358,36 @@ earlier drives re-run green):
 the old admin-editor UI is stale and the admin area is being rethought; no
 TipTap panel work or /admin/publish re-wire until that lands.
 
+### 3j. The tile mechanic (2026-07-13, Slice C): delete everywhere, glass tiles, right rail, tile → accordion morph
+
+Wolf's third round — the tile becomes an interaction system (15-assertion
+drive; the A/B/W7.7 drives re-run green):
+
+- **Delete on every tile** (rightmost tool, little trash): article blocks →
+  `remove_node`; sections — inline OR shared_ref — → `remove_section` on the
+  HOST page instance (deleting a shared section removes this page's
+  REFERENCE; the sec\_\* object remains — the confirm copy says so). Chrome
+  is excepted (a menu is not an element). **Every delete confirms first**
+  (modal, token-styled, Escape/backdrop cancel) and lands as a reviewable
+  draft — the region disappears in place; publish + release make it real.
+  The tray already phrases it ("Block removed (Hook)").
+- **Glass tiles**: the heavy accent pill became near-transparent
+  (`backdrop-filter` blur + saturate over a 32% surface tint) with the text
+  and tools at full contrast — content sticks out, chrome recedes.
+- **Right rail**: the tile sits just right of the content column, top
+  aligned with the block's heading (`rect.right + 14`, clamped) — well clear
+  of the centered "+" gap buttons. Chip z-index sits ABOVE the open panel so
+  hovering a neighboring block always yields a clickable tile (found by the
+  drive: the anchored panel used to intercept those clicks).
+- **Tile → accordion (container transform)**: the panel now opens IN PLACE
+  of the tile — `position:absolute` at the same rail, top aligned with the
+  object it belongs to, scrolling with the page — and a FLIP morph plays the
+  tile expanding into the accordion (220ms, `cubic-bezier(.2,.8,.2,1)`;
+  `prefers-reduced-motion` gets an instant open; mobile keeps the bottom
+  sheet). Pressing another tool on the same tile switches the accordion
+  section in place — no re-morph, no jump. Universal by construction: every
+  target kind (sections, article blocks, chrome) shares this one path.
+
 ### 4. What is deliberately NOT in this slice
 
 - **Articles.** No chips on article bodies (they carry no annotations). The

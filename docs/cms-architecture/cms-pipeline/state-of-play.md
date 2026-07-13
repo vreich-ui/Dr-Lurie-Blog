@@ -7,6 +7,33 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-13 H (CANVAS Slice C: delete on every tile + glass restyle + right-rail anchor + tile→accordion morph)
+
+Wolf's third field-test round, same session: the tile becomes an interaction
+system (07-canvas §3j).
+
+- **Delete everywhere** (rightmost trash on every tile; chrome excepted):
+  nodes → remove_node; sections incl. shared_refs → remove_section on the
+  HOST page (a shared delete removes the reference, never the sec\_\*
+  object). Always behind a confirmation modal; lands as a draft; region
+  disappears in place; tray phrases it.
+- **Glass tiles**: near-transparent blur surface, full-contrast content.
+- **Right rail**: tile just right of the content column, top-aligned with
+  the block's heading — clear of the "+" gaps. Drive found + fixed a real
+  z-order bug: the anchored panel intercepted clicks on a neighboring
+  block's tile (chip now stacks above the panel).
+- **Tile → accordion morph** (the container-transform idiom): the panel
+  opens in place of the tile, absolutely anchored and top-aligned with its
+  object, FLIP-animated out of the tile's box (reduced-motion safe; mobile
+  keeps the bottom sheet); tool presses switch sections in place. Universal
+  across all target kinds by construction.
+- **Gates**: 1205 + 49 tests · astro check 0 · eslint/prettier clean ·
+  build 173 pages · 15-assertion Slice-C drive (glass alpha; rail x/y
+  alignment to the pixel; trash rightmost; confirm modal semantics; cancel
+  sends nothing; remove_node wire; in-place disappearance; anchored panel
+  top == tile top; tool-switch stability) + Slice A/B and W7.7 drives
+  re-run green. Screenshots delivered to Wolf.
+
 ## Session 2026-07-13 G (CANVAS Slice B: second field-test round — preload, human tray, image placeholders, button states, bullets)
 
 Wolf's second live round (screenshots) + three rulings: **W7.7 remainder ON

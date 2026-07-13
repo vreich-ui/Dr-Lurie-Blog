@@ -175,26 +175,29 @@ body.dl-em-on .dl-em-fab{display:none}
 body.dl-em-on [data-cms-section-id].dl-em-hot>*,body.dl-em-on [data-cms-nav-object].dl-em-hot>*{outline:2px solid color-mix(in srgb,var(--dlem-accent) 60%,transparent);outline-offset:6px;border-radius:2px}
 body.dl-em-on [data-cms-section-id].dl-em-focus>*,body.dl-em-on [data-cms-nav-object].dl-em-focus>*{outline:2px solid var(--dlem-accent);outline-offset:6px}
 body.dl-em-on [data-cms-section-id].dl-em-draft>*,body.dl-em-on [data-cms-nav-object].dl-em-draft>*{outline:2px dashed var(--dlem-draft);outline-offset:6px}
-.dl-em-chip{position:fixed;z-index:99991;display:none;align-items:center;gap:7px;padding:4px 6px 4px 10px;
-  border-radius:7px;background:var(--dlem-accent);color:var(--dlem-accent-ink);font:600 11.5px var(--dlem-font);
-  box-shadow:var(--dlem-shadow)}
-.dl-em-chip .dl-em-id{font:400 10.5px ui-monospace,monospace;color:color-mix(in srgb,var(--dlem-accent-ink) 78%,transparent)}
-.dl-em-chip .dl-em-shared{background:color-mix(in srgb,var(--dlem-accent-ink) 22%,transparent);border-radius:4px;padding:1px 6px;font-size:10px}
+.dl-em-chip{position:fixed;z-index:99994;display:none;align-items:center;gap:7px;padding:4px 6px 4px 10px;
+  border-radius:9px;border:1px solid color-mix(in srgb,var(--dlem-text) 16%,transparent);
+  background:color-mix(in srgb,var(--dlem-surface) 32%,transparent);
+  -webkit-backdrop-filter:blur(9px) saturate(1.3);backdrop-filter:blur(9px) saturate(1.3);
+  color:var(--dlem-heading);font:700 11.5px var(--dlem-font);
+  box-shadow:0 2px 12px color-mix(in srgb,var(--dlem-text) 12%,transparent)}
+.dl-em-chip .dl-em-id{font:400 10.5px ui-monospace,monospace;color:var(--dlem-muted)}
+.dl-em-chip .dl-em-shared{background:color-mix(in srgb,var(--dlem-text) 12%,transparent);border-radius:4px;padding:1px 6px;font-size:10px;color:var(--dlem-text)}
 .dl-em-chip .dl-em-draftflag{background:var(--dlem-draft);border-radius:4px;padding:1px 6px;font-size:10px;color:#fff}
 .dl-em-chip .dl-em-tools{display:flex;gap:2px;margin-left:2px;padding-left:7px;
-  border-left:1px solid color-mix(in srgb,var(--dlem-accent-ink) 25%,transparent)}
+  border-left:1px solid color-mix(in srgb,var(--dlem-text) 18%,transparent)}
 .dl-em-chip .dl-em-tool{display:inline-flex;align-items:center;justify-content:center;width:26px;height:24px;
-  border:none;border-radius:5px;background:transparent;color:var(--dlem-accent-ink);cursor:pointer;padding:0}
-.dl-em-chip .dl-em-tool:hover{background:color-mix(in srgb,var(--dlem-accent-ink) 18%,transparent)}
+  border:none;border-radius:5px;background:transparent;color:var(--dlem-text);cursor:pointer;padding:0}
+.dl-em-chip .dl-em-tool:hover{background:color-mix(in srgb,var(--dlem-text) 14%,transparent);color:var(--dlem-heading)}
 .dl-em-chip .dl-em-tool svg{display:block}
 .dl-em-chip .dl-em-ask.dl-em-sel{background:color-mix(in srgb,var(--dlem-spark) 30%,transparent);
   box-shadow:0 0 0 1.5px var(--dlem-spark)}
 /* Selection-algorithm dropdown (related grids) — a chip-native compact select. */
 .dl-em-alg{appearance:none;-webkit-appearance:none;height:24px;padding:2px 18px 2px 8px;cursor:pointer;
-  border:1px solid color-mix(in srgb,var(--dlem-accent-ink) 35%,transparent);border-radius:5px;
-  background:color-mix(in srgb,var(--dlem-accent-ink) 12%,transparent) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center;
-  color:var(--dlem-accent-ink);font:600 10.5px var(--dlem-font)}
-.dl-em-alg:hover{border-color:var(--dlem-accent-ink)}
+  border:1px solid color-mix(in srgb,var(--dlem-text) 30%,transparent);border-radius:5px;
+  background:color-mix(in srgb,var(--dlem-text) 8%,transparent) url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' viewBox='0 0 8 5'%3E%3Cpath d='M1 1l3 3 3-3' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 6px center;
+  color:var(--dlem-text);font:600 10.5px var(--dlem-font)}
+.dl-em-alg:hover{border-color:var(--dlem-text)}
 .dl-em-alg option{color:var(--dlem-text);background:var(--dlem-surface)}
 .dl-em-gaplayer{position:absolute;top:0;left:0;width:100%;height:0;z-index:99989;display:none;pointer-events:none}
 body.dl-em-on .dl-em-gaplayer{display:block}
@@ -232,6 +235,22 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-upload.dl-em-loading{opacity:.5;pointer-events:none}
 .dl-em-upload.dl-em-loading svg{animation:dl-em-spin .8s linear infinite}
 @keyframes dl-em-spin{to{transform:rotate(360deg)}}
+/* Anchored mode (desktop): the panel sits where the tile was — right rail,
+   top aligned with the object it belongs to — and scrolls with the page. */
+.dl-em-panel.dl-em-anchored{position:absolute;right:auto;bottom:auto}
+/* A deleted region disappears in place (draft — publish makes it real). */
+.dl-em-removed{display:none!important}
+/* Delete confirmation modal. */
+.dl-em-confirm{position:fixed;inset:0;z-index:99996;display:flex;align-items:center;justify-content:center;
+  background:color-mix(in srgb,var(--dlem-text) 26%,transparent)}
+.dl-em-confirmcard{width:340px;max-width:calc(100vw - 40px);background:var(--dlem-surface);color:var(--dlem-text);
+  border:1px solid var(--dlem-border);border-radius:12px;box-shadow:var(--dlem-shadow);padding:16px 16px 12px;
+  font:13px/1.5 var(--dlem-font)}
+.dl-em-confirmcard p{margin:0 0 12px}
+.dl-em-confirmrow{display:flex;gap:8px;justify-content:flex-end}
+.dl-em-btn.dl-em-danger{background:var(--dlem-draft);border-color:var(--dlem-draft);color:#fff;
+  display:inline-flex;align-items:center;gap:6px}
+.dl-em-btn.dl-em-danger:hover{filter:brightness(1.06);color:#fff}
 /* Busy dots: every wait (AI round trip, record load, save) shows motion. */
 .dl-em-busy{display:inline-flex;align-items:center;gap:3px;margin-right:6px;vertical-align:middle}
 .dl-em-busy i{width:4px;height:4px;border-radius:50%;background:var(--dlem-accent);opacity:.25;
@@ -366,6 +385,11 @@ const ICON_IMAGE =
 const ICON_PLUS =
   '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" ' +
   'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+const ICON_TRASH =
+  '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>' +
+  '<path d="M10 11v6M14 11v6"/></svg>';
 const ICON_TAG =
   '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
   'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
@@ -573,6 +597,33 @@ export const mountEditMode = (options: MountOptions): void => {
       },
     };
   };
+
+  /** Destructive actions confirm first — promise resolves true on confirm. */
+  const confirmDialog = (message: string, confirmLabel = 'Delete'): Promise<boolean> =>
+    new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'dl-em-confirm';
+      overlay.innerHTML =
+        `<div class="dl-em-confirmcard" role="alertdialog" aria-modal="true">` +
+        `<p>${escapeHtml(message)}</p><div class="dl-em-confirmrow">` +
+        `<button class="dl-em-btn" data-em-cancel>Cancel</button>` +
+        `<button class="dl-em-btn dl-em-danger" data-em-ok>${ICON_TRASH} ${escapeHtml(confirmLabel)}</button>` +
+        `</div></div>`;
+      const done = (value: boolean): void => {
+        overlay.remove();
+        resolve(value);
+      };
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) done(false);
+      });
+      overlay.addEventListener('keydown', (event) => {
+        if ((event as KeyboardEvent).key === 'Escape') done(false);
+      });
+      overlay.querySelector('[data-em-cancel]')?.addEventListener('click', () => done(false));
+      overlay.querySelector('[data-em-ok]')?.addEventListener('click', () => done(true));
+      document.body.append(overlay);
+      overlay.querySelector<HTMLButtonElement>('[data-em-cancel]')?.focus();
+    });
 
   // ── record cache (B4): entering edit mode preloads every object visible on
   // the page (one get per distinct object, in parallel) so panels and chips
@@ -1144,6 +1195,45 @@ export const mountEditMode = (options: MountOptions): void => {
     scheduleGapRebuild();
   };
 
+  // ── delete (Slice C): remove an element as a reviewable draft op ──────────
+  // Nodes → remove_node on the article. Sections — inline OR shared_ref — →
+  // remove_section on the HOST page instance: deleting a shared section from
+  // a page removes the page's REFERENCE; the sec_* object itself remains.
+  const deleteRegion = async (target: EditTarget, region: HTMLElement): Promise<void> => {
+    const isNode = target.objectType === 'content_item' && Boolean(target.nodeId);
+    const what = isNode ? 'this article block' : `this ${target.sectionType} section`;
+    const sharedNote = target.shared
+      ? ' This is a shared section — deleting removes it from this page only; the shared object remains.'
+      : '';
+    const confirmed = await confirmDialog(
+      `Delete ${what}? The removal is saved as a draft — nothing changes on the live site until you publish and release.${sharedNote}`
+    );
+    if (!confirmed) return;
+    const objectType = isNode ? 'content_item' : 'page';
+    const objectId = isNode ? target.objectId : (region.dataset.cmsObjectId as string);
+    const op = isNode
+      ? { op: 'remove_node', node_id: target.nodeId as string }
+      : { op: 'remove_section', section_id: region.dataset.cmsSectionId as string };
+    const objectSession = session(objectType, objectId);
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      setStatus(`Locked by ${checkout.heldBy ?? 'another editor'} — try again later.`);
+      return;
+    }
+    const outcome = await objectSession.patch([op]);
+    if (!outcome.ok) {
+      setStatus(`Could not delete: ${outcome.error}`);
+      return;
+    }
+    invalidateRecord(objectType, objectId);
+    region.classList.add('dl-em-removed');
+    chip.style.display = 'none';
+    if (panelRegion === region) closePanel();
+    setStatus('Deleted — saved as a draft. Publish + release to make it real.');
+    await refreshPending();
+    scheduleGapRebuild();
+  };
+
   // ── hover chip ────────────────────────────────────────────────────────────
   let hotRegion: HTMLElement | undefined;
   let chipHideTimer: number | undefined;
@@ -1151,9 +1241,16 @@ export const mountEditMode = (options: MountOptions): void => {
   const positionChip = (region: HTMLElement): void => {
     const rect = regionRect(region);
     if (!rect) return;
+    // Right rail: just past the content column, top aligned with the object's
+    // first line (the heading) — well clear of the centered "+" gap buttons.
     chip.style.display = 'flex';
-    chip.style.left = `${Math.max(8, rect.left + 6)}px`;
-    chip.style.top = `${Math.max(42, rect.top - 14)}px`;
+    chip.style.visibility = 'hidden';
+    const width = chip.offsetWidth;
+    const rail = rect.right + 14;
+    const left = rail + width <= window.innerWidth - 8 ? rail : Math.max(8, window.innerWidth - width - 10);
+    chip.style.left = `${left}px`;
+    chip.style.top = `${Math.max(46, rect.top)}px`;
+    chip.style.visibility = 'visible';
   };
 
   /** Labels for the related-grid selection algorithms (chip dropdown). */
@@ -1258,11 +1355,15 @@ export const mountEditMode = (options: MountOptions): void => {
         ? ''
         : `<button class="dl-em-tool dl-em-ask${hasSelection ? ' dl-em-sel' : ''}" ` +
           `title="Ask AI${hasSelection ? ' about selection' : ''}" aria-label="Ask AI">${ICON_SPARKLES}</button>`) +
+      // Delete lives on every tile (chrome excepted — a menu is not an
+      // element), rightmost, always behind a confirmation modal.
+      (isNav ? '' : `<button class="dl-em-tool dl-em-del" title="Delete" aria-label="Delete">${ICON_TRASH}</button>`) +
       `</span>`;
     chip.querySelector('.dl-em-edit')?.addEventListener('click', () => void openPanel(target, region, 'edit'));
     chip.querySelector('.dl-em-img')?.addEventListener('click', () => void openPanel(target, region, 'image'));
     chip.querySelector('.dl-em-role')?.addEventListener('click', () => void openPanel(target, region, 'role'));
     chip.querySelector('.dl-em-ask')?.addEventListener('click', () => void openPanel(target, region, 'ai'));
+    chip.querySelector('.dl-em-del')?.addEventListener('click', () => void deleteRegion(target, region));
     chip.querySelector<HTMLSelectElement>('[data-em-alg]')?.addEventListener('change', (event) => {
       void applyAlgorithm(target, region, (event.target as HTMLSelectElement).value);
     });
@@ -1402,8 +1503,11 @@ export const mountEditMode = (options: MountOptions): void => {
       'dl-em-mode-role',
       'dl-em-has-image',
       'dl-em-nav',
-      'dl-em-article'
+      'dl-em-article',
+      'dl-em-anchored'
     );
+    panel.style.left = '';
+    panel.style.top = '';
     panel.querySelectorAll('.dl-em-acc').forEach((section) => section.classList.remove('dl-em-open'));
     panelState?.region.classList.remove('dl-em-focus');
     panelState = undefined;
@@ -1438,7 +1542,49 @@ export const mountEditMode = (options: MountOptions): void => {
     });
   });
 
+  // The tile → accordion mechanic (Slice C): the panel opens IN PLACE OF the
+  // tile — right rail, top aligned with the object it belongs to — and a FLIP
+  // container-transform plays the tile expanding into the accordion (the
+  // material "container transform" idiom; reduced-motion users get an instant
+  // open). Universal: every target kind shares this path. Mobile keeps the
+  // bottom sheet.
+  const anchorPanel = (region: HTMLElement): void => {
+    if (window.innerWidth <= 720) return; // the bottom-sheet media query owns mobile
+    const rect = regionRect(region);
+    if (!rect) return;
+    panel.classList.add('dl-em-anchored');
+    const width = 372;
+    const rail = rect.right + 14;
+    const left = rail + width <= window.innerWidth - 8 ? rail : Math.max(8, window.innerWidth - width - 12);
+    panel.style.left = `${left + window.scrollX}px`;
+    panel.style.top = `${Math.max(50, rect.top + window.scrollY)}px`;
+  };
+
+  const morphFromTile = (): void => {
+    if (window.innerWidth <= 720) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (chip.style.display === 'none') return;
+    const source = chip.getBoundingClientRect();
+    const dest = panel.getBoundingClientRect();
+    if (source.width === 0 || dest.width === 0) return;
+    const dx = source.left - dest.left;
+    const dy = source.top - dest.top;
+    const sx = Math.max(source.width / dest.width, 0.05);
+    const sy = Math.max(source.height / dest.height, 0.05);
+    panel.style.transformOrigin = 'top left';
+    panel.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 0.4, borderRadius: '9px' },
+        { transform: 'none', opacity: 1, borderRadius: '14px' },
+      ],
+      { duration: 220, easing: 'cubic-bezier(.2, .8, .2, 1)' }
+    );
+  };
+
   const openPanel = async (target: EditTarget, region: HTMLElement, mode: PanelMode): Promise<void> => {
+    // A tool press while the same tile's accordion is open just switches the
+    // section in place — the morph plays only on a fresh open.
+    const freshOpen = !panel.classList.contains('dl-em-open') || panelRegion !== region;
     if (panelState?.snapshot) restoreRegion(panelState.snapshot);
     closePanel();
     tray.classList.remove('dl-em-open');
@@ -1479,6 +1625,11 @@ export const mountEditMode = (options: MountOptions): void => {
 
     const selected = mode === 'ai' && selectionRegion === region ? currentSelectionText : undefined;
     panel.classList.add('dl-em-open');
+    anchorPanel(region);
+    if (freshOpen) {
+      morphFromTile();
+      chip.style.display = 'none'; // the accordion replaces the tile
+    }
     if (mode === 'ai') {
       inputEl.value = '';
       inputEl.focus();
