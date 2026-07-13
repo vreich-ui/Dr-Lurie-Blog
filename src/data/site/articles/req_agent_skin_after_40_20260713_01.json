@@ -1,0 +1,86 @@
+{
+  "__generated": {
+    "at": "2026-07-13T19:13:35.446Z",
+    "from": "objects/content_item/by-id/req_agent_skin_after_40_20260713_01.json",
+    "record_version": 2
+  },
+  "deck": "The shifts are real and mostly hormonal. Knowing which is which makes them easier to work with.",
+  "description": "What changes in skin after 40 — collagen, oil, hydration, and menopause — explained plainly.",
+  "nodes": [
+    {
+      "id": "n_s1",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "hook"
+      },
+      "public": {
+        "body": "Skin in your forties is not failing. It is running on a different hormonal budget, and a few informed adjustments go a long way.",
+        "eyebrow": "Skin after 40"
+      }
+    },
+    {
+      "id": "n_s2",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "context"
+      },
+      "public": {
+        "body": "Collagen production slows, so skin loses some of its bounce. Oil glands quiet down, so skin that was once shiny turns dry. Around menopause, falling estrogen accelerates both — often noticeably, over a couple of years.",
+        "title": "What shifts"
+      }
+    },
+    {
+      "id": "n_s3",
+      "kind": "content",
+      "private": {
+        "intent": "educate",
+        "strategy": "proof"
+      },
+      "public": {
+        "items": [
+          "A richer moisturizer, because the skin no longer makes as much of its own oil.",
+          "Daily sunscreen, which prevents far more visible aging than any serum reverses.",
+          "A retinoid, the best-studied ingredient for collagen — started slowly."
+        ],
+        "title": "What helps most"
+      }
+    },
+    {
+      "id": "n_s4",
+      "kind": "content",
+      "private": {
+        "intent": "reassure",
+        "strategy": "resolution"
+      },
+      "public": {
+        "body": "None of this is about turning back a clock. It is about giving skin the support it used to make for itself. That is a reasonable, achievable goal."
+      }
+    },
+    {
+      "id": "n_s5",
+      "kind": "action",
+      "private": {
+        "intent": "navigate",
+        "strategy": "recommendation"
+      },
+      "public": {
+        "ctaLink": "/learn/library",
+        "ctaText": "Explore the library"
+      }
+    }
+  ],
+  "seo": {
+    "meta_description": "What changes in skin after 40 — collagen, oil, hydration, and menopause — explained plainly."
+  },
+  "slug": "skin-after-40-what-changes",
+  "taxonomy": {
+    "category": "skin-after-40",
+    "tags": [
+      "skin-after-40",
+      "menopause"
+    ]
+  },
+  "title": "Skin after 40: what actually changes"
+}
