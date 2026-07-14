@@ -200,9 +200,11 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │     byte-identical → validate → create_variant dry-run → publish 60cd213 → released, deploy
 │     ready — the demo article req_agent_object_model_demo_20260713_01 is LIVE at
 │     /object-model-demo with per-node canvas chips; seed taxonomy fixed to registry terms).
-│     NEW articles are objects;
-│     the COMMITTED .md posts stay on the legacy pipeline (Wolf 2026-07-13: not worth migrating —
-│     W7.4/W7.6 waived; see [`08-articles-plan.md`](08-articles-plan.md) §0.5)
+│     CORPUS 2026-07-13: the 83 COMMITTED .md posts were WIPED (Wolf: mostly junk, rewrite not
+│       migrate) + a 10-article content_item corpus (req_agent_*_20260713_01, 2 per registry
+│       category) was created → published → released in one build; page_article gained a
+│       related content_grid ("More to read", tag_similarity). All articles are now objects.
+│     NEW articles are objects (W7.4/W7.6 waived; see [`08-articles-plan.md`](08-articles-plan.md) §0.5)
 │     attributes: slug · title · deck? · description? · image? · taxonomy{category?,tags[]} · seo ·
 │       nodes[] (the ANNOTATED node list — every block carries private.strategy hook/agitation/…/
 │       resolution + intent, plus commercial/rendering/chat/visibility; public.body = plain text |

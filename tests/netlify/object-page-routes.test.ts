@@ -183,9 +183,12 @@ test('the real committed exports emit ZERO paths today — every page object is 
   // S2 made `page_shop` the first catch-all-served export; W5 (2026-07-12)
   // converted the last three hand-coded routes the same way — their route
   // files are deleted and the objects own the routes, zero code each.
+  // 2026-07-13: `page_object_showcase` (a QA/dev surface, standard pageType on
+  // a free route, robots-noindex, unwired from nav) is served the same way.
   assert.deepEqual(
     [...paths].sort((a, b) => a.route.localeCompare(b.route)),
     [
+      { objectId: 'page_object_showcase', route: '/object-showcase', param: 'object-showcase' },
       { objectId: 'page_pricing', route: '/pricing', param: 'pricing' },
       { objectId: 'page_services', route: '/services', param: 'services' },
       { objectId: 'page_shop', route: '/shop', param: 'shop' },
