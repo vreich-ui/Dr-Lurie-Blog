@@ -145,6 +145,8 @@ Standing principle from S-2 applies across all of these: where an option would i
 - **OQ-16 — `__generated` marker for article markdown (new).** Derived JSON carries the marker (D§1); the audit flagged that committed `.md` files have no generated-file marker (A§1.7), and the plan never adds one because articles are untouched. Adding one line to `buildFrontmatter` is trivial but _is_ an article-pipeline change (same isolation class as T5.6). Decide whether to piggyback it on T5.6's PR (one bounded article-touch instead of two) or drop it permanently.
 - **Editorial (small, non-blocking):** Solutions-dropdown dedupe (T2.9 checkpoint); whether M-5 group targets ever become rendered links (currently stored-not-rendered by decision, C§1.2 — a future intentional behavior change); the 'Early Access' naming duplication between item and action.
 
+**Addendum (2026-07-14, W8):** OQ-4 remains REJECTED — W8's template-system expansion ([`09-template-system-plan.md`](09-template-system-plan.md)) gives agents section recipes and theme presets without making PageTypes data. T6.2's remaining "editor support" leftover is DESCOPED by Wolf (templates and section templates stay agent/MCP-first; canvas exposure waits on the admin-rethink ruling). W8's own open questions are tracked wave-locally as OQ-W8-1…4 in the 09 plan (the 06/08 convention), not here.
+
 ---
 
 ## 4. Compliance notes
