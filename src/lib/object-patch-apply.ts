@@ -185,6 +185,13 @@ export interface ApplyPatchOptions {
   actor: Principal;
   /** ISO timestamp recorded on history entries and `updated_at`. */
   at: string;
+  /**
+   * Extra details merged into every history entry this batch writes (before
+   * the reserved `op`/`capture` keys, which always win). Used by verbs that
+   * compose patch ops on the caller's behalf to record provenance — e.g.
+   * instantiate_section stamps `instantiated_from: stpl_*` (W8.2).
+   */
+  entryDetails?: Record<string, unknown>;
 }
 
 export interface ApplyPatchResult {
@@ -1095,7 +1102,7 @@ export const applyPatchOps = (
       at: options.at,
       action: op.op,
       actor: options.actor,
-      details: deepCloneJson({ op, capture }) as Record<string, unknown>,
+      details: deepCloneJson({ ...options.entryDetails, op, capture }) as Record<string, unknown>,
     });
   }
 

@@ -491,7 +491,17 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           severity: 'warns',
           enforced_live: true,
           description:
-            'A required slot without a blueprint warns (registry defaultData may supply it) — never a hard fail.',
+            'A required slot without a blueprint or blueprintRef warns (registry defaultData may supply it) — never a hard fail.',
+        },
+        {
+          id: 'template_blueprint_refs',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'A slot may carry an inline blueprint OR a blueprintRef naming a section_template (never both — ' +
+            'schema-enforced). The ref must resolve to an existing section_template whose blueprint type is in ' +
+            'the slot’s allowed set. It is dereferenced and deep-copied at instantiation ONLY — editing a recipe ' +
+            'changes future instantiations, never existing pages.',
         },
         {
           id: 'template_registry',
@@ -603,7 +613,18 @@ const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
       : []),
     ...(objectType === 'template'
       ? [
-          'object_instantiate_template (template_id + route + title [+ page_type/seo]) → creates a NEW page from this recipe through the standard page create validation; dry_run: true previews the built body without persisting. Pages copy the blueprints at creation and never live-inherit from the template.',
+          'object_instantiate_template (template_id + route + title [+ page_type/seo]) → creates a NEW page from this recipe through the standard page create validation; dry_run: true previews the built body without persisting. Pages copy the blueprints at creation and never live-inherit from the template. A slot may reference a section_template via blueprintRef — dereferenced and deep-copied at instantiation.',
+        ]
+      : []),
+    // W8.2, 09-plan §3: section recipes stamp through the standard write paths.
+    ...(objectType === 'section_template'
+      ? [
+          'object_instantiate_section_template (section_template_id + target {kind:"page", page_id, position?, lock_token, expected_record_version} | {kind:"standalone", requested_id?}) → deep-copies this blueprint with a fresh minted s_* id into a page YOU have checked out (one upsert_section through the standard patch path — the verb never auto-checkouts) or mints a standalone shared sec_* object via the standard create path; dry_run: true previews without persisting. Stamped sections never live-inherit from the recipe. Escape hatch: object_get the recipe and hand-copy its blueprint into a plain upsert_section.',
+        ]
+      : []),
+    ...(objectType === 'section'
+      ? [
+          'object_instantiate_section_template (target kind "standalone") — alternative create: mint this shared section from a section_template recipe.',
         ]
       : []),
     'object_checkout → lock_token + record_version',

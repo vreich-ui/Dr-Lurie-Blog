@@ -1351,6 +1351,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'object_instantiate_section_template',
+    description:
+      "Stamp a section-template recipe (W8): deep-copies the recipe's blueprint with a freshly minted s_* section id into an existing page — as ONE upsert_section through the standard patch path, so PageType law, the leaf rule, and reference integrity all gate it — or mints a standalone shared sec_* object through the standard create path. Page mode requires YOUR current page checkout (lock_token + expected_record_version; the verb never auto-checkouts). Stamped sections never live-inherit from the recipe (editing the recipe changes future stamps only). Pass dry_run: true to preview the exact op (page mode) or the would-be object (standalone mode) plus full validation without persisting; page-mode dry_run needs neither lock_token nor expected_record_version. The stamped section id is deterministic in (recipe, page, expected_record_version) — after a lost response / 409, dry_run with your ORIGINAL expected_record_version and object_get the page: if that section_id is already present, the first stamp landed. Read object_contract(\"section_template\") first.",
+    inputSchema: objectSchema(
+      {
+        section_template_id: stringSchema('The section-template object id, e.g. stpl_hero_landing.'),
+        target: anyObjectSchema(
+          'Where to stamp: {kind:"page", page_id, position?, lock_token, expected_record_version} (insert into a page you hold the checkout for; position clamped, appended when omitted) OR {kind:"standalone", requested_id?} (mint a new shared sec_* object; a valid id is minted from the recipe name when omitted).'
+        ),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the built op/body, ids, and validation; persist nothing (no lock needed).',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['section_template_id', 'target']
+    ),
+  },
+  {
     name: 'object_create_variant',
     description:
       'Clone a content_item (article) object as a DRAFT variant for judge/score/A-B work (W7.3): node ids are re-minted (annotations that reference them — claims/compliance node_ids — are re-pointed), lineage.parent_content_id is set to the source, scores reset, and the clone flows through the standard create validation. Variants need their own slug (defaults to "<source-slug>-variant"; pass slug when creating a second variant). Serving/traffic-splitting is out of scope — publishing a winner is an ordinary object_publish.',
@@ -3861,6 +3880,14 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         page_type: input.page_type,
         seo: input.seo,
         requested_id: input.requested_id,
+        dry_run: input.dry_run,
+        agent_name: input.agent_name,
+      });
+    case 'object_instantiate_section_template':
+      return callObjectAction(event, {
+        action: 'instantiate_section',
+        section_template_id: input.section_template_id,
+        target: input.target,
         dry_run: input.dry_run,
         agent_name: input.agent_name,
       });

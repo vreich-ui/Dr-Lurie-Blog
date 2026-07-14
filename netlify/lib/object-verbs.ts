@@ -50,6 +50,8 @@ import { buildVariantBody } from '../../src/lib/article-object/variant.js';
 import { buildPageBodyFromTemplate } from '../../src/lib/template-instantiate.js';
 import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.js';
 import { pageBodySchema, pageTypeIdSchema } from '../../src/schema/bodies/page-v1.js';
+import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
+import type { SectionInstance } from '../../src/schema/bodies/section-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import {
   objectTypes,
@@ -140,6 +142,32 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     // Preview mode: build + validate the would-be page, persist NOTHING.
     dry_run: z.boolean().optional(),
   }),
+  // ─── W8.2: stamp a section-template blueprint (09-plan §3). Page mode
+  // composes ONE upsert_section through the standard patch path under the
+  // CALLER'S checkout (the verb never auto-checkouts — one-lock discipline);
+  // standalone mode mints a new shared sec_* object through the create path.
+  z.object({
+    action: z.literal('instantiate_section'),
+    section_template_id: objectId,
+    target: z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('page'),
+        page_id: objectId,
+        // Insert position (clamped); appended when omitted.
+        position: z.number().int().nonnegative().optional(),
+        // Required for a REAL stamp (the handler 400s without them);
+        // optional here so dry_run previews need no checkout at all.
+        lock_token: z.string().min(1).optional(),
+        expected_record_version: z.number().int().nonnegative().optional(),
+      }),
+      z.object({
+        kind: z.literal('standalone'),
+        requested_id: z.string().min(1).optional(),
+      }),
+    ]),
+    // Preview mode: build the op / body + validate, persist NOTHING.
+    dry_run: z.boolean().optional(),
+  }),
   z.object({
     action: z.literal('checkout'),
     object_type: objectTypeSchema,
@@ -223,6 +251,12 @@ export type HandleObjectVerbOptions = {
   publishDeps?: Omit<PublishObjectDeps, 'nowMs' | 'validationContext'>;
   /** Approval policy for the publish gate + inventory; defaults to the committed config (tests inject). */
   approvalPolicy?: ApprovalPolicy;
+  /**
+   * INTERNAL (not request-settable): extra history-entry details for a patch
+   * this call composes on the caller's behalf — instantiate_section threads
+   * its provenance ({instantiated_from: stpl_*}) through here (W8.2).
+   */
+  patchEntryDetails?: Record<string, unknown>;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -572,6 +606,51 @@ export const handleObjectVerb = async (
         });
       }
 
+      // Pre-resolve every slot blueprintRef (W8.2) so the builder stays pure:
+      // each referenced section_template must exist and parse; its blueprint
+      // enters the map the builder deep-copies from. Deref happens HERE, at
+      // instantiation, only — recipes are never live-bound.
+      const refs = [
+        ...new Set(
+          parsedTemplate.data.slots
+            .map((slot) => slot.blueprintRef)
+            .filter((ref): ref is string => typeof ref === 'string')
+        ),
+      ];
+      const resolvedBlueprints: Record<string, SectionInstance> = {};
+      for (const ref of refs) {
+        const stplRecord = await loadRecord(store, objectRecordKey('section_template', ref));
+        if (!stplRecord) {
+          return err(422, {
+            error: `Slot blueprintRef "${ref}" does not resolve to a section_template object.`,
+            template_id: request.template_id,
+          });
+        }
+        const parsedStpl = sectionTemplateBodySchema.safeParse(stplRecord.body);
+        if (!parsedStpl.success) {
+          return err(422, {
+            error: `Section template "${ref}" does not parse as section_template.v1 — fix it before instantiating.`,
+            template_id: request.template_id,
+            issues: parsedStpl.error.issues,
+          });
+        }
+        resolvedBlueprints[ref] = parsedStpl.data.blueprint;
+      }
+      // Re-check type-in-allowed at the LIVE instantiation point: the recipe
+      // may have been re-blueprinted since the template was created/validated
+      // (template_blueprint_refs is checked on template writes, not recipe
+      // writes — the recipe doesn't know who references it).
+      for (const slot of parsedTemplate.data.slots) {
+        if (!slot.blueprintRef || slot.allowed.length === 0) continue;
+        const refType = resolvedBlueprints[slot.blueprintRef]?.type;
+        if (refType && !slot.allowed.includes(refType)) {
+          return err(422, {
+            error: `Slot "${slot.slotId}": referenced blueprint type "${refType}" (${slot.blueprintRef}) is no longer in the slot's allowed set — the recipe changed since this template was written.`,
+            template_id: request.template_id,
+          });
+        }
+      }
+
       const built = buildPageBodyFromTemplate(parsedTemplate.data, {
         route: request.route,
         title: request.title,
@@ -579,6 +658,7 @@ export const handleObjectVerb = async (
         seo: request.seo,
         templateRef: templateRecord.object_id,
         instantiatedAt: timestamp,
+        resolvedBlueprints,
       });
       if (!built.ok) {
         return err(422, { error: built.error, template_id: request.template_id });
@@ -631,6 +711,162 @@ export const handleObjectVerb = async (
       );
       if (result.status !== 200) return result;
       return ok({ ...result.body, instantiated_from: templateRecord.object_id });
+    }
+
+    case 'instantiate_section': {
+      // The recipe must EXIST (draft is fine — the `instantiate` existence
+      // semantics); its body must parse as section_template.v1.
+      const stplRecord = await loadRecord(
+        store,
+        objectRecordKey('section_template', request.section_template_id)
+      );
+      if (!stplRecord) {
+        return err(404, {
+          error: 'Section template not found',
+          not_found: true,
+          section_template_id: request.section_template_id,
+        });
+      }
+      const parsedStpl = sectionTemplateBodySchema.safeParse(stplRecord.body);
+      if (!parsedStpl.success) {
+        return err(422, {
+          error: 'Section template body does not parse as section_template.v1 — fix it before instantiating.',
+          section_template_id: request.section_template_id,
+          issues: parsedStpl.error.issues,
+        });
+      }
+
+      if (request.target.kind === 'page') {
+        const target = request.target;
+        // The section id is DETERMINISTIC in (recipe, page, record version):
+        // re-issuing the same stamp against the same version re-mints the
+        // same id (an upsert replaces in place — no duplicate), and after a
+        // lost response an agent can recover by dry-running with the
+        // ORIGINAL expected_record_version and checking whether the returned
+        // section_id already sits on the page. A deliberate second stamp
+        // happens after the version moved, so it gets a fresh id and inserts.
+        const mintStampId = (versionSeed: number) =>
+          mintId({ kind: 'section_instance' }, `${stplRecord.object_id}/${target.page_id}/${versionSeed}`);
+        const buildOp = (sectionId: string) => ({
+          op: 'upsert_section',
+          section: { ...deepClone(parsedStpl.data.blueprint), id: sectionId },
+          ...(target.position !== undefined ? { position: target.position } : {}),
+        });
+
+        if (request.dry_run) {
+          // Preview: the exact op a real stamp would apply + candidate-patch
+          // validation (apply on a clone, full pipeline) — nothing persisted,
+          // NO lock or version needed (the current record version seeds the
+          // id when expected_record_version is omitted). This is how the
+          // W8.4 credentialed run proves page mode without probe mutations.
+          const pageRecord = await loadRecord(store, objectRecordKey('page', target.page_id));
+          if (!pageRecord) {
+            return err(404, { error: 'Page not found', not_found: true, object_id: target.page_id });
+          }
+          const sectionId = mintStampId(target.expected_record_version ?? pageRecord.version);
+          const op = buildOp(sectionId);
+          const validation = validateCandidatePatch(pageRecord, [op], context);
+          return ok({
+            dry_run: true,
+            instantiated_from: stplRecord.object_id,
+            page_id: target.page_id,
+            section_id: sectionId,
+            op,
+            eligible: validation.eligible,
+            validation: validation.groups,
+            apply_error: validation.applyError,
+          });
+        }
+
+        // A REAL stamp needs the caller's checkout (schema-optional only so
+        // dry_run can omit them).
+        if (target.lock_token === undefined || target.expected_record_version === undefined) {
+          return err(400, {
+            error:
+              'Page-mode stamping requires lock_token and expected_record_version from YOUR page checkout (only dry_run: true works without them).',
+          });
+        }
+
+        // ONE upsert_section through the standard patch path under the
+        // caller's lock — full PageType law, leaf rule, reference integrity;
+        // the history entry carries the recipe provenance; the inverse
+        // (remove_section) comes free from the capture.
+        const sectionId = mintStampId(target.expected_record_version);
+        const result = await handleObjectVerb(
+          store,
+          {
+            action: 'patch',
+            object_type: 'page',
+            object_id: target.page_id,
+            lock_token: target.lock_token,
+            expected_record_version: target.expected_record_version,
+            ops: [buildOp(sectionId)],
+          },
+          principal,
+          { ...options, patchEntryDetails: { instantiated_from: stplRecord.object_id } }
+        );
+        // On conflict (409 after a lost response), surface the id this
+        // version WOULD have minted so the agent can check whether the first
+        // write actually landed before re-stamping at the new version.
+        if (result.status !== 200) {
+          return { status: result.status, body: { ...result.body, section_id_for_expected_version: sectionId } };
+        }
+        return ok({ ...result.body, instantiated_from: stplRecord.object_id, section_id: sectionId });
+      }
+
+      // Standalone mode: a new shared sec_* object through the standard
+      // create path — identical to a hand-authored one, then usable via
+      // shared_ref from any page.
+      let requestedId = request.target.requested_id;
+      if (!requestedId) {
+        try {
+          requestedId = mintId({ kind: 'object', objectType: 'section' }, stplRecord.object_id.replace(/^stpl_/, ''));
+        } catch (error) {
+          if (error instanceof MintIdError)
+            return err(400, { error: 'Could not mint an object id', detail: error.message });
+          throw error;
+        }
+      }
+      const body = {
+        section: {
+          ...deepClone(parsedStpl.data.blueprint),
+          // Deterministic per recipe: the wrapper holds exactly one instance,
+          // so the id needs no per-target variation.
+          id: mintId({ kind: 'section_instance' }, `${stplRecord.object_id}/standalone`),
+        },
+      };
+
+      if (request.dry_run) {
+        const check = validateObjectIdForType('section', requestedId);
+        if (!check.ok) return err(400, { error: 'Invalid requested_id', detail: check.error });
+        const groups = validateObject({ objectType: 'section', objectId: requestedId, body }, context);
+        const summary = summarizeValidation(groups);
+        const idTaken = Boolean(await store.get(objectRecordKey('section', requestedId)));
+        return ok({
+          dry_run: true,
+          instantiated_from: stplRecord.object_id,
+          object_id: requestedId,
+          id_available: !idTaken,
+          body,
+          validation: groups,
+          summary,
+        });
+      }
+
+      const result = await handleObjectVerb(
+        store,
+        {
+          action: 'create',
+          object_type: 'section',
+          site: stplRecord.site,
+          body,
+          requested_id: requestedId,
+        },
+        principal,
+        options
+      );
+      if (result.status !== 200) return result;
+      return ok({ ...result.body, instantiated_from: stplRecord.object_id });
     }
 
     case 'checkout': {
@@ -698,7 +934,11 @@ export const handleObjectVerb = async (
 
       let appliedRecord: ObjectRecord;
       try {
-        const applied = applyPatchOps(record, normalizedOps, { actor: principal, at: timestamp });
+        const applied = applyPatchOps(record, normalizedOps, {
+          actor: principal,
+          at: timestamp,
+          ...(options.patchEntryDetails ? { entryDetails: options.patchEntryDetails } : {}),
+        });
         appliedRecord = applied.record;
       } catch (error) {
         if (error instanceof PatchApplyError) {

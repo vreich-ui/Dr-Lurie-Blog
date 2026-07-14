@@ -90,10 +90,17 @@ export const handler = async (event: LambdaEvent) => {
     // section rules, route uniqueness, and taxonomy resolution are enforced live
     // (not the previous no-context degradation to `optional`). Flows to create,
     // patch, validate, and publish.
-    const requestData = request.data as { object_id?: string; object_type?: ObjectType };
+    const requestData = request.data as {
+      object_id?: string;
+      object_type?: ObjectType;
+      target?: { kind?: string; page_id?: string };
+    };
+    // instantiate_section (W8.2) validates the TARGET page under its own id —
+    // without the self ref, route uniqueness would flag the page's own route.
+    const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
     const validationContext = await buildStoreValidationContext(store, {
-      selfObjectId: requestData.object_id,
-      selfObjectType: requestData.object_type,
+      selfObjectId: requestData.object_id ?? targetPageId,
+      selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
     });
     const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value), { validationContext });
     return jsonResponse(result.status, result.body);

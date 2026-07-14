@@ -65,10 +65,17 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const store = (await getSiteObjectsBlobStore(event)) as unknown as ObjectVerbStore;
     // Same live validation context as the publish-key path (object-store.ts):
     // the browser admin path enforces the identical structural rules.
-    const requestData = request.data as { object_id?: string; object_type?: ObjectType };
+    const requestData = request.data as {
+      object_id?: string;
+      object_type?: ObjectType;
+      target?: { kind?: string; page_id?: string };
+    };
+    // instantiate_section (W8.2) validates the TARGET page under its own id —
+    // without the self ref, route uniqueness would flag the page's own route.
+    const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
     const validationContext = await buildStoreValidationContext(store, {
-      selfObjectId: requestData.object_id,
-      selfObjectType: requestData.object_type,
+      selfObjectId: requestData.object_id ?? targetPageId,
+      selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
     });
     const result = await handleObjectVerb(store, request.data, principal, { validationContext });
     return jsonResponse(result.status, result.body);

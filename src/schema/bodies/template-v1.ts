@@ -26,8 +26,16 @@ export const templateSlotSchema = z
     repeatable: z.boolean(),
     // Default section: registry editor.defaultData, customized (D§3.6).
     blueprint: sectionInstanceSchema.optional(),
+    // OR a section_template reference (stpl_* id, W8.2 — 09-plan §4):
+    // dereferenced and DEEP-COPIED at instantiation only, never live-bound —
+    // editing the recipe changes future instantiations, nothing existing.
+    // Resolution + type-in-allowed are validation-pipeline checks.
+    blueprintRef: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  .refine((slot) => !(slot.blueprint && slot.blueprintRef), {
+    message: 'A slot carries either an inline blueprint or a blueprintRef, not both.',
+  });
 export type TemplateSlot = z.infer<typeof templateSlotSchema>;
 
 export const templateBodySchema = z
