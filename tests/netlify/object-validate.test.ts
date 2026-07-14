@@ -400,9 +400,13 @@ test('check6 structure: shared_ref effective type is resolved for allowed-sectio
 test('check6 structure: types without their own structural rules report optional', () => {
   // navigation gained its own rules with T2.1 (an unrecognized body reports
   // nav_structure optional; the real rules are tested in
-  // object-validate-navigation.test.ts); site remains rule-free here.
+  // object-validate-navigation.test.ts). Site gained the brand-token value
+  // check in W8.3 — a body without unsafe token values reports complete.
   assert.equal(statusOf(checkStructuralInvariants('navigation', 'nav_x', {}, {}, true), 'nav_structure'), 'optional');
-  assert.equal(statusOf(checkStructuralInvariants('site', 'site_x', {}, {}, true), 'structure'), 'optional');
+  assert.equal(
+    statusOf(checkStructuralInvariants('site', 'site_x', {}, {}, true), 'brand_token_values'),
+    'complete'
+  );
 });
 
 // Regression guard for the 2026-07-10 incident: four real production publishes

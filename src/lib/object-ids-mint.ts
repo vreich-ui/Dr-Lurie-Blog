@@ -85,6 +85,7 @@ const OBJECT_PREFIX: Record<Exclude<ObjectType, 'content_item'>, string> = {
   site: 'site',
   template: 'tpl',
   section_template: 'stpl',
+  theme: 'thm',
   product: 'prod',
 };
 

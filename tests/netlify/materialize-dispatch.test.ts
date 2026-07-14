@@ -47,6 +47,15 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
     'src/data/site/section-templates/stpl_cta.json',
   ],
   [
+    'theme',
+    'thm_default',
+    {
+      name: 'Default',
+      tokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
+    },
+    'src/data/site/themes/thm_default.json',
+  ],
+  [
     'section',
     'sec_cta',
     { section: { id: 's_cta1', type: 'prose', data: { body: 'Hello' } } },

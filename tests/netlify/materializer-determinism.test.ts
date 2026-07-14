@@ -30,6 +30,14 @@ test('determinism: materializing the same body twice produces byte-identical out
       'stpl_cta',
       { name: 'CTA recipe', blueprint: { id: 's_bp', type: 'cta_banner', data: { heading: 'Go', actions: [] } } },
     ],
+    [
+      'theme',
+      'thm_default',
+      {
+        name: 'Default',
+        tokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
+      },
+    ],
     ['section', 'sec_cta', { section: { id: 's_cta1', type: 'prose', data: { body: 'Hello' } } }],
   ];
 

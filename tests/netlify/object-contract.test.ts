@@ -20,6 +20,7 @@ const GOVERNED: ObjectType[] = [
   'site',
   'template',
   'section_template',
+  'theme',
   'product',
 ];
 
@@ -133,6 +134,7 @@ test('anti-drift coverage guard: contract types match objectTypes exactly', () =
         'site',
         'template',
         'section_template',
+        'theme',
         'product',
         'content_item',
       ] as ObjectType[]),

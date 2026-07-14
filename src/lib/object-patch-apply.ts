@@ -1024,6 +1024,10 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       return applyRemoveFromList(op, slots, index, (slot) => slot.slotId);
     }
 
+    // ——— theme family (W8.3) ———
+    case 'set_theme_fields':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— section-template family (W8) ———
     // The body wraps exactly ONE blueprint (a SectionInstance), so the family
     // mirrors the shared-section wrapper: fields on the envelope, whole-unit
@@ -1188,7 +1192,8 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_article_meta':
     case 'set_template_meta':
     case 'set_section_template_meta':
-    case 'update_blueprint_data': {
+    case 'update_blueprint_data':
+    case 'set_theme_fields': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });
     }

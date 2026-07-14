@@ -15,6 +15,24 @@ import { z } from 'zod';
 
 export const SITE_SCHEMA_VERSION = 'site.v1';
 
+// Shared with theme.v1 (W8.3): a theme is a preset FOR this exact shape, so
+// the two cannot drift. Colors are keyed by CSS var name minus `--aw-color-`
+// (`dark:`-prefixed keys carry the .dark overrides); the consumed key list
+// lives in src/lib/registry/theme-tokens.ts.
+export const brandTokensSchema = z
+  .object({
+    colors: z.record(z.string(), z.string()),
+    fonts: z
+      .object({
+        sans: z.string(),
+        serif: z.string(),
+        heading: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
+export type BrandTokens = z.infer<typeof brandTokensSchema>;
+
 export const siteBodySchema = z
   .object({
     name: z.string().min(1),
@@ -38,18 +56,7 @@ export const siteBodySchema = z
         twitterHandle: z.string().optional(),
       })
       .strict(),
-    brandTokens: z
-      .object({
-        colors: z.record(z.string(), z.string()),
-        fonts: z
-          .object({
-            sans: z.string(),
-            serif: z.string(),
-            heading: z.string(),
-          })
-          .strict(),
-      })
-      .strict(),
+    brandTokens: brandTokensSchema,
     chrome: z
       .object({
         showRssFeed: z.boolean(),

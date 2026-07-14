@@ -47,6 +47,7 @@ export const governedObjectTypes = [
   'site',
   'template',
   'section_template',
+  'theme',
   'product',
   'content_item',
 ] as const;
@@ -71,6 +72,7 @@ export const approvalPolicyConfigSchema = z.strictObject({
     site: z.enum(['require-approval', 'autonomous']).optional(),
     template: z.enum(['require-approval', 'autonomous']).optional(),
     section_template: z.enum(['require-approval', 'autonomous']).optional(),
+    theme: z.enum(['require-approval', 'autonomous']).optional(),
     product: z.enum(['require-approval', 'autonomous']).optional(),
     content_item: z.enum(['require-approval', 'autonomous']).optional(),
   }),

@@ -32,6 +32,7 @@ import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-templ
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
+import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
 
 export type JsonSchema = Record<string, unknown>;
@@ -61,6 +62,7 @@ export const ASK_AI_BODY_SCHEMAS = {
   site: siteBodySchema,
   template: templateBodySchema,
   section_template: sectionTemplateBodySchema,
+  theme: themeBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
 } satisfies Record<AskAiObjectType, z.ZodType>;

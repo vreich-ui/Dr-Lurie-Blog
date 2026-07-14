@@ -57,6 +57,7 @@ import { pageBodySchema } from '../../schema/bodies/page-v1.js';
 import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
 import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
+import { themeBodySchema } from '../../schema/bodies/theme-v1.js';
 import { navigationBodySchema } from '../../schema/bodies/navigation-v1.js';
 import { siteBodySchema } from '../../schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../schema/bodies/taxonomy-v1.js';
@@ -83,6 +84,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   taxonomy: taxonomyBodySchema,
   template: templateBodySchema,
   section_template: sectionTemplateBodySchema,
+  theme: themeBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
 };
@@ -510,6 +512,40 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           description: 'A slot’s allowed types must be registered components (see section_types.component_bound).',
         },
       ];
+    case 'theme':
+      return [
+        {
+          id: 'theme_token_keys',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            'A published theme must carry every color key the renderer consumes (primary, secondary, accent, gold, ' +
+            'text-heading, text-default, text-muted, bg-page, bg-surface, bg-page-dark) so applying it is total — ' +
+            'exact-replace leaves no stale fallbacks (warns while drafting). dark:-prefixed overrides are optional ' +
+            '(a missing dark key falls back to the light value); unknown keys warn (inert).',
+        },
+        {
+          id: 'brand_token_values',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'Token values are interpolated RAW into an inline <style> tag, so every color/font value must pass the ' +
+            'safe-CSS grammar (hex / rgb()/rgba()/hsl()/hsla()/oklch()/color() / bare keyword; plain font stacks); ' +
+            'values carrying ;, {, }, <, >, url(, or @import are rejected. The SAME rule gates site.brandTokens.',
+        },
+      ];
+    case 'site':
+      return [
+        {
+          id: 'brand_token_values',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'brandTokens values are interpolated RAW into an inline <style> tag (CustomStyles) — every color/font ' +
+            'value must pass the safe-CSS grammar; values carrying ;, {, }, <, >, url(, or @import are rejected ' +
+            '(W8.3 — the same rule gates theme tokens).',
+        },
+      ];
     case 'section_template':
       return [
         {
@@ -627,6 +663,17 @@ const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
           'object_instantiate_section_template (target kind "standalone") — alternative create: mint this shared section from a section_template recipe.',
         ]
       : []),
+    // W8.3, 09-plan §6.4: applying a theme is a SITE write, not a theme op.
+    ...(objectType === 'theme'
+      ? [
+          'site_apply_theme (theme_id + site_id + lock_token + expected_record_version) → computes ONE exact-replace set_site_fields op (every color key the theme lacks is unset — no stale palette) and applies it through the standard patch path under YOUR site checkout; dry_run: true previews the computed op + validation without persisting. The site copies the tokens — nothing live-binds to a theme; publish the site separately to go live.',
+        ]
+      : []),
+    ...(objectType === 'site'
+      ? [
+          'site_apply_theme (theme_id + this site id + lock_token + expected_record_version) — alternative brandTokens edit: replace the token set with a theme preset in one atomic op (dry_run previews).',
+        ]
+      : []),
     'object_checkout → lock_token + record_version',
     'object_validate (dry-run the candidate_patch) then object_patch (with lock_token + expected_record_version)',
     ...(publishPolicy(objectType, policy).requires_approval
@@ -734,7 +781,9 @@ export const buildObjectContract = (
         ? 'Articles as governed objects (W7.3): an annotated node list (private.strategy/intent per block — the behavioral framework) with rich_text.v1 or plain-text bodies, plus the envelope-level judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). Committed legacy posts stay on their own pipeline.'
         : objectType === 'section_template'
           ? 'A section recipe (W8, design-principles rule 5): one named, pre-configured section blueprint agents create and evolve freely, then stamp into pages or mint as standalone shared sections. Instantiation deep-copies the blueprint and re-mints its id — nothing live-binds to a recipe, and a recipe renders nothing itself.'
-          : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
+          : objectType === 'theme'
+            ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys unset). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
+            : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
     body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),
     ...(objectType === 'page' ? { page_types: listPageTypeDefinitions() } : {}),

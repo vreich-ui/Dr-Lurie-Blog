@@ -1370,6 +1370,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     ),
   },
   {
+    name: 'site_apply_theme',
+    description:
+      "Apply a theme preset's brandTokens to the site singleton (W8.3): computes ONE exact-replace set_site_fields op — every color key the site carries but the theme lacks is explicitly unset, so no stale palette survives. The theme must be TOTAL (every renderer-consumed color key present) or the apply is rejected with the missing keys — an incomplete theme would delete keys from the site. Applies through the standard patch path under YOUR site checkout (lock_token + expected_record_version from object_checkout on the site object; the verb never auto-checkouts). One op = one atomic content_revision; history records applied_theme; the exact inverse makes reverting a standard discard. The site COPIES the tokens (nothing live-binds to the theme), and going live still requires the separate object_publish + release_to_production steps. Pass dry_run: true to preview the computed op + full validation without persisting — dry_run needs neither lock_token nor expected_record_version. Read object_contract(\"theme\") first.",
+    inputSchema: objectSchema(
+      {
+        theme_id: stringSchema('The theme object id, e.g. thm_drlurie_default.'),
+        site_id: stringSchema('The site singleton object id, e.g. site_drlurie.'),
+        lock_token: stringSchema('Your held site lock (from object_checkout on the site object); dry_run needs none.'),
+        expected_record_version: intSchema('The record_version your checkout returned; dry_run needs none.'),
+        dry_run: {
+          type: 'boolean',
+          description: 'true → return the computed set_site_fields op and validation; persist nothing (no lock).',
+        },
+        agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
+      },
+      ['theme_id', 'site_id']
+    ),
+  },
+  {
     name: 'object_create_variant',
     description:
       'Clone a content_item (article) object as a DRAFT variant for judge/score/A-B work (W7.3): node ids are re-minted (annotations that reference them — claims/compliance node_ids — are re-pointed), lineage.parent_content_id is set to the source, scores reset, and the clone flows through the standard create validation. Variants need their own slug (defaults to "<source-slug>-variant"; pass slug when creating a second variant). Serving/traffic-splitting is out of scope — publishing a winner is an ordinary object_publish.',
@@ -3888,6 +3907,16 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         action: 'instantiate_section',
         section_template_id: input.section_template_id,
         target: input.target,
+        dry_run: input.dry_run,
+        agent_name: input.agent_name,
+      });
+    case 'site_apply_theme':
+      return callObjectAction(event, {
+        action: 'apply_theme',
+        theme_id: input.theme_id,
+        site_id: input.site_id,
+        lock_token: input.lock_token,
+        expected_record_version: input.expected_record_version,
         dry_run: input.dry_run,
         agent_name: input.agent_name,
       });

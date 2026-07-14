@@ -543,6 +543,19 @@ const updateBlueprintDataSchema = z.strictObject({
   ...guard,
 });
 
+// ——— Theme (W8.3, 09-template-system-plan §6) ———
+
+// The set_site_fields idiom: deep-merge over the theme body (null unsets).
+// The whole surface is one op — `tokens` is an open color record + a strict
+// fonts trio, exactly siteBodySchema.brandTokens (one shared shape). Applying
+// a theme to the site is NOT a theme op: `site_apply_theme` computes ONE
+// exact-replace set_site_fields op under the caller's site checkout.
+const setThemeFieldsSchema = z.strictObject({
+  op: z.literal('set_theme_fields'),
+  fields: fieldsSchema,
+  ...guard,
+});
+
 // ——— The grammar ———
 
 // Union members stay plain object schemas (a zod discriminated-union
@@ -588,6 +601,7 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   setSectionTemplateMetaSchema,
   replaceBlueprintSchema,
   updateBlueprintDataSchema,
+  setThemeFieldsSchema,
 ]);
 
 const requireMergedIntoOnlyWhenDeprecated = (term: TermPayload, ctx: z.RefinementCtx, path: (string | number)[]) => {
@@ -674,6 +688,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
   site: ['set_site_fields'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
   section_template: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data'],
+  theme: ['set_theme_fields'],
   product: ['set_product_fields', 'set_product_price'],
   content_item: ['set_article_meta', 'upsert_node', 'update_node', 'move_node', 'set_node_visibility', 'remove_node'],
 };

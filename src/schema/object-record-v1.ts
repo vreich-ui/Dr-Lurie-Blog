@@ -12,6 +12,7 @@ export const objectTypes = [
   'site',
   'template',
   'section_template',
+  'theme',
   'product',
   'content_item',
 ] as const;

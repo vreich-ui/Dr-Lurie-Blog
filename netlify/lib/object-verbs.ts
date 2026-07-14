@@ -52,7 +52,10 @@ import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.j
 import { pageBodySchema, pageTypeIdSchema } from '../../src/schema/bodies/page-v1.js';
 import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
 import type { SectionInstance } from '../../src/schema/bodies/section-v1.js';
+import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
+import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
+import { THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
 import {
   objectTypes,
   objectTypeSchema,
@@ -166,6 +169,21 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
       }),
     ]),
     // Preview mode: build the op / body + validate, persist NOTHING.
+    dry_run: z.boolean().optional(),
+  }),
+  // ─── W8.3: apply a theme's tokens to the site singleton (09-plan §6.4).
+  // Computes ONE exact-replace set_site_fields op (stale keys unset) and
+  // routes it through the standard patch path under the CALLER'S site
+  // checkout. Publish stays the separate deliberate step.
+  z.object({
+    action: z.literal('apply_theme'),
+    theme_id: objectId,
+    site_id: objectId,
+    // Required for a REAL apply (the handler 400s without them); optional
+    // here so dry_run previews need no checkout at all.
+    lock_token: z.string().min(1).optional(),
+    expected_record_version: z.number().int().nonnegative().optional(),
+    // Preview mode: return the computed op + candidate validation, persist NOTHING.
     dry_run: z.boolean().optional(),
   }),
   z.object({
@@ -368,6 +386,8 @@ const seedForCreate = (objectType: ObjectType, body: unknown): string => {
     if (objectType === 'navigation' && typeof body.role === 'string') return body.role;
     if (objectType === 'site' && typeof body.name === 'string') return body.name;
     if (objectType === 'template' && typeof body.name === 'string') return body.name;
+    if (objectType === 'section_template' && typeof body.name === 'string') return body.name;
+    if (objectType === 'theme' && typeof body.name === 'string') return body.name;
     if (objectType === 'product' && typeof body.slug === 'string') return body.slug;
     if (objectType === 'content_item' && typeof body.slug === 'string') return body.slug;
     if (objectType === 'content_item' && typeof body.title === 'string') return body.title;
@@ -867,6 +887,113 @@ export const handleObjectVerb = async (
       );
       if (result.status !== 200) return result;
       return ok({ ...result.body, instantiated_from: stplRecord.object_id });
+    }
+
+    case 'apply_theme': {
+      // The theme must EXIST (draft is fine) and parse as theme.v1; the site
+      // record must exist and parse as site.v1 (the diff needs its current
+      // brandTokens).
+      const themeRecord = await loadRecord(store, objectRecordKey('theme', request.theme_id));
+      if (!themeRecord) {
+        return err(404, { error: 'Theme not found', not_found: true, theme_id: request.theme_id });
+      }
+      const parsedTheme = themeBodySchema.safeParse(themeRecord.body);
+      if (!parsedTheme.success) {
+        return err(422, {
+          error: 'Theme body does not parse as theme.v1 — fix the theme before applying.',
+          theme_id: request.theme_id,
+          issues: parsedTheme.error.issues,
+        });
+      }
+      // The theme must be TOTAL to be appliable: exact-replace would DELETE
+      // any consumed key the theme lacks from site.brandTokens, silently
+      // rendering fallback literals instead of the palette. The theme_token_keys
+      // rule only BLOCKS at theme publish (drafts warn) — and apply doesn't
+      // require a published theme — so the funnel enforces it here.
+      const missingKeys = THEME_COLOR_KEYS.filter(
+        (key) => typeof parsedTheme.data.tokens.colors[key] !== 'string'
+      );
+      if (missingKeys.length > 0) {
+        return err(422, {
+          error: `Theme "${request.theme_id}" is not total: missing consumed color key(s) ${missingKeys.join(', ')} — applying it would delete them from site.brandTokens and render fallback literals. Complete the theme first.`,
+          theme_id: request.theme_id,
+          missing_keys: missingKeys,
+        });
+      }
+
+      const siteRecord = await loadRecord(store, objectRecordKey('site', request.site_id));
+      if (!siteRecord) {
+        return err(404, { error: 'Site not found', not_found: true, object_id: request.site_id });
+      }
+      const parsedSite = siteBodySchema.safeParse(siteRecord.body);
+      if (!parsedSite.success) {
+        return err(422, {
+          error: 'Site body does not parse as site.v1 — heal it before applying a theme.',
+          object_id: request.site_id,
+          issues: parsedSite.error.issues,
+        });
+      }
+
+      // Exact-replace semantics: after the apply, site.brandTokens EQUALS the
+      // theme's tokens. `fields` deep-merges, so every color key the site
+      // carries but the theme doesn't must be explicitly unset (null) — the
+      // stale-palette leak a hand-written set_site_fields would make (§6.4).
+      const themeColors = parsedTheme.data.tokens.colors;
+      const staleUnsets = Object.fromEntries(
+        Object.keys(parsedSite.data.brandTokens.colors)
+          .filter((key) => !(key in themeColors))
+          .map((key) => [key, null])
+      );
+      const op = {
+        op: 'set_site_fields',
+        fields: {
+          brandTokens: {
+            colors: { ...staleUnsets, ...themeColors },
+            fonts: { ...parsedTheme.data.tokens.fonts },
+          },
+        },
+      };
+
+      if (request.dry_run) {
+        const validation = validateCandidatePatch(siteRecord, [op], context);
+        return ok({
+          dry_run: true,
+          applied_theme: themeRecord.object_id,
+          object_id: request.site_id,
+          op,
+          eligible: validation.eligible,
+          validation: validation.groups,
+          apply_error: validation.applyError,
+        });
+      }
+
+      // A REAL apply needs the caller's site checkout (schema-optional only
+      // so dry_run can omit them).
+      if (request.lock_token === undefined || request.expected_record_version === undefined) {
+        return err(400, {
+          error:
+            'Applying a theme requires lock_token and expected_record_version from YOUR site checkout (only dry_run: true works without them).',
+        });
+      }
+
+      // ONE op = one atomic content_revision bump; the history entry carries
+      // the theme provenance; the exact inverse (fields capture) makes
+      // "revert the theme" a standard Discard.
+      const result = await handleObjectVerb(
+        store,
+        {
+          action: 'patch',
+          object_type: 'site',
+          object_id: request.site_id,
+          lock_token: request.lock_token,
+          expected_record_version: request.expected_record_version,
+          ops: [op],
+        },
+        principal,
+        { ...options, patchEntryDetails: { applied_theme: themeRecord.object_id } }
+      );
+      if (result.status !== 200) return result;
+      return ok({ ...result.body, applied_theme: themeRecord.object_id });
     }
 
     case 'checkout': {

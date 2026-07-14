@@ -204,6 +204,22 @@ export const sectionTemplateDrillOps = (body) => {
 };
 
 /**
+ * Drill a `theme` object (W8.3): set_theme_fields is the whole op surface —
+ * poke the name and restore it (the siteDrillOps idiom). site_apply_theme is
+ * a verb, not a patch op; the driver proves it with a dry_run separately.
+ */
+export const themeDrillOps = (body) => {
+  const name = body.name;
+  return {
+    expected: ['set_theme_fields'],
+    ops: [
+      { op: 'set_theme_fields', fields: { name: `${name} [probe]` } },
+      { op: 'set_theme_fields', fields: { name } },
+    ],
+  };
+};
+
+/**
  * Drill a `taxonomy` object (W3): exercise all five term ops via a probe TERM
  * in the `tag` kind that is added, relabeled, deprecated, reactivated, and
  * removed — ending byte-identical to the seed. The probe slug is collision-free
@@ -345,6 +361,9 @@ export const drillOpsForSeed = (seed) => {
   }
   if (seed.objectType === 'section_template') {
     return sectionTemplateDrillOps(seed.body);
+  }
+  if (seed.objectType === 'theme') {
+    return themeDrillOps(seed.body);
   }
   if (seed.objectType === 'site') {
     return siteDrillOps(seed.body);

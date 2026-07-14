@@ -3,7 +3,7 @@ import type { ObjectType } from '../schema/object-record-v1.js';
 
 export type ObjectIdValidationResult = NamingValidationResult;
 
-export const OBJECT_ID_CEILING_RE = /^(site|page|tpl|stpl|sec|nav|tax|prod|req)_[a-z0-9_]+$/;
+export const OBJECT_ID_CEILING_RE = /^(site|page|tpl|stpl|sec|nav|tax|thm|prod|req)_[a-z0-9_]+$/;
 export const SECTION_INSTANCE_ID_RE = /^s_[a-z0-9]+$/;
 
 const OBJECT_ID_PATTERNS = {
@@ -14,6 +14,7 @@ const OBJECT_ID_PATTERNS = {
   taxonomy: /^tax_[a-z0-9]+(?:_[a-z0-9]+)*$/,
   template: /^tpl_[a-z0-9]+(?:_[a-z0-9]+)*$/,
   section_template: /^stpl_[a-z0-9]+(?:_[a-z0-9]+)*$/,
+  theme: /^thm_[a-z0-9]+(?:_[a-z0-9]+)*$/,
   product: /^prod_[a-z0-9]+(?:_[a-z0-9]+)*$/,
 } satisfies Record<Exclude<ObjectType, 'content_item'>, RegExp>;
 
@@ -25,6 +26,7 @@ const OBJECT_TYPE_PREFIXES = {
   taxonomy: 'tax_',
   template: 'tpl_',
   section_template: 'stpl_',
+  theme: 'thm_',
   product: 'prod_',
   content_item: 'req_',
 } satisfies Record<ObjectType, string>;
