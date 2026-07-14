@@ -7,6 +7,53 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-14 B (ADMIN MENU → main nav (MCP-editable, admin-gated); /object-showcase content-state variants; the stale-deploy incident FIXED)
+
+Wolf: "make me a page object with every possible existing object … Move the
+admin menu to the nav_header main menu … show if admin is logged in … Add a
+link to this page … This should actually happen through the MCP server too.
+Can it?" Plus a deploy incident: after the legacy wipe, production still
+showed the old posts at /learn/library/4.
+
+- **Stale-deploy incident — root-caused + FIXED.** Git/build were correct
+  (wiped `main` builds 68 pages, 2 library pages, zero old posts — proven
+  locally); production was serving a **pre-wipe deploy** because the earlier
+  `release_to_production` calls timed out client-side before confirming.
+  Re-fired the release → `released:true`, production live on `3c9debea`. Old
+  posts gone. (Auto-publish was NOT locked; the tool's client 60s timeout was
+  the culprit — verify releases via `deploy_status`, not the call return.)
+- **Admin menu is now a main-nav group, MCP-editable, admin-gated** — answering
+  "can MCP do it?": **the contents can, once a one-time code change lands.**
+  - Code (PR #435, merged `3c9debea`): `adminOnly` flag added to the navigation
+    schema (`NavItem` + `NavGroup`, M-9); the transform carries it only when
+    set (existing navs byte-identical); `Header.astro` renders an `adminOnly`
+    group's `<li>` with `data-admin-only hidden`; the header-auth script reveals
+    every `[data-admin-only]` element site-wide when the visitor is a signed-in
+    admin. The admin links were **removed from the account dropdown** — it is
+    now just login/account (Wolf's "old admin = a login state"). Build 68 pages,
+    nav/patch/schema suites 218+100 green, adapter test 8/8.
+  - MCP (after the schema deployed): added a `g_admin` group to `nav_header`
+    (`adminOnly:true`, route-kind items — Dashboard/Publish/Drafts/Library/AI
+    Publisher/Blob Store **+ Object Showcase**), published `9bdc2764`. The admin
+    menu's structure/content is now store-backed and editable via `object_patch`
+    — no longer a hardcoded JS array.
+- **`/object-showcase` expanded via MCP** (no git commit for the page): +16
+  content-state variant sections (37 total) — each block in minimal / short /
+  one-line text and image none/one/two states, in a labeled "Variants" cluster
+  below the full versions, so edge cases (missing-image fallbacks, bare
+  headings, single-item lists) are visible for QA. Published `03173c7c`.
+- **One release** deployed the admin group + showcase together — deploy
+  `6a561a09…` ready 11:15Z, `deploy_status` confirmed production reflects
+  `03173c7c`. The admin dropdown is LIVE for signed-in admins.
+- **MCP reachability note (Wolf's "good exercise"):** all 10 governed types are
+  fully MCP-reachable (create/checkout/patch/publish + typed ops + contract).
+  The gap this session closed: the admin menu was **chrome hardcoded in JS**,
+  not an object — now it's a `nav_header` group. Remaining hardcoded chrome to
+  audit if wanted: login-modal copy, some 404/system strings.
+- **Standalone-`card` validation gap (logged Session K) is CLOSED** by W8.1's
+  leaf-section validation fix (#437, `6198748`) — a leaf-only section placed
+  directly on a page is now rejected at write time.
+
 ## Session 2026-07-14 A (W8 PLANNED: template-system expansion — section templates, page-template composition, theme presets; docs only, no code, nothing converted)
 
 Wolf asked where templates stand and mandated "at least two types of
