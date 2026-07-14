@@ -136,7 +136,8 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   THE GATE THAT KEEPS THIS "RELEASED, NOT CONVERTED" (playbook criterion 3
   — every permitted action proven, not assumed; the W2.5 template precedent
   proved `instantiate` in production before flipping): the application-verb
-  production dry_runs (instantiate_section both modes; apply_theme dry_run
+  production dry_runs (instantiate_section BOTH modes × EACH of the 5 stpl
+  records — per-object conversion; apply_theme dry_run
   + one real no-op default apply) could not run — the converting session's
   frozen MCP tool snapshot predated the W8 deploys (a session snapshot
   never refreshes); they are verb-level-tested in the merged suite and are
