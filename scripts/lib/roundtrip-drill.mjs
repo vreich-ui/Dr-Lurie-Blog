@@ -177,6 +177,33 @@ export const templateDrillOps = (body, probeSlotId) => {
 };
 
 /**
+ * Drill a `section_template` object (W8.1): exercise all three ops —
+ * set_section_template_meta round-trips the name; update_blueprint_data pokes
+ * a plain-text blueprint field and restores it (reusing the section probe's
+ * field-picking logic); replace_blueprint swaps the blueprint for a clone of
+ * itself (a genuine whole-instance replace that re-dispatches and re-validates
+ * the union member). Final body byte-identical to the seed.
+ */
+export const sectionTemplateDrillOps = (body) => {
+  const name = body.name;
+  const blueprint = clone(body.blueprint);
+  // updateDataProbeOps builds update_section_data ops; a section-template
+  // blueprint has no section_id addressing (the body wraps exactly one), so
+  // only the probed `fields` payloads carry over.
+  const { ops: sectionOps } = updateDataProbeOps('s_probe', body.blueprint?.data ?? {});
+  const dataOps = sectionOps.map(({ fields }) => ({ op: 'update_blueprint_data', fields }));
+  return {
+    expected: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data'],
+    ops: [
+      { op: 'set_section_template_meta', fields: { name: `${name} [probe]` } },
+      { op: 'set_section_template_meta', fields: { name } },
+      ...dataOps,
+      { op: 'replace_blueprint', blueprint },
+    ],
+  };
+};
+
+/**
  * Drill a `taxonomy` object (W3): exercise all five term ops via a probe TERM
  * in the `tag` kind that is added, relabeled, deprecated, reactivated, and
  * removed — ending byte-identical to the seed. The probe slug is collision-free
@@ -294,7 +321,7 @@ export const articleDrillOps = (body, probeNodeId) => {
   };
 };
 
-/** Dispatch: build the drill for one seed (page, section, template, taxonomy, site, product, or content_item). */
+/** Dispatch: build the drill for one seed (page, section, template, section_template, taxonomy, site, product, or content_item). */
 export const drillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
@@ -315,6 +342,9 @@ export const drillOpsForSeed = (seed) => {
       .map((entry) => entry?.term_id)
       .filter((id) => typeof id === 'string');
     return taxonomyDrillOps(seed.body, deriveProbeId(existingTermIds, 't_rtprobe'));
+  }
+  if (seed.objectType === 'section_template') {
+    return sectionTemplateDrillOps(seed.body);
   }
   if (seed.objectType === 'site') {
     return siteDrillOps(seed.body);

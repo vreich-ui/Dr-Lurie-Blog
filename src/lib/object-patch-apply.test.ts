@@ -27,9 +27,11 @@ const makeRecord = (objectType: ObjectType, body: unknown): ObjectRecord<unknown
               ? 'site_drlurie'
               : objectType === 'template'
                 ? 'tpl_standard'
-                : objectType === 'product'
-                  ? 'prod_barrier_repair_guide'
-                  : 'req_agent_topic_20260704_01',
+                : objectType === 'section_template'
+                  ? 'stpl_hero_landing'
+                  : objectType === 'product'
+                    ? 'prod_barrier_repair_guide'
+                    : 'req_agent_topic_20260704_01',
   object_type: objectType,
   schema_version: `${objectType}.v1`,
   site: 'site_drlurie',
@@ -134,6 +136,16 @@ const templateBody = () => ({
     { slotId: 'main', allowed: ['hero', 'prose'], required: true, repeatable: false },
     { slotId: 'aside', allowed: ['bio'], required: false, repeatable: true },
   ],
+});
+
+const sectionTemplateBody = () => ({
+  name: 'Landing hero',
+  description: 'Opening hero recipe.',
+  blueprint: {
+    id: 's_stplhero',
+    type: 'hero',
+    data: { kicker: 'Overview', heading: 'New hero heading', actions: [] },
+  },
 });
 
 const productBody = () => ({
@@ -515,6 +527,29 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
     op: { op: 'move_slot', slot_id: 'aside', to_index: 0 },
   },
   { name: 'remove_slot', objectType: 'template', body: templateBody, op: { op: 'remove_slot', slot_id: 'main' } },
+
+  // section_template family (W8.1)
+  {
+    name: 'set_section_template_meta merges name and unsets description',
+    objectType: 'section_template',
+    body: sectionTemplateBody,
+    op: { op: 'set_section_template_meta', fields: { name: 'Campaign hero', description: null } },
+  },
+  {
+    name: 'replace_blueprint swaps the whole instance (type change included)',
+    objectType: 'section_template',
+    body: sectionTemplateBody,
+    op: {
+      op: 'replace_blueprint',
+      blueprint: { id: 's_stplcta', type: 'cta_banner', data: { heading: 'Keep exploring', actions: [] } },
+    },
+  },
+  {
+    name: 'update_blueprint_data deep-merges and unsets with null',
+    objectType: 'section_template',
+    body: sectionTemplateBody,
+    op: { op: 'update_blueprint_data', fields: { heading: 'A sharper hero heading', kicker: null } },
+  },
 
   // content_item / article node family (W7.3)
   {

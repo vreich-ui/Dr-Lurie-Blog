@@ -64,6 +64,8 @@ import {
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
+import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
+import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -213,6 +215,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     page: pageBodySchema,
     section: sectionBodySchema,
     template: templateBodySchema,
+    section_template: sectionTemplateBodySchema,
     site: siteBodySchema,
     taxonomy: taxonomyBodySchema,
     product: productBodySchema,
@@ -909,6 +912,46 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
   return criteria;
 };
 
+// ─── check 6e: section-template blueprint rules (W8, 09-plan §2.4) ───────────
+
+/**
+ * A recipe may only blueprint what a page could legally hold STANDALONE: the
+ * blueprint's type must be component-bound (isStandalonePlaceableSectionType).
+ * That excludes `card` — a block-tree leaf with no standalone component, which
+ * parses under the section union but kills the build (the Session-K gap this
+ * wave closes at every enforcement site) — and `shared_ref`: a pointer is not
+ * a recipe (instantiation deep-copies; copying a pointer would alias the
+ * target, not copy it). Enforced by direct import of the code registry — the
+ * same total Record the renderer dispatches through — so it is always on,
+ * never resolver-dependent.
+ */
+export const checkSectionTemplate = (body: unknown): ReadinessCriterion[] => {
+  if (!isRecord(body) || !isRecord(body.blueprint) || typeof body.blueprint.type !== 'string') {
+    return [
+      crit(
+        'blueprint_standalone_renderable',
+        'Blueprint type',
+        'optional',
+        'Section-template body shape not recognized (see schema check).'
+      ),
+    ];
+  }
+  const type = body.blueprint.type;
+  if (isStandalonePlaceableSectionType(type)) {
+    return [crit('blueprint_standalone_renderable', 'Blueprint type', 'complete', '')];
+  }
+  return [
+    crit(
+      'blueprint_standalone_renderable',
+      'Blueprint type',
+      'missing',
+      type === 'shared_ref'
+        ? 'A blueprint must be a concrete section, not a shared_ref pointer — instantiation copies, never aliases.'
+        : `Blueprint type "${type}" has no standalone component and would break the build — a card composes only inside a content_grid cards source.`
+    ),
+  ];
+};
+
 // ─── check 6c: navigation layout rules (T2.1, C§2.3-Navigation) ──────────────
 
 /** Canonical identity of a NavTarget for duplicate detection (key-order-free). */
@@ -1372,6 +1415,7 @@ export const checkStructuralInvariants = (
   // its single 'structure' group).
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
   if (objectType === 'template') return checkTemplate(body, context);
+  if (objectType === 'section_template') return checkSectionTemplate(body);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
   if (objectType === 'product') return checkProduct(body, context, atPublish);
   if (objectType === 'content_item') return checkContentItemStructure(body, context, atPublish);
@@ -1380,6 +1424,35 @@ export const checkStructuralInvariants = (
   // a page's inline sections OR a shared `section` wrapper. Emits nothing when
   // no grid is present (so non-grid sections keep the generic result below).
   const gridCriteria = checkContentGridCardLimits(body);
+
+  // The shared-section wrapper enforces the same standalone-placeability rule
+  // as pages (the Session-K gap): a leaf-only wrapped instance would break
+  // every page that shared_refs it, and a wrapper may not itself be a
+  // shared_ref (check 3 already rejects chains at the referencing side; this
+  // closes the authoring side).
+  if (objectType === 'section') {
+    const criteria: ReadinessCriterion[] = [...gridCriteria];
+    const instance = isRecord(body) && isRecord(body.section) ? body.section : undefined;
+    const type = instance && typeof instance.type === 'string' ? instance.type : undefined;
+    if (type !== undefined) {
+      criteria.push(
+        isStandalonePlaceableSectionType(type)
+          ? crit('structure_placeable', 'Standalone-placeable section', 'complete', '')
+          : crit(
+              'structure_placeable',
+              'Standalone-placeable section',
+              'missing',
+              type === 'shared_ref'
+                ? 'A shared section wraps a concrete instance, never another shared_ref (no reference chains).'
+                : `Section type "${type}" has no standalone component and would break the build — a card composes only inside a content_grid cards source.`
+            )
+      );
+    }
+    return criteria.length > 0
+      ? criteria
+      : [crit('structure', 'Structural invariants', 'optional', 'No structural invariants for this type.')];
+  }
+
   if (objectType !== 'page') {
     return gridCriteria.length > 0
       ? gridCriteria
@@ -1389,6 +1462,32 @@ export const checkStructuralInvariants = (
   const criteria: ReadinessCriterion[] = [...gridCriteria];
   const sections = collectSections(body);
   const visibleCount = sections.filter((section) => section.visibility !== 'hidden').length;
+
+  // Standalone placeability (the Session-K gap): the zod union admits every
+  // member, but a leaf-only type (`card`) has no standalone component — the
+  // production build died with "No component registered for section type
+  // 'card'" on 2026-07-13 after validation admitted one as a top-level page
+  // section. Rejected here at write time, the same layer that rejects
+  // disallowed types. `shared_ref` stays legal on pages (it dereferences
+  // before dispatch); `cards`-source grid CELLS are data, not section
+  // instances, and are untouched by this rule.
+  const notPlaceable = [
+    ...new Set(
+      sections
+        .filter((section) => section.type !== 'shared_ref' && !isStandalonePlaceableSectionType(section.type))
+        .map((section) => section.type)
+    ),
+  ];
+  criteria.push(
+    notPlaceable.length === 0
+      ? crit('structure_placeable', 'Standalone-placeable sections', 'complete', '')
+      : crit(
+          'structure_placeable',
+          'Standalone-placeable sections',
+          'missing',
+          `Section type(s) with no standalone component: ${notPlaceable.join(', ')} — placing them directly on a page breaks the build (a card composes only inside a content_grid cards source).`
+        )
+  );
 
   // PageType constraint, resolved up front: the ≥N-visible rule below is
   // per-PageType since W6 (content_detail publishes with zero sections — the
@@ -1611,13 +1710,21 @@ const checkContentItemRenderability = (body: unknown): ReadinessCriterion[] => {
 
 export const checkRenderability = (objectType: ObjectType, body: unknown): ReadinessCriterion[] => {
   if (objectType === 'content_item') return checkContentItemRenderability(body);
-  const sections: SectionInstance[] = isRecord(body)
-    ? objectType === 'page'
+  // A shared 'section' object wraps one instance; a section_template's
+  // blueprint IS one instance (W8) — run the real splitters over it too, so a
+  // recipe can never stamp a build-breaking body.
+  const wrappedInstance = (key: 'section' | 'blueprint'): SectionInstance[] => {
+    const instance = isRecord(body) ? body[key] : undefined;
+    return isRecord(instance) && typeof instance.type === 'string' ? [instance as SectionInstance] : [];
+  };
+  const sections: SectionInstance[] =
+    objectType === 'page' && isRecord(body)
       ? collectSections(body)
-      : objectType === 'section' && isRecord(body.section) && typeof body.section.type === 'string'
-        ? [body.section as SectionInstance]
-        : []
-    : [];
+      : objectType === 'section'
+        ? wrappedInstance('section')
+        : objectType === 'section_template'
+          ? wrappedInstance('blueprint')
+          : [];
   if (sections.length === 0) {
     return [crit('render_splitters', 'Component renderability', 'complete', '')];
   }

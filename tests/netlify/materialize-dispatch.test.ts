@@ -41,6 +41,12 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
     'src/data/site/templates/tpl_home.json',
   ],
   [
+    'section_template',
+    'stpl_cta',
+    { name: 'CTA recipe', blueprint: { id: 's_bp', type: 'cta_banner', data: { heading: 'Go', actions: [] } } },
+    'src/data/site/section-templates/stpl_cta.json',
+  ],
+  [
     'section',
     'sec_cta',
     { section: { id: 's_cta1', type: 'prose', data: { body: 'Hello' } } },

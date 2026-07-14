@@ -515,6 +515,34 @@ const removeSlotSchema = z.strictObject({
   ...guard,
 });
 
+// ——— Section template (W8, 09-template-system-plan §2.3) ———
+//
+// A section_template body wraps exactly ONE blueprint (a full SectionInstance),
+// so the family mirrors the shared-section wrapper's ops rather than a list
+// family: meta fields, whole-blueprint replacement, and deep-merge over the
+// blueprint's data. Changing the blueprint's TYPE is replace_blueprint with a
+// new {type, data} — a whole-instance swap re-validates the union member.
+
+const setSectionTemplateMetaSchema = z.strictObject({
+  op: z.literal('set_section_template_meta'),
+  fields: fieldsSchema.superRefine(forbidKeys(['blueprint'], 'set_section_template_meta (use the blueprint ops)')),
+  ...guard,
+});
+
+const replaceBlueprintSchema = z.strictObject({
+  op: z.literal('replace_blueprint'),
+  // The blueprint's s_* id is a placeholder (re-minted at instantiation);
+  // omit it to have the endpoint mint one (MINTED_ID_FIELD).
+  blueprint: sectionPayloadSchema,
+  ...guard,
+});
+
+const updateBlueprintDataSchema = z.strictObject({
+  op: z.literal('update_blueprint_data'),
+  fields: fieldsSchema,
+  ...guard,
+});
+
 // ——— The grammar ———
 
 // Union members stay plain object schemas (a zod discriminated-union
@@ -557,6 +585,9 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   upsertSlotSchema,
   moveSlotSchema,
   removeSlotSchema,
+  setSectionTemplateMetaSchema,
+  replaceBlueprintSchema,
+  updateBlueprintDataSchema,
 ]);
 
 const requireMergedIntoOnlyWhenDeprecated = (term: TermPayload, ctx: z.RefinementCtx, path: (string | number)[]) => {
@@ -642,6 +673,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
   taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
   site: ['set_site_fields'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
+  section_template: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data'],
   product: ['set_product_fields', 'set_product_price'],
   content_item: ['set_article_meta', 'upsert_node', 'update_node', 'move_node', 'set_node_visibility', 'remove_node'],
 };

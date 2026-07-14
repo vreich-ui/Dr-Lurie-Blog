@@ -22,6 +22,7 @@ const EXPECTED_TOP_LEVEL_PROPS: Record<string, string[]> = {
   taxonomy: ['kinds'],
   site: ['name', 'logo', 'urls', 'metadataDefaults', 'brandTokens', 'chrome', 'defaultNavigation', 'blog'],
   template: ['name', 'appliesTo', 'slots'],
+  section_template: ['name', 'description', 'blueprint'],
 };
 
 for (const objectType of Object.keys(ASK_AI_BODY_SCHEMAS)) {

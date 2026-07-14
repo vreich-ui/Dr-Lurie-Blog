@@ -1016,6 +1016,28 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
       if (index === -1) throw targetMissing(op, `slot '${op.slot_id}'`);
       return applyRemoveFromList(op, slots, index, (slot) => slot.slotId);
     }
+
+    // ——— section-template family (W8) ———
+    // The body wraps exactly ONE blueprint (a SectionInstance), so the family
+    // mirrors the shared-section wrapper: fields on the envelope, whole-unit
+    // replacement, and fields on the blueprint's data.
+    case 'set_section_template_meta':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
+    case 'replace_blueprint': {
+      assertNoNullValues(op.blueprint, 'replace_blueprint payload');
+      const current = expectPlainObject(body.blueprint, 'body.blueprint');
+      const before = elementSnapshot(current, 0);
+      checkGuard(op, before);
+      body.blueprint = deepCloneJson(op.blueprint);
+      return { kind: 'element', before, after: elementSnapshot(body.blueprint, 0) };
+    }
+
+    case 'update_blueprint_data': {
+      const blueprint = expectPlainObject(body.blueprint, 'body.blueprint');
+      const data = expectPlainObject(blueprint.data, 'blueprint data');
+      return applyFieldsOp(op, data, op.fields as UnknownRecord);
+    }
   }
 };
 
@@ -1157,9 +1179,23 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_product_fields':
     case 'set_product_price':
     case 'set_article_meta':
-    case 'set_template_meta': {
+    case 'set_template_meta':
+    case 'set_section_template_meta':
+    case 'update_blueprint_data': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });
+    }
+
+    case 'replace_blueprint': {
+      const elementCapture = expectCaptureKind(op, capture, 'element');
+      if (!elementCapture.before.exists) throw invalidInverse(op, 'capture has no before blueprint.');
+      // The blueprint always exists (the body schema requires it), so the
+      // inverse is always a restore — never a remove.
+      return patchOpSchema.parse({
+        op: 'replace_blueprint',
+        blueprint: deepCloneJson(elementCapture.before.value),
+        ...guardOf(elementCapture.after),
+      });
     }
 
     case 'update_node': {

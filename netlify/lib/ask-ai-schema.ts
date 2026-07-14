@@ -28,6 +28,7 @@ import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
 import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
+import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -59,6 +60,7 @@ export const ASK_AI_BODY_SCHEMAS = {
   taxonomy: taxonomyBodySchema,
   site: siteBodySchema,
   template: templateBodySchema,
+  section_template: sectionTemplateBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
 } satisfies Record<AskAiObjectType, z.ZodType>;
