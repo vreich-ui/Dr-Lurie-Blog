@@ -7,6 +7,66 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-14 C (W8.1–W8.3 BUILT + MERGED: section_template + instantiate verbs + blueprintRef + theme + site_apply_theme + token safety — NOT converted; W8.4 awaits Wolf's go)
+
+Wolf: "check if anything blocks this, including the latest commit. If nothing
+does merge and continue along this plan." Nothing blocked; the 09 design PR
+(#436) merged, then all three normal-mode build phases were built, reviewed,
+and merged the same day — each its own PR, each gated on the full suite +
+`astro check` 0 + build-diff EMPTY. **Nothing is CONVERTED: no store records
+exist for the new types; every inventory/conversion-map mark stays ⚪/🔴 until
+the human-gated W8.4 credentialed run.**
+
+- **W8.1 (PR #437, `6198748`)** — `section_template` is the TENTH governed
+  object type end-to-end (schema/ids/3 ops with exact inverses incl.
+  server-minted `blueprint.id`/validation/contract/materializer/policy/
+  collection/Ask-AI/drill) + five self-contained starter seeds
+  (`scripts/lib/section-templates-seed-data.mjs`). The Session-K leaf gap is
+  CLOSED at write time via one shared predicate
+  (`isStandalonePlaceableSectionType`): a standalone `card` on a page or in a
+  shared-section wrapper (or a wrapper wrapping a `shared_ref`) is now a
+  blocks_write failure; `cards`-source grid cells untouched; the committed
+  21-section showcase export pinned green.
+- **W8.2 (PR #439, `cf6d339`)** — `object_instantiate_section_template`:
+  page mode = ONE `upsert_section` through the standard patch path under the
+  CALLER'S checkout (fresh deterministic `s_*` id per (recipe, page,
+  version); `instantiated_from` provenance in history; exact inverse; "law
+  beats recipe" pinned — a hero recipe into a `listing` page is a 422);
+  standalone mode = a new `sec_*` via the create path. `templateSlot` gained
+  `blueprintRef` (mutually exclusive with inline blueprint; deref +
+  deep-copy at instantiation ONLY; live existence + type-in-allowed checks
+  via the new `resolveSectionTemplateType` resolver). Codex review fixes
+  folded in: dry_run needs no checkout fields; blueprintRef types re-checked
+  at the live instantiation point (a re-blueprinted recipe can't smuggle a
+  disallowed type); honest retry semantics (409 carries
+  `section_id_for_expected_version` for lost-response recovery). Fix found
+  en route: both endpoints now derive the validation-context self ref from
+  `target.page_id` too (route uniqueness would have flagged the target
+  page's own route).
+- **W8.3 (PR #440, `9bbba9c`)** — `theme` is the ELEVENTH governed type
+  (`theme.v1`; `brandTokensSchema` extracted from site.v1 and SHARED;
+  `set_theme_fields`; `thm_drlurie_default` seed importing the site seed's
+  tokens — byte-identical to production). `site_apply_theme` verb + MCP
+  tool: ONE exact-replace `set_site_fields` op (stale color keys explicitly
+  unset) under the caller's site checkout; `applied_theme` provenance;
+  revert = standard Discard; dry_run needs no checkout; an INCOMPLETE theme
+  is not appliable (Codex review fix — applying it would delete consumed
+  keys). **The §7.3 token-injection gap is CLOSED**: a shared safe-CSS
+  grammar (`src/lib/registry/theme-tokens.ts`) now gates `set_theme_fields`
+  AND `set_site_fields` (values with `;{}<>`, `url(`, `@import` rejected);
+  CustomStyles refactored onto the shared key/fallback registry,
+  byte-identical (build-diff EMPTY vs main).
+- **Suite: 1,320 tests green** (was 1,236 pre-wave); every phase also passed
+  `npm run check` (0 errors) and `scripts/build-diff.mjs` EMPTY.
+- **Still open: W8.4 (human_gate — Wolf's explicit go required)**: the
+  credentialed production conversion run per 09 §9 — create the 5 `stpl_*` +
+  `thm_drlurie_default`, drill every permitted op sequentially, publish,
+  release; prove `object_instantiate_section_template` by dry_run (both
+  modes) and `site_apply_theme` by dry_run + ONE real no-op apply of the
+  default theme; flip inventory/conversion-map/CLAUDE.md counts to CONVERTED
+  in the same change. Also open per 09: OQ-W8-1…4 (composite sections,
+  checkpoint) and the optional palette-derivation backlog slice.
+
 ## Session 2026-07-14 B (ADMIN MENU → main nav (MCP-editable, admin-gated); /object-showcase content-state variants; the stale-deploy incident FIXED)
 
 Wolf: "make me a page object with every possible existing object … Move the
