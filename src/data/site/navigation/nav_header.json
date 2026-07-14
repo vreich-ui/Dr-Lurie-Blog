@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-13T11:07:41.561Z",
+    "at": "2026-07-14T10:45:23.130Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 82
+    "record_version": 86
   },
   "actions": [
     {
@@ -120,6 +120,76 @@
         "kind": "route"
       },
       "title": "Offers"
+    },
+    {
+      "adminOnly": true,
+      "id": "g_admin",
+      "items": [
+        {
+          "description": "Admin home — overview and quick actions.",
+          "id": "i_admin_dashboard",
+          "label": "Dashboard",
+          "target": {
+            "href": "/admin",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Review and publish queued content.",
+          "id": "i_admin_publish",
+          "label": "Publish",
+          "target": {
+            "href": "/admin/publish",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Work in progress awaiting review.",
+          "id": "i_admin_drafts",
+          "label": "Drafts",
+          "target": {
+            "href": "/admin/drafts",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "All content in one place.",
+          "id": "i_admin_library",
+          "label": "Library",
+          "target": {
+            "href": "/admin/library",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Agent-assisted drafting and publishing.",
+          "id": "i_admin_ai",
+          "label": "AI Publisher",
+          "target": {
+            "href": "/admin/agent-admin",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Inspect the Netlify Blobs object store.",
+          "id": "i_admin_blobs",
+          "label": "Blob Store",
+          "target": {
+            "href": "/admin/blobs",
+            "kind": "route"
+          }
+        },
+        {
+          "description": "Every section type populated for QA.",
+          "id": "i_admin_showcase",
+          "label": "Object Showcase",
+          "target": {
+            "href": "/object-showcase",
+            "kind": "route"
+          }
+        }
+      ],
+      "title": "Admin"
     }
   ],
   "role": "header"
