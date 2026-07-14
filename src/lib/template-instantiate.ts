@@ -16,6 +16,11 @@
  *
  * Slot fill rules, in slot order:
  * - blueprint present      → copy it (fresh id; visibility/notes preserved).
+ * - blueprintRef present   → copy the referenced section_template's blueprint
+ *                            (W8.2). The builder stays PURE: the verb
+ *                            pre-resolves every ref into
+ *                            `request.resolvedBlueprints`; a ref missing from
+ *                            the map is an instantiation error.
  * - required, no blueprint → the registry editor `defaultData` of the slot's
  *                            FIRST allowed type. A required slot whose first
  *                            allowed type has no defaultData (shared_ref) is
@@ -41,6 +46,12 @@ export type InstantiateTemplateRequest = {
   templateRef: string;
   /** … and the (server) instantiation timestamp, ISO. */
   instantiatedAt: string;
+  /**
+   * Pre-resolved section-template blueprints, keyed by stpl_* id (W8.2). The
+   * verb loads + parses every slot's blueprintRef into this map so the
+   * builder needs no store access.
+   */
+  resolvedBlueprints?: Record<string, SectionInstance>;
 };
 
 export type InstantiateTemplateResult = { ok: true; body: PageBody } | { ok: false; error: string };
@@ -71,7 +82,8 @@ const resolvePageType = (
 const sectionFromSlot = (
   slot: TemplateSlot,
   slotIndex: number,
-  templateRef: string
+  templateRef: string,
+  resolvedBlueprints: Record<string, SectionInstance>
 ): { ok: true; section?: SectionInstance } | { ok: false; error: string } => {
   // Deterministic per template+slot (idempotent retries); unique within the
   // page even when two slots share one blueprint, and distinct from the
@@ -79,6 +91,16 @@ const sectionFromSlot = (
   const id = mintId({ kind: 'section_instance' }, `${templateRef}/${slot.slotId}/${slotIndex}`);
   if (slot.blueprint) {
     return { ok: true, section: { ...deepClone(slot.blueprint), id } };
+  }
+  if (slot.blueprintRef) {
+    const referenced = resolvedBlueprints[slot.blueprintRef];
+    if (!referenced) {
+      return {
+        ok: false,
+        error: `Slot "${slot.slotId}" references section template "${slot.blueprintRef}", which did not resolve — it must exist and parse as section_template.v1.`,
+      };
+    }
+    return { ok: true, section: { ...deepClone(referenced), id } };
   }
   if (!slot.required) return { ok: true };
   const type = slot.allowed[0];
@@ -107,7 +129,7 @@ export const buildPageBodyFromTemplate = (
 
   const sections: SectionInstance[] = [];
   for (const [index, slot] of template.slots.entries()) {
-    const filled = sectionFromSlot(slot, index, request.templateRef);
+    const filled = sectionFromSlot(slot, index, request.templateRef, request.resolvedBlueprints ?? {});
     if (!filled.ok) return { ok: false, error: filled.error };
     if (filled.section) sections.push(filled.section);
   }

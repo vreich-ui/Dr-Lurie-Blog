@@ -112,6 +112,11 @@ export type ObjectValidationContext = {
   /** Effective variant type of a shared 'section' object (for structural re-check). */
   resolveSharedSectionType?: (objectId: string) => SectionType | undefined;
   /**
+   * Blueprint type of a section_template object (W8.2) — the
+   * resolveSharedSectionType sibling, for template slot blueprintRef checks.
+   */
+  resolveSectionTemplateType?: (objectId: string) => SectionType | undefined;
+  /**
    * Whether a component type exists in the code component registry (D§3.4/OQ-4).
    * Registry lands in P3; absent here → registry membership not verified.
    */
@@ -858,7 +863,10 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
   const blueprintProblems: string[] = [];
   const requiredProblems: string[] = [];
   const registryProblems: string[] = [];
+  const refProblems: string[] = [];
   let registryChecked = false;
+  let sawRef = false;
+  let refChecked = false;
 
   for (const slot of body.slots) {
     if (!isRecord(slot)) continue;
@@ -880,7 +888,31 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
         );
     }
 
-    if (slot.required === true && !isRecord(slot.blueprint)) requiredProblems.push(slotId);
+    // blueprintRef (W8.2): must resolve to an existing section_template whose
+    // blueprint type the slot allows. Deref is instantiation-time-only; here
+    // we only verify the reference is honest. Mutual exclusion with an inline
+    // blueprint is the slot schema's refine (check 1).
+    const blueprintRef = typeof slot.blueprintRef === 'string' ? slot.blueprintRef : undefined;
+    if (blueprintRef) {
+      sawRef = true;
+      const resolution = context.resolveObject?.('section_template', blueprintRef);
+      if (resolution) {
+        refChecked = true;
+        if (!resolution.exists)
+          refProblems.push(`slot ${slotId}: blueprintRef "${blueprintRef}" does not resolve to a section_template.`);
+      }
+      const refType = context.resolveSectionTemplateType?.(blueprintRef);
+      if (refType !== undefined) {
+        refChecked = true;
+        if (allowed.length > 0 && !allowed.includes(refType))
+          blueprintProblems.push(
+            `slot ${slotId}: referenced blueprint type "${refType}" (${blueprintRef}) is not in the slot's allowed set.`
+          );
+      }
+    }
+
+    // A blueprintRef counts as "has a blueprint" — the recipe supplies content.
+    if (slot.required === true && !isRecord(slot.blueprint) && !blueprintRef) requiredProblems.push(slotId);
   }
 
   const criteria: ReadinessCriterion[] = [
@@ -908,6 +940,20 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
     );
   } else {
     criteria.push(crit('template_registry', 'Allowed types registered', 'complete', ''));
+  }
+  if (sawRef) {
+    criteria.push(
+      refProblems.length > 0
+        ? crit('template_blueprint_refs', 'Blueprint references', 'missing', refProblems.slice(0, 5).join(' '))
+        : refChecked
+          ? crit('template_blueprint_refs', 'Blueprint references', 'complete', '')
+          : crit(
+              'template_blueprint_refs',
+              'Blueprint references',
+              'optional',
+              'No section-template resolver supplied — blueprintRef resolution not verified here.'
+            )
+    );
   }
   return criteria;
 };

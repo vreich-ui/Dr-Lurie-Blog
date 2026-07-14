@@ -156,3 +156,30 @@ test('caller-supplied seo is used verbatim', () => {
   assert.ok(result.ok);
   assert.deepEqual(result.body.seo, { description: 'A probe.', robots: { index: false, follow: true } });
 });
+
+test('blueprintRef slots copy from the pre-resolved map with a fresh id (W8.2)', () => {
+  const composed = template({
+    slots: [{ slotId: 'slot_hero', allowed: ['hero'], required: true, repeatable: false, blueprintRef: 'stpl_hero' }],
+  });
+  const blueprint = {
+    id: 's_stplhero',
+    type: 'hero' as const,
+    data: { heading: 'Recipe heading', actions: [] },
+  };
+  const result = buildPageBodyFromTemplate(composed, { ...REQUEST, resolvedBlueprints: { stpl_hero: blueprint } });
+  assert.ok(result.ok, result.ok ? '' : result.error);
+  assert.equal(result.body.sections.length, 1);
+  assert.equal(result.body.sections[0]!.type, 'hero');
+  assert.deepEqual(result.body.sections[0]!.data, blueprint.data);
+  assert.notEqual(result.body.sections[0]!.id, 's_stplhero', 'fresh minted id, never the placeholder');
+  assert.ok(pageBodySchema.safeParse(result.body).success);
+});
+
+test('a blueprintRef missing from the resolved map is an error naming the slot and the ref (W8.2)', () => {
+  const composed = template({
+    slots: [{ slotId: 'slot_hero', allowed: ['hero'], required: true, repeatable: false, blueprintRef: 'stpl_ghost' }],
+  });
+  const result = buildPageBodyFromTemplate(composed, REQUEST);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.error, /slot_hero.*stpl_ghost/);
+});

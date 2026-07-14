@@ -81,6 +81,14 @@ export const buildStoreValidationContext = async (
     return body.section.type as SectionType;
   };
 
+  // The resolveSharedSectionType sibling for template slot blueprintRefs
+  // (W8.2): the blueprint type of a section_template record.
+  const resolveSectionTemplateType: ObjectValidationContext['resolveSectionTemplateType'] = (objectId) => {
+    const body = records.get(`section_template:${objectId}`)?.body;
+    if (!isRecord(body) || !isRecord(body.blueprint) || typeof body.blueprint.type !== 'string') return undefined;
+    return body.blueprint.type as SectionType;
+  };
+
   const isRouteTaken: ObjectValidationContext['isRouteTaken'] = (route) => {
     for (const [key, record] of records) {
       if (!key.startsWith('page:')) continue;
@@ -154,6 +162,7 @@ export const buildStoreValidationContext = async (
   return {
     resolveObject,
     resolveSharedSectionType,
+    resolveSectionTemplateType,
     isRouteTaken,
     isSlugTaken,
     isArticleSlugTaken,
