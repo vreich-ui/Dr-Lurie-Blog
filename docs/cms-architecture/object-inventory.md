@@ -49,7 +49,8 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-13, forty objects are CONVERTED** (all via credentialed
+**As of 2026-07-14, forty-one objects are CONVERTED** (+6 W8 recipe records
+RELEASED, not yet counted — see "Recipe family (W8)" below) (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
@@ -69,7 +70,9 @@ day went all-green: store-backed, every permitted op round-tripped, published
 export byte-verified (record_version 11 across all six). **W5's credentialed
 run (2026-07-13) added the three previously hand-coded pages**
 (`page_shop_preview`, `page_pricing`, `page_services` — see §1): the
-hand-coded-page backlog is empty for good.
+hand-coded-page backlog is empty for good. **W7.9 (2026-07-13) added the
+forty-first: the first `content_item` article object** (the
+`/object-model-demo` demo), joined since by the ten-article corpus.
 
 ### Status legend
 

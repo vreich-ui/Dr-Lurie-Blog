@@ -86,9 +86,9 @@ the validation engine).
 
 | Recipe                    | Ids      | Applies to          | Answers                                    | Status                                  |
 | ------------------------- | -------- | ------------------- | ------------------------------------------ | --------------------------------------- |
-| `template` (page)         | `tpl_*`  | a new page          | "how do I START a page of kind X?"         | 🟢 CONVERTED (W2.5) — gains §4 in W8.2  |
-| `section_template` (NEW)  | `stpl_*` | a section instance  | "how do I START a section of type Y?"      | ⚪ planned (W8.1–W8.2)                  |
-| `theme` (NEW)             | `thm_*`  | `site.brandTokens`  | "how do I re-skin the site's token set?"   | ⚪ planned (W8.3)                       |
+| `template` (page)         | `tpl_*`  | a new page          | "how do I START a page of kind X?"         | 🟢 CONVERTED (W2.5; §4 blueprintRef SHIPPED W8.2; metadata backfilled W8.4) |
+| `section_template` (NEW)  | `stpl_*` | a section instance  | "how do I START a section of type Y?"      | 🔵 BUILT (W8.1–W8.2) + RELEASED (W8.4, 5 records) — converts on the stamp-verb production dry_runs |
+| `theme` (NEW)             | `thm_*`  | `site.brandTokens`  | "how do I re-skin the site's token set?"   | 🔵 BUILT (W8.3) + RELEASED (W8.4, thm_drlurie_default) — converts on the apply-verb production proofs |
 
 Wolf's sentence, mapped: **code** = the section union + component registry +
 PageType registry + validation (what exists, what options, what amounts);
