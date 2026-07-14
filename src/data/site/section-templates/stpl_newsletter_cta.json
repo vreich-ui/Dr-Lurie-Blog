@@ -1,0 +1,20 @@
+{
+  "__generated": {
+    "at": "2026-07-14T15:52:23.491Z",
+    "from": "objects/section_template/by-id/stpl_newsletter_cta.json",
+    "record_version": 7
+  },
+  "blueprint": {
+    "data": {
+      "formName": "newsletter",
+      "heading": "Get the next letter",
+      "kicker": "Newsletter"
+    },
+    "id": "s_stplnewsletter",
+    "type": "newsletter_signup"
+  },
+  "description": "The standing newsletter capture block wired to the Netlify \"newsletter\" form.",
+  "name": "Newsletter signup",
+  "scope": "evergreen",
+  "whenToUse": "The standard email-capture ask, mid- or end-of-page, on any page meant to convert readers into subscribers."
+}
