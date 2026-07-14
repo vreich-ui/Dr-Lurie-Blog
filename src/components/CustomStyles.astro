@@ -1,6 +1,7 @@
 ---
 import '@fontsource-variable/inter';
 
+import { FALLBACK_COLORS, FALLBACK_FONTS } from '~/lib/registry/theme-tokens';
 import { getSiteObject } from '~/utils/site-object';
 
 // 'DM Sans'
@@ -29,30 +30,13 @@ import { getSiteObject } from '~/utils/site-object';
 // first, then the light key, then the fallback. Font loading (the <link>s
 // below and the @fontsource import) stays code: agents repoint the stacks to
 // any loaded family; shipping new font files is a code change either way.
-const FALLBACK_FONTS: Record<string, string> = {
-  sans: "'Inter Variable'",
-  serif: "'Source Serif 4', Georgia, serif",
-  heading: "'Playfair Display', 'Times New Roman', serif",
-};
-
-const FALLBACK_COLORS: Record<string, string> = {
-  primary: 'rgb(46 111 149)',
-  secondary: 'rgb(37 90 120)',
-  accent: 'rgb(94 140 138)',
-  gold: 'rgb(194 168 120)',
-  'text-heading': 'rgb(22 26 29)',
-  'text-default': 'rgb(36 41 46)',
-  'text-muted': 'rgb(58 65 73 / 76%)',
-  'bg-page': 'rgb(252 251 248)',
-  'bg-surface': 'rgb(247 245 240)',
-  'bg-page-dark': 'rgb(3 6 32)',
-  'dark:text-heading': 'rgb(247, 248, 248)',
-  'dark:text-default': 'rgb(229 236 246)',
-  'dark:text-muted': 'rgb(229 236 246 / 66%)',
-  'dark:bg-page': 'rgb(3 6 32)',
-  'dark:bg-surface': 'rgb(19 24 46)',
-};
-
+//
+// W8.3: the fallback literals and the consumed-key list live in the shared
+// theme-tokens registry (src/lib/registry/theme-tokens.ts, imported above),
+// which validation (checkTheme + the site brand-token check) reads too — the
+// enforced keys and the emitted keys cannot drift, and token VALUES are
+// safety-screened before they can ever reach this inline <style>
+// interpolation.
 const site = getSiteObject();
 const tokens = site?.brandTokens;
 

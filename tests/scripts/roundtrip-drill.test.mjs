@@ -19,6 +19,7 @@ import {
   sectionDrillOps,
   sectionTemplateDrillOps,
   siteDrillOps,
+  themeDrillOps,
   taxonomyDrillOps,
   templateDrillOps,
   updateDataProbeOps,
@@ -309,6 +310,21 @@ test('drillOpsForSeed dispatches a section_template seed', () => {
     'replace_blueprint',
     'update_blueprint_data',
   ]);
+});
+
+test('themeDrillOps pokes and restores the name — set_theme_fields is the only theme op (W8.3)', () => {
+  const body = { name: 'Default', tokens: { colors: {}, fonts: { sans: 'x', serif: 'y', heading: 'z' } } };
+  const { ops, expected } = themeDrillOps(body);
+  assert.deepEqual(expected, ['set_theme_fields']);
+  assert.deepEqual(ops, [
+    { op: 'set_theme_fields', fields: { name: 'Default [probe]' } },
+    { op: 'set_theme_fields', fields: { name: 'Default' } },
+  ]);
+});
+
+test('drillOpsForSeed dispatches a theme seed', () => {
+  const seed = { objectType: 'theme', body: { name: 'D', tokens: { colors: {}, fonts: {} } } };
+  assert.deepEqual(drillOpsForSeed(seed).expected, ['set_theme_fields']);
 });
 
 test('siteDrillOps pokes and restores the name — set_site_fields is the only site op', () => {

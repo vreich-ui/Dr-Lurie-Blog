@@ -29,9 +29,11 @@ const makeRecord = (objectType: ObjectType, body: unknown): ObjectRecord<unknown
                 ? 'tpl_standard'
                 : objectType === 'section_template'
                   ? 'stpl_hero_landing'
-                  : objectType === 'product'
-                    ? 'prod_barrier_repair_guide'
-                    : 'req_agent_topic_20260704_01',
+                  : objectType === 'theme'
+                    ? 'thm_default'
+                    : objectType === 'product'
+                      ? 'prod_barrier_repair_guide'
+                      : 'req_agent_topic_20260704_01',
   object_type: objectType,
   schema_version: `${objectType}.v1`,
   site: 'site_drlurie',
@@ -549,6 +551,20 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
     objectType: 'section_template',
     body: sectionTemplateBody,
     op: { op: 'update_blueprint_data', fields: { heading: 'A sharper hero heading', kicker: null } },
+  },
+
+  // theme family (W8.3)
+  {
+    name: 'set_theme_fields deep-merges token values and unsets a color',
+    objectType: 'theme',
+    body: () => ({
+      name: 'Default',
+      tokens: {
+        colors: { primary: '#112233', accent: '#445566' },
+        fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' },
+      },
+    }),
+    op: { op: 'set_theme_fields', fields: { tokens: { colors: { primary: '#000000', accent: null } } } },
   },
 
   // content_item / article node family (W7.3)

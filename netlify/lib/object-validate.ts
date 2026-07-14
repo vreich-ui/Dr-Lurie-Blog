@@ -65,7 +65,9 @@ import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
 import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
+import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
+import { checkBrandTokenValue, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -221,6 +223,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     section: sectionBodySchema,
     template: templateBodySchema,
     section_template: sectionTemplateBodySchema,
+    theme: themeBodySchema,
     site: siteBodySchema,
     taxonomy: taxonomyBodySchema,
     product: productBodySchema,
@@ -998,6 +1001,88 @@ export const checkSectionTemplate = (body: unknown): ReadinessCriterion[] => {
   ];
 };
 
+// ─── check 6f: brand-token rules (W8.3, 09-plan §6.3) ────────────────────────
+
+/**
+ * CSS-value safety over a brandTokens tree — shared by `theme` bodies and the
+ * `site` singleton, because BOTH feed the same raw interpolation into
+ * CustomStyles' inline <style> tag (set_site_fields accepted any string until
+ * this check — the live gap 09 §7.3 closes). Blocks at write.
+ */
+const brandTokenValueProblems = (tokens: unknown, at: string): string[] => {
+  if (!isRecord(tokens)) return [];
+  const problems: string[] = [];
+  const colors = isRecord(tokens.colors) ? tokens.colors : {};
+  for (const [key, value] of Object.entries(colors)) {
+    if (typeof value !== 'string') continue;
+    const check = checkBrandTokenValue('color', value);
+    if (!check.ok) problems.push(`${at}.colors.${key}: ${check.error}.`);
+  }
+  const fonts = isRecord(tokens.fonts) ? tokens.fonts : {};
+  for (const [key, value] of Object.entries(fonts)) {
+    if (typeof value !== 'string') continue;
+    const check = checkBrandTokenValue('font', value);
+    if (!check.ok) problems.push(`${at}.fonts.${key}: ${check.error}.`);
+  }
+  return problems;
+};
+
+const brandTokenValueCriterion = (tokens: unknown, at: string): ReadinessCriterion => {
+  const problems = brandTokenValueProblems(tokens, at);
+  return problems.length === 0
+    ? crit('brand_token_values', 'Brand token value safety', 'complete', '')
+    : crit('brand_token_values', 'Brand token value safety', 'missing', problems.slice(0, 3).join(' '));
+};
+
+/**
+ * Theme structural rules: every CustomStyles-consumed color key must be
+ * present so `site_apply_theme` is TOTAL (exact-replace leaves no key to fall
+ * back) — publish-gated, warns while drafting; unknown color keys warn
+ * (inert — the renderer reads only the known list; `dark:`-prefixed keys are
+ * the documented optional overrides); every value passes the safety grammar
+ * (blocks at write). Font keys are required by the zod shape already.
+ */
+export const checkTheme = (body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  if (!isRecord(body) || !isRecord(body.tokens)) {
+    return [
+      crit('theme_token_keys', 'Theme token keys', 'optional', 'Theme body shape not recognized (see schema check).'),
+    ];
+  }
+  const tokens = body.tokens;
+  const colors = isRecord(tokens.colors) ? tokens.colors : {};
+
+  const criteria: ReadinessCriterion[] = [];
+  const missing = THEME_COLOR_KEYS.filter((key) => typeof colors[key] !== 'string');
+  if (missing.length === 0) {
+    criteria.push(crit('theme_token_keys', 'Theme token keys', 'complete', ''));
+  } else {
+    criteria.push(
+      crit(
+        'theme_token_keys',
+        'Theme token keys',
+        atPublish ? 'missing' : 'warning',
+        `Missing color key(s) the renderer consumes: ${missing.join(', ')} — a published theme must be total so applying it leaves no stale fallbacks.`
+      )
+    );
+  }
+
+  const known = new Set<string>([...THEME_COLOR_KEYS, ...THEME_COLOR_KEYS.map((key) => `dark:${key}`)]);
+  const unknown = Object.keys(colors).filter((key) => !known.has(key));
+  if (unknown.length > 0) {
+    criteria.push(
+      crit(
+        'theme_token_unknown_keys',
+        'Unknown token keys',
+        'warning',
+        `Color key(s) the renderer never reads: ${unknown.slice(0, 5).join(', ')} — inert (kept, but they style nothing).`
+      )
+    );
+  }
+
+  criteria.push(brandTokenValueCriterion(tokens, 'tokens'));
+  return criteria;
+};
+
 // ─── check 6c: navigation layout rules (T2.1, C§2.3-Navigation) ──────────────
 
 /** Canonical identity of a NavTarget for duplicate detection (key-order-free). */
@@ -1462,9 +1547,15 @@ export const checkStructuralInvariants = (
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
   if (objectType === 'template') return checkTemplate(body, context);
   if (objectType === 'section_template') return checkSectionTemplate(body);
+  if (objectType === 'theme') return checkTheme(body, atPublish);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
   if (objectType === 'product') return checkProduct(body, context, atPublish);
   if (objectType === 'content_item') return checkContentItemStructure(body, context, atPublish);
+  // The site singleton's brandTokens feed the SAME inline <style> as themes —
+  // value safety applies on every site write too (the 09 §7.3 gap).
+  if (objectType === 'site') {
+    return [brandTokenValueCriterion(isRecord(body) ? body.brandTokens : undefined, 'brandTokens')];
+  }
 
   // content_grid card/limit sanity applies to any body that can carry a grid —
   // a page's inline sections OR a shared `section` wrapper. Emits nothing when

@@ -18,6 +18,7 @@ const cases: Array<[ObjectType, string, string]> = [
   ['taxonomy', 'tax_drlurie', 'objects/taxonomy/by-id/tax_drlurie.json'],
   ['template', 'tpl_home', 'objects/template/by-id/tpl_home.json'],
   ['section_template', 'stpl_hero_landing', 'objects/section_template/by-id/stpl_hero_landing.json'],
+  ['theme', 'thm_drlurie_default', 'objects/theme/by-id/thm_drlurie_default.json'],
   ['product', 'prod_barrier_repair_guide', 'objects/product/by-id/prod_barrier_repair_guide.json'],
   ['content_item', 'req_smoke_pdf_cta_20260630_01', 'objects/content_item/by-id/req_smoke_pdf_cta_20260630_01.json'],
 ];
