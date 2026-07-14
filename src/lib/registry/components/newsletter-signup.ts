@@ -15,6 +15,8 @@ export const newsletterSignupDefinition: SectionComponentDefinition<'newsletter_
   editor: {
     label: 'Newsletter signup',
     icon: 'tabler:mail',
+    useWhen:
+      'The email-capture block wired to a Netlify form — the standing mid- or end-of-page conversion ask on content pages.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

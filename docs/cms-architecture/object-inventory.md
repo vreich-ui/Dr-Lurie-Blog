@@ -291,6 +291,19 @@ Both flip to 🟢 only after the W8.4 credentialed run meets all five playbook
 criteria; update these rows, the conversion-map marks, and state-of-play in
 that same change.
 
+**Recipe self-description + reuse-first (W8.3b, 2026-07-14).** Every recipe
+(template / section_template / theme) must carry `description`, `whenToUse`,
+and `scope` (`evergreen` = standing/strategic, `one_off` = single-project) to
+PUBLISH — drafts warn. `object_inventory` serves these as one-line `recipe`
+summaries on every recipe row, so **REUSE FIRST is the documented default**:
+one cheap inventory call answers "what recipes exist and which fits" before
+any body fetch; a new recipe is created only when none fits. Each of the 19
+section types also carries an `editor.useWhen` one-liner (served via
+`object_contract.section_types` / `registry_get`). Creation can be restricted
+per type via the committed `src/config/creation-policy.ts` (humans always;
+agent allowlists; currently fully open — agent names are self-declared until
+OQ-3, so treat as coordination, not security).
+
 ---
 
 ## MVP TODO objects

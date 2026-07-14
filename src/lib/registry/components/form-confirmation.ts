@@ -13,6 +13,7 @@ export const formConfirmationDefinition: SectionComponentDefinition<'form_confir
   editor: {
     label: 'Form confirmation',
     icon: 'tabler:circle-check',
+    useWhen: 'Post-submit thank-you block with per-form message overrides — confirmation/thank-you pages only.',
     fieldHints: {
       eyebrow: { label: 'Eyebrow', help: 'Small uppercase lead-in above the title.', widget: 'text' },
       heading: { label: 'Title', help: 'Fallback title shown when no per-form override matches.', widget: 'text' },

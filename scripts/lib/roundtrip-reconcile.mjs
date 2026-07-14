@@ -40,7 +40,11 @@ export const diffFieldsForMerge = (target, current) => {
 
 const PAGE_META_KEYS = ['route', 'pageType', 'title', 'seo', 'navigationOverrides', 'template'];
 // set_template_meta forbids 'slots' (the slot ops own them) — mirror that split.
-const TEMPLATE_META_KEYS = ['name', 'appliesTo'];
+// W8.3b: the recipe-metadata trio is meta too (this is what backfills the 3
+// live tpl_* records when the enriched seeds run through ensure at W8.4).
+const TEMPLATE_META_KEYS = ['name', 'description', 'whenToUse', 'scope', 'appliesTo'];
+// set_section_template_meta forbids 'blueprint' (replace_blueprint owns it).
+const SECTION_TEMPLATE_META_KEYS = ['name', 'description', 'whenToUse', 'scope'];
 
 /**
  * The patch ops that heal a drifted record back to its seed body.
@@ -59,6 +63,10 @@ const TEMPLATE_META_KEYS = ['name', 'appliesTo'];
  *   full payload. Blunt but exact: there is no reorder op, and update_term slug
  *   renames mint deprecated aliases (C§2.3-taxonomy) that would leave the healed
  *   body differing from the seed. A kind already matching the seed is untouched.
+ * - section_template objects (W8.3b): meta diff (name/description/whenToUse/
+ *   scope; set_section_template_meta forbids `blueprint`) + wholesale
+ *   blueprint replacement — the shared-section idiom one level up.
+ * - theme objects (W8.3b): one fields bag, set_theme_fields — the site idiom.
  */
 export const reconcileOps = (seed, currentBody) => {
   if (seed.objectType === 'section') {
@@ -87,6 +95,23 @@ export const reconcileOps = (seed, currentBody) => {
       });
     }
     return ops;
+  }
+  if (seed.objectType === 'section_template') {
+    // The wrapper holds ONE blueprint (replace wholesale, the shared-section
+    // idiom) plus a meta bag (diffed with stray-nulling, trap 2).
+    const current = isPlainObject(currentBody) ? currentBody : {};
+    const pickMeta = (source) =>
+      Object.fromEntries(
+        SECTION_TEMPLATE_META_KEYS.flatMap((key) => (source[key] === undefined ? [] : [[key, source[key]]]))
+      );
+    return [
+      { op: 'set_section_template_meta', fields: diffFieldsForMerge(pickMeta(seed.body), pickMeta(current)) },
+      { op: 'replace_blueprint', blueprint: seed.body.blueprint },
+    ];
+  }
+  if (seed.objectType === 'theme') {
+    // One fields bag and set_theme_fields is its only op — the site idiom.
+    return [{ op: 'set_theme_fields', fields: diffFieldsForMerge(seed.body, currentBody) }];
   }
   if (seed.objectType === 'template') {
     const target = seed.body;

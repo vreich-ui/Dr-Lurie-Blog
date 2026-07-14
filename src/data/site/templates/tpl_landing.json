@@ -7,7 +7,9 @@
   "appliesTo": [
     "standard"
   ],
+  "description": "The campaign/landing shape: hero opener, optional curated highlight grid, closing CTA banner.",
   "name": "Landing page",
+  "scope": "evergreen",
   "slots": [
     {
       "allowed": [
@@ -68,5 +70,6 @@
       "required": false,
       "slotId": "slot_cta"
     }
-  ]
+  ],
+  "whenToUse": "Conversion-weight pages — launches, program and offer pages, campaign destinations. For ordinary informational pages use tpl_interior."
 }

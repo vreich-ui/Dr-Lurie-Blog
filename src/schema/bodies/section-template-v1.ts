@@ -19,6 +19,7 @@
  */
 import { z } from 'zod';
 
+import { recipeMetadataShape } from './recipe-metadata-v1.js';
 import { sectionInstanceSchema } from './section-v1.js';
 
 export const SECTION_TEMPLATE_SCHEMA_VERSION = 'section_template.v1';
@@ -26,9 +27,8 @@ export const SECTION_TEMPLATE_SCHEMA_VERSION = 'section_template.v1';
 export const sectionTemplateBodySchema = z
   .object({
     name: z.string().min(1),
-    // Agent-facing purpose note ("campaign hero with kicker + two CTAs");
-    // never rendered.
-    description: z.string().optional(),
+    // Self-description (W8.3b): schema-optional, required to publish.
+    ...recipeMetadataShape,
     blueprint: sectionInstanceSchema,
   })
   .strict();

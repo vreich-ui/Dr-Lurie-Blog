@@ -74,7 +74,13 @@ import {
 import { publishObject, type PublishObjectDeps } from './object-publish.js';
 import { checkPublishGate } from './publish-gate.js';
 import { resolveRolesForPrincipal } from './roles.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
+import { isGovernedObjectType, type ApprovalPolicy } from '../../src/lib/approval-policy.js';
+import {
+  activeCreationPolicy,
+  creationRuleFor,
+  isCreationAllowed,
+  type CreationPolicy,
+} from '../../src/lib/creation-policy.js';
 import { decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
@@ -275,6 +281,8 @@ export type HandleObjectVerbOptions = {
    * its provenance ({instantiated_from: stpl_*}) through here (W8.2).
    */
   patchEntryDetails?: Record<string, unknown>;
+  /** Creation policy for the create gate; defaults to the committed config (tests inject). W8.3b. */
+  creationPolicy?: CreationPolicy;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -398,6 +406,32 @@ const seedForCreate = (objectType: ObjectType, body: unknown): string => {
   return stableStringify(body);
 };
 
+/**
+ * The W8.3b creation gate. Humans always create; agents resolve through the
+ * committed creation policy (src/config/creation-policy.ts — default open).
+ * Keys on the type BEING CREATED. Returns the 403 to serve, or undefined
+ * when creation is allowed. ⚠️ agent_name is self-declared until OQ-3: a
+ * coordination seam, not a security boundary.
+ */
+const creationDenied = (
+  objectType: ObjectType,
+  principal: Principal,
+  policy: CreationPolicy
+): ObjectVerbResult | undefined => {
+  if (isCreationAllowed(objectType, principal, policy)) return undefined;
+  const rule = isGovernedObjectType(objectType) ? creationRuleFor(objectType, policy) : 'open';
+  return err(403, {
+    error:
+      `Creating ${objectType} objects is restricted by the creation policy (src/config/creation-policy.ts): ` +
+      `agent "${principal.kind === 'agent' ? principal.agent_name : ''}" is not on the allowlist (humans may ` +
+      `always create). REUSE FIRST: object_inventory({object_type: "${objectType}"}) lists what already exists — ` +
+      `recipes carry self-describing summaries — or ask for the allowlist to be widened.`,
+    code: 'creation_restricted',
+    object_type: objectType,
+    allowed_agents: rule === 'open' ? [] : rule.agents,
+  });
+};
+
 // ─── the dispatcher ───────────────────────────────────────────────────────────
 
 export const handleObjectVerb = async (
@@ -409,6 +443,7 @@ export const handleObjectVerb = async (
   const ts = options.nowMs ?? Date.now();
   const timestamp = nowIso(ts);
   const context = options.validationContext ?? {};
+  const creationPolicy = options.creationPolicy ?? activeCreationPolicy();
 
   switch (request.action) {
     case 'get': {
@@ -477,6 +512,13 @@ export const handleObjectVerb = async (
     case 'create': {
       const objectType = request.object_type;
 
+      // The authoritative creation gate (W8.3b) — BEFORE minting/existence
+      // probing, so a restricted caller learns nothing about id availability.
+      // create_variant/instantiate/instantiate_section-standalone recurse
+      // into this case, so no create path can bypass it.
+      const denied = creationDenied(objectType, principal, creationPolicy);
+      if (denied) return denied;
+
       let objectIdValue: string;
       if (request.requested_id) {
         const check = validateObjectIdForType(objectType, request.requested_id);
@@ -538,6 +580,10 @@ export const handleObjectVerb = async (
       // exist and parse as content_item.v1; the built body flows through the
       // standard `create` path so every rule (slug uniqueness, taxonomy,
       // renderability, deploy safety) applies to variants too.
+      // Pre-check the creation gate (the `create` recursion is authoritative;
+      // this keeps dry_run honest and the error early).
+      const variantDenied = creationDenied('content_item', principal, creationPolicy);
+      if (variantDenied) return variantDenied;
       const sourceKey = objectRecordKey('content_item', request.source_object_id);
       const sourceRecord = await loadRecord(store, sourceKey);
       if (!sourceRecord) {
@@ -611,6 +657,12 @@ export const handleObjectVerb = async (
     }
 
     case 'instantiate': {
+      // The policy keys on the CREATED type: instantiating makes a PAGE
+      // (restricting `template` restricts who mints recipes, not who uses
+      // them). Pre-check for dry_run honesty; the create recursion is
+      // authoritative.
+      const instantiateDenied = creationDenied('page', principal, creationPolicy);
+      if (instantiateDenied) return instantiateDenied;
       // The template must EXIST (draft is fine — the same existence semantics
       // as a shared_ref target); its body must parse as template.v1.
       const templateRecord = await loadRecord(store, objectRecordKey('template', request.template_id));
@@ -736,10 +788,7 @@ export const handleObjectVerb = async (
     case 'instantiate_section': {
       // The recipe must EXIST (draft is fine — the `instantiate` existence
       // semantics); its body must parse as section_template.v1.
-      const stplRecord = await loadRecord(
-        store,
-        objectRecordKey('section_template', request.section_template_id)
-      );
+      const stplRecord = await loadRecord(store, objectRecordKey('section_template', request.section_template_id));
       if (!stplRecord) {
         return err(404, {
           error: 'Section template not found',
@@ -836,7 +885,12 @@ export const handleObjectVerb = async (
 
       // Standalone mode: a new shared sec_* object through the standard
       // create path — identical to a hand-authored one, then usable via
-      // shared_ref from any page.
+      // shared_ref from any page. This CREATES a section object, so the
+      // creation gate applies (page-mode stamping above is a patch to an
+      // existing page — deliberately ungated). Pre-check for dry_run
+      // honesty; the create recursion is authoritative.
+      const standaloneDenied = creationDenied('section', principal, creationPolicy);
+      if (standaloneDenied) return standaloneDenied;
       let requestedId = request.target.requested_id;
       if (!requestedId) {
         try {
@@ -910,9 +964,7 @@ export const handleObjectVerb = async (
       // rendering fallback literals instead of the palette. The theme_token_keys
       // rule only BLOCKS at theme publish (drafts warn) — and apply doesn't
       // require a published theme — so the funnel enforces it here.
-      const missingKeys = THEME_COLOR_KEYS.filter(
-        (key) => typeof parsedTheme.data.tokens.colors[key] !== 'string'
-      );
+      const missingKeys = THEME_COLOR_KEYS.filter((key) => typeof parsedTheme.data.tokens.colors[key] !== 'string');
       if (missingKeys.length > 0) {
         return err(422, {
           error: `Theme "${request.theme_id}" is not total: missing consumed color key(s) ${missingKeys.join(', ')} — applying it would delete them from site.brandTokens and render fallback literals. Complete the theme first.`,

@@ -10,6 +10,8 @@ export const checklistDefinition: SectionComponentDefinition<'checklist', EmptyR
   editor: {
     label: 'Checklist',
     icon: 'tabler:checklist',
+    useWhen:
+      "Short scannable card-per-item list — qualifications, symptoms, what's included. Use steps instead when the order matters.",
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

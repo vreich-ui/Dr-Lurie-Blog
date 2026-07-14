@@ -790,7 +790,7 @@ test('template: a well-formed template passes', () => {
       },
     ],
   };
-  const criteria = checkTemplate(body, {});
+  const criteria = checkTemplate(body, {}, false);
   assert.equal(statusOf(criteria, 'template_blueprints'), 'complete');
   assert.equal(statusOf(criteria, 'template_required'), 'complete');
 });
@@ -809,7 +809,7 @@ test('template REJECTION: a blueprint whose type is not in the slot allowed set'
       },
     ],
   };
-  assert.equal(statusOf(checkTemplate(body, {}), 'template_blueprints'), 'missing');
+  assert.equal(statusOf(checkTemplate(body, {}, false), 'template_blueprints'), 'missing');
 });
 
 test('template WARN: a required slot without a blueprint warns', () => {
@@ -818,7 +818,7 @@ test('template WARN: a required slot without a blueprint warns', () => {
     appliesTo: ['standard'],
     slots: [{ slotId: 'main', allowed: ['hero'], required: true, repeatable: false }],
   };
-  assert.equal(statusOf(checkTemplate(body, {}), 'template_required'), 'warning');
+  assert.equal(statusOf(checkTemplate(body, {}, false), 'template_required'), 'warning');
 });
 
 test('template: component-registry membership is optional until a resolver is supplied, then enforced', () => {
@@ -827,8 +827,8 @@ test('template: component-registry membership is optional until a resolver is su
     appliesTo: ['standard'],
     slots: [{ slotId: 'main', allowed: ['hero', 'imaginary'], required: false, repeatable: false }],
   };
-  assert.equal(statusOf(checkTemplate(body, {}), 'template_registry'), 'optional');
-  const enforced = checkTemplate(body, { componentTypeExists: (t) => t === 'hero' });
+  assert.equal(statusOf(checkTemplate(body, {}, false), 'template_registry'), 'optional');
+  const enforced = checkTemplate(body, { componentTypeExists: (t) => t === 'hero' }, false);
   assert.equal(statusOf(enforced, 'template_registry'), 'missing');
 });
 

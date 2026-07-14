@@ -44,20 +44,20 @@ test('a component-bound blueprint type passes', () => {
 
 test('REJECTION: a card blueprint is a blocker — a leaf has no standalone component', () => {
   const body = { name: 'Card recipe', blueprint: { id: 's_bp', type: 'card', data: { title: 'One card' } } };
-  const criteria = checkSectionTemplate(body);
+  const criteria = checkSectionTemplate(body, false);
   assert.equal(statusOf(criteria, 'blueprint_standalone_renderable'), 'missing');
   assert.match(criteria[0]!.message, /content_grid cards source/);
 });
 
 test('REJECTION: a shared_ref blueprint is a blocker — a pointer is not a recipe', () => {
   const body = { name: 'Pointer recipe', blueprint: { id: 's_bp', type: 'shared_ref', data: { section: 'sec_x' } } };
-  const criteria = checkSectionTemplate(body);
+  const criteria = checkSectionTemplate(body, false);
   assert.equal(statusOf(criteria, 'blueprint_standalone_renderable'), 'missing');
   assert.match(criteria[0]!.message, /copies, never aliases/);
 });
 
 test('an unrecognized body shape reports optional (the schema check owns it)', () => {
-  assert.equal(statusOf(checkSectionTemplate({ name: 'x' }), 'blueprint_standalone_renderable'), 'optional');
+  assert.equal(statusOf(checkSectionTemplate({ name: 'x' }, false), 'blueprint_standalone_renderable'), 'optional');
 });
 
 test('full pipeline: a valid recipe validates clean; renderability runs the REAL splitters over the blueprint', () => {

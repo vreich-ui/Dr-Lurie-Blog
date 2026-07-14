@@ -14,6 +14,8 @@ export const contentGridDefinition: SectionComponentDefinition<'content_grid', C
   editor: {
     label: 'Content grid',
     icon: 'tabler:layout-grid',
+    useWhen:
+      'Any repeating card/tile row: curated copy cells (cards), hand-picked articles (manual), an automatic content query, or tag-similar related reading.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

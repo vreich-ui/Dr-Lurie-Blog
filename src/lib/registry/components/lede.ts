@@ -12,6 +12,8 @@ export const ledeDefinition: SectionComponentDefinition<'lede', HeroResolved> = 
   editor: {
     label: 'Lede',
     icon: 'tabler:text-caption',
+    useWhen:
+      'Quiet interior-page opener: kicker + heading + intro paragraphs. The default first section for standard/system pages; escalate to hero only when the page must sell.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

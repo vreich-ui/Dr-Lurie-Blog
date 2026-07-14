@@ -7,7 +7,9 @@
   "appliesTo": [
     "standard"
   ],
+  "description": "The standard interior-page shape: a quiet lede opener, one or more prose body sections, and an optional closing CTA banner.",
   "name": "Interior page",
+  "scope": "evergreen",
   "slots": [
     {
       "allowed": [
@@ -57,5 +59,6 @@
       "required": false,
       "slotId": "slot_cta"
     }
-  ]
+  ],
+  "whenToUse": "The default recipe for any evergreen content page — guides, explainers, policies. Pick tpl_landing when the page must convert with a hero + highlight grid; tpl_legal for single-block system boilerplate."
 }

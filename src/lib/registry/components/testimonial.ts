@@ -15,6 +15,7 @@ export const testimonialDefinition: SectionComponentDefinition<'testimonial', Em
   editor: {
     label: 'Testimonial',
     icon: 'tabler:quote',
+    useWhen: 'Quotes with attribution — social proof placed between content sections; not a card grid.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

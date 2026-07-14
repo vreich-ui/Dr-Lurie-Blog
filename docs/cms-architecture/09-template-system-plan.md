@@ -455,7 +455,8 @@ form. Direction, so W8 keeps the door open by construction:
 | **W8.1** | `section_template` type end-to-end + `isStandalonePlaceableSectionType` + the page/section leaf fix + seeds                          | —                     | normal         | Full suite + `astro check` 0 + build-diff EMPTY                       |
 | **W8.2** | `object_instantiate_section_template` (both modes, dry_run) + `blueprintRef` composition + `checkTemplate` additions                 | W8.1                  | normal         | Suite + local lifecycle drill + build-diff EMPTY                      |
 | **W8.3** | `theme` type end-to-end + token key registry + CustomStyles refactor (byte-identical) + value safety (theme AND site) + `site_apply_theme` + default seed | — (parallel-safe)     | normal         | Suite + build-diff EMPTY + local apply drill (apply → vars change → inverse restores) |
-| **W8.4** | Credentialed conversion run for both types + records; docs flip to CONVERTED; W8 exit                                                | W8.1–W8.3 merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
+| **W8.3b** | Recipe metadata (description/whenToUse/scope, publish-gated) uniform across the recipe family + creation-policy seam (committed config, default open) + reuse-first surfacing (inventory recipe summaries, REUSE-FIRST contract lines, section-type `useWhen` ×19) + metadata-complete seeds + committed tpl-export pre-materialization + reconcile support | W8.1–W8.3            | normal         | Suite + `npm run check` + build-diff EMPTY                            |
+| **W8.4** | Credentialed conversion run for both types + records (now incl. the tpl metadata backfill, Step 0); docs flip to CONVERTED; W8 exit  | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
 
 ### W8.1 brief — `section_template` + the leaf fix
 
@@ -508,15 +509,73 @@ form. Direction, so W8 keeps the door open by construction:
   key warns.
 - **Gate:** suite + build-diff EMPTY + the local apply drill.
 
+### W8.3b brief — recipe metadata + creation policy + reuse-first (Wolf, 2026-07-14)
+
+- **Mandate:** every recipe must be explainable in JSON (what it is, when to
+  use it, one-off vs strategic); template creation must be restrictable to
+  some agents (ability now, teeth later); agents reuse existing recipes with
+  discovery cheap enough to lower AI cost — **index-then-fetch, never
+  context-dumping**.
+- **Scope:**
+  - ✚ `src/schema/bodies/recipe-metadata-v1.ts`: `{description?, whenToUse?,
+    scope?: 'evergreen' | 'one_off'}` spread into all three recipe body
+    schemas ('evergreen' = a standing recipe with a strategy behind it;
+    'one_off' = built for a single project). Schema-OPTIONAL (the 3 live
+    tpl\_\* records keep parsing) but REQUIRED TO PUBLISH — the shared
+    `checkRecipeMetadata` criterion (`recipe_metadata`, blocks_publish, warns
+    drafting; empty-after-trim counts missing). Editable via each type's
+    existing meta/fields op — zero new ops.
+  - ✚ `src/config/creation-policy.ts` + ✚ `src/lib/creation-policy.ts` (the
+    approval-policy twin): per-type `'open' | {agents: [...]}` rules, master +
+    overrides, HUMANS ALWAYS CREATE, default fully open. Enforced at the top
+    of the `create` verb (before minting/existence probing — the recursion
+    from create_variant/instantiate/instantiate_section-standalone makes it
+    unbypassable) plus thin pre-checks in those three verbs for dry_run
+    honesty. The policy keys on the type BEING CREATED (instantiate → page;
+    standalone stamp → section); page-mode stamping and `site_apply_theme`
+    are patches, deliberately ungated. Denial = 403 `creation_restricted`
+    naming the allowlist and pointing at reuse. Surfaced on every
+    `object_contract` as `creation_policy`. ⚠️ agent_name is SELF-DECLARED
+    until OQ-3 — a coordination seam, not a security boundary; the same
+    allowlist becomes verifiable identity when OQ-3 lands.
+  - Reuse-first surfacing: `object_inventory` recipe rows carry a `recipe`
+    summary (name/scope/description/when_to_use + blueprint_type or
+    applies_to/slot_count) — one cheap call answers "what exists and which
+    fits"; the three recipe contracts open their workflow with a REUSE-FIRST
+    step; all 19 section components gained an `editor.useWhen` one-liner
+    (flows automatically into `object_contract.section_types` +
+    `registry_get`).
+  - Seeds: all 9 recipe seeds are metadata-complete; the 3 committed
+    `src/data/site/templates/*.json` exports were hand-updated with the SAME
+    trio — this pre-materializes exactly what the W8.4 backfill republishes
+    (byte-identical body), keeping `seed-objects-enforcement` green at
+    publish level; blobs-are-truth is restored the moment W8.4 runs.
+    `roundtrip-reconcile` gained the metadata keys in `TEMPLATE_META_KEYS`
+    plus the previously missing `section_template`/`theme` branches.
+- **Interim caveat:** the 3 live tpl\_\* records are *published*, so until
+  the W8.4 backfill, any patch to one whose applied body still lacks the trio
+  is a 422 (`recipe_metadata` blocks on published records) — the backfill
+  patch itself passes because validation runs on the applied body.
+- **Gate:** suite + `npm run check` + build-diff EMPTY (recipes render
+  nothing; the export metadata feeds no rendered surface).
+
 ### W8.4 brief — credentialed conversion run (human_gate)
 
 - **Scope:** the playbook, production, **strictly sequential ops** (the
-  Session-K gateway lesson): create the 5 `stpl_*` + `thm_drlurie_default` →
+  Session-K gateway lesson). **Step 0 — tpl metadata backfill:** run the
+  driver with the (now metadata-complete) template seeds
+  (`--production --seeds scripts/lib/templates-seed-data.mjs --release`) —
+  ensure reconciles the 3 live tpl\_\* bodies via `set_template_meta`
+  (description/whenToUse/scope), publish + release re-materializes the
+  exports byte-identical to the committed W8.3b pre-materialization. Then:
+  create the 5 `stpl_*` + `thm_drlurie_default` →
   drill every permitted op per type → publish → release.
   `object_instantiate_section_template` proven by dry_run in BOTH modes (no
   probe mutations — the W2.5 precedent); `site_apply_theme` proven by
   dry_run **plus one real apply of the default theme** — byte-identical to
-  production tokens, so a zero-risk end-to-end proof.
+  production tokens, so a zero-risk end-to-end proof. Seeds are
+  metadata-complete since W8.3b and the `recipe_metadata` criterion blocks
+  publish without the trio — any future seed edit must keep it.
 - **Docs (same change, per the definition of converted):** inventory rows +
   conversion-map marks flip to 🟢, state-of-play session entry, CLAUDE.md
   converted-count line.

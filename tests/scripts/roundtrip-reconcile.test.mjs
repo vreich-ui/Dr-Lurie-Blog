@@ -218,3 +218,64 @@ test('reconcileOps for a site singleton is one deep-merge diff that nulls strays
   assert.equal(ops[0].fields.chrome.stray, null, 'nested stray key must be explicitly nulled (trap 2)');
   assert.equal(ops[0].fields.strayTop, null, 'top-level stray key must be explicitly nulled');
 });
+
+test('reconcileOps for a template heals the W8.3b metadata trio (the tpl_* backfill mechanism)', () => {
+  const target = {
+    name: 'Interior page',
+    description: 'The interior shape.',
+    whenToUse: 'Default for content pages.',
+    scope: 'evergreen',
+    appliesTo: ['standard'],
+    slots: [{ slotId: 'slot_a', allowed: ['prose'], required: true, repeatable: false }],
+  };
+  // The live pre-backfill body: no metadata at all.
+  const current = { name: 'Interior page', appliesTo: ['standard'], slots: target.slots };
+  const ops = reconcileOps({ objectType: 'template', objectId: 'tpl_interior', body: target }, current);
+  const meta = ops.find((op) => op.op === 'set_template_meta');
+  assert.deepEqual(meta.fields, {
+    name: 'Interior page',
+    description: 'The interior shape.',
+    whenToUse: 'Default for content pages.',
+    scope: 'evergreen',
+    appliesTo: ['standard'],
+  });
+});
+
+test('reconcileOps for a section_template heals meta (blueprint excluded) then replaces the blueprint wholesale', () => {
+  const blueprint = { id: 's_bp', type: 'cta_banner', data: { heading: 'Go', actions: [] } };
+  const target = {
+    name: 'Closing CTA',
+    description: 'The closer.',
+    whenToUse: 'Stamp last.',
+    scope: 'evergreen',
+    blueprint,
+  };
+  const current = { name: 'Old name', description: 'Stale.', staleKey: 'x', blueprint: { id: 's_old', type: 'hero', data: {} } };
+  const ops = reconcileOps({ objectType: 'section_template', objectId: 'stpl_cta', body: target }, current);
+  assert.equal(ops.length, 2);
+  assert.equal(ops[0].op, 'set_section_template_meta');
+  assert.equal(ops[0].fields.name, 'Closing CTA');
+  assert.equal(ops[0].fields.whenToUse, 'Stamp last.');
+  assert.ok(!('blueprint' in ops[0].fields), 'meta op must not carry the blueprint (the op forbids it)');
+  assert.deepEqual(ops[1], { op: 'replace_blueprint', blueprint });
+});
+
+test('reconcileOps for a theme is one deep-merge diff with stray-nulling (the site idiom)', () => {
+  const target = {
+    name: 'Default',
+    description: 'The palette.',
+    whenToUse: 'Restore defaults.',
+    scope: 'evergreen',
+    tokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
+  };
+  const current = {
+    name: 'Default',
+    tokens: { colors: { primary: '#000000', stray: '#ffffff' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
+  };
+  const ops = reconcileOps({ objectType: 'theme', objectId: 'thm_default', body: target }, current);
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].op, 'set_theme_fields');
+  assert.equal(ops[0].fields.tokens.colors.primary, '#112233');
+  assert.equal(ops[0].fields.tokens.colors.stray, null, 'stray token keys are explicitly nulled');
+  assert.equal(ops[0].fields.description, 'The palette.');
+});

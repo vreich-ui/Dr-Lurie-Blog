@@ -47,12 +47,20 @@ test('every template body parses under template.v1 and every id passes the T0.3 
   }
 });
 
-test('every template validates clean with the component registry wired', () => {
+test('every template validates clean AT PUBLISH LEVEL with the component registry wired (W8.3b: metadata-complete)', () => {
   for (const seed of seeds) {
     const summary = summarizeValidation(
-      validateObject({ objectType: 'template', objectId: seed.objectId, body: seed.body }, { componentTypeExists })
+      validateObject(
+        { objectType: 'template', objectId: seed.objectId, body: seed.body },
+        { componentTypeExists, publishIntent: true }
+      )
     );
     assert.deepEqual(summary.blockers, [], `${seed.objectId}: ${JSON.stringify(summary.blockers)}`);
+    // The reuse-first index fields every seed must author (recipe_metadata).
+    const body = seed.body as unknown as { description?: string; whenToUse?: string; scope?: string };
+    assert.ok(body.description?.trim(), `${seed.objectId} needs a description`);
+    assert.ok(body.whenToUse?.trim(), `${seed.objectId} needs whenToUse`);
+    assert.ok(body.scope === 'evergreen' || body.scope === 'one_off', `${seed.objectId} needs a scope`);
   }
 });
 

@@ -18,6 +18,7 @@ import {
   inventoryDetailFromRecord,
   inventoryRowFromRecord,
   matchesInventoryFilters,
+  recipeSummaryFromBody,
 } from '../../netlify/lib/object-inventory.js';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
@@ -389,4 +390,85 @@ test('inventory single-object detail requires the type, 404s on a missing id, an
   assert.equal(object.site, 'site_drlurie');
   assert.equal(object.history_length, 1);
   assert.equal(object.unpublished_changes, true);
+});
+
+// ═══ recipe summaries — the W8.3b reuse-first index ═══════════════════════════
+
+test('recipe rows carry a snake_case summary with per-type kind details; other types carry none', () => {
+  const template = inventoryRowFromRecord(
+    baseRecord({
+      object_id: 'tpl_probe',
+      object_type: 'template',
+      body: {
+        name: 'Interior page',
+        description: 'The interior shape.',
+        whenToUse: 'Default for content pages.',
+        scope: 'evergreen',
+        appliesTo: ['standard'],
+        slots: [{ slotId: 'slot_a' }, { slotId: 'slot_b' }],
+      },
+    }),
+    NOW
+  );
+  assert.deepEqual(template.recipe, {
+    name: 'Interior page',
+    scope: 'evergreen',
+    description: 'The interior shape.',
+    when_to_use: 'Default for content pages.',
+    applies_to: ['standard'],
+    slot_count: 2,
+  });
+
+  const stamp = inventoryRowFromRecord(
+    baseRecord({
+      object_id: 'stpl_probe',
+      object_type: 'section_template',
+      body: {
+        name: 'Landing hero',
+        description: 'Opening hero.',
+        whenToUse: 'First section of landing pages.',
+        scope: 'evergreen',
+        blueprint: { id: 's_bp', type: 'hero', data: {} },
+      },
+    }),
+    NOW
+  );
+  assert.equal(stamp.recipe?.blueprint_type, 'hero');
+
+  const page = inventoryRowFromRecord(baseRecord(), NOW);
+  assert.equal(page.recipe, undefined, 'non-recipe rows carry no summary');
+});
+
+test('recipe summaries are DEFENSIVE: malformed or incomplete bodies yield nulls, never a throw', () => {
+  const malformed = inventoryRowFromRecord(
+    baseRecord({ object_id: 'thm_broken', object_type: 'theme', body: 42 }),
+    NOW
+  );
+  assert.deepEqual(malformed.recipe, { name: null, scope: null, description: null, when_to_use: null });
+
+  const partial = recipeSummaryFromBody('section_template', { name: 'X', scope: 'weird', blueprint: 'nope' });
+  assert.deepEqual(partial, {
+    name: 'X',
+    scope: null,
+    description: null,
+    when_to_use: null,
+    blueprint_type: null,
+  });
+});
+
+test('the detail view inherits the recipe summary', async () => {
+  const store = createMemoryStore();
+  await store.setJSON(
+    objectRecordKey('theme', 'thm_probe'),
+    baseRecord({
+      object_id: 'thm_probe',
+      object_type: 'theme',
+      schema_version: 'theme.v1',
+      body: { name: 'Default', description: 'The palette.', whenToUse: 'Restore defaults.', scope: 'evergreen', tokens: {} },
+    })
+  );
+  const res = await call(store, { action: 'inventory', object_type: 'theme', object_id: 'thm_probe' });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const detail = res.body.object as { recipe?: { name: string | null } };
+  assert.equal(detail.recipe?.name, 'Default');
 });

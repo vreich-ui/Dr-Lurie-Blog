@@ -34,6 +34,9 @@ export const SEED_SITE = 'site_drlurie';
 export const sectionTemplateHeroLandingBody = {
   name: 'Landing hero',
   description: 'Opening hero for a landing or campaign page: kicker + heading + intro copy + action slots.',
+  whenToUse:
+    'Stamp as the FIRST section of a campaign or landing page. Interior pages open with a lede (registry default), not a hero.',
+  scope: 'evergreen',
   blueprint: {
     id: 's_stplhero',
     type: 'hero',
@@ -49,6 +52,9 @@ export const sectionTemplateHeroLandingBody = {
 export const sectionTemplateAudienceGridBody = {
   name: 'Audience grid',
   description: 'Curated text-cell grid ("who this is for" / feature highlights) — cards are hand-written copy.',
+  whenToUse:
+    '"Who this is for" and feature-highlight rows where every cell is hand-written copy. For automatic article tiles use stpl_related_articles.',
+  scope: 'evergreen',
   blueprint: {
     id: 's_stplaudience',
     type: 'content_grid',
@@ -67,6 +73,9 @@ export const sectionTemplateAudienceGridBody = {
 export const sectionTemplateRelatedArticlesBody = {
   name: 'Related articles',
   description: 'Automatic related-content strip: three tiles picked by tag similarity from published articles.',
+  whenToUse:
+    'End-of-article and hub pages that should surface further reading automatically — cells fill themselves from published articles by tag similarity. For hand-curated cells use stpl_audience_grid.',
+  scope: 'evergreen',
   blueprint: {
     id: 's_stplrelated',
     type: 'content_grid',
@@ -82,6 +91,9 @@ export const sectionTemplateRelatedArticlesBody = {
 export const sectionTemplateNewsletterCtaBody = {
   name: 'Newsletter signup',
   description: 'The standing newsletter capture block wired to the Netlify "newsletter" form.',
+  whenToUse:
+    'The standard email-capture ask, mid- or end-of-page, on any page meant to convert readers into subscribers.',
+  scope: 'evergreen',
   blueprint: {
     id: 's_stplnewsletter',
     type: 'newsletter_signup',
@@ -96,6 +108,9 @@ export const sectionTemplateNewsletterCtaBody = {
 export const sectionTemplateCtaBannerBody = {
   name: 'Closing CTA banner',
   description: 'Closing call-to-action banner: heading + action slots (the interior-page closer).',
+  whenToUse:
+    'The standard page closer — stamp last on interior pages to route readers onward; customize heading and actions after stamping.',
+  scope: 'evergreen',
   blueprint: {
     id: 's_stplcta',
     type: 'cta_banner',

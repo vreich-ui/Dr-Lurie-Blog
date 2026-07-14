@@ -13,6 +13,7 @@ export const contentEmbedDefinition: SectionComponentDefinition<'content_embed',
   editor: {
     label: 'Content embed',
     icon: 'tabler:article',
+    useWhen: "An inline link-card to ONE published article — 'read this next' placed inside page flow.",
     fieldHints: {
       contentItem: { label: 'Content item', help: 'The id of a published article to link to.', widget: 'text' },
     },

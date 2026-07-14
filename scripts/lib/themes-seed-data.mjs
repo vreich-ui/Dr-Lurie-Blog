@@ -20,6 +20,9 @@ export const SEED_SITE = 'site_drlurie';
 export const themeDefaultBody = {
   name: 'Dr. Lurié default',
   description: 'The production palette, verbatim from the site seed — applying it to the untouched site is a no-op.',
+  whenToUse:
+    'Apply to restore the canonical production palette after theme experiments, or copy as the starting point when drafting a new palette variant.',
+  scope: 'evergreen',
   tokens: structuredClone(siteBody.brandTokens),
 };
 

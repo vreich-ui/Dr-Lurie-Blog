@@ -12,6 +12,8 @@ export const proseDefinition: SectionComponentDefinition<'prose', EmptyResolved>
   editor: {
     label: 'Prose',
     icon: 'tabler:align-left',
+    useWhen:
+      'Long-form body copy — headings, paragraphs, lists. The workhorse for any explanatory, editorial, or legal text; reach for it before anything more structured.',
     fieldHints: {
       body: { label: 'Body', help: 'Reader-width body copy. Paragraphs only.', widget: 'richtext' },
     },

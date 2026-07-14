@@ -13,6 +13,8 @@ export const linkListDefinition: SectionComponentDefinition<'link_list', LinkLis
   editor: {
     label: 'Link list',
     icon: 'tabler:list',
+    useWhen:
+      "A titled list of plain links — resource hubs, 'start here' indexes, in-page link groups. For card-styled tiles use content_grid instead.",
     fieldHints: {
       heading: { label: 'Heading', widget: 'text' },
       links: {

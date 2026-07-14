@@ -54,12 +54,19 @@ test('every body parses under section_template.v1 and every id passes the T0.3 v
   }
 });
 
-test('every recipe validates clean through the full pipeline', () => {
+test('every recipe validates clean AT PUBLISH LEVEL (W8.3b: metadata-complete)', () => {
   for (const seed of seeds) {
     const summary = summarizeValidation(
-      validateObject({ objectType: 'section_template', objectId: seed.objectId, body: seed.body }, {})
+      validateObject(
+        { objectType: 'section_template', objectId: seed.objectId, body: seed.body },
+        { publishIntent: true }
+      )
     );
     assert.deepEqual(summary.blockers, [], `${seed.objectId}: ${JSON.stringify(summary.blockers)}`);
+    const body = seed.body as unknown as { description?: string; whenToUse?: string; scope?: string };
+    assert.ok(body.description?.trim(), `${seed.objectId} needs a description`);
+    assert.ok(body.whenToUse?.trim(), `${seed.objectId} needs whenToUse`);
+    assert.ok(body.scope === 'evergreen' || body.scope === 'one_off', `${seed.objectId} needs a scope`);
   }
 });
 

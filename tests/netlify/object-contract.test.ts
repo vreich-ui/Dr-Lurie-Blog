@@ -157,3 +157,41 @@ test('section_template carries the blueprint op family, section vocabulary, and 
   assert.ok(contract.section_types && contract.section_types.length > 0, 'the section vocabulary must be served');
   assert.ok(contract.constraints.some((constraint) => constraint.id === 'blueprint_standalone_renderable'));
 });
+
+test('W8.3b: recipe types carry the recipe_metadata constraint, a REUSE-FIRST first workflow step, and useWhen hints', () => {
+  for (const type of ['template', 'section_template', 'theme'] as ObjectType[]) {
+    const contract = buildObjectContract(type);
+    assert.ok(
+      contract.constraints.some((constraint) => constraint.id === 'recipe_metadata'),
+      `${type} must carry the recipe_metadata constraint`
+    );
+    assert.match(contract.workflow.sequence[0]!, /REUSE FIRST/, `${type} workflow must open with reuse`);
+    assert.match(contract.workflow.sequence[0]!, new RegExp(type));
+  }
+  const page = buildObjectContract('page');
+  assert.equal(
+    page.constraints.some((constraint) => constraint.id === 'recipe_metadata'),
+    false,
+    'non-recipe types carry no recipe_metadata constraint'
+  );
+  assert.doesNotMatch(page.workflow.sequence[0]!, /REUSE FIRST/);
+  // useWhen flows automatically into the served section vocabulary.
+  const bound = (buildObjectContract('section_template').section_types ?? []).filter((s) => s.component_bound);
+  for (const sectionType of bound) {
+    assert.ok(sectionType.editor?.useWhen, `${sectionType.type} must serve editor.useWhen`);
+  }
+});
+
+test('W8.3b: creation_policy is served on every contract and reflects the injected policy', () => {
+  for (const type of OBJECT_CONTRACT_TYPES) {
+    const open = buildObjectContract(type).creation_policy;
+    assert.equal(open.humans, 'always_allowed');
+    assert.equal(open.agents, 'open', `${type} is open under the committed default`);
+    assert.match(open.note, /self-declared/);
+  }
+  const restricted = buildObjectContract('template', {
+    creationPolicy: { master: 'open', overrides: { template: { agents: ['site-builder'] } } },
+  }).creation_policy;
+  assert.deepEqual(restricted.agents, { allowlist: ['site-builder'] });
+  assert.match(restricted.note, /creation_restricted/);
+});

@@ -49,6 +49,13 @@ export type FieldHint = {
 export type ComponentEditorHints<TType extends SectionType> = {
   label: string;
   icon: string;
+  /**
+   * One-line "reach for this when…" (W8.3b) — the type-choosing agent reads
+   * this before any schema, so contrast with sibling types where confusion
+   * is likely (hero vs lede, checklist vs steps, link_list vs content_grid).
+   * Flows automatically into object_contract.section_types and registry_get.
+   */
+  useWhen?: string;
   fieldHints: Partial<Record<keyof SectionDataOf<TType> & string, FieldHint>>;
   defaultData: SectionDataOf<TType>;
 };

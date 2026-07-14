@@ -25,6 +25,64 @@ export type InventoryLockState =
   | { held: false }
   | { held: true; owner_id: string; owner_label: string; acquired_at: string; expires_at: string };
 
+/**
+ * The reuse-first index (W8.3b): a recipe row's one-line self-description,
+ * derived from the body's recipe metadata so an agent answers "what recipes
+ * exist and which fits?" from ONE inventory call instead of fetching bodies.
+ * Nulls signal incomplete metadata (drafts; pre-backfill records) — the
+ * recipe_metadata criterion blocks publish until they fill in.
+ */
+export type InventoryRecipeSummary = {
+  name: string | null;
+  scope: 'evergreen' | 'one_off' | null;
+  description: string | null;
+  /** Body key is `whenToUse`; rows are snake_case. */
+  when_to_use: string | null;
+  /** section_template: the blueprint's section type. */
+  blueprint_type?: string | null;
+  /** template: the PageTypes this recipe may start. */
+  applies_to?: string[];
+  /** template: how many slots the recipe carries. */
+  slot_count?: number | null;
+};
+
+const RECIPE_TYPES = new Set(['template', 'section_template', 'theme']);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === 'object' && !Array.isArray(value));
+
+const stringOrNull = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value : null);
+
+/**
+ * Defensive plain-object reads (no zod): a half-healed draft body yields
+ * nulls instead of throwing, so a malformed record can never break an
+ * inventory sweep. Returns undefined for non-recipe types.
+ */
+export const recipeSummaryFromBody = (
+  objectType: ObjectRecord['object_type'],
+  body: unknown
+): InventoryRecipeSummary | undefined => {
+  if (!RECIPE_TYPES.has(objectType)) return undefined;
+  const record = isRecord(body) ? body : {};
+  const summary: InventoryRecipeSummary = {
+    name: stringOrNull(record.name),
+    scope: record.scope === 'evergreen' || record.scope === 'one_off' ? record.scope : null,
+    description: stringOrNull(record.description),
+    when_to_use: stringOrNull(record.whenToUse),
+  };
+  if (objectType === 'section_template') {
+    summary.blueprint_type =
+      isRecord(record.blueprint) && typeof record.blueprint.type === 'string' ? record.blueprint.type : null;
+  }
+  if (objectType === 'template') {
+    summary.applies_to = Array.isArray(record.appliesTo)
+      ? record.appliesTo.filter((entry): entry is string => typeof entry === 'string')
+      : [];
+    summary.slot_count = Array.isArray(record.slots) ? record.slots.length : null;
+  }
+  return summary;
+};
+
 export type InventoryRow = {
   object_id: string;
   object_type: ObjectRecord['object_type'];
@@ -49,6 +107,8 @@ export type InventoryRow = {
    * (conservative — we cannot prove the live export is current).
    */
   unpublished_changes: boolean;
+  /** Present on recipe rows only (template / section_template / theme) — the W8.3b reuse-first index. */
+  recipe?: InventoryRecipeSummary;
 };
 
 export type InventoryDetail = InventoryRow & {
@@ -83,6 +143,7 @@ export const inventoryRowFromRecord = (
   const sanitized = lockActive ? sanitizeObjectLock(record.lock) : undefined;
   const publishedTime = record.publication.published_time;
   const receiptRevision = publishedContentRevision(record);
+  const recipe = recipeSummaryFromBody(record.object_type, record.body);
   return {
     object_id: record.object_id,
     object_type: record.object_type,
@@ -108,6 +169,7 @@ export const inventoryRowFromRecord = (
       publishedTime === null || publishedTime === undefined
         ? true
         : receiptRevision === null || receiptRevision !== record.content_revision,
+    ...(recipe ? { recipe } : {}),
   };
 };
 
