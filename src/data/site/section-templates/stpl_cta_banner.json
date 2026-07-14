@@ -1,0 +1,19 @@
+{
+  "__generated": {
+    "at": "2026-07-14T16:14:29.503Z",
+    "from": "objects/section_template/by-id/stpl_cta_banner.json",
+    "record_version": 8
+  },
+  "blueprint": {
+    "data": {
+      "actions": [],
+      "heading": "Keep exploring"
+    },
+    "id": "s_stplcta",
+    "type": "cta_banner"
+  },
+  "description": "Closing call-to-action banner: heading + action slots (the interior-page closer).",
+  "name": "Closing CTA banner",
+  "scope": "evergreen",
+  "whenToUse": "The standard page closer — stamp last on interior pages to route readers onward; customize heading and actions after stamping."
+}
