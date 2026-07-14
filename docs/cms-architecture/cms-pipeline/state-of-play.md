@@ -7,6 +7,67 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-14 E (W8.4 RUN — Wolf's go: recipe family RELEASED, not yet converted; the four application-verb production proofs are the open gate — first act of next session, then 41 → 47)
+
+Wolf: "do W8.4" (after merging W8.3b as PR #442). Run executed via the
+session MCP connection against production, strictly sequential ops.
+
+- **Step 0 — tpl metadata backfill**: the 3 live `tpl_*` reconciled to the
+  metadata-complete seeds via `reconcileOps` (one `set_template_meta`
+  carrying description/whenToUse/scope + idempotent slot heals), then the
+  FULL standing drill (all 4 template ops, probe slot in/out), validate
+  clean, publish (rev 20: commits `8cbe103` / `6d228fb` / `ae8588c`),
+  checkin. Exports content-identical to the W8.3b pre-materialization (only
+  the `__generated` stamp moved). `object_instantiate_template` dry_run
+  re-proven ×3 — incl. tpl_legal's blueprint-less required slot filling
+  from prose registry defaultData.
+- **Six creations**: 5 `stpl_*` + `thm_drlurie_default` created
+  (`agent_name: w84-conversion-run`), every permitted patch op drilled with
+  exact inverses (stpl: set_section_template_meta / update_blueprint_data /
+  replace_blueprint; thm: set_theme_fields), validated clean at publish
+  level (blueprint_standalone_renderable, theme_token_keys,
+  brand_token_values, recipe_metadata all green), published (commits
+  `b554133` / `a69ffeb` / `6ce0f8c` / `ac970a3` / `6e8eb1c` / `815de2a`),
+  checked in. First-ever `src/data/site/section-templates/` and
+  `src/data/site/themes/` exports.
+- **Released**: production deploy for `6e8eb1c` (all 9 exports) `ready` at
+  2026-07-14T16:23:38Z. store === seed === export verified byte-level
+  (script compare, modulo `__generated`).
+- **Contracts + index proven live**: section_template/theme contracts serve
+  exactly the drilled ops, the W8 constraints, `creation_policy`, and the
+  REUSE-FIRST opener; `object_inventory` rows carry full recipe summaries
+  (the W8.3b index working in production with real data).
+- **THE OPEN CONVERSION GATE — application-verb production proofs**: the
+  session's MCP tool snapshot predated the W8 deploys, so
+  `object_instantiate_section_template` and `site_apply_theme` were NOT
+  callable from this session (Wolf refreshed the connector mid-run; the
+  harness snapshot is session-static — confirmed by subagent probe; raw
+  HTTPS to the endpoint is blocked by the container network policy). Per
+  playbook criterion 3 and the W2.5 template precedent (instantiate proven
+  in production before the flip), the family therefore stays **RELEASED,
+  not converted** — inventory/map marks are 🔵, CLAUDE.md count stays 41.
+  The proofs (stamp dry_run in BOTH modes for EACH of the 5 stpl records —
+  per-object conversion, the W2.5 one-proof-per-template precedent; apply
+  dry_run + ONE real no-op default apply + site publish + release) are the
+  FIRST ACT of the next session; on green, flip the marks 🟢, count
+  41 → 47. Both
+  verbs are deployed, contract-advertised, and verb-level-tested in the
+  merged suite.
+- **Ops lessons (endpoint was flaky — 502s + 60s connector timeouts all
+  run)**: a timed-out `object_checkout` usually DID take the lock
+  server-side with a token never delivered — the lock is unreclaimable
+  until lease expiry (~15 min); park the object and work another. NEVER
+  blind-retry a mutating call: verify with `object_inventory` detail
+  (publish receipt / lock / unpublished_changes) first — every timed-out
+  create/patch/publish in this run had actually landed.
+- Docs updated in this change (RELEASED framing, per the Codex-flagged
+  no-half-measures call): object-inventory (W8 section → RELEASED table 🔵
+  + tpl backfill note), conversion-map (🔵 marks + W8 row with the open
+  gate), CLAUDE.md (count stays forty-one + "6 RELEASED pending proofs"),
+  09-plan (status header, W8.4 row, tpl caveat RESOLVED). `tpl_fieldtest`
+  stays trio-less (fieldtest family) — patching it 422s until backfilled
+  or retired.
+
 ## Session 2026-07-14 D (W8.3b BUILT: recipe metadata + creation-policy seam + reuse-first surfacing — NOT converted; W8.4 awaits Wolf's go, now with a tpl backfill Step 0)
 
 Wolf: recipes must be self-explaining in JSON ("what it is, whether it is for

@@ -49,7 +49,13 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-13, forty objects are CONVERTED** (all via credentialed
+**As of 2026-07-14, forty-one objects are CONVERTED** (+6 W8 recipe records
+RELEASED, not yet counted — see "Recipe family (W8)" below). The ledger
+counts objects whose round-trip was individually proven in a credentialed
+run; the ten-article corpus (W7.9 aftermath — created → published → released
+end-to-end via MCP, all store-backed) is live production content of the
+converted `content_item` type but only the demo article's full op-drill ran,
+so the ledger counts the demo, not the ten. (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
@@ -69,7 +75,9 @@ day went all-green: store-backed, every permitted op round-tripped, published
 export byte-verified (record_version 11 across all six). **W5's credentialed
 run (2026-07-13) added the three previously hand-coded pages**
 (`page_shop_preview`, `page_pricing`, `page_services` — see §1): the
-hand-coded-page backlog is empty for good.
+hand-coded-page backlog is empty for good. **W7.9 (2026-07-13) added the
+forty-first: the first `content_item` article object** (the
+`/object-model-demo` demo), joined since by the ten-article corpus.
 
 ### Status legend
 
@@ -84,12 +92,17 @@ hand-coded-page backlog is empty for good.
 
 ## The object types (use & boundaries)
 
-Nine object types exist, and **all nine are governed** (edited through the
-generic object verbs and the approval policy) since W7.3 (2026-07-13) brought
-`content_item` into the model. Two more are PLANNED (W8 —
-[`09-template-system-plan.md`](09-template-system-plan.md)): `section_template`
-and `theme`, the section- and site-level members of the recipe family; see
-"Planned (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
+Ten object types exist, and **all ten are governed** (edited through the
+generic object verbs and the approval policy — the authoritative list is
+`objectTypes` in `src/schema/object-record-v1.ts`): W7.3 (2026-07-13)
+brought `content_item` into the model, and W8 (2026-07-14) added
+`section_template` and `theme`, the section- and site-level members of the
+recipe family (records RELEASED 2026-07-14; conversion completes on the
+application-verb production proofs —
+[`09-template-system-plan.md`](09-template-system-plan.md)); see
+"Recipe family (W8)" under Singletons & templates below. (Session logs call
+these waves the "ninth/tenth/eleventh governed type" — historical labels
+that over-count by one; the contract enumerates ten.) The COMMITTED legacy posts (src/data/post/\*.md)
 stay on the older article pipeline untouched — Wolf's ruling: not worth
 migrating; new articles are objects. **Boundaries below are the human summary —
 the machine-checked, always-current version is `object_contract('<type>')`.**
@@ -112,6 +125,8 @@ trail. Flip one file to change the posture per type.
 | **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
 | **product**                 | One sellable digital good (download / pay-to-unlock / tip-PWYW / free lead magnet): `slug` + presentation + commerce + a fulfillment union on `kind`. Long-form copy composes via `presentation.page_ref` → an ordinary Page (06-shop-module-plan §1–2). | Slug lowercase-hyphen + unique (→ `/shop/<slug>`); mode↔fields coherence enforced; **price cache + Stripe linkage are NOT agent-patchable** (`product_set_price` only, S3); `fulfillment.artifact_ref` must be a trusted private-store ref; **publishes review-required**. |
 | **content_item** (articles) | An article as an annotated NODE LIST (W7.3): every block carries `private.strategy` (hook/agitation/…/resolution) + `intent` plus commercial/rendering/chat metadata; `public.body` is plain text or a `rich_text.v1` document. Envelope carries the judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). `create_variant` clones a draft for A/B judging. Renders through the blog furniture at `/<slug>`, joining listings/tags/RSS automatically. | `req_*` ids (artifact trust preserved); slug lowercase-hyphen + unique across articles AND committed posts; ≥1 public content node to publish; node ids opaque (no strategy words); annotations NEVER render (leak rule); rich-text bodies limited to the renderable grammar (embeds blocked until resolvers exist). **The 83 legacy committed posts were WIPED (Wolf 2026-07-13); the live corpus is 10 `content_item` objects + the demo, all store-backed.** Slug uniqueness still spans any committed posts should they return. |
+| **section_template** (W8)   | A section-level recipe: ONE pre-configured section blueprint (+ name/description/whenToUse/scope) an agent stamps into any page or mints as a standalone `sec_*` object via `object_instantiate_section_template` — copy at stamp time, never live-bound. Records RELEASED 2026-07-14, not yet converted (verb proofs pending).                                                          | Blueprint must be a standalone-placeable registered type (no `card` leaf, no `shared_ref`, no manual content picks, no asset refs — self-contained); metadata trio (description/whenToUse/scope) REQUIRED TO PUBLISH; creation gated by `src/config/creation-policy.ts` (open today).                                     |
+| **theme** (W8)              | A brandTokens preset (name/description/whenToUse/scope + `tokens: {colors, fonts}`): agents draft/validate a palette, then `site_apply_theme` copies it onto the site singleton as ONE exact-replace `set_site_fields` op (stale keys unset). NOT taxonomy; the site never live-inherits. Record RELEASED 2026-07-14, not yet converted (verb proofs pending).                             | Published themes must carry every renderer-consumed color key (apply is total); token values must pass the safe-CSS grammar (raw `<style>` interpolation — the same rule gates `site.brandTokens`); metadata trio REQUIRED TO PUBLISH; creation gated by the same committed policy.                                       |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
@@ -258,7 +273,9 @@ MCP tool creates a new page from a recipe through the standard create validation
 (`dry_run: true` previews without persisting); a required slot without a
 blueprint instantiates from the registry defaultData of its first allowed type.
 Three starter recipes are store-backed in production (batched run 2026-07-11 —
-all 4 template ops round-tripped + instantiate `dry_run` proven, published, released):
+all 4 template ops round-tripped + instantiate `dry_run` proven, published,
+released; metadata trio backfilled + fully re-drilled by the W8.4 run
+2026-07-14, published at content revision 20):
 
 | Object         | appliesTo  | Status       | Notes                                                                                                                                        |
 | -------------- | ---------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -266,30 +283,46 @@ all 4 template ops round-tripped + instantiate `dry_run` proven, published, rele
 | `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                                |
 | `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.               |
 
-### Planned (W8) — the rest of the recipe family 🔴 TODO
+### Recipe family (W8) — RELEASED 2026-07-14 🔵 (conversion completes on the verb proofs)
 
-Designed 2026-07-14 ([`09-template-system-plan.md`](09-template-system-plan.md));
-nothing built, nothing store-backed yet. Two new object types complete rule 5's
-recipe family (data, many, agent-editable; applied by COPY at instantiation;
-never live-bound):
+Designed, built (W8.1–W8.3b), and run (W8.4 credentialed run 2026-07-14 via
+the session MCP connection) the same wave
+([`09-template-system-plan.md`](09-template-system-plan.md)). Two object types
+complete rule 5's recipe family (data, many, agent-editable; applied by COPY
+at instantiation; never live-bound). **Status is RELEASED, not converted**:
+criterion 3 (every permitted action proven in production, the W2.5 precedent)
+still awaits the application-verb dry_runs — do NOT skip them:
 
-- **`section_template`** (`stpl_*`) — a named, pre-configured section blueprint
-  (`{name, description?, blueprint: sectionInstance}`) an agent stamps into any
-  page (one `upsert_section` under the caller's lock) or mints as a standalone
-  shared `sec_*` object, via `object_instantiate_section_template` (dry_run
-  both modes). Planned seeds: `stpl_hero_landing`, `stpl_audience_grid`,
-  `stpl_related_articles`, `stpl_newsletter_cta`, `stpl_cta_banner`. Page
-  templates gain slot-level `blueprintRef` composition in the same wave.
-- **`theme`** (`thm_*`) — a preset for `site.brandTokens`
-  (`{name, description?, tokens: brandTokensSchema}`); `site_apply_theme`
-  computes one exact-replace `set_site_fields` op (stale keys unset) under the
-  caller's site checkout. NOT taxonomy — nothing resolves against a theme; the
-  site never live-inherits from it. Planned seed: `thm_drlurie_default`
-  (byte-identical to production tokens).
+| Object                  | Type               | Status       | Notes                                                                                                                                  |
+| ----------------------- | ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `stpl_hero_landing`     | `section_template` | 🔵 RELEASED  | Landing/campaign hero opener (`hero` blueprint). All 3 ops round-tripped in production; published, released.                           |
+| `stpl_audience_grid`    | `section_template` | 🔵 RELEASED  | Curated text-cell grid — hand-written "who this is for" / feature cells (`content_grid`, `source.kind: cards`).                        |
+| `stpl_related_articles` | `section_template` | 🔵 RELEASED  | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
+| `stpl_newsletter_cta`   | `section_template` | 🔵 RELEASED  | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
+| `stpl_cta_banner`       | `section_template` | 🔵 RELEASED  | Closing CTA banner — the interior-page closer.                                                                                         |
+| `thm_drlurie_default`   | `theme`            | 🔵 RELEASED  | The production palette verbatim (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
 
-Both flip to 🟢 only after the W8.4 credentialed run meets all five playbook
-criteria; update these rows, the conversion-map marks, and state-of-play in
-that same change.
+All six: created in production (`agent_name: w84-conversion-run`) → every
+permitted patch op drilled with exact inverses (stpl:
+`set_section_template_meta` / `update_blueprint_data` / `replace_blueprint`;
+thm: `set_theme_fields`) → validated clean at publish level (incl.
+`blueprint_standalone_renderable`, `theme_token_keys`, `brand_token_values`,
+`recipe_metadata`) → published → released (deploy ready 2026-07-14T16:23Z);
+store === seed === export verified byte-level. The same run backfilled the
+metadata trio onto the 3 live `tpl_*` (Step 0 — now published at content
+revision 20; exports content-identical to the W8.3b pre-materialization) and
+re-proved `object_instantiate_template` dry_run on all three (incl.
+tpl_legal's registry-fallback path). **The conversion gate still open:** the
+application-verb production dry_runs — `object_instantiate_section_template`
+in BOTH modes for EACH of the five `stpl_*` records (per-object conversion,
+the W2.5 precedent), plus `site_apply_theme` dry_run + one real no-op
+default apply — could not run from the converting session — its MCP tool snapshot predates the W8
+deploys and a session snapshot never refreshes. Both verbs are live on the
+server, contract-advertised, and verb-level-tested in the merged suite, but
+per the playbook they must be PROVEN in production before these rows turn
+🟢 CONVERTED and the count moves 41 → 47. The proofs are the first act of
+the next session. `tpl_fieldtest` (fieldtest family) still lacks the trio —
+patching it 422s until backfilled or retired.
 
 **Recipe self-description + reuse-first (W8.3b, 2026-07-14).** Every recipe
 (template / section_template / theme) must carry `description`, `whenToUse`,
@@ -474,7 +507,8 @@ exist in the production registry — the seed now carries
 local rehearsals can't catch this class). Note: unpublish is still
 unsupported (OQ-2) — the demo stays live until edited.
 
-**Corpus CONVERTED + LIVE (2026-07-13, credentialed run):** after the legacy
+**Corpus LIVE (2026-07-13, credentialed run; not in the converted-object
+ledger):** after the legacy
 wipe (all 83 `src/data/post/*.md` deleted — the `post` collection is now
 permanently empty), a **ten-article corpus** was seeded
 (`scripts/lib/articles-corpus-seed-data.mjs`, two per registry category) and
