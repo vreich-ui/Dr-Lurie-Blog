@@ -45,6 +45,7 @@ export type HeaderMenuLink = {
   href?: string;
   description?: string;
   links?: HeaderMenuLink[];
+  adminOnly?: boolean;
 };
 
 export type HeaderAction = {
@@ -116,6 +117,8 @@ const headerItem = (item: NavItem, resolve: NavTargetResolver): HeaderMenuLink =
   ...(item.children && item.children.length > 0
     ? { links: item.children.map((child) => headerItem(child, resolve)) }
     : {}),
+  // M-9: carried only when set, so navs without adminOnly stay byte-identical.
+  ...(item.adminOnly ? { adminOnly: true } : {}),
 });
 
 export const navigationToHeaderProps = (body: NavigationBody, resolve: NavTargetResolver): HeaderNavProps => ({
@@ -127,6 +130,8 @@ export const navigationToHeaderProps = (body: NavigationBody, resolve: NavTarget
       // dropdowns) href the literal carries. Data preserved, behavior not.
       ...(group.target !== undefined ? { href: resolve(group.target) } : {}),
       ...(group.items.length > 0 ? { links: group.items.map((item) => headerItem(item, resolve)) } : {}),
+      // M-9: group-level admin gate (carried only when set → byte-identical otherwise).
+      ...(group.adminOnly ? { adminOnly: true } : {}),
     })),
   actions: (body.actions ?? []).map((action) => ({
     text: action.label,

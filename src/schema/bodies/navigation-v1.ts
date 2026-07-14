@@ -72,6 +72,7 @@ export type NavItem = {
   children?: NavItem[];
   icon?: string;
   ariaLabel?: string;
+  adminOnly?: boolean;
 };
 
 export const navItemSchema: z.ZodType<NavItem> = z.lazy(() =>
@@ -84,6 +85,11 @@ export const navItemSchema: z.ZodType<NavItem> = z.lazy(() =>
       children: z.array(navItemSchema).optional(), // dropdown groups (A§2.2); depth cap is T0.7
       icon: z.string().optional(), // M-7: icon-set name (e.g. 'tabler:rss')
       ariaLabel: z.string().optional(), // M-7: social links carry both today (navigation.ts:104)
+      // M-9 (2026-07-14): item is revealed client-side only when the visitor is
+      // a signed-in admin (Header renders it with `data-admin-only hidden`; the
+      // header-auth script toggles it on the admin-auth-state check). Data only —
+      // NOT a security boundary; admin routes enforce auth server-side.
+      adminOnly: z.boolean().optional(),
     })
     .strict()
 );
@@ -95,6 +101,9 @@ export const navGroupSchema = z
     slot: z.enum(['primary', 'secondary', 'social']).optional(), // M-2: footer row placement
     target: navTargetSchema.optional(), // M-5: stored, deliberately unrendered (C§1.2)
     items: z.array(navItemSchema),
+    // M-9 (2026-07-14): the whole group (a top-level header dropdown) is
+    // admin-only — same client-reveal contract as NavItem.adminOnly.
+    adminOnly: z.boolean().optional(),
   })
   .strict();
 export type NavGroup = z.infer<typeof navGroupSchema>;
