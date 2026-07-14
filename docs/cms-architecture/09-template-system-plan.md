@@ -1,19 +1,21 @@
 # 09 — Template System Plan (W8): the recipe family — section templates, page-template composition, theme presets
 
-> **Status (2026-07-14, end of day): CONVERTED.** Designed, built
-> (W8.1–W8.3b, PRs #437/#439/#440/#442), and run (W8.4 credentialed run via
-> the session MCP connection, same day) on branch
+> **Status (2026-07-14, end of day): RELEASED — not yet converted.**
+> Designed, built (W8.1–W8.3b, PRs #437/#439/#440/#442), and run (W8.4
+> credentialed run via the session MCP connection, same day) on branch
 > `claude/template-architecture-design-dem5xb`. Wolf's four decisions in §0
 > were GOVERNING throughout. All 9 recipe objects (3 tpl backfilled + 5 stpl
 > + 1 thm created) are store-backed, fully round-tripped on their patch
 > surface, published, and released (deploy ready 2026-07-14T16:23Z);
-> store === seed === export verified. One outstanding proof item: the
-> application-verb production dry_runs (`object_instantiate_section_template`
-> both modes; `site_apply_theme` dry_run + one real no-op default apply) —
-> the converting session's MCP tool snapshot predated the W8 deploys and
-> could not be refreshed; both verbs are live, contract-advertised, and
-> verb-level-tested. They run first thing next session. Composite sections
-> (§8) remain SPEC-ONLY behind OQ-W8-1…4.
+> store === seed === export verified. **The open conversion gate** (playbook
+> criterion 3; the W2.5 precedent proved `instantiate` in production before
+> flipping): the application-verb production dry_runs
+> (`object_instantiate_section_template` both modes; `site_apply_theme`
+> dry_run + one real no-op default apply) — the converting session's MCP
+> tool snapshot predated the W8 deploys and could not be refreshed; both
+> verbs are live, contract-advertised, and verb-level-tested. They run FIRST
+> thing next session; on green, flip inventory/map/CLAUDE.md to CONVERTED
+> (41 → 47). Composite sections (§8) remain SPEC-ONLY behind OQ-W8-1…4.
 
 ## 0. Mandate and decisions (Wolf, 2026-07-14 — GOVERNING for W8)
 
@@ -464,7 +466,7 @@ form. Direction, so W8 keeps the door open by construction:
 | **W8.2** | `object_instantiate_section_template` (both modes, dry_run) + `blueprintRef` composition + `checkTemplate` additions                 | W8.1                  | normal         | Suite + local lifecycle drill + build-diff EMPTY                      |
 | **W8.3** | `theme` type end-to-end + token key registry + CustomStyles refactor (byte-identical) + value safety (theme AND site) + `site_apply_theme` + default seed | — (parallel-safe)     | normal         | Suite + build-diff EMPTY + local apply drill (apply → vars change → inverse restores) |
 | **W8.3b** | Recipe metadata (description/whenToUse/scope, publish-gated) uniform across the recipe family + creation-policy seam (committed config, default open) + reuse-first surfacing (inventory recipe summaries, REUSE-FIRST contract lines, section-type `useWhen` ×19) + metadata-complete seeds + committed tpl-export pre-materialization + reconcile support | W8.1–W8.3            | normal         | Suite + `npm run check` + build-diff EMPTY                            |
-| **W8.4** | ✅ RUN 2026-07-14 (Wolf's go, session MCP connection): Step-0 tpl backfill + 6 creations + full drills + publishes + release; docs flipped. Outstanding: application-verb production dry_runs (frozen tool-snapshot blocker) — first act of next session | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
+| **W8.4** | 🔵 RUN 2026-07-14 (Wolf's go, session MCP connection): Step-0 tpl backfill + 6 creations + full drills + publishes + release — RELEASED. NOT yet converted: the application-verb production dry_runs (frozen tool-snapshot blocker) are the open gate; first act of next session, then docs flip 🟢 | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
 
 ### W8.1 brief — `section_template` + the leaf fix
 

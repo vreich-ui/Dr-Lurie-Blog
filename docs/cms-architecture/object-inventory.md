@@ -86,7 +86,8 @@ hand-coded-page backlog is empty for good.
 
 Nine object types exist, and **all nine are governed** (edited through the
 generic object verbs and the approval policy) since W7.3 (2026-07-13) brought
-`content_item` into the model. W8 added the last two (CONVERTED 2026-07-14 —
+`content_item` into the model. W8 added the last two (RELEASED 2026-07-14,
+conversion completes on the application-verb production proofs —
 [`09-template-system-plan.md`](09-template-system-plan.md)): `section_template`
 and `theme`, the section- and site-level members of the recipe family; see
 "Recipe family (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
@@ -268,22 +269,24 @@ released; metadata trio backfilled + fully re-drilled by the W8.4 run
 | `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                                |
 | `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.               |
 
-### Recipe family (W8) — CONVERTED 2026-07-14 🟢
+### Recipe family (W8) — RELEASED 2026-07-14 🔵 (conversion completes on the verb proofs)
 
-Designed, built (W8.1–W8.3b), and converted the same wave
-([`09-template-system-plan.md`](09-template-system-plan.md)); W8.4 credentialed
-run 2026-07-14 via the session MCP connection. Two object types complete rule
-5's recipe family (data, many, agent-editable; applied by COPY at
-instantiation; never live-bound):
+Designed, built (W8.1–W8.3b), and run (W8.4 credentialed run 2026-07-14 via
+the session MCP connection) the same wave
+([`09-template-system-plan.md`](09-template-system-plan.md)). Two object types
+complete rule 5's recipe family (data, many, agent-editable; applied by COPY
+at instantiation; never live-bound). **Status is RELEASED, not converted**:
+criterion 3 (every permitted action proven in production, the W2.5 precedent)
+still awaits the application-verb dry_runs — do NOT skip them:
 
 | Object                  | Type               | Status       | Notes                                                                                                                                  |
 | ----------------------- | ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `stpl_hero_landing`     | `section_template` | 🟢 CONVERTED | Landing/campaign hero opener (`hero` blueprint). All 3 ops round-tripped in production; published, released.                           |
-| `stpl_audience_grid`    | `section_template` | 🟢 CONVERTED | Curated text-cell grid — hand-written "who this is for" / feature cells (`content_grid`, `source.kind: cards`).                        |
-| `stpl_related_articles` | `section_template` | 🟢 CONVERTED | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
-| `stpl_newsletter_cta`   | `section_template` | 🟢 CONVERTED | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
-| `stpl_cta_banner`       | `section_template` | 🟢 CONVERTED | Closing CTA banner — the interior-page closer.                                                                                         |
-| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The production palette verbatim (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
+| `stpl_hero_landing`     | `section_template` | 🔵 RELEASED  | Landing/campaign hero opener (`hero` blueprint). All 3 ops round-tripped in production; published, released.                           |
+| `stpl_audience_grid`    | `section_template` | 🔵 RELEASED  | Curated text-cell grid — hand-written "who this is for" / feature cells (`content_grid`, `source.kind: cards`).                        |
+| `stpl_related_articles` | `section_template` | 🔵 RELEASED  | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
+| `stpl_newsletter_cta`   | `section_template` | 🔵 RELEASED  | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
+| `stpl_cta_banner`       | `section_template` | 🔵 RELEASED  | Closing CTA banner — the interior-page closer.                                                                                         |
+| `thm_drlurie_default`   | `theme`            | 🔵 RELEASED  | The production palette verbatim (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
 
 All six: created in production (`agent_name: w84-conversion-run`) → every
 permitted patch op drilled with exact inverses (stpl:
@@ -295,15 +298,16 @@ store === seed === export verified byte-level. The same run backfilled the
 metadata trio onto the 3 live `tpl_*` (Step 0 — now published at content
 revision 20; exports content-identical to the W8.3b pre-materialization) and
 re-proved `object_instantiate_template` dry_run on all three (incl.
-tpl_legal's registry-fallback path). **One outstanding proof item:** the
+tpl_legal's registry-fallback path). **The conversion gate still open:** the
 application-verb production dry_runs (`object_instantiate_section_template`
 both modes; `site_apply_theme` dry_run + one real no-op default apply) could
 not run from the converting session — its MCP tool snapshot predates the W8
 deploys and a session snapshot never refreshes. Both verbs are live on the
-server, contract-advertised, and verb-level-tested in the merged suite; the
-production dry_runs are the first act of the next session. `tpl_fieldtest`
-(fieldtest family) still lacks the trio — patching it 422s until backfilled
-or retired.
+server, contract-advertised, and verb-level-tested in the merged suite, but
+per the playbook they must be PROVEN in production before these rows turn
+🟢 CONVERTED and the count moves 41 → 47. The proofs are the first act of
+the next session. `tpl_fieldtest` (fieldtest family) still lacks the trio —
+patching it 422s until backfilled or retired.
 
 **Recipe self-description + reuse-first (W8.3b, 2026-07-14).** Every recipe
 (template / section_template / theme) must carry `description`, `whenToUse`,
