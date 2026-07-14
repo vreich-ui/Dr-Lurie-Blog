@@ -86,10 +86,10 @@ hand-coded-page backlog is empty for good.
 
 Nine object types exist, and **all nine are governed** (edited through the
 generic object verbs and the approval policy) since W7.3 (2026-07-13) brought
-`content_item` into the model. Two more are PLANNED (W8 —
+`content_item` into the model. W8 added the last two (CONVERTED 2026-07-14 —
 [`09-template-system-plan.md`](09-template-system-plan.md)): `section_template`
 and `theme`, the section- and site-level members of the recipe family; see
-"Planned (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
+"Recipe family (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
 stay on the older article pipeline untouched — Wolf's ruling: not worth
 migrating; new articles are objects. **Boundaries below are the human summary —
 the machine-checked, always-current version is `object_contract('<type>')`.**
@@ -258,7 +258,9 @@ MCP tool creates a new page from a recipe through the standard create validation
 (`dry_run: true` previews without persisting); a required slot without a
 blueprint instantiates from the registry defaultData of its first allowed type.
 Three starter recipes are store-backed in production (batched run 2026-07-11 —
-all 4 template ops round-tripped + instantiate `dry_run` proven, published, released):
+all 4 template ops round-tripped + instantiate `dry_run` proven, published,
+released; metadata trio backfilled + fully re-drilled by the W8.4 run
+2026-07-14, published at content revision 20):
 
 | Object         | appliesTo  | Status       | Notes                                                                                                                                        |
 | -------------- | ---------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -266,30 +268,42 @@ all 4 template ops round-tripped + instantiate `dry_run` proven, published, rele
 | `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                                |
 | `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.               |
 
-### Planned (W8) — the rest of the recipe family 🔴 TODO
+### Recipe family (W8) — CONVERTED 2026-07-14 🟢
 
-Designed 2026-07-14 ([`09-template-system-plan.md`](09-template-system-plan.md));
-nothing built, nothing store-backed yet. Two new object types complete rule 5's
-recipe family (data, many, agent-editable; applied by COPY at instantiation;
-never live-bound):
+Designed, built (W8.1–W8.3b), and converted the same wave
+([`09-template-system-plan.md`](09-template-system-plan.md)); W8.4 credentialed
+run 2026-07-14 via the session MCP connection. Two object types complete rule
+5's recipe family (data, many, agent-editable; applied by COPY at
+instantiation; never live-bound):
 
-- **`section_template`** (`stpl_*`) — a named, pre-configured section blueprint
-  (`{name, description?, blueprint: sectionInstance}`) an agent stamps into any
-  page (one `upsert_section` under the caller's lock) or mints as a standalone
-  shared `sec_*` object, via `object_instantiate_section_template` (dry_run
-  both modes). Planned seeds: `stpl_hero_landing`, `stpl_audience_grid`,
-  `stpl_related_articles`, `stpl_newsletter_cta`, `stpl_cta_banner`. Page
-  templates gain slot-level `blueprintRef` composition in the same wave.
-- **`theme`** (`thm_*`) — a preset for `site.brandTokens`
-  (`{name, description?, tokens: brandTokensSchema}`); `site_apply_theme`
-  computes one exact-replace `set_site_fields` op (stale keys unset) under the
-  caller's site checkout. NOT taxonomy — nothing resolves against a theme; the
-  site never live-inherits from it. Planned seed: `thm_drlurie_default`
-  (byte-identical to production tokens).
+| Object                  | Type               | Status       | Notes                                                                                                                                  |
+| ----------------------- | ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `stpl_hero_landing`     | `section_template` | 🟢 CONVERTED | Landing/campaign hero opener (`hero` blueprint). All 3 ops round-tripped in production; published, released.                           |
+| `stpl_audience_grid`    | `section_template` | 🟢 CONVERTED | Curated text-cell grid — hand-written "who this is for" / feature cells (`content_grid`, `source.kind: cards`).                        |
+| `stpl_related_articles` | `section_template` | 🟢 CONVERTED | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
+| `stpl_newsletter_cta`   | `section_template` | 🟢 CONVERTED | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
+| `stpl_cta_banner`       | `section_template` | 🟢 CONVERTED | Closing CTA banner — the interior-page closer.                                                                                         |
+| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The production palette verbatim (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
 
-Both flip to 🟢 only after the W8.4 credentialed run meets all five playbook
-criteria; update these rows, the conversion-map marks, and state-of-play in
-that same change.
+All six: created in production (`agent_name: w84-conversion-run`) → every
+permitted patch op drilled with exact inverses (stpl:
+`set_section_template_meta` / `update_blueprint_data` / `replace_blueprint`;
+thm: `set_theme_fields`) → validated clean at publish level (incl.
+`blueprint_standalone_renderable`, `theme_token_keys`, `brand_token_values`,
+`recipe_metadata`) → published → released (deploy ready 2026-07-14T16:23Z);
+store === seed === export verified byte-level. The same run backfilled the
+metadata trio onto the 3 live `tpl_*` (Step 0 — now published at content
+revision 20; exports content-identical to the W8.3b pre-materialization) and
+re-proved `object_instantiate_template` dry_run on all three (incl.
+tpl_legal's registry-fallback path). **One outstanding proof item:** the
+application-verb production dry_runs (`object_instantiate_section_template`
+both modes; `site_apply_theme` dry_run + one real no-op default apply) could
+not run from the converting session — its MCP tool snapshot predates the W8
+deploys and a session snapshot never refreshes. Both verbs are live on the
+server, contract-advertised, and verb-level-tested in the merged suite; the
+production dry_runs are the first act of the next session. `tpl_fieldtest`
+(fieldtest family) still lacks the trio — patching it 422s until backfilled
+or retired.
 
 **Recipe self-description + reuse-first (W8.3b, 2026-07-14).** Every recipe
 (template / section_template / theme) must carry `description`, `whenToUse`,

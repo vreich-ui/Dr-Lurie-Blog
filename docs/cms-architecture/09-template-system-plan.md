@@ -1,11 +1,19 @@
 # 09 — Template System Plan (W8): the recipe family — section templates, page-template composition, theme presets
 
-> **Status (2026-07-14): PLANNED — docs only, nothing built, nothing
-> converted.** Designed on branch `claude/template-architecture-design-dem5xb`
-> from Wolf's 2026-07-14 direction (§0). Wolf's four decisions in §0 are
-> GOVERNING for W8. Build happens in later sessions from the §9 briefs; the
-> two new object types flip to CONVERTED only after the W8.4 credentialed run
-> meets every playbook criterion.
+> **Status (2026-07-14, end of day): CONVERTED.** Designed, built
+> (W8.1–W8.3b, PRs #437/#439/#440/#442), and run (W8.4 credentialed run via
+> the session MCP connection, same day) on branch
+> `claude/template-architecture-design-dem5xb`. Wolf's four decisions in §0
+> were GOVERNING throughout. All 9 recipe objects (3 tpl backfilled + 5 stpl
+> + 1 thm created) are store-backed, fully round-tripped on their patch
+> surface, published, and released (deploy ready 2026-07-14T16:23Z);
+> store === seed === export verified. One outstanding proof item: the
+> application-verb production dry_runs (`object_instantiate_section_template`
+> both modes; `site_apply_theme` dry_run + one real no-op default apply) —
+> the converting session's MCP tool snapshot predated the W8 deploys and
+> could not be refreshed; both verbs are live, contract-advertised, and
+> verb-level-tested. They run first thing next session. Composite sections
+> (§8) remain SPEC-ONLY behind OQ-W8-1…4.
 
 ## 0. Mandate and decisions (Wolf, 2026-07-14 — GOVERNING for W8)
 
@@ -456,7 +464,7 @@ form. Direction, so W8 keeps the door open by construction:
 | **W8.2** | `object_instantiate_section_template` (both modes, dry_run) + `blueprintRef` composition + `checkTemplate` additions                 | W8.1                  | normal         | Suite + local lifecycle drill + build-diff EMPTY                      |
 | **W8.3** | `theme` type end-to-end + token key registry + CustomStyles refactor (byte-identical) + value safety (theme AND site) + `site_apply_theme` + default seed | — (parallel-safe)     | normal         | Suite + build-diff EMPTY + local apply drill (apply → vars change → inverse restores) |
 | **W8.3b** | Recipe metadata (description/whenToUse/scope, publish-gated) uniform across the recipe family + creation-policy seam (committed config, default open) + reuse-first surfacing (inventory recipe summaries, REUSE-FIRST contract lines, section-type `useWhen` ×19) + metadata-complete seeds + committed tpl-export pre-materialization + reconcile support | W8.1–W8.3            | normal         | Suite + `npm run check` + build-diff EMPTY                            |
-| **W8.4** | Credentialed conversion run for both types + records (now incl. the tpl metadata backfill, Step 0); docs flip to CONVERTED; W8 exit  | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
+| **W8.4** | ✅ RUN 2026-07-14 (Wolf's go, session MCP connection): Step-0 tpl backfill + 6 creations + full drills + publishes + release; docs flipped. Outstanding: application-verb production dry_runs (frozen tool-snapshot blocker) — first act of next session | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
 
 ### W8.1 brief — `section_template` + the leaf fix
 
@@ -552,10 +560,12 @@ form. Direction, so W8 keeps the door open by construction:
     publish level; blobs-are-truth is restored the moment W8.4 runs.
     `roundtrip-reconcile` gained the metadata keys in `TEMPLATE_META_KEYS`
     plus the previously missing `section_template`/`theme` branches.
-- **Interim caveat:** the 3 live tpl\_\* records are *published*, so until
-  the W8.4 backfill, any patch to one whose applied body still lacks the trio
-  is a 422 (`recipe_metadata` blocks on published records) — the backfill
-  patch itself passes because validation runs on the applied body.
+- **Interim caveat (RESOLVED by the W8.4 run 2026-07-14):** the 3 live
+  tpl\_\* records were *published* trio-less, so any patch whose applied body
+  still lacked the trio 422'd (`recipe_metadata` blocks on published
+  records) — the Step-0 backfill patch passed because validation runs on the
+  applied body. The caveat now applies only to `tpl_fieldtest` (fieldtest
+  family, deliberately not backfilled).
 - **Gate:** suite + `npm run check` + build-diff EMPTY (recipes render
   nothing; the export metadata feeds no rendered surface).
 

@@ -25,9 +25,10 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-13: **forty-one objects are converted** (the 37 below
+- Reality as of 2026-07-14: **forty-seven objects are converted** (the 37 below
   + the 3 W5 pages, credentialed run 2026-07-13 + the FIRST ARTICLE OBJECT,
-  W7.9 run 2026-07-13) — the 3 nav
+  W7.9 run 2026-07-13 + the 5 SECTION TEMPLATES and the DEFAULT THEME,
+  W8.4 run 2026-07-14) — the 3 nav
   objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
   page_contact + page_thank_you), the 12 shared sections under home/about, the
   3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
@@ -108,6 +109,32 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   (re-point internal surfaces; reduced — no aliases), W7.7 (admin editor +
   annotation panel + document-body canvas editing), OQ-W7-3 (strategy
   registry go/no-go).
+  **W8 CONVERTED (2026-07-14: W8.1–W8.3b built + merged; W8.4 credentialed
+  run same day via the session MCP connection)**: the RECIPE FAMILY —
+  `section_template` (tenth governed type; stpl_hero_landing /
+  stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
+  stpl_cta_banner) and `theme` (eleventh; thm_drlurie_default, the
+  production palette verbatim — applying it is a no-op) — plus
+  `object_instantiate_section_template` (stamp a section from a recipe,
+  standalone or page mode), `site_apply_theme` (exact-replace token apply
+  with stale-key nulls), template `blueprintRef` composition, CSS-token
+  injection safety on theme AND site, and W8.3b's recipe metadata
+  (description/whenToUse/scope REQUIRED TO PUBLISH), creation-policy seam
+  (committed config; default open; humans always), and reuse-first
+  surfacing (inventory recipe summaries + REUSE-FIRST contract workflow +
+  editor.useWhen ×19). Step 0 backfilled the trio onto the 3 live tpl_*
+  (published rev 20; exports content-identical to the W8.3b
+  pre-materialization). All 9 objects: created/reconciled → every
+  permitted patch op drilled with exact inverses → published → released
+  (deploy ready 2026-07-14T16:23Z); store === seed === export verified.
+  ONE OUTSTANDING PROOF ITEM: the application-verb production dry_runs
+  (instantiate_section both modes; apply_theme dry_run + one real no-op
+  default apply) — blocked ONLY by this session's frozen MCP tool
+  snapshot (the tools deployed mid-session; a session's connector
+  snapshot never refreshes); they are verb-level-tested in the merged
+  suite and are the FIRST ACT of the next session. tpl_fieldtest (the
+  2026-07-08 fieldtest leftover) still lacks the metadata trio — patching
+  it 422s until backfilled or retired.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 

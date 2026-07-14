@@ -235,28 +235,33 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │       round-tripped + instantiate dry_run per recipe) · published · released 2026-07-11
 │     boundary: recipes only — creation-time copy, never live-binding; PageType registry
 │       stays the enforced law; behavior stays in generic components
-│     ⚪ W8 (PLANNED — 09-template-system-plan.md §4): slots gain optional `blueprintRef`
+│     🟢 W8.2 (SHIPPED): slots gain optional `blueprintRef`
 │       → a section_template, dereferenced + deep-copied at instantiation only
 │
-├── ⚪ SECTION TEMPLATES ─ type: section_template ─ PLANNED (W8.1–W8.2 —
+├── 🟢 SECTION TEMPLATES ─ type: section_template ─ CONVERTED (W8.4 run 2026-07-14 —
 │     [`09-template-system-plan.md`](09-template-system-plan.md) §2–§3): the section-level
-│     recipe — {name · description? · blueprint: ONE pre-configured sectionInstance};
-│     ops set_section_template_meta · replace_blueprint · update_blueprint_data;
+│     recipe — {name · description · whenToUse · scope · blueprint: ONE pre-configured
+│     sectionInstance}; ops set_section_template_meta · replace_blueprint ·
+│     update_blueprint_data (all round-tripped in production);
 │     `object_instantiate_section_template` stamps the blueprint into a page (one
 │     upsert_section under the caller's lock) or mints a standalone sec_* object;
-│     blueprint must be a standalone-placeable type (no card leaf, no shared_ref)
-│   ├── ⚪ stpl_hero_landing ─ hero (the page_home s_hero shape)
-│   ├── ⚪ stpl_audience_grid ─ content_grid `cards` (the sec_home_audience_grid shape)
-│   ├── ⚪ stpl_related_articles ─ content_grid `related`/tag_similarity (the page_article shape)
-│   ├── ⚪ stpl_newsletter_cta ─ newsletter_signup (the sec_newsletter_signup shape)
-│   └── ⚪ stpl_cta_banner ─ cta_banner (the W1/about closing-CTA shape)
+│     blueprint must be a standalone-placeable type (no card leaf, no shared_ref);
+│     production dry_run proof of the stamp verb (both modes): next session (frozen
+│     tool-snapshot blocker; verb live + contract-advertised + suite-tested)
+│   ├── 🟢 stpl_hero_landing ─ hero (the page_home s_hero shape)
+│   ├── 🟢 stpl_audience_grid ─ content_grid `cards` (the sec_home_audience_grid shape)
+│   ├── 🟢 stpl_related_articles ─ content_grid `related`/tag_similarity (the page_article shape)
+│   ├── 🟢 stpl_newsletter_cta ─ newsletter_signup (the sec_newsletter_signup shape)
+│   └── 🟢 stpl_cta_banner ─ cta_banner (the W1/about closing-CTA shape)
 │
-├── ⚪ THEMES ─ type: theme ─ PLANNED (W8.3 — [`09-template-system-plan.md`](09-template-system-plan.md)
-│     §6): preset for site.brandTokens — {name · description? · tokens: brandTokensSchema};
-│     op set_theme_fields; `site_apply_theme` computes ONE exact-replace set_site_fields op
-│     (stale keys unset) under the caller's site checkout. NOT taxonomy: nothing resolves
-│     against a theme; the site never live-inherits — apply copies values.
-│   └── ⚪ thm_drlurie_default ─ tokens imported from site-seed (byte-identical to production)
+├── 🟢 THEMES ─ type: theme ─ CONVERTED (W8.4 run 2026-07-14 —
+│     [`09-template-system-plan.md`](09-template-system-plan.md) §6): preset for
+│     site.brandTokens — {name · description · whenToUse · scope · tokens};
+│     op set_theme_fields (round-tripped in production); `site_apply_theme` computes ONE
+│     exact-replace set_site_fields op (stale keys unset) under the caller's site checkout.
+│     NOT taxonomy: nothing resolves against a theme; the site never live-inherits — apply
+│     copies values. Production dry_run + real no-op default apply: next session (same blocker).
+│   └── 🟢 thm_drlurie_default ─ tokens imported from site-seed (byte-identical to production)
 │
 ├── MEDIA / ARTIFACTS ─ artifact store (images, PDFs) ─ 🔵 pipeline exists (upload/trust);
 │     refs consumed by: bio.portraitAssetRef · about.portrait · product cards · article images
@@ -296,7 +301,7 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 | W5         | RE-GROUNDED in the shop module (2026-07-12 — see [`06-shop-module-plan.md`](06-shop-module-plan.md)): /pricing renders pricing_table tiers FROM product objects; shop-preview → content_split; /services + product content use MOCKUP data (Wolf, 2026-07-12 — supersedes the copy-or-delete wait). The ⚪ types mint after S1–S3 of the shop build. **S1+S2+S3 DONE 2026-07-12 (the full §9 critical path)**: `product` is the eighth object type (S1a), commerce/event stores + checkout→webhook→token delivery live (S1b/c, PRs #411–#413), /shop + /shop/[slug] render from 3 MOCK products + page_shop (first catch-all-served page) + page_product_detail. **W5 pages CONVERTED (credentialed run 2026-07-13)**: pricing_table/steps/content_split minted; /pricing, /services, /solutions/shop-preview are store-backed + published + released page objects, route files deleted; `commerce_orders` admin tool live. The 3 MOCK products stay at approval_required (review-required gate) — Wolf approves in /admin/objects to flip them too | New reusable section types (pricing_table, steps, content_split) — DONE 2026-07-12       | M-L  |
 | W6         | ✅ CONVERTED (credentialed run 2026-07-12): listing/content_detail PageTypes defined; 6 page objects (library, topics ×2, category, tag, article) store-backed, round-tripped, published, released — byte-identical cutover held | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
 | W7         | PLANNED (2026-07-12 — see [`08-articles-plan.md`](08-articles-plan.md); Wolf resolved OQ-8: **one-time migration**, adapter retired): `content_item` becomes the ninth object type (keeps `req_*` ids; artifact trust unchanged); node envelope (strategy/intent/commercial — the DTC semantic layer, preserved by directive) stays the spine, `public.body` upgrades to `rich_text.v1` (Contentful model, substrate built in-wave incl. section bodies); one renderer for build/admin/canvas; `create_variant` + scores as the A/B substrate; ~31 tool names become aliases over object verbs; per-article cutover + DOM-equivalence harness over the 83 posts; canvas-for-articles as the final phase. Phases W7.1–W7.9, each its own session. | Wolf's 2026-07-12 rulings supersede "post-MVP"; the §3.10 freeze lifts only inside approved phases | XL   |
-| W8         | PLANNED (2026-07-14 — see [`09-template-system-plan.md`](09-template-system-plan.md); Wolf's four decisions §0): the **recipe family** completes rule 5 — `section_template` (tenth object type: named section blueprints agents stamp into any page or as standalone `sec_*` objects, via `object_instantiate_section_template`) + page-template `blueprintRef` composition + `theme` (eleventh type: brandToken presets applied by `site_apply_theme`, exact-replace semantics) + design-principles rule 6 (layout = bounded data fields, never CSS). Folds in the leaf-section validation fix (Session-K `card` gap) and token value safety on `site`. Composable "composite" sections are SPEC-ONLY, gated on OQ-W8-1…4. Phases W8.1–W8.4, each its own session; W8.4 is the credentialed run | Completes the recipe side of rule 5; makes new sections + re-skins zero-code agent actions | M-L  |
+| W8         | CONVERTED (built W8.1–W8.3b + W8.4 credentialed run, all 2026-07-14 — see [`09-template-system-plan.md`](09-template-system-plan.md)): the **recipe family** completes rule 5 — `section_template` (tenth object type: 5 starter recipes live) + page-template `blueprintRef` composition + `theme` (eleventh type: `thm_drlurie_default` live; applied by `site_apply_theme`, exact-replace semantics) + rule 6 (layout = bounded data fields, never CSS) + W8.3b recipe metadata / creation-policy seam / reuse-first surfacing. Leaf-section fix + token value safety on `site` folded in. Outstanding: application-verb production dry_runs (next session — frozen tool-snapshot blocker). Composable "composite" sections remain SPEC-ONLY, gated on OQ-W8-1…4 | Completes the recipe side of rule 5; makes new sections + re-skins zero-code agent actions | M-L  |
 | any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted                                                                         | Independent, non-blocking                                                            | S    |
 
 **Keep this file current:** whenever an object converts, flip its mark here AND
