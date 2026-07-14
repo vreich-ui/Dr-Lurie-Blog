@@ -7,6 +7,55 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-14 A (W8 PLANNED: template-system expansion — section templates, page-template composition, theme presets; docs only, no code, nothing converted)
+
+Wolf asked where templates stand and mandated "at least two types of
+templates: page template and section template," with the division of labor
+"the code dictates what functionality, options exist and what amount …
+template decides object position within section. CSS stuff stays with site."
+Recon confirmed page templates already exist and are CONVERTED-but-dormant
+(W2.5, zero instantiations) and every section is already uniform JSON through
+one registry — the gaps were section-level recipes and any recipe treatment
+for site CSS tokens. Wolf's four decisions (recorded in 09 §0): section
+templates STAGED (recipes over the existing coded types now; composable
+"composite" sections SPEC-ONLY, gated on OQ-W8-1…4); deliverable = plan doc +
+per-phase briefs; theme presets IN scope (settled: theming is NOT taxonomy —
+it's a recipe); push the design branch, no PR.
+
+- **[`09-template-system-plan.md`](../09-template-system-plan.md) written**
+  (the 06/08 convention: one plan doc, embedded W8.1–W8.4 briefs). The
+  architecture: the **recipe family** completes design-principles rule 5 —
+  `template → page` (exists), `section_template → section` (NEW, tenth type:
+  `{name, description?, blueprint: sectionInstance}`, 3 ops with inverses,
+  `object_instantiate_section_template` stamping into a page under the
+  caller's lock or minting a standalone `sec_*`; 5 planned seeds), `theme →
+  site.brandTokens` (NEW, eleventh type: `set_theme_fields` +
+  `site_apply_theme` computing ONE exact-replace `set_site_fields` op with
+  stale-key unsets). Page templates gain slot-level `blueprintRef` →
+  section_template (deref + deep-copy at instantiation only). Provenance
+  decisions recorded: no schema-level provenance on section instances and no
+  `site.theme` field — history carries attribution.
+- **Design-principles rule 6 added (GOVERNING)**: layout is bounded data,
+  never free-form style — components expose enumerated layout fields, agents
+  select values, no CSS/class names in schema ever. Rule 5 extended to the
+  recipe family.
+- **Two live gaps scheduled into the wave**: the Session-K standalone-`card`
+  validation gap (fix in W8.1 via the new shared
+  `isStandalonePlaceableSectionType` helper, also used for stpl blueprints)
+  and a NEW finding — brand-token values flow **unvalidated** from
+  `set_site_fields` into CustomStyles' inline `<style>` (value-safety grammar
+  closes it for both `site` and `theme` in W8.3, alongside a byte-identical
+  CustomStyles refactor onto a shared `theme-tokens.ts` key registry).
+- **Docs updated in the same change**: conversion-map (⚪ SECTION TEMPLATES +
+  ⚪ THEMES nodes, W8 wave row), object-inventory ("Planned (W8)" block —
+  🔴 TODO, nothing overstated), 05-task-breakdown addendum (OQ-4 stays
+  rejected; T6.2 editor leftover descoped; W8 OQs live wave-locally in 09),
+  design-principles (rule 6 + rule-5 extension).
+- **Nothing built, nothing converted**: no code, no store writes, no schema
+  changes. The converted count stays 41. W8.1–W8.3 are normal build sessions;
+  W8.4 is the human-gated credentialed run — both new types flip to CONVERTED
+  only when all five playbook criteria hold there.
+
 ## Session 2026-07-13 K (CREDENTIALED CORPUS RUN: the ten-article content_item corpus is CONVERTED + LIVE; `page_article` gets a related grid; `/object-showcase` QA page built)
 
 Follows Session J (the wipe + seed). Wolf: "Related-grid options do them …

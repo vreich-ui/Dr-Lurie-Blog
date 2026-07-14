@@ -86,7 +86,10 @@ hand-coded-page backlog is empty for good.
 
 Nine object types exist, and **all nine are governed** (edited through the
 generic object verbs and the approval policy) since W7.3 (2026-07-13) brought
-`content_item` into the model. The COMMITTED legacy posts (src/data/post/\*.md)
+`content_item` into the model. Two more are PLANNED (W8 —
+[`09-template-system-plan.md`](09-template-system-plan.md)): `section_template`
+and `theme`, the section- and site-level members of the recipe family; see
+"Planned (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
 stay on the older article pipeline untouched — Wolf's ruling: not worth
 migrating; new articles are objects. **Boundaries below are the human summary —
 the machine-checked, always-current version is `object_contract('<type>')`.**
@@ -262,6 +265,31 @@ all 4 template ops round-tripped + instantiate `dry_run` proven, published, rele
 | `tpl_interior` | `standard` | 🟢 CONVERTED | Lede open + prose body + optional cta close (the W1 interior shape). All 4 template ops + instantiate `dry_run` round-tripped in production. |
 | `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                                |
 | `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.               |
+
+### Planned (W8) — the rest of the recipe family 🔴 TODO
+
+Designed 2026-07-14 ([`09-template-system-plan.md`](09-template-system-plan.md));
+nothing built, nothing store-backed yet. Two new object types complete rule 5's
+recipe family (data, many, agent-editable; applied by COPY at instantiation;
+never live-bound):
+
+- **`section_template`** (`stpl_*`) — a named, pre-configured section blueprint
+  (`{name, description?, blueprint: sectionInstance}`) an agent stamps into any
+  page (one `upsert_section` under the caller's lock) or mints as a standalone
+  shared `sec_*` object, via `object_instantiate_section_template` (dry_run
+  both modes). Planned seeds: `stpl_hero_landing`, `stpl_audience_grid`,
+  `stpl_related_articles`, `stpl_newsletter_cta`, `stpl_cta_banner`. Page
+  templates gain slot-level `blueprintRef` composition in the same wave.
+- **`theme`** (`thm_*`) — a preset for `site.brandTokens`
+  (`{name, description?, tokens: brandTokensSchema}`); `site_apply_theme`
+  computes one exact-replace `set_site_fields` op (stale keys unset) under the
+  caller's site checkout. NOT taxonomy — nothing resolves against a theme; the
+  site never live-inherits from it. Planned seed: `thm_drlurie_default`
+  (byte-identical to production tokens).
+
+Both flip to 🟢 only after the W8.4 credentialed run meets all five playbook
+criteria; update these rows, the conversion-map marks, and state-of-play in
+that same change.
 
 ---
 

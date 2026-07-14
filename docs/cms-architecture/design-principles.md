@@ -81,6 +81,26 @@ The resolution of the flexibility-vs-strict-rules tension for specialty pages �
 - Rejected alternatives, recorded: templates-as-law / live inheritance (the
   propagation trap), and PageType-as-data (guardrails would become
   agent-mutable; revisit only if agents should invent page _kinds_ — OQ-4).
+- **Extension (Wolf, 2026-07-14 — W8):** rule 5 generalizes to the **recipe
+  family** — `template → page`, `section_template → section`, `theme →
+  site.brandTokens` ([`09-template-system-plan.md`](09-template-system-plan.md)).
+  Same contract for all three: data, many, agent-editable, applied by COPY at
+  instantiation, never live-bound; the law stays in code.
+
+### 6. Layout is bounded data, never free-form style (Wolf, 2026-07-14, GOVERNING)
+
+A component exposes layout variation **only as enumerated/bounded data fields**
+in its zod schema (`content_grid.columns` 1–4, `content_split.reverse`),
+rendered through pre-built class mappings. Templates and agents **select**
+values; no schema field ever carries CSS, class names, or arbitrary style
+tokens. New layout options are a code change to one component + its schema
+(the registry pattern), so every expressible option is render-proven and
+canvas-safe. Grown on demand (rule 1), never speculatively. This is the
+code/data boundary in Wolf's words: _"the code dictates what functionality,
+options exist and what amount … template decides object position within
+section. CSS stuff stays with site."_ It also governs any future composite
+section (09 §8): child blocks get bounded arrangement fields, never pixel
+positions.
 
 ## What this means for the current state (2026-07-08)
 
