@@ -129,6 +129,11 @@ const templateObjectCollection = defineCollection({
   schema: derivedExportSchema,
 });
 
+const sectionTemplateObjectCollection = defineCollection({
+  loader: glob({ pattern: '*.json', base: 'src/data/site/section-templates' }),
+  schema: derivedExportSchema,
+});
+
 const productObjectCollection = defineCollection({
   // generateId pins the entry id to the FILENAME (= object id). The glob
   // loader's default prefers a top-level `slug` field when the data has one —
@@ -168,6 +173,7 @@ export const collections = {
   navigationObject: navigationObjectCollection,
   sectionObject: sectionObjectCollection,
   templateObject: templateObjectCollection,
+  sectionTemplateObject: sectionTemplateObjectCollection,
   productObject: productObjectCollection,
   articleObject: articleObjectCollection,
 };

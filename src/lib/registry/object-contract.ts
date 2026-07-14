@@ -56,6 +56,7 @@ import { contentItemBodySchema } from '../../schema/bodies/content-item-v1.js';
 import { pageBodySchema } from '../../schema/bodies/page-v1.js';
 import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
+import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
 import { navigationBodySchema } from '../../schema/bodies/navigation-v1.js';
 import { siteBodySchema } from '../../schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../schema/bodies/taxonomy-v1.js';
@@ -81,6 +82,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   site: siteBodySchema,
   taxonomy: taxonomyBodySchema,
   template: templateBodySchema,
+  section_template: sectionTemplateBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
 };
@@ -163,6 +165,7 @@ const MINTED_ID_FIELD: Partial<Record<PatchOpName, string>> = {
   upsert_group: 'group.id',
   upsert_slot: 'slot.slotId',
   upsert_node: 'node.id',
+  replace_blueprint: 'blueprint.id',
 };
 
 // Ops (or op fields) that exist only for inverse/Discard derivation — agents
@@ -295,6 +298,26 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           enforced_live: true,
           description:
             'template.ref, navigationOverrides.{header,footer}, shared_ref targets and content_grid manual items must resolve to existing (and, for published nav targets, published) objects.',
+        },
+        {
+          id: 'structure_placeable',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'Every inline section must be a component-bound (standalone-placeable) type or a shared_ref pointer. ' +
+            'Leaf-only types (card) compose ONLY inside a content_grid cards source — placed directly they parse ' +
+            'but break the site build (W8, closes the Session-K gap).',
+        },
+      ];
+    case 'section':
+      return [
+        {
+          id: 'structure_placeable',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'A shared section wraps one concrete component-bound instance — never a card leaf (no standalone ' +
+            'component) and never another shared_ref (no reference chains).',
         },
       ];
     case 'navigation':
@@ -475,6 +498,19 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           severity: 'blocks_write',
           enforced_live: true,
           description: 'A slot’s allowed types must be registered components (see section_types.component_bound).',
+        },
+      ];
+    case 'section_template':
+      return [
+        {
+          id: 'blueprint_standalone_renderable',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'The blueprint must be a component-bound section type placeable standalone on a page (see ' +
+            'section_types.component_bound) — never a card leaf (no standalone component; composes only inside a ' +
+            'content_grid cards source) and never a shared_ref (a pointer is not a recipe: instantiation copies, ' +
+            'never aliases). The blueprint’s s_* id is a placeholder — instantiation always re-mints a fresh one.',
         },
       ];
     default:
@@ -667,7 +703,7 @@ export const buildObjectContract = (
 ): ObjectContract => {
   const policy = options.approvalPolicy ?? activeApprovalPolicy();
   const schema = BODY_SCHEMA[objectType];
-  const includesSections = objectType === 'page' || objectType === 'section';
+  const includesSections = objectType === 'page' || objectType === 'section' || objectType === 'section_template';
   return {
     object_type: objectType,
     governed: isGovernedObjectType(objectType),
@@ -675,7 +711,9 @@ export const buildObjectContract = (
     summary:
       objectType === 'content_item'
         ? 'Articles as governed objects (W7.3): an annotated node list (private.strategy/intent per block — the behavioral framework) with rich_text.v1 or plain-text bodies, plus the envelope-level judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). Committed legacy posts stay on their own pipeline.'
-        : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
+        : objectType === 'section_template'
+          ? 'A section recipe (W8, design-principles rule 5): one named, pre-configured section blueprint agents create and evolve freely, then stamp into pages or mint as standalone shared sections. Instantiation deep-copies the blueprint and re-mints its id — nothing live-binds to a recipe, and a recipe renders nothing itself.'
+          : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
     body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),
     ...(objectType === 'page' ? { page_types: listPageTypeDefinitions() } : {}),

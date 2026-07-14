@@ -59,6 +59,7 @@ const OBJECT_IDS: Record<GovernedObjectType, string> = {
   taxonomy: 'tax_drlurie',
   site: 'site_drlurie',
   template: 'tpl_home',
+  section_template: 'stpl_hero_landing',
   product: 'prod_barrier_repair_guide',
   content_item: 'req_agent_probe_20260713_01',
 };

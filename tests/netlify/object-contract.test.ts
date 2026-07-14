@@ -12,7 +12,16 @@ import { sectionTypes } from '../../src/schema/bodies/section-v1.js';
 import { patchOpNamesByObjectType } from '../../src/schema/object-patch-ops.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
 
-const GOVERNED: ObjectType[] = ['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'product'];
+const GOVERNED: ObjectType[] = [
+  'page',
+  'section',
+  'navigation',
+  'taxonomy',
+  'site',
+  'template',
+  'section_template',
+  'product',
+];
 
 // Building every contract exercises z.toJSONSchema over the recursive navItem
 // (z.lazy), the section discriminated union, and the patch-op refinements — so
@@ -43,7 +52,7 @@ test('every governed type — content_item included since W7.3 — carries a non
 });
 
 test('section_types covers every variant; the component-bound ones carry editor hints', () => {
-  for (const type of ['page', 'section'] as ObjectType[]) {
+  for (const type of ['page', 'section', 'section_template'] as ObjectType[]) {
     const sections = buildObjectContract(type).section_types ?? [];
     assert.deepEqual(
       sections.map((s) => s.type).sort(),
@@ -116,7 +125,33 @@ test('anti-drift coverage guard: contract types match objectTypes exactly', () =
   assert.deepEqual(
     [...OBJECT_CONTRACT_TYPES].sort(),
     [
-      ...(['page', 'section', 'navigation', 'taxonomy', 'site', 'template', 'product', 'content_item'] as ObjectType[]),
+      ...([
+        'page',
+        'section',
+        'navigation',
+        'taxonomy',
+        'site',
+        'template',
+        'section_template',
+        'product',
+        'content_item',
+      ] as ObjectType[]),
     ].sort()
   );
+});
+
+test('section_template carries the blueprint op family, section vocabulary, and the placeability constraint (W8.1)', () => {
+  const contract = buildObjectContract('section_template');
+  assert.equal(contract.governed, true);
+  assert.deepEqual(
+    contract.patch_ops.map((op) => op.op),
+    ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data']
+  );
+  assert.equal(
+    contract.patch_ops.find((op) => op.op === 'replace_blueprint')?.minted_id_field,
+    'blueprint.id',
+    'replace_blueprint must advertise the server-minted blueprint id'
+  );
+  assert.ok(contract.section_types && contract.section_types.length > 0, 'the section vocabulary must be served');
+  assert.ok(contract.constraints.some((constraint) => constraint.id === 'blueprint_standalone_renderable'));
 });

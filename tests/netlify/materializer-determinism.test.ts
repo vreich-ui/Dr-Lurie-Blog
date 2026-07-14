@@ -25,6 +25,11 @@ test('determinism: materializing the same body twice produces byte-identical out
     ['navigation', 'nav_footer', { role: 'footer', groups: [] }],
     ['taxonomy', 'tax_drlurie', { kinds: { category: { terms: [] }, tag: { terms: [] } } }],
     ['template', 'tpl_home', { name: 'Home template', appliesTo: [], slots: [] }],
+    [
+      'section_template',
+      'stpl_cta',
+      { name: 'CTA recipe', blueprint: { id: 's_bp', type: 'cta_banner', data: { heading: 'Go', actions: [] } } },
+    ],
     ['section', 'sec_cta', { section: { id: 's_cta1', type: 'prose', data: { body: 'Hello' } } }],
   ];
 

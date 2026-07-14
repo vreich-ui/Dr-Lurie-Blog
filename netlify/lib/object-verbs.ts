@@ -306,6 +306,12 @@ const mintOpsIds = (rawOps: readonly unknown[]): { ops: unknown[]; minted: Minte
       const id = mintId({ kind: 'article_node' }, stableStringify(op.node));
       op.node.id = id;
       note('node.id', id);
+    } else if (op.op === 'replace_blueprint' && isRecord(op.blueprint) && !op.blueprint.id) {
+      // A section-template blueprint id is a placeholder anyway (re-minted at
+      // instantiation, W8) — mint it like any section instance id.
+      const id = mintId({ kind: 'section_instance' }, stableStringify(op.blueprint));
+      op.blueprint.id = id;
+      note('blueprint.id', id);
     }
     return op;
   });

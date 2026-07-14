@@ -17,6 +17,7 @@ import {
   drillOpsForSeed,
   pageDrillOps,
   sectionDrillOps,
+  sectionTemplateDrillOps,
   siteDrillOps,
   taxonomyDrillOps,
   templateDrillOps,
@@ -274,6 +275,40 @@ test('drillOpsForSeed dispatches by object type', () => {
   const templateDrill = drillOpsForSeed(templateSeed);
   assert.equal(templateDrill.expected.length, 4);
   assert.equal(templateDrill.ops.find((op) => op.op === 'upsert_slot').slot.slotId, 'slot_rtprobe2');
+});
+
+test('sectionTemplateDrillOps exercises all three ops, byte-identical (W8.1)', () => {
+  const body = {
+    name: 'Landing hero',
+    blueprint: {
+      id: 's_stplhero',
+      type: 'hero',
+      data: { kicker: 'Overview', heading: 'New hero heading', actions: [] },
+    },
+  };
+  const { ops, expected } = sectionTemplateDrillOps(body);
+  assert.deepEqual(expected, ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data']);
+  assert.deepEqual(ops, [
+    { op: 'set_section_template_meta', fields: { name: 'Landing hero [probe]' } },
+    { op: 'set_section_template_meta', fields: { name: 'Landing hero' } },
+    { op: 'update_blueprint_data', fields: { heading: 'New hero heading [probe]' } },
+    { op: 'update_blueprint_data', fields: { heading: 'New hero heading' } },
+    { op: 'replace_blueprint', blueprint: body.blueprint },
+  ]);
+  // The replace payload is a CLONE, not the seed's own object reference.
+  assert.notEqual(ops[4].blueprint, body.blueprint);
+});
+
+test('drillOpsForSeed dispatches a section_template seed', () => {
+  const seed = {
+    objectType: 'section_template',
+    body: { name: 'R', blueprint: { id: 's_x', type: 'cta_banner', data: { heading: 'Go', actions: [] } } },
+  };
+  assert.deepEqual(drillOpsForSeed(seed).expected, [
+    'set_section_template_meta',
+    'replace_blueprint',
+    'update_blueprint_data',
+  ]);
 });
 
 test('siteDrillOps pokes and restores the name — set_site_fields is the only site op', () => {

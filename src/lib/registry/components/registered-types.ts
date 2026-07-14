@@ -38,3 +38,18 @@ export type RegisteredSectionType = (typeof REGISTERED_SECTION_TYPES)[number];
 
 export const isRegisteredSectionType = (type: string): type is RegisteredSectionType =>
   (REGISTERED_SECTION_TYPES as readonly string[]).includes(type);
+
+/**
+ * The section types legal as a STANDALONE instance — directly in a page's
+ * `sections[]` (alongside `shared_ref` pointers, which the caller allows
+ * separately), as a shared 'section' object's wrapped instance, or as a
+ * section-template blueprint (W8). Exactly the component-bound list: `card`
+ * is a block-tree LEAF (rendered only inside a content_grid `cards` source —
+ * it parses under the section union but has no standalone component, so the
+ * build dies with "No component registered", the Session-K gap), and
+ * `shared_ref` is a pointer, never a concrete instance. One predicate for
+ * every enforcement site, so the page rule, the wrapper rule, and the
+ * blueprint rule cannot drift.
+ */
+export const isStandalonePlaceableSectionType = (type: string): type is RegisteredSectionType =>
+  isRegisteredSectionType(type);

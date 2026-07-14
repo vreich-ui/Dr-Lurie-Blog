@@ -32,6 +32,9 @@ const DIRS: Array<{ dir: string; type: ObjectType }> = [
   // Templates too, so a committed page's `template.ref` resolves (the whole set
   // must be present for cross-object references to validate).
   { dir: join(SITE_DATA, 'templates'), type: 'template' },
+  // Section-template exports (W8.1) — the dir holds only .gitkeep until the
+  // W8.4 credentialed run publishes the first recipes; missing/empty is fine.
+  { dir: join(SITE_DATA, 'section-templates'), type: 'section_template' },
   // Product exports (S2 onward) — the dir is absent until the first product
   // publishes; the loader skips missing dirs.
   { dir: join(SITE_DATA, 'products'), type: 'product' },

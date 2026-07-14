@@ -84,6 +84,7 @@ const OBJECT_PREFIX: Record<Exclude<ObjectType, 'content_item'>, string> = {
   taxonomy: 'tax',
   site: 'site',
   template: 'tpl',
+  section_template: 'stpl',
   product: 'prod',
 };
 

@@ -20,6 +20,7 @@ import { materializeNavigation } from './materializers/navigation.js';
 import { materializePage } from './materializers/page.js';
 import { materializeProduct } from './materializers/product.js';
 import { materializeSection } from './materializers/section.js';
+import { materializeSectionTemplate } from './materializers/section-template.js';
 import { materializeSite } from './materializers/site.js';
 import { materializeTaxonomy } from './materializers/taxonomy.js';
 import { materializeTemplate } from './materializers/template.js';
@@ -45,6 +46,8 @@ export function materialize(
       return materializeTaxonomy(objectId, body, meta);
     case 'template':
       return materializeTemplate(objectId, body, meta);
+    case 'section_template':
+      return materializeSectionTemplate(objectId, body, meta);
     case 'section':
       return materializeSection(objectId, body, meta);
     case 'product':
