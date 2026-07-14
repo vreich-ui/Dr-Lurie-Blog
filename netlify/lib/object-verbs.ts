@@ -55,6 +55,7 @@ import type { SectionInstance } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
+import { THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
 import {
   objectTypes,
   objectTypeSchema,
@@ -904,6 +905,22 @@ export const handleObjectVerb = async (
           issues: parsedTheme.error.issues,
         });
       }
+      // The theme must be TOTAL to be appliable: exact-replace would DELETE
+      // any consumed key the theme lacks from site.brandTokens, silently
+      // rendering fallback literals instead of the palette. The theme_token_keys
+      // rule only BLOCKS at theme publish (drafts warn) — and apply doesn't
+      // require a published theme — so the funnel enforces it here.
+      const missingKeys = THEME_COLOR_KEYS.filter(
+        (key) => typeof parsedTheme.data.tokens.colors[key] !== 'string'
+      );
+      if (missingKeys.length > 0) {
+        return err(422, {
+          error: `Theme "${request.theme_id}" is not total: missing consumed color key(s) ${missingKeys.join(', ')} — applying it would delete them from site.brandTokens and render fallback literals. Complete the theme first.`,
+          theme_id: request.theme_id,
+          missing_keys: missingKeys,
+        });
+      }
+
       const siteRecord = await loadRecord(store, objectRecordKey('site', request.site_id));
       if (!siteRecord) {
         return err(404, { error: 'Site not found', not_found: true, object_id: request.site_id });

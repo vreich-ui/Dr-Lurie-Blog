@@ -241,6 +241,27 @@ test('a real apply REQUIRES the site checkout: missing fields 400, wrong lock 42
   assert.equal(stale.status, 409);
 });
 
+test('REJECTION: an INCOMPLETE theme is not appliable — apply would delete consumed keys from the site', async () => {
+  const store = createMemoryStore();
+  await seedSite(store);
+  const incomplete = altThemeBody();
+  delete (incomplete.tokens.colors as Record<string, string>).primary;
+  delete (incomplete.tokens.colors as Record<string, string>).gold;
+  await seedObject(store, 'theme', 'thm_partial', incomplete);
+
+  // Both the real apply AND the dry_run refuse — a preview of a
+  // palette-deleting apply should say so, not validate green.
+  const res = await call(store, {
+    action: 'apply_theme',
+    theme_id: 'thm_partial',
+    site_id: 'site_drlurie',
+    dry_run: true,
+  });
+  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.deepEqual(res.body.missing_keys, ['primary', 'gold']);
+  assert.deepEqual((loadSite(store).body as SiteBody).brandTokens, siteBody.brandTokens, 'site untouched');
+});
+
 test('a missing theme is a 404 naming it', async () => {
   const store = createMemoryStore();
   await seedSite(store);
