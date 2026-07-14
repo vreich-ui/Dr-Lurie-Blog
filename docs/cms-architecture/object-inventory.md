@@ -84,12 +84,13 @@ hand-coded-page backlog is empty for good.
 
 ## The object types (use & boundaries)
 
-Nine object types exist, and **all nine are governed** (edited through the
-generic object verbs and the approval policy) since W7.3 (2026-07-13) brought
-`content_item` into the model. W8 added the last two (RELEASED 2026-07-14,
+Eleven object types exist, and **all eleven are governed** (edited through the
+generic object verbs and the approval policy): W7.3 (2026-07-13) brought
+`content_item` into the model as the ninth, and W8 (2026-07-14) added the
+tenth and eleventh — `section_template` and `theme`, the section- and
+site-level members of the recipe family (records RELEASED 2026-07-14;
 conversion completes on the application-verb production proofs —
-[`09-template-system-plan.md`](09-template-system-plan.md)): `section_template`
-and `theme`, the section- and site-level members of the recipe family; see
+[`09-template-system-plan.md`](09-template-system-plan.md)); see
 "Recipe family (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
 stay on the older article pipeline untouched — Wolf's ruling: not worth
 migrating; new articles are objects. **Boundaries below are the human summary —
@@ -113,6 +114,8 @@ trail. Flip one file to change the posture per type.
 | **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
 | **product**                 | One sellable digital good (download / pay-to-unlock / tip-PWYW / free lead magnet): `slug` + presentation + commerce + a fulfillment union on `kind`. Long-form copy composes via `presentation.page_ref` → an ordinary Page (06-shop-module-plan §1–2). | Slug lowercase-hyphen + unique (→ `/shop/<slug>`); mode↔fields coherence enforced; **price cache + Stripe linkage are NOT agent-patchable** (`product_set_price` only, S3); `fulfillment.artifact_ref` must be a trusted private-store ref; **publishes review-required**. |
 | **content_item** (articles) | An article as an annotated NODE LIST (W7.3): every block carries `private.strategy` (hook/agitation/…/resolution) + `intent` plus commercial/rendering/chat metadata; `public.body` is plain text or a `rich_text.v1` document. Envelope carries the judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). `create_variant` clones a draft for A/B judging. Renders through the blog furniture at `/<slug>`, joining listings/tags/RSS automatically. | `req_*` ids (artifact trust preserved); slug lowercase-hyphen + unique across articles AND committed posts; ≥1 public content node to publish; node ids opaque (no strategy words); annotations NEVER render (leak rule); rich-text bodies limited to the renderable grammar (embeds blocked until resolvers exist). **The 83 legacy committed posts were WIPED (Wolf 2026-07-13); the live corpus is 10 `content_item` objects + the demo, all store-backed.** Slug uniqueness still spans any committed posts should they return. |
+| **section_template** (W8)   | A section-level recipe: ONE pre-configured section blueprint (+ name/description/whenToUse/scope) an agent stamps into any page or mints as a standalone `sec_*` object via `object_instantiate_section_template` — copy at stamp time, never live-bound. Records RELEASED 2026-07-14, not yet converted (verb proofs pending).                                                          | Blueprint must be a standalone-placeable registered type (no `card` leaf, no `shared_ref`, no manual content picks, no asset refs — self-contained); metadata trio (description/whenToUse/scope) REQUIRED TO PUBLISH; creation gated by `src/config/creation-policy.ts` (open today).                                     |
+| **theme** (W8)              | A brandTokens preset (name/description/whenToUse/scope + `tokens: {colors, fonts}`): agents draft/validate a palette, then `site_apply_theme` copies it onto the site singleton as ONE exact-replace `set_site_fields` op (stale keys unset). NOT taxonomy; the site never live-inherits. Record RELEASED 2026-07-14, not yet converted (verb proofs pending).                             | Published themes must carry every renderer-consumed color key (apply is total); token values must pass the safe-CSS grammar (raw `<style>` interpolation — the same rule gates `site.brandTokens`); metadata trio REQUIRED TO PUBLISH; creation gated by the same committed policy.                                       |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
