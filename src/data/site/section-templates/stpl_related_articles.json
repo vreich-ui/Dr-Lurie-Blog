@@ -1,0 +1,24 @@
+{
+  "__generated": {
+    "at": "2026-07-14T16:09:17.252Z",
+    "from": "objects/section_template/by-id/stpl_related_articles.json",
+    "record_version": 8
+  },
+  "blueprint": {
+    "data": {
+      "columns": 3,
+      "heading": "More to read",
+      "limit": 3,
+      "source": {
+        "algorithm": "tag_similarity",
+        "kind": "related"
+      }
+    },
+    "id": "s_stplrelated",
+    "type": "content_grid"
+  },
+  "description": "Automatic related-content strip: three tiles picked by tag similarity from published articles.",
+  "name": "Related articles",
+  "scope": "evergreen",
+  "whenToUse": "End-of-article and hub pages that should surface further reading automatically — cells fill themselves from published articles by tag similarity. For hand-curated cells use stpl_audience_grid."
+}
