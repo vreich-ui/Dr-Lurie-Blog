@@ -92,14 +92,17 @@ forty-first: the first `content_item` article object** (the
 
 ## The object types (use & boundaries)
 
-Eleven object types exist, and **all eleven are governed** (edited through the
-generic object verbs and the approval policy): W7.3 (2026-07-13) brought
-`content_item` into the model as the ninth, and W8 (2026-07-14) added the
-tenth and eleventh — `section_template` and `theme`, the section- and
-site-level members of the recipe family (records RELEASED 2026-07-14;
-conversion completes on the application-verb production proofs —
+Ten object types exist, and **all ten are governed** (edited through the
+generic object verbs and the approval policy — the authoritative list is
+`objectTypes` in `src/schema/object-record-v1.ts`): W7.3 (2026-07-13)
+brought `content_item` into the model, and W8 (2026-07-14) added
+`section_template` and `theme`, the section- and site-level members of the
+recipe family (records RELEASED 2026-07-14; conversion completes on the
+application-verb production proofs —
 [`09-template-system-plan.md`](09-template-system-plan.md)); see
-"Recipe family (W8)" under Singletons & templates below. The COMMITTED legacy posts (src/data/post/\*.md)
+"Recipe family (W8)" under Singletons & templates below. (Session logs call
+these waves the "ninth/tenth/eleventh governed type" — historical labels
+that over-count by one; the contract enumerates ten.) The COMMITTED legacy posts (src/data/post/\*.md)
 stay on the older article pipeline untouched — Wolf's ruling: not worth
 migrating; new articles are objects. **Boundaries below are the human summary —
 the machine-checked, always-current version is `object_contract('<type>')`.**
@@ -310,9 +313,10 @@ metadata trio onto the 3 live `tpl_*` (Step 0 — now published at content
 revision 20; exports content-identical to the W8.3b pre-materialization) and
 re-proved `object_instantiate_template` dry_run on all three (incl.
 tpl_legal's registry-fallback path). **The conversion gate still open:** the
-application-verb production dry_runs (`object_instantiate_section_template`
-both modes; `site_apply_theme` dry_run + one real no-op default apply) could
-not run from the converting session — its MCP tool snapshot predates the W8
+application-verb production dry_runs — `object_instantiate_section_template`
+in BOTH modes for EACH of the five `stpl_*` records (per-object conversion,
+the W2.5 precedent), plus `site_apply_theme` dry_run + one real no-op
+default apply — could not run from the converting session — its MCP tool snapshot predates the W8
 deploys and a session snapshot never refreshes. Both verbs are live on the
 server, contract-advertised, and verb-level-tested in the merged suite, but
 per the playbook they must be PROVEN in production before these rows turn

@@ -46,9 +46,11 @@ session MCP connection against production, strictly sequential ops.
   playbook criterion 3 and the W2.5 template precedent (instantiate proven
   in production before the flip), the family therefore stays **RELEASED,
   not converted** — inventory/map marks are 🔵, CLAUDE.md count stays 41.
-  The four proofs (stamp dry_run standalone + page mode; apply dry_run +
-  ONE real no-op default apply + site publish + release) are the FIRST ACT
-  of the next session; on green, flip the marks 🟢, count 41 → 47. Both
+  The proofs (stamp dry_run in BOTH modes for EACH of the 5 stpl records —
+  per-object conversion, the W2.5 one-proof-per-template precedent; apply
+  dry_run + ONE real no-op default apply + site publish + release) are the
+  FIRST ACT of the next session; on green, flip the marks 🟢, count
+  41 → 47. Both
   verbs are deployed, contract-advertised, and verb-level-tested in the
   merged suite.
 - **Ops lessons (endpoint was flaky — 502s + 60s connector timeouts all
