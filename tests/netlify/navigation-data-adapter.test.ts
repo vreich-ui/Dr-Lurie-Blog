@@ -204,3 +204,38 @@ test('resolver: page/taxonomy targets throw loudly in Phase 2 (no silent dead li
   assert.throws(() => resolve({ kind: 'page', page: 'page_home' }), /materialize time/);
   assert.throws(() => resolve({ kind: 'taxonomy', termKind: 'category', term_id: 't_abc' }), /taxonomy registry/);
 });
+
+// ── M-9: adminOnly carry-through (admin menu → main nav, client-gated) ────────
+
+test('adapter carries adminOnly on group and item only when set — absent otherwise (byte-identical)', () => {
+  const body = navigationBodySchema.parse({
+    role: 'header',
+    groups: [
+      {
+        id: 'grp_public',
+        title: 'Learn',
+        items: [{ id: 'itm_lib', label: 'Library', target: { kind: 'route', href: '/learn/library' } }],
+      },
+      {
+        id: 'grp_admin',
+        title: 'Admin',
+        adminOnly: true,
+        items: [
+          { id: 'itm_dash', label: 'Dashboard', target: { kind: 'route', href: '/admin' }, adminOnly: true },
+          { id: 'itm_show', label: 'Object Showcase', target: { kind: 'route', href: '/object-showcase' } },
+        ],
+      },
+    ],
+  });
+  const props = navigationToHeaderProps(body, resolve);
+
+  // Public group and its item stay exactly as before — no adminOnly key leaks in.
+  assert.deepStrictEqual(props.links[0], {
+    text: 'Learn',
+    links: [{ text: 'Library', href: '/learn/library' }],
+  });
+  // Admin group carries the flag; the item that set it does too, the one that didn't stays clean.
+  assert.equal(props.links[1].adminOnly, true);
+  assert.equal(props.links[1].links?.[0].adminOnly, true);
+  assert.ok(!('adminOnly' in (props.links[1].links?.[1] ?? {})));
+});

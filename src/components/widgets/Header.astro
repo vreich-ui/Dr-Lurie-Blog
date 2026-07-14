@@ -17,6 +17,7 @@ interface Link {
   icon?: string;
   description?: string;
   authAction?: string;
+  adminOnly?: boolean;
 }
 
 interface MenuLink extends Link {
@@ -99,8 +100,11 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
         class="flex flex-col md:flex-row md:self-center w-full md:w-auto text-xl md:text-[0.9375rem] tracking-[0.01rem] font-medium md:justify-center"
       >
         {
-          links.map(({ text, href, links }) => (
-            <li class={links?.length ? 'dropdown' : ''}>
+          links.map(({ text, href, links, adminOnly }) => (
+            <li
+              class={links?.length ? 'dropdown' : ''}
+              {...(adminOnly ? { 'data-admin-only': true, hidden: true } : {})}
+            >
               {links?.length ? (
                 <>
                   <button
@@ -285,6 +289,15 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
 </header>
 
 <LoginModal />
+
+<style>
+  /* M-9: admin-only nav items ship hidden and are revealed client-side only for
+     signed-in admins (header-auth script toggles [hidden]). Explicit rule so the
+     flex `<li>` stays collapsed until then — same guard AdminNav uses. */
+  [data-admin-only][hidden] {
+    display: none;
+  }
+</style>
 
 <div
   id="header-search-overlay"
