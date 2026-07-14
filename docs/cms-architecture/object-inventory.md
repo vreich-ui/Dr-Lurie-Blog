@@ -50,7 +50,12 @@ the production store**. These are different, and only the second is "converted"
   This needs production credentials and a proven round-trip.
 
 **As of 2026-07-14, forty-one objects are CONVERTED** (+6 W8 recipe records
-RELEASED, not yet counted — see "Recipe family (W8)" below) (all via credentialed
+RELEASED, not yet counted — see "Recipe family (W8)" below). The ledger
+counts objects whose round-trip was individually proven in a credentialed
+run; the ten-article corpus (W7.9 aftermath — created → published → released
+end-to-end via MCP, all store-backed) is live production content of the
+converted `content_item` type but only the demo article's full op-drill ran,
+so the ledger counts the demo, not the ten. (all via credentialed
 `home-conversion-roundtrip.mjs --production --release` runs — store-backed, every
 permitted op round-tripped in production, published, `released:true`): the 3 nav
 objects; the home-page family (`page_home`, `sec_home_audience_grid`,
@@ -498,7 +503,8 @@ exist in the production registry — the seed now carries
 local rehearsals can't catch this class). Note: unpublish is still
 unsupported (OQ-2) — the demo stays live until edited.
 
-**Corpus CONVERTED + LIVE (2026-07-13, credentialed run):** after the legacy
+**Corpus LIVE (2026-07-13, credentialed run; not in the converted-object
+ledger):** after the legacy
 wipe (all 83 `src/data/post/*.md` deleted — the `post` collection is now
 permanently empty), a **ten-article corpus** was seeded
 (`scripts/lib/articles-corpus-seed-data.mjs`, two per registry category) and

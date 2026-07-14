@@ -592,6 +592,16 @@ form. Direction, so W8 keeps the door open by construction:
   conversion-map marks flip to 🟢, state-of-play session entry, CLAUDE.md
   converted-count line.
 - **Gate:** all five playbook criteria per type; store === seed === export.
+- **RUN OUTCOME (2026-07-14) — what remains:** everything above EXCEPT the
+  two application-verb proofs completed (Step 0, 6 creations, all patch-op
+  drills, publishes, release, store === seed === export, contract +
+  inventory checks, instantiate_template dry_runs ×3). The four verb calls
+  (`object_instantiate_section_template` dry_run standalone + page mode;
+  `site_apply_theme` dry_run + one real no-op default apply → site publish
+  → release) could NOT run: the converting session's MCP tool snapshot
+  predated the W8 deploys and never refreshes. **The next session runs
+  ONLY those four calls, then flips the docs 🟢 (41 → 47)** — do not re-run
+  the completed steps (re-verify with `object_inventory` if in doubt).
 
 ## 10. Exit criteria
 
