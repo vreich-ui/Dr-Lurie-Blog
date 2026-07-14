@@ -7,6 +7,61 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-14 D (W8.3b BUILT: recipe metadata + creation-policy seam + reuse-first surfacing — NOT converted; W8.4 awaits Wolf's go, now with a tpl backfill Step 0)
+
+Wolf: recipes must be self-explaining in JSON ("what it is, whether it is for
+a project that is one off or it has a strategy"); template creation must be
+restrictable to some agents ("this dev is for later but the ability can be
+inserted now"); agents should reuse existing templates, with well-described
+types/use cases to lower AI cost. Decisions (AskUserQuestion): metadata on
+ALL THREE recipe types uniformly; minimums REQUIRED TO PUBLISH (drafts warn;
+the 3 live tpl\_\* get backfilled at W8.4); restriction = committed-config
+seam, default open. Push-back accepted: the AI-cost pattern is
+INDEX-THEN-FETCH, not "provide all context" — a one-line-per-recipe index in
+`object_inventory`, then `object_get` only the chosen one.
+
+- **Recipe metadata (09 §W8.3b brief)**: shared `recipe-metadata-v1.ts` —
+  `description` / `whenToUse` / `scope: 'evergreen' | 'one_off'` spread into
+  template.v1 + section_template.v1 + theme.v1 (page templates had NO
+  description field before this). Schema-optional (additive: production
+  records keep parsing), publish-gated by the shared `checkRecipeMetadata`
+  criterion (`recipe_metadata`; empty-after-trim = missing). Zero new patch
+  ops — the existing meta/fields ops carry the trio. All 9 seeds are
+  metadata-complete; the 3 committed tpl exports were hand-updated with the
+  same trio (pre-materializing the W8.4 backfill byte-identically — keeps
+  seed-objects-enforcement green at publish level). INTERIM CAVEAT: until
+  the backfill, patching a live tpl\_\* without adding the trio 422s.
+- **Creation-policy seam**: `src/config/creation-policy.ts` +
+  `src/lib/creation-policy.ts` (approval-policy twin; per-type
+  `'open' | {agents}`, humans always, DEFAULT FULLY OPEN — nothing is
+  restricted today). Enforced at the top of `create` (recursion-proof) with
+  dry_run-honest pre-checks in create_variant/instantiate/
+  instantiate_section-standalone; keys on the CREATED type (instantiate →
+  page; standalone stamp → section; page-mode stamping + apply_theme are
+  patches, ungated — test-pinned). 403 `creation_restricted` names the
+  allowlist and points at reuse. Surfaced on every contract as
+  `creation_policy`. ⚠️ Documented honestly: agent_name is self-declared
+  until OQ-3 — coordination seam, not security.
+- **Reuse-first surfacing**: `object_inventory` recipe rows carry a
+  defensive body-derived `recipe` summary (name/scope/description/
+  when_to_use + blueprint_type | applies_to + slot_count); the three recipe
+  contracts open with a REUSE-FIRST workflow step; every one of the 19
+  section components gained an `editor.useWhen` one-liner (auto-served via
+  contract section_types + registry_get); tool descriptions updated
+  (object_inventory / object_contract / object_create).
+- **Reconcile machinery**: `TEMPLATE_META_KEYS` gained the trio (this IS the
+  W8.4 backfill mechanism — ensure heals the live records to the enriched
+  seeds); the previously missing `section_template` + `theme` reconcile
+  branches were added (they would have crashed on drifted records).
+- **Suite: 1,343 tests green** (new: recipe-metadata schema/criterion/
+  pipeline per type; creation-policy resolution + verb-level 403s incl.
+  recursion and page-mode-ungated pins; inventory summaries incl. malformed
+  bodies; contract/useWhen/REUSE-FIRST pins; publish-level seed tightening;
+  reconcile heal tests). `npm run check` 0 errors; build-diff EMPTY.
+- **Still open: W8.4** (human_gate, unchanged in gate) — now begins with
+  Step 0: the tpl metadata backfill via the templates-seeds driver run, then
+  the stpl/thm creation run as planned. OQ-W8-1…4 remain checkpoints.
+
 ## Session 2026-07-14 C (W8.1–W8.3 BUILT + MERGED: section_template + instantiate verbs + blueprintRef + theme + site_apply_theme + token safety — NOT converted; W8.4 awaits Wolf's go)
 
 Wolf: "check if anything blocks this, including the latest commit. If nothing

@@ -12,6 +12,8 @@ export const contentSplitDefinition: SectionComponentDefinition<'content_split',
   editor: {
     label: 'Content split',
     icon: 'tabler:layout-columns',
+    useWhen:
+      'Two-column copy-beside-media row with optional CTAs — alternating feature explainers, product stories; reverse flips the columns.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

@@ -12,6 +12,8 @@ export const contactFormDefinition: SectionComponentDefinition<'contact_form', E
   editor: {
     label: 'Contact form',
     icon: 'tabler:mail',
+    useWhen:
+      "The Netlify-backed contact form with heading and disclaimer — the contact page's working section or an embedded inquiry block.",
     fieldHints: {
       heading: { label: 'Heading', widget: 'text' },
       subtitle: { label: 'Subtitle', help: 'Optional intro line under the heading.', widget: 'text' },

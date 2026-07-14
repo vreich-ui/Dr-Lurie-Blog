@@ -7,7 +7,9 @@
   "appliesTo": [
     "system"
   ],
+  "description": "A minimal system-page recipe: one required prose slot with no blueprint — instantiation fills it from the prose registry defaultData (the standing proof of the fallback path).",
   "name": "Legal page",
+  "scope": "evergreen",
   "slots": [
     {
       "allowed": [
@@ -17,5 +19,6 @@
       "required": true,
       "slotId": "slot_body"
     }
-  ]
+  ],
+  "whenToUse": "Legal and system boilerplate — privacy, terms, disclaimers — where the page is one run of prose and nothing else."
 }

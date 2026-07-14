@@ -12,6 +12,8 @@ export const bioDefinition: SectionComponentDefinition<'bio', EmptyResolved> = {
   editor: {
     label: 'Bio',
     icon: 'tabler:user',
+    useWhen:
+      'Author/credibility block: portrait, introduction, credential trust notes, disclaimer. Typically once per site area — the about page or an article-adjacent trust section.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

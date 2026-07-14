@@ -12,6 +12,8 @@ export const stepsDefinition: SectionComponentDefinition<'steps', EmptyResolved>
   editor: {
     label: 'Steps',
     icon: 'tabler:list-numbers',
+    useWhen:
+      "A numbered sequence — how-it-works, protocols, onboarding paths. Use when order matters; checklist when it doesn't.",
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

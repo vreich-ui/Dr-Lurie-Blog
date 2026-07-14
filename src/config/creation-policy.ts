@@ -1,0 +1,22 @@
+/**
+ * The COMMITTED creation-policy config (W8.3b) — who may CREATE objects of
+ * each type. Wolf's one-file lever, the approval-policy twin: edit this file
+ * to restrict a type, no code changes.
+ *
+ *   master: 'open'                    → any principal creates any type;
+ *   master: { agents: ['name', …] }   → only listed agents (humans always may);
+ *   overrides.<type>                  → per-type rule beating the master,
+ *                                       e.g. template: { agents: ['site-builder'] }.
+ *
+ * Dev-stage default: fully open — the seam exists (enforced in the create/
+ * instantiate verbs, surfaced in every object_contract), the restrictions
+ * arrive when Wolf writes them. ⚠️ agent names are SELF-DECLARED until OQ-3
+ * per-agent credentials land: treat this as coordination, not security (full
+ * caveat in src/lib/creation-policy.ts).
+ */
+import type { CreationPolicyConfig } from '../lib/creation-policy.js';
+
+export const creationPolicyConfig = {
+  master: 'open',
+  overrides: {},
+} satisfies CreationPolicyConfig;

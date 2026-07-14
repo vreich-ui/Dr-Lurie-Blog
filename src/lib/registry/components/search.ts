@@ -11,6 +11,7 @@ export const searchDefinition: SectionComponentDefinition<'search', EmptyResolve
   editor: {
     label: 'Search',
     icon: 'tabler:search',
+    useWhen: "The site search widget — the /search page's working section; rarely useful elsewhere.",
     fieldHints: {
       placeholder: { label: 'Placeholder', help: 'Input placeholder text.', widget: 'text' },
       indexRoute: { label: 'Index route', help: 'The JSON search index to query (e.g. /search.json).', widget: 'text' },

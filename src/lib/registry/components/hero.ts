@@ -12,6 +12,8 @@ export const heroDefinition: SectionComponentDefinition<'hero', HeroResolved> = 
   editor: {
     label: 'Hero',
     icon: 'tabler:sparkles',
+    useWhen:
+      'Big campaign-weight page opener: kicker, large heading, intro, CTA buttons. Use once, first, on landing/offer pages — interior pages usually want the quieter lede.',
     fieldHints: {
       kicker: { label: 'Kicker', help: 'Small uppercase lead-in line above the heading.', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

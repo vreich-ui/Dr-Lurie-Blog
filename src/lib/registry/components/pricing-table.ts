@@ -13,6 +13,8 @@ export const pricingTableDefinition: SectionComponentDefinition<'pricing_table',
   editor: {
     label: 'Pricing table',
     icon: 'tabler:report-money',
+    useWhen:
+      'Tiered pricing columns whose price/availability resolve live from product objects — compare-plans sections.',
     fieldHints: {
       kicker: { label: 'Kicker', widget: 'text' },
       heading: { label: 'Heading', widget: 'text' },

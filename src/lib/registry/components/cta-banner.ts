@@ -13,6 +13,8 @@ export const ctaBannerDefinition: SectionComponentDefinition<'cta_banner', HeroR
   editor: {
     label: 'CTA banner',
     icon: 'tabler:speakerphone',
+    useWhen:
+      'Full-width closing call-to-action: heading + buttons. The standard last section routing readers onward from interior and landing pages.',
     fieldHints: {
       heading: { label: 'Heading', widget: 'text' },
       body: { label: 'Body', help: 'Optional supporting copy above the buttons.', widget: 'richtext' },

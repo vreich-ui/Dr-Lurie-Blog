@@ -14,6 +14,8 @@ export const productPreviewDefinition: SectionComponentDefinition<'product_previ
   editor: {
     label: 'Product preview',
     icon: 'tabler:shopping-bag',
+    useWhen:
+      'Product cards resolved live from shop objects (hand-picked, query, or curated cells) with price badges — the buy-adjacent grid on content pages.',
     fieldHints: {
       heading: { label: 'Heading', widget: 'text' },
       source: {

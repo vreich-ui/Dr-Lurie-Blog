@@ -27,6 +27,7 @@ import {
   publishRequiresApproval,
   type ApprovalPolicy,
 } from '../approval-policy.js';
+import { activeCreationPolicy, creationRuleFor, type CreationPolicy } from '../creation-policy.js';
 import type { PatchApplyErrorCode } from '../object-patch-apply.js';
 import { childRuleFor } from './block-tree.js';
 import { bioDefinition } from './components/bio.js';
@@ -207,6 +208,20 @@ export type Constraint = {
 };
 
 const RICHTEXT_ALLOWLIST = 'p, br, strong, em, a, ul, ol, li, h2, h3';
+
+// Shared by the three recipe types (template / section_template / theme) —
+// the W8.3b self-description rule, enforced by checkRecipeMetadata.
+const RECIPE_METADATA_CONSTRAINT: Constraint = {
+  id: 'recipe_metadata',
+  severity: 'blocks_publish',
+  enforced_live: true,
+  description:
+    'Every recipe must be explainable before it publishes: description (what it is), whenToUse (when to pick it ' +
+    'over sibling recipes), and scope ("evergreen" = a standing recipe with a strategy behind it; "one_off" = ' +
+    'built for a single project) are required to publish and warn while drafting. Schema-optional (older records ' +
+    'parse); editable via this type’s meta/fields op. These fields feed the object_inventory recipe summaries — ' +
+    'the reuse-first index.',
+};
 
 // Boundaries every governed type shares.
 const COMMON_CONSTRAINTS: Constraint[] = [
@@ -511,6 +526,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           enforced_live: true,
           description: 'A slot’s allowed types must be registered components (see section_types.component_bound).',
         },
+        RECIPE_METADATA_CONSTRAINT,
       ];
     case 'theme':
       return [
@@ -533,6 +549,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'safe-CSS grammar (hex / rgb()/rgba()/hsl()/hsla()/oklch()/color() / bare keyword; plain font stacks); ' +
             'values carrying ;, {, }, <, >, url(, or @import are rejected. The SAME rule gates site.brandTokens.',
         },
+        RECIPE_METADATA_CONSTRAINT,
       ];
     case 'site':
       return [
@@ -558,6 +575,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'content_grid cards source) and never a shared_ref (a pointer is not a recipe: instantiation copies, ' +
             'never aliases). The blueprint’s s_* id is a placeholder — instantiation always re-mints a fresh one.',
         },
+        RECIPE_METADATA_CONSTRAINT,
       ];
     default:
       return [];
@@ -584,6 +602,32 @@ const PUBLISH_DENIAL_CODES: Record<string, string> = {
   publish_action_not_pinned:
     'An agent-executed publish of a gated type needs the approval to pin the exact action (M-6).',
   publish_action_mismatch: 'The requested publish action differs from the approved (pinned) one.',
+};
+
+/**
+ * Who may CREATE this type (W8.3b) — computed from the committed creation
+ * policy (src/config/creation-policy.ts), never hardcoded. Humans always
+ * create; the policy constrains agents. ⚠️ agent_name is self-declared until
+ * OQ-3 — a coordination seam, not a security boundary.
+ */
+export type CreationPolicyContract = {
+  humans: 'always_allowed';
+  agents: 'open' | { allowlist: string[] };
+  note: string;
+};
+
+const creationPolicyContract = (objectType: ObjectType, policy: CreationPolicy): CreationPolicyContract => {
+  const rule = isGovernedObjectType(objectType) ? creationRuleFor(objectType, policy) : 'open';
+  return {
+    humans: 'always_allowed',
+    agents: rule === 'open' ? 'open' : { allowlist: rule.agents },
+    note:
+      'Resolution: per-type override → master (src/config/creation-policy.ts; currently ' +
+      (rule === 'open' ? 'open for this type' : 'ALLOWLISTED for this type — a denial is a 403 creation_restricted') +
+      '). The policy keys on the type BEING CREATED: object_instantiate_template creates a page; a standalone ' +
+      'section stamp creates a section; page-mode stamping and site_apply_theme are patches, never gated. ' +
+      'agent_name is self-declared until per-agent credentials (OQ-3) land — treat as coordination, not security.',
+  };
 };
 
 export type PublishPolicyContract = {
@@ -633,6 +677,13 @@ const PATCH_ERROR_CODES: Record<PatchApplyErrorCode, { http: number; meaning: st
 
 const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
   sequence: [
+    // W8.3b, Wolf: agents reuse existing recipes before minting new ones —
+    // the inventory summary is the cheap index; fetch bodies only after it.
+    ...(objectType === 'template' || objectType === 'section_template' || objectType === 'theme'
+      ? [
+          `REUSE FIRST: object_inventory({object_type: "${objectType}"}) lists every existing ${objectType} with a self-describing recipe summary (description, whenToUse, scope) — pick one and object_get it; create a NEW recipe only when none fits, and give it description/whenToUse/scope so the next agent can reuse yours.`,
+        ]
+      : []),
     'object_contract (this call) → read the schema, ops, constraints',
     'object_create (omit requested_id to mint one) — for a new object',
     ...(objectType === 'content_item'
@@ -759,6 +810,7 @@ export type ObjectContract = {
   patch_ops: PatchOpContract[];
   constraints: Constraint[];
   publish_policy: PublishPolicyContract;
+  creation_policy: CreationPolicyContract;
   workflow: ReturnType<typeof workflow>;
   auxiliary_inputs: AuxiliaryInput[];
 };
@@ -767,9 +819,10 @@ export const OBJECT_CONTRACT_TYPES = objectTypes;
 
 export const buildObjectContract = (
   objectType: ObjectType,
-  options: { approvalPolicy?: ApprovalPolicy } = {}
+  options: { approvalPolicy?: ApprovalPolicy; creationPolicy?: CreationPolicy } = {}
 ): ObjectContract => {
   const policy = options.approvalPolicy ?? activeApprovalPolicy();
+  const creationPolicy = options.creationPolicy ?? activeCreationPolicy();
   const schema = BODY_SCHEMA[objectType];
   const includesSections = objectType === 'page' || objectType === 'section' || objectType === 'section_template';
   return {
@@ -790,6 +843,7 @@ export const buildObjectContract = (
     patch_ops: patchOpContracts(objectType),
     constraints: [...COMMON_CONSTRAINTS, ...perTypeConstraints(objectType)],
     publish_policy: publishPolicy(objectType, policy),
+    creation_policy: creationPolicyContract(objectType, creationPolicy),
     workflow: workflow(objectType, policy),
     auxiliary_inputs: auxiliaryInputs(objectType),
   };

@@ -856,7 +856,11 @@ export const checkTaxonomyRegistry = (body: unknown, context: ObjectValidationCo
  * P3, so this is `optional` until wired). `appliesTo` PageType existence is
  * already enforced by the body zod (a fixed enum), so it isn't re-checked.
  */
-export const checkTemplate = (body: unknown, context: ObjectValidationContext): ReadinessCriterion[] => {
+export const checkTemplate = (
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish: boolean
+): ReadinessCriterion[] => {
   if (!isRecord(body) || !Array.isArray(body.slots)) {
     return [
       crit('template_slots', 'Template slots', 'optional', 'Template body shape not recognized (see schema check).'),
@@ -958,7 +962,39 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
             )
     );
   }
+  criteria.push(...checkRecipeMetadata(body, atPublish));
   return criteria;
+};
+
+// ─── check 6g: recipe self-description (W8.3b) ───────────────────────────────
+
+/**
+ * Every recipe (template / section_template / theme) must explain itself
+ * before it publishes: description (what it is), whenToUse (when to pick it
+ * over sibling recipes), and scope ('evergreen' = standing/strategic,
+ * 'one_off' = single-project). Schema-optional — pre-W8.3b records parse —
+ * but publish-gated here, the theme_token_keys idiom. These fields ARE the
+ * reuse-first index object_inventory serves, so emptiness after trim counts
+ * as missing: a blank description indexes nothing.
+ */
+export const checkRecipeMetadata = (body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  if (!isRecord(body)) return []; // the schema group owns shape failures
+  const missing: string[] = [];
+  if (typeof body.description !== 'string' || !body.description.trim()) missing.push('description');
+  if (typeof body.whenToUse !== 'string' || !body.whenToUse.trim()) missing.push('whenToUse');
+  if (body.scope !== 'evergreen' && body.scope !== 'one_off') missing.push('scope');
+  return [
+    missing.length === 0
+      ? crit('recipe_metadata', 'Recipe metadata', 'complete', '')
+      : crit(
+          'recipe_metadata',
+          'Recipe metadata',
+          atPublish ? 'missing' : 'warning',
+          `A published recipe must explain itself: missing ${missing.join(', ')}. Set description (what it is), ` +
+            `whenToUse (when to pick it over sibling recipes), and scope ('evergreen' = standing recipe with a ` +
+            `strategy behind it; 'one_off' = built for a single project) via this type's meta/fields op.`
+        ),
+  ];
 };
 
 // ─── check 6e: section-template blueprint rules (W8, 09-plan §2.4) ───────────
@@ -974,7 +1010,7 @@ export const checkTemplate = (body: unknown, context: ObjectValidationContext): 
  * same total Record the renderer dispatches through — so it is always on,
  * never resolver-dependent.
  */
-export const checkSectionTemplate = (body: unknown): ReadinessCriterion[] => {
+export const checkSectionTemplate = (body: unknown, atPublish: boolean): ReadinessCriterion[] => {
   if (!isRecord(body) || !isRecord(body.blueprint) || typeof body.blueprint.type !== 'string') {
     return [
       crit(
@@ -986,19 +1022,17 @@ export const checkSectionTemplate = (body: unknown): ReadinessCriterion[] => {
     ];
   }
   const type = body.blueprint.type;
-  if (isStandalonePlaceableSectionType(type)) {
-    return [crit('blueprint_standalone_renderable', 'Blueprint type', 'complete', '')];
-  }
-  return [
-    crit(
-      'blueprint_standalone_renderable',
-      'Blueprint type',
-      'missing',
-      type === 'shared_ref'
-        ? 'A blueprint must be a concrete section, not a shared_ref pointer — instantiation copies, never aliases.'
-        : `Blueprint type "${type}" has no standalone component and would break the build — a card composes only inside a content_grid cards source.`
-    ),
-  ];
+  const placeable = isStandalonePlaceableSectionType(type)
+    ? crit('blueprint_standalone_renderable', 'Blueprint type', 'complete', '')
+    : crit(
+        'blueprint_standalone_renderable',
+        'Blueprint type',
+        'missing',
+        type === 'shared_ref'
+          ? 'A blueprint must be a concrete section, not a shared_ref pointer — instantiation copies, never aliases.'
+          : `Blueprint type "${type}" has no standalone component and would break the build — a card composes only inside a content_grid cards source.`
+      );
+  return [placeable, ...checkRecipeMetadata(body, atPublish)];
 };
 
 // ─── check 6f: brand-token rules (W8.3, 09-plan §6.3) ────────────────────────
@@ -1080,6 +1114,7 @@ export const checkTheme = (body: unknown, atPublish: boolean): ReadinessCriterio
   }
 
   criteria.push(brandTokenValueCriterion(tokens, 'tokens'));
+  criteria.push(...checkRecipeMetadata(body, atPublish));
   return criteria;
 };
 
@@ -1545,8 +1580,8 @@ export const checkStructuralInvariants = (
   // content_item carry their own rules (dispatched here so the pipeline keeps
   // its single 'structure' group).
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
-  if (objectType === 'template') return checkTemplate(body, context);
-  if (objectType === 'section_template') return checkSectionTemplate(body);
+  if (objectType === 'template') return checkTemplate(body, context, atPublish);
+  if (objectType === 'section_template') return checkSectionTemplate(body, atPublish);
   if (objectType === 'theme') return checkTheme(body, atPublish);
   if (objectType === 'navigation') return checkNavigationStructure(body, context, atPublish);
   if (objectType === 'product') return checkProduct(body, context, atPublish);

@@ -14,6 +14,7 @@
 import { z } from 'zod';
 
 import { pageTypeIdSchema } from './page-v1.js';
+import { recipeMetadataShape } from './recipe-metadata-v1.js';
 import { sectionInstanceSchema, sectionTypeSchema } from './section-v1.js';
 
 export const TEMPLATE_SCHEMA_VERSION = 'template.v1';
@@ -41,6 +42,8 @@ export type TemplateSlot = z.infer<typeof templateSlotSchema>;
 export const templateBodySchema = z
   .object({
     name: z.string().min(1),
+    // Self-description (W8.3b): schema-optional, required to publish.
+    ...recipeMetadataShape,
     appliesTo: z.array(pageTypeIdSchema),
     slots: z.array(templateSlotSchema),
   })

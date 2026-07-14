@@ -138,3 +138,12 @@ test('splitRichTextBlocks: prose gets the full allowlist (p/h2/h3/ul/ol), still 
   assert.deepEqual(splitRichTextBlocks('<h3>Sub</h3>'), [{ tag: 'h3', html: 'Sub' }]);
   assert.throws(() => splitRichTextBlocks('<p>One</p>loose text'), /outside top-level p\/h2\/h3\/ul\/ol blocks/);
 });
+
+test('every registered component carries a useWhen one-liner (the W8.3b type-choosing index)', () => {
+  for (const definition of DEFINITIONS) {
+    const useWhen = definition.editor.useWhen;
+    assert.equal(typeof useWhen, 'string', `${definition.type} must carry editor.useWhen`);
+    assert.ok(useWhen!.trim().length > 0, `${definition.type} useWhen must not be empty`);
+    assert.ok(useWhen!.length <= 220, `${definition.type} useWhen is an index line, not an essay`);
+  }
+});

@@ -34,6 +34,11 @@ export const SEED_SITE = 'site_drlurie';
 
 export const templateInteriorBody = {
   name: 'Interior page',
+  description:
+    'The standard interior-page shape: a quiet lede opener, one or more prose body sections, and an optional closing CTA banner.',
+  whenToUse:
+    'The default recipe for any evergreen content page — guides, explainers, policies. Pick tpl_landing when the page must convert with a hero + highlight grid; tpl_legal for single-block system boilerplate.',
+  scope: 'evergreen',
   appliesTo: ['standard'],
   slots: [
     {
@@ -74,6 +79,10 @@ export const templateInteriorBody = {
 
 export const templateLandingBody = {
   name: 'Landing page',
+  description: 'The campaign/landing shape: hero opener, optional curated highlight grid, closing CTA banner.',
+  whenToUse:
+    'Conversion-weight pages — launches, program and offer pages, campaign destinations. For ordinary informational pages use tpl_interior.',
+  scope: 'evergreen',
   appliesTo: ['standard'],
   slots: [
     {
@@ -121,6 +130,11 @@ export const templateLandingBody = {
 
 export const templateLegalBody = {
   name: 'Legal page',
+  description:
+    'A minimal system-page recipe: one required prose slot with no blueprint — instantiation fills it from the prose registry defaultData (the standing proof of the fallback path).',
+  whenToUse:
+    'Legal and system boilerplate — privacy, terms, disclaimers — where the page is one run of prose and nothing else.',
+  scope: 'evergreen',
   appliesTo: ['system'],
   slots: [
     // No blueprint on purpose: instantiation falls back to the prose registry
