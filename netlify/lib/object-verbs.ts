@@ -155,8 +155,10 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
         page_id: objectId,
         // Insert position (clamped); appended when omitted.
         position: z.number().int().nonnegative().optional(),
-        lock_token: z.string().min(1),
-        expected_record_version: z.number().int().nonnegative(),
+        // Required for a REAL stamp (the handler 400s without them);
+        // optional here so dry_run previews need no checkout at all.
+        lock_token: z.string().min(1).optional(),
+        expected_record_version: z.number().int().nonnegative().optional(),
       }),
       z.object({
         kind: z.literal('standalone'),
@@ -634,6 +636,20 @@ export const handleObjectVerb = async (
         }
         resolvedBlueprints[ref] = parsedStpl.data.blueprint;
       }
+      // Re-check type-in-allowed at the LIVE instantiation point: the recipe
+      // may have been re-blueprinted since the template was created/validated
+      // (template_blueprint_refs is checked on template writes, not recipe
+      // writes — the recipe doesn't know who references it).
+      for (const slot of parsedTemplate.data.slots) {
+        if (!slot.blueprintRef || slot.allowed.length === 0) continue;
+        const refType = resolvedBlueprints[slot.blueprintRef]?.type;
+        if (refType && !slot.allowed.includes(refType)) {
+          return err(422, {
+            error: `Slot "${slot.slotId}": referenced blueprint type "${refType}" (${slot.blueprintRef}) is no longer in the slot's allowed set — the recipe changed since this template was written.`,
+            template_id: request.template_id,
+          });
+        }
+      }
 
       const built = buildPageBodyFromTemplate(parsedTemplate.data, {
         route: request.route,
@@ -722,30 +738,33 @@ export const handleObjectVerb = async (
 
       if (request.target.kind === 'page') {
         const target = request.target;
-        // Deterministic per (recipe, page, record version): a timed-out RETRY
-        // (same expected_record_version) re-mints the same id and upserts in
-        // place — idempotent; a deliberate SECOND stamp happens after the
-        // first bumped the version, so it gets a fresh id and inserts.
-        const sectionId = mintId(
-          { kind: 'section_instance' },
-          `${stplRecord.object_id}/${target.page_id}/${target.expected_record_version}`
-        );
-        const section = { ...deepClone(parsedStpl.data.blueprint), id: sectionId };
-        const op = {
+        // The section id is DETERMINISTIC in (recipe, page, record version):
+        // re-issuing the same stamp against the same version re-mints the
+        // same id (an upsert replaces in place — no duplicate), and after a
+        // lost response an agent can recover by dry-running with the
+        // ORIGINAL expected_record_version and checking whether the returned
+        // section_id already sits on the page. A deliberate second stamp
+        // happens after the version moved, so it gets a fresh id and inserts.
+        const mintStampId = (versionSeed: number) =>
+          mintId({ kind: 'section_instance' }, `${stplRecord.object_id}/${target.page_id}/${versionSeed}`);
+        const buildOp = (sectionId: string) => ({
           op: 'upsert_section',
-          section,
+          section: { ...deepClone(parsedStpl.data.blueprint), id: sectionId },
           ...(target.position !== undefined ? { position: target.position } : {}),
-        };
+        });
 
         if (request.dry_run) {
           // Preview: the exact op a real stamp would apply + candidate-patch
           // validation (apply on a clone, full pipeline) — nothing persisted,
-          // no lock required. This is how the W8.4 credentialed run proves
-          // page mode without probe mutations.
+          // NO lock or version needed (the current record version seeds the
+          // id when expected_record_version is omitted). This is how the
+          // W8.4 credentialed run proves page mode without probe mutations.
           const pageRecord = await loadRecord(store, objectRecordKey('page', target.page_id));
           if (!pageRecord) {
             return err(404, { error: 'Page not found', not_found: true, object_id: target.page_id });
           }
+          const sectionId = mintStampId(target.expected_record_version ?? pageRecord.version);
+          const op = buildOp(sectionId);
           const validation = validateCandidatePatch(pageRecord, [op], context);
           return ok({
             dry_run: true,
@@ -759,10 +778,20 @@ export const handleObjectVerb = async (
           });
         }
 
+        // A REAL stamp needs the caller's checkout (schema-optional only so
+        // dry_run can omit them).
+        if (target.lock_token === undefined || target.expected_record_version === undefined) {
+          return err(400, {
+            error:
+              'Page-mode stamping requires lock_token and expected_record_version from YOUR page checkout (only dry_run: true works without them).',
+          });
+        }
+
         // ONE upsert_section through the standard patch path under the
         // caller's lock — full PageType law, leaf rule, reference integrity;
         // the history entry carries the recipe provenance; the inverse
         // (remove_section) comes free from the capture.
+        const sectionId = mintStampId(target.expected_record_version);
         const result = await handleObjectVerb(
           store,
           {
@@ -771,12 +800,17 @@ export const handleObjectVerb = async (
             object_id: target.page_id,
             lock_token: target.lock_token,
             expected_record_version: target.expected_record_version,
-            ops: [op],
+            ops: [buildOp(sectionId)],
           },
           principal,
           { ...options, patchEntryDetails: { instantiated_from: stplRecord.object_id } }
         );
-        if (result.status !== 200) return result;
+        // On conflict (409 after a lost response), surface the id this
+        // version WOULD have minted so the agent can check whether the first
+        // write actually landed before re-stamping at the new version.
+        if (result.status !== 200) {
+          return { status: result.status, body: { ...result.body, section_id_for_expected_version: sectionId } };
+        }
         return ok({ ...result.body, instantiated_from: stplRecord.object_id, section_id: sectionId });
       }
 

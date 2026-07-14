@@ -138,7 +138,7 @@ test('page mode stamps a deep copy under the caller lock: fresh id, position hon
   assert.equal((loadPage(store, 'page_probe').body as PageBody).sections.length, 1, 'the stamp is fully undoable');
 });
 
-test('a second stamp after the version moved inserts ANOTHER copy with a distinct id (retries stay idempotent per version)', async () => {
+test('a second stamp after the version moved inserts ANOTHER copy with a distinct id (same-version re-issues replace in place)', async () => {
   const store = createMemoryStore();
   await seedObject(store, 'section_template', 'stpl_cta', ctaRecipeBody());
   await seedObject(store, 'page', 'page_probe', standardPageBody());
@@ -164,6 +164,13 @@ test('page mode REQUIRES the caller lock (423) and a current version (409) — t
   await seedObject(store, 'section_template', 'stpl_cta', ctaRecipeBody());
   await seedObject(store, 'page', 'page_probe', standardPageBody());
 
+  const missingCheckout = await call(store, {
+    action: 'instantiate_section',
+    section_template_id: 'stpl_cta',
+    target: { kind: 'page', page_id: 'page_probe' },
+  });
+  assert.equal(missingCheckout.status, 400, 'a real stamp without checkout fields is a clear 400, not a zod error');
+
   const noLock = await call(store, {
     action: 'instantiate_section',
     section_template_id: 'stpl_cta',
@@ -178,6 +185,9 @@ test('page mode REQUIRES the caller lock (423) and a current version (409) — t
     target: { kind: 'page', page_id: 'page_probe', lock_token: lockToken, expected_record_version: 0 },
   });
   assert.equal(stale.status, 409);
+  // Lost-response recovery affordance: the 409 names the id that version
+  // would have minted, so the agent can check whether its stamp landed.
+  assert.equal(typeof stale.body.section_id_for_expected_version, 'string');
 });
 
 test('LAW BEATS RECIPE: stamping a type the PageType disallows is a 422 and persists nothing', async () => {
@@ -203,7 +213,7 @@ test('LAW BEATS RECIPE: stamping a type the PageType disallows is a 422 and pers
   assert.equal((loadPage(store, 'page_listing').body as PageBody).sections.length, 1, 'nothing persisted');
 });
 
-test('page-mode dry_run previews the exact op + validation with NO lock and NO persistence', async () => {
+test('page-mode dry_run previews the exact op + validation with NO checkout fields and NO persistence', async () => {
   const store = createMemoryStore();
   await seedObject(store, 'section_template', 'stpl_cta', ctaRecipeBody());
   await seedObject(store, 'page', 'page_probe', standardPageBody());
@@ -211,7 +221,7 @@ test('page-mode dry_run previews the exact op + validation with NO lock and NO p
   const res = await call(store, {
     action: 'instantiate_section',
     section_template_id: 'stpl_cta',
-    target: { kind: 'page', page_id: 'page_probe', position: 1, lock_token: 'unused', expected_record_version: 1 },
+    target: { kind: 'page', page_id: 'page_probe', position: 1 },
     dry_run: true,
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
@@ -331,6 +341,29 @@ test('CREATE-time law: a template with a dangling or type-mismatched blueprintRe
     requested_id: 'tpl_mismatch',
   });
   assert.equal(mismatched.status, 422, JSON.stringify(mismatched.body));
+});
+
+test('INSTANTIATE-time law: a recipe re-blueprinted to a type outside the slot allowed set fails the instantiate with 422', async () => {
+  const store = createMemoryStore();
+  await seedObject(store, 'section_template', 'stpl_hero_landing', heroRecipeBody());
+  await seedObject(store, 'template', 'tpl_composed', refTemplateBody());
+
+  // The recipe changes AFTER the template was created/validated: its
+  // blueprint becomes a cta_banner while the slot still allows only hero.
+  const key = objectRecordKey('section_template', 'stpl_hero_landing');
+  const record = JSON.parse(store.blobs.get(key)!) as ObjectRecord;
+  record.body = ctaRecipeBody();
+  store.blobs.set(key, JSON.stringify(record));
+
+  const res = await call(store, {
+    action: 'instantiate',
+    template_id: 'tpl_composed',
+    site: 'site_drlurie',
+    route: '/composed',
+    title: 'Composed page',
+  });
+  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.match(String(res.body.error), /no longer in the slot's allowed set/);
 });
 
 test('INSTANTIATE-time law: a ref that vanished after template creation fails the instantiate with 422', async () => {
