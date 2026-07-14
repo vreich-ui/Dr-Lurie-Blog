@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-13T18:25:11.944Z",
+    "at": "2026-07-14T11:13:00.913Z",
     "from": "objects/page/by-id/page_object_showcase.json",
-    "record_version": 7
+    "record_version": 27
   },
   "pageType": "standard",
   "route": "/object-showcase",
@@ -360,6 +360,225 @@
       },
       "id": "s_shared",
       "type": "shared_ref"
+    },
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>Below: each block in its minimal / short / no-image / max-image states, so edge cases and missing affordances are visible next to the fully-populated versions above.</p>",
+        "heading": "Content-state variants",
+        "kicker": "Variants"
+      },
+      "id": "s_variants",
+      "type": "lede"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Primary",
+            "style": "primary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          },
+          {
+            "label": "Secondary",
+            "style": "secondary",
+            "target": {
+              "href": "https://example.com",
+              "kind": "external"
+            }
+          }
+        ],
+        "body": "<p>This hero holds a longer, multi-sentence paragraph so we can see how the block handles a full block of copy rather than a single line. It should wrap gracefully, keep the heading dominant, and leave the two action buttons legible at the bottom.</p><p>A second paragraph pushes the vertical rhythm further to expose any spacing or truncation issues.</p>",
+        "heading": "A hero carrying a full paragraph of body text",
+        "kicker": "Hero — long copy"
+      },
+      "id": "s_herofull",
+      "type": "hero"
+    },
+    {
+      "data": {
+        "actions": [],
+        "heading": "Hero — heading only (nothing else set)"
+      },
+      "id": "s_heromin",
+      "type": "hero"
+    },
+    {
+      "data": {
+        "body": "<p>A short prose paragraph: two sentences of body copy. Enough to see mid-length rendering without a heading or list.</p>"
+      },
+      "id": "s_proseshort",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "body": "<p>A single sentence of prose, nothing more.</p>"
+      },
+      "id": "s_proseoneline",
+      "type": "prose"
+    },
+    {
+      "data": {
+        "body": "<p>A bio block with the portrait omitted, to see how the layout handles a missing image (it should not look like a broken link).</p>",
+        "heading": "Bio — no portrait",
+        "kicker": "About",
+        "trustNotes": [
+          "One trust note"
+        ]
+      },
+      "id": "s_bionoimg",
+      "type": "bio"
+    },
+    {
+      "data": {
+        "actions": [
+          {
+            "label": "Learn more",
+            "style": "primary",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ],
+        "body": "<p>The side-by-side block with its images omitted entirely, to check the text-only fallback.</p>",
+        "heading": "Split — no image",
+        "images": [],
+        "kicker": "Feature"
+      },
+      "id": "s_splitnoimg",
+      "type": "content_split"
+    },
+    {
+      "data": {
+        "actions": [],
+        "body": "<p>The side-by-side block carrying two images, to check the multi-image layout.</p>",
+        "heading": "Split — two images (max)",
+        "images": [
+          {
+            "alt": "First demo image",
+            "src": "/images/dr-lurie-portrait4.jpeg"
+          },
+          {
+            "alt": "Second demo image",
+            "src": "/images/dr-lurie-portrait4.jpeg"
+          }
+        ],
+        "kicker": "Feature"
+      },
+      "id": "s_splitmaximg",
+      "type": "content_split"
+    },
+    {
+      "data": {
+        "heading": "Checklist — one item",
+        "items": [
+          "The only item in the list"
+        ]
+      },
+      "id": "s_checkmin",
+      "type": "checklist"
+    },
+    {
+      "data": {
+        "actions": [],
+        "heading": "CTA banner — heading only, no body or buttons"
+      },
+      "id": "s_ctamin",
+      "type": "cta_banner"
+    },
+    {
+      "data": {
+        "heading": "FAQ — one question",
+        "items": [
+          {
+            "a": "<p>One short answer.</p>",
+            "q": "Just one question?"
+          }
+        ]
+      },
+      "id": "s_faqmin",
+      "type": "faq"
+    },
+    {
+      "data": {
+        "heading": "Testimonial — single quote",
+        "quotes": [
+          {
+            "quote": "A single quote with no attribution set."
+          }
+        ]
+      },
+      "id": "s_quotesmin",
+      "type": "testimonial"
+    },
+    {
+      "data": {
+        "heading": "Steps — two, no kicker",
+        "items": [
+          {
+            "description": "Do the first thing.",
+            "title": "First"
+          },
+          {
+            "description": "Then the second.",
+            "title": "Second"
+          }
+        ]
+      },
+      "id": "s_stepsmin",
+      "type": "steps"
+    },
+    {
+      "data": {
+        "columns": 1,
+        "heading": "Cards — one card, one column",
+        "limit": 1,
+        "source": {
+          "cards": [
+            {
+              "description": "The only cell in this grid.",
+              "title": "Solo card"
+            }
+          ],
+          "kind": "cards"
+        }
+      },
+      "id": "s_cardsmin",
+      "type": "content_grid"
+    },
+    {
+      "data": {
+        "links": [
+          {
+            "label": "A single link, no heading",
+            "target": {
+              "href": "/learn/library",
+              "kind": "route"
+            }
+          }
+        ]
+      },
+      "id": "s_linksmin",
+      "type": "link_list"
+    },
+    {
+      "data": {
+        "heading": "Pricing — one tier",
+        "tiers": [
+          {
+            "features": [
+              "Free"
+            ],
+            "product": "prod_starter_checklist"
+          }
+        ]
+      },
+      "id": "s_pricingmin",
+      "type": "pricing_table"
     }
   ],
   "seo": {
