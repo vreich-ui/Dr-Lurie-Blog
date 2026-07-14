@@ -102,7 +102,7 @@ section template (§4), exactly as a page's section may reference a shared
 section — always dereferenced **at instantiation, by deep copy**. Editing a
 recipe never changes anything already instantiated from it.
 
-## 2. `section_template` — the tenth object type
+## 2. `section_template` — the new section-recipe object type
 
 ### 2.1 Why a new type (decision record)
 
@@ -314,7 +314,7 @@ on-demand candidates, named so the next need doesn't improvise:
 `content_split.imageLayout ('stagger'|'stack')`. Add only when a real recipe
 or page needs one.
 
-## 6. `theme` — the eleventh object type, and `site_apply_theme`
+## 6. `theme` — the brand-token recipe object type, and `site_apply_theme`
 
 ### 6.1 What it is (and is not)
 
