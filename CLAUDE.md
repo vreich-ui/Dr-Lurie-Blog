@@ -77,7 +77,7 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   call; the shop build runs in its own session).
   **W7 CONVERTED (2026-07-13: W7.3 + W7.8 built; W7.9 credentialed run the
   same day via the session MCP connection — the type's five criteria all
-  hold)**: `content_item` is the NINTH governed type — the
+  hold)**: `content_item` joined the governed set — the
   annotated-node article model (every block carries `private.strategy`
   hook/agitation/…/resolution + `intent`, the original architecture's
   semantic layer, imported verbatim; envelope claims/sources/compliance/
@@ -117,10 +117,13 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   W8.4 credentialed run same day via the session MCP connection; conversion
   completes on the four application-verb production proofs, the FIRST ACT of
   the next session)**: the RECIPE FAMILY —
-  `section_template` (tenth governed type; stpl_hero_landing /
+  `section_template` (stpl_hero_landing /
   stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
-  stpl_cta_banner) and `theme` (eleventh; thm_drlurie_default, the
-  production palette verbatim — applying it is a no-op) — plus
+  stpl_cta_banner) and `theme` (thm_drlurie_default, the
+  production palette verbatim — applying it is a no-op) — completing the
+  TEN governed types (`objectTypes` in `src/schema/object-record-v1.ts` is
+  the authoritative list; older session logs' "ninth/tenth/eleventh
+  governed type" labels over-count by one) — plus
   `object_instantiate_section_template` (stamp a section from a recipe,
   standalone or page mode), `site_apply_theme` (exact-replace token apply
   with stale-key nulls), template `blueprintRef` composition, CSS-token
