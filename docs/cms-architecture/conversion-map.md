@@ -11,9 +11,7 @@
 >
 > Status marks match [`object-inventory.md`](object-inventory.md):
 > 🟢 CONVERTED (all five playbook criteria) · 🟣 RENDERS (export only — a
-> rendered stub) · 🔴 TODO (no object at all) · 🔵 optional — or, on the W8
-> recipe nodes only, RELEASED-not-yet-converted (store-backed + published +
-> released; flips 🟢 when the application-verb production proofs pass) ·
+> rendered stub) · 🔴 TODO (no object at all) · 🔵 optional ·
 > ⚪ potential (does not exist; composable from other objects) · ⛔ never an
 > object.
 >
@@ -29,6 +27,8 @@
 ```text
 site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07-11; export commit a20f107)
 │   the root everything hangs off; seed scripts/lib/site-seed-data.mjs → export src/data/site/site.json
+│   ⚠ SEED STALE vs production since the 2026-07-13 live rebrand (brandTokens + heading font):
+│     do NOT run the site family through the reconcile driver until the seed is updated
 │   LIVE from the object (pre-conversion literals as fallback when the export is absent):
 │     brandTokens (every CustomStyles custom property, light + dark:` keys) · logo.text ·
 │     chrome{showRssFeed, showThemeToggle} · metadataDefaults (title template, description,
@@ -241,7 +241,7 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │     🟢 W8.2 (SHIPPED): slots gain optional `blueprintRef`
 │       → a section_template, dereferenced + deep-copied at instantiation only
 │
-├── 🔵 SECTION TEMPLATES ─ type: section_template ─ RELEASED, not yet converted (W8.4 run 2026-07-14 —
+├── 🟢 SECTION TEMPLATES ─ type: section_template ─ CONVERTED (W8.4 run 2026-07-14; verb proofs 2026-07-15 —
 │     [`09-template-system-plan.md`](09-template-system-plan.md) §2–§3): the section-level
 │     recipe — {name · description · whenToUse · scope · blueprint: ONE pre-configured
 │     sectionInstance}; ops set_section_template_meta · replace_blueprint ·
@@ -249,24 +249,26 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │     `object_instantiate_section_template` stamps the blueprint into a page (one
 │     upsert_section under the caller's lock) or mints a standalone sec_* object;
 │     blueprint must be a standalone-placeable type (no card leaf, no shared_ref);
-│     CONVERSION GATE: the stamp verb's production dry_run (both modes) has NOT run
-│     (frozen tool-snapshot blocker; verb live + contract-advertised + suite-tested) —
-│     rows flip 🟢 only after it passes (first act of next session)
-│   ├── 🔵 stpl_hero_landing ─ hero (the page_home s_hero shape)
-│   ├── 🔵 stpl_audience_grid ─ content_grid `cards` (the sec_home_audience_grid shape)
-│   ├── 🔵 stpl_related_articles ─ content_grid `related`/tag_similarity (the page_article shape)
-│   ├── 🔵 stpl_newsletter_cta ─ newsletter_signup (the sec_newsletter_signup shape)
-│   └── 🔵 stpl_cta_banner ─ cta_banner (the W1/about closing-CTA shape)
+│     stamp verb PROVEN in production 2026-07-15: dry_run BOTH modes × EACH record
+│     (10/10 eligible, zero blockers)
+│   ├── 🟢 stpl_hero_landing ─ hero (the page_home s_hero shape)
+│   ├── 🟢 stpl_audience_grid ─ content_grid `cards` (the sec_home_audience_grid shape)
+│   ├── 🟢 stpl_related_articles ─ content_grid `related`/tag_similarity (the page_article shape)
+│   ├── 🟢 stpl_newsletter_cta ─ newsletter_signup (the sec_newsletter_signup shape)
+│   └── 🟢 stpl_cta_banner ─ cta_banner (the W1/about closing-CTA shape)
 │
-├── 🔵 THEMES ─ type: theme ─ RELEASED, not yet converted (W8.4 run 2026-07-14 —
+├── 🟢 THEMES ─ type: theme ─ CONVERTED (W8.4 run 2026-07-14; verb proofs 2026-07-15 —
 │     [`09-template-system-plan.md`](09-template-system-plan.md) §6): preset for
 │     site.brandTokens — {name · description · whenToUse · scope · tokens};
 │     op set_theme_fields (round-tripped in production); `site_apply_theme` computes ONE
 │     exact-replace set_site_fields op (stale keys unset) under the caller's site checkout.
 │     NOT taxonomy: nothing resolves against a theme; the site never live-inherits — apply
-│     copies values. CONVERSION GATE: apply_theme production dry_run + one real no-op
-│     default apply have NOT run (same blocker) — flips 🟢 only after they pass.
-│   └── 🔵 thm_drlurie_default ─ tokens imported from site-seed (byte-identical to production)
+│     copies values. apply_theme PROVEN in production 2026-07-15 (dry_run + one real
+│     apply end-to-end). ⚠ the real apply exposed LIVE-PALETTE DRIFT: production was
+│     rebranded 2026-07-13 after the seeds; apply put the old palette live ~6 min; restored
+│     byte-exact (eba0c42). thm_drlurie_default now ≠ live palette; site seed stale.
+│   └── 🟢 thm_drlurie_default ─ tokens from site-seed (⚠ NO LONGER matches live production —
+│         the 2026-07-13 rebrand postdates the seed; Wolf decides update-vs-keep)
 │
 ├── MEDIA / ARTIFACTS ─ artifact store (images, PDFs) ─ 🔵 pipeline exists (upload/trust);
 │     refs consumed by: bio.portraitAssetRef · about.portrait · product cards · article images
@@ -306,7 +308,7 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 | W5         | RE-GROUNDED in the shop module (2026-07-12 — see [`06-shop-module-plan.md`](06-shop-module-plan.md)): /pricing renders pricing_table tiers FROM product objects; shop-preview → content_split; /services + product content use MOCKUP data (Wolf, 2026-07-12 — supersedes the copy-or-delete wait). The ⚪ types mint after S1–S3 of the shop build. **S1+S2+S3 DONE 2026-07-12 (the full §9 critical path)**: `product` is the eighth object type (S1a), commerce/event stores + checkout→webhook→token delivery live (S1b/c, PRs #411–#413), /shop + /shop/[slug] render from 3 MOCK products + page_shop (first catch-all-served page) + page_product_detail. **W5 pages CONVERTED (credentialed run 2026-07-13)**: pricing_table/steps/content_split minted; /pricing, /services, /solutions/shop-preview are store-backed + published + released page objects, route files deleted; `commerce_orders` admin tool live. The 3 MOCK products stay at approval_required (review-required gate) — Wolf approves in /admin/objects to flip them too | New reusable section types (pricing_table, steps, content_split) — DONE 2026-07-12       | M-L  |
 | W6         | ✅ CONVERTED (credentialed run 2026-07-12): listing/content_detail PageTypes defined; 6 page objects (library, topics ×2, category, tag, article) store-backed, round-tripped, published, released — byte-identical cutover held | Biggest chunk; formalizes listing loaders; connects pages ↔ articles                | L    |
 | W7         | PLANNED (2026-07-12 — see [`08-articles-plan.md`](08-articles-plan.md); Wolf resolved OQ-8: **one-time migration**, adapter retired): `content_item` becomes the ninth object type (keeps `req_*` ids; artifact trust unchanged); node envelope (strategy/intent/commercial — the DTC semantic layer, preserved by directive) stays the spine, `public.body` upgrades to `rich_text.v1` (Contentful model, substrate built in-wave incl. section bodies); one renderer for build/admin/canvas; `create_variant` + scores as the A/B substrate; ~31 tool names become aliases over object verbs; per-article cutover + DOM-equivalence harness over the 83 posts; canvas-for-articles as the final phase. Phases W7.1–W7.9, each its own session. | Wolf's 2026-07-12 rulings supersede "post-MVP"; the §3.10 freeze lifts only inside approved phases | XL   |
-| W8         | RELEASED — not yet converted (built W8.1–W8.3b + W8.4 credentialed run, all 2026-07-14 — see [`09-template-system-plan.md`](09-template-system-plan.md)): the **recipe family** completes rule 5 — `section_template` (5 starter recipes live) + page-template `blueprintRef` composition + `theme` (`thm_drlurie_default` live; applied by `site_apply_theme`, exact-replace semantics) — completing the TEN governed types (`objectTypes`, `src/schema/object-record-v1.ts`) + rule 6 (layout = bounded data fields, never CSS) + W8.3b recipe metadata / creation-policy seam / reuse-first surfacing. Leaf-section fix + token value safety on `site` folded in. CONVERSION GATE still open: application-verb production dry_runs (next session — frozen tool-snapshot blocker); the family counts as converted only after they pass. Composable "composite" sections remain SPEC-ONLY, gated on OQ-W8-1…4 | Completes the recipe side of rule 5; makes new sections + re-skins zero-code agent actions | M-L  |
+| W8         | CONVERTED (built W8.1–W8.3b + W8.4 credentialed run 2026-07-14; verb proofs 2026-07-15 — see [`09-template-system-plan.md`](09-template-system-plan.md)): the **recipe family** completes rule 5 — `section_template` (5 starter recipes live) + page-template `blueprintRef` composition + `theme` (`thm_drlurie_default` live; applied by `site_apply_theme`, exact-replace semantics) — completing the TEN governed types (`objectTypes`, `src/schema/object-record-v1.ts`) + rule 6 (layout = bounded data fields, never CSS) + W8.3b recipe metadata / creation-policy seam / reuse-first surfacing. Leaf-section fix + token value safety on `site` folded in. Application verbs PROVEN in production 2026-07-15 (stamp dry_run both modes × each stpl; apply dry_run + one real apply — which exposed live-palette drift, reverted byte-exact; theme/site seeds now stale vs production, Wolf to rule). Composable "composite" sections remain SPEC-ONLY, gated on OQ-W8-1…4 | Completes the recipe side of rule 5; makes new sections + re-skins zero-code agent actions | M-L  |
 | any        | Housekeeping: delete /homes/\* demos · retire `checklist` type (or keep as reusable) · archive/unpublish MCP verbs · announcement object if wanted                                                                         | Independent, non-blocking                                                            | S    |
 
 **Keep this file current:** whenever an object converts, flip its mark here AND

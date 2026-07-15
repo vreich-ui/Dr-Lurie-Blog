@@ -7,6 +7,49 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-15 (W8.4 verb proofs — recipe family CONVERTED, 41 → 47; the "no-op" apply exposed live-palette drift, reverted byte-exact)
+
+Wolf reset the MCP connector ("connection is reset. continue") — the fresh
+registry exposed `object_instantiate_section_template` and
+`site_apply_theme`, unblocking the four proofs deferred from Session E.
+
+- **Stamp proofs (per-object, the W2.5 precedent):** dry_run in BOTH modes
+  (standalone + page mode onto page_object_showcase) for EACH of the five
+  `stpl_*` records — 10/10 `eligible: true`, zero blockers; deterministic
+  minted section ids; PageType law / route uniqueness / placeability all
+  exercised on the page-mode candidate patch.
+- **Theme proofs:** `site_apply_theme` dry_run (computed exact-replace
+  `set_site_fields` op, full token set, `brand_token_values` green), then
+  ONE REAL apply under a site checkout — atomic op (content_revision 7),
+  `applied_theme` in history, validate clean, publish (`ec2cbd3`), checkin,
+  release (deploy ready 09:30:57Z). **Criterion 3 now holds for both types
+  → recipe family CONVERTED, count 41 → 47.**
+- **INCIDENT — the "no-op" premise was false:** production's brandTokens
+  had been REBRANDED on 2026-07-13 (teal/terracotta palette + Source Serif
+  heading font; site published at content_revision 6) AFTER the seed corpus
+  was written, so the theme (authored from the SEED, verified against the
+  seed by the W8.3 tests) reverted the live look. The wrong palette was live ~6 minutes
+  (09:30:57–09:37:13Z); detected via the export diff; restored byte-exact by patching the pre-apply
+  brandTokens back (`set_site_fields`, publish `eba0c42`, release).
+  **Lesson: "byte-identical to production" claims must be checked against
+  the LIVE record at apply time — the seed corpus is not production.**
+- **Open follow-ups (Wolf's call):** (1) `thm_drlurie_default` no longer
+  matches the live palette — update it to the 2026-07-13 rebrand (restores
+  the "applying is a no-op" invariant) or keep it as the launch palette
+  with corrected metadata; (2) `scripts/lib/site-seed-data.mjs` is stale vs
+  production — a site-family reconcile run would "heal" the rebrand away;
+  update the seed before any such run.
+- Endpoint flakiness persisted (502s/timeouts); the verify-before-retry
+  discipline held — every timed-out mutation had landed (incl. both site
+  publishes and both releases). A post-reset harness quirk: one tool's
+  approval died with a broken permission stream ("requires approval" on
+  `object_inventory`); worked around with already-approved reads.
+- Docs flipped in this change: CLAUDE.md (forty-seven + W8 CONVERTED
+  paragraph with drift caveats), object-inventory (🟢 table, verb-proof
+  record, follow-ups), conversion-map (🟢 marks, site-seed stale warning,
+  W8 row), 09-plan (status header, §1 table, W8.4 row, RUN OUTCOME
+  COMPLETE).
+
 ## Session 2026-07-14 E (W8.4 RUN — Wolf's go: recipe family RELEASED, not yet converted; the four application-verb production proofs are the open gate — first act of next session, then 41 → 47)
 
 Wolf: "do W8.4" (after merging W8.3b as PR #442). Run executed via the

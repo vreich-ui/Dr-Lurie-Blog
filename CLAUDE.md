@@ -25,14 +25,11 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   passes all five. Rendering-only work is labelled "rendered, not converted."
 - **After EVERY session, update the documentation.** An object does not count as
   converted without a written record of it (inventory row + session-log entry).
-- Reality as of 2026-07-14: **forty-one objects are converted** (the 37 below
+- Reality as of 2026-07-15: **forty-seven objects are converted** (the 37 below
   + the 3 W5 pages, credentialed run 2026-07-13 + the FIRST ARTICLE OBJECT,
-  W7.9 run 2026-07-13), **plus 6 W8 recipe objects RELEASED but not yet
-  counted as converted** (5 section templates + the default theme, W8.4 run
-  2026-07-14: store-backed, every patch op round-tripped in production,
-  published, released — they flip to converted, 41 → 47, only when the
-  application-verb production dry_runs pass; see the W8 paragraph below) —
-  the 3 nav
+  W7.9 run 2026-07-13 + the 5 SECTION TEMPLATES and the DEFAULT THEME, W8.4
+  run 2026-07-14 with the application-verb production proofs completed
+  2026-07-15; see the W8 paragraph below) — the 3 nav
   objects, all 12 page objects (home + about + the 8 W1 interior/system pages +
   page_contact + page_thank_you), the 12 shared sections under home/about, the
   3 templates (tpl_interior/landing/legal), the `tax_drlurie` taxonomy
@@ -113,14 +110,13 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   (re-point internal surfaces; reduced — no aliases), W7.7 (admin editor +
   annotation panel + document-body canvas editing), OQ-W7-3 (strategy
   registry go/no-go).
-  **W8 RELEASED — NOT YET CONVERTED (2026-07-14: W8.1–W8.3b built + merged;
-  W8.4 credentialed run same day via the session MCP connection; conversion
-  completes on the four application-verb production proofs, the FIRST ACT of
-  the next session)**: the RECIPE FAMILY —
+  **W8 CONVERTED (2026-07-14 run + 2026-07-15 application-verb production
+  proofs, both via the session MCP connection)**: the RECIPE FAMILY —
   `section_template` (stpl_hero_landing /
   stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
   stpl_cta_banner) and `theme` (thm_drlurie_default, the
-  production palette verbatim — applying it is a no-op) — completing the
+  LAUNCH palette — ⚠ NOT the live palette since the 2026-07-13 rebrand;
+  applying it is NOT a no-op, see the drift incident below) — completing the
   TEN governed types (`objectTypes` in `src/schema/object-record-v1.ts` is
   the authoritative list; older session logs' "ninth/tenth/eleventh
   governed type" labels over-count by one) — plus
@@ -136,17 +132,23 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   pre-materialization). All 9 objects: created/reconciled → every
   permitted patch op drilled with exact inverses → published → released
   (deploy ready 2026-07-14T16:23Z); store === seed === export verified.
-  THE GATE THAT KEEPS THIS "RELEASED, NOT CONVERTED" (playbook criterion 3
-  — every permitted action proven, not assumed; the W2.5 template precedent
-  proved `instantiate` in production before flipping): the application-verb
-  production dry_runs (instantiate_section BOTH modes × EACH of the 5 stpl
-  records — per-object conversion; apply_theme dry_run
-  + one real no-op default apply) could not run — the converting session's
-  frozen MCP tool snapshot predated the W8 deploys (a session snapshot
-  never refreshes); they are verb-level-tested in the merged suite and are
-  the FIRST ACT of the next session, which flips the docs to CONVERTED
-  (41 → 47). tpl_fieldtest (the 2026-07-08 fieldtest leftover) still lacks
-  the metadata trio — patching it 422s until backfilled or retired.
+  APPLICATION-VERB PROOFS (2026-07-15, after a connector reset exposed the
+  W8 tools): instantiate_section dry_run BOTH modes × EACH of the 5 stpl
+  records (10/10 eligible, zero blockers) + apply_theme dry_run + ONE REAL
+  default apply end-to-end (atomic op, applied_theme in history, publish,
+  release). **The real apply exposed LIVE-PALETTE DRIFT:** the site's
+  brandTokens had been rebranded in production on 2026-07-13 (teal/
+  terracotta, Source Serif heading) AFTER the seeds were written, so the
+  "no-op" apply actually put the old palette live for ~6 minutes (09:30:57–09:37:13Z); restored
+  byte-exact (export commit `eba0c42`) and re-released. OPEN FOLLOW-UPS:
+  (1) thm_drlurie_default's tokens now DON'T match live production — its
+  description/whenToUse ("applying it is a no-op") are stale; Wolf decides
+  whether to update it to the live palette or keep it as the launch
+  palette. (2) `scripts/lib/site-seed-data.mjs` is stale vs production —
+  running the site-family driver would "heal" the live rebrand away; do
+  NOT reconcile the site until the seed is updated. tpl_fieldtest (the
+  2026-07-08 fieldtest leftover) still lacks the metadata trio — patching
+  it 422s until backfilled or retired.
 
 ## Core structure — read [`docs/cms-architecture/core-structure.md`](docs/cms-architecture/core-structure.md) FIRST
 
