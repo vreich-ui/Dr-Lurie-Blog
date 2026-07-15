@@ -1,6 +1,20 @@
 import path from 'node:path';
 
-import sharp from 'sharp';
+import type sharpType from 'sharp';
+
+// sharp's native libvips binding dominates cold-start module evaluation for
+// every function that bundles this file (the /mcp endpoint included, via
+// save-artifact and artifact-upload). Loading it on first image validation
+// instead of at import keeps initialize/tools/list and all non-image tool
+// calls off that cost. Cached per runtime instance.
+let cachedSharp: typeof sharpType | undefined;
+
+const loadSharp = async (): Promise<typeof sharpType> => {
+  if (!cachedSharp) {
+    cachedSharp = (await import('sharp')).default;
+  }
+  return cachedSharp;
+};
 
 const supportedFormats = new Set(['jpeg', 'png', 'webp']);
 
@@ -80,7 +94,7 @@ export const validatePublishImageBytes = async ({
   });
   const expectedFormat = extensionFormat ?? contentTypeFormat;
 
-  let metadata: sharp.Metadata;
+  let metadata: sharpType.Metadata;
 
   if (normalizedContentType && !contentTypeFormat) {
     throw new ImageValidationError({
@@ -90,6 +104,11 @@ export const validatePublishImageBytes = async ({
       reason: `declared unsupported content type ${normalizedContentType}`,
     });
   }
+
+  // Loaded outside the decode try/catch: a broken sharp install must surface
+  // as the raw module error (as it did when this was a top-level import),
+  // never be misreported as invalid image bytes.
+  const sharp = await loadSharp();
 
   try {
     metadata = await sharp(bytes, { failOn: 'error' }).metadata();
