@@ -298,6 +298,46 @@ test('discard ACCEPTS a real privileged palette entry from history and reverts t
   assert.deepEqual(result.record.body, original.body, 'the palette returns to its pre-apply state');
 });
 
+test('discard restores a LEGACY palette entry (pre-rollout set_site_fields{brandTokens}) via the privileged op', () => {
+  // A history entry from before the theme-only ban: a set_site_fields whose
+  // fields carried brandTokens. It no longer parses under the grammar, but its
+  // real, history-verified capture must still revert (not 400).
+  const original = siteRecord();
+  const legacyForwardOp = { op: 'set_site_fields', fields: { brandTokens: { colors: { primary: '#00ff00' } } } };
+  const legacyCapture = {
+    kind: 'fields',
+    before: { brandTokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } } },
+    after: { brandTokens: { colors: { primary: '#00ff00' } } },
+  };
+  // Splice the legacy entry into history exactly as the old engine would have.
+  const withLegacy: ObjectRecord = {
+    ...original,
+    body: { ...(original.body as object), brandTokens: { colors: { primary: '#00ff00' } } },
+    history: [...original.history, { at: AT, action: 'set_site_fields', actor: agentActor, details: { op: legacyForwardOp, capture: legacyCapture } }],
+  };
+  const result = discardProposal(withLegacy, {
+    entries: [{ op: legacyForwardOp, capture: legacyCapture }],
+    actor: reviewer,
+    at: LATER,
+  });
+  assert.equal(result.ok, true, JSON.stringify(result.ok ? '' : result.body));
+  if (!result.ok) return;
+  assert.deepEqual(
+    (result.record.body as { brandTokens: unknown }).brandTokens,
+    legacyCapture.before.brandTokens,
+    'the pre-edit palette is restored'
+  );
+
+  // …but a FORGED legacy palette entry (not in history) is still refused.
+  const forged = discardProposal(original, {
+    entries: [{ op: legacyForwardOp, capture: legacyCapture }],
+    actor: reviewer,
+    at: LATER,
+  });
+  assert.equal(!forged.ok && forged.status, 403);
+  assert.equal(!forged.ok && forged.body.code, 'discard_privileged_unverified');
+});
+
 test('discard rejects malformed entries and empty batches loudly', () => {
   const record = pageRecord();
   const empty = discardProposal(record, { entries: [], actor: reviewer, at: AT });
