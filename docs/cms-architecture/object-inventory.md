@@ -299,7 +299,7 @@ object — the application-verb production proofs ran 2026-07-15:
 | `stpl_related_articles` | `section_template` | 🟢 CONVERTED | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
 | `stpl_newsletter_cta`   | `section_template` | 🟢 CONVERTED | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
 | `stpl_cta_banner`       | `section_template` | 🟢 CONVERTED | Closing CTA banner — the interior-page closer.                                                                                         |
-| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The launch palette, 19 color keys + 3 font stacks — ⚠ no longer matches live production (2026-07-13 rebrand; see the drift caveat below). `set_theme_fields` round-tripped; apply verb proven end-to-end. |
+| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The canonical palette, 19 color keys + 3 font stacks — live again since Wolf's ordered restore (2026-07-15). `set_theme_fields` round-tripped; apply verb proven end-to-end (twice). |
 
 All six: created in production (`agent_name: w84-conversion-run`) → every
 permitted patch op drilled with exact inverses (stpl:
@@ -320,12 +320,18 @@ publish `ec2cbd3`, release). **The real apply exposed LIVE-PALETTE DRIFT:**
 the site's brandTokens were rebranded in production on 2026-07-13 (teal/
 terracotta, Source Serif heading) after the seeds were written, so the
 "no-op" apply put the old palette live for ~6 minutes (09:30:57–09:37:13Z);
-restored byte-exact (export commit `eba0c42`) and re-released. OPEN
-FOLLOW-UPS: (1) `thm_drlurie_default`'s tokens do NOT match live production
-— its description/whenToUse are stale until Wolf decides whether it becomes
-the live palette or stays the launch palette; (2) `site-seed-data.mjs` is
-stale vs production — do NOT reconcile the site family until the seed is
-updated (a driver run would "heal" the live rebrand away).
+restored byte-exact (export commit `eba0c42`) and re-released. RESOLVED
+SAME DAY (Wolf's ruling): the 2026-07-13 palette change was an agent's
+casual color edit, not a sanctioned rebrand — Wolf ordered the original
+palette restored (real apply of thm_drlurie_default, publish `2f88ef6`,
+released 10:35:46Z). The theme IS the live palette again and the site seed's
+brandTokens match production again — the PALETTE follow-ups are CLOSED,
+but `site-seed-data.mjs` is still stale on name / logo.text /
+metadataDefaults (the live "Skincare" branding postdates the seed): do NOT
+reconcile the site family until the seed is updated. NEW DIRECTION (Wolf,
+pending build): palette changes via themes ONLY (close the direct
+brandTokens patch path); theme creation restrictable to a maker agent;
+optional human-approval pin per type already exists in approval-policy.
 `tpl_fieldtest` (fieldtest family) still lacks the trio — patching it 422s
 until backfilled or retired.
 

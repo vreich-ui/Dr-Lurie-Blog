@@ -115,8 +115,8 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   `section_template` (stpl_hero_landing /
   stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
   stpl_cta_banner) and `theme` (thm_drlurie_default, the
-  LAUNCH palette — ⚠ NOT the live palette since the 2026-07-13 rebrand;
-  applying it is NOT a no-op, see the drift incident below) — completing the
+  canonical palette — live again since Wolf's ordered restore, 2026-07-15,
+  see the drift incident below) — completing the
   TEN governed types (`objectTypes` in `src/schema/object-record-v1.ts` is
   the authoritative list; older session logs' "ninth/tenth/eleventh
   governed type" labels over-count by one) — plus
@@ -140,13 +140,20 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   brandTokens had been rebranded in production on 2026-07-13 (teal/
   terracotta, Source Serif heading) AFTER the seeds were written, so the
   "no-op" apply actually put the old palette live for ~6 minutes (09:30:57–09:37:13Z); restored
-  byte-exact (export commit `eba0c42`) and re-released. OPEN FOLLOW-UPS:
-  (1) thm_drlurie_default's tokens now DON'T match live production — its
-  description/whenToUse ("applying it is a no-op") are stale; Wolf decides
-  whether to update it to the live palette or keep it as the launch
-  palette. (2) `scripts/lib/site-seed-data.mjs` is stale vs production —
-  running the site-family driver would "heal" the live rebrand away; do
-  NOT reconcile the site until the seed is updated. tpl_fieldtest (the
+  byte-exact (export commit `eba0c42`) and re-released. RESOLVED SAME DAY
+  (Wolf's ruling): the 2026-07-13 palette change was an agent's casual
+  color edit, NOT a sanctioned rebrand — Wolf ordered the ORIGINAL palette
+  restored (real `site_apply_theme` of thm_drlurie_default, publish
+  `2f88ef6`, released 10:35:46Z). thm_drlurie_default IS the live palette
+  again and the seed's brandTokens match production — the PALETTE
+  follow-ups are closed, but `site-seed-data.mjs` is STILL STALE on
+  name/logo.text/metadataDefaults (the live "Skincare" branding postdates
+  the seed): do NOT reconcile the site family until the seed is updated. NEW DIRECTION (Wolf 2026-07-15, pending build):
+  palette changes must go through THEMES ONLY — close the direct
+  `set_site_fields`-on-brandTokens hole (the one the color-editing agent
+  used); theme workflow = requesting agent → maker agent (creation-policy
+  restriction) → publish, with the optional human-approval pin available
+  in `src/config/approval-policy.ts`. tpl_fieldtest (the
   2026-07-08 fieldtest leftover) still lacks the metadata trio — patching
   it 422s until backfilled or retired.
 
