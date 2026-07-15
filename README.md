@@ -186,6 +186,13 @@ Agent runtimes can generate and store artifacts through `pdf-tool` without addin
 
 Keep `PDF_TOOL_AGENT_RUN_TOKEN` in server-side or agent-runtime secrets only. Do not expose it to browser code, checked-in configuration, workflow JSON, prompts, or tool schemas. Workflow JSON should store only immutable `ArtifactReference` objects, never binary bytes or base64 payloads.
 
+`pdf-tool` itself is stateless and holds no blob credentials: agents fetch a short-lived storage grant from the Dr. Lurie MCP tool `get_pdf_tool_storage_grant` and forward it with each `pdf-tool` call, and `pdf-tool` writes directly into this site's Netlify Blob stores. The grant is served from two Dr. Lurie site environment variables (see `docs/agents/pdf-tool-storage-grant.md` for the provisioning and rotation runbook):
+
+- `PDF_TOOL_STORAGE_TOKEN` — personal access token of a dedicated Netlify machine account whose only access is this site/team
+- `PDF_TOOL_STORAGE_SITE_ID` — this site's API ID
+
+Never expose either variable in client-side code, logs, or workflow JSON, and never write a grant or its token into any persisted record. Verify the six grant stores with `node scripts/provision-pdf-tool-stores.mjs`.
+
 #### OpenAI Agent Builder / Agents SDK publish handoff
 
 `/.netlify/functions/run-publisher-agent` expects JSON with these top-level fields: `slug`, `title`, one of `markdown` or `content`, and optional `description`, `publishDate`, `author`, `tags`, `images`, `overwrite`.

@@ -12,6 +12,7 @@ import {
   triggerNetlifyBuild,
 } from '../lib/netlify-deploys.js';
 import { releaseToProduction } from '../lib/production-release.js';
+import { buildPdfToolStorageGrant } from '../lib/pdf-tool-storage-grant.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import {
   getArtifactBlobStore,
@@ -1108,6 +1109,12 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
     }),
   },
   {
+    name: 'get_pdf_tool_storage_grant',
+    description:
+      'Fetch a short-lived storage grant for pdf-tool. pdf-tool is stateless and holds no blob credentials: call this tool before ANY pdf-tool MCP call that touches storage and pass the entire returned grant object as that call\'s "storage" argument — pdf-tool uses it to write artifacts, templates, image-search state, and its job records directly into Dr-Lurie\'s Netlify Blob stores. expiresAt is roughly one hour out and is advisory-but-enforced: pdf-tool rejects expired grants, so fetch a fresh grant per working session instead of caching one long-term. If pdf-tool returns "grant expired" or a storage auth error, fetch a fresh grant and retry once before surfacing the failure. SECRET HANDLING: the grant contains a live storage token. NEVER write the grant or its token into workflow JSON, drafts, article content, artifact metadata, or any other persisted record — store only the ArtifactReferences pdf-tool returns. Auth-gated like every other tool on this MCP endpoint; no input is required.',
+    inputSchema: objectSchema({}),
+  },
+  {
     name: 'create_artifact_upload_intent',
     description:
       'Create a short-lived scoped direct artifact upload intent. New clients should call this tool first, then upload raw bytes with HTTP POST application/octet-stream to /api/artifacts/upload using the returned requiredHeaders. Keeps binary bytes out of MCP arguments and returns no server secrets other than the scoped upload token. Accepted image formats: JPEG, PNG, WebP only — the upload decodes the bytes and rejects GIF, AVIF, SVG, and anything that does not decode as the declared type. PDF uploads must start with %PDF-.',
@@ -2039,6 +2046,26 @@ const callReleaseToProduction = async (event: LambdaEvent, input: Record<string,
     event.log?.({ event: 'production_release_failed', error: message });
     return toolError(message, { error_code: 'production_release_failed' });
   }
+};
+
+const callGetPdfToolStorageGrant = (event: LambdaEvent) => {
+  const built = buildPdfToolStorageGrant();
+
+  if (!built.ok) {
+    event.log?.({ event: 'pdf_tool_storage_grant_not_configured' });
+    return toolError(built.error, { error_code: built.errorCode });
+  }
+
+  // Issuance is logged metadata-only; the token must never appear in any log
+  // or stored record.
+  event.log?.({
+    event: 'pdf_tool_storage_grant_issued',
+    grantVersion: built.grant.grantVersion,
+    grantType: built.grant.grantType,
+    expiresAt: built.grant.expiresAt,
+  });
+
+  return toolResult({ ...built.grant });
 };
 
 const hasReaderVisibleArticleBodyNode = (node: unknown) => {
@@ -3738,6 +3765,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
       return callTriggerNetlifyBuild(event, input);
     case 'release_to_production':
       return callReleaseToProduction(event, input);
+    case 'get_pdf_tool_storage_grant':
+      return callGetPdfToolStorageGrant(event);
     case 'create_artifact_upload_intent':
       return callCreateArtifactUploadIntent(event, input);
     case 'create_artifact_from_url': {
