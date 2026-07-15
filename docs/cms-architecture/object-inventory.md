@@ -299,7 +299,7 @@ object — the application-verb production proofs ran 2026-07-15:
 | `stpl_related_articles` | `section_template` | 🟢 CONVERTED | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
 | `stpl_newsletter_cta`   | `section_template` | 🟢 CONVERTED | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
 | `stpl_cta_banner`       | `section_template` | 🟢 CONVERTED | Closing CTA banner — the interior-page closer.                                                                                         |
-| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The launch palette (see the drift caveat below) (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
+| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The launch palette, 19 color keys + 3 font stacks — ⚠ no longer matches live production (2026-07-13 rebrand; see the drift caveat below). `set_theme_fields` round-tripped; apply verb proven end-to-end. |
 
 All six: created in production (`agent_name: w84-conversion-run`) → every
 permitted patch op drilled with exact inverses (stpl:
@@ -311,17 +311,23 @@ store === seed === export verified byte-level. The same run backfilled the
 metadata trio onto the 3 live `tpl_*` (Step 0 — now published at content
 revision 20; exports content-identical to the W8.3b pre-materialization) and
 re-proved `object_instantiate_template` dry_run on all three (incl.
-tpl_legal's registry-fallback path). **The conversion gate still open:** the
-application-verb production dry_runs — `object_instantiate_section_template`
-in BOTH modes for EACH of the five `stpl_*` records (per-object conversion,
-the W2.5 precedent), plus `site_apply_theme` dry_run + one real no-op
-default apply — could not run from the converting session — its MCP tool snapshot predates the W8
-deploys and a session snapshot never refreshes. Both verbs are live on the
-server, contract-advertised, and verb-level-tested in the merged suite, but
-per the playbook they must be PROVEN in production before these rows turn
-🟢 CONVERTED and the count moves 41 → 47. The proofs are the first act of
-the next session. `tpl_fieldtest` (fieldtest family) still lacks the trio —
-patching it 422s until backfilled or retired.
+tpl_legal's registry-fallback path). **Verb proofs (2026-07-15, after a connector reset exposed the W8 tools):**
+`object_instantiate_section_template` dry_run in BOTH modes for EACH of the
+five `stpl_*` records — 10/10 eligible, zero blockers (per-object
+conversion, the W2.5 precedent) — plus `site_apply_theme` dry_run and ONE
+REAL default apply end-to-end (atomic op, `applied_theme` in history,
+publish `ec2cbd3`, release). **The real apply exposed LIVE-PALETTE DRIFT:**
+the site's brandTokens were rebranded in production on 2026-07-13 (teal/
+terracotta, Source Serif heading) after the seeds were written, so the
+"no-op" apply put the old palette live for ~6 minutes (09:30:57–09:37:13Z);
+restored byte-exact (export commit `eba0c42`) and re-released. OPEN
+FOLLOW-UPS: (1) `thm_drlurie_default`'s tokens do NOT match live production
+— its description/whenToUse are stale until Wolf decides whether it becomes
+the live palette or stays the launch palette; (2) `site-seed-data.mjs` is
+stale vs production — do NOT reconcile the site family until the seed is
+updated (a driver run would "heal" the live rebrand away).
+`tpl_fieldtest` (fieldtest family) still lacks the trio — patching it 422s
+until backfilled or retired.
 
 **Recipe self-description + reuse-first (W8.3b, 2026-07-14).** Every recipe
 (template / section_template / theme) must carry `description`, `whenToUse`,
