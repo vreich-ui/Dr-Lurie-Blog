@@ -115,7 +115,8 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   `section_template` (stpl_hero_landing /
   stpl_audience_grid / stpl_related_articles / stpl_newsletter_cta /
   stpl_cta_banner) and `theme` (thm_drlurie_default, the
-  production palette verbatim — applying it is a no-op) — completing the
+  LAUNCH palette — ⚠ NOT the live palette since the 2026-07-13 rebrand;
+  applying it is NOT a no-op, see the drift incident below) — completing the
   TEN governed types (`objectTypes` in `src/schema/object-record-v1.ts` is
   the authoritative list; older session logs' "ninth/tenth/eleventh
   governed type" labels over-count by one) — plus
