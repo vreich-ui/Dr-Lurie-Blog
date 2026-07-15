@@ -145,8 +145,10 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   color edit, NOT a sanctioned rebrand — Wolf ordered the ORIGINAL palette
   restored (real `site_apply_theme` of thm_drlurie_default, publish
   `2f88ef6`, released 10:35:46Z). thm_drlurie_default IS the live palette
-  again and `site-seed-data.mjs` matches production again — both drift
-  follow-ups CLOSED. NEW DIRECTION (Wolf 2026-07-15, pending build):
+  again and the seed's brandTokens match production — the PALETTE
+  follow-ups are closed, but `site-seed-data.mjs` is STILL STALE on
+  name/logo.text/metadataDefaults (the live "Skincare" branding postdates
+  the seed): do NOT reconcile the site family until the seed is updated. NEW DIRECTION (Wolf 2026-07-15, pending build):
   palette changes must go through THEMES ONLY — close the direct
   `set_site_fields`-on-brandTokens hole (the one the color-editing agent
   used); theme workflow = requesting agent → maker agent (creation-policy

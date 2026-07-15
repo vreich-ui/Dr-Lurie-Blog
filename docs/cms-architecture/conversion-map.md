@@ -27,8 +27,11 @@
 ```text
 site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07-11; export commit a20f107)
 │   the root everything hangs off; seed scripts/lib/site-seed-data.mjs → export src/data/site/site.json
-│   seed matches production again since Wolf's ordered palette restore (2026-07-15,
+│   brandTokens match production again since Wolf's ordered palette restore (2026-07-15,
 │     publish 2f88ef6) — the 2026-07-13 agent color edit was unsanctioned and is undone
+│   ⚠ SEED STILL STALE on OTHER fields (name / logo.text / metadataDefaults carry the live
+│     "Skincare" branding the seed predates): do NOT run the site family through the
+│     reconcile driver until the seed is updated — ensure would overwrite those live fields
 │   LIVE from the object (pre-conversion literals as fallback when the export is absent):
 │     brandTokens (every CustomStyles custom property, light + dark:` keys) · logo.text ·
 │     chrome{showRssFeed, showThemeToggle} · metadataDefaults (title template, description,

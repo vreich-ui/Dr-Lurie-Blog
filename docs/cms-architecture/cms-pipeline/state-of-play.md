@@ -19,8 +19,12 @@ asked to change something in colors around" — NOT a sanctioned rebrand — and
   `wolf-ordered-palette-restore`) → validate clean → publish (`2f88ef6`) →
   checkin → release (production live on that commit, deploy ready
   10:35:46Z). The canonical palette is live; thm_drlurie_default's
-  description ("applying is a no-op") and `site-seed-data.mjs` are accurate
-  again — both Session-2026-07-15 drift follow-ups CLOSED.
+  description ("applying is a no-op") is accurate again and the seed's
+  brandTokens match production — the PALETTE follow-ups are closed. ⚠ But
+  `site-seed-data.mjs` remains stale on name / logo.text /
+  metadataDefaults (the live "Skincare" branding postdates the seed) — the
+  do-not-reconcile-the-site-family warning STANDS until the seed is
+  updated (Codex caught the over-broad all-clear).
 - **New governance directive (Wolf, verbatim in intent), PENDING BUILD:**
   (1) "agents should only be able to change theme of the whole site not
   individual widgets and objects" — widgets already carry no color fields

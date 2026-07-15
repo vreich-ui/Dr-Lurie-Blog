@@ -16,8 +16,9 @@
 > the live look ~6 min (09:30:57–09:37:13Z); restored byte-exact (`eba0c42`) and re-released.
 > Resolved 2026-07-15: Wolf ruled the 2026-07-13 palette change an
 > unsanctioned agent edit and ordered the original palette restored (second
-> real apply, publish `2f88ef6`, released) — theme and site seed match
-> production again. NEW DIRECTION (pending build): palette changes via
+> real apply, publish `2f88ef6`, released) — the theme and the seed's
+> brandTokens match production again (⚠ the seed stays stale on
+> name/logo/metadataDefaults — no site-family reconciles until updated). NEW DIRECTION (pending build): palette changes via
 > themes ONLY (close direct brandTokens patching); theme workflow
 > requester → maker (creation policy) with the optional human-approval pin.
 > Docs flipped to CONVERTED, 41 → 47. Composite sections (§8) remain
@@ -609,9 +610,11 @@ form. Direction, so W8 keeps the door open by construction:
   the apply put the old palette live ~6 min; restored byte-exact
   (`eba0c42`) + re-released. LESSON: "byte-identical to production" claims
   must be verified against the LIVE record at apply time, not the seed
-  corpus. Follow-ups CLOSED 2026-07-15: Wolf ordered the original palette
-  restored (second real apply, publish `2f88ef6`, released) — the theme
-  and site-seed-data.mjs match production again.
+  corpus. Palette follow-ups CLOSED 2026-07-15: Wolf ordered the original
+  palette restored (second real apply, publish `2f88ef6`, released) — the
+  theme and the seed's brandTokens match production again. The seed stays
+  STALE on name/logo.text/metadataDefaults ("Skincare" branding): no
+  site-family reconcile runs until it is updated.
 
 ## 10. Exit criteria
 
