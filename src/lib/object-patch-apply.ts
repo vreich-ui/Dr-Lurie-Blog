@@ -102,7 +102,7 @@ const deepCloneJson = <T>(value: T): T => {
   return value;
 };
 
-const deepEqualJson = (a: unknown, b: unknown): boolean => {
+export const deepEqualJson = (a: unknown, b: unknown): boolean => {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((entry, i) => deepEqualJson(entry, b[i]));

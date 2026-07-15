@@ -35,6 +35,14 @@ stay one-line config flips, deliberately not turned on).
     passes it, `discardProposal` passes `PRIVILEGED_PATCH_OPS` (re-applying an
     already-authorized inverse), and a plain `object_patch` passes none →
     `op_not_applicable`. Guarded by tests at the engine and verb levels.
+  - **SECOND P1 (Codex, same review):** `object_discard` forwards
+    caller-supplied `entries` unverified, so granting discard the palette
+    privilege let a forged `set_site_brand_tokens` entry (attacker-chosen
+    `capture.before`) set an arbitrary palette. Fixed: `discardProposal` now
+    verifies every privileged-op entry against the record's ACTUAL history
+    (`deepEqualJson` on `details.op`+`details.capture`) before applying —
+    a fabricated palette entry → 403 `discard_privileged_unverified`; a real
+    one (from a genuine apply) reverts as before. Tested both ways.
   - `brand_token_values` / `theme_token_keys` CSS-safety criteria are
     body-keyed (object type `site`), so they gate the new op unchanged.
 - **Contract:** site gains a `palette_theme_only` constraint (blocks_write)

@@ -33,6 +33,7 @@ import { z } from 'zod';
 
 import {
   applyPatchOps,
+  deepEqualJson,
   derivePatchInverse,
   PatchApplyError,
   type PatchOpCapture,
@@ -238,8 +239,38 @@ export type DiscardInput = {
   at: string;
 };
 
+// A privileged op (set_site_brand_tokens) is applyable during discard only as
+// the inverse of a REAL, already-authorized history entry — never a
+// caller-fabricated {op, capture}. object_discard forwards caller-supplied
+// entries, so without this a site checkout alone could forge a
+// set_site_brand_tokens entry with an arbitrary `capture.before` and set any
+// palette, bypassing site_apply_theme's total-theme path (Codex P1).
+const isPrivilegedEntryOp = (op: unknown): boolean =>
+  typeof op === 'object' &&
+  op !== null &&
+  PRIVILEGED_PATCH_OPS.includes((op as { op?: string }).op as never);
+
+const entryMatchesHistory = (record: ObjectRecord, entry: { op: unknown; capture: unknown }): boolean =>
+  record.history.some(
+    (h) =>
+      h.details !== undefined &&
+      deepEqualJson((h.details as { op?: unknown }).op, entry.op) &&
+      deepEqualJson((h.details as { capture?: unknown }).capture, entry.capture)
+  );
+
 export const discardProposal = (record: ObjectRecord, input: DiscardInput): ReviewOpResult => {
   if (input.entries.length === 0) return err(400, 'nothing_to_discard', { error: 'No ops to discard.' });
+
+  // Any privileged-op entry must be provably from this record's history before
+  // its inverse is granted the privilege — else the palette writer is forgeable.
+  for (const entry of input.entries) {
+    if (isPrivilegedEntryOp(entry.op) && !entryMatchesHistory(record, entry)) {
+      return err(403, 'discard_privileged_unverified', {
+        error:
+          'A discarded palette op (set_site_brand_tokens) must match a real history entry — a fabricated capture cannot set the palette. Revert the palette by applying a theme (site_apply_theme).',
+      });
+    }
+  }
 
   let inverses: PatchOp[];
   try {

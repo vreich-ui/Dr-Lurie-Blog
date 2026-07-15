@@ -32,6 +32,24 @@ const pageRecord = (): ObjectRecord => ({
   content_revision: 1,
 });
 
+const siteRecord = (): ObjectRecord => ({
+  object_id: 'site_drlurie',
+  object_type: 'site',
+  schema_version: 'site.v1',
+  site: 'site_drlurie',
+  created_at: AT,
+  updated_at: AT,
+  status: 'active',
+  body: {
+    name: 'Dr. Lurié',
+    brandTokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
+  },
+  publication: { published_time: null },
+  history: [{ at: AT, action: 'object_create', actor: reviewer }],
+  version: 3,
+  content_revision: 1,
+});
+
 // ─── submit / decide state machine ───────────────────────────────────────────
 
 test('submitReview opens review, records the M-6 requested action, bumps version only', () => {
@@ -242,6 +260,42 @@ test('discard refuses a blind revert when intervening accepted ops moved the sam
   if (result.ok) return;
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'discard_conflict');
+});
+
+test('discard REFUSES a fabricated privileged palette entry not in history (Codex P1 — no palette forgery)', () => {
+  const record = siteRecord();
+  // A caller with only a site checkout forges a set_site_brand_tokens entry
+  // whose capture.before is an arbitrary palette and capture.after matches the
+  // current one — its inverse would set the arbitrary palette with privilege.
+  const fabricated = {
+    op: { op: 'set_site_brand_tokens', fields: { brandTokens: { colors: { primary: '#deadbe' } } } },
+    capture: {
+      kind: 'fields',
+      before: { brandTokens: { colors: { primary: '#deadbe' } } },
+      after: { brandTokens: { colors: { primary: '#112233' } } },
+    },
+  };
+  const result = discardProposal(record, { entries: [fabricated], actor: reviewer, at: LATER });
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, 'discard_privileged_unverified');
+});
+
+test('discard ACCEPTS a real privileged palette entry from history and reverts the palette', () => {
+  // A genuine privileged apply (what site_apply_theme does) records a real
+  // set_site_brand_tokens history entry; discarding THAT entry is allowed.
+  const original = siteRecord();
+  const forward = applyPatchOps(
+    original,
+    [{ op: 'set_site_brand_tokens', fields: { brandTokens: { colors: { primary: '#ff0000' } } } }],
+    { actor: agentActor, at: AT, privilegedOps: ['set_site_brand_tokens'] }
+  );
+  const entry = forward.record.history[forward.record.history.length - 1].details as { op: unknown; capture: unknown };
+  const result = discardProposal(forward.record, { entries: [entry], actor: reviewer, at: LATER });
+  assert.equal(result.ok, true, JSON.stringify(result.ok ? '' : result.body));
+  if (!result.ok) return;
+  assert.deepEqual(result.record.body, original.body, 'the palette returns to its pre-apply state');
 });
 
 test('discard rejects malformed entries and empty batches loudly', () => {
