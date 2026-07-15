@@ -13,6 +13,11 @@ export type LambdaContext = {
       app_metadata?: Record<string, unknown>;
     };
   };
+  /**
+   * AWS Lambda's remaining-invocation-budget accessor, passed through by the
+   * Netlify Functions runtime. Optional: absent in local/unit-test invocations.
+   */
+  getRemainingTimeInMillis?: () => number;
 };
 
 export type AdminAuthState = {

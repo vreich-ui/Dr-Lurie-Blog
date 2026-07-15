@@ -88,8 +88,11 @@ type LambdaEvent = {
   body?: string | null;
   headers?: Record<string, string | undefined>;
   httpMethod?: string;
+  /** Epoch ms by which this invocation is killed by the platform; derived from the Lambda context when available. */
+  invocationDeadlineMs?: number;
   isBase64Encoded?: boolean;
   log?: StructuredLogger;
+  queryStringParameters?: Record<string, string | undefined>;
   rpcMethod?: string | null;
   requestId?: string;
   slug?: string | null;
@@ -118,6 +121,12 @@ type ToolDefinition = {
 const SERVER_NAME = 'Dr_Lurie_MCP_Server';
 const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
 const PROTOCOL_VERSION = '2025-06-18';
+
+// Cold-start observability: a fresh runtime instance means the caller just
+// paid module-evaluation latency. Surfaced in the per-request structured log
+// and in the ping tool so slow first calls are attributable from client side.
+const INSTANCE_BOOTED_AT_MS = Date.now();
+let instanceInvocationCount = 0;
 const ALLOWED_AGENTS = allowedAgentNames;
 const ALLOWED_AGENT_SET = new Set<string>(ALLOWED_AGENTS);
 const ARTIFACT_LIST_DEFAULT_LIMIT = 50;
@@ -1091,7 +1100,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'release_to_production',
     description:
-      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when a ready production deploy matches the target commit; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes. NOTE: if the site\'s Netlify "Auto Publishing" is Locked, the build succeeds as a deploy preview but does NOT update production until it is unlocked or the deploy is published manually.',
+      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when a ready production deploy matches the target commit; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). WAIT BUDGET: the in-call wait is capped to this serverless function\'s remaining invocation time (seconds, not the full build duration), so a normal 30-120s production build usually returns build_not_confirmed_live on the first call — that is the expected flow, not an error. Do not retry release_to_production; poll deploy_status with the returned targetCommit until the deploy is ready. One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes. NOTE: if the site\'s Netlify "Auto Publishing" is Locked, the build succeeds as a deploy preview but does NOT update production until it is unlocked or the deploy is published manually.',
     inputSchema: objectSchema({
       commit: stringSchema(
         'Optional commit SHA the live production deploy must reflect. Defaults to the current content branch HEAD.'
@@ -1104,7 +1113,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
       timeout_seconds: {
         type: 'integer',
         minimum: 1,
-        description: 'Optional maximum seconds to wait for the deploy to reach a terminal state before reporting back.',
+        description:
+          'Optional maximum seconds to wait for the deploy to reach a terminal state before reporting back. Always additionally capped to the remaining serverless invocation budget so the call returns a structured receipt instead of being killed by the platform timeout.',
       },
     }),
   },
@@ -2015,12 +2025,44 @@ const callTriggerNetlifyBuild = async (event: LambdaEvent, input: Record<string,
   }
 };
 
+// A synchronous Netlify function is killed at its platform timeout (10s
+// default, 26s max) — a deploy poll that outlives the invocation dies as a
+// dropped connection, not a JSON-RPC response, and the agent's MCP client
+// reads that as the whole server failing. Cap the wait so the agent always
+// gets the structured build_not_confirmed_live receipt and follows up with
+// deploy_status. The margin also covers the pre-poll work inside
+// releaseToProduction (branch-HEAD resolution + build-hook POST) and response
+// serialization.
+const RELEASE_WAIT_SAFETY_MARGIN_MS = 3_500;
+const RELEASE_WAIT_FALLBACK_SECONDS = 6;
+
+const resolveReleaseWaitBudgetSeconds = (
+  requestedSeconds: number | undefined,
+  invocationDeadlineMs: number | undefined,
+  nowMs: number = Date.now()
+) => {
+  const platformBudgetSeconds =
+    invocationDeadlineMs === undefined
+      ? RELEASE_WAIT_FALLBACK_SECONDS
+      : Math.floor((invocationDeadlineMs - nowMs - RELEASE_WAIT_SAFETY_MARGIN_MS) / 1000);
+  const cappedSeconds = Math.max(1, platformBudgetSeconds);
+
+  return requestedSeconds === undefined ? cappedSeconds : Math.max(1, Math.min(requestedSeconds, cappedSeconds));
+};
+
 const callReleaseToProduction = async (event: LambdaEvent, input: Record<string, unknown>) => {
   const commit = toNonEmptyString(input.commit);
   const forceBuild = typeof input.force_build === 'boolean' ? input.force_build : undefined;
-  const timeoutSeconds = typeof input.timeout_seconds === 'number' ? input.timeout_seconds : undefined;
+  const requestedTimeoutSeconds = typeof input.timeout_seconds === 'number' ? input.timeout_seconds : undefined;
+  const timeoutSeconds = resolveReleaseWaitBudgetSeconds(requestedTimeoutSeconds, event.invocationDeadlineMs);
 
-  event.log?.({ event: 'production_release_requested', commit: commit ?? null, forceBuild: forceBuild ?? null });
+  event.log?.({
+    event: 'production_release_requested',
+    commit: commit ?? null,
+    forceBuild: forceBuild ?? null,
+    requestedTimeoutSeconds: requestedTimeoutSeconds ?? null,
+    effectiveTimeoutSeconds: timeoutSeconds,
+  });
 
   try {
     const result = await releaseToProduction({
@@ -3665,7 +3707,14 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
 
   switch (name) {
     case 'ping':
-      return toolResult({ ok: true, server: SERVER_DIAGNOSTIC_NAME });
+      // instance_age_ms near zero means this call paid a cold start; the
+      // fields are additive diagnostics on top of the original {ok, server}.
+      return toolResult({
+        ok: true,
+        server: SERVER_DIAGNOSTIC_NAME,
+        instance_age_ms: Date.now() - INSTANCE_BOOTED_AT_MS,
+        instance_invocations: instanceInvocationCount,
+      });
     case 'save_json_blob_create_request':
       if (toNonEmptyString(input.request_id) === undefined) return missingRequestIdError();
       return callAction(
@@ -4216,13 +4265,43 @@ export const _mcpInternal = {
   publishArticleHandler,
   getArtifactIndexBlobStore,
   objectStoreHandler,
+  resolveReleaseWaitBudgetSeconds,
 };
 
-export const handler = async (rawEvent: LambdaEvent, _context?: LambdaContext) => {
-  const event = withStructuredLogger(rawEvent);
-  event.log?.({ event: 'mcp_request_received', rpcMethod: null, slug: null, httpMethod: event.httpMethod });
+export const handler = async (rawEvent: LambdaEvent, context?: LambdaContext) => {
+  instanceInvocationCount += 1;
+
+  const remainingTimeMs =
+    typeof context?.getRemainingTimeInMillis === 'function' ? context.getRemainingTimeInMillis() : undefined;
+  const event = withStructuredLogger({
+    ...rawEvent,
+    ...(remainingTimeMs !== undefined ? { invocationDeadlineMs: Date.now() + remainingTimeMs } : {}),
+  });
+  event.log?.({
+    event: 'mcp_request_received',
+    rpcMethod: null,
+    slug: null,
+    httpMethod: event.httpMethod,
+    instanceAgeMs: Date.now() - INSTANCE_BOOTED_AT_MS,
+    instanceInvocations: instanceInvocationCount,
+    coldStart: instanceInvocationCount === 1,
+    ...(remainingTimeMs !== undefined ? { invocationBudgetMs: remainingTimeMs } : {}),
+  });
   if (event.httpMethod === 'OPTIONS') {
     return emptyResponse(204);
+  }
+
+  // Unauthenticated liveness probe for uptime monitors and keep-warm pings:
+  // GET /mcp?health=1 answers 200 with non-sensitive instance diagnostics.
+  // Plain GET stays 405 below, as the Streamable HTTP spec requires for a
+  // server that does not offer an SSE stream.
+  if (event.httpMethod === 'GET' && toNonEmptyString(event.queryStringParameters?.health)) {
+    return response(200, {
+      ok: true,
+      server: SERVER_DIAGNOSTIC_NAME,
+      instance_age_ms: Date.now() - INSTANCE_BOOTED_AT_MS,
+      instance_invocations: instanceInvocationCount,
+    });
   }
 
   if (event.httpMethod !== 'POST') {

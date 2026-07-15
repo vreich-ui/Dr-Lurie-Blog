@@ -15,6 +15,12 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+# Keep the /mcp function warm and log a latency probe every 5 minutes so
+# agents don't pay a cold start (and time out) on first connect. Scheduled
+# functions run only on the published production deploy.
+[functions."mcp-keepalive"]
+  schedule = "*/5 * * * *"
+
 
 [[redirects]]
   from = "/pdf/*"
