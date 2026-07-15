@@ -326,9 +326,10 @@ casual color edit, not a sanctioned rebrand — Wolf ordered the original
 palette restored (real apply of thm_drlurie_default, publish `2f88ef6`,
 released 10:35:46Z). The theme IS the live palette again and the site seed's
 brandTokens match production again — the PALETTE follow-ups are CLOSED,
-but `site-seed-data.mjs` is still stale on name / logo.text /
-metadataDefaults (the live "Skincare" branding postdates the seed): do NOT
-reconcile the site family until the seed is updated. NEW DIRECTION (Wolf,
+and `site-seed-data.mjs` was RESYNCED to the live "Skincare" branding
+2026-07-15 via `scripts/sync-site-seed.mjs` (a drift-guard test in
+site-seed.test.ts keeps seed === production) — the site family is safe to
+reconcile again. NEW DIRECTION (Wolf,
 pending build): palette changes via themes ONLY (close the direct
 brandTokens patch path); theme creation restrictable to a maker agent;
 optional human-approval pin per type already exists in approval-policy.

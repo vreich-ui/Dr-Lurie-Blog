@@ -14,6 +14,9 @@
  *     check is live for site objects, not decorative).
  */
 import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
@@ -22,6 +25,30 @@ import { siteBodySchema, type SiteBody } from '../../src/schema/bodies/site-v1.j
 import { CONVERSION_SEEDS, SEED_SITE, siteBody } from '../../scripts/lib/site-seed-data.mjs';
 
 const body = siteBody as SiteBody;
+
+// The compiled test runs from a temp dir; ascend to the repo root to read the
+// committed production export.
+const findExport = (): string => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 10; i += 1) {
+    const candidate = join(dir, 'src', 'data', 'site', 'site.json');
+    if (existsSync(candidate)) return candidate;
+    dir = dirname(dir);
+  }
+  throw new Error('could not locate src/data/site/site.json');
+};
+
+// Order-independent deep equality (the export sorts object keys).
+const stable = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(stable)
+    : value && typeof value === 'object'
+      ? Object.fromEntries(
+          Object.keys(value as Record<string, unknown>)
+            .sort()
+            .map((key) => [key, stable((value as Record<string, unknown>)[key])])
+        )
+      : value;
 
 const resolveObject = (objectType: string, objectId: string) => ({
   exists: objectType === 'navigation' && ['nav_header', 'nav_footer', 'nav_footer_home'].includes(objectId),
@@ -35,6 +62,20 @@ test('the batch is the single site_drlurie singleton owning itself', () => {
       seed.objectId,
     ]),
     [['site', 'site_drlurie']]
+  );
+});
+
+test('the seed body matches the released production export (drift guard — run scripts/sync-site-seed.mjs)', () => {
+  const exported = JSON.parse(readFileSync(findExport(), 'utf8')) as Record<string, unknown>;
+  delete exported.__generated;
+  const drift = [...new Set([...Object.keys(exported), ...Object.keys(body as Record<string, unknown>)])].filter(
+    (key) =>
+      JSON.stringify(stable((body as Record<string, unknown>)[key])) !== JSON.stringify(stable(exported[key]))
+  );
+  assert.deepEqual(
+    drift,
+    [],
+    `site seed drifted from production on: ${drift.join(', ')} — run \`node scripts/sync-site-seed.mjs\` to resync`
   );
 });
 

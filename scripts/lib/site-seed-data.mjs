@@ -1,9 +1,17 @@
 /**
  * Seed data for the site singleton — `site_drlurie` (W4, 2026-07-11).
  *
- * The body carries the CURRENT live values, transcribed from where each one
- * was hardcoded (byte-identical cutover: seeding these values changes nothing
- * on the rendered site):
+ * The body carries the CURRENT live values. It tracks the released production
+ * export (`src/data/site/site.json`, the materialization of the store record) —
+ * NOT the original hardcoded literals: name / logo.text / metadataDefaults were
+ * edited live (the "Skincare" rebrand) after W4, so this seed is kept in sync
+ * with production by `scripts/sync-site-seed.mjs` (run it, or `--check` in CI,
+ * after any released site edit). Keeping seed === production is what makes a
+ * `home-conversion-roundtrip --seeds site-seed-data.mjs --production` reconcile
+ * a safe no-op instead of a rollback of the live branding.
+ *
+ * Original provenance of each field (byte-identical W4 cutover; still where a
+ * value lives when the export is absent, as a fallback):
  *
  *   - name / urls / metadataDefaults / blog — src/config.yaml (site, metadata,
  *     apps.blog blocks);
@@ -32,19 +40,19 @@
 export const SEED_SITE = 'site_drlurie';
 
 export const siteBody = {
-  name: 'Dr. Lurié',
+  name: 'Dr. Lurié Skincare',
   logo: {
-    text: 'DR. LURIÉ SCIENCE',
+    text: 'DR. LURIÉ SKINCARE',
   },
   urls: {
     base: '/',
     canonicalHost: 'https://drluriescience.netlify.app',
   },
   metadataDefaults: {
-    titleTemplate: '%s — Dr. Lurié',
     description:
-      'Science-led education on aging skin, age-related scent changes, and future age-aware skincare solutions.',
+      'A calm Dr. Lurié Skincare publishing space for people who arrived late, need help now, and mistrust the skin-care market.',
     ogImage: '/Social/og-default.jpg',
+    titleTemplate: '%s - Dr. Lurié Skincare',
     twitterHandle: '@drlurie',
   },
   brandTokens: {

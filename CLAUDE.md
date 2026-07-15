@@ -146,9 +146,10 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   restored (real `site_apply_theme` of thm_drlurie_default, publish
   `2f88ef6`, released 10:35:46Z). thm_drlurie_default IS the live palette
   again and the seed's brandTokens match production — the PALETTE
-  follow-ups are closed, but `site-seed-data.mjs` is STILL STALE on
-  name/logo.text/metadataDefaults (the live "Skincare" branding postdates
-  the seed): do NOT reconcile the site family until the seed is updated. THEME-ONLY PALETTE GOVERNANCE SHIPPED (Wolf 2026-07-15
+  follow-ups are closed, and `site-seed-data.mjs` was RESYNCED to the live
+  "Skincare" branding 2026-07-15 (`scripts/sync-site-seed.mjs`; a site-seed
+  drift-guard test keeps it in lockstep) — the site family is safe to
+  reconcile again. THEME-ONLY PALETTE GOVERNANCE SHIPPED (Wolf 2026-07-15
   directive): `brandTokens` is no longer patchable via `set_site_fields`
   (grammar refusal, 400 `invalid_op`); the palette changes ONLY through
   `site_apply_theme`, which emits the privileged tool-authored
