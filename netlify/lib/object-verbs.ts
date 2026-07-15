@@ -281,6 +281,14 @@ export type HandleObjectVerbOptions = {
    * its provenance ({instantiated_from: stpl_*}) through here (W8.2).
    */
   patchEntryDetails?: Record<string, unknown>;
+  /**
+   * INTERNAL (not request-settable): patch ops to accept beyond the type's
+   * agent-facing allowlist — the privileged, non-submittable ops. site_apply_theme
+   * threads ['set_site_brand_tokens'] here so ITS composed patch applies while a
+   * hand-authored object_patch (which passes none) is refused (theme-only palette
+   * governance, Wolf 2026-07-15).
+   */
+  privilegedOps?: readonly string[];
   /** Creation policy for the create gate; defaults to the committed config (tests inject). W8.3b. */
   creationPolicy?: CreationPolicy;
 };
@@ -1009,7 +1017,7 @@ export const handleObjectVerb = async (
       };
 
       if (request.dry_run) {
-        const validation = validateCandidatePatch(siteRecord, [op], context);
+        const validation = validateCandidatePatch(siteRecord, [op], context, ['set_site_brand_tokens']);
         return ok({
           dry_run: true,
           applied_theme: themeRecord.object_id,
@@ -1044,7 +1052,12 @@ export const handleObjectVerb = async (
           ops: [op],
         },
         principal,
-        { ...options, patchEntryDetails: { applied_theme: themeRecord.object_id } }
+        {
+          ...options,
+          patchEntryDetails: { applied_theme: themeRecord.object_id },
+          // The palette writer is not agent-submittable; only THIS verb applies it.
+          privilegedOps: ['set_site_brand_tokens'],
+        }
       );
       if (result.status !== 200) return result;
       return ok({ ...result.body, applied_theme: themeRecord.object_id });
@@ -1119,6 +1132,7 @@ export const handleObjectVerb = async (
           actor: principal,
           at: timestamp,
           ...(options.patchEntryDetails ? { entryDetails: options.patchEntryDetails } : {}),
+          ...(options.privilegedOps ? { privilegedOps: options.privilegedOps } : {}),
         });
         appliedRecord = applied.record;
       } catch (error) {

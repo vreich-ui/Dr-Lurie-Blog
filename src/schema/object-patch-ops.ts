@@ -706,7 +706,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
     'remove_action',
   ],
   taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
-  site: ['set_site_fields', 'set_site_brand_tokens'],
+  site: ['set_site_fields'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
   section_template: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data'],
   theme: ['set_theme_fields'],
@@ -716,3 +716,14 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
 
 export const isPatchOpAllowedForObjectType = (objectType: ObjectType, opName: PatchOpName): boolean =>
   (patchOpNamesByObjectType[objectType] as readonly string[]).includes(opName);
+
+// Ops that are valid in the grammar but NOT in any type's agent-facing
+// allowlist: they exist ONLY as the output of a privileged verb (and its
+// inverse, re-applied on Discard). `set_site_brand_tokens` is the palette
+// writer — a hand-authored one via object_patch is refused (op_not_applicable),
+// so the site palette changes solely through site_apply_theme (theme-only
+// governance, Wolf 2026-07-15). Unlike set_product_price (which stays
+// agent-submittable and leans on the product review gate), the site is
+// autonomous, so the op itself must be un-submittable. applyPatchOps accepts
+// these only when a caller passes them as `privilegedOps`.
+export const PRIVILEGED_PATCH_OPS: readonly PatchOpName[] = ['set_site_brand_tokens'];

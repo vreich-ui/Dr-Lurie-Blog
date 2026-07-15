@@ -37,7 +37,7 @@ import {
   PatchApplyError,
   type PatchOpCapture,
 } from '../../src/lib/object-patch-apply.js';
-import { patchOpSchema, type PatchOp } from '../../src/schema/object-patch-ops.js';
+import { patchOpSchema, PRIVILEGED_PATCH_OPS, type PatchOp } from '../../src/schema/object-patch-ops.js';
 import type { ObjectRecord, Principal, ReviewState } from '../../src/schema/object-record-v1.js';
 import { canDecideReview, type Role } from './roles.js';
 
@@ -256,7 +256,14 @@ export const discardProposal = (record: ObjectRecord, input: DiscardInput): Revi
   }
 
   try {
-    const applied = applyPatchOps(record, inverses, { actor: input.actor, at: input.at });
+    // Discard re-applies inverses of ALREADY-authorized ops, so it may include
+    // the privileged palette writer (the inverse of a site_apply_theme) — pass
+    // it as privileged, exactly as the applying verb did.
+    const applied = applyPatchOps(record, inverses, {
+      actor: input.actor,
+      at: input.at,
+      privilegedOps: PRIVILEGED_PATCH_OPS,
+    });
     return {
       ok: true,
       status: 200,

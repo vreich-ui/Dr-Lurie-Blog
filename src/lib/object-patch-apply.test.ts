@@ -47,8 +47,8 @@ const makeRecord = (objectType: ObjectType, body: unknown): ObjectRecord<unknown
   content_revision: 2,
 });
 
-const apply = (record: ObjectRecord<unknown>, ops: unknown[]): ApplyPatchResult =>
-  applyPatchOps(record, ops, { actor: AGENT, at: AT });
+const apply = (record: ObjectRecord<unknown>, ops: unknown[], privilegedOps?: readonly string[]): ApplyPatchResult =>
+  applyPatchOps(record, ops, { actor: AGENT, at: AT, ...(privilegedOps ? { privilegedOps } : {}) });
 
 // ——— fixtures (structural mirrors of the D§3.2–3.8 shapes) ———
 
@@ -203,6 +203,8 @@ interface RoundTripCase {
   objectType: ObjectType;
   body: () => unknown;
   op: Record<string, unknown>;
+  /** Privileged, non-allowlisted ops the case needs (e.g. set_site_brand_tokens). */
+  privilegedOps?: readonly string[];
 }
 
 const ROUND_TRIP_CASES: RoundTripCase[] = [
@@ -494,6 +496,9 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
       op: 'set_site_brand_tokens',
       fields: { brandTokens: { colors: { primary: '#000000', tertiary: '#abcdef' } } },
     },
+    // Privileged: not in the site allowlist — only site_apply_theme (and the
+    // inverse re-applied here) may apply it.
+    privilegedOps: ['set_site_brand_tokens'],
   },
   // product family
   {
@@ -647,13 +652,31 @@ describe('apply(op) then apply(inverse(op)) restores the prior body exactly', ()
       const original = testCase.body();
       const record = makeRecord(testCase.objectType, testCase.body());
 
-      const forward = apply(record, [testCase.op]);
+      const forward = apply(record, [testCase.op], testCase.privilegedOps);
       const inverse = derivePatchInverse(forward.applied[0].op, forward.applied[0].capture);
-      const reverted = apply(forward.record, [inverse]);
+      const reverted = apply(forward.record, [inverse], testCase.privilegedOps);
 
       assert.deepStrictEqual(reverted.record.body, original);
     });
   }
+
+  it('set_site_brand_tokens is REFUSED without privilege (theme-only governance — object_patch cannot hand-author it)', () => {
+    const record = makeRecord('site', siteBody());
+    assert.throws(
+      () => apply(record, [{ op: 'set_site_brand_tokens', fields: { brandTokens: { colors: { primary: '#000' } } } }]),
+      (error: unknown) => error instanceof PatchApplyError && error.code === 'op_not_applicable'
+    );
+    // …but the exact same op applies when the caller is privileged (the verb path).
+    const okApply = apply(
+      record,
+      [{ op: 'set_site_brand_tokens', fields: { brandTokens: { colors: { primary: '#000' } } } }],
+      ['set_site_brand_tokens']
+    );
+    assert.equal(
+      (okApply.record.body as { brandTokens: { colors: { primary: string } } }).brandTokens.colors.primary,
+      '#000'
+    );
+  });
 
   it('a multi-op batch round-trips by applying inverses in reverse order', () => {
     const original = pageBody();

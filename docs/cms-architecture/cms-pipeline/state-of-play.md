@@ -20,11 +20,21 @@ stay one-line config flips, deliberately not turned on).
     **400**), before any value reaches validation. The hole the 2026-07-13
     color-editing agent used is closed for safe AND unsafe values alike; the
     error points at `site_apply_theme`.
-  - New privileged op `set_site_brand_tokens` (`fields: {brandTokens}` only),
-    marked `agent_authored: false` in the contract — the ONLY writer of the
-    palette. `site_apply_theme` now emits it instead of `set_site_fields`.
-    Same deep-merge/exact-replace mechanics; the fields-capture inverse makes
-    "revert the theme" a standard Discard, unchanged.
+  - New privileged op `set_site_brand_tokens` (`fields: {brandTokens}` only) —
+    the ONLY writer of the palette. `site_apply_theme` now emits it instead of
+    `set_site_fields`; same deep-merge/exact-replace mechanics; the
+    fields-capture inverse makes "revert the theme" a Discard, unchanged.
+  - **CRITICAL (Codex P1 caught pre-merge):** the privileged op is NOT in the
+    site agent-allowlist (`patchOpNamesByObjectType.site` stays
+    `['set_site_fields']`). Unlike `set_product_price` (allowlisted, leans on
+    the product review gate), `site` is AUTONOMOUS — an allowlisted palette op
+    would let an agent hand-author `set_site_brand_tokens` via `object_patch`
+    and skip the total-theme completeness check. So the op is applyable ONLY
+    when a caller passes it as `privilegedOps` (new `applyPatchOps` /
+    `HandleObjectVerbOptions` / `validateCandidatePatch` option): `site_apply_theme`
+    passes it, `discardProposal` passes `PRIVILEGED_PATCH_OPS` (re-applying an
+    already-authorized inverse), and a plain `object_patch` passes none →
+    `op_not_applicable`. Guarded by tests at the engine and verb levels.
   - `brand_token_values` / `theme_token_keys` CSS-safety criteria are
     body-keyed (object type `site`), so they gate the new op unchanged.
 - **Contract:** site gains a `palette_theme_only` constraint (blocks_write)

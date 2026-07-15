@@ -16,7 +16,7 @@ import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '
 import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
 import { checkTheme, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
+import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
 import { validateObjectIdForType } from '../../src/lib/object-ids.js';
 import type { PatchOp } from '../../src/schema/object-patch-ops.js';
 import { themeBodySchema, type ThemeBody } from '../../src/schema/bodies/theme-v1.js';
@@ -154,18 +154,43 @@ test('apply replaces brandTokens EXACTLY: theme values in, stale site keys unset
   assert.equal(entry.action, 'set_site_brand_tokens');
   assert.equal(entry.details?.applied_theme, 'thm_midnight');
 
-  // Reverting the theme is a standard Discard: the exact inverse restores.
-  const inverse = derivePatchInverse(entry.details!.op as PatchOp, entry.details!.capture as PatchOpCapture);
-  const undo = await call(store, {
+  // Reverting the theme is a Discard: the exact inverse is a set_site_brand_tokens
+  // op that re-applies through the PRIVILEGED path (as discardProposal does) —
+  // never a raw agent object_patch (that path refuses the privileged op).
+  const inverse = derivePatchInverse(entry.details!.op as PatchOp, entry.details!.capture as PatchOpCapture) as {
+    op: string;
+  };
+  assert.equal(inverse.op, 'set_site_brand_tokens', 'the theme inverse is itself the privileged palette op');
+  const reverted = applyPatchOps(loadSite(store), [inverse], {
+    actor: { kind: 'agent', agent_name: 'discard', auth: 'publish_key' },
+    at: new Date(0).toISOString(),
+    privilegedOps: ['set_site_brand_tokens'],
+  });
+  assert.deepEqual(
+    (reverted.record.body as SiteBody).brandTokens,
+    siteBody.brandTokens,
+    'the privileged inverse restores exactly'
+  );
+});
+
+test('REJECTION: an agent cannot hand-author the privileged palette op via object_patch (the P1 guard)', async () => {
+  const store = createMemoryStore();
+  await seedSite(store);
+  const { lockToken, recordVersion } = await checkoutSite(store);
+
+  // set_site_brand_tokens is NOT in the site allowlist — a direct object_patch is
+  // refused op_not_applicable, so the total-theme completeness check in
+  // site_apply_theme cannot be bypassed.
+  const res = await call(store, {
     action: 'patch',
     object_type: 'site',
     object_id: 'site_drlurie',
     lock_token: lockToken,
-    expected_record_version: site.version,
-    ops: [inverse],
+    expected_record_version: recordVersion,
+    ops: [{ op: 'set_site_brand_tokens', fields: { brandTokens: { colors: { primary: '#112233' } } } }],
   });
-  assert.equal(undo.status, 200, JSON.stringify(undo.body));
-  assert.deepEqual((loadSite(store).body as SiteBody).brandTokens, siteBody.brandTokens, 'inverse restores exactly');
+  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.equal(res.body.code, 'op_not_applicable');
 });
 
 test('applying the DEFAULT theme to the untouched site is a no-op (the W8.4 zero-risk proof)', async () => {

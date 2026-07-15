@@ -173,7 +173,7 @@ const MINTED_ID_FIELD: Partial<Record<PatchOpName, string>> = {
 
 // Ops (or op fields) that exist only for inverse/Discard derivation — agents
 // should not hand-author them; the engine emits them when reverting.
-const INTERNAL_OPS = new Set<PatchOpName>(['reactivate_term', 'set_product_price', 'set_site_brand_tokens']);
+const INTERNAL_OPS = new Set<PatchOpName>(['reactivate_term', 'set_product_price']);
 
 const opArgSchema = (opName: PatchOpName): JsonSchema | undefined => {
   const option = patchOpUnionSchema.options.find(

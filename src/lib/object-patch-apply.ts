@@ -48,6 +48,7 @@ import { ZodError } from 'zod';
 import {
   patchOpSchema,
   patchOpNamesByObjectType,
+  PRIVILEGED_PATCH_OPS,
   type PatchJsonValue,
   type PatchOp,
   type PatchOpOfName,
@@ -192,6 +193,15 @@ export interface ApplyPatchOptions {
    * instantiate_section stamps `instantiated_from: stpl_*` (W8.2).
    */
   entryDetails?: Record<string, unknown>;
+  /**
+   * Ops to accept beyond the object type's agent-facing allowlist — the
+   * privileged, non-submittable ops (PRIVILEGED_PATCH_OPS). ONLY the verb that
+   * constructs them (site_apply_theme → set_site_brand_tokens) and the Discard
+   * path (re-applying an already-authorized inverse) pass them; a plain
+   * object_patch passes none, so a hand-authored privileged op is rejected
+   * op_not_applicable. Defaults to none.
+   */
+  privilegedOps?: readonly string[];
 }
 
 export interface ApplyPatchResult {
@@ -1085,12 +1095,15 @@ export const applyPatchOps = (
       throw error;
     }
     const allowed = patchOpNamesByObjectType[record.object_type] as readonly string[];
-    if (!allowed.includes(parsed.op)) {
+    const privileged = options.privilegedOps ?? [];
+    if (!allowed.includes(parsed.op) && !privileged.includes(parsed.op)) {
       throw new PatchApplyError(
         'op_not_applicable',
         record.object_type === 'content_item'
           ? `ops[${index}]: content_item is served by the existing article tool surface (C§2.0); generic patch ops do not apply.`
-          : `ops[${index}]: op '${parsed.op}' does not apply to object_type '${record.object_type}'.`
+          : PRIVILEGED_PATCH_OPS.includes(parsed.op as never)
+            ? `ops[${index}]: op '${parsed.op}' is tool-authored (not hand-authorable) — the palette changes only through site_apply_theme.`
+            : `ops[${index}]: op '${parsed.op}' does not apply to object_type '${record.object_type}'.`
       );
     }
     return parsed;
