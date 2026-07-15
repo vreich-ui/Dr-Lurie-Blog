@@ -613,8 +613,9 @@ form. Direction, so W8 keeps the door open by construction:
   corpus. Palette follow-ups CLOSED 2026-07-15: Wolf ordered the original
   palette restored (second real apply, publish `2f88ef6`, released) — the
   theme and the seed's brandTokens match production again. The seed stays
-  STALE on name/logo.text/metadataDefaults ("Skincare" branding): no
-  site-family reconcile runs until it is updated.
+  RESYNCED to the live "Skincare" branding 2026-07-15
+  (`scripts/sync-site-seed.mjs` + a drift-guard test) — the site family is
+  safe to reconcile again.
 
 ## 10. Exit criteria
 

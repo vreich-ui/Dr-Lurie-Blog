@@ -7,6 +7,32 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-15 E (site seed resynced to production: scripts/sync-site-seed.mjs + a drift-guard test — the do-not-reconcile caveat is closed)
+
+Wolf: "script for site-seed-data.mjs." Closed the last standing follow-up from
+the palette incident — `site-seed-data.mjs` was stale on name / logo.text /
+metadataDefaults (the live "Skincare" rebrand postdated the seed), so a
+site-family reconcile would have rolled the live branding back to the seed.
+
+- **`scripts/sync-site-seed.mjs`** (NEW): rewrites the seed's `siteBody` from
+  the COMMITTED production export (`src/data/site/site.json`, the released
+  materialization — no credentials, deterministic). MINIMAL diff: unchanged
+  fields (brandTokens/urls/chrome/nav/blog) are kept verbatim in the seed's
+  readable order; only the drifted fields take the export's value. `--check`
+  mode reports drift and exits 1 (CI-friendly); default writes; idempotent.
+- **Ran it**: name → "Dr. Lurié Skincare", logo.text → "DR. LURIÉ SKINCARE",
+  metadataDefaults → the live titleTemplate + description. seed === production
+  verified (order-independent). Seed header comment updated: it now tracks the
+  released export via the sync script, not the original hardcoded literals.
+- **Drift guard**: `site-seed.test.ts` gains a test asserting the seed
+  deep-equals the committed export (fails with "run scripts/sync-site-seed.mjs"
+  if they diverge) — exactly the check that would have caught the original
+  drift. This closes the do-not-reconcile-the-site-family caveat Codex flagged;
+  the site family is safe to reconcile again.
+- Note: brandTokens is included in the sync for completeness, but the reconcile
+  driver's site branch still EXCLUDES it (theme-only governance) — the palette
+  heals via a theme apply, never the seed. Gates: 1294 + 57 green, check +
+  build-diff clean/EMPTY.
 ## Session 2026-07-15 D (pdf-tool storage-grant provider: get_pdf_tool_storage_grant SHIPPED — stateless pdf-tool writes into OUR blob stores)
 
 Task (Wolf): make Dr-Lurie the storage-grant provider for the now-stateless
@@ -104,7 +130,8 @@ stay one-line config flips, deliberately not turned on).
   maker-agent restriction on theme creation (`src/config/creation-policy.ts`),
   human-approval pin on theme/site (`src/config/approval-policy.ts`). Agent-
   approves-agent review remains unbuilt (M-6 approvals are human-only). The
-  site seed (`site-seed-data.mjs`) is still stale on name/logo/metadata.
+  site seed (`site-seed-data.mjs`) was resynced to production 2026-07-15
+  (`scripts/sync-site-seed.mjs` + a drift-guard test).
 
 ## Session 2026-07-15 B (Wolf's palette ruling: original restored via a REAL theme apply; theme-only governance directive logged)
 
@@ -120,10 +147,10 @@ asked to change something in colors around" — NOT a sanctioned rebrand — and
   10:35:46Z). The canonical palette is live; thm_drlurie_default's
   description ("applying is a no-op") is accurate again and the seed's
   brandTokens match production — the PALETTE follow-ups are closed. ⚠ But
-  `site-seed-data.mjs` remains stale on name / logo.text /
-  metadataDefaults (the live "Skincare" branding postdates the seed) — the
-  do-not-reconcile-the-site-family warning STANDS until the seed is
-  updated (Codex caught the over-broad all-clear).
+  `site-seed-data.mjs` was RESYNCED to the live "Skincare" branding
+  2026-07-15 via `scripts/sync-site-seed.mjs`, with a drift-guard test in
+  site-seed.test.ts holding seed === production — the site family is safe to
+  reconcile again (this closes the do-not-reconcile caveat Codex flagged).
 - **New governance directive (Wolf, verbatim in intent), PENDING BUILD:**
   (1) "agents should only be able to change theme of the whole site not
   individual widgets and objects" — widgets already carry no color fields
