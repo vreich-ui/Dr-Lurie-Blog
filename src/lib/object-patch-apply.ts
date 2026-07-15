@@ -48,6 +48,7 @@ import { ZodError } from 'zod';
 import {
   patchOpSchema,
   patchOpNamesByObjectType,
+  PRIVILEGED_PATCH_OPS,
   type PatchJsonValue,
   type PatchOp,
   type PatchOpOfName,
@@ -101,7 +102,7 @@ const deepCloneJson = <T>(value: T): T => {
   return value;
 };
 
-const deepEqualJson = (a: unknown, b: unknown): boolean => {
+export const deepEqualJson = (a: unknown, b: unknown): boolean => {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     return a.length === b.length && a.every((entry, i) => deepEqualJson(entry, b[i]));
@@ -192,6 +193,15 @@ export interface ApplyPatchOptions {
    * instantiate_section stamps `instantiated_from: stpl_*` (W8.2).
    */
   entryDetails?: Record<string, unknown>;
+  /**
+   * Ops to accept beyond the object type's agent-facing allowlist — the
+   * privileged, non-submittable ops (PRIVILEGED_PATCH_OPS). ONLY the verb that
+   * constructs them (site_apply_theme → set_site_brand_tokens) and the Discard
+   * path (re-applying an already-authorized inverse) pass them; a plain
+   * object_patch passes none, so a hand-authored privileged op is rejected
+   * op_not_applicable. Defaults to none.
+   */
+  privilegedOps?: readonly string[];
 }
 
 export interface ApplyPatchResult {
@@ -987,6 +997,12 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_site_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // The palette writer (theme-only governance): same deep-merge mechanics as
+    // set_site_fields, but the grammar restricts `fields` to `brandTokens`, so
+    // only site_apply_theme (and inverse derivation) ever produces it.
+    case 'set_site_brand_tokens':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— product family ———
     // Same deep-merge mechanics as set_site_fields; the grammar already
     // refuses commerce.price / commerce.stripe / commerce.stripe_test
@@ -1079,12 +1095,15 @@ export const applyPatchOps = (
       throw error;
     }
     const allowed = patchOpNamesByObjectType[record.object_type] as readonly string[];
-    if (!allowed.includes(parsed.op)) {
+    const privileged = options.privilegedOps ?? [];
+    if (!allowed.includes(parsed.op) && !privileged.includes(parsed.op)) {
       throw new PatchApplyError(
         'op_not_applicable',
         record.object_type === 'content_item'
           ? `ops[${index}]: content_item is served by the existing article tool surface (C§2.0); generic patch ops do not apply.`
-          : `ops[${index}]: op '${parsed.op}' does not apply to object_type '${record.object_type}'.`
+          : PRIVILEGED_PATCH_OPS.includes(parsed.op as never)
+            ? `ops[${index}]: op '${parsed.op}' is tool-authored (not hand-authorable) — the palette changes only through site_apply_theme.`
+            : `ops[${index}]: op '${parsed.op}' does not apply to object_type '${record.object_type}'.`
       );
     }
     return parsed;
@@ -1187,6 +1206,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_page_meta':
     case 'set_nav_meta':
     case 'set_site_fields':
+    case 'set_site_brand_tokens':
     case 'set_product_fields':
     case 'set_product_price':
     case 'set_article_meta':

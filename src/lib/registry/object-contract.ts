@@ -562,6 +562,17 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'value must pass the safe-CSS grammar; values carrying ;, {, }, <, >, url(, or @import are rejected ' +
             '(W8.3 — the same rule gates theme tokens).',
         },
+        {
+          id: 'palette_theme_only',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'brandTokens cannot be patched via set_site_fields — the palette changes ONLY through the ' +
+            'site_apply_theme tool, which copies a theme object’s tokens in one governed set_site_brand_tokens ' +
+            'patch (that op is tool-authored — do not hand-author it). So every color edit goes through an ' +
+            'auditable, revertible theme, and theme creation is restrictable to a maker agent via the creation ' +
+            'policy (Wolf 2026-07-15).',
+        },
       ];
     case 'section_template':
       return [

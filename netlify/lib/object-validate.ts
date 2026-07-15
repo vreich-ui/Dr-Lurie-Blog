@@ -2104,11 +2104,15 @@ export type CandidatePatchValidation = {
 export const validateCandidatePatch = (
   record: ObjectRecord<unknown>,
   ops: readonly unknown[],
-  context: ObjectValidationContext = {}
+  context: ObjectValidationContext = {},
+  // Privileged, non-submittable ops to accept (site_apply_theme's dry_run passes
+  // ['set_site_brand_tokens']); an agent object_validate passes none, so a
+  // hand-authored privileged op dry-runs as op_not_applicable — honest.
+  privilegedOps: readonly string[] = []
 ): CandidatePatchValidation => {
   let appliedBody: unknown;
   try {
-    const result = applyPatchOps(record, ops, { actor: DRY_RUN_ACTOR, at: DRY_RUN_AT });
+    const result = applyPatchOps(record, ops, { actor: DRY_RUN_ACTOR, at: DRY_RUN_AT, privilegedOps });
     appliedBody = result.record.body;
   } catch (error) {
     if (error instanceof PatchApplyError) {

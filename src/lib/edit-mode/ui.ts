@@ -842,6 +842,7 @@ export const mountEditMode = (options: MountOptions): void => {
     if (/^(update_item|upsert_group|remove_group|upsert_action|remove_action|set_nav_meta|move_item)$/.test(action))
       return 'Menu copy edited';
     if (action === 'set_site_fields') return 'Site settings edited';
+    if (action === 'set_site_brand_tokens') return 'Site palette applied';
     if (/product/.test(action)) return 'Product details edited';
     if (/term/.test(action)) return 'Vocabulary edited';
     return undefined;

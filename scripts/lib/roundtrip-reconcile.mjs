@@ -73,10 +73,19 @@ export const reconcileOps = (seed, currentBody) => {
     return [{ op: 'upsert_section', section: seed.body.section }];
   }
   if (seed.objectType === 'site') {
-    // The singleton is one fields bag and set_site_fields is its only op: one
-    // deep-merge diff against the current record, nulling strays at every
-    // depth (trap 2), heals it wholesale.
-    return [{ op: 'set_site_fields', fields: diffFieldsForMerge(seed.body, currentBody) }];
+    // The singleton is one fields bag; set_site_fields heals every field via a
+    // deep-merge diff against the current record, nulling strays at every depth
+    // (trap 2). EXCEPT brandTokens: that field is theme-governed (Wolf
+    // 2026-07-15) — set_site_fields refuses it, so the reconcile driver never
+    // touches the palette. Palette drift is healed by applying a theme
+    // (site_apply_theme of the canonical thm_drlurie_default), not by reconcile.
+    const stripPalette = (body) => {
+      const rest = { ...(isPlainObject(body) ? body : {}) };
+      delete rest.brandTokens;
+      return rest;
+    };
+    const fields = diffFieldsForMerge(stripPalette(seed.body), stripPalette(currentBody));
+    return Object.keys(fields).length > 0 ? [{ op: 'set_site_fields', fields }] : [];
   }
   if (seed.objectType === 'taxonomy') {
     const current = isPlainObject(currentBody) ? currentBody : {};

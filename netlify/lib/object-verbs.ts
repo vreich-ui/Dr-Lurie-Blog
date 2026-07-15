@@ -178,7 +178,7 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     dry_run: z.boolean().optional(),
   }),
   // ─── W8.3: apply a theme's tokens to the site singleton (09-plan §6.4).
-  // Computes ONE exact-replace set_site_fields op (stale keys unset) and
+  // Computes ONE exact-replace set_site_brand_tokens op (stale keys unset) and
   // routes it through the standard patch path under the CALLER'S site
   // checkout. Publish stays the separate deliberate step.
   z.object({
@@ -281,6 +281,14 @@ export type HandleObjectVerbOptions = {
    * its provenance ({instantiated_from: stpl_*}) through here (W8.2).
    */
   patchEntryDetails?: Record<string, unknown>;
+  /**
+   * INTERNAL (not request-settable): patch ops to accept beyond the type's
+   * agent-facing allowlist — the privileged, non-submittable ops. site_apply_theme
+   * threads ['set_site_brand_tokens'] here so ITS composed patch applies while a
+   * hand-authored object_patch (which passes none) is refused (theme-only palette
+   * governance, Wolf 2026-07-15).
+   */
+  privilegedOps?: readonly string[];
   /** Creation policy for the create gate; defaults to the committed config (tests inject). W8.3b. */
   creationPolicy?: CreationPolicy;
 };
@@ -989,7 +997,9 @@ export const handleObjectVerb = async (
       // Exact-replace semantics: after the apply, site.brandTokens EQUALS the
       // theme's tokens. `fields` deep-merges, so every color key the site
       // carries but the theme doesn't must be explicitly unset (null) — the
-      // stale-palette leak a hand-written set_site_fields would make (§6.4).
+      // stale-palette leak a hand-written brandTokens patch would make (§6.4).
+      // brandTokens rides the privileged set_site_brand_tokens op — set_site_fields
+      // refuses it (theme-only palette governance).
       const themeColors = parsedTheme.data.tokens.colors;
       const staleUnsets = Object.fromEntries(
         Object.keys(parsedSite.data.brandTokens.colors)
@@ -997,7 +1007,7 @@ export const handleObjectVerb = async (
           .map((key) => [key, null])
       );
       const op = {
-        op: 'set_site_fields',
+        op: 'set_site_brand_tokens',
         fields: {
           brandTokens: {
             colors: { ...staleUnsets, ...themeColors },
@@ -1007,7 +1017,7 @@ export const handleObjectVerb = async (
       };
 
       if (request.dry_run) {
-        const validation = validateCandidatePatch(siteRecord, [op], context);
+        const validation = validateCandidatePatch(siteRecord, [op], context, ['set_site_brand_tokens']);
         return ok({
           dry_run: true,
           applied_theme: themeRecord.object_id,
@@ -1042,7 +1052,12 @@ export const handleObjectVerb = async (
           ops: [op],
         },
         principal,
-        { ...options, patchEntryDetails: { applied_theme: themeRecord.object_id } }
+        {
+          ...options,
+          patchEntryDetails: { applied_theme: themeRecord.object_id },
+          // The palette writer is not agent-submittable; only THIS verb applies it.
+          privilegedOps: ['set_site_brand_tokens'],
+        }
       );
       if (result.status !== 200) return result;
       return ok({ ...result.body, applied_theme: themeRecord.object_id });
@@ -1117,6 +1132,7 @@ export const handleObjectVerb = async (
           actor: principal,
           at: timestamp,
           ...(options.patchEntryDetails ? { entryDetails: options.patchEntryDetails } : {}),
+          ...(options.privilegedOps ? { privilegedOps: options.privilegedOps } : {}),
         });
         appliedRecord = applied.record;
       } catch (error) {

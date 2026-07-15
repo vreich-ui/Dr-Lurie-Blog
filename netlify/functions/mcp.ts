@@ -1372,7 +1372,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'site_apply_theme',
     description:
-      'Apply a theme preset\'s brandTokens to the site singleton (W8.3): computes ONE exact-replace set_site_fields op — every color key the site carries but the theme lacks is explicitly unset, so no stale palette survives. The theme must be TOTAL (every renderer-consumed color key present) or the apply is rejected with the missing keys — an incomplete theme would delete keys from the site. Applies through the standard patch path under YOUR site checkout (lock_token + expected_record_version from object_checkout on the site object; the verb never auto-checkouts). One op = one atomic content_revision; history records applied_theme; the exact inverse makes reverting a standard discard. The site COPIES the tokens (nothing live-binds to the theme), and going live still requires the separate object_publish + release_to_production steps. Pass dry_run: true to preview the computed op + full validation without persisting — dry_run needs neither lock_token nor expected_record_version. Read object_contract("theme") first.',
+      'Apply a theme preset\'s brandTokens to the site singleton (W8.3): computes ONE exact-replace set_site_brand_tokens op (the privileged palette writer — brandTokens is not patchable via set_site_fields) — every color key the site carries but the theme lacks is explicitly unset, so no stale palette survives. The theme must be TOTAL (every renderer-consumed color key present) or the apply is rejected with the missing keys — an incomplete theme would delete keys from the site. Applies through the standard patch path under YOUR site checkout (lock_token + expected_record_version from object_checkout on the site object; the verb never auto-checkouts). One op = one atomic content_revision; history records applied_theme; the exact inverse makes reverting a standard discard. The site COPIES the tokens (nothing live-binds to the theme), and going live still requires the separate object_publish + release_to_production steps. Pass dry_run: true to preview the computed op + full validation without persisting — dry_run needs neither lock_token nor expected_record_version. Read object_contract("theme") first.',
     inputSchema: objectSchema(
       {
         theme_id: stringSchema('The theme object id, e.g. thm_drlurie_default.'),
@@ -1381,7 +1381,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         expected_record_version: intSchema('The record_version your checkout returned; dry_run needs none.'),
         dry_run: {
           type: 'boolean',
-          description: 'true → return the computed set_site_fields op and validation; persist nothing (no lock).',
+          description: 'true → return the computed set_site_brand_tokens op and validation; persist nothing (no lock).',
         },
         agent_name: stringSchema('Optional self-declared agent name recorded on history (attribution only).'),
       },
@@ -1443,7 +1443,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_patch',
     description:
-      'Apply typed patch ops under a held lock. Requires lock_token and expected_record_version (stale version → 409; missing/expired/wrong lock → 423). Omitted ids on add_term/upsert_* ops are minted server-side. A resulting body that fails validation rejects the op (422) without persisting.',
+      'Apply typed patch ops under a held lock. Requires lock_token and expected_record_version (stale version → 409; missing/expired/wrong lock → 423). Omitted ids on add_term/upsert_* ops are minted server-side. A resulting body that fails validation rejects the op (422) without persisting. Palette governance: site.brandTokens is NOT patchable here — a set_site_fields carrying brandTokens is refused; the palette changes only through the site_apply_theme tool (theme-only, Wolf 2026-07-15). set_site_brand_tokens is tool-authored (do not hand-author it).',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
