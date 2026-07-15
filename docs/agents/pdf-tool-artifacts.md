@@ -2,6 +2,19 @@
 
 `pdf-tool` is the artifact generation and storage utility for agent-created images, PDFs, and related binary outputs. Dr. Lurie remains the owner of workflow JSON and publication state; agents own orchestration between the two systems.
 
+## Storage grants (stateless pdf-tool)
+
+`pdf-tool` is stateless and holds no blob credentials: it writes artifacts, templates, image-search state, and its job records directly into Dr. Lurie's Netlify Blob stores using a short-lived storage grant that the agent fetches from Dr. Lurie and forwards with each call. Full contract, store list, provisioning, and rotation runbook: [`pdf-tool-storage-grant.md`](pdf-tool-storage-grant.md).
+
+Rules for every agent driving `pdf-tool`:
+
+1. Before any `pdf-tool` call that touches storage, call the Dr. Lurie MCP tool `get_pdf_tool_storage_grant` and pass the entire result as that call's `storage` argument.
+2. Store returned `ArtifactReference` objects in workflow JSON as usual. **NEVER** write the grant or its token into workflow JSON, drafts, or any persisted blob.
+3. If `pdf-tool` returns "grant expired" or a storage auth error, fetch a fresh grant and retry once before surfacing the failure.
+4. Do not cache grants long-term — `expiresAt` (~1 hour) is enforced by `pdf-tool`.
+
+`get_pdf_tool_storage_grant` is a credential provider on the Dr. Lurie MCP endpoint, not a `pdf-tool` wrapper — agents still call `pdf-tool` directly for jobs and polling, exactly as below.
+
 ## Current architecture
 
 1. The agent creates or updates the Dr. Lurie workflow JSON through the existing Dr. Lurie MCP checkout, patch, and checkin tools.

@@ -7,6 +7,49 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-15 D (pdf-tool storage-grant provider: get_pdf_tool_storage_grant SHIPPED — stateless pdf-tool writes into OUR blob stores)
+
+Task (Wolf): make Dr-Lurie the storage-grant provider for the now-stateless
+pdf-tool — pdf-tool holds no blob credentials; agents fetch a short-lived
+grant here and forward it per call. Not an object conversion; MCP-surface +
+ops work only.
+
+- **New MCP tool `get_pdf_tool_storage_grant`** (mcp.ts, behind the standard
+  endpoint auth gate like every tool): returns the exact grant contract
+  pdf-tool accepts — `grantVersion: 1`, `grantType: 'netlify-pat'`,
+  `projectId: 'dr-lurie'`, `siteId`/`token` from env, the six-store mapping,
+  `expiresAt` = now + 1h (advisory-but-enforced: pdf-tool rejects expired
+  grants → agents re-fetch, never cache). Grant builder + canonical store
+  list live in `netlify/lib/pdf-tool-storage-grant.ts`. Fails closed
+  (`pdf_tool_storage_grant_not_configured`) until the env pair exists.
+  Issuance logs are metadata-only — the token appears in no log and no
+  stored record, proven by test.
+- **Env pair (HUMAN STEP, not yet done):** `PDF_TOOL_STORAGE_TOKEN` (PAT of
+  a dedicated Netlify machine account whose ONLY access is this site/team —
+  leak blast radius = this one site) + `PDF_TOOL_STORAGE_SITE_ID`. Runbook
+  with the machine-account steps, monthly-rotation and revocation procedure:
+  `docs/agents/pdf-tool-storage-grant.md`. Rotation needs no pdf-tool
+  change; the tool always serves current env values.
+- **Stores:** grant hands out artifacts / artifact-index (shared with us) +
+  pdf-templates / image-search / pdf-render-data / **pdf-tool-jobs (NEW —
+  pdf-tool writes its job records there, giving us the full artifact-job
+  audit trail in our own store)**. `scripts/provision-pdf-tool-stores.mjs`
+  proves all six writable with the grant credentials (write→read→delete
+  probe, prints no secrets) — run it after the env pair lands.
+- **Agent rules** (README + `docs/agents/pdf-tool-artifacts.md`): fetch a
+  grant before any storage-touching pdf-tool call and pass it as the
+  `storage` argument; persist only returned ArtifactReferences — NEVER the
+  grant/token; on "grant expired"/storage-auth error fetch fresh and retry
+  once. The old doc's "don't add pdf-tool wrapper tools" rule stands — this
+  is a credential provider, not a wrapper.
+- **Future (designed for, NOT built):** `grantType: 'exchange'` — opaque
+  short-lived token + server-to-server exchange endpoint so the PAT never
+  transits agent context. Grant shape kept stable so it's a drop-in.
+- **Tests:** 7 new (exact contract incl. key-set, TTL from injected clock,
+  fail-closed × 3 env cases, no-token-in-logs, 401 without endpoint auth /
+  grant with it, description teaches the three agent rules) + 2 pinning the
+  provisioning script's store list to the contract. Suite 1300 + 59 green.
+
 ## Session 2026-07-15 C (Theme-only palette enforcement SHIPPED: brandTokens is grammar-locked out of set_site_fields; the privileged set_site_brand_tokens writer)
 
 Wolf: "do the Theme-only enforcement now only." Built the enforcement half of
