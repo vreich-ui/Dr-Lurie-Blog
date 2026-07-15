@@ -148,12 +148,16 @@ hold (full definition + recipe: [`docs/cms-architecture/conversion-playbook.md`]
   again and the seed's brandTokens match production — the PALETTE
   follow-ups are closed, but `site-seed-data.mjs` is STILL STALE on
   name/logo.text/metadataDefaults (the live "Skincare" branding postdates
-  the seed): do NOT reconcile the site family until the seed is updated. NEW DIRECTION (Wolf 2026-07-15, pending build):
-  palette changes must go through THEMES ONLY — close the direct
-  `set_site_fields`-on-brandTokens hole (the one the color-editing agent
-  used); theme workflow = requesting agent → maker agent (creation-policy
-  restriction) → publish, with the optional human-approval pin available
-  in `src/config/approval-policy.ts`. tpl_fieldtest (the
+  the seed): do NOT reconcile the site family until the seed is updated. THEME-ONLY PALETTE GOVERNANCE SHIPPED (Wolf 2026-07-15
+  directive): `brandTokens` is no longer patchable via `set_site_fields`
+  (grammar refusal, 400 `invalid_op`); the palette changes ONLY through
+  `site_apply_theme`, which emits the privileged tool-authored
+  `set_site_brand_tokens` op (the exact `set_product_fields`⇸`set_product_price`
+  funnel, applied to the site). The reconcile driver's site branch now
+  excludes brandTokens. Still available as one-line config flips: maker-agent
+  restriction on theme creation (`src/config/creation-policy.ts`) and the
+  optional human-approval pin (`src/config/approval-policy.ts`); agent-
+  approves-agent review is not built (M-6 approvals are human-only). tpl_fieldtest (the
   2026-07-08 fieldtest leftover) still lacks the metadata trio — patching
   it 422s until backfilled or retired.
 

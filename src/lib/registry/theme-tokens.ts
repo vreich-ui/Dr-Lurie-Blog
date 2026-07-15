@@ -9,7 +9,7 @@
  * or extend the site's CSS from content. Validation (checkTheme + the site
  * structural check) and the renderer both read THIS module, so the enforced
  * key list and the emitted key list cannot drift, and no unsafe value reaches
- * the style tag through `set_theme_fields` OR `set_site_fields`.
+ * the style tag through `set_theme_fields` (theme bodies) OR `set_site_brand_tokens` (the site palette writer emitted by site_apply_theme).
  *
  * Client-safe (no server imports): the Netlify function bundle and the .astro
  * renderer both import it.

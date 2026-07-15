@@ -151,7 +151,7 @@ test('apply replaces brandTokens EXACTLY: theme values in, stale site keys unset
   );
 
   const entry = site.history.at(-1)!;
-  assert.equal(entry.action, 'set_site_fields');
+  assert.equal(entry.action, 'set_site_brand_tokens');
   assert.equal(entry.details?.applied_theme, 'thm_midnight');
 
   // Reverting the theme is a standard Discard: the exact inverse restores.
@@ -207,7 +207,7 @@ test('dry_run previews the computed exact-replace op (stale keys as null) with N
   assert.equal(res.status, 200, JSON.stringify(res.body));
   assert.equal(res.body.eligible, true);
   const op = res.body.op as { op: string; fields: { brandTokens: { colors: Record<string, unknown> } } };
-  assert.equal(op.op, 'set_site_fields');
+  assert.equal(op.op, 'set_site_brand_tokens');
   assert.equal(op.fields.brandTokens.colors['dark:bg-surface'], null, 'stale keys are explicit null unsets');
   assert.equal(op.fields.brandTokens.colors.primary, '#112233');
   assert.equal(JSON.stringify(loadSite(store).body), before, 'nothing persisted');
@@ -290,11 +290,14 @@ test('REJECTION: a theme carrying a CSS-injection value is blocked at write', as
   );
 });
 
-test('REJECTION: set_site_fields can no longer smuggle an unsafe value into site.brandTokens (the §7.3 gap)', async () => {
+test('REJECTION: set_site_fields can no longer touch site.brandTokens at all — theme-only governance (Wolf 2026-07-15)', async () => {
   const store = createMemoryStore();
   await seedSite(store);
   const { lockToken, recordVersion } = await checkoutSite(store);
 
+  // brandTokens is now refused at the GRAMMAR (invalid_op → 400), before any
+  // value even reaches the CSS-safety criterion — the palette hole the
+  // color-editing agent used is closed for both safe and unsafe values.
   const res = await call(store, {
     action: 'patch',
     object_type: 'site',
@@ -303,17 +306,32 @@ test('REJECTION: set_site_fields can no longer smuggle an unsafe value into site
     expected_record_version: recordVersion,
     ops: [{ op: 'set_site_fields', fields: { brandTokens: { colors: { primary: 'red; } body { display:none' } } } }],
   });
-  assert.equal(res.status, 422, JSON.stringify(res.body));
+  assert.equal(res.status, 400, JSON.stringify(res.body));
+  assert.equal(res.body.code, 'invalid_op');
+  assert.match(String(res.body.message), /brandTokens.*site_apply_theme/);
 
-  const fontAttack = await call(store, {
+  // Even a perfectly SAFE brandTokens value is refused here — the point is the
+  // path, not the value: colors change only through a theme.
+  const safeValueAttempt = await call(store, {
     action: 'patch',
     object_type: 'site',
     object_id: 'site_drlurie',
     lock_token: lockToken,
     expected_record_version: recordVersion,
-    ops: [{ op: 'set_site_fields', fields: { brandTokens: { fonts: { sans: "x</style><script>alert(1)</script>" } } } }],
+    ops: [{ op: 'set_site_fields', fields: { brandTokens: { colors: { primary: '#112233' } } } }],
   });
-  assert.equal(fontAttack.status, 422, JSON.stringify(fontAttack.body));
+  assert.equal(safeValueAttempt.status, 400, JSON.stringify(safeValueAttempt.body));
+
+  // A NON-brandTokens set_site_fields still works (logo, chrome, metadata…).
+  const nonPalette = await call(store, {
+    action: 'patch',
+    object_type: 'site',
+    object_id: 'site_drlurie',
+    lock_token: lockToken,
+    expected_record_version: recordVersion,
+    ops: [{ op: 'set_site_fields', fields: { logo: { text: 'RENAMED' } } }],
+  });
+  assert.equal(nonPalette.status, 200, JSON.stringify(nonPalette.body));
 });
 
 // ═══ key completeness (checkTheme) ════════════════════════════════════════════

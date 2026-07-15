@@ -987,6 +987,12 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_site_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // The palette writer (theme-only governance): same deep-merge mechanics as
+    // set_site_fields, but the grammar restricts `fields` to `brandTokens`, so
+    // only site_apply_theme (and inverse derivation) ever produces it.
+    case 'set_site_brand_tokens':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— product family ———
     // Same deep-merge mechanics as set_site_fields; the grammar already
     // refuses commerce.price / commerce.stripe / commerce.stripe_test
@@ -1187,6 +1193,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_page_meta':
     case 'set_nav_meta':
     case 'set_site_fields':
+    case 'set_site_brand_tokens':
     case 'set_product_fields':
     case 'set_product_price':
     case 'set_article_meta':

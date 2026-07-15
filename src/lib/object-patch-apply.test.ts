@@ -475,12 +475,24 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
   },
   // site family
   {
-    name: 'set_site_fields deep-merges nested tokens and unsets a subtree',
+    name: 'set_site_fields deep-merges non-palette fields and unsets a subtree',
     objectType: 'site',
     body: siteBody,
     op: {
       op: 'set_site_fields',
-      fields: { brandTokens: { colors: { primary: '#000000', tertiary: '#abcdef' } }, chrome: null },
+      fields: { metadataDefaults: { description: 'New description' }, chrome: null },
+    },
+  },
+  // The palette writer (theme-only governance): brandTokens rides its own
+  // privileged op, deep-merging nested tokens and unsetting a subtree — and it
+  // inverts exactly, so "revert the theme" is a standard Discard.
+  {
+    name: 'set_site_brand_tokens deep-merges nested tokens and unsets a subtree',
+    objectType: 'site',
+    body: siteBody,
+    op: {
+      op: 'set_site_brand_tokens',
+      fields: { brandTokens: { colors: { primary: '#000000', tertiary: '#abcdef' } } },
     },
   },
   // product family

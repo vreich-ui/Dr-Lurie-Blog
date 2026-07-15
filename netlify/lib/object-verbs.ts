@@ -178,7 +178,7 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     dry_run: z.boolean().optional(),
   }),
   // ─── W8.3: apply a theme's tokens to the site singleton (09-plan §6.4).
-  // Computes ONE exact-replace set_site_fields op (stale keys unset) and
+  // Computes ONE exact-replace set_site_brand_tokens op (stale keys unset) and
   // routes it through the standard patch path under the CALLER'S site
   // checkout. Publish stays the separate deliberate step.
   z.object({
@@ -989,7 +989,9 @@ export const handleObjectVerb = async (
       // Exact-replace semantics: after the apply, site.brandTokens EQUALS the
       // theme's tokens. `fields` deep-merges, so every color key the site
       // carries but the theme doesn't must be explicitly unset (null) — the
-      // stale-palette leak a hand-written set_site_fields would make (§6.4).
+      // stale-palette leak a hand-written brandTokens patch would make (§6.4).
+      // brandTokens rides the privileged set_site_brand_tokens op — set_site_fields
+      // refuses it (theme-only palette governance).
       const themeColors = parsedTheme.data.tokens.colors;
       const staleUnsets = Object.fromEntries(
         Object.keys(parsedSite.data.brandTokens.colors)
@@ -997,7 +999,7 @@ export const handleObjectVerb = async (
           .map((key) => [key, null])
       );
       const op = {
-        op: 'set_site_fields',
+        op: 'set_site_brand_tokens',
         fields: {
           brandTokens: {
             colors: { ...staleUnsets, ...themeColors },

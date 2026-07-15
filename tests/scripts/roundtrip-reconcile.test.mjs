@@ -219,6 +219,19 @@ test('reconcileOps for a site singleton is one deep-merge diff that nulls strays
   assert.equal(ops[0].fields.strayTop, null, 'top-level stray key must be explicitly nulled');
 });
 
+test('reconcileOps for a site EXCLUDES brandTokens — the palette is theme-governed (Wolf 2026-07-15)', () => {
+  // brandTokens drifts alongside a real field; the driver heals the field but
+  // NEVER emits brandTokens (set_site_fields refuses it). Palette drift heals
+  // via site_apply_theme, not reconcile.
+  const target = { name: 'Dr. Lurié', brandTokens: { colors: { primary: 'rgb(31 98 112)' } } };
+  const current = { name: 'DRIFTED', brandTokens: { colors: { primary: 'rgb(9 9 9)' } } };
+  const ops = reconcileOps({ objectType: 'site', objectId: 'site_drlurie', body: target }, current);
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].op, 'set_site_fields');
+  assert.equal(ops[0].fields.name, 'Dr. Lurié');
+  assert.ok(!('brandTokens' in ops[0].fields), 'brandTokens never appears in a reconcile op');
+});
+
 test('reconcileOps for a template heals the W8.3b metadata trio (the tpl_* backfill mechanism)', () => {
   const target = {
     name: 'Interior page',

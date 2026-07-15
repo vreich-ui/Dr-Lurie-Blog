@@ -347,10 +347,30 @@ const removeTermSchema = z.strictObject({
 
 // ——— Site (C§2.0) ———
 
+// Deep-partial SiteBody; per-field validation is T0.7's job. `brandTokens` is
+// NOT patchable here (Wolf 2026-07-15, theme-only palette governance): the
+// palette changes ONLY through site_apply_theme, which emits the privileged
+// set_site_brand_tokens op below — so every color edit goes through an
+// auditable, revertible, maker-restrictable theme object. Exactly the
+// set_product_fields ⇸ set_product_price funnel, applied to the site.
 const setSiteFieldsSchema = z.strictObject({
   op: z.literal('set_site_fields'),
-  // Deep-partial SiteBody; per-field validation is T0.7's job.
-  fields: fieldsSchema,
+  fields: fieldsSchema.superRefine(
+    forbidKeys(['brandTokens'], 'set_site_fields (the palette changes only via site_apply_theme)')
+  ),
+  ...guard,
+});
+
+// The palette WRITER — the exact complement of set_site_fields' refusal:
+// `fields` carries ONLY `brandTokens`. Constructed by the `site_apply_theme`
+// verb (which copies a theme's tokens with exact-replace semantics) and by
+// inverse derivation (the Discard path — "revert the theme"); marked
+// agent_authored: false in the contract. Kept fields-shaped so its inverse is
+// this same op with the captured before-tree, and so the body-level
+// brand_token_values / theme_token_keys safety criteria gate it unchanged.
+const setSiteBrandTokensSchema = z.strictObject({
+  op: z.literal('set_site_brand_tokens'),
+  fields: z.strictObject({ brandTokens: fieldsSchema }),
   ...guard,
 });
 
@@ -586,6 +606,7 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   reactivateTermSchema,
   removeTermSchema,
   setSiteFieldsSchema,
+  setSiteBrandTokensSchema,
   setProductFieldsSchema,
   setProductPriceSchema,
   setArticleMetaSchema,
@@ -685,7 +706,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
     'remove_action',
   ],
   taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
-  site: ['set_site_fields'],
+  site: ['set_site_fields', 'set_site_brand_tokens'],
   template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
   section_template: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data'],
   theme: ['set_theme_fields'],

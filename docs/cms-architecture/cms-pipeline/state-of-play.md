@@ -7,6 +7,44 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-15 C (Theme-only palette enforcement SHIPPED: brandTokens is grammar-locked out of set_site_fields; the privileged set_site_brand_tokens writer)
+
+Wolf: "do the Theme-only enforcement now only." Built the enforcement half of
+the 2026-07-15 B directive (the maker-agent restriction and human-approval pin
+stay one-line config flips, deliberately not turned on).
+
+- **The two-op grammar split (the set_product_fields ⇸ set_product_price
+  precedent, applied to the site):**
+  - `set_site_fields` now `superRefine`s `forbidKeys(['brandTokens'])` — a
+    hand-written brandTokens patch is refused at the grammar (`invalid_op` →
+    **400**), before any value reaches validation. The hole the 2026-07-13
+    color-editing agent used is closed for safe AND unsafe values alike; the
+    error points at `site_apply_theme`.
+  - New privileged op `set_site_brand_tokens` (`fields: {brandTokens}` only),
+    marked `agent_authored: false` in the contract — the ONLY writer of the
+    palette. `site_apply_theme` now emits it instead of `set_site_fields`.
+    Same deep-merge/exact-replace mechanics; the fields-capture inverse makes
+    "revert the theme" a standard Discard, unchanged.
+  - `brand_token_values` / `theme_token_keys` CSS-safety criteria are
+    body-keyed (object type `site`), so they gate the new op unchanged.
+- **Contract:** site gains a `palette_theme_only` constraint (blocks_write)
+  and advertises `set_site_brand_tokens` as tool-authored; `object_patch` /
+  `site_apply_theme` MCP descriptions updated.
+- **Reconcile driver:** the site branch now strips `brandTokens` from the
+  `set_site_fields` diff — the driver never emits the palette (it would 400
+  now); palette drift heals via a theme apply, not reconcile. (Reinforces the
+  standing "don't reconcile the site family until the seed is updated" note —
+  which is about name/logo/metadata, not the palette.)
+- **Tests:** grammar refusal end-to-end (400 + message + a non-palette
+  set_site_fields still 200); apply now emits + inverts set_site_brand_tokens;
+  reconcile excludes brandTokens; contract advertises the op agent_authored:
+  false. Suite 1288 + 57 green; check + build-diff EMPTY.
+- **Still available as config flips (NOT turned on, per "enforcement only"):**
+  maker-agent restriction on theme creation (`src/config/creation-policy.ts`),
+  human-approval pin on theme/site (`src/config/approval-policy.ts`). Agent-
+  approves-agent review remains unbuilt (M-6 approvals are human-only). The
+  site seed (`site-seed-data.mjs`) is still stale on name/logo/metadata.
+
 ## Session 2026-07-15 B (Wolf's palette ruling: original restored via a REAL theme apply; theme-only governance directive logged)
 
 Wolf: the 2026-07-13 teal/terracotta palette was "made by an agent which was
