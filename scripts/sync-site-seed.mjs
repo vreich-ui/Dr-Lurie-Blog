@@ -82,15 +82,18 @@ if (checkOnly) {
   process.exit(1);
 }
 
-// ── build the next body with a MINIMAL diff: keep every unchanged field
-//    verbatim from the seed (preserving its readable key order/formatting —
-//    e.g. brandTokens' grouped order), and take the export's value only for
-//    the fields that actually drifted. Append any export-only keys after. ──
+// ── build the next body with a MINIMAL diff: the export is the source of
+//    truth, so the result carries EXACTLY the export's keys. Keep every
+//    unchanged field verbatim from the seed (preserving its readable key
+//    order/formatting — e.g. brandTokens' grouped order), take the export's
+//    value for fields that drifted, DROP any seed-only keys (a key the export
+//    no longer has), and append any export-only keys last — so a sync always
+//    reaches seed === export (the drift guard's invariant). ──
 const valuesEqual = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
 const nextBody = {};
 for (const key of Object.keys(currentBody)) {
-  if (!(key in exported)) nextBody[key] = currentBody[key];
-  else nextBody[key] = valuesEqual(currentBody[key], exported[key]) ? currentBody[key] : exported[key];
+  if (!(key in exported)) continue; // seed-only key → dropped (export is authoritative)
+  nextBody[key] = valuesEqual(currentBody[key], exported[key]) ? currentBody[key] : exported[key];
 }
 for (const key of Object.keys(exported)) if (!(key in nextBody)) nextBody[key] = exported[key];
 
@@ -127,4 +130,6 @@ if (!pattern.test(source)) {
 }
 fs.writeFileSync(SEED_PATH, source.replace(pattern, block));
 console.log(`[sync-site-seed] rewrote ${path.relative(repoRoot, SEED_PATH)} from the production export.`);
-console.log('[sync-site-seed] run `npx prettier --write scripts/lib/site-seed-data.mjs` to normalize, then re-run the seed test.');
+console.log(
+  '[sync-site-seed] run `npx prettier --write scripts/lib/site-seed-data.mjs` to normalize, then re-run the seed test.'
+);
