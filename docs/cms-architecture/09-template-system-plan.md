@@ -1,21 +1,23 @@
 # 09 — Template System Plan (W8): the recipe family — section templates, page-template composition, theme presets
 
-> **Status (2026-07-14, end of day): RELEASED — not yet converted.**
+> **Status (2026-07-15): CONVERTED — W8 exit criteria met.**
 > Designed, built (W8.1–W8.3b, PRs #437/#439/#440/#442), and run (W8.4
 > credentialed run via the session MCP connection, same day) on branch
 > `claude/template-architecture-design-dem5xb`. Wolf's four decisions in §0
 > were GOVERNING throughout. All 9 recipe objects (3 tpl backfilled + 5 stpl
 > + 1 thm created) are store-backed, fully round-tripped on their patch
 > surface, published, and released (deploy ready 2026-07-14T16:23Z);
-> store === seed === export verified. **The open conversion gate** (playbook
-> criterion 3; the W2.5 precedent proved `instantiate` in production before
-> flipping): the application-verb production dry_runs
-> (`object_instantiate_section_template` both modes; `site_apply_theme`
-> dry_run + one real no-op default apply) — the converting session's MCP
-> tool snapshot predated the W8 deploys and could not be refreshed; both
-> verbs are live, contract-advertised, and verb-level-tested. They run FIRST
-> thing next session; on green, flip inventory/map/CLAUDE.md to CONVERTED
-> (41 → 47). Composite sections (§8) remain SPEC-ONLY behind OQ-W8-1…4.
+> store === seed === export verified. The application-verb production
+> proofs ran 2026-07-15 (after a connector reset exposed the W8 tools):
+> stamp dry_run BOTH modes × EACH of the 5 stpl records (10/10 eligible),
+> apply_theme dry_run + ONE REAL default apply end-to-end (publish +
+> release). ⚠ The real apply exposed LIVE-PALETTE DRIFT — production was
+> rebranded 2026-07-13 after the seeds were written, so the apply reverted
+> the live look ~6 min (09:30:57–09:37:13Z); restored byte-exact (`eba0c42`) and re-released.
+> Open: thm_drlurie_default ≠ live palette (update-vs-keep is Wolf's call);
+> site-seed-data.mjs stale vs production (do NOT reconcile the site family
+> until updated). Docs flipped to CONVERTED, 41 → 47. Composite sections
+> (§8) remain SPEC-ONLY behind OQ-W8-1…4.
 
 ## 0. Mandate and decisions (Wolf, 2026-07-14 — GOVERNING for W8)
 
@@ -87,8 +89,8 @@ the validation engine).
 | Recipe                    | Ids      | Applies to          | Answers                                    | Status                                  |
 | ------------------------- | -------- | ------------------- | ------------------------------------------ | --------------------------------------- |
 | `template` (page)         | `tpl_*`  | a new page          | "how do I START a page of kind X?"         | 🟢 CONVERTED (W2.5; §4 blueprintRef SHIPPED W8.2; metadata backfilled W8.4) |
-| `section_template` (NEW)  | `stpl_*` | a section instance  | "how do I START a section of type Y?"      | 🔵 BUILT (W8.1–W8.2) + RELEASED (W8.4, 5 records) — converts on the stamp-verb production dry_runs |
-| `theme` (NEW)             | `thm_*`  | `site.brandTokens`  | "how do I re-skin the site's token set?"   | 🔵 BUILT (W8.3) + RELEASED (W8.4, thm_drlurie_default) — converts on the apply-verb production proofs |
+| `section_template` (NEW)  | `stpl_*` | a section instance  | "how do I START a section of type Y?"      | 🟢 CONVERTED (W8.4 run 2026-07-14; stamp verb proven both modes × each record 2026-07-15) |
+| `theme` (NEW)             | `thm_*`  | `site.brandTokens`  | "how do I re-skin the site's token set?"   | 🟢 CONVERTED (W8.4 run 2026-07-14; apply verb proven end-to-end 2026-07-15 — tokens now ≠ live palette, see status header) |
 
 Wolf's sentence, mapped: **code** = the section union + component registry +
 PageType registry + validation (what exists, what options, what amounts);
@@ -466,7 +468,7 @@ form. Direction, so W8 keeps the door open by construction:
 | **W8.2** | `object_instantiate_section_template` (both modes, dry_run) + `blueprintRef` composition + `checkTemplate` additions                 | W8.1                  | normal         | Suite + local lifecycle drill + build-diff EMPTY                      |
 | **W8.3** | `theme` type end-to-end + token key registry + CustomStyles refactor (byte-identical) + value safety (theme AND site) + `site_apply_theme` + default seed | — (parallel-safe)     | normal         | Suite + build-diff EMPTY + local apply drill (apply → vars change → inverse restores) |
 | **W8.3b** | Recipe metadata (description/whenToUse/scope, publish-gated) uniform across the recipe family + creation-policy seam (committed config, default open) + reuse-first surfacing (inventory recipe summaries, REUSE-FIRST contract lines, section-type `useWhen` ×19) + metadata-complete seeds + committed tpl-export pre-materialization + reconcile support | W8.1–W8.3            | normal         | Suite + `npm run check` + build-diff EMPTY                            |
-| **W8.4** | 🔵 RUN 2026-07-14 (Wolf's go, session MCP connection): Step-0 tpl backfill + 6 creations + full drills + publishes + release — RELEASED. NOT yet converted: the application-verb production dry_runs (frozen tool-snapshot blocker) are the open gate; first act of next session, then docs flip 🟢 | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
+| **W8.4** | ✅ COMPLETE (run 2026-07-14 + verb proofs 2026-07-15): Step-0 tpl backfill + 6 creations + full drills + publishes + release + all application-verb production proofs (stamp both modes × each stpl; apply dry_run + one real apply — exposed live-palette drift, reverted byte-exact); docs flipped 🟢, 41 → 47 | W8.1–W8.3b merged + deployed | **human_gate** | All five playbook criteria per type (§10)                             |
 
 ### W8.1 brief — `section_template` + the leaf fix
 
@@ -592,18 +594,19 @@ form. Direction, so W8 keeps the door open by construction:
   conversion-map marks flip to 🟢, state-of-play session entry, CLAUDE.md
   converted-count line.
 - **Gate:** all five playbook criteria per type; store === seed === export.
-- **RUN OUTCOME (2026-07-14) — what remains:** everything above EXCEPT the
-  two application-verb proofs completed (Step 0, 6 creations, all patch-op
+- **RUN OUTCOME — COMPLETE:** 2026-07-14: Step 0, 6 creations, all patch-op
   drills, publishes, release, store === seed === export, contract +
-  inventory checks, instantiate_template dry_runs ×3). The verb proofs
-  (`object_instantiate_section_template` dry_run in BOTH modes for EACH of
-  the five `stpl_*` records — per-object conversion, the W2.5 precedent of
-  one instantiate proof per template; plus `site_apply_theme` dry_run + one
-  real no-op default apply → site publish → release) could NOT run: the
-  converting session's MCP tool snapshot predated the W8 deploys and never
-  refreshes. **The next session runs ONLY those proofs (10 stamp dry_runs +
-  the theme pair), then flips the docs 🟢 (41 → 47)** — do not re-run the
-  completed steps (re-verify with `object_inventory` if in doubt).
+  inventory checks, instantiate_template dry_runs ×3. 2026-07-15 (connector
+  reset exposed the W8 tools): stamp dry_run BOTH modes × EACH stpl (10/10
+  eligible, zero blockers) + apply_theme dry_run + ONE REAL default apply →
+  site publish (`ec2cbd3`) → release (deploy ready 09:30:57Z). **The
+  "no-op" premise was FALSE** — production had been rebranded 2026-07-13
+  (teal/terracotta + Source Serif heading) after the seeds were written;
+  the apply put the old palette live ~6 min; restored byte-exact
+  (`eba0c42`) + re-released. LESSON: "byte-identical to production" claims
+  must be verified against the LIVE record at apply time, not the seed
+  corpus. Open follow-ups: update-or-keep thm_drlurie_default (Wolf), and
+  update site-seed-data.mjs before ANY site-family reconcile.
 
 ## 10. Exit criteria
 

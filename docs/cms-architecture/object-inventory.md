@@ -49,8 +49,8 @@ the production store**. These are different, and only the second is "converted"
   can fully manipulate it via MCP (checkout → patch → publish → release → re-render).
   This needs production credentials and a proven round-trip.
 
-**As of 2026-07-14, forty-one objects are CONVERTED** (+6 W8 recipe records
-RELEASED, not yet counted — see "Recipe family (W8)" below). The ledger
+**As of 2026-07-15, forty-seven objects are CONVERTED** (the 41 baseline +
+the 6 W8 recipe records — see "Recipe family (W8)" below). The ledger
 counts objects whose round-trip was individually proven in a credentialed
 run; the ten-article corpus (W7.9 aftermath — created → published → released
 end-to-end via MCP, all store-backed) is live production content of the
@@ -97,7 +97,7 @@ generic object verbs and the approval policy — the authoritative list is
 `objectTypes` in `src/schema/object-record-v1.ts`): W7.3 (2026-07-13)
 brought `content_item` into the model, and W8 (2026-07-14) added
 `section_template` and `theme`, the section- and site-level members of the
-recipe family (records RELEASED 2026-07-14; conversion completes on the
+recipe family (released 2026-07-14, CONVERTED on the 2026-07-15
 application-verb production proofs —
 [`09-template-system-plan.md`](09-template-system-plan.md)); see
 "Recipe family (W8)" under Singletons & templates below. (Session logs call
@@ -125,8 +125,8 @@ trail. Flip one file to change the posture per type.
 | **template**                | A reusable page blueprint (slots + allowed section types + default blueprints). Records _provenance_ only — pages do **not** live-inherit from a template after instantiation.                        | A slot's blueprint type must be in that slot's allowed set; allowed types must be registered components.                                                                                                               |
 | **product**                 | One sellable digital good (download / pay-to-unlock / tip-PWYW / free lead magnet): `slug` + presentation + commerce + a fulfillment union on `kind`. Long-form copy composes via `presentation.page_ref` → an ordinary Page (06-shop-module-plan §1–2). | Slug lowercase-hyphen + unique (→ `/shop/<slug>`); mode↔fields coherence enforced; **price cache + Stripe linkage are NOT agent-patchable** (`product_set_price` only, S3); `fulfillment.artifact_ref` must be a trusted private-store ref; **publishes review-required**. |
 | **content_item** (articles) | An article as an annotated NODE LIST (W7.3): every block carries `private.strategy` (hook/agitation/…/resolution) + `intent` plus commercial/rendering/chat metadata; `public.body` is plain text or a `rich_text.v1` document. Envelope carries the judge/score substrate (claims/sources/compliance/emotional_strategy/scores/lineage). `create_variant` clones a draft for A/B judging. Renders through the blog furniture at `/<slug>`, joining listings/tags/RSS automatically. | `req_*` ids (artifact trust preserved); slug lowercase-hyphen + unique across articles AND committed posts; ≥1 public content node to publish; node ids opaque (no strategy words); annotations NEVER render (leak rule); rich-text bodies limited to the renderable grammar (embeds blocked until resolvers exist). **The 83 legacy committed posts were WIPED (Wolf 2026-07-13); the live corpus is 10 `content_item` objects + the demo, all store-backed.** Slug uniqueness still spans any committed posts should they return. |
-| **section_template** (W8)   | A section-level recipe: ONE pre-configured section blueprint (+ name/description/whenToUse/scope) an agent stamps into any page or mints as a standalone `sec_*` object via `object_instantiate_section_template` — copy at stamp time, never live-bound. Records RELEASED 2026-07-14, not yet converted (verb proofs pending).                                                          | Blueprint must be a standalone-placeable registered type (no `card` leaf, no `shared_ref`, no manual content picks, no asset refs — self-contained); metadata trio (description/whenToUse/scope) REQUIRED TO PUBLISH; creation gated by `src/config/creation-policy.ts` (open today).                                     |
-| **theme** (W8)              | A brandTokens preset (name/description/whenToUse/scope + `tokens: {colors, fonts}`): agents draft/validate a palette, then `site_apply_theme` copies it onto the site singleton as ONE exact-replace `set_site_fields` op (stale keys unset). NOT taxonomy; the site never live-inherits. Record RELEASED 2026-07-14, not yet converted (verb proofs pending).                             | Published themes must carry every renderer-consumed color key (apply is total); token values must pass the safe-CSS grammar (raw `<style>` interpolation — the same rule gates `site.brandTokens`); metadata trio REQUIRED TO PUBLISH; creation gated by the same committed policy.                                       |
+| **section_template** (W8)   | A section-level recipe: ONE pre-configured section blueprint (+ name/description/whenToUse/scope) an agent stamps into any page or mints as a standalone `sec_*` object via `object_instantiate_section_template` — copy at stamp time, never live-bound. Records CONVERTED (verb proofs 2026-07-15).                                                          | Blueprint must be a standalone-placeable registered type (no `card` leaf, no `shared_ref`, no manual content picks, no asset refs — self-contained); metadata trio (description/whenToUse/scope) REQUIRED TO PUBLISH; creation gated by `src/config/creation-policy.ts` (open today).                                     |
+| **theme** (W8)              | A brandTokens preset (name/description/whenToUse/scope + `tokens: {colors, fonts}`): agents draft/validate a palette, then `site_apply_theme` copies it onto the site singleton as ONE exact-replace `set_site_fields` op (stale keys unset). NOT taxonomy; the site never live-inherits. Record CONVERTED (verb proofs 2026-07-15; tokens = launch palette, see drift caveat).                             | Published themes must carry every renderer-consumed color key (apply is total); token values must pass the safe-CSS grammar (raw `<style>` interpolation — the same rule gates `site.brandTokens`); metadata trio REQUIRED TO PUBLISH; creation gated by the same committed policy.                                       |
 
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
@@ -283,24 +283,23 @@ released; metadata trio backfilled + fully re-drilled by the W8.4 run
 | `tpl_landing`  | `standard` | 🟢 CONVERTED | Hero open + curated card grid + cta close (campaign shape). Round-tripped in production, published, released.                                |
 | `tpl_legal`    | `system`   | 🟢 CONVERTED | One required blueprint-less prose slot — exercises the defaultData fallback. Round-tripped in production, published, released.               |
 
-### Recipe family (W8) — RELEASED 2026-07-14 🔵 (conversion completes on the verb proofs)
+### Recipe family (W8) — CONVERTED 🟢 (released 2026-07-14; verb proofs 2026-07-15)
 
 Designed, built (W8.1–W8.3b), and run (W8.4 credentialed run 2026-07-14 via
 the session MCP connection) the same wave
 ([`09-template-system-plan.md`](09-template-system-plan.md)). Two object types
 complete rule 5's recipe family (data, many, agent-editable; applied by COPY
-at instantiation; never live-bound). **Status is RELEASED, not converted**:
-criterion 3 (every permitted action proven in production, the W2.5 precedent)
-still awaits the application-verb dry_runs — do NOT skip them:
+at instantiation; never live-bound). All five playbook criteria hold per
+object — the application-verb production proofs ran 2026-07-15:
 
 | Object                  | Type               | Status       | Notes                                                                                                                                  |
 | ----------------------- | ------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `stpl_hero_landing`     | `section_template` | 🔵 RELEASED  | Landing/campaign hero opener (`hero` blueprint). All 3 ops round-tripped in production; published, released.                           |
-| `stpl_audience_grid`    | `section_template` | 🔵 RELEASED  | Curated text-cell grid — hand-written "who this is for" / feature cells (`content_grid`, `source.kind: cards`).                        |
-| `stpl_related_articles` | `section_template` | 🔵 RELEASED  | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
-| `stpl_newsletter_cta`   | `section_template` | 🔵 RELEASED  | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
-| `stpl_cta_banner`       | `section_template` | 🔵 RELEASED  | Closing CTA banner — the interior-page closer.                                                                                         |
-| `thm_drlurie_default`   | `theme`            | 🔵 RELEASED  | The production palette verbatim (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
+| `stpl_hero_landing`     | `section_template` | 🟢 CONVERTED | Landing/campaign hero opener (`hero` blueprint). All 3 ops round-tripped in production; published, released.                           |
+| `stpl_audience_grid`    | `section_template` | 🟢 CONVERTED | Curated text-cell grid — hand-written "who this is for" / feature cells (`content_grid`, `source.kind: cards`).                        |
+| `stpl_related_articles` | `section_template` | 🟢 CONVERTED | Automatic further-reading strip (`content_grid`, `source.kind: related`, tag similarity, 3 tiles).                                     |
+| `stpl_newsletter_cta`   | `section_template` | 🟢 CONVERTED | The standing email-capture block (`newsletter_signup`, Netlify "newsletter" form).                                                     |
+| `stpl_cta_banner`       | `section_template` | 🟢 CONVERTED | Closing CTA banner — the interior-page closer.                                                                                         |
+| `thm_drlurie_default`   | `theme`            | 🟢 CONVERTED | The launch palette (see the drift caveat below) (19 color keys + 3 font stacks); applying it to the untouched site is a no-op. `set_theme_fields` round-tripped. |
 
 All six: created in production (`agent_name: w84-conversion-run`) → every
 permitted patch op drilled with exact inverses (stpl:
