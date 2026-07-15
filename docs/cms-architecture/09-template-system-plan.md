@@ -14,10 +14,14 @@
 > release). ⚠ The real apply exposed LIVE-PALETTE DRIFT — production was
 > rebranded 2026-07-13 after the seeds were written, so the apply reverted
 > the live look ~6 min (09:30:57–09:37:13Z); restored byte-exact (`eba0c42`) and re-released.
-> Open: thm_drlurie_default ≠ live palette (update-vs-keep is Wolf's call);
-> site-seed-data.mjs stale vs production (do NOT reconcile the site family
-> until updated). Docs flipped to CONVERTED, 41 → 47. Composite sections
-> (§8) remain SPEC-ONLY behind OQ-W8-1…4.
+> Resolved 2026-07-15: Wolf ruled the 2026-07-13 palette change an
+> unsanctioned agent edit and ordered the original palette restored (second
+> real apply, publish `2f88ef6`, released) — theme and site seed match
+> production again. NEW DIRECTION (pending build): palette changes via
+> themes ONLY (close direct brandTokens patching); theme workflow
+> requester → maker (creation policy) with the optional human-approval pin.
+> Docs flipped to CONVERTED, 41 → 47. Composite sections (§8) remain
+> SPEC-ONLY behind OQ-W8-1…4.
 
 ## 0. Mandate and decisions (Wolf, 2026-07-14 — GOVERNING for W8)
 
@@ -605,8 +609,9 @@ form. Direction, so W8 keeps the door open by construction:
   the apply put the old palette live ~6 min; restored byte-exact
   (`eba0c42`) + re-released. LESSON: "byte-identical to production" claims
   must be verified against the LIVE record at apply time, not the seed
-  corpus. Open follow-ups: update-or-keep thm_drlurie_default (Wolf), and
-  update site-seed-data.mjs before ANY site-family reconcile.
+  corpus. Follow-ups CLOSED 2026-07-15: Wolf ordered the original palette
+  restored (second real apply, publish `2f88ef6`, released) — the theme
+  and site-seed-data.mjs match production again.
 
 ## 10. Exit criteria
 

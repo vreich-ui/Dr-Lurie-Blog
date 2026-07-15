@@ -7,6 +7,34 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-15 B (Wolf's palette ruling: original restored via a REAL theme apply; theme-only governance directive logged)
+
+Wolf: the 2026-07-13 teal/terracotta palette was "made by an agent which was
+asked to change something in colors around" — NOT a sanctioned rebrand — and
+"I actually need it returned to the original colors."
+
+- **Restore executed (the apply verb's second real production run):**
+  checkout site → `site_apply_theme` thm_drlurie_default (atomic op,
+  content_revision 9, `applied_theme` in history, agent_name
+  `wolf-ordered-palette-restore`) → validate clean → publish (`2f88ef6`) →
+  checkin → release (production live on that commit, deploy ready
+  10:35:46Z). The canonical palette is live; thm_drlurie_default's
+  description ("applying is a no-op") and `site-seed-data.mjs` are accurate
+  again — both Session-2026-07-15 drift follow-ups CLOSED.
+- **New governance directive (Wolf, verbatim in intent), PENDING BUILD:**
+  (1) "agents should only be able to change theme of the whole site not
+  individual widgets and objects" — widgets already carry no color fields
+  (rule 6); the remaining hole is DIRECT `set_site_fields` on
+  `brandTokens` (exactly what the 2026-07-13 agent used) — close it so
+  `site_apply_theme` is the only palette writer. (2) Theme workflow:
+  a requesting agent asks; a MAKER agent creates (the W8.3b
+  creation-policy override, e.g. `{theme: {agents: ['theme-maker']}}` —
+  coordination-grade until OQ-3 credentials). (3) "an optional human
+  approval required setting" — EXISTS: pin `theme`/`site` to
+  require-approval in `src/config/approval-policy.ts` (one line, currently
+  autonomous). Agent-approves-agent review is NOT built (M-6 approvals are
+  human-only) — needs its own design if Wolf wants it literal.
+
 ## Session 2026-07-15 (W8.4 verb proofs — recipe family CONVERTED, 41 → 47; the "no-op" apply exposed live-palette drift, reverted byte-exact)
 
 Wolf reset the MCP connector ("connection is reset. continue") — the fresh

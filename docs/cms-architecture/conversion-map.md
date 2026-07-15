@@ -27,8 +27,8 @@
 ```text
 site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07-11; export commit a20f107)
 │   the root everything hangs off; seed scripts/lib/site-seed-data.mjs → export src/data/site/site.json
-│   ⚠ SEED STALE vs production since the 2026-07-13 live rebrand (brandTokens + heading font):
-│     do NOT run the site family through the reconcile driver until the seed is updated
+│   seed matches production again since Wolf's ordered palette restore (2026-07-15,
+│     publish 2f88ef6) — the 2026-07-13 agent color edit was unsanctioned and is undone
 │   LIVE from the object (pre-conversion literals as fallback when the export is absent):
 │     brandTokens (every CustomStyles custom property, light + dark:` keys) · logo.text ·
 │     chrome{showRssFeed, showThemeToggle} · metadataDefaults (title template, description,
@@ -264,11 +264,11 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │     exact-replace set_site_fields op (stale keys unset) under the caller's site checkout.
 │     NOT taxonomy: nothing resolves against a theme; the site never live-inherits — apply
 │     copies values. apply_theme PROVEN in production 2026-07-15 (dry_run + one real
-│     apply end-to-end). ⚠ the real apply exposed LIVE-PALETTE DRIFT: production was
-│     rebranded 2026-07-13 after the seeds; apply put the old palette live ~6 min; restored
-│     byte-exact (eba0c42). thm_drlurie_default now ≠ live palette; site seed stale.
-│   └── 🟢 thm_drlurie_default ─ tokens from site-seed (⚠ NO LONGER matches live production —
-│         the 2026-07-13 rebrand postdates the seed; Wolf decides update-vs-keep)
+│     apply end-to-end; a second real apply the same day executed Wolf's ordered restore
+│     of the original palette — publish 2f88ef6, released). NEW RULE pending build (Wolf
+│     2026-07-15): palette changes via THEMES ONLY — direct set_site_fields on brandTokens
+│     to be closed; theme creation restrictable per agent; human-approval pin optional.
+│   └── 🟢 thm_drlurie_default ─ the canonical palette (live again since the 2026-07-15 restore)
 │
 ├── MEDIA / ARTIFACTS ─ artifact store (images, PDFs) ─ 🔵 pipeline exists (upload/trust);
 │     refs consumed by: bio.portraitAssetRef · about.portrait · product cards · article images
