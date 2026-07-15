@@ -300,6 +300,22 @@ export const discardProposal = (record: ObjectRecord, input: DiscardInput): Revi
           'A discarded palette op must match a real history entry — a fabricated capture cannot set the palette. Revert the palette by applying a theme (site_apply_theme).',
       });
     }
+    // Blind-revert protection for the LEGACY palette path (C§2.4): the
+    // synthesized inverse (below) carries no per-op guard, so verify here that
+    // the palette hasn't moved since the captured op — else the revert would
+    // blindly overwrite an intervening edit. The privileged op keeps its own
+    // guard through derivePatchInverse, so this only covers the legacy rewrite.
+    if (isLegacyPaletteEntryOp(entry.op)) {
+      const capturedAfter = (entry.capture as { after?: unknown } | undefined)?.after;
+      const expectedPalette = isRecordObject(capturedAfter) ? capturedAfter.brandTokens : undefined;
+      const currentPalette = isRecordObject(record.body) ? (record.body as Record<string, unknown>).brandTokens : undefined;
+      if (!deepEqualJson(currentPalette, expectedPalette)) {
+        return err(409, 'discard_conflict', {
+          error:
+            'The palette moved since this legacy edit (intervening theme/site change); blind revert refused (C§2.4) — revert by applying a theme (site_apply_theme).',
+        });
+      }
+    }
   }
 
   let inverses: PatchOp[];

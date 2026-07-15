@@ -336,6 +336,17 @@ test('discard restores a LEGACY palette entry (pre-rollout set_site_fields{brand
   });
   assert.equal(!forged.ok && forged.status, 403);
   assert.equal(!forged.ok && forged.body.code, 'discard_privileged_unverified');
+
+  // …and blind-revert is preserved: if the palette moved since the legacy edit
+  // (the body no longer matches capture.after), discard refuses with a conflict.
+  const moved: ObjectRecord = { ...withLegacy, body: { ...(withLegacy.body as object), brandTokens: { colors: { primary: '#abcabc' } } } };
+  const conflict = discardProposal(moved, {
+    entries: [{ op: legacyForwardOp, capture: legacyCapture }],
+    actor: reviewer,
+    at: LATER,
+  });
+  assert.equal(!conflict.ok && conflict.status, 409);
+  assert.equal(!conflict.ok && conflict.body.code, 'discard_conflict');
 });
 
 test('discard rejects malformed entries and empty batches loudly', () => {
