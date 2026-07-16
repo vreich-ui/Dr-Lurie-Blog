@@ -1073,7 +1073,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'verify_article_images',
     description:
-      'Verify that a published article page contains the expected images and that each is fetchable as an image. TIMING: run this only after the publish deploy is live — Netlify deploys take 30-120s, so poll deploy_status with the publish commit until deployStatus is "ready" first; an immediate check hits the previous deploy. A response with inconclusive: true (page unreachable or non-200 pageStatus) means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png). Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem; each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
+      'Verify that a published article page contains the expected images and that each is fetchable as an image. DEPLOY-AWARE TIMING: pass the publish commit as "commit" and this tool correlates the check to that commit\'s Netlify deploy — image assertions run only once that deploy is confirmed "ready", and a page still served by a stale/previous deploy comes back inconclusive:true (deploy timing), never a false missing-image defect. deployReady:true in the response means the target deploy is live and the result is definitive. Without a commit it falls back to the legacy heuristic (poll deploy_status until deployStatus is "ready" yourself first; an immediate check may hit the previous deploy). A response with inconclusive:true means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png). Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem; each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
     inputSchema: objectSchema(
       {
         url: stringSchema('Published article URL to fetch and inspect for <img> src/srcset sources.'),
@@ -1082,6 +1082,22 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
           items: stringSchema('Expected image URL, page-relative image path, or ~/assets display path.'),
           description:
             'Expected images that must appear in the article HTML. Display paths (~/assets/images/uploads/...) are matched by filename stem against Astro-hashed build URLs.',
+        },
+        commit: stringSchema(
+          'Optional publish commit SHA. When set, the check waits for/correlates to that commit\'s Netlify deploy so a not-yet-live deploy returns inconclusive instead of a false missing-image defect. Use the commit_sha from the publish receipt.'
+        ),
+        deployTimeoutSeconds: {
+          type: 'integer',
+          minimum: 0,
+          maximum: 120,
+          description:
+            'Optional seconds to wait in-call for the target commit deploy to reach a terminal state. Default 0 = single-shot correlation (poll deploy_status yourself first). Capped so the call always returns.',
+        },
+        deployPollIntervalSeconds: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 30,
+          description: 'Optional poll interval (seconds) used only when deployTimeoutSeconds > 0. Default 5.',
         },
       },
       ['url', 'expectedImages']
@@ -1514,7 +1530,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_review_decide',
     description:
-      'Approve or request changes on an open review. Fully agentic: a detached approval agent may decide over the shared MCP publish key, so an object can go edit → approve → publish with no human; a human decides through the admin UI with a configured role. Same shared logic, one path. On approve, publish_action pins the authorized action (M-6) that an agent-executed publish must then match exactly (publish-gate.ts), so an agentic approval is still explicit and pinned; publish_action is ignored for request_changes. Bumps version, never content_revision. TODO: agent approval currently rides the shared publish key and will move to a separate gate/credential dedicated to approval/editor agents.',
+      'Approve or request changes on an open review. Fully agentic: a detached approval agent may decide over the shared MCP publish key, so an object can go edit → approve → publish with no human; a human decides through the admin UI with a configured role. Same shared logic, one path. On approve, publish_action pins the authorized action (M-6) that an agent-executed publish must then match exactly (publish-gate.ts), so an agentic approval is still explicit and pinned; publish_action is ignored for request_changes. For a live-publish approval you may additionally pass approval_pin to bind agent execution to the exact content-item/request id, artifact set, and release/build behavior reviewed. Bumps version, never content_revision. TODO: agent approval currently rides the shared publish key and will move to a separate gate/credential dedicated to approval/editor agents.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -1524,6 +1540,25 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         publish_action: publishActionInputSchema(
           'Optional M-6 pin for an approval, e.g. { published_time: "immediate" }; ignored for request_changes.'
         ),
+        approval_pin: {
+          type: 'object',
+          additionalProperties: false,
+          description:
+            'Optional extended live-publish pin for an approval: binds an agent-executed publish to the exact content-item/request id, artifact set, and release/build behavior reviewed. Ignored for request_changes.',
+          properties: {
+            request_id: stringSchema('Exact content-item / workflow request id the approval covers.'),
+            artifact_set: {
+              type: 'array',
+              items: stringSchema('Approved artifact identifier (blobKey or sha256).'),
+              description: 'The exact set of artifacts approved; an agent-executed publish must use exactly this set.',
+            },
+            release_build: {
+              type: 'string',
+              enum: ['defer', 'release'],
+              description: 'Whether the approval authorizes a deferred (default) or an immediate release/build.',
+            },
+          },
+        },
       },
       ['object_type', 'object_id', 'decision']
     ),
@@ -1980,6 +2015,11 @@ const callVerifyArticleImages = async (event: LambdaEvent, input: Record<string,
     body: JSON.stringify({
       url: input.url,
       expectedImages: input.expectedImages,
+      ...(input.commit !== undefined ? { commit: input.commit } : {}),
+      ...(input.deployTimeoutSeconds !== undefined ? { deployTimeoutSeconds: input.deployTimeoutSeconds } : {}),
+      ...(input.deployPollIntervalSeconds !== undefined
+        ? { deployPollIntervalSeconds: input.deployPollIntervalSeconds }
+        : {}),
     }),
   });
   const body = parseJsonResponseBody(verifyResponse.body);
@@ -2287,6 +2327,23 @@ const validateCanonicalArticleBody = (recordInput: Record<string, unknown> | und
     };
   }
 
+  // article_body.v1 is the ONLY canonical content path. A legacy prose blob
+  // (content.blocks / content.structure.sections) carried ALONGSIDE it is a
+  // competing, non-canonical body — reject it here rather than let an ambiguous
+  // record publish. Markdown exists only as an export/render adapter
+  // (src/lib/article-content/to-markdown.ts), never as canonical input.
+  const legacyBlocks = Array.isArray(content?.blocks) ? content.blocks : [];
+  const legacyStructure = getRecordValue(content?.structure);
+  const legacySections = Array.isArray(legacyStructure?.sections) ? legacyStructure.sections : [];
+  if (legacyBlocks.length > 0 || legacySections.length > 0) {
+    return {
+      ok: false as const,
+      error:
+        'article_body.v1 is the only canonical content path; a competing content.blocks / content.structure prose body must not accompany it at publish. Remove the legacy prose — Markdown and block/structure prose are export-only, never canonical input.',
+      error_code: 'competing_non_canonical_body',
+    };
+  }
+
   return { ok: true as const, articleBody, content };
 };
 
@@ -2349,11 +2406,18 @@ const buildCanonicalPublishPayload = async (
     );
   };
 
+  // Only a request-scoped artifact pointer (a Major Key blobKey like
+  // image/<req>/<sha>.<ext>) is a trusted featured-image source. Remote URLs,
+  // data URIs, and repo/asset paths carried on the register are NOT accepted:
+  // the single artifact transfer protocol is a pdf-tool storage-grant write that
+  // lands in the artifact index as a blobKey. parseArtifactPointer(path) is the
+  // gate — anything that is not such a pointer contributes no candidate, so a
+  // remote URL can never be promoted to the committed frontmatter image.
   const imageAssets = Array.isArray(media?.image_asset_register) ? media.image_asset_register : [];
   for (const asset of imageAssets) {
     const assetRecord = getRecordValue(asset);
     const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
-    if (path) {
+    if (path && parseArtifactPointer(path)) {
       candidates.push({ path, priority: isHeroAsset(assetRecord) ? 10 : 5 });
     }
   }
@@ -2367,7 +2431,7 @@ const buildCanonicalPublishPayload = async (
       const asset = imageAssets.find((a: unknown) => getRecordValue(a)?.asset_id === assetId);
       const assetRecord = getRecordValue(asset);
       const path = toNonEmptyString(assetRecord?.repoPath) || toNonEmptyString(assetRecord?.url);
-      if (path) {
+      if (path && parseArtifactPointer(path)) {
         candidates.push({ path, priority: isHeroSet ? 12 : 6 });
       }
     }
@@ -2378,12 +2442,15 @@ const buildCanonicalPublishPayload = async (
     const nodeRecord = getRecordValue(node);
     const nodePublic = getRecordValue(nodeRecord?.public);
     const nodeMedia = getRecordValue(nodePublic?.media);
+    // Same trust gate for node media: only a request-scoped artifact pointer is a
+    // featured-image (or cross-request document) source; a node whose src is a
+    // remote URL / data URI / repo path contributes no candidate.
     const path = toNonEmptyString(nodeMedia?.src);
-    if (path && nodeMedia?.type === 'image') {
+    if (path && parseArtifactPointer(path) && nodeMedia?.type === 'image') {
       const rendering = getRecordValue(nodeRecord?.rendering);
       const isHeroNode = rendering?.presentation === 'hero' || nodeRecord?.id === 'n_hero';
       candidates.push({ path, priority: isHeroNode ? 10 : 3 });
-    } else if (path && nodeMedia?.type === 'document') {
+    } else if (path && parseArtifactPointer(path) && nodeMedia?.type === 'document') {
       // Include document (PDF) pointers for cross-request resolution.
       // Priority 0 ensures PDFs never influence featured-image selection.
       candidates.push({ path, priority: 0 });
@@ -4067,6 +4134,7 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         decision: input.decision,
         note: input.note,
         publish_action: input.publish_action,
+        approval_pin: input.approval_pin,
       });
     case 'object_discard':
       return callObjectAction(event, {

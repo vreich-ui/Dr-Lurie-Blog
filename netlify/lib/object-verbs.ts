@@ -81,7 +81,7 @@ import {
   isCreationAllowed,
   type CreationPolicy,
 } from '../../src/lib/creation-policy.js';
-import { decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
+import { approvalPinSchema, decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────
 
@@ -244,6 +244,9 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     decision: z.enum(['approve', 'request_changes']),
     note: z.string().optional(),
     publish_action: publishActionSchema.optional(),
+    // Extended live-publish pin (Goal 4): bind agent execution to the exact
+    // content-item/request id, artifact set, and release/build behavior.
+    approval_pin: approvalPinSchema.optional(),
   }),
   z.object({
     action: z.literal('discard'),
@@ -1252,6 +1255,7 @@ export const handleObjectVerb = async (
         decision: request.decision,
         note: request.note,
         publish_action: request.publish_action,
+        approval_pin: request.approval_pin,
       });
       if (!result.ok) return err(result.status, result.body);
 

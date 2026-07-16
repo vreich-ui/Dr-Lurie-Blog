@@ -133,7 +133,8 @@ describe('patch_canonical_input rejection messages are reason-specific', () => {
     const error = parseBody(resp).error ?? '';
     assert.match(error, /belongs to request 'req_other_flow_topic_20260703_09', not '/);
     assert.match(error, /Cross-request artifact references are not accepted/);
-    assert.match(error, /re-upload/i);
+    // Recovery is via the pdf-tool storage grant, the only artifact transfer path.
+    assert.match(error, /get_pdf_tool_storage_grant|storage grant/);
   });
 
   it('says an indexed-but-soft-deleted artifact is soft-deleted', async () => {
@@ -189,7 +190,9 @@ describe('patch_canonical_input rejection messages are reason-specific', () => {
     const error = parseBody(resp).error ?? '';
     assert.match(error, /not in the artifact index for request/);
     assert.ok(error.includes(neverUploaded), `error must name the rejected blobKey: ${error}`);
-    assert.match(error, /create_artifact_upload_intent|create_artifact_from_url/);
+    // The sanctioned recovery path is the pdf-tool storage grant (the only
+    // artifact transfer protocol), not the legacy upload tools.
+    assert.match(error, /get_pdf_tool_storage_grant|storage grant/);
     assert.match(error, /list_artifacts_for_request/);
   });
 });

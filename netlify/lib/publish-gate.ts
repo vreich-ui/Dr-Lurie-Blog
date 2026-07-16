@@ -56,7 +56,7 @@
  * publishObject (which by design assumes it is already authorized). The
  * policy defaults to the committed config; tests inject their own.
  */
-import { effectiveApproval, type PublishAction } from './review-state.js';
+import { effectiveApproval, type ApprovalPin, type PublishAction } from './review-state.js';
 import { canExecutePublish, type Role } from './roles.js';
 import {
   activeApprovalPolicy,
@@ -69,6 +69,16 @@ import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.
 export type RequestedPublishAction = {
   /** As the publish call supplies it: ISO string, null (unpublish), or omitted (= immediate). */
   published_time?: string | null;
+  /**
+   * The artifact set (blobKeys/sha256) this publish will use. Only needed when
+   * the consumed approval pins an artifact_set — the gate confirms they match.
+   */
+  artifact_set?: readonly string[];
+  /**
+   * The release/build behavior this publish will use. Only needed when the
+   * consumed approval pins release_build — the gate confirms they match.
+   */
+  release_build?: 'defer' | 'release';
 };
 
 export type PublishGateDenialCode =
@@ -78,14 +88,19 @@ export type PublishGateDenialCode =
   | 'approval_stale'
   | 'publish_role_required'
   | 'publish_action_not_pinned'
-  | 'publish_action_mismatch';
+  | 'publish_action_mismatch'
+  | 'publish_request_id_mismatch'
+  | 'publish_artifact_set_required'
+  | 'publish_artifact_set_mismatch'
+  | 'publish_release_build_required'
+  | 'publish_release_build_mismatch';
 
 export type PublishGateResult =
   | {
       allow: true;
       requires_approval: boolean;
       /** Present exactly when the type required approval — the consumed approval's pin. */
-      approval?: { content_revision: number; publish_action?: PublishAction };
+      approval?: { content_revision: number; publish_action?: PublishAction; approval_pin?: ApprovalPin };
     }
   | { allow: false; requires_approval: boolean; status: 403; code: PublishGateDenialCode; reason: string };
 
@@ -105,6 +120,71 @@ const publishActionMatchesPin = (pin: PublishAction, requested: RequestedPublish
   const pinned = Date.parse(pin.published_time);
   const asked = Date.parse(requested.published_time);
   return !Number.isNaN(pinned) && !Number.isNaN(asked) && pinned === asked;
+};
+
+const sameStringSet = (a: readonly string[], b: readonly string[]): boolean => {
+  if (a.length !== b.length) return false;
+  const inB = new Set(b);
+  return a.every((value) => inB.has(value));
+};
+
+/**
+ * Enforce the extended live-publish pin (Goal 4) against an agent-executed
+ * publish: the exact content-item/request id, the exact artifact set, and the
+ * approved release/build behavior. Returns a denial or undefined (all clear).
+ * Only applied to agents — humans with publish authority are not bound by the
+ * pin (C§2.2), exactly like the M-6 publish_action pin.
+ */
+const checkExtendedPin = (
+  pin: ApprovalPin | undefined,
+  record: ObjectRecord,
+  requested: RequestedPublishAction
+): PublishGateResult | undefined => {
+  if (!pin) return undefined;
+
+  if (pin.request_id !== undefined && pin.request_id !== record.object_id) {
+    return deny(
+      true,
+      'publish_request_id_mismatch',
+      `The approval pins content-item/request id '${pin.request_id}', but this publish targets '${record.object_id}'; a different item requires its own approval.`
+    );
+  }
+
+  if (pin.artifact_set !== undefined) {
+    if (requested.artifact_set === undefined) {
+      return deny(
+        true,
+        'publish_artifact_set_required',
+        'The approval pins an exact artifact set; the publish must declare its artifact_set so the gate can confirm it matches the approved one.'
+      );
+    }
+    if (!sameStringSet(pin.artifact_set, requested.artifact_set)) {
+      return deny(
+        true,
+        'publish_artifact_set_mismatch',
+        'The publish artifact set differs from the approved one; any change to the artifact set requires re-approval.'
+      );
+    }
+  }
+
+  if (pin.release_build !== undefined) {
+    if (requested.release_build === undefined) {
+      return deny(
+        true,
+        'publish_release_build_required',
+        'The approval pins the release/build behavior; the publish must declare release_build ("defer" | "release") so the gate can confirm it matches.'
+      );
+    }
+    if (pin.release_build !== requested.release_build) {
+      return deny(
+        true,
+        'publish_release_build_mismatch',
+        `The approval pins release/build behavior '${pin.release_build}', but the publish requested '${requested.release_build}'; a different behavior requires re-approval.`
+      );
+    }
+  }
+
+  return undefined;
 };
 
 export type PublishGateInput = {
@@ -173,6 +253,7 @@ export const checkPublishGate = (input: PublishGateInput): PublishGateResult => 
       approval: {
         content_revision: approval.approval.content_revision,
         ...(approval.approval.publish_action !== undefined ? { publish_action: approval.approval.publish_action } : {}),
+        ...(approval.approval.approval_pin !== undefined ? { approval_pin: approval.approval.approval_pin } : {}),
       },
     };
   }
@@ -193,9 +274,18 @@ export const checkPublishGate = (input: PublishGateInput): PublishGateResult => 
       'The requested publish action differs from the approved one; any different action requires re-approval (M-6).'
     );
   }
+  // Extended live-publish pin (Goal 4): when the approval also pins the exact
+  // request/content-item id, artifact set, or release/build behavior, the agent
+  // publish must match all of them.
+  const extendedDenial = checkExtendedPin(approval.approval.approval_pin, input.record, input.requested);
+  if (extendedDenial) return extendedDenial;
   return {
     allow: true,
     requires_approval: true,
-    approval: { content_revision: approval.approval.content_revision, publish_action: pin },
+    approval: {
+      content_revision: approval.approval.content_revision,
+      publish_action: pin,
+      ...(approval.approval.approval_pin !== undefined ? { approval_pin: approval.approval.approval_pin } : {}),
+    },
   };
 };

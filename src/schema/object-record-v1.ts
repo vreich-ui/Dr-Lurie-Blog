@@ -48,6 +48,24 @@ export const reviewStateSchema = z.object({
           published_time: z.union([z.string(), z.null(), z.literal('immediate')]),
         })
         .optional(),
+      /**
+       * The extended live-publish pin (additive to the M-6 publish_action pin).
+       * When an approval carries it, an AGENT-executed publish on a gated type
+       * is authorized only for the exact request/content-item id, the exact
+       * artifact set, and the exact release/build behavior the reviewer saw.
+       * Absent = the pre-existing behavior (publish_action + content_revision
+       * are the whole pin). Humans with publish authority are not bound by it.
+       */
+      approval_pin: z
+        .object({
+          /** The exact content-item / workflow request id the approval covers. */
+          request_id: z.string().optional(),
+          /** The exact set of artifact identifiers (blobKeys/sha256) approved. */
+          artifact_set: z.array(z.string()).optional(),
+          /** Whether the approval authorizes an immediate release/build or a deferred one. */
+          release_build: z.enum(['defer', 'release']).optional(),
+        })
+        .optional(),
       content_revision: z.number(),
     })
   ),

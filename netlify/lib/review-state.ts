@@ -47,6 +47,33 @@ export const publishActionSchema = z.strictObject({
 });
 export type PublishAction = z.infer<typeof publishActionSchema>;
 
+/**
+ * The extended live-publish pin an approval may additionally carry (Goal 4):
+ * the exact content-item/request id, the exact artifact set, and the approved
+ * release/build behavior. Enforced against agent execution by the publish gate;
+ * omitted fields simply aren't enforced.
+ */
+export const approvalPinSchema = z.strictObject({
+  request_id: z.string().min(1).optional(),
+  artifact_set: z.array(z.string().min(1)).optional(),
+  release_build: z.enum(['defer', 'release']).optional(),
+});
+export type ApprovalPin = z.infer<typeof approvalPinSchema>;
+
+const validateApprovalPin = (value: unknown): { pin?: ApprovalPin; error?: ReviewOpResult } => {
+  if (value === undefined) return {};
+  const parsed = approvalPinSchema.safeParse(value);
+  if (!parsed.success) {
+    return {
+      error: err(400, 'invalid_approval_pin', {
+        error:
+          'approval_pin must be {request_id?: string, artifact_set?: string[], release_build?: "defer" | "release"}.',
+      }),
+    };
+  }
+  return { pin: parsed.data };
+};
+
 export type ReviewOpResult =
   | { ok: true; status: 200; record: ObjectRecord; body: Record<string, unknown> }
   | { ok: false; status: number; body: Record<string, unknown> };
@@ -148,6 +175,12 @@ export type DecideReviewInput = {
   note?: string;
   /** M-6 pin; meaningful on approvals. Ignored-by-gate on request_changes. */
   publish_action?: PublishAction;
+  /**
+   * Extended live-publish pin (Goal 4); meaningful on approvals. Binds agent
+   * execution to the exact request/content-item id, artifact set, and
+   * release/build behavior the reviewer saw. Ignored on request_changes.
+   */
+  approval_pin?: ApprovalPin;
 };
 
 export const decideReview = (record: ObjectRecord, input: DecideReviewInput): ReviewOpResult => {
@@ -159,6 +192,8 @@ export const decideReview = (record: ObjectRecord, input: DecideReviewInput): Re
   }
   const { action, error } = validatePublishAction(input.publish_action);
   if (error) return error;
+  const { pin, error: pinError } = validateApprovalPin(input.approval_pin);
+  if (pinError) return pinError;
 
   const review: ReviewState = {
     state: input.decision === 'approve' ? 'approved' : 'changes_requested',
@@ -170,6 +205,7 @@ export const decideReview = (record: ObjectRecord, input: DecideReviewInput): Re
         decision: input.decision,
         ...(input.note !== undefined ? { note: input.note } : {}),
         ...(action !== undefined ? { publish_action: action } : {}),
+        ...(pin !== undefined ? { approval_pin: pin } : {}),
         // The pin: approval is valid only while the body stays at this
         // revision. Deliberately NOT `version` (D§3.9 — lock ops and the
         // publish stamp bump version and must not invalidate approvals).
@@ -191,6 +227,7 @@ export const decideReview = (record: ObjectRecord, input: DecideReviewInput): Re
           decision: input.decision,
           ...(input.note !== undefined ? { note: input.note } : {}),
           ...(action !== undefined ? { publish_action: action } : {}),
+          ...(pin !== undefined ? { approval_pin: pin } : {}),
           content_revision: record.content_revision,
         },
       },
@@ -308,7 +345,9 @@ export const discardProposal = (record: ObjectRecord, input: DiscardInput): Revi
     if (isLegacyPaletteEntryOp(entry.op)) {
       const capturedAfter = (entry.capture as { after?: unknown } | undefined)?.after;
       const expectedPalette = isRecordObject(capturedAfter) ? capturedAfter.brandTokens : undefined;
-      const currentPalette = isRecordObject(record.body) ? (record.body as Record<string, unknown>).brandTokens : undefined;
+      const currentPalette = isRecordObject(record.body)
+        ? (record.body as Record<string, unknown>).brandTokens
+        : undefined;
       if (!deepEqualJson(currentPalette, expectedPalette)) {
         return err(409, 'discard_conflict', {
           error:

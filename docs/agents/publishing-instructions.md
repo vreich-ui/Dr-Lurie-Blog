@@ -103,9 +103,15 @@ A failed publish never changes `published_time`. The publish response includes `
 
 ## 5. Verification
 
-Call `verify_article_images` ONLY after the deploy for the publish commit is live: poll
-`deploy_status` until `deployStatus === "ready"` (deploys take 30–120 s; an immediate check
-hits the previous deploy).
+**Preferred (deploy-aware):** pass the publish `commit` to `verify_article_images`. The tool
+then correlates the check to that commit's Netlify deploy and only asserts images once the
+deploy is confirmed ready — a page still served by a stale/previous deploy comes back
+`inconclusive` (deploy timing), never a false missing-image defect, and `deployReady: true`
+means the result is definitive. This removes the manual pre-poll below.
+
+Without a `commit`, fall back to the legacy flow: call `verify_article_images` ONLY after the
+deploy for the publish commit is live — poll `deploy_status` until `deployStatus === "ready"`
+(deploys take 30–120 s; an immediate check hits the previous deploy).
 
 ### 5a. Manually triggering a build with `trigger_netlify_build`
 
