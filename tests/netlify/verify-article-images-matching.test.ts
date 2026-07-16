@@ -2,10 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { handler as verifyHandler } from '../../netlify/functions/verify-article-images.js';
-import {
-  createAdminArtifactPreviewLoader,
-  getAdminBlobImageEndpoint,
-} from '../../src/lib/admin/artifact-preview.js';
+import { createAdminArtifactPreviewLoader, getAdminBlobImageEndpoint } from '../../src/lib/admin/artifact-preview.js';
 
 const publishSecret = 'verify-images-matching-test-secret';
 
@@ -14,6 +11,11 @@ type VerifyResponseBody = {
   inconclusive?: boolean;
   pageStatus?: number;
   errors?: string[];
+  commit?: string;
+  deployAware?: boolean;
+  deployReady?: boolean;
+  deployNote?: string;
+  deploy?: { deployStatus?: string; commit?: string };
   images: Array<{
     expected: string;
     present: boolean;
@@ -119,6 +121,175 @@ test('verify marks a non-200 page as inconclusive with deploy-timing guidance', 
   assert.equal(body.pageStatus, 404);
   assert.match(String(body.errors?.[0]), /deploy may not be live yet/);
   assert.match(String(body.errors?.[0]), /deploy_status/);
+});
+
+// ---------------------------------------------------------------------------
+// Deploy-aware verification: correlate to the publish commit's Netlify deploy so
+// a stale/not-yet-live deploy is deploy TIMING (inconclusive), not a false
+// missing-image defect.
+// ---------------------------------------------------------------------------
+
+const NETLIFY_DEPLOYS_URL = 'https://api.netlify.com/api/v1/sites/test-site/deploys?per_page=20&page=1';
+
+const deployListResponse = (deploys: Array<Record<string, unknown>>) => () =>
+  new Response(JSON.stringify(deploys), { status: 200, headers: { 'content-type': 'application/json' } });
+
+const callVerifyDeployAware = async ({
+  payload,
+  routes,
+  deployConfigured = true,
+}: {
+  payload: Record<string, unknown>;
+  routes: Record<string, () => Response>;
+  deployConfigured?: boolean;
+}): Promise<VerifyResponseBody> => {
+  const prev = {
+    site: process.env.NETLIFY_SITE_ID,
+    siteAlt: process.env.SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN,
+    tokenAlt: process.env.NETLIFY_BLOBS_TOKEN,
+  };
+  process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
+  process.env.PUBLISH_SECRET = publishSecret;
+  if (deployConfigured) {
+    process.env.NETLIFY_SITE_ID = 'test-site';
+    process.env.NETLIFY_AUTH_TOKEN = 'test-token';
+  } else {
+    delete process.env.NETLIFY_SITE_ID;
+    delete process.env.SITE_ID;
+    delete process.env.NETLIFY_AUTH_TOKEN;
+    delete process.env.NETLIFY_BLOBS_TOKEN;
+  }
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    for (const [route, respond] of Object.entries(routes)) {
+      if (url === route) return respond();
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  try {
+    const response = await verifyHandler({
+      httpMethod: 'POST',
+      headers: { 'x-publish-key': publishSecret, 'content-type': 'application/json' },
+      body: JSON.stringify({ url: 'https://example.com/learn/my-article', ...payload }),
+    });
+    return JSON.parse(response.body) as VerifyResponseBody;
+  } finally {
+    globalThis.fetch = originalFetch;
+    const restore = (key: string, value: string | undefined) => {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    };
+    restore('NETLIFY_SITE_ID', prev.site);
+    restore('SITE_ID', prev.siteAlt);
+    restore('NETLIFY_AUTH_TOKEN', prev.token);
+    restore('NETLIFY_BLOBS_TOKEN', prev.tokenAlt);
+  }
+};
+
+test('deploy-aware: a not-ready deploy is inconclusive even when the live page is missing the image', async () => {
+  // The page (previous deploy) 200s WITHOUT the expected image; legacy behavior
+  // would call this a proven defect. With the target commit's deploy still
+  // building, it must be deploy timing (inconclusive), not a missing-image bug.
+  const body = await callVerifyDeployAware({
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/hero-shot.png'], commit: 'abc123' },
+    routes: {
+      [NETLIFY_DEPLOYS_URL]: deployListResponse([{ id: 'dep-building', state: 'building', commit_ref: 'abc123' }]),
+      'https://example.com/learn/my-article': () =>
+        new Response(pageHtml('<img src="/_astro/unrelated.Aa11bb.webp">'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+    },
+  });
+
+  assert.equal(body.verified, false, JSON.stringify(body));
+  assert.equal(body.inconclusive, true, 'a not-yet-live deploy must be inconclusive, not a defect');
+  assert.equal(body.deployReady, false);
+  assert.equal(body.deployAware, true);
+  assert.deepEqual(body.images, []);
+  assert.match(String(body.errors?.[0]), /not live yet|deploy timing/);
+});
+
+test('deploy-aware: a ready deploy proves a missing image is a real defect', async () => {
+  const body = await callVerifyDeployAware({
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/missing-pic.png'], commit: 'abc123' },
+    routes: {
+      [NETLIFY_DEPLOYS_URL]: deployListResponse([
+        { id: 'dep-ready', state: 'ready', commit_ref: 'abc123', ssl_url: 'https://example.com' },
+      ]),
+      'https://example.com/learn/my-article': () =>
+        new Response(pageHtml('<img src="/_astro/unrelated.Aa11bb.webp">'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+    },
+  });
+
+  assert.equal(body.verified, false, JSON.stringify(body));
+  assert.equal(body.inconclusive, false, 'with the target deploy live, a missing image is a proven defect');
+  assert.equal(body.deployReady, true);
+  assert.equal(body.images[0].present, false);
+  assert.ok(body.images[0].error);
+});
+
+test('deploy-aware: a ready deploy verifies a present image', async () => {
+  const body = await callVerifyDeployAware({
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/hero-shot.png'], commit: 'abc123' },
+    routes: {
+      [NETLIFY_DEPLOYS_URL]: deployListResponse([
+        { id: 'dep-ready', state: 'ready', commit_ref: 'abc123', ssl_url: 'https://example.com' },
+      ]),
+      'https://example.com/learn/my-article': () =>
+        new Response(pageHtml('<img src="/_astro/hero-shot.C3jHx8yz.webp" alt="hero">'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+      'https://example.com/_astro/hero-shot.C3jHx8yz.webp': webpResponse,
+    },
+  });
+
+  assert.equal(body.verified, true, JSON.stringify(body));
+  assert.equal(body.inconclusive, false);
+  assert.equal(body.deployReady, true);
+});
+
+test('deploy-aware: a failed deploy is inconclusive with build-failure guidance (not an image defect)', async () => {
+  const body = await callVerifyDeployAware({
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/hero-shot.png'], commit: 'abc123' },
+    routes: {
+      [NETLIFY_DEPLOYS_URL]: deployListResponse([
+        { id: 'dep-failed', state: 'error', commit_ref: 'abc123', error_message: 'build failed' },
+      ]),
+    },
+  });
+
+  assert.equal(body.verified, false);
+  assert.equal(body.inconclusive, true);
+  assert.equal(body.deployReady, false);
+  assert.match(String(body.errors?.[0]), /did not succeed|build/);
+});
+
+test('deploy-aware degrades gracefully when Netlify deploy lookup is not configured', async () => {
+  const body = await callVerifyDeployAware({
+    deployConfigured: false,
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/hero-shot.png'], commit: 'abc123' },
+    routes: {
+      'https://example.com/learn/my-article': () =>
+        new Response(pageHtml('<img src="/_astro/hero-shot.C3jHx8yz.webp" alt="hero">'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+      'https://example.com/_astro/hero-shot.C3jHx8yz.webp': webpResponse,
+    },
+  });
+
+  assert.equal(body.deployAware, false, 'without deploy lookup, correlation is skipped but the check still runs');
+  assert.equal(body.verified, true, JSON.stringify(body));
+  assert.ok(body.deployNote, 'a note explains that deploy correlation was skipped');
 });
 
 // ---------------------------------------------------------------------------

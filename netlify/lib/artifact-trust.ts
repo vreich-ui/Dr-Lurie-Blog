@@ -118,8 +118,9 @@ export const describeUntrustedArtifactRef = (path: string, value: string, trust:
   if (ownerRequestId && ownerRequestId !== trust.requestId) {
     return (
       `${path} "${value}" belongs to request '${ownerRequestId}', not '${trust.requestId}'. ` +
-      `Cross-request artifact references are not accepted in canonical input. Re-upload the bytes under ` +
-      `this request id (create_artifact_upload_intent or create_artifact_from_url) and use the returned blobKey.`
+      `Cross-request artifact references are not accepted in canonical input. Regenerate the artifact for this ` +
+      `request through pdf-tool using a Dr-Lurie storage grant (get_pdf_tool_storage_grant) so it is written into ` +
+      `this request's artifact index, then use the returned ArtifactReference blobKey.`
     );
   }
 
@@ -133,7 +134,8 @@ export const describeUntrustedArtifactRef = (path: string, value: string, trust:
 
   return (
     `${path} "${value}" is not in the artifact index for request '${trust.requestId}' and is not present in ` +
-    `agent_outputs.artifactReferences. Upload the artifact first (create_artifact_upload_intent or ` +
-    `create_artifact_from_url) and use the exact returned blobKey — list_artifacts_for_request shows what exists.`
+    `agent_outputs.artifactReferences. Generate the artifact through pdf-tool using a Dr-Lurie storage grant ` +
+    `(get_pdf_tool_storage_grant) so it lands in this request's index, then use the exact returned ArtifactReference ` +
+    `blobKey — list_artifacts_for_request shows what exists.`
   );
 };

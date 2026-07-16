@@ -3,7 +3,11 @@ import test from 'node:test';
 
 import { checkinObjectLock, checkoutObjectLock } from '../../netlify/lib/object-lock.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { checkPublishGate, type PublishGateResult } from '../../netlify/lib/publish-gate.js';
+import {
+  checkPublishGate,
+  type PublishGateResult,
+  type RequestedPublishAction,
+} from '../../netlify/lib/publish-gate.js';
 import {
   canDecideReview,
   canExecutePublish,
@@ -419,6 +423,106 @@ test('M-6: a null pin is the only thing authorizing an agent unpublish', () => {
 test("M-6: an 'immediate' pin requires the call to omit published_time", () => {
   const explicit = gateWithPinAndRequest({ published_time: 'immediate' }, { published_time: AT });
   assert.equal(explicit.allow === false && explicit.code, 'publish_action_mismatch');
+});
+
+// ─── extended live-publish pin (Goal 4): request id + artifact set + release/build ───
+//
+// Additive to M-6: an approval MAY additionally pin the exact content-item id,
+// artifact set, and release/build behavior. Enforced for agent execution only;
+// humans with publish authority are not bound. An approval WITHOUT the extended
+// pin behaves exactly as the M-6 baseline (proven by the whole matrix above,
+// which sets no approval_pin).
+
+type ExtendedPin = { request_id?: string; artifact_set?: string[]; release_build?: 'defer' | 'release' };
+
+const approveWithPin = (publishAction: { published_time: string | null }, approvalPin: ExtendedPin): ReviewState => ({
+  state: 'approved',
+  decisions: [
+    {
+      at: AT,
+      by: humanActor,
+      decision: 'approve',
+      publish_action: publishAction,
+      approval_pin: approvalPin,
+      content_revision: 2,
+    },
+  ],
+});
+
+const gateExtended = (
+  review: ReviewState,
+  principalKey: 'agent' | 'human_admin',
+  requested: RequestedPublishAction
+) => {
+  const { principal, roles } = PRINCIPALS[principalKey];
+  return checkPublishGate({
+    record: baseRecord('content_item', OBJECT_IDS.content_item, review),
+    principal,
+    roles,
+    requested,
+    policy: gateOne('content_item', 'require-approval'),
+  });
+};
+
+test('extended pin: request_id must match the target object_id for agent execution', () => {
+  const matching = gateExtended(
+    approveWithPin({ published_time: 'immediate' }, { request_id: OBJECT_IDS.content_item }),
+    'agent',
+    {}
+  );
+  assert.equal(matching.allow, true, JSON.stringify(matching));
+
+  const mismatch = gateExtended(
+    approveWithPin({ published_time: 'immediate' }, { request_id: 'req_other_20260101_01' }),
+    'agent',
+    {}
+  );
+  assert.equal(mismatch.allow === false && mismatch.code, 'publish_request_id_mismatch');
+});
+
+test('extended pin: artifact_set must be declared by the publish and match exactly (order-insensitive)', () => {
+  const pinnedSet = [
+    `image/${OBJECT_IDS.content_item}/${'a'.repeat(64)}.png`,
+    `pdf/${OBJECT_IDS.content_item}/${'b'.repeat(64)}.pdf`,
+  ];
+  const review = approveWithPin({ published_time: 'immediate' }, { artifact_set: pinnedSet });
+
+  const ok = gateExtended(review, 'agent', { artifact_set: [pinnedSet[1], pinnedSet[0]] });
+  assert.equal(ok.allow, true, JSON.stringify(ok));
+
+  const missing = gateExtended(review, 'agent', {});
+  assert.equal(missing.allow === false && missing.code, 'publish_artifact_set_required');
+
+  const diff = gateExtended(review, 'agent', { artifact_set: [pinnedSet[0]] });
+  assert.equal(diff.allow === false && diff.code, 'publish_artifact_set_mismatch');
+});
+
+test('extended pin: release_build must be declared by the publish and match', () => {
+  const review = approveWithPin({ published_time: 'immediate' }, { release_build: 'defer' });
+  assert.equal(gateExtended(review, 'agent', { release_build: 'defer' }).allow, true);
+
+  const missing = gateExtended(review, 'agent', {});
+  assert.equal(missing.allow === false && missing.code, 'publish_release_build_required');
+
+  const diff = gateExtended(review, 'agent', { release_build: 'release' });
+  assert.equal(diff.allow === false && diff.code, 'publish_release_build_mismatch');
+});
+
+test('extended pin binds agents but not humans with publish authority; the pin is surfaced on allow', () => {
+  const review = approveWithPin({ published_time: 'immediate' }, { request_id: 'req_other_20260101_01' });
+
+  assert.equal(gateExtended(review, 'agent', {}).allow, false, 'the agent is bound by the id pin');
+
+  const human = gateExtended(review, 'human_admin', {});
+  assert.equal(human.allow, true, JSON.stringify(human));
+  assert.equal(human.allow === true && human.approval?.approval_pin?.request_id, 'req_other_20260101_01');
+});
+
+test('an approval with no extended pin behaves exactly as the M-6 baseline', () => {
+  const review: ReviewState = { state: 'approved', decisions: [approveDecision(2, { published_time: 'immediate' })] };
+  const result = gateExtended(review, 'agent', {});
+  assert.equal(result.allow, true);
+  assert.equal(result.allow === true && result.approval?.approval_pin, undefined);
 });
 
 // ─── the preserved invalidation lifecycle (D§3.1/D§3.9), on a gated type ─────

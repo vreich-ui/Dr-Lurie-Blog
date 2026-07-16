@@ -7,6 +7,76 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
+
+Task (vreich): "implement the Dr. Lurie publishing backend changes needed for
+live-ready article publishing" — six requirements, on branch
+`claude/dr-lurie-publishing-backend-rs22da`. **Scope choice under the governing
+freeze**: `publish-article.ts` + `admin-workflow-lock.ts` stayed OFF-LIMITS and
+no Wolf ruling was reversed. Enforcement was added at the TOUCHABLE
+MCP/canonical boundaries — additive + default-off — so the frozen fallbacks
+become UNREACHABLE rather than edited. The two aggressive options (unfreeze
+publish-article.ts to gate its direct-HTTP markdown/URL fallbacks; flip
+`content_item` to require-approval) were deliberately NOT taken — each needs
+Wolf sign-off (the W7.5 unlock; OQ-W7-4).
+
+- **Goal 6 — deploy-aware image verification (SHIPPED).** `verify_article_images`
+  takes an optional `commit`: it correlates to that commit's Netlify deploy
+  (reusing `pollDeployReceipt`/`getDeployReceiptByCommit`) and runs image
+  assertions ONLY once the deploy is confirmed ready. A page served by a
+  stale/previous deploy is now `inconclusive` (deploy timing) or carries a
+  build-failure note — never a false `verified:false` missing-image defect;
+  `deployReady:true` ⇒ definitive. Degrades gracefully (`deployAware:false`)
+  when deploy lookup is unconfigured; no-`commit` callers are byte-identical.
+  (`netlify/functions/verify-article-images.ts`, mcp.ts tool schema+wrapper; +5 tests.)
+
+- **Goals 2+3 — grant-only artifact transfer (SHIPPED, partial).** Closed the
+  one reachable publish leak: `buildCanonicalPublishPayload` now derives
+  featured-image candidates ONLY from request-scoped artifact pointers
+  (`parseArtifactPointer` gate) — a remote URL / data URI / repo path in
+  `image_asset_register` / `image_sets` / node media src can no longer be
+  promoted to the committed frontmatter image. Trust-gate rejection copy
+  (`artifact-trust.ts`) now points agents at `get_pdf_tool_storage_grant`, not
+  the legacy upload tools. **DEFERRED (OQ-W7-1-authorized follow-up)**: globally
+  removing `save_artifact` / `create_artifact_from_url` /
+  `create_artifact_upload_intent` from tools/list — a deep deletion cascade in
+  the frozen-adjacent mcp.ts, not undertaken without scope confirmation. Literal
+  req-3 ("publishing code must not use them as fallbacks") is satisfied: the
+  canonical publish path never invokes them and no longer trusts remote
+  URLs/repo paths. (mcp.ts, artifact-trust.ts; publish-by-time-media +
+  canonical-promotion-trust tests updated to the secure behavior.)
+
+- **Goal 1 — article_body.v1 as the only canonical content path (SHIPPED).** The
+  governed MCP publish boundary already required article_body.v1
+  (`validateCanonicalArticleBody`) and emits only article_body
+  (`buildCanonicalPublishPayload` never sets markdown/content). ADDED a
+  fail-closed guard: a competing legacy prose blob (`content.blocks` /
+  `content.structure.sections`) carried alongside article_body is rejected at
+  publish (`error_code: competing_non_canonical_body`). Markdown stays an
+  export-only adapter (`to-markdown.ts`). Remaining markdown-input doors — the
+  frozen `publish-article.ts` direct-HTTP fallback and `run-publisher-agent`'s
+  LLM conversion — are frozen-path follow-ups. (mcp.ts; +1 test.)
+
+- **Goals 4+5 — extended live-publish approval pin + batchable release (SHIPPED,
+  default-off).** The approval decision may now additionally pin the exact
+  content-item/request id, artifact set, and release/build behavior
+  (`object-record-v1.ts` reviewStateSchema.decisions.`approval_pin`;
+  `review-state.ts` `approvalPinSchema`). The publish gate (`publish-gate.ts`)
+  enforces them for AGENT execution on a gated type — `request_id` vs
+  `record.object_id` always; `artifact_set`/`release_build` when the publish
+  declares them — with new denial codes; humans with publish authority stay
+  unbound (C§2.2). Settable via `object_review_decide` (mcp.ts + object-verbs.ts).
+  **DEFAULT-OFF**: committed policy stays all-autonomous (product-gated), so
+  OQ-W7-4 (articles autonomous) is preserved — turning on live-gated article
+  publish is a one-line `content_item: 'require-approval'` flip plus (for the
+  legacy WorkflowRecord article path) wiring the gate in, a frozen-path
+  follow-up. Release/build is already explicit + batchable (object exports carry
+  `[skip netlify]`; one release = one deploy; batch via one `trigger_netlify_build`)
+  — the new `release_build` pin makes that behavior part of the approval. (+6 gate tests.)
+
+- **Gates**: `npm test` 1324 + 59 green; eslint clean on every touched file;
+  prettier clean. No frozen file edited; no default behavior reversed.
+
 ## Session 2026-07-16 (W9 PLANNED: admin workspace overhaul — the chat-first admin conversion; docs only, no code, nothing converted)
 
 Wolf's direct mandate: overhaul the admin UX ("consistent, logical and user

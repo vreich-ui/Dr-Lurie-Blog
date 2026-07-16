@@ -7,7 +7,7 @@ describe('save_json_blob_publish_by_time media promotion', () => {
   process.env.NETLIFY_PUBLISH_SECRET = publishSecret;
   process.env.MCP_HTTP_AUTH_TOKEN = 'test-mcp-token';
 
-  it('promotes images from article_body, image_sets, and artifactReferences to publish payload', async () => {
+  it('promotes trusted artifact references and never selects a remote URL / repo path as featuredImage', async () => {
     const requestId = 'req_test_mediapromotion_20260605_01';
     const lockToken = 'lock_test_123';
     const sha256_ref = 'a'.repeat(64);
@@ -168,13 +168,18 @@ describe('save_json_blob_publish_by_time media promotion', () => {
     // Verify the captured publish payload has the promoted images
     assert.ok(capturedPublishPayload);
     const payload = capturedPublishPayload as unknown as Record<string, unknown>;
-    // Priority check:
-    // set_hero (points to asset_1) has priority 12.
-    // asset_hero has priority 10.
-    // node-hero.jpg has priority 10.
-    // asset-regular has priority 5.
-    // Win: asset_1 path (https://example.com/asset-regular.jpg)
-    assert.equal(payload.featuredImage, 'https://example.com/asset-regular.jpg');
+    // SECURITY: the register/image_sets entries and the node media src are all
+    // remote URLs — NOT request-scoped artifact pointers — so none of them is a
+    // trusted featured-image source and none can be promoted to the committed
+    // frontmatter image. Only the request-scoped artifact blobKeys (the index ref
+    // and the final_article output ref) are eligible; the highest-priority such
+    // pointer wins. This is the "pdf-tool grant is the only transfer" invariant.
+    assert.equal(payload.featuredImage, `image/${requestId}/${sha256_ref}.png`);
+    assert.doesNotMatch(
+      String(payload.featuredImage),
+      /^https?:\/\//,
+      'a remote URL must never be promoted to the featured image'
+    );
 
     // Artifact references should include both from index and from final_article output
     const artifactRefs = payload.artifactReferences as Record<string, unknown>[];
@@ -467,5 +472,57 @@ describe('save_json_blob_publish_by_time media promotion', () => {
       undefined,
       `featuredImage must not be a document pointer, got: ${String(payload.featuredImage)}`
     );
+  });
+
+  it('rejects a publish whose canonical content carries a competing legacy prose blob (blocks)', async () => {
+    const requestId = 'req_competing_prose_20260716_01';
+    const lockToken = 'lock_competing_prose_1';
+    const mockRecord = {
+      request_id: requestId,
+      input: {
+        record_type: 'content_source',
+        schema_version: 'content_source.v1',
+        content: {
+          title: 'Competing Prose',
+          article_body: {
+            schema_version: 'article_body.v1',
+            nodes: [{ id: 'n_intro', kind: 'content', public: { body: 'Canonical article body.' } }],
+          },
+          // article_body.v1 is the only canonical content path — a legacy prose
+          // blob alongside it must be rejected at the publishing boundary.
+          blocks: [{ block_id: 'b1', block_type: 'paragraph', payload: { text: 'legacy prose blob' } }],
+        },
+      },
+      agent_outputs: {},
+      lock: { token: lockToken, expires_at: new Date(Date.now() + 10000).toISOString() },
+      version: 1,
+    };
+
+    mock.method(_mcpInternal, 'saveJsonBlobHandler', async (event: Record<string, unknown>) => {
+      const body = JSON.parse(event.body as string);
+      if (body.action === 'get_request') {
+        return { statusCode: 200, body: JSON.stringify({ ok: true, record: mockRecord }) };
+      }
+      return { statusCode: 500, body: 'Unexpected action' };
+    });
+
+    const response = await mcpHandler({
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.MCP_HTTP_AUTH_TOKEN}` },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: {
+          name: 'save_json_blob_publish_by_time',
+          arguments: { request_id: requestId, lock_token: lockToken },
+        },
+      }),
+    } as Record<string, unknown>);
+
+    assert.equal(response.statusCode, 200);
+    const body = JSON.parse(response.body);
+    assert.equal(body.result?.isError, true, JSON.stringify(body));
+    assert.equal(body.result?.structuredContent?.error_code, 'competing_non_canonical_body');
   });
 });
