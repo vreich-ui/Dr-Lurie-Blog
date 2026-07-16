@@ -482,3 +482,84 @@ test('publish_by_time: with navigation overridden to require-approval, a human a
     });
   });
 });
+
+test('publish_by_time: an approval that pins artifact_set + release_build is satisfiable — the agent declares them and publishes; omitting them is denied', async () => {
+  await withGitHubEnv(async () => {
+    const store = createMemoryStore();
+    const objectId = await seedNav(store);
+    const artifactSet = [
+      `image/req_pin_20260716_01/${'a'.repeat(64)}.png`,
+      `pdf/req_pin_20260716_01/${'b'.repeat(64)}.pdf`,
+    ];
+
+    const lockToken = await checkoutAs(store, 'navigation', objectId, AGENT);
+    await call(store, {
+      action: 'submit_review',
+      object_type: 'navigation',
+      object_id: objectId,
+      lock_token: lockToken,
+      requested_publish_action: { published_time: 'immediate' },
+    });
+    await call(
+      store,
+      { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: lockToken },
+      AGENT
+    );
+    await withRoleEnv(async () => {
+      await call(
+        store,
+        {
+          action: 'review_decide',
+          object_type: 'navigation',
+          object_id: objectId,
+          decision: 'approve',
+          publish_action: { published_time: 'immediate' },
+          approval_pin: { artifact_set: artifactSet, release_build: 'defer' },
+        },
+        HUMAN_ADMIN
+      );
+    });
+
+    const github = createGitHubApiMock();
+    const deps = {
+      publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} },
+      approvalPolicy: GATE_NAVIGATION,
+    };
+
+    // The exact footgun: an approval pins an artifact_set but the publish declares
+    // none — the gate cannot confirm it, so it is denied (not silently published).
+    const relock1 = await checkoutAs(store, 'navigation', objectId, AGENT);
+    const missing = await call(
+      store,
+      { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock1 },
+      AGENT,
+      deps
+    );
+    assert.equal(missing.status, 403, JSON.stringify(missing.body));
+    assert.equal(missing.body.code, 'publish_artifact_set_required', JSON.stringify(missing.body));
+    await call(
+      store,
+      { action: 'checkin', object_type: 'navigation', object_id: objectId, lock_token: relock1 },
+      AGENT
+    );
+
+    // Declaring the pinned set (order-insensitive) + release behavior satisfies the
+    // pin and the agent publishes — the live-publish approval flow is usable.
+    const relock2 = await checkoutAs(store, 'navigation', objectId, AGENT);
+    const ok = await call(
+      store,
+      {
+        action: 'publish_by_time',
+        object_type: 'navigation',
+        object_id: objectId,
+        lock_token: relock2,
+        artifact_set: [artifactSet[1], artifactSet[0]],
+        release_build: 'defer',
+      },
+      AGENT,
+      deps
+    );
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.published, true, 'declaring the pinned artifact_set + release_build lets the agent publish');
+  });
+});

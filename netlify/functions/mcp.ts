@@ -1084,7 +1084,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
             'Expected images that must appear in the article HTML. Display paths (~/assets/images/uploads/...) are matched by filename stem against Astro-hashed build URLs.',
         },
         commit: stringSchema(
-          'Optional publish commit SHA. When set, the check waits for/correlates to that commit\'s Netlify deploy so a not-yet-live deploy returns inconclusive instead of a false missing-image defect. Use the commit_sha from the publish receipt.'
+          "Optional publish commit SHA. When set, the check waits for/correlates to that commit's Netlify deploy so a not-yet-live deploy returns inconclusive instead of a false missing-image defect. Use the commit_sha from the publish receipt."
         ),
         deployTimeoutSeconds: {
           type: 'integer',
@@ -1598,6 +1598,18 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
         published_time: nullableStringSchema(
           'Optional ISO instant. Omit to publish now. null (unpublish) and future timestamps are rejected in this phase.'
         ),
+        artifact_set: {
+          type: 'array',
+          items: stringSchema('Artifact identifier (blobKey or sha256) this publish uses.'),
+          description:
+            'Optional. Declare the artifact set this publish uses so an approval that pins an artifact_set can be satisfied — the gate confirms they match exactly. Only needed for approval-gated types whose current approval pins one.',
+        },
+        release_build: {
+          type: 'string',
+          enum: ['defer', 'release'],
+          description:
+            'Optional. The release/build behavior this publish uses, so an approval that pins release_build can be satisfied. Object publishes always defer the deploy (release is the separate release_to_production step); this declares the approved intent for the gate.',
+        },
       },
       ['object_type', 'object_id', 'lock_token']
     ),
@@ -4151,6 +4163,8 @@ const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
         object_id: input.object_id,
         lock_token: input.lock_token,
         published_time: input.published_time,
+        artifact_set: input.artifact_set,
+        release_build: input.release_build,
       });
     case 'product_set_price': {
       const stripe = await getStripeClient();

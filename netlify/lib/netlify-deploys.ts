@@ -9,6 +9,8 @@ export type DeployReceipt = {
   startedAt: string;
   finishedAt: string;
   errorMessage: string;
+  /** Netlify deploy context: 'production' | 'deploy-preview' | 'branch-deploy' | ''(unknown). */
+  context?: string;
 };
 
 type NetlifyDeploy = Record<string, unknown>;
@@ -126,6 +128,7 @@ const mapNetlifyDeployToReceipt = (deploy: NetlifyDeploy): DeployReceipt => {
     startedAt: firstStringValue(deploy.created_at, deploy.started_at, deploy.deploy_started_at, deploy.updated_at),
     finishedAt,
     errorMessage: getDeployErrorMessage(deploy),
+    context: firstStringValue(deploy.context),
   };
 };
 
@@ -179,6 +182,29 @@ export const getDeployReceiptByDeployId = async (deployId: string): Promise<Depl
   const deploy = await fetchNetlifyApi(`/deploys/${encodeURIComponent(normalizedDeployId)}`);
 
   if (deploy && typeof deploy === 'object') return mapNetlifyDeployToReceipt(deploy as NetlifyDeploy);
+
+  return undefined;
+};
+
+/**
+ * The deploy currently PUBLISHED to production (what the live site serves), via
+ * the site object's `published_deploy`. This is the authoritative "what is
+ * production actually serving" signal — distinct from "a build for this commit
+ * is ready", which under locked Netlify Auto Publishing can be a ready-but-
+ * unpublished deploy (or a deploy preview). Returns undefined when the site
+ * lookup is unavailable so callers can degrade to a best-effort check.
+ */
+export const getPublishedProductionDeploy = async (): Promise<DeployReceipt | undefined> => {
+  const { siteId } = getNetlifyDeployConfig();
+  if (!siteId) return undefined;
+
+  try {
+    const site = await fetchNetlifyApi(`/sites/${encodeURIComponent(siteId)}`);
+    const published = site && typeof site === 'object' ? (site as Record<string, unknown>).published_deploy : undefined;
+    if (published && typeof published === 'object') return mapNetlifyDeployToReceipt(published as NetlifyDeploy);
+  } catch {
+    // Fall through — the caller degrades to a best-effort ready-by-commit check.
+  }
 
   return undefined;
 };
