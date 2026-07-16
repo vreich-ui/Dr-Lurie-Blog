@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-13T11:03:06.292Z",
+    "at": "2026-07-16T12:55:59.463Z",
     "from": "objects/page/by-id/page_home.json",
-    "record_version": 101
+    "record_version": 108
   },
   "navigationOverrides": {
     "footer": "nav_footer_home"
@@ -32,7 +32,7 @@
         ],
         "body": "<p>This is a calm publishing space for people who skipped the skin-care boom, got burned by product noise, or only recently realized their skin needs attention.</p><p>Start with plain education, download the practical PDFs, join the newsletter if it helps, and consider the small offer shelf only when you feel oriented.</p>",
         "heading": "Dr. Lurié Skincare for people who need help now and mistrust the market.",
-        "kicker": "For people who came late to skin care"
+        "kicker": "For people who came early to skin care"
       },
       "id": "s_hero",
       "type": "hero"
