@@ -28,6 +28,7 @@ import {
   type ApprovalPolicy,
 } from '../approval-policy.js';
 import { activeCreationPolicy, creationRuleFor, type CreationPolicy } from '../creation-policy.js';
+import { activeMediaPolicy, type MediaPolicy } from '../media-policy.js';
 import type { PatchApplyErrorCode } from '../object-patch-apply.js';
 import { childRuleFor } from './block-tree.js';
 import { bioDefinition } from './components/bio.js';
@@ -666,6 +667,29 @@ const publishPolicy = (objectType: ObjectType, policy: ApprovalPolicy): PublishP
   };
 };
 
+/**
+ * media_policy — the per-site image budget, echoed from src/config/media-policy.ts
+ * so any agent reading the contract discovers it even without touching pdf-tool
+ * (where it also rides the storage grant as `limits`). Site-wide, not per-type.
+ */
+export type MediaPolicyContract = {
+  max_image_bytes: number;
+  preferred_image_format: string;
+  over_budget: 'warn' | 'block';
+  note: string;
+};
+
+const mediaPolicyContract = (policy: MediaPolicy): MediaPolicyContract => ({
+  max_image_bytes: policy.maxImageBytes,
+  preferred_image_format: policy.preferredImageFormat,
+  over_budget: policy.overBudget,
+  note:
+    'Per-site image budget (src/config/media-policy.ts), also carried on the pdf-tool storage grant as `limits`. ' +
+    'Encode images to preferred_image_format and keep each within max_image_bytes. over_budget=warn stores an ' +
+    'over-limit image but flags it (abide unless a human/admin explicitly asks for a larger one); block rejects it. ' +
+    'To fix an already-stored oversize image, ask pdf-tool to shrink it under the budget.',
+});
+
 // ─── workflow (sequence, lock discipline, error catalog) ─────────────────────
 
 // Type-linked to PatchApplyErrorCode so a new engine error code forces an entry.
@@ -822,6 +846,7 @@ export type ObjectContract = {
   constraints: Constraint[];
   publish_policy: PublishPolicyContract;
   creation_policy: CreationPolicyContract;
+  media_policy: MediaPolicyContract;
   workflow: ReturnType<typeof workflow>;
   auxiliary_inputs: AuxiliaryInput[];
 };
@@ -830,10 +855,11 @@ export const OBJECT_CONTRACT_TYPES = objectTypes;
 
 export const buildObjectContract = (
   objectType: ObjectType,
-  options: { approvalPolicy?: ApprovalPolicy; creationPolicy?: CreationPolicy } = {}
+  options: { approvalPolicy?: ApprovalPolicy; creationPolicy?: CreationPolicy; mediaPolicy?: MediaPolicy } = {}
 ): ObjectContract => {
   const policy = options.approvalPolicy ?? activeApprovalPolicy();
   const creationPolicy = options.creationPolicy ?? activeCreationPolicy();
+  const mediaPolicy = options.mediaPolicy ?? activeMediaPolicy();
   const schema = BODY_SCHEMA[objectType];
   const includesSections = objectType === 'page' || objectType === 'section' || objectType === 'section_template';
   return {
@@ -855,6 +881,7 @@ export const buildObjectContract = (
     constraints: [...COMMON_CONSTRAINTS, ...perTypeConstraints(objectType)],
     publish_policy: publishPolicy(objectType, policy),
     creation_policy: creationPolicyContract(objectType, creationPolicy),
+    media_policy: mediaPolicyContract(mediaPolicy),
     workflow: workflow(objectType, policy),
     auxiliary_inputs: auxiliaryInputs(objectType),
   };
