@@ -22,6 +22,7 @@
  * (workflow JSON, drafts, blobs). Rotation needs no code change: the tool
  * always serves the current env values.
  */
+import { activeMediaPolicy, mediaPolicyLimits, type MediaPolicyLimits } from '../../src/lib/media-policy.js';
 
 /** Store handles pdf-tool writes through a grant, keyed by grant field name. */
 export const pdfToolStorageStores = {
@@ -42,6 +43,13 @@ export type PdfToolStorageGrant = {
   siteId: string;
   token: string;
   stores: PdfToolStorageStores;
+  /**
+   * Per-site media policy pdf-tool honors when generating/storing images:
+   * the byte budget, the preferred web format, and warn-vs-block. Sourced from
+   * src/config/media-policy.ts. Additive to the grant contract — unrelated to
+   * the grantType/token exchange plan, so it does not affect that migration.
+   */
+  limits: MediaPolicyLimits;
   expiresAt: string;
 };
 
@@ -83,6 +91,7 @@ export const buildPdfToolStorageGrant = (now: Date = new Date()): BuildPdfToolSt
       siteId,
       token,
       stores: { ...pdfToolStorageStores },
+      limits: mediaPolicyLimits(activeMediaPolicy()),
       expiresAt: new Date(now.getTime() + pdfToolStorageGrantTtlMs).toISOString(),
     },
   };

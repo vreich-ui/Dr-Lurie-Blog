@@ -12,6 +12,7 @@ Rules for every agent driving `pdf-tool`:
 2. Store returned `ArtifactReference` objects in workflow JSON as usual. **NEVER** write the grant or its token into workflow JSON, drafts, or any persisted blob.
 3. If `pdf-tool` returns "grant expired" or a storage auth error, fetch a fresh grant and retry once before surfacing the failure.
 4. Do not cache grants long-term — `expiresAt` (~1 hour) is enforced by `pdf-tool`.
+5. Honor the grant's `limits` (per-site media policy). When you create or store an image, target `preferredImageFormat` (web-optimized) and keep it within `maxImageBytes` (~150 KB) — pass a matching `requirements.maxBytes` on the `pdf-tool` job. `maxImageBytes` is the site's hard cap; `requirements.maxBytes` may only lower it, never raise it. If an image ends up over budget, `overBudget: "block"` means it is rejected and `overBudget: "warn"` means it may be stored but is flagged — only exceed the budget on an explicit human/admin request. To fix an already-stored oversize image, ask `pdf-tool` to shrink it (re-encode under `maxImageBytes`) rather than leaving it oversize.
 
 `get_pdf_tool_storage_grant` is a credential provider on the Dr. Lurie MCP endpoint, not a `pdf-tool` wrapper — agents still call `pdf-tool` directly for jobs and polling, exactly as below.
 

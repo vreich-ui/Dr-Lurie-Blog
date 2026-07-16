@@ -29,6 +29,11 @@ list) and the `get_pdf_tool_storage_grant` tool in
     "renderData": "pdf-render-data",
     "jobs": "pdf-tool-jobs"
   },
+  "limits": {
+    "maxImageBytes": 153600,
+    "preferredImageFormat": "webp",
+    "overBudget": "warn"
+  },
   "expiresAt": "<issuance + 1 hour, ISO 8601>"
 }
 ```
@@ -37,6 +42,18 @@ list) and the `get_pdf_tool_storage_grant` tool in
   so agents must re-fetch rather than cache long-term.
 - Keep the shape stable. The future `grantType: "exchange"` (below) must be a
   drop-in change of `grantType`/`token` semantics only.
+- `limits` is the per-site **media policy**, sourced from
+  `src/config/media-policy.ts` (each site's repo sets its own; adjustable
+  without code changes): `maxImageBytes` (the byte budget, ~150 KB
+  web-optimized), `preferredImageFormat` (the web format to encode to), and
+  `overBudget` (the toggle next to the limit — `warn` = store an over-limit
+  image but flag it, `block` = reject it). pdf-tool MUST honor it: encode images
+  to `preferredImageFormat` and compress/resize under `maxImageBytes`; if it
+  can't, reject when `overBudget` is `block`, else store the smallest achieved
+  and flag it over-budget. pdf-tool should also expose a **"shrink existing
+  artifact"** path so an already-stored oversize image can be re-encoded under
+  the budget on request. Agents receive the same numbers and keep artifacts
+  within budget unless a human/admin explicitly asks for a larger one.
 
 ## The six stores
 
