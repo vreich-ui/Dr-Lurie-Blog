@@ -7,6 +7,7 @@ import {
   pdfToolStorageGrantTtlMs,
   pdfToolStorageStores,
 } from '../../netlify/lib/pdf-tool-storage-grant.js';
+import { activeMediaPolicy, mediaPolicyLimits } from '../../src/lib/media-policy.js';
 
 type ToolCallResult = {
   isError?: boolean;
@@ -84,6 +85,7 @@ test('get_pdf_tool_storage_grant returns the exact grant contract when configure
       assert.equal(grant.siteId, 'site-api-id-1234');
       assert.equal(grant.token, 'nfp_test_machine_pat');
       assert.deepEqual(grant.stores, CONTRACT_STORES);
+      assert.deepEqual(grant.limits, mediaPolicyLimits(activeMediaPolicy()));
 
       const expiresAt = Date.parse(String(grant.expiresAt));
       assert.ok(Number.isFinite(expiresAt), `expiresAt must be an ISO timestamp; got ${String(grant.expiresAt)}`);
@@ -96,6 +98,7 @@ test('get_pdf_tool_storage_grant returns the exact grant contract when configure
         'expiresAt',
         'grantType',
         'grantVersion',
+        'limits',
         'projectId',
         'siteId',
         'stores',

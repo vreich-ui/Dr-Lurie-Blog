@@ -38,6 +38,7 @@ import {
 } from './targets.js';
 import { applyNavChangesToBody, navChangesToOps, navEditFieldsFor, type NavEditField } from './nav-editor.js';
 import type { NavigationBody } from '../../schema/bodies/navigation-v1.js';
+import { mediaPolicyConfig } from '../../config/media-policy.js';
 import { previewFieldChange, restoreRegion, snapshotRegion, type RegionSnapshot } from './preview.js';
 import {
   askAiSuggestion,
@@ -257,6 +258,8 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-btn.dl-em-danger{background:var(--dlem-draft);border-color:var(--dlem-draft);color:#fff;
   display:inline-flex;align-items:center;gap:6px}
 .dl-em-btn.dl-em-danger:hover{filter:brightness(1.06);color:#fff}
+.dl-em-btn.dl-em-primary{background:var(--dlem-accent);border-color:var(--dlem-accent);color:var(--dlem-accent-ink)}
+.dl-em-btn.dl-em-primary:hover{filter:brightness(1.06)}
 /* Busy dots: every wait (AI round trip, record load, save) shows motion. */
 .dl-em-busy{display:inline-flex;align-items:center;gap:3px;margin-right:6px;vertical-align:middle}
 .dl-em-busy i{width:4px;height:4px;border-radius:50%;background:var(--dlem-accent);opacity:.25;
@@ -666,6 +669,102 @@ export const mountEditMode = (options: MountOptions): void => {
       document.body.append(overlay);
       overlay.querySelector<HTMLButtonElement>('[data-em-cancel]')?.focus();
     });
+
+  /**
+   * Over-budget image upload: a warning, not a block. Offer to shrink the image
+   * in the browser or keep it as-is — the admin on the canvas decides. Resolves
+   * 'smaller' | 'asis' | 'cancel'.
+   */
+  const chooseImageSize = (fileBytes: number, budgetBytes: number): Promise<'smaller' | 'asis' | 'cancel'> =>
+    new Promise((resolve) => {
+      const kb = (n: number): string => `${Math.max(1, Math.round(n / 1024))} KB`;
+      const overlay = document.createElement('div');
+      overlay.className = 'dl-em-confirm';
+      overlay.innerHTML =
+        `<div class="dl-em-confirmcard" role="alertdialog" aria-modal="true">` +
+        `<p>This image is <strong>${kb(fileBytes)}</strong> — over the ${kb(budgetBytes)} web budget. ` +
+        `Smaller images load faster and are easier on readers.</p>` +
+        `<div class="dl-em-confirmrow">` +
+        `<button class="dl-em-btn" data-em-cancel>Cancel</button>` +
+        `<button class="dl-em-btn" data-em-asis>Use as is</button>` +
+        `<button class="dl-em-btn dl-em-primary" data-em-smaller>Make smaller</button>` +
+        `</div></div>`;
+      const done = (value: 'smaller' | 'asis' | 'cancel'): void => {
+        overlay.remove();
+        resolve(value);
+      };
+      overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) done('cancel');
+      });
+      overlay.addEventListener('keydown', (event) => {
+        if ((event as KeyboardEvent).key === 'Escape') done('cancel');
+      });
+      overlay.querySelector('[data-em-cancel]')?.addEventListener('click', () => done('cancel'));
+      overlay.querySelector('[data-em-asis]')?.addEventListener('click', () => done('asis'));
+      overlay.querySelector('[data-em-smaller]')?.addEventListener('click', () => done('smaller'));
+      document.body.append(overlay);
+      overlay.querySelector<HTMLButtonElement>('[data-em-smaller]')?.focus();
+    });
+
+  const blobToUploadFile = (blob: Blob, originalName: string, format: 'webp' | 'png'): File => {
+    const base = originalName.replace(/\.[^./\\]+$/, '') || 'image';
+    const ext = format === 'png' ? 'png' : 'webp';
+    return new File([blob], `${base}.${ext}`, { type: blob.type || `image/${ext}` });
+  };
+
+  /**
+   * Shrink an over-budget image in the browser (net-new — the canvas had no
+   * client-side image processing). Re-encodes toward the site's preferred web
+   * format, dropping quality then dimensions until it fits the byte budget.
+   * Returns the smallest result it can make, or the original if the browser
+   * can't decode/encode it.
+   */
+  const downscaleImage = async (file: File, budgetBytes: number, format: 'webp' | 'png'): Promise<File> => {
+    const mime = format === 'png' ? 'image/png' : 'image/webp';
+    const encode = (canvas: HTMLCanvasElement, quality: number | undefined): Promise<Blob | null> =>
+      new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), mime, quality));
+
+    let bitmap: ImageBitmap;
+    try {
+      bitmap = await createImageBitmap(file);
+    } catch {
+      return file;
+    }
+
+    let width = bitmap.width;
+    let height = bitmap.height;
+    const MAX_EDGE = 1600; // cap the longest side for web
+    const longest = Math.max(width, height);
+    if (longest > MAX_EDGE) {
+      const scale = MAX_EDGE / longest;
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+
+    const qualities = format === 'png' ? [undefined] : [0.82, 0.7, 0.6, 0.5, 0.4];
+    let smallest: Blob | null = null;
+    try {
+      for (let pass = 0; pass < 5 && width >= 32 && height >= 32; pass++) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) break;
+        ctx.drawImage(bitmap, 0, 0, width, height);
+        for (const quality of qualities) {
+          const blob = await encode(canvas, quality);
+          if (!blob) continue;
+          if (!smallest || blob.size < smallest.size) smallest = blob;
+          if (blob.size <= budgetBytes) return blobToUploadFile(blob, file.name, format);
+        }
+        width = Math.round(width * 0.75);
+        height = Math.round(height * 0.75);
+      }
+    } finally {
+      bitmap.close();
+    }
+    return smallest ? blobToUploadFile(smallest, file.name, format) : file;
+  };
 
   // ── record cache (B4): entering edit mode preloads every object visible on
   // the page (one get per distinct object, in parallel) so panels and chips
@@ -2230,10 +2329,34 @@ export const mountEditMode = (options: MountOptions): void => {
     srcInput: HTMLInputElement,
     button: HTMLButtonElement
   ): Promise<void> => {
+    let toUpload: File = file;
+    // Over the per-site web budget? Offer to shrink in-browser or keep as-is — a
+    // warning, not a block: the admin on the canvas keeps their own judgement.
+    if (file.size > mediaPolicyConfig.maxImageBytes) {
+      const choice = await chooseImageSize(file.size, mediaPolicyConfig.maxImageBytes);
+      if (choice === 'cancel') return;
+      if (choice === 'smaller') {
+        toUpload = await downscaleImage(file, mediaPolicyConfig.maxImageBytes, mediaPolicyConfig.preferredImageFormat);
+        const fits = toUpload.size <= mediaPolicyConfig.maxImageBytes;
+        log(
+          'sys',
+          `Resized to ${Math.round(toUpload.size / 1024)} KB${
+            fits ? '' : ' — still over budget, the smallest the browser could make it'
+          }.`
+        );
+      } else {
+        log(
+          'sys',
+          `Using the full-size image (${Math.round(file.size / 1024)} KB) — over the ${Math.round(
+            mediaPolicyConfig.maxImageBytes / 1024
+          )} KB web budget.`
+        );
+      }
+    }
     button.disabled = true;
     button.classList.add('dl-em-loading');
     try {
-      const result = await uploadImageArtifact(getToken, state.target.objectId, file);
+      const result = await uploadImageArtifact(getToken, state.target.objectId, toUpload);
       if (!result.ok) {
         log('sys', `Upload failed: ${escapeHtml(result.error)}`);
         return;
