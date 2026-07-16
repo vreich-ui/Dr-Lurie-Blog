@@ -40,6 +40,7 @@ T9.15	checkpoint	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.15-go
 T9.16	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T9.16-chat-credentialed-run.md
 T9.17	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.17-agents-hub.md
 T9.18	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.18-templates-themes-studio.md
+T9.26	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.26-agent-roster-assignment.md
 T9.19	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.19-canvas-document-body-editing.md
 T9.20	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.20-article-settings-surface.md
 T9.21	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.21-readiness-tray-token-bridge.md

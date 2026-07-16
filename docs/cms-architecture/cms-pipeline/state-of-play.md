@@ -41,10 +41,19 @@ were waiting on.
   roles, T9.9 generated inspector, T9.12/13 chat runtime, T9.15 governance,
   T9.19 canvas edit); Opus on substantial product UI/integration; Sonnet on
   mechanical/prep. Recorded in the plan §9.
-- **OQ-W9-1…8 await Wolf** (plan §11): ChatKit fate; runtime
-  guardrail-override store vs commit-only (gates T9.15 — checkpoint mode);
-  chat provider default (rec: Anthropic); third visible tier; canonical-input
-  retirement; unpublish stance; human-Principal-only chat; Owner force-checkin.
+- **SAME-DAY AMENDMENT (Wolf):** (1) both Anthropic AND OpenAI are current
+  providers and the provider **must be settable** — OQ-W9-3 RESOLVED; both
+  adapters are v1 in T9.13, provider/model live on the agent profile, never
+  hardcoded. (2) **Dedicated per-object agents**: an object may have its own
+  agent and an admin changing that object is ALWAYS connected to it — new
+  plan §4a (agent profiles + `agent-profiles` store + object → type →
+  site-default resolution, stamped per run), runtime half in T9.13, roster/
+  assignment UI + canvas Ask-AI re-point in NEW task **T9.26** (queued after
+  T9.18, opus/medium). 26 briefs total now.
+- **OQ-W9-1…8 await Wolf, minus resolved -3** (plan §11): ChatKit fate;
+  runtime guardrail-override store vs commit-only (gates T9.15 — checkpoint
+  mode); third visible tier; canonical-input retirement; unpublish stance;
+  human-Principal-only chat; Owner force-checkin.
 - Off-limits files untouched and stay so per the briefs
   (`admin-workflow-lock.ts`, `publish-article.ts`, article MCP tools —
   T9.22 re-points only their CALLER, closing W7.5).

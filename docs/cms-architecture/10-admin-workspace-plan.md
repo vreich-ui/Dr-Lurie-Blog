@@ -7,12 +7,17 @@
 > editor in favor of this [canvas] UX"_ (state-of-play 2026-07-13 G) and
 > _"the W7.7 remainder is ON HOLD — the admin area is being rethought"_
 > (07-canvas-editing.md §4). T9.19 formally lifts that hold.
-> Task briefs: `cms-pipeline/T9.1-*.md` … `T9.25-*.md`; queue rows appended
-> to `cms-pipeline/queue.tsv`. Open questions for Wolf: §11 (OQ-W9-1…8).
+> Task briefs: `cms-pipeline/T9.1-*.md` … `T9.26-*.md`; queue rows appended
+> to `cms-pipeline/queue.tsv`. Open questions for Wolf: §11 (OQ-W9-1…8;
+> -3 resolved same day).
 > Decisions already taken by Wolf at commissioning (2026-07-16, via session
 > Q&A): deliverable = this plan + briefs; UI stack = React islands scoped to
 > /admin; CMS Agents = in-house agent endpoint; roles = two tiers
 > (Owner + Admin).
+> AMENDED same day (Wolf): **both Anthropic and OpenAI are current
+> providers and the provider must be settable** (resolves OQ-W9-3), and
+> **objects may have DEDICATED agents** — an admin changing an object must
+> always be connected to that object's agent (§4a, T9.26).
 
 ## 0. Mandate (Wolf, 2026-07-16 — GOVERNING for W9)
 
@@ -178,6 +183,29 @@ sees "Take over" → force checkin, §6), actions: Publish (gated by readiness
 types), Discard changes, Edit on site, New variant (content_item →
 `create_variant`).
 
+### 4a. Dedicated agents per object (Wolf's 2026-07-16 amendment)
+
+Each object MAY have its own dedicated agent, and **an admin changing an
+object is always connected to that object's agent** — the workspace never
+hands an object's conversation to a generic bot when a dedicated one exists.
+
+- **Agent profile** = a named configuration: `{ profile_id, name, avatar?,
+  provider: 'anthropic' | 'openai', model, system_prompt, tool_autonomy_
+  overrides?, status, created_by, updated_at }`. Both provider adapters are
+  **v1 requirements** (not a seam) behind one interface; provider + model
+  are SET on the profile — never hardcoded in the runtime.
+- **Assignment + resolution**: an assignments doc maps `object_id →
+  profile_id` and `object_type → profile_id`, plus a site-default profile.
+  Resolution chain: object → type default → site default. Storage: new
+  `agent-profiles` blob store (same house pattern as `users`), Owner-managed.
+- **Binding**: every object-scoped chat (`obj:<objectId>`) resolves the
+  dedicated agent at `send` time and stamps the resolved profile into the
+  run record (mid-run reconfiguration never switches a live run). The chat
+  UI always shows WHICH agent is speaking (name/avatar chip). The canvas
+  Ask-AI routes through the same resolution (T9.26) so "change something on
+  this object" means the same agent on every surface. Hub free-form chats
+  use the site-default profile until the conversation adopts an object.
+
 ### What the agent can do
 
 The chat tool registry is a curated wrapper over the verb surface, executed
@@ -249,7 +277,8 @@ under `tests/netlify/`.
 
 | Piece | Files | Auth tier | Notes |
 |---|---|---|---|
-| **Chat runtime** | `netlify/functions/admin-agent-chat.ts` (verbs: create_chat / list_chats / get_chat?since_seq / send / approve_tool / deny_tool / cancel), `netlify/functions/admin-agent-chat-run-background.ts` (the loop, 15-min budget), `netlify/lib/agent/{loop,tools,provider,chat-store}.ts`; new blob store `agent-chats` | Admin (apply_theme tool Owner) | `send` verifies identity, captures the human Principal into the run record, enqueues the background run. The loop calls a provider adapter (default Anthropic — OQ-W9-3; an OpenAI adapter behind the same interface) and executes tools via `handleObjectVerb` directly. Turn events (text chunks at paragraph/tool boundaries, tool calls, approval requests) append to the chat doc; the client polls `get_chat?since_seq` (~1s while running). SSE streaming (Functions 2.0 Response streaming) is a marked upgrade seam, not v1 — polling is reliable, testable under the Node runner, and the event log doubles as persistence. Caps: max tool calls/turn, token budget, wall clock. Approval resume re-verifies the stored pending call (no client args trusted). |
+| **Chat runtime** | `netlify/functions/admin-agent-chat.ts` (verbs: create_chat / list_chats / get_chat?since_seq / send / approve_tool / deny_tool / cancel), `netlify/functions/admin-agent-chat-run-background.ts` (the loop, 15-min budget), `netlify/lib/agent/{loop,tools,provider,profiles,chat-store}.ts`; new blob stores `agent-chats` + `agent-profiles` | Admin (apply_theme tool Owner) | `send` verifies identity, captures the human Principal into the run record, **resolves the object's dedicated agent profile (object → type → site default) and stamps it into the run**, then enqueues the background run. The loop instantiates the profile's provider adapter — **Anthropic AND OpenAI are both v1 adapters behind one interface; provider/model are set on the profile, never hardcoded (Wolf 2026-07-16)** — and executes tools via `handleObjectVerb` directly. Turn events (text chunks at paragraph/tool boundaries, tool calls, approval requests) append to the chat doc; the client polls `get_chat?since_seq` (~1s while running). SSE streaming (Functions 2.0 Response streaming) is a marked upgrade seam, not v1 — polling is reliable, testable under the Node runner, and the event log doubles as persistence. Caps: max tool calls/turn, token budget, wall clock. Approval resume re-verifies the stored pending call (no client args trusted). |
+| **Agent profiles & assignment** | `netlify/lib/agent/profiles.ts` (store + resolution, lands with T9.13; seeds a site-default profile per provider), roster/assignment UI + canvas Ask-AI re-point in **T9.26** | read: Admin; manage/assign: Owner | Profiles per §4a; assignments doc (`object_id → profile`, `object_type → profile`, site default). The canvas `admin-ask-ai-object` re-points through the same resolution so every change surface talks to the object's dedicated agent. |
 | **Users store** | `netlify/lib/users-store.ts`, `netlify/functions/admin-users.ts` (me / update_me / list / invite / set_role / disable); new blob store `users` | me/update_me: any admin (self only); rest: Owner | Schema in §8. Invite drives the GoTrue admin API using the short-lived admin token Netlify injects at `context.clientContext.identity` — no new secrets. |
 | **Roles extension** | `netlify/lib/roles.ts` gains `Role = 'owner' \| 'admin' \| 'publisher' \| 'editor'` and an async resolver consulting the users store; `ADMIN_EMAILS` members are **bootstrap Owners** (env fallback — a wiped store can never lock Wolf out); owner implies admin+publisher. Callers (`admin-object`, `admin-release`, new functions) migrate to the async resolver. | — | **Security-boundary work** (feeds `publish-gate`): Fable task, exhaustive tests — store/env precedence, disabled user loses roles, agent principals still resolve to `[]`, publish-gate behavior pinned unchanged for existing role sets. `publish-gate.ts` itself is NOT modified. |
 | **Force checkin** | Additive `{ force: true }` option on the existing `checkin` verb in `netlify/lib/object-verbs.ts`, allowed only when resolved roles include `owner`; history-attributed | Owner | Bounded additive change to the verb core (OQ-W9-8). Tests: non-owner 403, owner takeover writes history, lock semantics preserved (`version` bumps, never `content_revision`). |
@@ -378,13 +407,14 @@ up when in doubt):**
 | T9.11 | Attention inbox + audit feed | auto / sonnet / medium | T9.9 |
 | **W9.d Chat** | | | |
 | T9.12 | Agent-runtime spike (throwaway; loop + background fn + approval pause proven on a deployed function) | notify / **fable** / high | T9.1 |
-| T9.13 | Chat endpoint productionized (full tool registry, budgets, forged-resume rejection, principal attribution) | notify / **fable** / xhigh | T9.12, T9.4 |
+| T9.13 | Chat endpoint productionized (full tool registry, budgets, forged-resume rejection, principal attribution; **both provider adapters + agent-profile resolution**, §4a) | notify / **fable** / xhigh | T9.12, T9.4 |
 | T9.14 | Chat UI + chat-first layout flip (inspector collapses to "Details") | auto / **opus** / high | T9.13, T9.9 |
 | T9.15 | Governance store + guardrails page | **checkpoint** (OQ-W9-2) / fable / high | T9.13, T9.4 |
 | T9.16 | Chat credentialed run (create an article via chat end-to-end on production; flip a guardrail; verify audit) | human_gate / sonnet / medium | T9.14, T9.15 |
 | **W9.e Hub & studio** | | | |
 | T9.17 | CMS Agents hub (cross-object chats, create-flows with dry-run cards) | auto / **opus** / medium | T9.14 |
 | T9.18 | Templates & Themes studio | auto / **opus** / medium | T9.14, T9.4 |
+| T9.26 | Agent roster & assignment UI + canvas Ask-AI re-point through profiles (§4a) | auto / **opus** / medium | T9.14 |
 | **W9.f Canvas ports** | | | |
 | T9.19 | W7.7 remainder: document-body TipTap editing in canvas (lifts the recorded hold) | notify / **fable** / high | T9.2 |
 | T9.20 | Article settings surface (canvas + inspector) | auto / **opus** / medium | T9.19 |
@@ -426,9 +456,10 @@ up when in doubt):**
    override-store-with-committed-fallback design, or must policy stay
    commit-only (then the page ships read-only and toggles are config PRs)?
    Gates T9.15.
-3. **OQ-W9-3 — Chat provider default:** recommend Anthropic for the tool
-   loop (an OpenAI adapter kept behind the same interface; canvas Ask-AI
-   stays OpenAI until subsumed). Confirm.
+3. **OQ-W9-3 — RESOLVED (Wolf, 2026-07-16):** both Anthropic and OpenAI
+   are current providers; the provider is SET per agent profile (§4a),
+   never hardcoded. Both adapters are v1 requirements in T9.13; the canvas
+   Ask-AI re-points through profile resolution in T9.26.
 4. **OQ-W9-4 — Third tier:** should `editor`/`publisher` become a visible
    third workspace tier now, or stay env-only vocabulary under the
    two-tier UI (recommended)?
