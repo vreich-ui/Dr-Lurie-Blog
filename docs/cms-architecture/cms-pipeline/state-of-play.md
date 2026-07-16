@@ -74,7 +74,15 @@ Wolf sign-off (the W7.5 unlock; OQ-W7-4).
   `[skip netlify]`; one release = one deploy; batch via one `trigger_netlify_build`)
   — the new `release_build` pin makes that behavior part of the approval. (+6 gate tests.)
 
-- **Gates**: `npm test` 1324 + 59 green; eslint clean on every touched file;
+- **Post-review hardening (Codex P2 ×2 on PR #452)**: (a) wired `artifact_set` +
+  `release_build` through `object_publish` → object-verbs → gate, so an approval
+  that pins them is SATISFIABLE (the agent declares them on the publish) instead
+  of bricking the object with `publish_artifact_set_required`; (b)
+  `verify_article_images` now treats the site's PUBLISHED production deploy as the
+  source of truth for `deployReady` (new `getPublishedProductionDeploy`), so a
+  ready-but-unpublished build under locked Auto Publishing (or a ready deploy
+  preview) is inconclusive, never a false missing-image defect. (+3 tests.)
+- **Gates**: `npm test` 1327 + 59 green; eslint clean on every touched file;
   prettier clean. No frozen file edited; no default behavior reversed.
 
 ## Session 2026-07-16 (W9 PLANNED: admin workspace overhaul — the chat-first admin conversion; docs only, no code, nothing converted)

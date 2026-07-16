@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getHeader } from '../lib/admin-auth.js';
 import {
   getDeployReceiptByCommit,
+  getPublishedProductionDeploy,
   isNetlifyDeployLookupConfigured,
   pollDeployReceipt,
   type DeployReceipt,
@@ -86,11 +87,35 @@ const describeUnreadyDeploy = (commit: string, deploy: DeployReceipt | undefined
   );
 };
 
+const isProductionOrUnknownContext = (deploy: DeployReceipt | undefined): boolean =>
+  !deploy?.context || deploy.context === 'production';
+
+const describeTargetNotLive = (
+  commit: string,
+  buildDeploy: DeployReceipt | undefined,
+  publishedProd: DeployReceipt | undefined
+): string => {
+  // Built successfully, but production is still serving a DIFFERENT commit —
+  // Netlify Auto Publishing is likely locked or the rollout is mid-flight. This
+  // is a publishing-timing state, NOT a missing-image defect.
+  if (buildDeploy?.deployStatus === 'ready' && publishedProd && publishedProd.commit !== commit) {
+    return (
+      `The deploy for commit ${commit} built successfully, but production is currently published on commit ` +
+      `${publishedProd.commit || '(unknown)'} — Netlify Auto Publishing may be locked, or the publish is mid-rollout. ` +
+      `Retry once production reflects the commit. This is deploy timing/publishing, not a missing-image defect.`
+    );
+  }
+  return describeUnreadyDeploy(commit, buildDeploy);
+};
+
 /**
- * Correlate the verification to a specific publish commit's deploy so that
- * "the deploy is still building" is never mistaken for "the image is missing".
- * Degrades gracefully (deployAware:false, still proceeds) when deploy lookup is
- * not configured on this server.
+ * Correlate the verification to a specific publish commit and confirm PRODUCTION
+ * actually serves it before allowing definitive image assertions — so "the
+ * deploy is still building" OR "a build is ready but not published to production
+ * (locked Auto Publishing / a deploy preview)" is never mistaken for "the image
+ * is missing". The authoritative signal is the site's published production
+ * deploy, not merely a ready build for the commit. Degrades gracefully
+ * (deployAware:false, still proceeds) when deploy lookup is not configured.
  */
 const evaluateTargetDeploy = async (
   commit: string,
@@ -107,9 +132,10 @@ const evaluateTargetDeploy = async (
     };
   }
 
-  let deploy: DeployReceipt | undefined;
+  // The build deploy for this commit — drives the status/timing message.
+  let buildDeploy: DeployReceipt | undefined;
   try {
-    deploy =
+    buildDeploy =
       deployTimeoutSeconds > 0
         ? await pollDeployReceipt({
             commit,
@@ -125,12 +151,37 @@ const evaluateTargetDeploy = async (
     };
   }
 
-  const reflectsTarget = Boolean(deploy && deploy.deployStatus === 'ready' && deploy.commit === commit);
+  // Authoritative signal: is production ACTUALLY published on the target commit?
+  // A ready build — even a ready deploy preview, or a ready-but-unpublished
+  // production build under locked Auto Publishing — is not proof the live site
+  // serves it; only the published production deploy is.
+  const publishedProd = await getPublishedProductionDeploy();
+  if (publishedProd !== undefined) {
+    const productionLive = publishedProd.deployStatus === 'ready' && publishedProd.commit === commit;
+    if (productionLive) return { deployAware: true, reflectsTarget: true, deploy: publishedProd };
+    return {
+      deployAware: true,
+      reflectsTarget: false,
+      ...(buildDeploy ? { deploy: buildDeploy } : {}),
+      reason: describeTargetNotLive(commit, buildDeploy, publishedProd),
+    };
+  }
+
+  // Published-deploy lookup unavailable — degrade to a best-effort check: a READY
+  // deploy for the commit in a production (or unknown) context, excluding deploy
+  // previews. Documented caveat: under locked Auto Publishing this can be a
+  // ready-but-unpublished deploy, so prefer configuring the site lookup above.
+  const reflectsTarget = Boolean(
+    buildDeploy &&
+      buildDeploy.deployStatus === 'ready' &&
+      buildDeploy.commit === commit &&
+      isProductionOrUnknownContext(buildDeploy)
+  );
   return {
     deployAware: true,
     reflectsTarget,
-    ...(deploy ? { deploy } : {}),
-    ...(reflectsTarget ? {} : { reason: describeUnreadyDeploy(commit, deploy) }),
+    ...(buildDeploy ? { deploy: buildDeploy } : {}),
+    ...(reflectsTarget ? {} : { reason: describeUnreadyDeploy(commit, buildDeploy) }),
   };
 };
 

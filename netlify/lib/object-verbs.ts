@@ -262,6 +262,12 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     object_id: objectId,
     lock_token: z.string().min(1),
     published_time: z.union([z.string(), z.null()]).optional(),
+    // Declared so an approval that pins them (Goal 4) can be satisfied: the gate
+    // confirms they match the consumed approval's approval_pin. Object publishing
+    // always defers the deploy (release is the separate explicit step), so
+    // release_build here is the authorized intent the gate checks, not an executor.
+    artifact_set: z.array(z.string().min(1)).optional(),
+    release_build: z.enum(['defer', 'release']).optional(),
   }),
 ]);
 
@@ -1287,7 +1293,11 @@ export const handleObjectVerb = async (
         record,
         principal,
         roles: resolveRolesForPrincipal(principal),
-        requested: { published_time: request.published_time },
+        requested: {
+          published_time: request.published_time,
+          ...(request.artifact_set !== undefined ? { artifact_set: request.artifact_set } : {}),
+          ...(request.release_build !== undefined ? { release_build: request.release_build } : {}),
+        },
         policy: options.approvalPolicy,
       });
       if (!gate.allow)

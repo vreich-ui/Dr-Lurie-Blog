@@ -292,6 +292,62 @@ test('deploy-aware degrades gracefully when Netlify deploy lookup is not configu
   assert.ok(body.deployNote, 'a note explains that deploy correlation was skipped');
 });
 
+const NETLIFY_SITE_URL = 'https://api.netlify.com/api/v1/sites/test-site';
+
+const sitePublishedResponse = (publishedDeploy: Record<string, unknown> | null) => () =>
+  new Response(JSON.stringify({ published_deploy: publishedDeploy }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+
+test('deploy-aware: production published on the target commit is definitive (deployReady + verified)', async () => {
+  const body = await callVerifyDeployAware({
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/hero-shot.png'], commit: 'abc123' },
+    routes: {
+      [NETLIFY_DEPLOYS_URL]: deployListResponse([{ id: 'dep-ready', state: 'ready', commit_ref: 'abc123' }]),
+      [NETLIFY_SITE_URL]: sitePublishedResponse({
+        id: 'dep-ready',
+        state: 'ready',
+        commit_ref: 'abc123',
+        ssl_url: 'https://example.com',
+      }),
+      'https://example.com/learn/my-article': () =>
+        new Response(pageHtml('<img src="/_astro/hero-shot.C3jHx8yz.webp" alt="hero">'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+      'https://example.com/_astro/hero-shot.C3jHx8yz.webp': webpResponse,
+    },
+  });
+
+  assert.equal(body.deployReady, true, JSON.stringify(body));
+  assert.equal(body.verified, true);
+  assert.equal(body.inconclusive, false);
+});
+
+test('deploy-aware: a ready build not yet published to production (locked Auto Publishing) is inconclusive, not a defect', async () => {
+  // The build for the target commit is READY, but production is still published
+  // on an older commit and the live page therefore lacks the new image. This must
+  // NOT be reported as a missing-image defect — it is a publishing-timing state.
+  const body = await callVerifyDeployAware({
+    payload: { expectedImages: ['~/assets/images/uploads/my-article/hero-shot.png'], commit: 'abc123' },
+    routes: {
+      [NETLIFY_DEPLOYS_URL]: deployListResponse([{ id: 'dep-ready', state: 'ready', commit_ref: 'abc123' }]),
+      [NETLIFY_SITE_URL]: sitePublishedResponse({ id: 'dep-old', state: 'ready', commit_ref: 'oldcommit000000' }),
+      'https://example.com/learn/my-article': () =>
+        new Response(pageHtml('<img src="/_astro/unrelated.Aa11bb.webp">'), {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        }),
+    },
+  });
+
+  assert.equal(body.verified, false);
+  assert.equal(body.inconclusive, true, 'a ready-but-unpublished build must not assert against stale production');
+  assert.equal(body.deployReady, false);
+  assert.match(String(body.errors?.[0]), /Auto Publishing|built successfully|publish/i);
+});
+
 // ---------------------------------------------------------------------------
 // Admin artifact preview (Stage 5.3): blobKeys resolve through admin-get-blob-image
 // ---------------------------------------------------------------------------
