@@ -18,3 +18,33 @@ T0.8	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T0.8-verb-endp
 T0.9	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T0.9-mcp-exposure.md
 T0.10	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T0.10-ci-tests.md
 T0.11	notify	claude-sonnet-5	high	docs/cms-architecture/cms-pipeline/T0.11-exit-drill.md
+#
+# W9 — admin workspace overhaul (plan: docs/cms-architecture/10-admin-workspace-plan.md).
+# Queue order pulls the T9.12 spike forward (depends only on T9.1) per the plan's ordering argument.
+# mode legend as above, plus: checkpoint = blocked on the OQ named in the brief; human_gate = prepared by agent, completed by a human action.
+T9.1	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T9.1-react-islands-admin.md
+T9.2	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.2-admin-ui-kit.md
+T9.3	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.3-admin-shell-home.md
+T9.12	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.12-agent-runtime-spike.md
+T9.4	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.4-users-store-owner-role.md
+T9.5	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.5-admins-page-invites.md
+T9.6	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.6-profile-page.md
+T9.7	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T9.7-rbac-credentialed-verification.md
+T9.8	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T9.8-content-library.md
+T9.9	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.9-object-workspace-v1.md
+T9.10	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.10-live-preview-pane.md
+T9.11	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T9.11-attention-inbox-audit-feed.md
+T9.13	notify	claude-fable-5	xhigh	docs/cms-architecture/cms-pipeline/T9.13-chat-endpoint.md
+T9.14	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T9.14-chat-ui-layout-flip.md
+T9.15	checkpoint	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.15-governance-guardrails.md
+T9.16	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T9.16-chat-credentialed-run.md
+T9.17	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.17-agents-hub.md
+T9.18	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.18-templates-themes-studio.md
+T9.26	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.26-agent-roster-assignment.md
+T9.19	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T9.19-canvas-document-body-editing.md
+T9.20	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.20-article-settings-surface.md
+T9.21	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.21-readiness-tray-token-bridge.md
+T9.22	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.22-repoint-ai-publisher.md
+T9.23	human_gate	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.23-parity-signoff.md
+T9.24	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.24-legacy-deletion.md
+T9.25	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.25-records-closeout.md
