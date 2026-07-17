@@ -1,0 +1,177 @@
+/*
+ * Admin semantic token layer (T9.2).
+ *
+ * One design language for the whole /admin/* workspace. Semantic `--adm-*`
+ * tokens derived from the site's `--aw-*` brand variables (defined in
+ * src/components/CustomStyles.astro) so the workspace inherits the brand's
+ * palette and fonts, plus a few workspace-only roles (danger/success/warning,
+ * elevated surfaces, focus ring) that the reader theme doesn't define.
+ *
+ * Light values live on :root; dark overrides live under `.dark` (the site's
+ * class-based dark mode, tailwind.config darkMode:'class'). This file is
+ * imported only by admin pages, so it never reaches public output — T9.1's
+ * byte-identical invariant is preserved.
+ *
+ * Components consume these via Tailwind arbitrary values, e.g.
+ * `bg-[var(--adm-surface)]`, or the small utility classes at the bottom.
+ */
+
+:root {
+  /* Surfaces — mapped from brand bg tokens, with a raised step for cards/menus. */
+  --adm-surface-page: var(--aw-color-bg-page, #ffffff);
+  --adm-surface: var(--aw-color-bg-surface, #ffffff);
+  --adm-surface-raised: #ffffff;
+  --adm-surface-sunken: #f4f5f7;
+  --adm-overlay: rgba(15, 18, 20, 0.45);
+
+  /* Text — straight from brand text tokens. */
+  --adm-text: var(--aw-color-text-default, #1a1a1a);
+  --adm-text-heading: var(--aw-color-text-heading, #0f1214);
+  --adm-text-muted: var(--aw-color-text-muted, #5b6470);
+  --adm-text-on-accent: #ffffff;
+
+  /* Accent — the brand primary drives the workspace action color. */
+  --adm-accent: var(--aw-color-primary, #2563eb);
+  --adm-accent-hover: color-mix(in srgb, var(--aw-color-primary, #2563eb) 88%, black);
+  --adm-accent-soft: color-mix(in srgb, var(--aw-color-primary, #2563eb) 12%, transparent);
+
+  /* Status roles — workspace-only; the reader theme has no danger/success. */
+  --adm-danger: #dc2626;
+  --adm-danger-soft: #fee2e2;
+  --adm-danger-text: #991b1b;
+  --adm-success: #16a34a;
+  --adm-success-soft: #dcfce7;
+  --adm-success-text: #166534;
+  --adm-warning: #d97706;
+  --adm-warning-soft: #fef3c7;
+  --adm-warning-text: #92400e;
+  --adm-info: #2563eb;
+  --adm-info-soft: #dbeafe;
+  --adm-info-text: #1e40af;
+
+  /* Lines + focus. */
+  --adm-border: rgba(15, 18, 20, 0.12);
+  --adm-border-strong: rgba(15, 18, 20, 0.22);
+  --adm-ring: color-mix(in srgb, var(--aw-color-primary, #2563eb) 55%, transparent);
+
+  /* Radius scale. */
+  --adm-radius-sm: 0.375rem;
+  --adm-radius-md: 0.5rem;
+  --adm-radius-lg: 0.75rem;
+  --adm-radius-xl: 1rem;
+  --adm-radius-pill: 999px;
+
+  /* Spacing scale (4px base). */
+  --adm-space-1: 0.25rem;
+  --adm-space-2: 0.5rem;
+  --adm-space-3: 0.75rem;
+  --adm-space-4: 1rem;
+  --adm-space-5: 1.5rem;
+  --adm-space-6: 2rem;
+
+  /* Type scale. */
+  --adm-text-xs: 0.75rem;
+  --adm-text-sm: 0.875rem;
+  --adm-text-base: 1rem;
+  --adm-text-lg: 1.125rem;
+  --adm-text-xl: 1.375rem;
+  --adm-text-2xl: 1.75rem;
+
+  /* Elevation. */
+  --adm-shadow-sm: 0 1px 2px rgba(15, 18, 20, 0.08);
+  --adm-shadow-md: 0 4px 12px rgba(15, 18, 20, 0.12);
+  --adm-shadow-lg: 0 12px 32px rgba(15, 18, 20, 0.18);
+
+  --adm-font-sans: var(--aw-font-sans, ui-sans-serif, system-ui, sans-serif);
+}
+
+.dark {
+  --adm-surface-page: var(--aw-color-bg-page, #0f1214);
+  --adm-surface: var(--aw-color-bg-surface, #171b1f);
+  --adm-surface-raised: #1e2329;
+  --adm-surface-sunken: #0c0f11;
+  --adm-overlay: rgba(0, 0, 0, 0.6);
+
+  --adm-text: var(--aw-color-text-default, #e6e8ea);
+  --adm-text-heading: var(--aw-color-text-heading, #f4f6f8);
+  --adm-text-muted: var(--aw-color-text-muted, #9aa4b0);
+  --adm-text-on-accent: #ffffff;
+
+  --adm-accent-soft: color-mix(in srgb, var(--aw-color-primary, #3b82f6) 22%, transparent);
+
+  --adm-danger: #f87171;
+  --adm-danger-soft: rgba(248, 113, 113, 0.16);
+  --adm-danger-text: #fca5a5;
+  --adm-success: #4ade80;
+  --adm-success-soft: rgba(74, 222, 128, 0.16);
+  --adm-success-text: #86efac;
+  --adm-warning: #fbbf24;
+  --adm-warning-soft: rgba(251, 191, 36, 0.16);
+  --adm-warning-text: #fcd34d;
+  --adm-info: #60a5fa;
+  --adm-info-soft: rgba(96, 165, 250, 0.16);
+  --adm-info-text: #93c5fd;
+
+  --adm-border: rgba(255, 255, 255, 0.12);
+  --adm-border-strong: rgba(255, 255, 255, 0.24);
+
+  --adm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --adm-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --adm-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* ─── shared utility classes ─────────────────────────────────────────────── */
+
+.adm-root {
+  color: var(--adm-text);
+  font-family: var(--adm-font-sans);
+}
+
+/* Consistent keyboard focus ring across every interactive kit control. */
+.adm-focusable:focus-visible {
+  outline: 2px solid var(--adm-ring);
+  outline-offset: 2px;
+}
+
+/* Native <dialog> backdrop for Dialog/Drawer/ConfirmDialog. */
+.adm-dialog::backdrop {
+  background: var(--adm-overlay);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .adm-animate-in {
+    animation: adm-fade-in 120ms ease-out both;
+  }
+}
+
+@keyframes adm-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.adm-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--adm-surface-sunken) 25%,
+    color-mix(in srgb, var(--adm-surface-sunken) 60%, var(--adm-border)) 37%,
+    var(--adm-surface-sunken) 63%
+  );
+  background-size: 400% 100%;
+  animation: adm-shimmer 1.4s ease infinite;
+}
+
+@keyframes adm-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}

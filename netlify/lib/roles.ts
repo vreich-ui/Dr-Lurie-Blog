@@ -24,8 +24,9 @@
  */
 import { parseAdminEmails } from './admin-auth.js';
 import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { UserRecord, UserRole } from './users-store.js';
 
-export type Role = 'admin' | 'publisher' | 'editor';
+export type Role = 'owner' | 'admin' | 'publisher' | 'editor';
 
 export type RoleEnv = Partial<
   Record<'ROLE_EMAILS_ADMIN' | 'ROLE_EMAILS_PUBLISHER' | 'ROLE_EMAILS_EDITOR' | 'ADMIN_EMAILS', string>
@@ -50,6 +51,64 @@ export const resolveHumanRoles = (email: string, env: RoleEnv = process.env as R
 
 export const resolveRolesForPrincipal = (principal: Principal, env: RoleEnv = process.env as RoleEnv): Role[] =>
   principal.kind === 'human' ? resolveHumanRoles(principal.email, env) : [];
+
+/**
+ * A workspace tier expanded to the full role set the rest of the system reads.
+ * `owner` implies admin + publisher so publish-gate.ts stays byte-untouched
+ * (it only ever sees admin/publisher); the `owner` entry is additive for the
+ * new Owner-only gates.
+ */
+export const expandRole = (role: UserRole): Role[] => (role === 'owner' ? ['owner', 'admin', 'publisher'] : ['admin']);
+
+export const isOwner = (roles: readonly Role[]): boolean => roles.includes('owner');
+
+export interface AsyncRoleResolverDeps {
+  env?: RoleEnv;
+  /** Reads a users-store record by email; omit to resolve from env only. Throwing → treated as "no record" (env fallback). */
+  getUserRecord?: (email: string) => Promise<UserRecord | null>;
+}
+
+/**
+ * The T9.4 async resolver. Precedence:
+ *   1. Agent principals → [] (a capability class, not a role — unchanged).
+ *   2. `ADMIN_EMAILS` members → owner, ALWAYS (bootstrap Owner; a wiped or
+ *      corrupt store, or a disabled record, can never lock them out).
+ *   3. A users-store record → its tier (disabled ⇒ [] — loses all roles).
+ *   4. No record → the legacy env allowlists (resolveHumanRoles).
+ * A store read that throws is treated as "no record" so the store being
+ * unavailable degrades to env rather than denying everyone.
+ */
+export const resolveRolesForPrincipalAsync = async (
+  principal: Principal,
+  deps: AsyncRoleResolverDeps = {}
+): Promise<Role[]> => {
+  const env = deps.env ?? (process.env as RoleEnv);
+  if (principal.kind !== 'human') return [];
+
+  const normalized = normalizeEmail(principal.email);
+  if (!normalized) return [];
+
+  // (2) Bootstrap Owner — overrides the store entirely (lockout-impossible).
+  const bootstrapOwners = new Set(parseAdminEmails(env.ADMIN_EMAILS));
+  if (bootstrapOwners.has(normalized)) return expandRole('owner');
+
+  // (3) Store record wins for everyone else.
+  if (deps.getUserRecord) {
+    let record: UserRecord | null = null;
+    try {
+      record = await deps.getUserRecord(normalized);
+    } catch {
+      record = null; // store unavailable/corrupt → fall through to env
+    }
+    if (record) {
+      if (record.status === 'disabled') return [];
+      return expandRole(record.role);
+    }
+  }
+
+  // (4) Legacy env allowlists (never grants owner except via ADMIN_EMAILS above).
+  return resolveHumanRoles(principal.email, env);
+};
 
 /** Publish execution authority (Tier 2 human path, Tier 3 always): admin or publisher. */
 export const canExecutePublish = (roles: readonly Role[]): boolean =>

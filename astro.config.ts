@@ -6,6 +6,7 @@ import { defineConfig, passthroughImageService } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import tailwind from '@astrojs/tailwind';
 import mdx from '@astrojs/mdx';
+import react from '@astrojs/react';
 import partytown from '@astrojs/partytown';
 import icon from 'astro-icon';
 import compress from 'astro-compress';
@@ -31,6 +32,9 @@ export default defineConfig({
     }),
     sitemap(),
     mdx(),
+    // React renderer — scoped in practice to /admin/* islands (W9). No public
+    // page mounts a React component, so no reader page loads the React runtime.
+    react(),
     icon({
       include: {
         tabler: ['*'],

@@ -1,5 +1,7 @@
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { getCoreBlobStoreSourceDiagnostics } from '../lib/blob-store.js';
+import { resolveRolesFromEvent } from '../lib/request-roles.js';
+import { isOwner } from '../lib/roles.js';
 
 type LambdaEvent = {
   blobs?: unknown;
@@ -30,6 +32,16 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
   if (!adminState.isAdmin) {
     return jsonResponse(403, { error: 'This user is not authorized to inspect blob store diagnostics.' });
+  }
+
+  // T9.4: maintenance/diagnostics tools are Owner-only.
+  const roles = await resolveRolesFromEvent(event, {
+    kind: 'human',
+    id: adminState.userId ?? '',
+    email: adminState.email ?? '',
+  });
+  if (!isOwner(roles)) {
+    return jsonResponse(403, { error: 'Owner access is required for maintenance diagnostics.' });
   }
 
   return jsonResponse(200, {

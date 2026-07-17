@@ -1,0 +1,9 @@
+---
+// Admin profile (T9.6) — self-service profile, on AdminLayout.
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import ProfilePage from '~/components/admin-ui/ProfilePage';
+---
+
+<AdminLayout title="Admin — Profile">
+  <ProfilePage client:load />
+</AdminLayout>
