@@ -1,12 +1,13 @@
 ---
-import KitProbe from '~/components/admin/KitProbe';
+import '~/assets/styles/admin-tokens.css';
+import KitGallery from '~/components/admin-ui/KitGallery';
 import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
-// T9.1 — proof page for the admin-scoped React islands integration.
-// Uses the same client-side auth gate as src/pages/admin/index.astro. The only
-// new capability it demonstrates is a hydrated React island (KitProbe). Kit
-// tokens/components are T9.2; the workspace shell is T9.3.
+// T9.1 → T9.2 — the admin UI kit gallery. Uses the same client-side auth gate
+// as src/pages/admin/index.astro. The React island (KitGallery) renders every
+// admin-ui component in every state, light and dark. The workspace shell that
+// consumes this kit is T9.3.
 const pageTitle = 'Admin UI Kit';
 const metadata = {
   title: pageTitle,
@@ -22,7 +23,7 @@ const metadata = {
     <header class="kit-header">
       <p class="kit-kicker">Admin workspace</p>
       <h1>{pageTitle}</h1>
-      <p class="kit-intro">React-islands integration proof (T9.1). Reusable kit components arrive in T9.2.</p>
+      <p class="kit-intro">The admin UI kit — every component in every state, with a light / dark toggle.</p>
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
@@ -49,8 +50,7 @@ const metadata = {
       <AdminNav />
 
       <section class="kit-island" data-auth-gated hidden>
-        <p class="kit-kicker">Islands proof</p>
-        <KitProbe client:load />
+        <KitGallery client:load />
       </section>
     </div>
   </section>
