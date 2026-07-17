@@ -11,3 +11,5 @@ export * from './forms';
 export * from './overlays';
 export * from './menus';
 export * from './data';
+export { AdminShell } from './AdminShell';
+export type { AdminShellProps } from './AdminShell';

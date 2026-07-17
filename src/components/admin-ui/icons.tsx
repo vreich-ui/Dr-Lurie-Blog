@@ -122,3 +122,73 @@ export const IconClock = (p: IconProps) => (
     <path d="M12 8v4l3 2" />
   </IconBase>
 );
+export const IconHome = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M4 11l8-7 8 7" />
+    <path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" />
+    <path d="M10 20v-6h4v6" />
+  </IconBase>
+);
+export const IconLibrary = (p: IconProps) => (
+  <IconBase {...p}>
+    <rect x="4" y="4" width="7" height="7" rx="1" />
+    <rect x="13" y="4" width="7" height="7" rx="1" />
+    <rect x="4" y="13" width="7" height="7" rx="1" />
+    <rect x="13" y="13" width="7" height="7" rx="1" />
+  </IconBase>
+);
+export const IconSparkles = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M12 4l1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6z" />
+    <path d="M18 15l.7 1.8L20.5 17.5 18.7 18.2 18 20l-.7-1.8L15.5 17.5l1.8-.7z" />
+  </IconBase>
+);
+export const IconPalette = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M12 3a9 9 0 0 0 0 18 2 2 0 0 0 2-2 2 2 0 0 1 2-2h1a4 4 0 0 0 4-4 9 9 0 0 0-9-8z" />
+    <circle cx="7.5" cy="10.5" r="1" />
+    <circle cx="10.5" cy="7" r="1" />
+    <circle cx="15" cy="8" r="1" />
+  </IconBase>
+);
+export const IconSettings = (p: IconProps) => (
+  <IconBase {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L16 3H8l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L8 21h8l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6A7 7 0 0 0 19 12z" />
+  </IconBase>
+);
+export const IconUser = (p: IconProps) => (
+  <IconBase {...p}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </IconBase>
+);
+export const IconWrench = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M14 7a4 4 0 0 0-5.5 4.5l-4 4a2.1 2.1 0 0 0 3 3l4-4A4 4 0 0 0 16 9l-2 2-2-2 2-2z" />
+  </IconBase>
+);
+export const IconMenu = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </IconBase>
+);
+export const IconLogout = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4" />
+    <path d="M16 17l5-5-5-5M21 12H9" />
+  </IconBase>
+);
+export const IconRocket = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M5 15c-1.5 1.5-2 5-2 5s3.5-.5 5-2a2.8 2.8 0 0 0-3-3z" />
+    <path d="M9 13l-2-2c1-4 4-7 10-8 -1 6-4 9-8 10z" />
+    <circle cx="14.5" cy="9.5" r="1.2" />
+  </IconBase>
+);
+export const IconFilePlus = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z" />
+    <path d="M14 3v4h4M12 11v6M9 14h6" />
+  </IconBase>
+);
