@@ -22,7 +22,12 @@ import {
   type UserRecord,
   type UsersBlobStore,
 } from '../lib/users-store.js';
+import { MAJOR_KEY_ARTIFACT_REF_RE } from '../lib/artifact-trust.js';
 import type { Principal } from '../../src/schema/object-record-v1.js';
+
+/** An avatar must be an uploaded IMAGE artifact reference, not a URL/data URI. */
+export const isTrustedAvatarRef = (ref: string): boolean =>
+  ref.startsWith('image/') && MAJOR_KEY_ARTIFACT_REF_RE.test(ref);
 
 type LambdaEvent = {
   httpMethod?: string;
@@ -105,10 +110,23 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     switch (req.verb) {
       case 'me': {
         const stored = await getUserRecord(store, email);
-        return jsonResponse(200, { user: stored ?? synthesizedRecord(email, owner), bootstrap: !stored, roles });
+        if (stored) {
+          // T9.6: stamp last_seen on every self-read.
+          const seen: UserRecord = { ...stored, last_seen_at: nowIso() };
+          await putUserRecord(store, seen);
+          return jsonResponse(200, { user: seen, bootstrap: false, roles });
+        }
+        return jsonResponse(200, { user: synthesizedRecord(email, owner), bootstrap: true, roles });
       }
 
       case 'update_me': {
+        // T9.6: an avatar must be an uploaded image artifact reference
+        // (image/<id>/<sha256>.<ext>) — never an arbitrary URL or data URI.
+        if (req.avatar_artifact !== undefined && !isTrustedAvatarRef(req.avatar_artifact)) {
+          return jsonResponse(400, {
+            error: 'Avatar must be an uploaded image artifact reference, not a URL.',
+          });
+        }
         const base = (await getUserRecord(store, email)) ?? synthesizedRecord(email, owner);
         const updated: UserRecord = {
           ...base,
