@@ -31,11 +31,13 @@ import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import {
   checkinObjectLock,
   checkoutObjectLock,
+  forceReleaseObjectLock,
   isObjectLockActive,
   refreshObjectLock,
   sanitizeObjectLock,
   type ObjectLockStore,
 } from './object-lock.js';
+import type { Role } from './roles.js';
 import { objectRecordKey, objectStatusIndexKey, OBJECT_STORE_MARKER_VALUE } from './object-store-keys.js';
 import {
   summarizeValidation,
@@ -209,7 +211,10 @@ export const objectVerbRequestSchema = z.discriminatedUnion('action', [
     action: z.literal('checkin'),
     object_type: objectTypeSchema,
     object_id: objectId,
-    lock_token: z.string().min(1),
+    // Optional: a normal check-in needs the lock token; an owner force
+    // takeover (force:true) needs no token. The handler enforces the pairing.
+    lock_token: z.string().min(1).optional(),
+    force: z.boolean().optional(),
   }),
   z.object({
     action: z.literal('patch'),
@@ -300,6 +305,12 @@ export type HandleObjectVerbOptions = {
   privilegedOps?: readonly string[];
   /** Creation policy for the create gate; defaults to the committed config (tests inject). W8.3b. */
   creationPolicy?: CreationPolicy;
+  /**
+   * Resolved roles of the acting human (T9.4). Supplied by the caller after
+   * server-side resolution; gates owner-only verb options (checkin{force}).
+   * Absent ⇒ treated as no roles.
+   */
+  roles?: readonly Role[];
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -1097,6 +1108,19 @@ export const handleObjectVerb = async (
 
     case 'checkin': {
       const key = objectRecordKey(request.object_type, request.object_id);
+      if (request.force) {
+        // Owner-only lock takeover (OQ-W9-8). Delegates to the tested
+        // force-release path: previous-owner history, version bump, and
+        // content_revision is never touched.
+        if (!(options.roles ?? []).includes('owner')) {
+          return err(403, { error: 'Force check-in requires the owner role.' });
+        }
+        const forced = await forceReleaseObjectLock(store, key, { actor: principal, nowMs: ts });
+        return withRecordVersion(forced);
+      }
+      if (!request.lock_token) {
+        return err(400, { error: 'checkin requires lock_token (or force for an owner).' });
+      }
       const result = await checkinObjectLock(store, key, {
         actor: principal,
         lockToken: request.lock_token,

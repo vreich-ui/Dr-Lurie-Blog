@@ -14,6 +14,7 @@
  * all, it only forces a build and reports on the resulting deploy.
  */
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import { resolveRolesFromEvent } from '../lib/request-roles.js';
 import { releaseToProduction } from '../lib/production-release.js';
 
 type LambdaEvent = {
@@ -51,7 +52,14 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
   const adminState = await getAdminStateFromEvent(event, context);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
-  if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
+  // T9.4: gate on resolved roles (users store + bootstrap owners), a superset
+  // of the old ADMIN_EMAILS-only check.
+  const roles = await resolveRolesFromEvent(event, {
+    kind: 'human',
+    id: adminState.userId ?? '',
+    email: adminState.email ?? '',
+  });
+  if (!roles.includes('admin')) return jsonResponse(403, { error: 'Admin access required' });
 
   try {
     const result = await releaseToProduction(parseOptions(event));

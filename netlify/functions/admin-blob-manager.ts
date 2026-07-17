@@ -1,4 +1,6 @@
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import { resolveRolesFromEvent } from '../lib/request-roles.js';
+import { isOwner } from '../lib/roles.js';
 import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
 import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
 import { getManagedBlobStore, listManagedBlobStores } from '../lib/blob-admin.js';
@@ -357,6 +359,16 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
   if (!adminState.isAdmin) {
     return jsonResponse(403, { error: 'This user is not authorized to manage blob stores.' });
+  }
+
+  // T9.4: the blob browser + wipe tools are Owner-only maintenance.
+  const roles = await resolveRolesFromEvent(event, {
+    kind: 'human',
+    id: adminState.userId ?? '',
+    email: adminState.email ?? '',
+  });
+  if (!isOwner(roles)) {
+    return jsonResponse(403, { error: 'Owner access is required for blob-store maintenance.' });
   }
 
   const params = parseBody(event);

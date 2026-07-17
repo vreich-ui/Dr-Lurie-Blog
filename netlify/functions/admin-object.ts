@@ -16,6 +16,8 @@
  */
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
+import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
@@ -77,7 +79,12 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       selfObjectId: requestData.object_id ?? targetPageId,
       selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
     });
-    const result = await handleObjectVerb(store, request.data, principal, { validationContext });
+    // T9.4: resolve the acting human's roles server-side so owner-only verb
+    // options (checkin{force}) are gated by the real tier, not client claims.
+    const roles = await resolveRolesForPrincipalAsync(principal, {
+      getUserRecord: async (email) => getUserRecord(await getUsersBlobStore(event), email),
+    });
+    const result = await handleObjectVerb(store, request.data, principal, { validationContext, roles });
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('Admin_Object request failed.', error);
