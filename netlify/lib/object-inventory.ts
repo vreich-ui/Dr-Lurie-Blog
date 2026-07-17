@@ -18,6 +18,7 @@ import {
   type ApprovalPolicy,
 } from '../../src/lib/approval-policy.js';
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { objectDisplayName } from '../../src/lib/admin/display-name.js';
 
 export type InventoryReviewState = 'none' | 'open' | 'changes_requested' | 'approved';
 
@@ -86,6 +87,10 @@ export const recipeSummaryFromBody = (
 export type InventoryRow = {
   object_id: string;
   object_type: ObjectRecord['object_type'];
+  /** Human display name derived from the body (T9.2) — browse surfaces show this, never the id. */
+  display_name: string;
+  /** Record last-updated timestamp, mirrored so browse surfaces can sort by it without a detail fetch. */
+  updated_at: string;
   status: ObjectRecord['status'];
   /**
    * Whether publishing this type currently requires human approval, per the
@@ -147,6 +152,8 @@ export const inventoryRowFromRecord = (
   return {
     object_id: record.object_id,
     object_type: record.object_type,
+    display_name: objectDisplayName(record),
+    updated_at: record.updated_at,
     status: record.status,
     requires_approval: isGovernedObjectType(record.object_type)
       ? publishRequiresApproval(record.object_type, policy)

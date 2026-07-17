@@ -1,0 +1,9 @@
+---
+// Content library (T9.8) — the human-named browse surface, on AdminLayout.
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import ContentLibrary from '~/components/admin-ui/ContentLibrary';
+---
+
+<AdminLayout title="Admin — Content">
+  <ContentLibrary client:load />
+</AdminLayout>

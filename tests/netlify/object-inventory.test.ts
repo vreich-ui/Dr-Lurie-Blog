@@ -98,6 +98,15 @@ const baseRecord = (overrides: Partial<ObjectRecord> = {}): ObjectRecord => ({
 
 // ═══ derivation rules (pure) ══════════════════════════════════════════════════
 
+test('display_name (T9.2 derivation) and updated_at are mirrored onto the row', () => {
+  const untitled = inventoryRowFromRecord(baseRecord(), NOW);
+  assert.equal(untitled.display_name, 'Untitled page');
+  assert.equal(untitled.updated_at, '2026-07-01T00:00:00.000Z');
+
+  const named = inventoryRowFromRecord(baseRecord({ body: validPageBody('Start Here') as ObjectRecord['body'] }), NOW);
+  assert.equal(named.display_name, 'Start Here');
+});
+
 test('a never-published draft reports unpublished_changes with no receipt revision', () => {
   const row = inventoryRowFromRecord(baseRecord(), NOW);
   assert.equal(row.unpublished_changes, true);
@@ -464,7 +473,13 @@ test('the detail view inherits the recipe summary', async () => {
       object_id: 'thm_probe',
       object_type: 'theme',
       schema_version: 'theme.v1',
-      body: { name: 'Default', description: 'The palette.', whenToUse: 'Restore defaults.', scope: 'evergreen', tokens: {} },
+      body: {
+        name: 'Default',
+        description: 'The palette.',
+        whenToUse: 'Restore defaults.',
+        scope: 'evergreen',
+        tokens: {},
+      },
     })
   );
   const res = await call(store, { action: 'inventory', object_type: 'theme', object_id: 'thm_probe' });

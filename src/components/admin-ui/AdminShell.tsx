@@ -8,7 +8,7 @@
  *
  * Legacy pages remain reachable under the "Legacy" group until W9.g (T9.24).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { cn } from './utils';
@@ -28,8 +28,16 @@ import {
   IconLogout,
   IconSearch,
   IconExternalLink,
+  IconRocket,
   type IconProps,
 } from './icons';
+import { objectTypeLabel } from '../../lib/admin/display-name';
+import type { LibraryRow } from '../../lib/admin/library-logic';
+
+async function shellToken(): Promise<string> {
+  const m = await import('../../utils/goTrueClient');
+  return (await m.getAccessToken()) ?? '';
+}
 
 interface NavItem {
   label: string;
@@ -152,6 +160,8 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
   const [email, setEmail] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [objectRows, setObjectRows] = useState<LibraryRow[]>([]);
+  const objectsAttempted = useRef(false);
 
   useEffect(() => {
     let alive = true;
@@ -176,6 +186,26 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // Lazy-load the object list the first time the palette opens so Cmd-K can
+  // fuzzy-find any object by its human display name (T9.8).
+  useEffect(() => {
+    if (!paletteOpen || objectsAttempted.current) return;
+    objectsAttempted.current = true;
+    let alive = true;
+    (async () => {
+      try {
+        const { fetchInventoryRows } = await import('../../lib/admin/library-client');
+        const rows = await fetchInventoryRows(shellToken);
+        if (alive) setObjectRows(rows);
+      } catch {
+        // palette still works for nav/actions without the object list
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [paletteOpen]);
+
   const onLogout = () => {
     import('../../utils/goTrueClient')
       .then((m) => m.logout())
@@ -183,7 +213,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
       .finally(() => window.location.assign('/admin'));
   };
 
-  const commands: CommandItem[] = NAV.flatMap((group) =>
+  const navCommands: CommandItem[] = NAV.flatMap((group) =>
     group.items
       .filter((item) => !item.soon)
       .map((item) => ({
@@ -193,6 +223,34 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
         onSelect: () => window.location.assign(item.href),
       }))
   );
+
+  const actionCommands: CommandItem[] = [
+    {
+      id: 'action-release',
+      label: 'Release to production',
+      group: 'Actions',
+      icon: <IconRocket size={16} />,
+      onSelect: () => window.location.assign('/admin'),
+    },
+    {
+      id: 'action-new-chat',
+      label: 'New chat',
+      group: 'Actions',
+      icon: <IconSparkles size={16} />,
+      keywords: ['agent', 'ai'],
+      onSelect: () => window.location.assign('/admin/agent-admin'),
+    },
+  ];
+
+  const objectCommands: CommandItem[] = objectRows.map((row) => ({
+    id: `object-${row.object_id}`,
+    label: row.display_name,
+    group: objectTypeLabel(row.object_type),
+    keywords: [row.object_id, row.object_type],
+    onSelect: () => window.location.assign(`/admin/content/${encodeURIComponent(row.object_id)}`),
+  }));
+
+  const commands: CommandItem[] = [...actionCommands, ...navCommands, ...objectCommands];
 
   return (
     <ToastProvider>
