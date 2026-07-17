@@ -20,6 +20,7 @@ import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } fro
 import { Tabs } from './menus';
 import { ConfirmDialog, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
+import { ObjectPreview } from './ObjectPreview';
 import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '../../schema/object-record-v1';
@@ -396,6 +397,7 @@ function WorkspaceBody() {
       {/* Tabs */}
       <Tabs
         tabs={[
+          { id: 'preview', label: 'Preview', content: <ObjectPreview record={record} /> },
           { id: 'details', label: 'Details', content: <GeneratedInspector record={record} onEditOnSite={url} /> },
           { id: 'history', label: 'History', content: <HistoryTimeline entries={history} now={now || undefined} /> },
           {
