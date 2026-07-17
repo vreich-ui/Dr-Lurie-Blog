@@ -18,6 +18,7 @@ import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
 import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
+import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
@@ -84,7 +85,15 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const roles = await resolveRolesForPrincipalAsync(principal, {
       getUserRecord: async (email) => getUserRecord(await getUsersBlobStore(event), email),
     });
-    const result = await handleObjectVerb(store, request.data, principal, { validationContext, roles });
+    // T9.15: runtime governance overrides (else committed policy) feed the
+    // publish/create gates.
+    const { approval, creation } = await resolveActivePolicies(await getGovernanceBlobStore(event));
+    const result = await handleObjectVerb(store, request.data, principal, {
+      validationContext,
+      roles,
+      approvalPolicy: approval,
+      creationPolicy: creation,
+    });
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('Admin_Object request failed.', error);

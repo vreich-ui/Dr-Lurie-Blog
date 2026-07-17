@@ -1,0 +1,9 @@
+---
+// Adjustable guardrails (T9.15) — Owner-write / Admin-read, on AdminLayout.
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import GovernancePage from '~/components/admin-ui/GovernancePage';
+---
+
+<AdminLayout title="Admin — Guardrails">
+  <GovernancePage client:load />
+</AdminLayout>
