@@ -1,0 +1,16 @@
+---
+// Object workspace (T9.9) — the chat-first single-object surface (forms-parity
+// floor). A single placeholder page; the netlify.toml rewrite serves it for
+// every /admin/content/<id>, and the island reads the id client-side from the
+// URL (same pattern as /admin/objects/*).
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import ObjectWorkspace from '~/components/admin-ui/ObjectWorkspace';
+
+export function getStaticPaths() {
+  return [{ params: { objectId: '__workspace' } }];
+}
+---
+
+<AdminLayout title="Admin — Object">
+  <ObjectWorkspace client:load />
+</AdminLayout>

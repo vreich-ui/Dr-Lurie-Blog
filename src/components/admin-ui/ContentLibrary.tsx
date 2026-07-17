@@ -54,7 +54,7 @@ function LibraryTable({ rows, now }: { rows: LibraryRow[]; now: number }) {
         const dot = readinessDot(r);
         return (
           <a
-            href={`/admin/content/${encodeURIComponent(r.object_id)}`}
+            href={`/admin/content/${encodeURIComponent(r.object_id)}?type=${r.object_type}`}
             className="adm-focusable group flex items-center gap-2.5 rounded"
           >
             <span

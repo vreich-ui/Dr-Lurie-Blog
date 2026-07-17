@@ -50,6 +50,15 @@
   to = "/admin/objects/lookup"
   status = 200
 
+# T9.9: serve the object workspace for any /admin/content/<id>. status 200
+# without force, so the static content library at /admin/content/ and the
+# placeholder page itself are not shadowed; only paths with no static file
+# (real object ids) rewrite to the workspace, which reads the id client-side.
+[[redirects]]
+  from = "/admin/content/*"
+  to = "/admin/content/__workspace"
+  status = 200
+
 [[redirects]]
   from = "/blog"
   to = "/learn/library"

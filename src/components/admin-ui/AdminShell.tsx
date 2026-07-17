@@ -247,7 +247,8 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
     label: row.display_name,
     group: objectTypeLabel(row.object_type),
     keywords: [row.object_id, row.object_type],
-    onSelect: () => window.location.assign(`/admin/content/${encodeURIComponent(row.object_id)}`),
+    onSelect: () =>
+      window.location.assign(`/admin/content/${encodeURIComponent(row.object_id)}?type=${row.object_type}`),
   }));
 
   const commands: CommandItem[] = [...actionCommands, ...navCommands, ...objectCommands];
