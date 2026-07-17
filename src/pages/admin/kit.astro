@@ -1,0 +1,236 @@
+---
+import KitProbe from '~/components/admin/KitProbe';
+import AdminNav from '~/components/admin/AdminNav.astro';
+import Layout from '~/layouts/PageLayout.astro';
+
+// T9.1 — proof page for the admin-scoped React islands integration.
+// Uses the same client-side auth gate as src/pages/admin/index.astro. The only
+// new capability it demonstrates is a hydrated React island (KitProbe). Kit
+// tokens/components are T9.2; the workspace shell is T9.3.
+const pageTitle = 'Admin UI Kit';
+const metadata = {
+  title: pageTitle,
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+---
+
+<Layout metadata={metadata}>
+  <section class="admin-kit mx-auto max-w-[920px] px-4 py-10 sm:px-6 sm:py-14">
+    <header class="kit-header">
+      <p class="kit-kicker">Admin workspace</p>
+      <h1>{pageTitle}</h1>
+      <p class="kit-intro">React-islands integration proof (T9.1). Reusable kit components arrive in T9.2.</p>
+    </header>
+
+    <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
+
+    <!-- Shown when signed out -->
+    <div data-admin-signin-prompt hidden class="admin-gate-panel">
+      <p class="kit-kicker">Admin login required</p>
+      <p class="admin-gate-message">
+        Sign in with your editor account to view the admin kit. Public articles remain available without login.
+      </p>
+      <button type="button" class="btn-primary admin-gate-btn" data-admin-open-login>Sign in to editor</button>
+    </div>
+
+    <!-- Shown when signed in but not an admin -->
+    <div data-admin-forbidden-prompt hidden class="admin-gate-panel">
+      <p class="kit-kicker">Access restricted</p>
+      <p class="admin-gate-message">
+        You are signed in, but this email is not listed in ADMIN_EMAILS. Contact the site admin to request access.
+      </p>
+    </div>
+
+    <!-- Shown when signed-in admin -->
+    <div data-admin-shell hidden>
+      <AdminNav />
+
+      <section class="kit-island" data-auth-gated hidden>
+        <p class="kit-kicker">Islands proof</p>
+        <KitProbe client:load />
+      </section>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .admin-kit {
+    color: var(--aw-color-text-default);
+  }
+
+  .kit-header {
+    margin-bottom: 1.5rem;
+  }
+
+  .kit-kicker {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--aw-color-text-muted);
+    margin-bottom: 0.25rem;
+  }
+
+  .kit-intro {
+    color: var(--aw-color-text-muted);
+  }
+
+  .admin-gate-panel {
+    border: 1px solid var(--aw-color-border, rgba(120, 120, 120, 0.3));
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .admin-gate-message {
+    margin: 0.5rem 0 1rem;
+  }
+
+  .kit-island {
+    margin-top: 1.5rem;
+  }
+
+  .admin-kit-probe {
+    border: 1px solid var(--aw-color-border, rgba(120, 120, 120, 0.3));
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .admin-kit-probe__note {
+    margin-bottom: 1rem;
+  }
+</style>
+
+<script>
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-nocheck
+  import { currentUser, getAccessToken, handleOAuthCallback } from '~/utils/goTrueClient';
+
+  (() => {
+    const initializeAdminKitPage = () => {
+      const pageRoot = document.querySelector('.admin-kit');
+      if (!pageRoot || pageRoot.dataset.adminKitInitialized === 'true') return;
+      pageRoot.dataset.adminKitInitialized = 'true';
+
+      const gatedContent = Array.from(document.querySelectorAll('[data-auth-gated]'));
+      const adminShell = document.querySelector('[data-admin-shell]');
+      const authStatus = document.querySelector('[data-auth-status]');
+      const signinPrompt = document.querySelector('[data-admin-signin-prompt]');
+      const forbiddenPrompt = document.querySelector('[data-admin-forbidden-prompt]');
+
+      const setGatedContentVisible = (visible) => {
+        gatedContent.forEach((element) => {
+          element.hidden = !visible;
+        });
+      };
+
+      const setAdminShellVisible = (visible) => {
+        if (adminShell) adminShell.hidden = !visible;
+      };
+
+      const authStatusMessages = {
+        checking: 'Checking editor access…',
+        'signed-out': '',
+        forbidden: '',
+        error: 'Something went wrong. Please refresh or try again.',
+        'signed-in': '',
+      };
+
+      const setAuthStatus = (message) => {
+        if (authStatus) authStatus.textContent = message;
+      };
+
+      const setAuthState = (state) => {
+        const isSignedIn = state === 'signed-in';
+        const isSignedOut = state === 'signed-out';
+        const isForbidden = state === 'forbidden';
+
+        setAuthStatus(authStatusMessages[state] ?? '');
+        setAdminShellVisible(isSignedIn);
+        setGatedContentVisible(isSignedIn);
+        if (signinPrompt) signinPrompt.hidden = !isSignedOut;
+        if (forbiddenPrompt) forbiddenPrompt.hidden = !isForbidden;
+      };
+
+      // Wire up the Sign In button inside the gate panel
+      document.querySelector('[data-admin-open-login]')?.addEventListener('click', () => {
+        window.__drLurieLoginModal?.open();
+      });
+
+      const getAdminStateForUser = async (_user) => {
+        const token = await getAccessToken();
+        if (!token) return { authenticated: false, isAdmin: false };
+
+        const response = await fetch('/.netlify/functions/admin-auth-state', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        return response
+          .json()
+          .catch(() => ({ authenticated: true, isAdmin: false, error: 'Admin access could not be verified.' }));
+      };
+
+      const renderAuthState = async () => {
+        const user = currentUser();
+        const signedIn = Boolean(user);
+
+        if (signedIn) {
+          const adminState = await getAdminStateForUser(user);
+
+          if (adminState.isAdmin) {
+            setAuthState('signed-in');
+            return;
+          }
+
+          setAuthState('forbidden');
+          return;
+        }
+
+        setAuthState('signed-out');
+      };
+
+      const initializeIdentityAuth = async () => {
+        setAuthState('checking');
+
+        try {
+          const oauthUser = await handleOAuthCallback();
+          if (oauthUser) {
+            window.__drLurieLoginModal?.close();
+          }
+          await renderAuthState();
+
+          document.addEventListener('dr-lurie:login', () => {
+            renderAuthState().catch((error) => {
+              console.error('Identity authentication refresh failed.', error);
+            });
+          });
+          document.addEventListener('dr-lurie:logout', () => {
+            renderAuthState().catch((error) => {
+              console.error('Identity authentication refresh failed.', error);
+            });
+          });
+        } catch (error) {
+          console.error('Identity authentication initialization failed.', error);
+          setAuthState('error');
+        }
+      };
+
+      initializeIdentityAuth();
+    };
+
+    if (!window.__drLurieAdminKitPageLoadListener) {
+      window.__drLurieAdminKitPageLoadListener = true;
+      document.addEventListener('astro:page-load', initializeAdminKitPage);
+    }
+
+    initializeAdminKitPage();
+  })();
+</script>
