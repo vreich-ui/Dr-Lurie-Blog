@@ -460,6 +460,36 @@ const creationDenied = (
   });
 };
 
+// ─── read-only bulk enumeration (T9.11) ───────────────────────────────────────
+
+/**
+ * Load every object record across all types — the read-only sweep the audit
+ * feed / attention inbox aggregate over. Reuses the same list + loadRecord path
+ * as the `inventory` verb; no writes, no gating (callers authorize at the
+ * function edge). Unloadable keys are skipped, never thrown on.
+ */
+export const listAllObjectRecords = async (
+  store: ObjectVerbStore,
+  options: { status?: 'active' | 'archived' } = {}
+): Promise<ObjectRecord[]> => {
+  const records: ObjectRecord[] = [];
+  for (const objectType of objectTypes) {
+    const listResult = await store.list({
+      prefix: `objects/${objectType}/by-id/`,
+      directories: false,
+      paginate: true,
+    });
+    const items = await collectBlobListItems(listResult);
+    for (const item of items) {
+      const record = await loadRecord(store, item.key);
+      if (!record) continue;
+      if (options.status && record.status !== options.status) continue;
+      records.push(record);
+    }
+  }
+  return records;
+};
+
 // ─── the dispatcher ───────────────────────────────────────────────────────────
 
 export const handleObjectVerb = async (
