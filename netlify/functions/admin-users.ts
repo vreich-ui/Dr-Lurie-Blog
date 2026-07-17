@@ -23,6 +23,7 @@ import {
   type UsersBlobStore,
 } from '../lib/users-store.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE } from '../lib/artifact-trust.js';
+import { inviteUser, activateOnLogin, type GoTrueIdentity } from '../lib/user-invite.js';
 import type { Principal } from '../../src/schema/object-record-v1.js';
 
 /** An avatar must be an uploaded IMAGE artifact reference, not a URL/data URI. */
@@ -51,6 +52,7 @@ const requestSchema = z.discriminatedUnion('verb', [
     avatar_artifact: z.string().min(1).optional(),
   }),
   z.object({ verb: z.literal('list') }),
+  z.object({ verb: z.literal('invite'), email: z.string().min(3), role: userRoleSchema }),
   z.object({ verb: z.literal('set_role'), email: z.string().min(3), role: userRoleSchema }),
   z.object({ verb: z.literal('disable'), email: z.string().min(3) }),
 ]);
@@ -109,14 +111,14 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const req = request.data;
     switch (req.verb) {
       case 'me': {
-        const stored = await getUserRecord(store, email);
-        if (stored) {
-          // T9.6: stamp last_seen on every self-read.
-          const seen: UserRecord = { ...stored, last_seen_at: nowIso() };
-          await putUserRecord(store, seen);
-          return jsonResponse(200, { user: seen, bootstrap: false, roles });
-        }
-        return jsonResponse(200, { user: synthesizedRecord(email, owner), bootstrap: true, roles });
+        // T9.5/T9.6: first-login activation (invited → active + stamp user_id)
+        // and last_seen on every self-read. Bootstrap owners have no record.
+        const activated = await activateOnLogin(store, email, adminState.userId, nowIso());
+        return jsonResponse(200, {
+          user: activated ?? synthesizedRecord(email, owner),
+          bootstrap: !activated,
+          roles,
+        });
       }
 
       case 'update_me': {
@@ -143,6 +145,22 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       case 'list': {
         if (!owner) return jsonResponse(403, { error: 'Owner access required' });
         return jsonResponse(200, { users: await listUserRecords(store) });
+      }
+
+      case 'invite': {
+        if (!owner) return jsonResponse(403, { error: 'Owner access required' });
+        const identity = (context as { clientContext?: { identity?: GoTrueIdentity } } | undefined)?.clientContext
+          ?.identity;
+        const result = await inviteUser({
+          store,
+          email: req.email,
+          role: req.role,
+          invitedBy: email,
+          at: nowIso(),
+          identity,
+          fetchImpl: (url, init) => fetch(url, init),
+        });
+        return jsonResponse(200, { user: result.record, invite: result.invite });
       }
 
       case 'set_role':

@@ -67,7 +67,7 @@ const NAV: NavGroup[] = [
     label: 'Settings',
     items: [
       { label: 'Guardrails', href: '/admin/settings/guardrails', icon: IconSettings, soon: true },
-      { label: 'Admins', href: '/admin/settings/admins', icon: IconUser, soon: true },
+      { label: 'Admins', href: '/admin/settings/admins', icon: IconUser },
       { label: 'Profile', href: '/admin/profile', icon: IconUser },
       { label: 'Maintenance', href: '/admin/maintenance', icon: IconWrench, soon: true },
     ],
