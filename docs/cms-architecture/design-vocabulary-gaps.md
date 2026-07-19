@@ -201,3 +201,41 @@ protocol — the schema edit rides the next build task.)
 
 **Also carried to T10.4:** if Wolf names concrete reference sites, say so —
 the survey re-runs against them as a small follow-up before T10.5 builds.
+
+## 7. RATIFIED (Wolf, 2026-07-19 — T10.4 checkpoint record, collected interactively in-session)
+
+Rulings on the §6 questions, verbatim-in-intent:
+
+- **OQ-W10-1a (mints): APPROVED — all, with `video_embed` FOLDED INTO
+  `media`.** The mint list is FIVE types: batch 1 (T10.5) = `media`
+  (image/gallery, including `kind: 'video'` with the provider-allowlisted
+  embed posture), `brand_row`, `stats`; batch 2 (T10.6) = `timeline`,
+  `comparison_table`. No standalone `video_embed` type.
+- **OQ-W10-1b (variants): APPROVED — all five.** `hero.variant
+('center'|'split'|'background')`, `cta_banner.compact?: boolean`,
+  `content_split.imageLayout ('stagger'|'stack')`, `steps.columns (2|3|4)`,
+  `testimonial.layout ('single'|'wall')` + `testimonial.variant
+('quote'|'pullquote')`. Defaults = today's render, byte-identical. Built
+  in T10.6 per the queue's task naming.
+- **OQ-W10-2 (axes): RATIFIED AS SHIPPED.** The T10.1 seven-axis set and
+  enum values stand unamended; `type.measure` stays deferred to first real
+  theme demand (no delta rides T10.5). `11-platformization-plan.md` §1
+  needs no update.
+
+Per-entry disposition table (approved / deferred / rejected):
+
+| Entry                                          | Ruling                                     |
+| ---------------------------------------------- | ------------------------------------------ |
+| `media` (incl. video kind)                     | APPROVED — batch 1                         |
+| `brand_row`                                    | APPROVED — batch 1                         |
+| `stats`                                        | APPROVED — batch 1                         |
+| `timeline`                                     | APPROVED — batch 2                         |
+| `comparison_table`                             | APPROVED — batch 2                         |
+| `video_embed` (standalone)                     | REJECTED as standalone — folded into media |
+| All 5 variant fields                           | APPROVED — batch 2                         |
+| `type.measure` axis                            | DEFERRED — first real theme demand         |
+| `layout.surfaceAlternation`, `shape.cardStyle` | DEFERRED (per survey recommendation)       |
+
+No reference sites were named — the archetype basis stands; no survey
+re-run required before T10.5. **T10.5 and T10.6 are unblocked against this
+record.**
