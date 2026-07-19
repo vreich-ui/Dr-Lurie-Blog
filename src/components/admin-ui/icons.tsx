@@ -192,3 +192,15 @@ export const IconFilePlus = (p: IconProps) => (
     <path d="M14 3v4h4M12 11v6M9 14h6" />
   </IconBase>
 );
+export const IconRobot = (p: IconProps) => (
+  <IconBase {...p}>
+    <rect x="4" y="8" width="16" height="11" rx="2" />
+    <path d="M12 4v4M9 13v.01M15 13v.01M9 16h6" />
+  </IconBase>
+);
+export const IconSend = (p: IconProps) => (
+  <IconBase {...p}>
+    <path d="M4.5 12L20 5l-3 14-5.5-4.5z" />
+    <path d="M11.5 14.5L20 5" />
+  </IconBase>
+);
