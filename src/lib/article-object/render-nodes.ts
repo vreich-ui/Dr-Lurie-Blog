@@ -273,10 +273,13 @@ const WORDS_PER_MINUTE = 200;
 
 export const renderArticleNodes = (objectId: string, body: ContentItemBody): RenderedArticle => {
   const rendered: string[] = [];
+  // T13.5 (W13): an article with tracking.enabled:false opts every node
+  // wrapper out — the loader skips [data-cms-track="off"] subtrees.
+  const trackingOffAttr = body.tracking?.enabled === false ? ' data-cms-track="off"' : '';
   for (const node of body.nodes) {
     if ((node.visibility ?? 'public') !== 'public') continue; // never-render-private
     rendered.push(
-      `<div style="display:contents" data-cms-object-id="${escapeHtml(objectId)}" data-cms-node-id="${escapeHtml(node.id)}" data-cms-node-kind="${escapeHtml(node.kind)}">${nodeHtml(node)}</div>`
+      `<div style="display:contents" data-cms-object-id="${escapeHtml(objectId)}" data-cms-node-id="${escapeHtml(node.id)}" data-cms-node-kind="${escapeHtml(node.kind)}"${trackingOffAttr}>${nodeHtml(node)}</div>`
     );
   }
   const html = rendered.join('');

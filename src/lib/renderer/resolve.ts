@@ -52,6 +52,13 @@ export type RenderableSection = {
    * object (where it belongs) instead of the referencing page.
    */
   sharedObjectId?: string;
+  /**
+   * T13.5 (W13): the OWNING object set `tracking.enabled: false` — the
+   * annotation layer emits `data-cms-track="off"` so the loader skips this
+   * wrapper's subtree. For inline sections the page's flag propagates; for
+   * shared_refs the target section object's own flag governs.
+   */
+  trackingOff?: boolean;
 };
 
 /** The Layout `metadata` prop this page renders with. */
@@ -78,6 +85,8 @@ export type ResolvePageDeps = {
     type: SectionType;
     data: unknown;
     visibility?: 'public' | 'hidden';
+    /** T13.5: the shared OBJECT set tracking.enabled:false. */
+    trackingOff?: boolean;
   };
   /**
    * Resolvers for content_grid `manual`/`query` sources (M-8, T3.9). A `cards`
@@ -129,12 +138,15 @@ export const parsePageExport = (data: unknown): PageBody => pageBodySchema.parse
  */
 export const parseSharedSectionExport = (
   data: unknown
-): { type: SectionType; data: unknown; visibility?: 'public' | 'hidden' } => {
+): { type: SectionType; data: unknown; visibility?: 'public' | 'hidden'; trackingOff?: boolean } => {
   const body = sectionBodySchema.parse(stripGenerated(data));
   return {
     type: body.section.type,
     data: body.section.data,
     ...(body.section.visibility !== undefined ? { visibility: body.section.visibility } : {}),
+    // T13.5: a shared section OBJECT with tracking.enabled:false opts its
+    // wrapper out everywhere it is referenced (data-cms-track="off").
+    ...(body.tracking?.enabled === false ? { trackingOff: true } : {}),
   };
 };
 
@@ -223,7 +235,8 @@ const renderable = (
   type: SectionType,
   data: unknown,
   deps: ResolvePageDeps,
-  sharedObjectId?: string
+  sharedObjectId?: string,
+  trackingOff?: boolean
 ): RenderableSection => ({
   id,
   type,
@@ -231,6 +244,7 @@ const renderable = (
   resolved: resolvedFor(type, data, deps),
   ctx: {},
   ...(sharedObjectId ? { sharedObjectId } : {}),
+  ...(trackingOff ? { trackingOff: true } : {}),
 });
 
 /**
@@ -245,7 +259,11 @@ const renderable = (
  * it). This mirrors the validator's `structure_visible` count, which already
  * treats hidden sections as not rendered.
  */
-export const resolveSections = (sections: PageBody['sections'], deps: ResolvePageDeps): RenderableSection[] =>
+export const resolveSections = (
+  sections: PageBody['sections'],
+  deps: ResolvePageDeps,
+  options: { trackingOff?: boolean } = {}
+): RenderableSection[] =>
   sections
     .filter((section) => section.visibility !== 'hidden')
     .flatMap((section) => {
@@ -254,13 +272,24 @@ export const resolveSections = (sections: PageBody['sections'], deps: ResolvePag
         // page section id so React-style keys stay stable and unique per page.
         const target = deps.resolveSharedSection(section.data.section);
         if (target.visibility === 'hidden') return [];
-        return [renderable(section.id, target.type, target.data, deps, section.data.section)];
+        return [
+          renderable(
+            section.id,
+            target.type,
+            target.data,
+            deps,
+            section.data.section,
+            // The shared OBJECT's flag governs its wrapper; the page-level
+            // flag also covers everything the page places.
+            target.trackingOff === true || options.trackingOff === true
+          ),
+        ];
       }
-      return [renderable(section.id, section.type, section.data, deps)];
+      return [renderable(section.id, section.type, section.data, deps, undefined, options.trackingOff === true)];
     });
 
 export const resolvePageSections = (page: PageBody, deps: ResolvePageDeps): RenderableSection[] =>
-  resolveSections(page.sections, deps);
+  resolveSections(page.sections, deps, { trackingOff: page.tracking?.enabled === false });
 
 export const resolvePageMetadata = (page: PageBody): PageRenderMetadata => ({
   title: page.title,

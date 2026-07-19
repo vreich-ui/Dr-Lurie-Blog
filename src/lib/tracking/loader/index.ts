@@ -17,21 +17,35 @@ import { classifyClick, trackableRefOf, type ElementLike } from './dom.js';
 let tracker: Tracker | null = null;
 let observer: IntersectionObserver | null = null;
 
-const readPageContext = (): { context: PageContext; search: string } | null => {
-  const element = document.getElementById('trk-config');
-  if (!element?.textContent) return null;
-  try {
-    const raw = JSON.parse(element.textContent) as Record<string, unknown>;
-    const context: PageContext = {
-      path: location.pathname,
-      route: typeof raw.route === 'string' ? raw.route : null,
-      object: (raw.object as PageContext['object']) ?? undefined,
-      article: (raw.article as PageContext['article']) ?? undefined,
-    };
-    return { context, search: location.search };
-  } catch {
-    return null;
-  }
+// Page identity is derived from the DOM the render path already stamps
+// (data-cms-object-id / data-cms-node-id) — the config JSON stays static
+// across pages, so the loader needs no per-page server assembly.
+const TYPE_BY_PREFIX: Record<string, string> = {
+  page_: 'page',
+  sec_: 'section',
+  req_: 'content_item',
+  prod_: 'product',
+};
+
+const readPageContext = (): PageContext => {
+  const first = document.querySelector('[data-cms-object-id]');
+  const objectId = first?.getAttribute('data-cms-object-id') ?? null;
+  const prefix = objectId ? Object.keys(TYPE_BY_PREFIX).find((candidate) => objectId.startsWith(candidate)) : undefined;
+  const nodes = document.querySelectorAll('[data-cms-node-id]');
+  const articleId = nodes[0]?.getAttribute('data-cms-object-id') ?? undefined;
+  return {
+    path: location.pathname,
+    route: null,
+    object: objectId && prefix ? { object_type: TYPE_BY_PREFIX[prefix], object_id: objectId } : undefined,
+    article:
+      nodes.length > 0 && articleId
+        ? {
+            object_id: articleId,
+            node_count: nodes.length,
+            last_node_id: nodes[nodes.length - 1]!.getAttribute('data-cms-node-id'),
+          }
+        : undefined,
+  };
 };
 
 const send = (path: string, body: string): void => {
@@ -41,10 +55,16 @@ const send = (path: string, body: string): void => {
 };
 
 const bindPage = (): void => {
-  const read = readPageContext();
-  if (!read || location.pathname.startsWith('/admin')) return;
+  if (location.pathname.startsWith('/admin')) return;
   const configElement = document.getElementById('trk-config');
-  const config = parseTrackerConfig(configElement?.textContent ? JSON.parse(configElement.textContent) : {});
+  if (!configElement?.textContent) return;
+  let rawConfig: unknown;
+  try {
+    rawConfig = JSON.parse(configElement.textContent);
+  } catch {
+    return;
+  }
+  const config = parseTrackerConfig(rawConfig);
   if (!tracker) {
     tracker = createTracker(config, {
       send,
@@ -57,7 +77,7 @@ const bindPage = (): void => {
       gpc: (navigator as { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
     });
   }
-  tracker.pageLoad(read.context, read.search);
+  tracker.pageLoad(readPageContext(), location.search);
 
   observer?.disconnect();
   observer = new IntersectionObserver(
