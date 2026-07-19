@@ -3,10 +3,10 @@
 Status: **governing plan for W13** (drafted 2026-07-19, strategy session on
 `claude/object-tracking-strategy-jh76f4`). Records the owner directive of
 2026-07-19 (vreich) and the session's confirmed decisions. Companion briefs:
-`cms-pipeline/T13.1`–`T13.11`; queue rows appended to `cms-pipeline/queue.tsv`.
+`cms-pipeline/T13.1`–`T13.13`; queue rows appended to `cms-pipeline/queue.tsv`.
 Nothing in this wave is built yet — this doc + briefs are the deliverable of
 the strategy session; W13's own open questions are tracked wave-locally here
-(§13, the 06/08 convention).
+(§13, the 06/08 convention) — **all six answered 2026-07-19, zero open**.
 
 ## 0. Directive, and the amendment it makes
 
@@ -71,7 +71,9 @@ untouched; OQ-W7-2 (traffic-split serving) stays deferred.
 server-side conversion uploads (Google Ads API / Meta CAPI — seams recorded,
 §7); a TCF-certified CMP (§8); traffic splitting / variant serving
 (OQ-W7-2); reporting UI of any kind (the owner DB is the analysis surface);
-GTM (recommended OUT — OQ-W13-3).
+GTM (**ruled OUT** — OQ-W13-3, 2026-07-19); scores-feedback
+_implementation_ (the design is commissioned as T13.13; implementing it is
+a later decision on that design).
 
 ## 2. The `tracking` attribute (all ten types)
 
@@ -222,6 +224,15 @@ they don't mint; the singleton rule for site/taxonomy), and
 publish**, like navigation/taxonomy/site. Both are the standing one-line
 levers. OQ-W13-2 asks Wolf to ratify.
 
+**RULED (vreich, 2026-07-19 — supersedes the recommendation above):**
+publish ships **AUTONOMOUS** — no approval-policy override (the
+`all-autonomous` master covers it); autonomy is config-driven ("auto if
+configured in config"), and the posture gains an **owner-facing toggle in
+the admin UI** (task T13.12, riding the T9.15 override-layer outcome).
+The creation restriction STANDS (`{ agents: [] }` — humans/seeds mint,
+agents edit). Flipping to require-approval stays a one-line lever (or the
+toggle) whenever wanted.
+
 ## 4. Provider adapters & render integration
 
 All code under `src/lib/tracking/` + `src/components/tracking/` — core
@@ -345,8 +356,8 @@ props (ALLOWLISTED per event: depth_pct, dwell_ms, pct_read, href_host, goal,
 visitor { mode: cookieless|consented, vid?, vhash, shash } (vhash/shash ingest-computed) ·
 consent { analytics, ads, gpc } ·
 context { referrer (session-first only), utm{source,medium,campaign,content,term},
-          viewport{w,h}, lang, ua (server-stamped), geo{country,subdivision,city?}
-          (server-enriched; city retention = OQ-W13-4) }
+          viewport{w,h}, lang, ua (server-stamped), geo{country,subdivision}
+          (server-enriched; city dropped at ingest — OQ-W13-4 ruling) }
 ```
 
 PII rules: no raw email ever; **raw IP is hashed into vhash and discarded**;
@@ -373,7 +384,9 @@ anon identifiers only; `props` is an allowlist, not a passthrough (the
   `events/<yyyy-mm-dd>/<ts>-<uuid>.json` (the commerce-events layout;
   `getTrackingEventsBlobStore` in `netlify/lib/blob-store.ts`). The mirror
   exists for **replay into the owner DB only** — never a reporting surface
-  (house rule: no reporting on blob listing).
+  (house rule: no reporting on blob listing). Mirror retention: **90
+  days** (OQ-W13-4 ruling) — recorded policy; enforcement is a future
+  cleanup script, no schema field.
 - **Abuse:** same-origin only (reject foreign `Origin`), instance-local
   token bucket, enum/regex gates, fast 202 always.
 - **Region oracle:** `GET /api/t?mode=region` → `{country}` from the geo
@@ -399,9 +412,10 @@ exports (`src/data/site/articles/*.json`) carry per-node `private.strategy`
 boundary. The owner DB ingests exports into a `node_strategy(project_id,
 object_id, node_id, strategy, intent, …)` dimension; engagement-by-strategy
 is a JOIN on `(object_id, node_id)`. **Events carry `node_id` only —
-leak-safe by construction.** OQ-W13-5 asks Wolf to bless this pattern
-explicitly (and rules on whether `scores[].scored_by` may ever cite
-tracking metrics — currently undesigned, stays deferred).
+leak-safe by construction.** OQ-W13-5 ANSWERED (vreich, 2026-07-19): the
+join is **BLESSED**, and the scores-feedback design (metrics-derived
+`scores[]` entries) is **commissioned as T13.13, design-only** —
+implementation remains a later decision on that design.
 
 ### 5.5 Ad-blocker posture (honest)
 
@@ -566,7 +580,7 @@ per type, §2).
 
 ## 12. W13 task breakdown & queue integration
 
-Briefs: `cms-pipeline/T13.1-…` through `T13.11-…`; queue rows appended
+Briefs: `cms-pipeline/T13.1-…` through `T13.13-…`; queue rows appended
 after W12 (reordering queue.tsv IS the scheduler; W13 may be pulled ahead
 of W10–W12 freely — see the §9 sequencing note on W11). Every task: `npm
 run check` + `npm test` green, `build-diff` EMPTY vs pre-task main (until
@@ -581,39 +595,68 @@ unless asked.
 | T13.3 | `tracking_event.v1`/batch schemas, `tracking-events` lib + blob store, `track-ingest` function (validate/enrich/forward/mirror), `/api/t` redirect, region oracle, abuse guards | auto | T13.2 |
 | T13.4 | Own loader client (observers off `data-cms-*`, batching, VT-safe lifecycle, identity modes, size budget) | auto | T13.3 |
 | T13.5 | `TrackingScripts.astro` (Layout swap, `/admin` bail, config+goal-map assembly) + `own`/`plausible` adapters + consent bootstrap skeleton; retire `Analytics.astro`/`SplitbeeAnalytics.astro`/config.yaml analytics | auto | T13.4 |
-| T13.6 | `ConsentBanner` + geo-adaptive gating + GPC + Consent Mode v2 defaults | **checkpoint** (OQ-W13-1) | T13.5 |
-| T13.7 | `google_ads` + `ga4` adapters + goal→conversion bridge (purchase/opt_in/contact_submit) | **checkpoint** (OQ-W13-3) | T13.6 |
+| T13.6 | `ConsentBanner` + geo-adaptive gating + GPC + Consent Mode v2 defaults | auto (OQ-W13-1 answered 2026-07-19) | T13.5 |
+| T13.7 | `google_ads` + `ga4` adapters + goal→conversion bridge (purchase/opt_in/contact_submit) | auto (OQ-W13-3 answered 2026-07-19) | T13.6 |
 | T13.8 | `meta_pixel`/`taboola`/`outbrain`/`mgid` adapters; CSP Report-Only block + hosts-drift test + dist integrity tests | auto | T13.7 |
 | T13.9 | Owner-DB reference kit (DDL + NOTIFY trigger + NDJSON receiver contract + mirror replay script — docs/SQL only) | auto | T13.3 |
 | T13.10 | Seeds (`tracking-config-seed-data.mjs`) + roundtrip drill/reconcile: `set_tracking` on ALL ten types + the trk singleton; inventory/map/state-of-play records same change | auto | T13.2 |
 | T13.11 | **Credentialed production drive**: env vars set; human-executed publish of `trk_drlurie`; release; live beacons verified at sink/mirror; the five converted-criteria proven for `tracking_config` AND a `set_tracking` round-trip on one object of each of the ten types via MCP; CSP promoted from Report-Only if the soak is clean | **human_gate** | T13.6–T13.10 |
+| T13.12 | Admin governance toggle for tracking (owner-only posture surface; rides the T9.15 override-layer outcome) — OQ-W13-2 ruling | auto | T13.2 |
+| T13.13 | Scores-feedback design (metrics-derived `scores[]` — design-only; §15 appendix deliverable) — OQ-W13-5 ruling | auto | T13.3 |
 
 **Schema-vintage trap applies to T13.11:** every schema/grammar change must
 be merged and deployed to main before the credentialed run (playbook trap 12).
 
-## 13. Open questions for Wolf (OQ-W13, wave-local per the 06/08 convention)
+## 13. Open questions — ALL ANSWERED 2026-07-19 (OQ-W13, wave-local per the 06/08 convention)
 
-- **OQ-W13-1 — Consent posture ratification:** `geo-adaptive` as seeded?
-  Confirm the restricted-regions list (EEA+UK+CH), and geo granularity
-  (keep `city` at ingest or country/subdivision only?). Gates T13.6.
-- **OQ-W13-2 — tracking_config governance:** ratify require-approval +
-  Tier-3 human-executed publish, and human/seed-only creation (agents edit,
-  never mint). One-line levers either way.
-- **OQ-W13-3 — Provider set v1:** confirm GTM stays OUT (recommended —
-  an arbitrary-script container contradicts the vetted-adapter law);
-  `plausible` slot dormant; the native trio (taboola/outbrain/mgid) all
-  in v1 or on demand? Gates T13.7.
-- **OQ-W13-4 — Retention/PII policy:** blob-mirror retention days,
-  impression/dwell sample rates, city-level geo yes/no, and the DNT stance
-  (GPC is honored; classic DNT is noise — ignore, or honor both?).
-- **OQ-W13-5 — The strategy join:** bless engagement×`private.strategy`
-  joins in the owner DB from exports (events carry node_id only) as
-  leak-rule-compatible; and rule whether `scores[].scored_by` may later
-  cite tracking metrics (recommendation: separate design, later wave).
-- **OQ-W13-6 — Own-sink contract:** who provisions `TRACKING_SINK_URL` /
-  `TRACKING_SINK_TOKEN` / `TRACKING_SALT` (per-tenant Netlify env), and
-  the versioning rule for `tracking_event.v1` changes (recommendation:
-  additive-only, v2 = dual-write, mirroring commerce_event.v1).
+Rulings taken interactively by vreich, 2026-07-19 (session C). Original
+question text kept for history; each ruling is GOVERNING for W13.
+
+- **OQ-W13-1 — Consent posture ratification — RATIFIED AS SEEDED
+  (vreich, 2026-07-19):** posture `geo-adaptive`; `restricted_regions` =
+  **EEA-30 (EU-27 + IS/LI/NO) + UK + CH**; geo granularity =
+  **country + subdivision, city dropped at ingest** (also under OQ-W13-4);
+  GPC honored globally; unknown region = hold pixels until the oracle
+  answers. → T13.6 UNBLOCKED (queue row flipped to auto).
+  _(Asked: geo-adaptive as seeded? regions list? city vs country?)_
+- **OQ-W13-2 — tracking_config governance — ANSWERED, SUPERSEDES THE
+  RECOMMENDATION (vreich, 2026-07-19):** publish autonomy is
+  **config-driven — "auto if configured in config"** — and the committed
+  config **ships AUTONOMOUS** (NO approval-policy override; the
+  `all-autonomous` master covers it; flip to require-approval remains a
+  one-line lever any time). Creation restriction STANDS: humans/seeds
+  mint, agents edit (`creation-policy` override `{ agents: [] }`). NEW
+  SCOPE: the posture must be surfaced as an **owner toggle in the admin
+  UI** → task **T13.12** (rides the T9.15 override-layer outcome).
+  _(Asked: ratify require-approval + Tier-3 human-executed publish? —
+  declined in favor of config-driven autonomy + UI surfacing.)_
+- **OQ-W13-3 — Provider set v1 — RATIFIED (vreich, 2026-07-19):** the
+  FULL adapter set ships in v1 — google_ads, ga4, meta_pixel, taboola,
+  outbrain, mgid — all disabled until flipped in `trk_drlurie`;
+  `plausible` stays a dormant fallback slot; **GTM is permanently OUT**
+  (an unreviewable script container contradicts the vetted-adapter law;
+  any future enablement is its own Wolf decision). → T13.7 UNBLOCKED
+  (queue row flipped to auto).
+- **OQ-W13-4 — Retention/PII policy — RATIFIED, RECOMMENDED BUNDLE
+  (vreich, 2026-07-19):** blob-mirror retention **90 days** (recorded
+  policy; enforcement = a future cleanup script — no schema field);
+  **no sampling at launch** (`sample_rate` stays 1.0 everywhere; the
+  lever is reserved for when volume costs bite); geo **country +
+  subdivision only, city dropped at ingest**; **GPC honored, legacy DNT
+  ignored**.
+- **OQ-W13-5 — The strategy join — BLESS BOTH (vreich, 2026-07-19):**
+  (a) engagement×`private.strategy` joins in the owner DB from committed
+  exports are **BLESSED** as leak-rule-compatible (events carry `node_id`
+  only; rendered HTML stays the leak boundary); (b) the scores-feedback
+  design — how metrics-derived `scores[]`/`scored_by` entries would work
+  — is **COMMISSIONED as T13.13 (design-only)**; implementation remains a
+  later decision on that design's evidence.
+- **OQ-W13-6 — Own-sink contract — ANSWERED (vreich, 2026-07-19):**
+  vreich provisions `TRACKING_SINK_URL` / `TRACKING_SINK_TOKEN` /
+  `TRACKING_SALT` (per-tenant Netlify env) **before the T13.11 drive**;
+  `tracking_event.v1` evolves **additive-only, v2 = dual-write** (the
+  commerce_event.v1 rule); the Postgres + `pg_notify` reference kit
+  stands as designed.
 
 ## 14. Verification & the five criteria
 

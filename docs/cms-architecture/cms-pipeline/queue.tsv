@@ -92,9 +92,12 @@ T13.2	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.2-tracking
 T13.3	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.3-tracking-event-ingest.md
 T13.4	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.4-own-tracker-loader.md
 T13.5	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.5-tracking-scripts-component.md
-T13.6	checkpoint	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.6-consent-banner-geo.md
-T13.7	checkpoint	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.7-google-ads-adapter-bridge.md
+T13.6	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.6-consent-banner-geo.md
+T13.7	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.7-google-ads-adapter-bridge.md
 T13.8	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T13.8-native-adapters-csp.md
 T13.9	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T13.9-owner-db-reference-kit.md
 T13.10	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T13.10-tracking-seeds-roundtrip.md
 T13.11	human_gate	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.11-tracking-production-drive.md
+# W13 post-ruling additions (OQ-W13-1…6 all answered 2026-07-19 — T13.6/T13.7 flipped to auto above; reorder freely).
+T13.12	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T13.12-admin-governance-toggle.md
+T13.13	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T13.13-scores-feedback-design.md
