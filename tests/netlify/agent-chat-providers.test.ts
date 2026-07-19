@@ -8,7 +8,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { anthropicAdapter, openaiAdapter, type WireTool } from '../../netlify/lib/agent/provider.js';
+import {
+  anthropicAdapter,
+  openaiAdapter,
+  toAnthropicMessages,
+  toOpenAIMessages,
+  type WireTool,
+} from '../../netlify/lib/agent/provider.js';
 import type { ChatMsg } from '../../netlify/lib/agent/chat-store.js';
 
 const TOOLS: WireTool[] = [
@@ -149,6 +155,84 @@ test('openai adapter: wire shape + parse conformance (same neutral result)', asy
     toolCalls: [{ id: 'call_c', name: 'get_object', args: { object_type: 'page', object_id: 'page_x' } }],
     outputTokens: 42,
   });
+});
+
+// ─── regression: transcript-shape defect behind the "New article" 400 ────────
+//
+// Production crash (2026-07-19): the Site Agent's opening turn calls
+// get_contract + list_objects in parallel (both auto-execute), then the NEXT
+// provider turn 400s: "messages.2.content.0: unexpected tool_use_id found in
+// tool_result blocks". Root cause (loop.ts): `run.call_queue = turn.toolCalls`
+// aliased the SAME array already pushed onto the transcript's assistant
+// message as `tool_calls`. Draining call_queue with `.shift()` then silently
+// erased tool_use entries from the persisted assistant turn as each call
+// executed — by the time both had run, the assistant message's tool_calls
+// had been mutated down to `[]`, while its two tool_results still referenced
+// the now-vanished ids. This is exactly that corrupted shape, hand-built
+// (loop.ts's own drain sequence is covered separately in
+// agent-chat-protocol.test.ts, which exercises runAgentLoop directly).
+const CORRUPTED_OPENING_TURN: ChatMsg[] = [
+  { role: 'user', text: 'Write an article about retinoid basics.' },
+  {
+    role: 'assistant',
+    text: "I'll check the content_item contract and the taxonomy registry first.",
+    tool_calls: [], // ← should have been [get_contract, list_objects]; erased by the aliasing bug
+  },
+  { role: 'tool', tool_call_id: 'toolu_01contract', content: '{"body_schema":{}}' },
+  { role: 'tool', tool_call_id: 'toolu_02registry', content: '{"objects":[]}' },
+];
+
+// The correctly-recorded version of the same turn (what loop.ts produces
+// post-fix): both ids remain on the assistant message.
+const VALID_OPENING_TURN: ChatMsg[] = [
+  { role: 'user', text: 'Write an article about retinoid basics.' },
+  {
+    role: 'assistant',
+    text: "I'll check the content_item contract and the taxonomy registry first.",
+    tool_calls: [
+      { id: 'toolu_01contract', name: 'get_contract', args: { object_type: 'content_item' } },
+      { id: 'toolu_02registry', name: 'list_objects', args: { object_type: 'tax_drlurie' } },
+    ],
+  },
+  { role: 'tool', tool_call_id: 'toolu_01contract', content: '{"body_schema":{}}' },
+  { role: 'tool', tool_call_id: 'toolu_02registry', content: '{"objects":[]}' },
+];
+
+test('toAnthropicMessages: throws on a desynced transcript instead of building a request Anthropic would 400 on', () => {
+  assert.throws(() => toAnthropicMessages(CORRUPTED_OPENING_TURN), /desynced/);
+});
+
+test('toAnthropicMessages: the anthropic adapter never even calls fetch for a desynced transcript', async () => {
+  const { requests, fetchImpl } = capture({});
+  const adapter = anthropicAdapter({ model: 'claude-opus-4-8', apiKey: 'test-key', fetchImpl });
+  await assert.rejects(() => adapter({ system: 'SYS', transcript: CORRUPTED_OPENING_TURN, tools: TOOLS }), /desynced/);
+  assert.equal(requests.length, 0, 'the doomed request must never be sent');
+});
+
+test('toAnthropicMessages: the correctly-recorded opening turn (get_contract + list_objects) round-trips clean', () => {
+  const messages = toAnthropicMessages(VALID_OPENING_TURN);
+  assert.equal(messages.length, 3);
+  const assistantBlocks = (messages[1] as { content: { type: string; id?: string }[] }).content;
+  assert.deepEqual(
+    assistantBlocks.map((block) => block.type),
+    ['text', 'tool_use', 'tool_use']
+  );
+  const resultBlocks = messages[2]!.content as { type: string; tool_use_id: string }[];
+  assert.deepEqual(
+    resultBlocks.map((block) => block.tool_use_id),
+    ['toolu_01contract', 'toolu_02registry']
+  );
+});
+
+test('toOpenAIMessages: throws directly on the same desynced transcript', () => {
+  assert.throws(() => toOpenAIMessages('SYS', CORRUPTED_OPENING_TURN), /desynced/);
+});
+
+test('toOpenAIMessages (via openai adapter): throws on the same desynced shape', async () => {
+  const { requests, fetchImpl } = capture({});
+  const adapter = openaiAdapter({ model: 'gpt-5', apiKey: 'test-key', fetchImpl });
+  await assert.rejects(() => adapter({ system: 'SYS', transcript: CORRUPTED_OPENING_TURN, tools: TOOLS }), /desynced/);
+  assert.equal(requests.length, 0, 'the doomed request must never be sent');
 });
 
 test('openai adapter: malformed tool arguments parse to empty args, never throw', async () => {
