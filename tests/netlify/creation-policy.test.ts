@@ -37,9 +37,9 @@ const TEMPLATES_RESTRICTED: CreationPolicy = {
 
 // ═══ resolution ═══════════════════════════════════════════════════════════════
 
-test('the committed config parses and is fully open (the dev-stage default)', () => {
+test('the committed config parses: open master, tracking_config human/seed-only (W13)', () => {
   const policy = resolveCreationPolicy(creationPolicyConfig);
-  assert.deepEqual(policy, { master: 'open', overrides: {} });
+  assert.deepEqual(policy, { master: 'open', overrides: { tracking_config: { agents: [] } } });
   assert.deepEqual(activeCreationPolicy(), policy);
 });
 
@@ -51,11 +51,10 @@ test('a malformed config THROWS instead of silently resolving to the permissive 
     /Invalid creation-policy config/,
     'a typo in an override key must fail the parse, never silently do nothing'
   );
-  assert.throws(
-    () => resolveCreationPolicy({ master: 'open', overrides: { template: { agents: [] } } }),
-    /Invalid creation-policy config/,
-    'an EMPTY allowlist is a config error — use a real list or open'
-  );
+  // W13: an EMPTY allowlist is LEGAL and means "no agents at all" — the
+  // tracking_config posture (humans/seeds mint; agents only edit).
+  const emptyList = resolveCreationPolicy({ master: 'open', overrides: { template: { agents: [] } } });
+  assert.deepEqual(emptyList.overrides.template, { agents: [] });
 });
 
 test('resolution: humans always; agents resolve override → master; ungoverned types open', () => {

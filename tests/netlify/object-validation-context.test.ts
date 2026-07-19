@@ -66,7 +66,11 @@ test('resolveArtifactRef: refs from the request payload and record bodies pre-re
   // A record body referencing the artifact by its PUBLIC path — the sweep must
   // normalize it back to the raw key.
   const store = makeStore([
-    { type: 'section', id: 'sec_x', body: { section: { type: 'bio', data: { portrait: { src: `/img/${REF_REQUEST}/${REF_SHA}.png` } } } } },
+    {
+      type: 'section',
+      id: 'sec_x',
+      body: { section: { type: 'bio', data: { portrait: { src: `/img/${REF_REQUEST}/${REF_SHA}.png` } } } },
+    },
   ]);
 
   const context = await buildStoreValidationContext(store, {

@@ -411,7 +411,9 @@ export const askAiForObject = async (
   }
 
   const aiResult =
-    deps.provider === 'anthropic' ? await callAnthropic(userMessage, tool, deps) : await callOpenAI(userMessage, tool, deps);
+    deps.provider === 'anthropic'
+      ? await callAnthropic(userMessage, tool, deps)
+      : await callOpenAI(userMessage, tool, deps);
   if (!aiResult.ok) return err(aiResult.status, { error: aiResult.error });
 
   // Strip null/undefined (as the article version does) AND, on the copy-only

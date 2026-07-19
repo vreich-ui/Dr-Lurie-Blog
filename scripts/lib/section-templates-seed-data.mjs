@@ -64,7 +64,10 @@ export const sectionTemplateAudienceGridBody = {
       limit: 4,
       source: {
         kind: 'cards',
-        cards: [{ description: 'First audience or feature cell.' }, { description: 'Second audience or feature cell.' }],
+        cards: [
+          { description: 'First audience or feature cell.' },
+          { description: 'Second audience or feature cell.' },
+        ],
       },
     },
   },

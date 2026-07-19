@@ -202,10 +202,7 @@ test('validation: a valid axis set is complete; an invalid enum value blocks wit
   assert.ok(axisCriterion);
   assert.equal(axisCriterion.status, 'complete');
 
-  const bad = checkTheme(
-    { name: 'bad', tokens: { ...themeWith({}).tokens, shape: { radius: 'blob' } } },
-    false
-  );
+  const bad = checkTheme({ name: 'bad', tokens: { ...themeWith({}).tokens, shape: { radius: 'blob' } } }, false);
   const badCriterion = bad.find((criterion) => criterion.id === 'brand_token_axes');
   assert.ok(badCriterion);
   assert.equal(badCriterion.status, 'missing');

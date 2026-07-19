@@ -74,7 +74,8 @@ describe('articleBodyToMarkdown hero-dedup', () => {
   });
 
   it('still renders a document link on a hero node (documents cannot be featured images)', () => {
-    const docPath = '/pdf/req_test_doc_20260101_01/abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234.pdf';
+    const docPath =
+      '/pdf/req_test_doc_20260101_01/abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234.pdf';
     const body = {
       schema_version: 'article_body.v1' as const,
       nodes: [
@@ -127,9 +128,6 @@ describe('articleBodyToMarkdown hero-dedup', () => {
     // Hero title SHOULD be in body
     assert.ok(md.includes('Hero Title'), `hero node title must still appear in body; got:\n${md}`);
     // Inline image SHOULD be in body
-    assert.ok(
-      md.includes(`![Inline alt](${inlineImagePath})`),
-      `inline image must still appear in body; got:\n${md}`
-    );
+    assert.ok(md.includes(`![Inline alt](${inlineImagePath})`), `inline image must still appear in body; got:\n${md}`);
   });
 });

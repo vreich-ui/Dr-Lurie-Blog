@@ -240,7 +240,10 @@ const validateImageArtifact = async (input: UploadRequest, bytes: Buffer) => {
   // Match the direct-upload path (artifact-upload.ts validateArtifactBytes): image bytes are
   // validated whenever EITHER the declared kind or the content type says image. Keying off the
   // kind alone let image/* payloads uploaded under e.g. kind "attachment" skip sharp validation.
-  if (input.artifactKind !== ArtifactKind.Image && !normalizeUploadContentType(input.contentType).startsWith('image/')) {
+  if (
+    input.artifactKind !== ArtifactKind.Image &&
+    !normalizeUploadContentType(input.contentType).startsWith('image/')
+  ) {
     return undefined;
   }
 

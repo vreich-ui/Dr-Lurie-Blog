@@ -15,7 +15,10 @@ test('determinism: materializing the same body twice produces byte-identical out
         logo: { text: 'Dr. Lurié' },
         urls: { base: 'https://drlurie.com', canonicalHost: 'drlurie.com' },
         metadataDefaults: { titleTemplate: '%s', description: 'd', ogImage: '/og.png' },
-        brandTokens: { colors: { primary: '#000', secondary: '#fff' }, fonts: { sans: 'Inter', serif: 'Georgia', heading: 'Inter' } },
+        brandTokens: {
+          colors: { primary: '#000', secondary: '#fff' },
+          fonts: { sans: 'Inter', serif: 'Georgia', heading: 'Inter' },
+        },
         chrome: { showRssFeed: true, showThemeToggle: true },
         defaultNavigation: { header: 'nav_header', footer: 'nav_footer' },
         blog: { listPath: '/blog', postsPerPage: 10, categoryBase: '/category', tagBase: '/tag' },
@@ -44,7 +47,11 @@ test('determinism: materializing the same body twice produces byte-identical out
   for (const [objectType, objectId, body] of bodies) {
     const first = materialize(objectType, objectId, body, meta);
     const second = materialize(objectType, objectId, body, meta);
-    assert.equal(second.content, first.content, `${objectType} materialization was not byte-identical across two calls`);
+    assert.equal(
+      second.content,
+      first.content,
+      `${objectType} materialization was not byte-identical across two calls`
+    );
     assert.equal(second.path, first.path);
   }
 });
@@ -62,7 +69,11 @@ test('determinism: object key insertion order never affects output (explicit sor
       fonts: { heading: 'Inter', serif: 'Georgia', sans: 'Inter' },
       colors: { secondary: '#f59e0b', primary: '#1f2937' },
     },
-    metadataDefaults: { ogImage: '/images/og-default.png', description: 'Dermatology insights.', titleTemplate: '%s — Dr. Lurié' },
+    metadataDefaults: {
+      ogImage: '/images/og-default.png',
+      description: 'Dermatology insights.',
+      titleTemplate: '%s — Dr. Lurié',
+    },
     urls: { canonicalHost: 'drlurie.com', base: 'https://drlurie.com' },
     logo: { text: 'Dr. Lurié' },
     name: 'Dr. Lurié',
@@ -71,7 +82,11 @@ test('determinism: object key insertion order never affects output (explicit sor
     name: 'Dr. Lurié',
     logo: { text: 'Dr. Lurié' },
     urls: { base: 'https://drlurie.com', canonicalHost: 'drlurie.com' },
-    metadataDefaults: { titleTemplate: '%s — Dr. Lurié', description: 'Dermatology insights.', ogImage: '/images/og-default.png' },
+    metadataDefaults: {
+      titleTemplate: '%s — Dr. Lurié',
+      description: 'Dermatology insights.',
+      ogImage: '/images/og-default.png',
+    },
     brandTokens: {
       colors: { primary: '#1f2937', secondary: '#f59e0b' },
       fonts: { sans: 'Inter', serif: 'Georgia', heading: 'Inter' },

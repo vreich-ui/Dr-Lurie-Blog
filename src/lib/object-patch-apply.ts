@@ -1044,6 +1044,11 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_theme_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // W13 (12-plan §3): the tracker-registry singleton — the set_site_fields
+    // idiom, open deep-merge over the whole body.
+    case 'set_tracking_config_fields':
+      return applyFieldsOp(op, body, op.fields as UnknownRecord);
+
     // ——— tracking (W13, 12-plan §2) ———
     // The uniform writer of the shared `tracking` block on all ten types.
     // Captures are WHOLE-BLOCK ({tracking: <tree|null>} on both sides, null =
@@ -1259,6 +1264,7 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_template_meta':
     case 'set_section_template_meta':
     case 'update_blueprint_data':
+    case 'set_tracking_config_fields':
     case 'set_theme_fields': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });

@@ -37,7 +37,10 @@ const heroBlueprint = () => ({
 test('a component-bound blueprint type passes', () => {
   const body = { name: 'Hero recipe', blueprint: heroBlueprint() };
   assert.equal(
-    statusOf(checkStructuralInvariants('section_template', 'stpl_x', body, {}, false), 'blueprint_standalone_renderable'),
+    statusOf(
+      checkStructuralInvariants('section_template', 'stpl_x', body, {}, false),
+      'blueprint_standalone_renderable'
+    ),
     'complete'
   );
 });
@@ -82,7 +85,11 @@ test('full pipeline: a valid recipe validates clean; renderability runs the REAL
         objectId: 'stpl_probe',
         body: {
           name: 'Hero recipe',
-          blueprint: { id: 's_bp', type: 'hero', data: { heading: 'H', body: '<h2>Not allowed here</h2>', actions: [] } },
+          blueprint: {
+            id: 's_bp',
+            type: 'hero',
+            data: { heading: 'H', body: '<h2>Not allowed here</h2>', actions: [] },
+          },
         },
       },
       {}
@@ -117,10 +124,17 @@ test('shared_ref stays legal on pages; cards-source grid CELLS are untouched by 
     {
       id: 's_grid',
       type: 'content_grid',
-      data: { heading: 'Grid', limit: 4, source: { kind: 'cards', cards: [{ title: 'Cell one' }, { title: 'Cell two' }] } },
+      data: {
+        heading: 'Grid',
+        limit: 4,
+        source: { kind: 'cards', cards: [{ title: 'Cell one' }, { title: 'Cell two' }] },
+      },
     },
   ]);
-  assert.equal(statusOf(checkStructuralInvariants('page', 'page_probe', body, {}, false), 'structure_placeable'), 'complete');
+  assert.equal(
+    statusOf(checkStructuralInvariants('page', 'page_probe', body, {}, false), 'structure_placeable'),
+    'complete'
+  );
 });
 
 // ═══ the Session-K leaf fix: shared-section wrappers ═════════════════════════

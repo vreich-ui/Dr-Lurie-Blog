@@ -38,7 +38,12 @@ import {
   type ObjectLockStore,
 } from './object-lock.js';
 import type { Role } from './roles.js';
-import { objectRecordKey, objectStatusIndexKey, OBJECT_STORE_MARKER_VALUE } from './object-store-keys.js';
+import {
+  objectRecordKey,
+  objectStatusIndexKey,
+  objectStatusIndexPrefix,
+  OBJECT_STORE_MARKER_VALUE,
+} from './object-store-keys.js';
 import {
   summarizeValidation,
   validateCandidatePatch,
@@ -602,6 +607,24 @@ export const handleObjectVerb = async (
 
       const key = objectRecordKey(objectType, objectIdValue);
       if (await store.get(key)) return err(409, { error: 'Object already exists', object_id: objectIdValue });
+
+      // W13 (12-plan §3): tracking_config is a per-site SINGLETON (the
+      // site/taxonomy convention, but engine-enforced): creating a second
+      // active registry is refused regardless of its id — edit the existing
+      // one via set_tracking_config_fields instead.
+      if (objectType === 'tracking_config') {
+        const existing = await collectBlobListItems(
+          await store.list({ prefix: objectStatusIndexPrefix('tracking_config', 'active') })
+        );
+        if (existing.length > 0) {
+          const existingId = existing[0]!.key.split('/').at(-1);
+          return err(409, {
+            error: `A tracking_config singleton already exists (${existingId}) — edit it via set_tracking_config_fields; a site has exactly one tracker registry.`,
+            object_id: existingId,
+            singleton: true,
+          });
+        }
+      }
 
       const groups = validateObject({ objectType, objectId: objectIdValue, body: request.body }, context);
       const summary = summarizeValidation(groups);

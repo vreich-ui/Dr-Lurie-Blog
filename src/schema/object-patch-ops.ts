@@ -609,6 +609,22 @@ const setTrackingSchema = z.strictObject({
   ...guard,
 });
 
+// ——— Tracking config (W13, 12-plan §3) ———
+
+// The set_site_fields idiom for the tracker registry singleton: open
+// deep-merge over the whole body (null unsets), NO forbidKeys — providers is
+// a fixed-key strict object, so plain merge edits one provider block without
+// upsert ops, and the body schema (regex-pinned IDs, env-var NAMES, the
+// gtm-permanently-out refinement) gates the merged result. Inverse = the
+// captured before-tree. This type does NOT get set_tracking and does NOT
+// carry the per-object tracking attribute — it is the registry the
+// attribute's goals resolve against.
+const setTrackingConfigFieldsSchema = z.strictObject({
+  op: z.literal('set_tracking_config_fields'),
+  fields: fieldsSchema,
+  ...guard,
+});
+
 // ——— The grammar ———
 
 // Union members stay plain object schemas (a zod discriminated-union
@@ -657,6 +673,7 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   updateBlueprintDataSchema,
   setThemeFieldsSchema,
   setTrackingSchema,
+  setTrackingConfigFieldsSchema,
 ]);
 
 const requireMergedIntoOnlyWhenDeprecated = (term: TermPayload, ctx: z.RefinementCtx, path: (string | number)[]) => {
@@ -756,6 +773,7 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
     'remove_node',
     'set_tracking',
   ],
+  tracking_config: ['set_tracking_config_fields'],
 };
 
 export const isPatchOpAllowedForObjectType = (objectType: ObjectType, opName: PatchOpName): boolean =>

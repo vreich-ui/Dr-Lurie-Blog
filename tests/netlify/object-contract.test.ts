@@ -145,6 +145,7 @@ test('anti-drift coverage guard: contract types match objectTypes exactly', () =
         'theme',
         'product',
         'content_item',
+        'tracking_config',
       ] as ObjectType[]),
     ].sort()
   );
@@ -194,7 +195,12 @@ test('W8.3b: creation_policy is served on every contract and reflects the inject
   for (const type of OBJECT_CONTRACT_TYPES) {
     const open = buildObjectContract(type).creation_policy;
     assert.equal(open.humans, 'always_allowed');
-    assert.equal(open.agents, 'open', `${type} is open under the committed default`);
+    if (type === 'tracking_config') {
+      // W13: human/seed-only under the committed default ({ agents: [] }).
+      assert.deepEqual(open.agents, { allowlist: [] }, 'tracking_config is agent-closed');
+    } else {
+      assert.equal(open.agents, 'open', `${type} is open under the committed default`);
+    }
     assert.match(open.note, /self-declared/);
   }
   const restricted = buildObjectContract('template', {

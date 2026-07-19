@@ -25,31 +25,20 @@
           {
             "actionLabel": "Get it free",
             "description": "Start here: audit your current routine in one page.",
-            "features": [
-              "One-page routine audit",
-              "Instant download",
-              "No email required"
-            ],
+            "features": ["One-page routine audit", "Instant download", "No email required"],
             "product": "prod_starter_checklist"
           },
           {
             "actionLabel": "Buy the guide",
             "description": "The full, referenced barrier repair plan.",
-            "features": [
-              "Complete repair protocol",
-              "Ingredient checklists",
-              "Free updates to this edition"
-            ],
+            "features": ["Complete repair protocol", "Ingredient checklists", "Free updates to this edition"],
             "highlighted": true,
             "product": "prod_barrier_repair_guide"
           },
           {
             "actionLabel": "Support",
             "description": "Keep the library free and unsponsored.",
-            "features": [
-              "Pay what you want",
-              "Every cent funds research time"
-            ],
+            "features": ["Pay what you want", "Every cent funds research time"],
             "product": "prod_support_the_work"
           }
         ]

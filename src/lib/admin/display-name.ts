@@ -25,6 +25,7 @@ export const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
   theme: 'Theme',
   product: 'Product',
   content_item: 'Article',
+  tracking_config: 'Tracking config',
 };
 
 export function objectTypeLabel(type: ObjectType): string {

@@ -7,9 +7,7 @@
   "claims": {
     "claim_list": [
       {
-        "node_ids": [
-          "n_s2"
-        ],
+        "node_ids": ["n_s2"],
         "notes": "Established dermatology; barrier function and TEWL.",
         "risk": "low",
         "status": "verified",
@@ -90,10 +88,7 @@
   "slug": "what-your-skin-barrier-does",
   "taxonomy": {
     "category": "skin-health",
-    "tags": [
-      "skin-barrier",
-      "skin-science"
-    ]
+    "tags": ["skin-barrier", "skin-science"]
   },
   "title": "What your skin barrier actually does"
 }

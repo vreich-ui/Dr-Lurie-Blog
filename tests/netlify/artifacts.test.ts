@@ -220,7 +220,11 @@ test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact
 });
 
 test('reconcileImageArtifactReference reads from stores that only support arrayBuffer binary reads', async () => {
-  const reference = makeImageReference('req_test_arraybufferonly_20260605_01', Buffer.from('array buffer bytes'), 'arraybuffer.jpg');
+  const reference = makeImageReference(
+    'req_test_arraybufferonly_20260605_01',
+    Buffer.from('array buffer bytes'),
+    'arraybuffer.jpg'
+  );
   const values = new Map([[reference.blobKey, Buffer.from('array buffer bytes')]]);
   const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
   const store: ReadableArtifactBlobStore = {

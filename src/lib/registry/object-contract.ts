@@ -61,6 +61,7 @@ import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
 import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../schema/bodies/theme-v1.js';
+import { trackingConfigBodySchema } from '../../schema/bodies/tracking-config-v1.js';
 import { navigationBodySchema } from '../../schema/bodies/navigation-v1.js';
 import { siteBodySchema } from '../../schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../schema/bodies/taxonomy-v1.js';
@@ -90,6 +91,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   theme: themeBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
+  tracking_config: trackingConfigBodySchema,
 };
 
 // ─── section-type editor hints (only the component-bound types carry them) ───
@@ -624,6 +626,40 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
         },
         RECIPE_METADATA_CONSTRAINT,
       ];
+    case 'tracking_config':
+      return [
+        {
+          id: 'tracking_config_safety',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'THE SAFETY LAW (the checkBrandTokenValue analogue): agents flip typed switches and supply regex-pinned ' +
+            'IDs — no script text or URL field exists anywhere in the body. The own tracker\u2019s endpoint/auth are ' +
+            'env-var NAMES (A-Z0-9_, never values or URLs); plausible.api_host is a bare-https origin. Code-owned ' +
+            'adapter templates re-assert every regex at render. GTM is permanently OUT (OQ-W13-3): the key exists ' +
+            'for shape stability but can never be enabled.',
+        },
+        {
+          id: 'tracking_config_singleton',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'One tracker registry per site (trk_<project>, the site_/tax_ convention) — creating a second active ' +
+            'tracking_config is refused (409); edit the existing one via set_tracking_config_fields. Creation is ' +
+            'human/seed-only ({agents: []} in the creation policy); agents EDIT the singleton, they never mint one. ' +
+            'Publish ships AUTONOMOUS under the master approval policy (OQ-W13-2, 2026-07-19) \u2014 the posture ' +
+            'gains an owner UI toggle (T13.12); flipping to require-approval stays a one-line lever.',
+        },
+        {
+          id: 'tracking_config_ready',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            'Publish readiness: every enabled provider carries its regex-pinned id; banner copy (headline + body) ' +
+            'must exist whenever any advertising-class provider is enabled under a posture other than us-first; ' +
+            'restricted_regions must be non-empty under geo-adaptive. Warns while drafting.',
+        },
+      ];
     default:
       return [];
   }
@@ -918,12 +954,21 @@ export const buildObjectContract = (
           ? 'A section recipe (W8, design-principles rule 5): one named, pre-configured section blueprint agents create and evolve freely, then stamp into pages or mint as standalone shared sections. Instantiation deep-copies the blueprint and re-mints its id — nothing live-binds to a recipe, and a recipe renders nothing itself.'
           : objectType === 'theme'
             ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values plus the bounded layout/shape/type design axes (T10.1) agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys and omitted axes unset — defaults win). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
-            : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
+            : objectType === 'tracking_config'
+              ? 'The per-project tracker registry singleton (W13, 12-plan §3): fixed-key provider blocks with regex-pinned IDs (never script/URLs), the consent posture (geo-adaptive seed per OQ-W13-1), and the per-type collection defaults matrix. Publishing it is the site-wide script switch: the export (src/data/site/tracking.json) decides which trackers execute on every page. Human/seed-minted; agents edit via set_tracking_config_fields.'
+              : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
     body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),
     ...(objectType === 'page' ? { page_types: listPageTypeDefinitions() } : {}),
     patch_ops: patchOpContracts(objectType),
-    constraints: [...COMMON_CONSTRAINTS, ...perTypeConstraints(objectType)],
+    // tracking_config does not carry the per-object tracking attribute
+    // (schema-level) — the shared constraint would be a false promise there.
+    constraints: [
+      ...COMMON_CONSTRAINTS.filter(
+        (constraint) => !(objectType === 'tracking_config' && constraint.id === 'tracking_attribute')
+      ),
+      ...perTypeConstraints(objectType),
+    ],
     publish_policy: publishPolicy(objectType, policy),
     creation_policy: creationPolicyContract(objectType, creationPolicy),
     media_policy: mediaPolicyContract(mediaPolicy),

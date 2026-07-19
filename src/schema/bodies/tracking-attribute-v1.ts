@@ -81,4 +81,7 @@ export const TRACKABLE_ACTIVITIES_BY_TYPE: Record<string, readonly TrackingGoalA
   theme: [],
   template: [],
   section_template: [],
+  // The registry singleton itself is configuration — no reader events, and it
+  // does not carry the tracking attribute at all (schema-level).
+  tracking_config: [],
 };

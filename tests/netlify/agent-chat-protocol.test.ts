@@ -138,7 +138,14 @@ const setup = async (turns: ProviderTurnResult[], options: { roles?: ('owner' | 
   const autonomy = resolveAutonomy(undefined, undefined);
   const send = async (text: string) => {
     const fresh = (await loadChatDoc(deps.chatStore, 'obj:page_chat'))!;
-    return startRun({ chatStore: deps.chatStore, toolContext, nowIso: deps.nowIso, nowMs: () => NOW }, fresh, text, HUMAN, PROFILE, autonomy);
+    return startRun(
+      { chatStore: deps.chatStore, toolContext, nowIso: deps.nowIso, nowMs: () => NOW },
+      fresh,
+      text,
+      HUMAN,
+      PROFILE,
+      autonomy
+    );
   };
   return { store, deps, toolContext, send };
 };
@@ -173,7 +180,12 @@ test('checkout+patch pause per §4 defaults; approvals execute STORED args under
   let doc = (await loadChatDoc(deps.chatStore, 'obj:page_chat'))!;
   assert.equal(doc.run!.pending!.tool, 'checkout');
 
-  const approve1 = await approvePendingTool({ chatStore: deps.chatStore, toolContext: deps.toolContext, nowIso: deps.nowIso }, 'obj:page_chat', 'c1', HUMAN);
+  const approve1 = await approvePendingTool(
+    { chatStore: deps.chatStore, toolContext: deps.toolContext, nowIso: deps.nowIso },
+    'obj:page_chat',
+    'c1',
+    HUMAN
+  );
   assert.equal(approve1.status, 200, JSON.stringify(approve1.body));
   assert.equal(approve1.body.is_error, false);
 
@@ -267,7 +279,10 @@ test('deny feeds the refusal to the model and the run continues without writing'
   assert.equal(hop2.status, 'idle');
   assert.equal(sawDenial, true);
   const record = JSON.parse(store.blobs.get(objectRecordKey('page', 'page_chat'))!) as ObjectRecord;
-  assert.equal(((record.body as ReturnType<typeof validPageBody>).sections[0]!.data as { heading: string }).heading, 'Before');
+  assert.equal(
+    ((record.body as ReturnType<typeof validPageBody>).sections[0]!.data as { heading: string }).heading,
+    'Before'
+  );
 });
 
 // ─── transcript integrity (regression: 2026-07-19 "New article" 400) ────────
@@ -404,9 +419,15 @@ test('apply_theme is Owner-gated at EXECUTION even when approved by an admin', a
     name: 'apply_theme',
     args: { theme_id: 'thm_x', site_id: 'site_drlurie', lock_token: 'x', expected_record_version: 1 },
   };
-  const { deps, send } = await setup([{ toolCalls: [applyCall], outputTokens: 2 }, { text: 'ok', toolCalls: [], outputTokens: 1 }], {
-    roles: ['admin'], // NOT owner
-  });
+  const { deps, send } = await setup(
+    [
+      { toolCalls: [applyCall], outputTokens: 2 },
+      { text: 'ok', toolCalls: [], outputTokens: 1 },
+    ],
+    {
+      roles: ['admin'], // NOT owner
+    }
+  );
   const sent = await send('Retheme.');
   const hop = await runAgentLoop(deps, 'obj:page_chat', sent.resume!.triggerToken);
   assert.equal(hop.status, 'awaiting_approval');
@@ -493,7 +514,12 @@ test('cancel: cooperative while queued-fresh is rejected only when idle; awaitin
   const { deps, send } = await setup([{ toolCalls: [patchCall('p9', 'X')], outputTokens: 1 }]);
   const sent = await send('Edit.');
   await runAgentLoop(deps, 'obj:page_chat', sent.resume!.triggerToken);
-  const protocolDeps = { chatStore: deps.chatStore, toolContext: deps.toolContext, nowIso: deps.nowIso, nowMs: () => NOW };
+  const protocolDeps = {
+    chatStore: deps.chatStore,
+    toolContext: deps.toolContext,
+    nowIso: deps.nowIso,
+    nowMs: () => NOW,
+  };
   const cancel = await cancelRun(protocolDeps, 'obj:page_chat');
   assert.equal(cancel.status, 200);
   assert.equal(cancel.body.immediate, true);
@@ -514,7 +540,10 @@ test('profile resolution precedence: object beats type beats site default; disab
 
   assert.equal(resolveProfile(doc, { objectId: 'page_chat', objectType: 'page' }).profile_id, 'prof_a');
   assert.equal(resolveProfile(doc, { objectId: 'page_other', objectType: 'page' }).profile_id, 'prof_b');
-  assert.equal(resolveProfile(doc, { objectId: 'sec_x', objectType: 'section' }).profile_id, 'prof_site_default_anthropic');
+  assert.equal(
+    resolveProfile(doc, { objectId: 'sec_x', objectType: 'section' }).profile_id,
+    'prof_site_default_anthropic'
+  );
 
   // Disabled object assignment falls through to the type default.
   doc.profiles.prof_a!.status = 'disabled';

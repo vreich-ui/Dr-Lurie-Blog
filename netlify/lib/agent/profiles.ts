@@ -135,4 +135,7 @@ export const resolveProfile = (
 };
 
 export const getAgentProfilesBlobStore = (event: unknown): Promise<AgentProfilesStore> =>
-  getNetlifyBlobStore({ name: 'agent-profiles', consistency: 'strong' }, event) as unknown as Promise<AgentProfilesStore>;
+  getNetlifyBlobStore(
+    { name: 'agent-profiles', consistency: 'strong' },
+    event
+  ) as unknown as Promise<AgentProfilesStore>;

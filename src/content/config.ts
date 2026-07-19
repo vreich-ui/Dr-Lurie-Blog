@@ -104,6 +104,11 @@ const siteObjectCollection = defineCollection({
   schema: derivedExportSchema,
 });
 
+const trackingConfigObjectCollection = defineCollection({
+  loader: glob({ pattern: 'tracking.json', base: 'src/data/site' }),
+  schema: derivedExportSchema,
+});
+
 const taxonomyObjectCollection = defineCollection({
   loader: glob({ pattern: 'taxonomy.json', base: 'src/data/site' }),
   schema: derivedExportSchema,
@@ -174,6 +179,7 @@ export const collections = {
   post: postCollection,
   siteObject: siteObjectCollection,
   taxonomyObject: taxonomyObjectCollection,
+  trackingConfigObject: trackingConfigObjectCollection,
   pageObject: pageObjectCollection,
   navigationObject: navigationObjectCollection,
   sectionObject: sectionObjectCollection,

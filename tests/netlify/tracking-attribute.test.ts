@@ -36,6 +36,7 @@ import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
+import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
 import { patchOpSchema, patchOpNamesByObjectType } from '../../src/schema/object-patch-ops.js';
 import { objectTypes, type ObjectRecord, type ObjectType, type Principal } from '../../src/schema/object-record-v1.js';
 import { siteBody } from '../../scripts/lib/site-seed-data.mjs';
@@ -100,6 +101,9 @@ const BODIES: Record<ObjectType, { schema: { safeParse: (v: unknown) => { succes
     schema: contentItemBodySchema,
     body: { slug: 'x', title: 'X', nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'Hello.' } }] },
   },
+  // tracking_config does NOT carry the attribute (schema-level) and does not
+  // get set_tracking — covered by its own T13.2 test set.
+  tracking_config: { schema: trackingConfigBodySchema, body: null },
 };
 
 test('the tracking shape parses on all ten bodies; bodies without it still parse (additive guarantee)', () => {
@@ -123,17 +127,19 @@ test('the tracking shape parses on all ten bodies; bodies without it still parse
   );
 });
 
-test('set_tracking is allowlisted on ALL TEN types', () => {
+test('set_tracking is allowlisted on all ten attribute-carrying types — and NOT on tracking_config', () => {
   for (const objectType of objectTypes) {
-    assert.ok(
-      (patchOpNamesByObjectType[objectType] as readonly string[]).includes('set_tracking'),
-      `${objectType} allows set_tracking`
-    );
+    const allowed = (patchOpNamesByObjectType[objectType] as readonly string[]).includes('set_tracking');
+    if (objectType === 'tracking_config') {
+      assert.equal(allowed, false, 'the registry singleton does not carry the attribute');
+    } else {
+      assert.ok(allowed, `${objectType} allows set_tracking`);
+    }
   }
 });
 
 test('apply + exact inverse on every type: first-set inverts to removal', () => {
-  for (const objectType of objectTypes) {
+  for (const objectType of objectTypes.filter((type) => type !== 'tracking_config')) {
     const body = { plain: 'body' }; // engine is shape-agnostic; schema gating is the verb layer's job
     const forward = apply(objectType, body, [{ op: 'set_tracking', fields: TRACKING }]);
     const applied = forward.record.body as Record<string, unknown>;
@@ -270,8 +276,8 @@ test('validation criterion: valid goals complete; non-collectable activity warns
   }
 });
 
-test('the contract lists set_tracking on all ten types and carries the funnel constraint', () => {
-  for (const objectType of objectTypes) {
+test('the contract lists set_tracking on all ten attribute-carrying types and carries the funnel constraint', () => {
+  for (const objectType of objectTypes.filter((type) => type !== 'tracking_config')) {
     const contract = buildObjectContract(objectType) as unknown as {
       patch_ops: { op: string }[];
       constraints: { id: string; description: string }[];

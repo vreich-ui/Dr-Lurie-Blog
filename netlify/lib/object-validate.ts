@@ -78,6 +78,7 @@ import {
   GOAL_KEY_RE,
   TRACKABLE_ACTIVITIES_BY_TYPE,
 } from '../../src/schema/bodies/tracking-attribute-v1.js';
+import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -250,6 +251,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     taxonomy: taxonomyBodySchema,
     product: productBodySchema,
     content_item: contentItemBodySchema,
+    tracking_config: trackingConfigBodySchema,
   };
 
 // Mirrors node-renderer.ts TIPTAP_ALLOWED (A§1.5): the only tags TipTap emits.
@@ -1981,6 +1983,85 @@ const checkTrackingAttribute = (objectType: ObjectType, body: unknown, atPublish
   return [crit('tracking_attribute', label, 'complete', '')];
 };
 
+/**
+ * T13.2 — `tracking_config_ready` (12-plan §3): the publish criterion for
+ * the tracker-registry singleton. Enabled providers must carry their
+ * regex-pinned id (the schema already blocks the write; the criterion keeps
+ * the WHY readable); banner copy must exist whenever any advertising-class
+ * provider is enabled under a posture that can show a banner (≠ 'us-first');
+ * `restricted_regions` must be non-empty under 'geo-adaptive'; GTM can never
+ * be enabled (permanently OUT, OQ-W13-3). Publish-gating rules warn while
+ * drafting. Store-independent — reads only the body.
+ */
+const checkTrackingConfig = (body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  const label = 'Tracking config readiness';
+  if (!isRecord(body) || !isRecord(body.providers) || !isRecord(body.consent)) {
+    return [crit('tracking_config_ready', label, 'optional', 'Body shape not recognized (see schema check).')];
+  }
+  const providers = body.providers;
+  const consent = body.consent;
+
+  const hard: string[] = [];
+  const publishProblems: string[] = [];
+
+  const idFieldByProvider: Record<string, string> = {
+    ga4: 'measurement_id',
+    gtm: 'container_id',
+    google_ads: 'conversion_id',
+    meta_pixel: 'pixel_id',
+    taboola: 'account_id',
+    outbrain: 'account_id',
+    mgid: 'account_id',
+    plausible: 'api_host',
+  };
+  let advertisingEnabled = false;
+  for (const [key, idField] of Object.entries(idFieldByProvider)) {
+    const block = providers[key];
+    if (!isRecord(block) || block.enabled !== true) continue;
+    if (key === 'gtm') {
+      hard.push('providers.gtm: GTM is permanently OUT (OQ-W13-3) — it can never be enabled.');
+      continue;
+    }
+    const id = block[idField];
+    if (typeof id !== 'string' || id.trim() === '') {
+      hard.push(`providers.${key}: enabled requires ${idField} to be set (regex-pinned; see the contract).`);
+    }
+    if (block.consent_class === 'advertising') advertisingEnabled = true;
+  }
+
+  const posture = typeof consent.posture === 'string' ? consent.posture : '';
+  const banner = consent.banner;
+  const bannerPresent =
+    isRecord(banner) &&
+    typeof banner.headline === 'string' &&
+    banner.headline.trim() !== '' &&
+    typeof banner.body === 'string' &&
+    banner.body.trim() !== '';
+  if (advertisingEnabled && posture !== 'us-first' && !bannerPresent) {
+    publishProblems.push(
+      `consent.banner: an advertising-class provider is enabled under posture '${posture}' — banner copy (headline + body) is required before publish.`
+    );
+  }
+  if (
+    posture === 'geo-adaptive' &&
+    (!Array.isArray(consent.restricted_regions) || consent.restricted_regions.length === 0)
+  ) {
+    publishProblems.push(
+      "consent.restricted_regions: must be non-empty under 'geo-adaptive' (seed = EEA-30 + UK + CH per OQ-W13-1)."
+    );
+  }
+
+  if (hard.length > 0) {
+    return [crit('tracking_config_ready', label, 'missing', hard.slice(0, 3).join(' '))];
+  }
+  if (publishProblems.length > 0) {
+    return [
+      crit('tracking_config_ready', label, atPublish ? 'missing' : 'warning', publishProblems.slice(0, 3).join(' ')),
+    ];
+  }
+  return [crit('tracking_config_ready', label, 'complete', '')];
+};
+
 export const checkStructuralInvariants = (
   objectType: ObjectType,
   objectId: string,
@@ -2004,6 +2085,7 @@ const checkStructuralInvariantsByType = (
   // content_item carry their own rules (dispatched here so the pipeline keeps
   // its single 'structure' group).
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
+  if (objectType === 'tracking_config') return checkTrackingConfig(body, atPublish);
   if (objectType === 'template') return checkTemplate(body, context, atPublish);
   if (objectType === 'section_template') return checkSectionTemplate(body, atPublish);
   if (objectType === 'theme') return checkTheme(body, atPublish);

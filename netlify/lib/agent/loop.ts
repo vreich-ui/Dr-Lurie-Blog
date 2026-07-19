@@ -117,7 +117,12 @@ const resultObjectRef = (
   }
 };
 
-const finishRun = (doc: ChatDoc, at: string, outcome: 'completed' | 'error' | 'cancelled' | 'caps', chips: string[]) => {
+const finishRun = (
+  doc: ChatDoc,
+  at: string,
+  outcome: 'completed' | 'error' | 'cancelled' | 'caps',
+  chips: string[]
+) => {
   if (doc.run) {
     doc.runs.push({
       run_id: doc.run.run_id,
@@ -142,7 +147,11 @@ const runChips = (doc: ChatDoc, run: ChatRun): string[] => {
   const executed = runEvents.filter((event) => event.type === 'tool_result' && !event.detail?.is_error);
   const byTool = (name: string) =>
     executed.filter((event) => (event.detail?.tool as string | undefined) === name).length;
-  const created = byTool('create_object') + byTool('create_variant') + byTool('instantiate_template') + byTool('instantiate_section_template');
+  const created =
+    byTool('create_object') +
+    byTool('create_variant') +
+    byTool('instantiate_template') +
+    byTool('instantiate_section_template');
   if (created > 0) chips.push(`created ${created} object${created === 1 ? '' : 's'}`);
   const published = byTool('publish');
   if (published > 0) chips.push(`published ${published}`);
@@ -463,7 +472,10 @@ export const startRun = async (
       return { status: 409, body: { error: `a run is already ${doc.status}`, status_detail: doc.status } };
     }
     // Stale takeover: close the wedged run honestly, then continue below.
-    appendChatEvent(doc, at(), 'run_error', { run_id: doc.run?.run_id, message: 'run stalled; taken over by a new send' });
+    appendChatEvent(doc, at(), 'run_error', {
+      run_id: doc.run?.run_id,
+      message: 'run stalled; taken over by a new send',
+    });
     if (doc.run) {
       doc.runs.push({
         run_id: doc.run.run_id,

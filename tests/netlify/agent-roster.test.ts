@@ -135,9 +135,7 @@ test('ask-ai anthropic transport: /v1/messages, x-api-key, forced tool_choice, p
     calls.push({ url: String(url), init: init! });
     return new Response(
       JSON.stringify({
-        content: [
-          { type: 'tool_use', name: 'propose_object_changes', input: { title: 'Calmer skin, explained' } },
-        ],
+        content: [{ type: 'tool_use', name: 'propose_object_changes', input: { title: 'Calmer skin, explained' } }],
       }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     );

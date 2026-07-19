@@ -67,6 +67,7 @@ const OBJECT_IDS: Record<GovernedObjectType, string> = {
   theme: 'thm_drlurie_default',
   product: 'prod_barrier_repair_guide',
   content_item: 'req_agent_probe_20260713_01',
+  tracking_config: 'trk_drlurie',
 };
 
 const approveDecision = (contentRevision: number, publishAction?: { published_time: string | null }) => ({
