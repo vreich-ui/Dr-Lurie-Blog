@@ -72,7 +72,7 @@ import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import type { ObjectRecord, ObjectType, Principal } from '../../src/schema/object-record-v1.js';
-import { MAJOR_KEY_ARTIFACT_REF_RE, publicPathForArtifactRef } from './artifact-trust.js';
+import { MAJOR_KEY_ARTIFACT_REF_RE, publicPathForArtifactRef, rawArtifactRefForPublicPath } from './artifact-trust.js';
 
 export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
 
@@ -1568,6 +1568,164 @@ export const checkProduct = (
   return criteria;
 };
 
+// ─── content_item media path + hero rules (bug ② object-path closure) ────────
+//
+// The renderer serves node media over the blob routes: `type:'image'` →
+// `<img src>`, `type:'document'` → an honest download link
+// (src/lib/article-object/render-nodes.ts). Nothing validated those srcs, so a
+// mistyped path 404'd live, and a PDF in the hero (`body.image.src`) would
+// reach Astro's getImage at build — the object-path analogue of the legacy
+// PDF-as-featuredImage bug. Raw Major Keys are already blocked by check 5b;
+// these rules cover the PATH FORMS: `/img|/pdf/{id}/{sha}.{ext}` is the
+// governed value (existence-checked via resolveArtifactRef when available),
+// other root-relative site paths and remote https URLs WARN (renderable but
+// ungoverned/unverifiable — remote-block is a policy decision flagged for
+// Wolf), and everything else (data:, legacy src/assets/, bare relative paths)
+// blocks. video/audio/embed srcs are out of scope until they render richer
+// than a link.
+
+const IMG_PUBLIC_PATH_RE = /^\/img\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+const PDF_PUBLIC_PATH_RE = /^\/pdf\/[^/]+\/[0-9a-f]{64}\.pdf$/i;
+
+type ArticleMediaProblem = { message: string; kind: 'block' | 'warn' | 'existence' };
+
+const resolvePublicPathExistence = (
+  path: string,
+  value: string,
+  context: ObjectValidationContext
+): ArticleMediaProblem | undefined => {
+  const resolution = context.resolveArtifactRef?.(rawArtifactRefForPublicPath(value));
+  if (!resolution) return undefined;
+  if (resolution.deleted) {
+    return {
+      kind: 'existence',
+      message: `${path} "${value}" points at a soft-deleted artifact — restore it (restore_artifact) or re-upload, then retry.`,
+    };
+  }
+  if (!resolution.exists) {
+    return {
+      kind: 'existence',
+      message:
+        `${path} "${value}" has no artifact behind it (never uploaded, or the key is mistyped) — it will 404 on the live page. ` +
+        `Use the exact blobKey pdf-tool returned (list_artifacts_for_request shows what exists), as its public path.`,
+    };
+  }
+  return undefined;
+};
+
+const classifyArticleImageSrc = (
+  path: string,
+  value: string,
+  context: ObjectValidationContext,
+  { forbidPdf = false } = {}
+): ArticleMediaProblem | undefined => {
+  if (BASE64_DATA_URI_RE.test(value)) return { kind: 'block', message: `${path} must not be a data URI.` };
+  if (LEGACY_REPO_PATH_RE.test(value))
+    return { kind: 'block', message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.` };
+  if (MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return undefined; // check 5b reports raw keys with the canonical message
+  if (forbidPdf && (PDF_PUBLIC_PATH_RE.test(value) || /\.pdf$/i.test(value))) {
+    return {
+      kind: 'block',
+      message:
+        `${path} "${value}" is a PDF — the hero image field must hold an IMAGE ` +
+        `(a PDF here reaches Astro's getImage and fails the whole build). Link the PDF from a document media node or a /pdf/ ctaLink instead.`,
+    };
+  }
+  if (IMG_PUBLIC_PATH_RE.test(value)) return resolvePublicPathExistence(path, value, context);
+  if (REMOTE_URL_RE.test(value)) {
+    return {
+      kind: 'warn',
+      message: `${path} is a remote URL — it bypasses artifact governance and can rot. Prefer a /img/ artifact path (pdf-tool under a storage grant).`,
+    };
+  }
+  if (value.startsWith('/')) {
+    return {
+      kind: 'warn',
+      message: `${path} is a site-static path ("${value}") — existence is not verifiable here. Prefer a /img/ artifact path.`,
+    };
+  }
+  return {
+    kind: 'block',
+    message: `${path} "${value}" is not a servable image path. Use the /img/{id}/{sha256}.{ext} public path of an uploaded artifact.`,
+  };
+};
+
+const classifyArticleDocumentSrc = (
+  path: string,
+  value: string,
+  context: ObjectValidationContext
+): ArticleMediaProblem | undefined => {
+  if (BASE64_DATA_URI_RE.test(value)) return { kind: 'block', message: `${path} must not be a data URI.` };
+  if (LEGACY_REPO_PATH_RE.test(value))
+    return { kind: 'block', message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.` };
+  if (MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return undefined; // check 5b reports raw keys
+  if (PDF_PUBLIC_PATH_RE.test(value)) return resolvePublicPathExistence(path, value, context);
+  if (REMOTE_URL_RE.test(value)) {
+    return {
+      kind: 'warn',
+      message: `${path} is a remote URL — prefer a /pdf/ artifact path (pdf-tool under a storage grant) so the download is governed.`,
+    };
+  }
+  return {
+    kind: 'block',
+    message: `${path} "${value}" is not a servable document path. Use the /pdf/{id}/{sha256}.pdf public path of an uploaded PDF artifact.`,
+  };
+};
+
+const checkContentItemMedia = (
+  article: ContentItemBody,
+  context: ObjectValidationContext,
+  atPublish: boolean
+): ReadinessCriterion[] => {
+  const problems: ArticleMediaProblem[] = [];
+  let sawMedia = false;
+
+  const inspect = (problem: ArticleMediaProblem | undefined) => {
+    if (problem) problems.push(problem);
+  };
+
+  const inspectMediaObject = (path: string, media: { type: string; src: string }) => {
+    sawMedia = true;
+    if (media.type === 'image') inspect(classifyArticleImageSrc(`${path}.src`, media.src, context));
+    if (media.type === 'document') inspect(classifyArticleDocumentSrc(`${path}.src`, media.src, context));
+    // video/audio/embed srcs are out of scope (no richer renderer yet).
+  };
+
+  article.nodes.forEach((node, index) => {
+    const base = `nodes.${index}.public`;
+    if (node.public.media) inspectMediaObject(`${base}.media`, node.public.media);
+    (node.public.images ?? []).forEach((image, imageIndex) =>
+      inspectMediaObject(`${base}.images.${imageIndex}`, image)
+    );
+    const ctaLink = node.public.ctaLink;
+    if (typeof ctaLink === 'string' && (ctaLink.startsWith('/pdf/') || PDF_PUBLIC_PATH_RE.test(ctaLink))) {
+      sawMedia = true;
+      inspect(classifyArticleDocumentSrc(`${base}.ctaLink`, ctaLink, context));
+    }
+  });
+
+  if (article.image) {
+    sawMedia = true;
+    inspect(classifyArticleImageSrc('image.src', article.image.src, context, { forbidPdf: true }));
+  }
+
+  if (!sawMedia) return [];
+
+  const blocks = problems.filter((problem) => problem.kind === 'block').map((problem) => problem.message);
+  const existence = problems.filter((problem) => problem.kind === 'existence').map((problem) => problem.message);
+  const warns = problems.filter((problem) => problem.kind === 'warn').map((problem) => problem.message);
+
+  if (blocks.length > 0)
+    return [crit('article_media', 'Article media paths', 'missing', blocks.slice(0, 5).join(' '))];
+  if (existence.length > 0) {
+    return [
+      crit('article_media', 'Article media paths', atPublish ? 'missing' : 'warning', existence.slice(0, 5).join(' ')),
+    ];
+  }
+  if (warns.length > 0) return [crit('article_media', 'Article media paths', 'warning', warns.slice(0, 5).join(' '))];
+  return [crit('article_media', 'Article media paths', 'complete', '')];
+};
+
 /**
  * content_item structural invariants (W7.3): node-id uniqueness, slug
  * uniqueness across article objects AND committed legacy posts (one permalink
@@ -1632,6 +1790,8 @@ const checkContentItemStructure = (
       )
     );
   }
+
+  criteria.push(...checkContentItemMedia(article, context, atPublish));
 
   return criteria;
 };

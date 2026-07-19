@@ -62,6 +62,27 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
   `object-validate.ts`, both entry functions; +9 tests.)
 
+- **Fix 2 — content_item media path + hero rules (SHIPPED; bug ② closed on the
+  object path).** Node media srcs were schema-unconstrained strings: a mistyped
+  path 404'd live, and a PDF in the hero (`body.image.src`) would reach Astro's
+  getImage at build — the object-path analogue of the legacy
+  PDF-as-featuredImage bug. New `article_media` criterion (structure group):
+  image media/`images[]` srcs take the `/img/{id}/{sha}.{ext}` public path and
+  document media + `/pdf/` ctaLinks take `/pdf/{id}/{sha}.pdf` — both
+  EXISTENCE-checked through Fix 3's `resolveArtifactRef` (absent/deleted →
+  publish blocker, draft warning); remote https and site-static paths WARN
+  (renderable but ungoverned — remote warn-vs-block flagged for Wolf); data
+  URIs, legacy `src/assets/` paths, and bare relative paths BLOCK; the hero
+  must be an IMAGE — `/pdf/`/.pdf there blocks with the build-breaker message.
+  video/audio/embed srcs stay out of scope until they render richer than a
+  link. Renderer unchanged (document→honest link is the sanctioned rendering;
+  now pinned by a render-matrix test). `object_contract("content_item")` gained
+  image/PDF `auxiliary_inputs` rows (grant-first flow, public-path rule,
+  never-a-PDF-hero), and the stale `create_artifact_upload_intent` hints on
+  *AssetRef/product-fulfillment guidance now point at the storage-grant path.
+  (`netlify/lib/object-validate.ts`, `src/lib/registry/object-contract.ts`;
+  +6 validation tests, +1 renderer test.)
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for

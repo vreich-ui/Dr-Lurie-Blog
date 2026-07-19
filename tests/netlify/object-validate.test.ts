@@ -1018,3 +1018,96 @@ test('product: validateObject dispatches the product criteria through the struct
   assert.ok(structure && statusOf(structure.criteria, 'product_slug') === 'complete');
   assert.equal(summarizeValidation(groups).eligible, true);
 });
+
+// ═══ content_item media paths + hero rules (bug ② object-path closure) ═══════
+
+const ART_SHA = 'f'.repeat(64);
+const ART_IMG_PATH = `/img/req_probe_media_20260719_01/${ART_SHA}.webp`;
+const ART_PDF_PATH = `/pdf/req_probe_media_20260719_01/${ART_SHA}.pdf`;
+
+const articleBodyWith = (overrides: Record<string, unknown>) => ({
+  slug: 'probe-article',
+  title: 'Probe',
+  nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' } }],
+  ...overrides,
+});
+
+const articleStructure = (body: unknown, context: ObjectValidationContext = {}, atPublish = true) =>
+  checkStructuralInvariants('content_item', 'req_probe_media_20260719_01', body, context, atPublish);
+
+test('article media: /img/ public-path image with a confirmed artifact passes', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const criteria = articleStructure(body, { resolveArtifactRef: () => ({ exists: true }) });
+  assert.equal(statusOf(criteria, 'article_media'), 'complete');
+});
+
+test('article media: a mistyped /img/ path (no artifact behind it) warns while drafting, blocks at publish', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const context: ObjectValidationContext = { resolveArtifactRef: () => ({ exists: false }) };
+  assert.equal(statusOf(articleStructure(body, context, false), 'article_media'), 'warning');
+  const atPublish = articleStructure(body, context, true);
+  assert.equal(statusOf(atPublish, 'article_media'), 'missing');
+  assert.match(atPublish.find((c) => c.id === 'article_media')!.message, /404 on the live page/);
+});
+
+test('article media: document media and /pdf/ ctaLinks take the /pdf/ public path; junk paths block', () => {
+  const good = articleBodyWith({
+    nodes: [
+      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'document', src: ART_PDF_PATH, title: 'Guide' } } },
+      { id: 'n_m2', kind: 'action', public: { ctaText: 'Download', ctaLink: ART_PDF_PATH } },
+    ],
+  });
+  assert.equal(statusOf(articleStructure(good, { resolveArtifactRef: () => ({ exists: true }) }), 'article_media'), 'complete');
+
+  const junkCta = articleBodyWith({
+    nodes: [{ id: 'n_m2', kind: 'action', public: { ctaText: 'Download', ctaLink: '/pdf/not-a-real-key.pdf' } }],
+  });
+  assert.equal(statusOf(articleStructure(junkCta), 'article_media'), 'missing');
+});
+
+test('article media REJECTION: a PDF in the hero image field blocks with the build-breaker message', () => {
+  const body = articleBodyWith({ image: { src: ART_PDF_PATH, alt: 'Guide' } });
+  const criteria = articleStructure(body);
+  assert.equal(statusOf(criteria, 'article_media'), 'missing');
+  assert.match(criteria.find((c) => c.id === 'article_media')!.message, /must hold an IMAGE|fails the whole build/);
+});
+
+test('article media: remote https and site-static image srcs warn (ungoverned), data URIs and bare paths block', () => {
+  const remote = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'https://example.com/x.jpg' } } }],
+  });
+  assert.equal(statusOf(articleStructure(remote), 'article_media'), 'warning');
+
+  const siteStatic = articleBodyWith({ image: { src: '/images/dr-lurie-portrait4.jpeg' } });
+  assert.equal(statusOf(articleStructure(siteStatic), 'article_media'), 'warning');
+
+  const dataUri = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'data:image/png;base64,AAAA' } } }],
+  });
+  assert.equal(statusOf(articleStructure(dataUri), 'article_media'), 'missing');
+
+  const bare = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'hero.png' } } }],
+  });
+  assert.equal(statusOf(articleStructure(bare), 'article_media'), 'missing');
+});
+
+test('article media: gallery images[] entries are validated like single media; no media → no criterion', () => {
+  const gallery = articleBodyWith({
+    nodes: [
+      {
+        id: 'n_m1',
+        kind: 'content',
+        public: { body: 'Copy.', images: [{ type: 'image', src: ART_IMG_PATH }, { type: 'image', src: 'data:x' }] },
+      },
+    ],
+  });
+  assert.equal(statusOf(articleStructure(gallery), 'article_media'), 'missing');
+
+  const none = articleStructure(articleBodyWith({}));
+  assert.equal(none.find((c) => c.id === 'article_media'), undefined);
+});
