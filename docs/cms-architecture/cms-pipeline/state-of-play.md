@@ -7,6 +7,37 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 (artifact-publishing hardening: CMS-Agent ↔ Dr-Lurie ↔ pdf-tool triangle)
+
+Task (vreich): analyze the artifact-production/publishing triangle (CMS-Agent
+MCP orchestrator, this repo's Dr_Lurie MCP, pdf-tool) and make image/PDF
+publishing smooth and bug-free. Branch
+`claude/cms-agent-artifacts-publishing-12g3tk`. Live-state evidence gathered
+first: 10 failed queue records (2026-06-30..07-02 smokes) triaged into six
+failure classes (post-publish 404 / pdf-tool 429 / ×4 canonical-input trust
+rejections / ×2 "PDF template not found" / self-referential URL 422 / PDF
+media entry 422); CMS-Agent's dr-lurie project is read-only allowlist +
+`publishEnabled=false`; both external MCP legs showed >60 s cold starts.
+User-ratified decisions: the OBJECT path (`content_item` → `object_publish` →
+`release_to_production`) is the canonical artifact route; legacy stays frozen.
+
+- **Fix 1 — release truth signal (SHIPPED).** `released:true` used to mean "a
+  ready deploy exists for the commit", which under locked Netlify Auto
+  Publishing can be a ready-but-unpublished deploy (the documented
+  `production-release.ts` risk; failure class 1's ambiguity).
+  `releaseToProduction` now consults `getPublishedProductionDeploy` (the same
+  authoritative signal `verify_article_images` adopted on 07-16): published
+  commit match ⇒ `released:true` + `productionConfirmed:true` (published wins
+  even if the receipt poll never saw ready); ready-but-unpublished ⇒ new status
+  `build_ready_not_published` with unlock guidance; site lookup unavailable ⇒
+  prior ready-by-commit behavior with `productionConfirmed:false` ("not
+  independently proven live"). `deploy_status` additively returns
+  `publishedDeploy` + `productionConfirmed` (absent = unknown, never "not
+  live"); both tool descriptions now teach "poll until ready AND
+  productionConfirmed". (`netlify/lib/production-release.ts`,
+  `netlify/functions/deploy-status.ts`, mcp.ts descriptions; +4
+  production-release tests, +3 new `deploy-status.test.ts`.)
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for

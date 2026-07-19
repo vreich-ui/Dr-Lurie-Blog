@@ -76,6 +76,64 @@ const routeHappyPath =
     return undefined;
   };
 
+// Serves the site object (published_deploy) in addition to the happy-path
+// routes. The /deploys check must come first: /sites/{id}/deploys contains both
+// substrings.
+const routeWithPublished =
+  (deployCommit: string, deployState: string, publishedCommit: string): FetchRoute =>
+  (url) => {
+    if (url.includes('/build_hooks/')) return new Response('ok', { status: 200 });
+    if (url.includes('api.github.com') && url.includes('/git/ref/heads/')) {
+      return jsonResponse({ object: { sha: HEAD_SHA } });
+    }
+    if (url.includes('api.netlify.com') && url.includes('/deploys')) {
+      return jsonResponse([{ id: 'd1', state: deployState, commit_ref: deployCommit, ssl_url: 'https://drlurie.com' }]);
+    }
+    if (url.includes('api.netlify.com') && url.includes('/sites/')) {
+      return jsonResponse({
+        published_deploy: { id: 'pub1', state: 'ready', commit_ref: publishedCommit, ssl_url: 'https://drlurie.com' },
+      });
+    }
+    return undefined;
+  };
+
+test('published deploy matching the target commit confirms the release', async () => {
+  await withEnv(CONFIGURED, async () => {
+    await withFetch(routeWithPublished(HEAD_SHA, 'ready', HEAD_SHA), async () => {
+      const result = await releaseToProduction({ intervalSeconds: 1, timeoutSeconds: 5 });
+      assert.equal(result.status, 'released');
+      assert.equal(result.released, true);
+      assert.equal(result.productionConfirmed, true);
+      assert.equal(result.publishedDeploy?.deployId, 'pub1');
+    });
+  });
+});
+
+test('ready build with production serving an older commit reports build_ready_not_published, not released', async () => {
+  await withEnv(CONFIGURED, async () => {
+    await withFetch(routeWithPublished(HEAD_SHA, 'ready', 'oldsha999'), async () => {
+      const result = await releaseToProduction({ intervalSeconds: 1, timeoutSeconds: 5 });
+      assert.equal(result.status, 'build_ready_not_published');
+      assert.equal(result.released, false);
+      assert.equal(result.productionConfirmed, false);
+      assert.equal(result.productionReflectsCommit, true, 'the ready-by-commit signal itself is preserved');
+      assert.equal(result.publishedDeploy?.commit, 'oldsha999');
+      assert.match(result.reason, /Auto Publishing/);
+    });
+  });
+});
+
+test('a published deploy on the target commit wins even when the receipt poll never sees ready', async () => {
+  await withEnv(CONFIGURED, async () => {
+    await withFetch(routeWithPublished('othersha', 'building', HEAD_SHA), async () => {
+      const result = await releaseToProduction({ intervalSeconds: 1, timeoutSeconds: 1 });
+      assert.equal(result.released, true);
+      assert.equal(result.productionConfirmed, true);
+      assert.equal(result.status, 'released');
+    });
+  });
+});
+
 test('forceBuild without a configured build hook refuses rather than reporting a stale deploy', async () => {
   await withEnv({ NETLIFY_SITE_ID: 'site-abc', NETLIFY_AUTH_TOKEN: 'tok-abc' }, async () => {
     const result = await releaseToProduction({ forceBuild: true });
@@ -96,6 +154,10 @@ test('full path: forces a build, resolves HEAD, waits, and confirms production r
       assert.equal(result.productionReflectsCommit, true);
       assert.equal(result.deploy?.deployStatus, 'ready');
       assert.equal(result.productionUrl, 'https://drlurie.com');
+      // The site (published_deploy) endpoint is not routed here, so the
+      // published-deploy signal degrades to unavailable: still released by
+      // ready-by-commit, but never independently confirmed.
+      assert.equal(result.productionConfirmed, false);
     });
   });
 });

@@ -29,6 +29,7 @@
  * "Release to Production" button (humans) both call this function.
  */
 import {
+  getPublishedProductionDeploy,
   isNetlifyBuildHookConfigured,
   isNetlifyDeployLookupConfigured,
   pollDeployReceipt,
@@ -50,12 +51,13 @@ export type ReleaseToProductionOptions = {
 };
 
 export type ReleaseToProductionResult = {
-  /** True only when a terminal, ready production deploy reflects the target commit. */
+  /** True only when production is confirmed (or, without site lookup, best-effort ready) on the target commit. */
   released: boolean;
   /** Machine-readable outcome for callers that branch on it. */
   status:
     | 'released'
     | 'build_not_confirmed_live'
+    | 'build_ready_not_published'
     | 'commit_unresolved'
     | 'build_hook_not_configured'
     | 'deploy_lookup_not_configured';
@@ -65,7 +67,17 @@ export type ReleaseToProductionResult = {
   triggeredAt?: string;
   /** Whether the ready deploy's commit matches the resolved target commit. */
   productionReflectsCommit: boolean;
+  /**
+   * True only when the site's published_deploy (what production actually
+   * serves) reflects the target commit. False either means production serves
+   * something else OR the published-deploy lookup was unavailable — a false
+   * here with released:true means "ready-by-commit only, not independently
+   * confirmed live".
+   */
+  productionConfirmed: boolean;
   deploy?: DeployReceipt;
+  /** The deploy production currently serves, when the site lookup resolves it. */
+  publishedDeploy?: DeployReceipt;
   productionUrl?: string;
 };
 
@@ -122,6 +134,7 @@ export const releaseToProduction = async (
       targetCommit: '',
       buildTriggered: false,
       productionReflectsCommit: false,
+      productionConfirmed: false,
     };
   }
 
@@ -135,6 +148,7 @@ export const releaseToProduction = async (
       targetCommit: '',
       buildTriggered: false,
       productionReflectsCommit: false,
+      productionConfirmed: false,
     };
   }
 
@@ -158,6 +172,7 @@ export const releaseToProduction = async (
       buildTriggered,
       triggeredAt,
       productionReflectsCommit: false,
+      productionConfirmed: false,
     };
   }
 
@@ -168,17 +183,49 @@ export const releaseToProduction = async (
   });
   const productionReflectsCommit = deploy.deployStatus === 'ready' && deploy.commit === targetCommit;
 
-  return {
-    released: productionReflectsCommit,
-    status: productionReflectsCommit ? 'released' : 'build_not_confirmed_live',
-    reason: productionReflectsCommit
-      ? `Production is live on commit ${targetCommit}.`
-      : `The production deploy for commit ${targetCommit} did not reach a ready state within the wait budget (deploy status: ${deploy.deployStatus}). Re-check deploy_status; the build may still be in progress.`,
+  // "Ready" is necessary but not sufficient: under locked Auto Publishing a
+  // deploy builds to ready without production ever serving it. The site's
+  // published_deploy is the authoritative live signal, so consult it and only
+  // fall back to ready-by-commit when the site lookup is unavailable.
+  const publishedDeploy = await getPublishedProductionDeploy();
+  const shared = {
     targetCommit,
     buildTriggered,
     triggeredAt,
     productionReflectsCommit,
     deploy,
-    productionUrl: deploy.productionUrl || undefined,
+    ...(publishedDeploy ? { publishedDeploy } : {}),
+    productionUrl: publishedDeploy?.productionUrl || deploy.productionUrl || undefined,
+  };
+
+  if (publishedDeploy?.commit === targetCommit) {
+    return {
+      released: true,
+      status: 'released',
+      reason: `Production is live on commit ${targetCommit} (published deploy ${publishedDeploy.deployId || 'unknown'}).`,
+      productionConfirmed: true,
+      ...shared,
+    };
+  }
+
+  if (publishedDeploy && productionReflectsCommit) {
+    return {
+      released: false,
+      status: 'build_ready_not_published',
+      reason: `The build for commit ${targetCommit} is ready, but production still serves ${publishedDeploy.commit || 'a different commit'} — Netlify "Auto Publishing" is likely locked. Unlock it (or publish the deploy manually in the Netlify UI), then re-check deploy_status.`,
+      productionConfirmed: false,
+      ...shared,
+    };
+  }
+
+  return {
+    released: !publishedDeploy && productionReflectsCommit,
+    status: !publishedDeploy && productionReflectsCommit ? 'released' : 'build_not_confirmed_live',
+    reason:
+      !publishedDeploy && productionReflectsCommit
+        ? `Production deploy for commit ${targetCommit} is ready (published-deploy lookup unavailable — confirmed ready-by-commit only).`
+        : `The production deploy for commit ${targetCommit} did not reach a ready state within the wait budget (deploy status: ${deploy.deployStatus}). Re-check deploy_status; the build may still be in progress.`,
+    productionConfirmed: false,
+    ...shared,
   };
 };
