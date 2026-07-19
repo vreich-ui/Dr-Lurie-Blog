@@ -82,3 +82,19 @@ T12.3	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T12.3-theme
 T12.4	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T12.4-emission-pipeline.md
 T12.5	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T12.5-fidelity-loop.md
 T12.6	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T12.6-capture-acceptance-run.md
+#
+# W13 — object tracking & analytics (plan: docs/cms-architecture/12-object-tracking-and-analytics.md, 2026-07-19).
+# W13 may be pulled ahead of W10-W12 freely (reordering this file IS the scheduler). Briefs are written against
+# today's single-repo tree — if W11 (core extraction) lands first, whichever wave runs second rebases file paths
+# mechanically (12-plan §9). Checkpoints: T13.6 waits on OQ-W13-1, T13.7 on OQ-W13-3 (both tracked in 12-plan §13).
+T13.1	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.1-tracking-attribute.md
+T13.2	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.2-tracking-config-type.md
+T13.3	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.3-tracking-event-ingest.md
+T13.4	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.4-own-tracker-loader.md
+T13.5	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.5-tracking-scripts-component.md
+T13.6	checkpoint	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.6-consent-banner-geo.md
+T13.7	checkpoint	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.7-google-ads-adapter-bridge.md
+T13.8	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T13.8-native-adapters-csp.md
+T13.9	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T13.9-owner-db-reference-kit.md
+T13.10	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T13.10-tracking-seeds-roundtrip.md
+T13.11	human_gate	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T13.11-tracking-production-drive.md

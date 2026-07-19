@@ -7,6 +7,70 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 B (W13 STRATEGY: object tracking & analytics — doc 12 + T13 briefs; docs only, nothing built)
+
+Task (vreich): research + plan "tracking as an attribute of each existing
+object" — all usual trackers (Google Ads + native ad platforms), an OWN
+tracker preferred over Plausible (the owner runs a DB listening to
+triggers), object-type-aware activity collection, a legal-but-aggressive
+posture, and project-dependent config (Dr. Lurie = one of several
+projects). Session decisions (vreich, recorded in the plan §0): this
+session ships docs+briefs only · own-tracker ingest = first-party relay ·
+consent = geo-adaptive · branch pushed, NO PR (house rule). Branch
+`claude/object-tracking-strategy-jh76f4`.
+
+- **NEW [`12-object-tracking-and-analytics.md`](../12-object-tracking-and-analytics.md)**
+  — governing plan for W13. Core design: (1) a cross-type `tracking` body
+  attribute on ALL TEN types (the recipe-metadata spread pattern;
+  enabled/label/tags/goals; ONE uniform `set_tracking` op with exact
+  inverses + a one-writer funnel via `forbidKeys` on the seven open fields
+  ops — nav is already strict, taxonomy/section gain their first
+  body-fields op); (2) `tracking_config` as the ELEVENTH governed type
+  (`trk_drlurie`: fixed-key provider registry with regex-pinned IDs — the
+  `checkBrandTokenValue` law extended to scripts: agents flip typed
+  switches, never inject script/URLs; consent block; per-type collection
+  matrix; export `src/data/site/tracking.json`; require-approval +
+  human-executed publish recommended, OQ-W13-2); (3) the own first-party
+  pipeline: ≤4KB loader riding the EXISTING `data-cms-*` identity
+  attributes → batched sendBeacon → `/api/t` relay function →
+  `tracking_event.v1` (commerce_event.v1 rules verbatim; server-stamped
+  `project_id`; cookieless daily-hash identity, zero device storage) →
+  owner DB (Postgres + `pg_notify` reference kit) with a Blobs mirror for
+  replay; (4) vetted adapters (google_ads/ga4/meta/taboola/outbrain/mgid +
+  a dormant plausible slot; GTM recommended OUT) firing conversions ONLY
+  from per-object `tracking.goals`; (5) geo-adaptive consent (own tracker
+  consent-free everywhere by cookieless design; pixels
+  Consent-Mode-v2-gated in EEA/UK/CH, auto-fire elsewhere; GPC always
+  wins). Leak rule preserved: `label`/`tags` never render (leak tests
+  extend); events carry `node_id` only — engagement×strategy joins happen
+  in the owner DB from exports (OQ-W13-5 asks the blessing). The plan §0
+  records the AMENDMENT: this directive supersedes the 03 §1.7-6 /
+  inventory "analytics stays config.yaml" exclusion.
+- **Briefs + queue:** `T13.1`–`T13.11` committed (attribute → config type
+  → event schema/ingest → loader → render seam → consent [checkpoint
+  OQ-W13-1] → google_ads bridge [checkpoint OQ-W13-3] → natives+CSP-RO →
+  owner-DB kit → seeds/roundtrip → human-gated production drive proving
+  the five criteria for `tracking_config` AND a `set_tracking` round-trip
+  on one object of each of the ten types). queue.tsv rows appended after
+  W12 with the W11-sequencing note (whichever wave runs second rebases
+  paths). OQ-W13-1…6 live wave-locally in the 12 plan §13 (the 06/08
+  convention); 05 §3 carries the pointer addendum.
+- **Records:** object-inventory (planned-type note under the types table +
+  MVP TODO #7), conversion-map (W13 row). NOTHING BUILT — no schema, no
+  store record, no render change; every W13 mark is ⚪ PLANNED, and the
+  build is untouched.
+
+**Waiting on Wolf/vreich (this session adds):**
+
+1. **OQ-W13-1** (consent posture ratification: regions list, geo
+   granularity — gates T13.6) and **OQ-W13-3** (provider set v1; GTM
+   stays out? — gates T13.7).
+2. **OQ-W13-2 / -4 / -5 / -6** (governance tier for `tracking_config`,
+   retention/PII policy, the owner-DB strategy-join blessing, sink env
+   provisioning) — record answers in the 12 plan §13.
+3. Review/merge of `claude/object-tracking-strategy-jh76f4` (no PR opened
+   — house rule; branch review requested instead).
+
 ## Session 2026-07-19 (PRODUCTION FIX: CMS Agents chat 400 on the opening tool-call turn — array-aliasing bug in the run loop)
 
 Task (vreich): fix a production bug reported twice on prod (request_ids
