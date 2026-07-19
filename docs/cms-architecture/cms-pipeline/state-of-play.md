@@ -118,6 +118,47 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   self-test 2/2 PASS again. (`.github/workflows/actions.yaml`,
   `scripts/build-diff.mjs`.)
 
+- **E2E ARTIFACT DRILL — FULL LIVE PROOF (2026-07-19, session MCP connection;
+  the drill ran against the DEPLOYED server — this branch's fixes ship with
+  the PR and are proven by the local suite meanwhile).** Modes A→B→C:
+  **(A)** grant fetched → pdf-tool `list_pdf_templates` preflight (11
+  templates, 4 active — failure-class 4 was remediated 2026-06-30, the
+  `smoke-symptom-worksheet-v1` template landed minutes after the smokes
+  failed) → image job (gpt-image-1, webp, **50,372 bytes — under the 150 KB
+  budget**) + PDF job (pdfme, 9,506 bytes, 1 page A4) both complete →
+  `verify_agent_artifact` **5/5 checks** on both → both visible in
+  `list_artifacts_for_request req_artifact_drill_20260719_01` →
+  `object_validate` candidate patch on the demo article **eligible:true**;
+  negative probe (raw Major Key in `media.src`) correctly REFUSED by the
+  deployed `render_image_ref` check. **(B)** checkout → patch (two nodes:
+  `n_demoartifacts` image + `n_demoworksheet` PDF CTA; rev 15, ready) →
+  `object_publish` → commit `3cea365` dark (`deploy_status` showed NO deploy —
+  the [skip netlify] deferral held) → checkin. **(C)** `release_to_production
+  {commit}` — the MCP response was LOST to a proxy 502, and the
+  state-check-first discipline (deploy_status BEFORE any retry) proved the
+  hook HAD fired: production-context deploy `6a5cb1c4…` ready in 38 s, no
+  duplicate build wasted. `verify_article_images` → **verified:true,
+  deployReady:true**, all three `/img/` exact-matched and fetching 200
+  `image/*`; the `/pdf/` worksheet URL serves **200** from production; the
+  released export carries both nodes byte-exact. The demo article at
+  `/object-model-demo` now demonstrates agent-produced binary artifacts
+  end-to-end. Cold-start note: two 60 s first-call timeouts (CMS-Agent
+  registration read; one object_validate under a concurrent pair) — both
+  succeeded on single retry; keepalive recommendation stands.
+
+- **Stale-queue disposition (Fix 6) — BLOCKED ON OPERATOR, documented.** The
+  60 stale workflow records (50 pending pre-W7 drafts of wiped articles + 10
+  failed June-smoke evidence) should be wiped via `wipe_blob_stores
+  {prefixes:['workflows/']}` (dry-run → review sampleKeys → confirm
+  WIPE_BLOBS). The session connection CANNOT run it — the tool answered
+  "Unauthorized: a valid server publish key is required" even on dry-run —
+  so deletion stays operator-gated. Fixture payloads for the four class-3
+  failure shapes were extracted FIRST and are pinned as committed regression
+  tests (`canonical-input-trust-replay.test.ts`), so the wipe loses no
+  evidence. Operator checklist: (1) dry-run, (2) confirm the sampleKeys are
+  all `workflows/…`, (3) live run with `confirm:"WIPE_BLOBS"`, (4) note the
+  count here.
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for
