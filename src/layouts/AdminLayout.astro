@@ -22,6 +22,15 @@ const metadata = {
 ---
 
 <Layout metadata={metadata}>
+  {
+    /* The /admin/* workspace is a full-viewport app: its own sidebar + topbar
+      are the chrome, and the AdminShell (min-h-screen) plus the chat panels'
+      100vh-anchored composers own the viewport. The public site footer has no
+      place here and, appended after the app, overlapped the chat composer /
+      Send (T9.16 drive finding) — suppress it by passing an empty footer slot.
+      The header stays: it hosts the login modal the signed-out gate opens. */
+  }
+  <Fragment slot="footer"></Fragment>
   <div class="admin-gate adm-root">
     <p class="admin-gate-status" data-auth-status aria-live="polite" role="status"></p>
 

@@ -21,6 +21,8 @@
  * (rendered through the W7.1 substrate; embeds are validation-blocked until
  * their resolvers exist, so this renderer passes none).
  */
+import { BLOCKS } from '@contentful/rich-text-types';
+
 import { renderRichTextV1Html } from '../richtext/render-html.js';
 import type { ContentItemBody, ContentItemNode } from '../../schema/bodies/content-item-v1.js';
 
@@ -198,12 +200,26 @@ const disclosureHtml = (node: ContentItemNode): string => {
   return `<p class="article-node-disclosure text-sm text-muted uppercase tracking-wide">${escapeHtml(disclosure.label ?? 'Sponsored')}</p>`;
 };
 
+/**
+ * Does a rich_text.v1 body open with a heading-2 block? Such a body already
+ * renders the section heading itself, so the node's own `public.title` must
+ * NOT emit a second identical <h2> above it — otherwise every titled node
+ * shows its heading twice on the live article (T9.16 chat-drive finding).
+ * Plain-string bodies never carry headings, so they never suppress the title.
+ */
+const bodyOpensWithHeading2 = (body: ContentItemNode['public']['body']): boolean => {
+  if (!body || typeof body === 'string') return false;
+  return body.content[0]?.nodeType === BLOCKS.HEADING_2;
+};
+
 const headerHtml = (node: ContentItemNode): string => {
   const { eyebrow, title } = node.public;
   const eyebrowHtml = eyebrow
     ? `<p class="article-node-eyebrow text-sm uppercase tracking-wide text-muted">${escapeHtml(eyebrow)}</p>`
     : '';
-  const titleHtml = title ? `<h2>${escapeHtml(title)}</h2>` : '';
+  // T9.16: when the body already opens with a heading-2, THAT block is the
+  // section heading — emitting the title as another <h2> renders it twice.
+  const titleHtml = title && !bodyOpensWithHeading2(node.public.body) ? `<h2>${escapeHtml(title)}</h2>` : '';
   return eyebrowHtml + titleHtml;
 };
 

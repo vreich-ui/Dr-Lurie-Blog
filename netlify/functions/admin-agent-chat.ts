@@ -24,12 +24,7 @@ import type { ObjectVerbStore } from '../lib/object-verbs.js';
 import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
 import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
 import { buildToolContext } from '../lib/agent/context.js';
-import {
-  approvePendingTool,
-  cancelRun,
-  denyPendingTool,
-  startRun,
-} from '../lib/agent/loop.js';
+import { approvePendingTool, cancelRun, denyPendingTool, startRun } from '../lib/agent/loop.js';
 import {
   getAgentChatBlobStore,
   listChatDocs,
@@ -45,6 +40,8 @@ import {
   getProfilesDoc,
   putProfilesDoc,
   resolveProfile,
+  type AgentProfile,
+  type AgentProfilesDoc,
 } from '../lib/agent/profiles.js';
 import { isOwner } from '../lib/roles.js';
 import { randomUUID } from 'node:crypto';
@@ -138,7 +135,19 @@ const triggerBackground = async (chatId: string, triggerToken: string): Promise<
   }
 };
 
-const chatSummary = (doc: ChatDoc) => ({
+const agentView = (p: Pick<AgentProfile, 'profile_id' | 'name' | 'provider' | 'model' | 'avatar_artifact'>) => ({
+  profile_id: p.profile_id,
+  name: p.name,
+  provider: p.provider,
+  model: p.model,
+  ...(p.avatar_artifact ? { avatar_artifact: p.avatar_artifact } : {}),
+});
+
+/** `idleProfile` is the §4a-resolved agent to name when NO run exists yet — so
+ *  the chip shows the real agent (name + provider) before the first message,
+ *  not the generic fallback (T9.16 idle-chip finding). A run (live or last)
+ *  always wins, since its frozen profile is the agent that actually ran. */
+const chatSummary = (doc: ChatDoc, idleProfile?: AgentProfile) => ({
   chat_id: doc.chat_id,
   kind: doc.kind,
   ...(doc.object_type ? { object_type: doc.object_type } : {}),
@@ -147,18 +156,13 @@ const chatSummary = (doc: ChatDoc) => ({
   status: doc.status,
   updated_at: doc.updated_at,
   last_outcome: doc.runs[doc.runs.length - 1] ?? null,
-  ...(doc.run
-    ? {
-        agent: {
-          profile_id: doc.run.profile.profile_id,
-          name: doc.run.profile.name,
-          provider: doc.run.profile.provider,
-          model: doc.run.profile.model,
-          ...(doc.run.profile.avatar_artifact ? { avatar_artifact: doc.run.profile.avatar_artifact } : {}),
-        },
-      }
-    : {}),
+  ...(doc.run ? { agent: agentView(doc.run.profile) } : idleProfile ? { agent: agentView(idleProfile) } : {}),
 });
+
+/** Resolve the agent to display for an idle (never-run) chat; a chat that has
+ *  a run carries its own frozen agent, so none is needed. */
+const idleProfileFor = (profilesDoc: AgentProfilesDoc, doc: ChatDoc): AgentProfile | undefined =>
+  doc.run ? undefined : resolveProfile(profilesDoc, { objectId: doc.object_id, objectType: doc.object_type });
 
 export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
@@ -196,13 +200,18 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
 
     switch (request.data.action) {
       case 'create_chat': {
+        const profilesDoc = await getProfilesDoc(await getAgentProfilesBlobStore(event), nowIso());
         if (request.data.kind === 'object') {
           if (!request.data.object_type || !request.data.object_id) {
             return jsonResponse(400, { error: 'object chats need object_type and object_id.' });
           }
           const chatId = objectChatId(request.data.object_id);
           const existing = await loadChatDoc(chatStore, chatId);
-          if (existing) return jsonResponse(200, { chat: chatSummary(existing), existed: true });
+          if (existing)
+            return jsonResponse(200, {
+              chat: chatSummary(existing, idleProfileFor(profilesDoc, existing)),
+              existed: true,
+            });
           const doc: ChatDoc = {
             schema_version: 'agent-chat.v1',
             chat_id: chatId,
@@ -219,7 +228,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
             runs: [],
           };
           await saveChatDoc(chatStore, doc);
-          return jsonResponse(200, { chat: chatSummary(doc), existed: false });
+          return jsonResponse(200, { chat: chatSummary(doc, idleProfileFor(profilesDoc, doc)), existed: false });
         }
         const doc: ChatDoc = {
           schema_version: 'agent-chat.v1',
@@ -235,20 +244,24 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
           runs: [],
         };
         await saveChatDoc(chatStore, doc);
-        return jsonResponse(200, { chat: chatSummary(doc), existed: false });
+        return jsonResponse(200, { chat: chatSummary(doc, idleProfileFor(profilesDoc, doc)), existed: false });
       }
 
       case 'list_chats': {
         const docs = await listChatDocs(chatStore);
-        return jsonResponse(200, { chats: docs.map(chatSummary) });
+        const profilesDoc = await getProfilesDoc(await getAgentProfilesBlobStore(event), nowIso());
+        return jsonResponse(200, { chats: docs.map((doc) => chatSummary(doc, idleProfileFor(profilesDoc, doc))) });
       }
 
       case 'get_chat': {
         const doc = await loadChatDoc(chatStore, request.data.chat_id);
         if (!doc) return jsonResponse(404, { error: 'chat not found' });
         const since = request.data.since_seq ?? 0;
+        const profilesDoc = doc.run
+          ? undefined
+          : await getProfilesDoc(await getAgentProfilesBlobStore(event), nowIso());
         return jsonResponse(200, {
-          ...chatSummary(doc),
+          ...chatSummary(doc, profilesDoc ? idleProfileFor(profilesDoc, doc) : undefined),
           seq: doc.seq,
           events: doc.events.filter((eventItem) => eventItem.seq > since),
           ...(doc.status === 'awaiting_approval' && doc.run?.pending
