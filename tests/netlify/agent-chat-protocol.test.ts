@@ -20,6 +20,7 @@ import {
   saveChatDoc,
   type AgentChatStore,
   type ChatDoc,
+  type ChatMsg,
 } from '../../netlify/lib/agent/chat-store.js';
 import { buildToolContext } from '../../netlify/lib/agent/context.js';
 import {
@@ -33,7 +34,11 @@ import {
 } from '../../netlify/lib/agent/loop.js';
 import { emptyProfilesDoc, resolveProfile } from '../../netlify/lib/agent/profiles.js';
 import { resolveAutonomy } from '../../netlify/lib/agent/tools.js';
-import type { ProviderAdapter, ProviderTurnResult } from '../../netlify/lib/agent/provider.js';
+import {
+  toAnthropicMessages,
+  type ProviderAdapter,
+  type ProviderTurnResult,
+} from '../../netlify/lib/agent/provider.js';
 import { handler as chatHandler } from '../../netlify/functions/admin-agent-chat.js';
 import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
 
@@ -263,6 +268,55 @@ test('deny feeds the refusal to the model and the run continues without writing'
   assert.equal(sawDenial, true);
   const record = JSON.parse(store.blobs.get(objectRecordKey('page', 'page_chat'))!) as ObjectRecord;
   assert.equal(((record.body as ReturnType<typeof validPageBody>).sections[0]!.data as { heading: string }).heading, 'Before');
+});
+
+// ─── transcript integrity (regression: 2026-07-19 "New article" 400) ────────
+
+test('two parallel auto tool calls on the opening turn keep BOTH tool_use ids on the recorded assistant message', async () => {
+  // Root cause reproduced end-to-end: loop.ts used to alias run.call_queue to
+  // the SAME array already pushed onto the transcript as the assistant
+  // message's tool_calls. Draining call_queue with .shift() (once per
+  // auto-executed call) silently erased both ids from that recorded message
+  // by the time the run asked the provider for a second turn — exactly the
+  // shape Anthropic 400s on ("messages.2.content.0: unexpected tool_use_id
+  // ... Each tool_result block must have a corresponding tool_use block in
+  // the previous message").
+  const call1 = { id: 'toolu_1', name: 'get_object', args: { object_type: 'page', object_id: 'page_chat' } };
+  const call2 = { id: 'toolu_2', name: 'get_object', args: { object_type: 'page', object_id: 'page_chat' } };
+  const capturedTranscripts: ChatMsg[][] = [];
+  const adapter: ProviderAdapter = async ({ transcript }) => {
+    // Snapshot NOW: the transcript array is mutated in place by later loop
+    // steps, so capturing a bare reference would hide exactly the corruption
+    // this test exists to catch.
+    capturedTranscripts.push(JSON.parse(JSON.stringify(transcript)) as ChatMsg[]);
+    if (capturedTranscripts.length === 1) {
+      return { text: 'Reading twice.', toolCalls: [call1, call2], outputTokens: 2 };
+    }
+    return { text: 'Done.', toolCalls: [], outputTokens: 1 };
+  };
+  const { deps, send } = await setup([]);
+  deps.adapter = adapter;
+  const sent = await send('Look something up twice.');
+  const hop = await runAgentLoop(deps, 'obj:page_chat', sent.resume!.triggerToken);
+  assert.equal(hop.status, 'idle');
+  assert.equal(capturedTranscripts.length, 2, 'the run must have asked the provider for a second turn');
+
+  // This is exactly the transcript that would be serialized into the SECOND
+  // provider request. The turn-1 assistant message must still carry BOTH ids
+  // (both tool calls were 'auto' read-class and drained before this point).
+  const turn2Transcript = capturedTranscripts[1]!;
+  const assistantMsg = turn2Transcript.find((msg) => msg.role === 'assistant') as
+    | { tool_calls?: { id: string }[] }
+    | undefined;
+  assert.deepEqual(
+    (assistantMsg?.tool_calls ?? []).map((call) => call.id),
+    ['toolu_1', 'toolu_2'],
+    'both opening tool_use ids must survive onto the recorded assistant turn'
+  );
+
+  // And the real Anthropic conversion must accept it without throwing.
+  const messages = toAnthropicMessages(turn2Transcript);
+  assert.equal(messages.length, 3); // user, assistant(2 tool_use), user(2 tool_result)
 });
 
 // ─── arg validation & contract constraint ────────────────────────────────────

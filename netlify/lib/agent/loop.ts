@@ -307,7 +307,11 @@ export const runAgentLoop = async (
         await persist();
         return { ok: true, status: doc.status };
       }
-      run.call_queue = turn.toolCalls;
+      // Clone: call_queue is drained with shift() below, which MUST NOT mutate
+      // the tool_calls array just recorded on the transcript's assistant
+      // message above (they'd otherwise alias the same array — draining would
+      // silently erase tool_use entries from the persisted turn).
+      run.call_queue = [...turn.toolCalls];
       await persist();
     }
   } catch (error) {

@@ -53,19 +53,36 @@ const DEFAULT_MAX_TOKENS = 16000;
 
 // ─── Anthropic ───────────────────────────────────────────────────────────────
 
-const toAnthropicMessages = (transcript: ChatMsg[]): Anthropic.MessageParam[] => {
+export const toAnthropicMessages = (transcript: ChatMsg[]): Anthropic.MessageParam[] => {
   const messages: Anthropic.MessageParam[] = [];
+  // tool_use ids opened by the most recently emitted assistant turn that a
+  // tool_result hasn't answered yet; null once that turn is fully answered
+  // (or no assistant tool_use turn is open). A defensive invariant, not just
+  // a merge convenience: a tool_result that can't match here means SOME
+  // upstream step (loop.ts recording, pause/resume, ...) desynced the
+  // transcript — better to fail loudly here than send Anthropic a request
+  // it will reject with a cryptic 400.
+  let openToolUseIds: Set<string> | null = null;
   for (const msg of transcript) {
     if (msg.role === 'user') {
       messages.push({ role: 'user', content: msg.text });
+      openToolUseIds = null;
     } else if (msg.role === 'assistant') {
+      const calls = msg.tool_calls ?? [];
       const content: Anthropic.ContentBlockParam[] = [];
       if (msg.text) content.push({ type: 'text', text: msg.text });
-      for (const call of msg.tool_calls ?? []) {
+      for (const call of calls) {
         content.push({ type: 'tool_use', id: call.id, name: call.name, input: call.args });
       }
       if (content.length > 0) messages.push({ role: 'assistant', content });
+      openToolUseIds = calls.length > 0 ? new Set(calls.map((call) => call.id)) : null;
     } else {
+      if (openToolUseIds === null || !openToolUseIds.has(msg.tool_call_id)) {
+        throw new Error(
+          `toAnthropicMessages: tool_result "${msg.tool_call_id}" does not answer a tool_use in the ` +
+            'immediately preceding assistant turn (transcript is desynced).'
+        );
+      }
       const block: Anthropic.ToolResultBlockParam = {
         type: 'tool_result',
         tool_use_id: msg.tool_call_id,
@@ -79,6 +96,7 @@ const toAnthropicMessages = (transcript: ChatMsg[]): Anthropic.MessageParam[] =>
       } else {
         messages.push({ role: 'user', content: [block] });
       }
+      openToolUseIds.delete(msg.tool_call_id);
     }
   }
   return messages;
@@ -116,18 +134,23 @@ export const anthropicAdapter = (options: AdapterOptions): ProviderAdapter => {
 
 type OpenAIMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
-const toOpenAIMessages = (system: string, transcript: ChatMsg[]): OpenAIMessage[] => {
+export const toOpenAIMessages = (system: string, transcript: ChatMsg[]): OpenAIMessage[] => {
   const messages: OpenAIMessage[] = [{ role: 'system', content: system }];
+  // Mirrors toAnthropicMessages' invariant check: every tool message must
+  // follow an assistant message that declared that tool_call id.
+  let openToolCallIds: Set<string> | null = null;
   for (const msg of transcript) {
     if (msg.role === 'user') {
       messages.push({ role: 'user', content: msg.text });
+      openToolCallIds = null;
     } else if (msg.role === 'assistant') {
+      const calls = msg.tool_calls ?? [];
       messages.push({
         role: 'assistant',
         content: msg.text ?? null,
-        ...(msg.tool_calls && msg.tool_calls.length > 0
+        ...(calls.length > 0
           ? {
-              tool_calls: msg.tool_calls.map((call) => ({
+              tool_calls: calls.map((call) => ({
                 id: call.id,
                 type: 'function' as const,
                 function: { name: call.name, arguments: JSON.stringify(call.args) },
@@ -135,9 +158,17 @@ const toOpenAIMessages = (system: string, transcript: ChatMsg[]): OpenAIMessage[
             }
           : {}),
       });
+      openToolCallIds = calls.length > 0 ? new Set(calls.map((call) => call.id)) : null;
     } else {
+      if (openToolCallIds === null || !openToolCallIds.has(msg.tool_call_id)) {
+        throw new Error(
+          `toOpenAIMessages: tool message "${msg.tool_call_id}" does not answer a tool_call in the ` +
+            'immediately preceding assistant turn (transcript is desynced).'
+        );
+      }
       // OpenAI mirrors errors inside the content string; there is no is_error flag.
       messages.push({ role: 'tool', tool_call_id: msg.tool_call_id, content: msg.content });
+      openToolCallIds.delete(msg.tool_call_id);
     }
   }
   return messages;

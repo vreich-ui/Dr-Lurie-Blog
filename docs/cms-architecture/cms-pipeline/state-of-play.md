@@ -7,6 +7,78 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 (PRODUCTION FIX: CMS Agents chat 400 on the opening tool-call turn — array-aliasing bug in the run loop)
+
+Task (vreich): fix a production bug reported twice on prod (request_ids
+`req_011CdBZxMCf8BLLwAMyy1lHC`, `req_011CdBa3eHhuvx4QdvfMxGBz`) — at
+`/admin/agents` → **New article**, the Site Agent's opening move
+(`get_contract` + `list_objects`, both parallel + `auto`) succeeds, then the
+SECOND provider turn 400s: `messages.2.content.0: unexpected tool_use_id
+found in tool_result blocks`. No ApprovalCard ever rendered, blocking step 1
+of the T9.16 drive. Branch `claude/cms-agents-provider-crash-8gte1j`.
+
+**Root cause (`netlify/lib/agent/loop.ts`):** `run.call_queue =
+turn.toolCalls` assigned the SAME array reference already pushed onto the
+transcript as the assistant message's `tool_calls`
+(`run.transcript.push({..., tool_calls: turn.toolCalls})`). Draining
+call_queue with `.shift()` — once per auto-executed / not-available /
+parse-error call — mutates that shared array in place, silently erasing
+tool_use entries from the PERSISTED assistant turn as each call resolves.
+With 2 parallel auto calls, by the time both had run, the recorded assistant
+message's `tool_calls` had been mutated down to `[]` while its two
+tool_results still referenced the now-vanished ids — exactly Anthropic's
+rejected shape (the "previous message" has no tool_use left to match).
+Neither existing test caught it: `agent-chat-providers.test.ts` fed
+`toAnthropicMessages` a hand-built, never-corrupted transcript (never
+exercised `loop.ts`), and `agent-chat-protocol.test.ts`'s scripted adapter
+ignored its `transcript` argument entirely (never exercised the real
+Anthropic/OpenAI conversion) — the gap was in the seam between the two test
+files, not inside either one.
+
+**Fix (minimal, provider-neutral, no schema/protocol change):**
+
+- `loop.ts`: clone on assignment — `run.call_queue = [...turn.toolCalls]` —
+  so draining the queue can never mutate the transcript's recorded turn.
+- `provider.ts`: both `toAnthropicMessages` and `toOpenAIMessages` now track
+  the open tool_use/tool_call ids per assistant turn and THROW a clear,
+  attributable error if a tool result doesn't match the immediately
+  preceding assistant turn, instead of silently building a request the
+  provider would reject with a cryptic 400 (both now exported for direct
+  unit testing).
+- Audited pause/resume (approve/deny) and the not-available/parse-error
+  paths: all already preserve pairing correctly once the aliasing is broken
+  (approve/deny use non-mutating `.filter()`; the shared-array bug was the
+  only source of corruption across every path that touches `call_queue`).
+
+**Tests added (each independently verified to fail pre-fix / pass post-fix
+by temporarily reverting just that half of the fix and re-running):**
+
+- `agent-chat-protocol.test.ts`: `runAgentLoop` end-to-end with 2 parallel
+  auto `get_object` calls on the opening turn, capturing the transcript
+  handed to the SECOND provider call and asserting both tool_use ids survive
+  on the recorded assistant turn.
+- `agent-chat-providers.test.ts`: a hand-built corrupted transcript
+  (mirroring the real `get_contract`+`list_objects` shape) asserting
+  `toAnthropicMessages`/`toOpenAIMessages` throw instead of building the
+  doomed request (and that the adapters never even call `fetch`); a
+  companion valid-shape test proves the same tool names still round-trip
+  clean.
+- Full suite: **1495/1495 + 59/59** (6 new tests over the last-recorded
+  1489/1489); `npx eslint` + `npx prettier --check` clean on all four
+  changed files (`loop.ts`, `provider.ts`, both test files).
+
+**Honest gap — NOT re-driven live:** this sandbox has no deploy and no
+`ANTHROPIC_API_KEY`/`OPENAI_API_KEY`, so the fix is verified by exact
+root-cause tracing against the reported transcript shape + the regression
+tests above, NOT by a live `/admin/agents` → New article click-through. The
+T9.16 drive's step 1 (get_contract + list_objects → `create_object`
+ApprovalCard, no 400) should now clear on the real deploy; if it doesn't,
+that's a NEW finding, not a reopening of this one.
+
+**Standing:** the 47-converted-objects count and every Wolf ruling above are
+unchanged — this is a runtime bug fix in the chat infrastructure, not an
+object conversion.
+
 ## Session 2026-07-19 (W9 REMAINDER BUILT: T9.12→T9.13→T9.14→T9.17→T9.18→T9.26→T9.20→T9.21→T9.22 + both human-gate preps — the queue's outstanding work fished before W10; chat system code-complete, gates pending)
 
 Task (vreich): "Work along queue.tsv. Before we get to the new client wide
