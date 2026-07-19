@@ -7,6 +7,52 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 C (W13 RULINGS: OQ-W13-1…6 all answered — queue unblocked, T13.12/T13.13 added; docs only)
+
+Task (vreich): walk the six OQ-W13 questions interactively and record the
+rulings. All six answered 2026-07-19; recorded as dated GOVERNING
+amendments in the 12 plan §13 (wave-local convention). Branch
+`claude/object-tracking-strategy-jh76f4` (restarted from `bcab22e`),
+merged to main same session per vreich's delivery choice.
+
+**The rulings (full text in [`12-object-tracking-and-analytics.md`](../12-object-tracking-and-analytics.md) §13):**
+
+1. **OQ-W13-1 RATIFIED as seeded** — geo-adaptive; restricted regions =
+   EEA-30 + UK + CH; GPC global; unknown = hold. → **T13.6 flipped
+   checkpoint→auto** in queue.tsv.
+2. **OQ-W13-2 ANSWERED, supersedes the doc's recommendation** — publish
+   autonomy is config-driven ("auto if configured in config"): ships
+   **AUTONOMOUS** (no approval-policy override; master covers it);
+   creation stays human/seed-only (`{agents: []}`); posture must surface
+   as an **owner toggle in the admin UI** → **NEW T13.12** (rides the
+   T9.15 override-layer outcome). Doc 12 §3 amended in place.
+3. **OQ-W13-3 RATIFIED** — full adapter set (google_ads/ga4/meta/taboola/
+   outbrain/mgid, all shipped disabled; plausible dormant); **GTM
+   permanently OUT**. → **T13.7 flipped checkpoint→auto**.
+4. **OQ-W13-4 RATIFIED (recommended bundle)** — mirror retention 90d
+   (policy; enforcement = future cleanup script); no sampling at launch;
+   geo country+subdivision, **city dropped at ingest**; GPC honored,
+   legacy DNT ignored. (12-plan §5.2/§5.3 + T13.3 brief updated.)
+5. **OQ-W13-5 BLESS BOTH** — the engagement×`private.strategy` owner-DB
+   join is BLESSED (events carry node_id only), AND the scores-feedback
+   design is commissioned → **NEW T13.13** (design-only; deliverable =
+   doc 12 §15 appendix; implementation stays a later decision).
+6. **OQ-W13-6 ANSWERED** — vreich provisions `TRACKING_SINK_URL`/`_TOKEN`/
+   `TRACKING_SALT` in Netlify env **before the T13.11 drive**;
+   tracking_event.v1 = additive-only, v2 dual-write; Postgres+pg_notify
+   kit stands.
+
+**Changes:** doc 12 (§0/§1/§3/§5.2/§5.3/§5.4/§12/§13 amendments); briefs
+T13.2/T13.3/T13.6/T13.7/T13.10 updated with the rulings (T13.6/T13.7
+headers now `mode: auto`); NEW briefs T13.12 + T13.13; queue.tsv: two
+mode flips + two appended rows. **W13 is now fully unblocked through
+T13.10** — the only remaining gates are the T13.11 human_gate drive and
+its env provisioning. Session-B "Waiting on" items 1–2 are RESOLVED by
+this session; item 3 (merge) executed same-day.
+
+**Verification:** docs-only diff; `npm run check` + `npm test` green;
+queue.tsv tab/5-column/path check green (13 W13 rows).
+
 ## Session 2026-07-19 B (W13 STRATEGY: object tracking & analytics — doc 12 + T13 briefs; docs only, nothing built)
 
 Task (vreich): research + plan "tracking as an attribute of each existing
