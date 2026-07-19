@@ -9,10 +9,23 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
-import { Badge, Button, Card, EmptyState, Skeleton, StatusPill } from './primitives';
+import { Avatar, Badge, Button, Card, EmptyState, Skeleton, StatusPill } from './primitives';
+import { Input, Select, Textarea } from './forms';
+import { Dialog, useToast } from './overlays';
 import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
 import { IconExternalLink, IconFilePlus, IconPalette, IconPencil, IconPlus, IconSparkles } from './icons';
-import { createFreeChat, listChats, type ChatStatus, type ChatSummaryView } from '../../lib/admin/chat-client';
+import {
+  assignProfile,
+  createFreeChat,
+  listChats,
+  listProfiles,
+  upsertProfile,
+  type AgentAssignmentsView,
+  type AgentProfileView,
+  type ChatStatus,
+  type ChatSummaryView,
+  type ProfileUpsertInput,
+} from '../../lib/admin/chat-client';
 
 async function getToken(): Promise<string> {
   const m = await import('../../utils/goTrueClient');
@@ -72,6 +85,227 @@ const STATUS_TONE: Record<ChatStatus, 'success' | 'info' | 'warning' | 'neutral'
   error: 'warning',
   cancelled: 'neutral',
 };
+
+// ─── T9.26: agent roster & assignment (Owner manage, Admin read) ─────────────
+
+const OBJECT_TYPES = [
+  'page',
+  'section',
+  'navigation',
+  'taxonomy',
+  'site',
+  'template',
+  'product',
+  'content_item',
+  'section_template',
+  'theme',
+];
+
+function RosterSection({ owner }: { owner: boolean }) {
+  const { toast } = useToast();
+  const [profiles, setProfiles] = useState<AgentProfileView[] | null>(null);
+  const [assignments, setAssignments] = useState<AgentAssignmentsView | null>(null);
+  const [editing, setEditing] = useState<ProfileUpsertInput | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const reload = async () => {
+    try {
+      const res = await listProfiles(getToken);
+      setProfiles(res.profiles);
+      setAssignments(res.assignments);
+    } catch {
+      setProfiles([]);
+      setAssignments(null);
+    }
+  };
+  useEffect(() => {
+    void reload();
+  }, []);
+
+  const save = async () => {
+    if (!editing) return;
+    setBusy(true);
+    try {
+      await upsertProfile(getToken, editing);
+      toast({ title: 'Agent saved', tone: 'success' });
+      setEditing(null);
+      await reload();
+    } catch (saveError) {
+      toast({
+        title: 'Could not save the agent',
+        description: saveError instanceof Error ? saveError.message : undefined,
+        tone: 'danger',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const assign = async (target: Parameters<typeof assignProfile>[1], profileId: string | null) => {
+    setBusy(true);
+    try {
+      const res = await assignProfile(getToken, target, profileId);
+      setAssignments(res.assignments);
+    } catch (assignError) {
+      toast({
+        title: 'Assignment failed',
+        description: assignError instanceof Error ? assignError.message : undefined,
+        tone: 'danger',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const profileOptions = (profiles ?? [])
+    .filter((profile) => profile.status === 'active')
+    .map((profile) => ({ value: profile.profile_id, label: profile.name }));
+
+  return (
+    <Card
+      kicker="Roster"
+      title="Dedicated agents"
+      actions={
+        owner ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            leftIcon={<IconPlus size={14} />}
+            onClick={() => setEditing({ name: '', provider: 'anthropic', model: 'claude-opus-4-8', system_prompt: '' })}
+          >
+            New agent
+          </Button>
+        ) : undefined
+      }
+    >
+      {profiles === null ? (
+        <Skeleton variant="rect" height={80} />
+      ) : (
+        <div className="flex flex-col gap-3">
+          <ul className="flex flex-col">
+            {profiles.map((profile) => (
+              <li
+                key={profile.profile_id}
+                className="flex items-center justify-between gap-2 border-b border-[var(--adm-border)] py-2 last:border-0"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <Avatar name={profile.name} size={24} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)]">
+                      {profile.name}
+                    </span>
+                    <span className="block text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+                      {profile.provider === 'anthropic' ? 'Claude' : 'GPT'} · {profile.model}
+                    </span>
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {profile.status === 'disabled' ? <Badge tone="warning">disabled</Badge> : null}
+                  {assignments?.site_default === profile.profile_id ? <Badge tone="info">site default</Badge> : null}
+                  {owner ? (
+                    <Button size="sm" variant="ghost" onClick={() => setEditing({ ...profile })}>
+                      Edit
+                    </Button>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {owner && assignments ? (
+            <details>
+              <summary className="cursor-pointer text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-text-muted)]">
+                Assignments (site default + per-type)
+              </summary>
+              <div className="mt-2 flex flex-col gap-2">
+                <Select
+                  label="Site default"
+                  value={assignments.site_default ?? ''}
+                  onChange={(event) => void assign({ kind: 'site_default' }, event.target.value || null)}
+                  options={[{ value: '', label: '— none —' }, ...profileOptions]}
+                  disabled={busy}
+                />
+                {OBJECT_TYPES.map((type) => (
+                  <Select
+                    key={type}
+                    label={type}
+                    value={assignments.types[type] ?? ''}
+                    onChange={(event) => void assign({ kind: 'type', object_type: type }, event.target.value || null)}
+                    options={[{ value: '', label: '— inherit site default —' }, ...profileOptions]}
+                    disabled={busy}
+                  />
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </div>
+      )}
+
+      <Dialog
+        open={editing !== null}
+        onClose={() => setEditing(null)}
+        title={editing?.profile_id ? `Edit ${editing.name}` : 'New agent'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditing(null)} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={() => void save()} loading={busy} disabled={!editing?.name || !editing?.model}>
+              Save agent
+            </Button>
+          </>
+        }
+      >
+        {editing ? (
+          <div className="flex flex-col gap-3">
+            <Input
+              label="Name"
+              value={editing.name}
+              onChange={(event) => setEditing({ ...editing, name: event.target.value })}
+            />
+            <Select
+              label="Provider"
+              value={editing.provider}
+              onChange={(event) => setEditing({ ...editing, provider: event.target.value as 'anthropic' | 'openai' })}
+              options={[
+                { value: 'anthropic', label: 'Anthropic (Claude)' },
+                { value: 'openai', label: 'OpenAI (GPT)' },
+              ]}
+            />
+            <Input
+              label="Model"
+              value={editing.model}
+              onChange={(event) => setEditing({ ...editing, model: event.target.value })}
+              hint="e.g. claude-opus-4-8 / gpt-5 — editable data, never hardcoded."
+            />
+            <Textarea
+              label="System prompt"
+              rows={5}
+              value={editing.system_prompt ?? ''}
+              onChange={(event) => setEditing({ ...editing, system_prompt: event.target.value })}
+              hint="Leave empty to keep the current prompt (or the house default for new agents)."
+            />
+            <Input
+              label="Avatar artifact (optional)"
+              value={editing.avatar_artifact ?? ''}
+              onChange={(event) => setEditing({ ...editing, avatar_artifact: event.target.value || undefined })}
+              hint="An artifact reference; upload via your profile page's avatar flow."
+            />
+            <Select
+              label="Status"
+              value={editing.status ?? 'active'}
+              onChange={(event) => setEditing({ ...editing, status: event.target.value as 'active' | 'disabled' })}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'disabled', label: 'Disabled (falls through the resolution chain)' },
+              ]}
+            />
+          </div>
+        ) : null}
+      </Dialog>
+    </Card>
+  );
+}
 
 function HubBody() {
   const [chats, setChats] = useState<ChatSummaryView[] | null>(null);
@@ -163,6 +397,8 @@ function HubBody() {
             ))}
           </div>
         </Card>
+
+        <RosterSection owner={owner} />
 
         <Card kicker="Conversations" title="Recent sessions" className="min-h-0 flex-1 overflow-auto">
           {chats === null ? (

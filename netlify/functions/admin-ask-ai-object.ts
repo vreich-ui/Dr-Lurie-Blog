@@ -26,6 +26,7 @@ import { z } from 'zod';
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
 import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { askAiForObject, type AskAiObjectStore } from '../lib/ask-ai-object.js';
+import { getAgentProfilesBlobStore, getProfilesDoc, resolveProfile } from '../lib/agent/profiles.js';
 
 const jsonHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 
@@ -70,10 +71,6 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
   if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return jsonResponse(500, { error: 'OPENAI_API_KEY is not configured' });
-  const model = process.env.OPENAI_MODEL ?? 'gpt-4o';
-
   let rawBody: unknown;
   try {
     const text =
@@ -87,8 +84,28 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (!parsed.success) return jsonResponse(400, { error: 'Invalid request', issues: parsed.error.issues });
 
   try {
+    // T9.26 (§4a): the suggestion speaks through the OBJECT'S dedicated agent
+    // — profile resolution (object → type → site default) supplies provider +
+    // model; nothing is hardcoded here anymore. Copy-only guard and schema
+    // behavior are unchanged in the core.
+    const profilesDoc = await getProfilesDoc(await getAgentProfilesBlobStore(event), new Date().toISOString());
+    const profile = resolveProfile(profilesDoc, {
+      objectId: parsed.data.object_id,
+      objectType: parsed.data.object_type,
+    });
+    const apiKey = profile.provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return jsonResponse(500, {
+        error: `${profile.provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'} is not configured for the assigned agent "${profile.name}".`,
+      });
+    }
+
     const store = (await getSiteObjectsBlobStore(event)) as unknown as AskAiObjectStore;
-    const result = await askAiForObject(store, parsed.data, { apiKey, model });
+    const result = await askAiForObject(store, parsed.data, {
+      apiKey,
+      model: profile.model,
+      provider: profile.provider,
+    });
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('admin-ask-ai-object failed', {

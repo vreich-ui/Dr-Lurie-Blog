@@ -126,3 +126,49 @@ export const cancelChatRun = (getToken: GetToken, chatId: string) =>
 /** Live statuses poll fast (~1.2s); idle backs off (5s). */
 export const pollIntervalFor = (status: ChatStatus | undefined): number =>
   status === 'queued' || status === 'running' ? 1200 : status === 'awaiting_approval' ? 2000 : 5000;
+
+// ─── T9.26: roster & assignment ──────────────────────────────────────────────
+
+export interface AgentProfileView {
+  profile_id: string;
+  name: string;
+  avatar_artifact?: string;
+  provider: 'anthropic' | 'openai';
+  model: string;
+  system_prompt: string;
+  tool_autonomy_overrides?: Record<string, 'auto' | 'ask' | 'off'>;
+  status: 'active' | 'disabled';
+  created_by: string;
+  updated_at: string;
+}
+
+export interface AgentAssignmentsView {
+  objects: Record<string, string>;
+  types: Record<string, string>;
+  site_default?: string;
+}
+
+export const listProfiles = (getToken: GetToken) =>
+  post<{ profiles: AgentProfileView[]; assignments: AgentAssignmentsView }>(getToken, { action: 'list_profiles' });
+
+export interface ProfileUpsertInput {
+  profile_id?: string;
+  name: string;
+  avatar_artifact?: string;
+  provider: 'anthropic' | 'openai';
+  model: string;
+  system_prompt?: string;
+  tool_autonomy_overrides?: Record<string, 'auto' | 'ask' | 'off'>;
+  status?: 'active' | 'disabled';
+}
+
+export const upsertProfile = (getToken: GetToken, profile: ProfileUpsertInput) =>
+  post<{ profile: AgentProfileView }>(getToken, { action: 'upsert_profile', profile });
+
+export type AssignTarget =
+  | { kind: 'object'; object_id: string }
+  | { kind: 'type'; object_type: string }
+  | { kind: 'site_default' };
+
+export const assignProfile = (getToken: GetToken, target: AssignTarget, profileId: string | null) =>
+  post<{ assignments: AgentAssignmentsView }>(getToken, { action: 'assign_profile', target, profile_id: profileId });

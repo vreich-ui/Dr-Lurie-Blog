@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminShell } from './AdminShell';
 import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
 import { Tabs } from './menus';
+import { Select } from './forms';
 import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
 import { ObjectPreview } from './ObjectPreview';
@@ -150,6 +151,63 @@ function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] 
     });
   }
   return [{ id: 'validation', label: 'Validation', criteria }];
+}
+
+// ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads) ────────
+
+function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: boolean }) {
+  const [profiles, setProfiles] = useState<{ profile_id: string; name: string; status: string }[]>([]);
+  const [assigned, setAssigned] = useState<string>('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { listProfiles } = await import('../../lib/admin/chat-client');
+        const res = await listProfiles(getToken);
+        setProfiles(res.profiles);
+        setAssigned(res.assignments.objects[objectId] ?? '');
+      } catch {
+        /* roster unavailable — the resolved chip in the chat header still shows the agent */
+      }
+    })();
+  }, [objectId]);
+
+  if (profiles.length === 0) return null;
+  const options = [
+    { value: '', label: '— inherit (type default → site default) —' },
+    ...profiles
+      .filter((profile) => profile.status === 'active')
+      .map((profile) => ({ value: profile.profile_id, label: profile.name })),
+  ];
+  if (!owner) {
+    const name = profiles.find((profile) => profile.profile_id === assigned)?.name;
+    return (
+      <p className="text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
+        Dedicated agent: <span className="text-[var(--adm-text)]">{name ?? 'inherited'}</span>
+      </p>
+    );
+  }
+  return (
+    <Select
+      label="Dedicated agent"
+      hint="New conversations on this object use this agent (live runs keep the agent they started with)."
+      value={assigned}
+      disabled={busy}
+      onChange={async (event) => {
+        const next = event.target.value;
+        setBusy(true);
+        try {
+          const { assignProfile } = await import('../../lib/admin/chat-client');
+          await assignProfile(getToken, { kind: 'object', object_id: objectId }, next || null);
+          setAssigned(next);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      options={options}
+    />
+  );
 }
 
 // ─── workspace body ───────────────────────────────────────────────────────────
@@ -490,6 +548,9 @@ function WorkspaceBody() {
 
       {/* Details drawer — the classic CMS forms, one click away, never gone. */}
       <Drawer open={detailsOpen} onClose={() => setDetailsOpen(false)} title="Details" width={560}>
+        <div className="mb-4">
+          <DedicatedAgentPicker objectId={record.object_id} owner={owner} />
+        </div>
         <Tabs
           tabs={[
             { id: 'details', label: 'Details', content: <GeneratedInspector record={record} onEditOnSite={url} /> },

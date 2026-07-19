@@ -39,7 +39,15 @@ import {
   saveChatDoc,
   type ChatDoc,
 } from '../lib/agent/chat-store.js';
-import { getAgentProfilesBlobStore, getProfilesDoc, resolveProfile } from '../lib/agent/profiles.js';
+import {
+  agentProviderSchema,
+  getAgentProfilesBlobStore,
+  getProfilesDoc,
+  putProfilesDoc,
+  resolveProfile,
+} from '../lib/agent/profiles.js';
+import { isOwner } from '../lib/roles.js';
+import { randomUUID } from 'node:crypto';
 import { resolveAutonomy, type ToolAutonomy } from '../lib/agent/tools.js';
 import { objectTypeSchema, type Principal } from '../../src/schema/object-record-v1.js';
 import { z } from 'zod';
@@ -87,6 +95,31 @@ const requestSchema = z.discriminatedUnion('action', [
     reason: z.string().max(2000).optional(),
   }),
   z.object({ action: z.literal('cancel'), chat_id: z.string().min(1) }),
+  // ─── T9.26: roster & assignment (read: Admin; manage/assign: Owner) ────────
+  z.object({ action: z.literal('list_profiles') }),
+  z.object({
+    action: z.literal('upsert_profile'),
+    profile: z.object({
+      profile_id: z.string().min(1).optional(),
+      name: z.string().min(1).max(120),
+      avatar_artifact: z.string().optional(),
+      provider: agentProviderSchema,
+      model: z.string().min(1).max(120),
+      system_prompt: z.string().max(20_000).optional(),
+      tool_autonomy_overrides: z.record(z.string(), z.enum(['auto', 'ask', 'off'])).optional(),
+      status: z.enum(['active', 'disabled']).optional(),
+    }),
+  }),
+  z.object({
+    action: z.literal('assign_profile'),
+    target: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('object'), object_id: z.string().min(1) }),
+      z.object({ kind: z.literal('type'), object_type: objectTypeSchema }),
+      z.object({ kind: z.literal('site_default') }),
+    ]),
+    /** null clears the assignment (falls back down the §4a chain). */
+    profile_id: z.union([z.string().min(1), z.null()]),
+  }),
 ]);
 
 /** Fire-and-forget background trigger; a lost POST leaves the doc queued and
@@ -131,7 +164,19 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
   const adminState = await getAdminStateFromEvent(event, context);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
-  if (!adminState.isAdmin) return jsonResponse(403, { error: 'Admin access required' });
+
+  // T9.4 house pattern: the wall is the RESOLVED role set (users store +
+  // ADMIN_EMAILS bootstrap owners) — invited store-tier admins get in; a
+  // disabled member loses access.
+  const callerPrincipal: Principal = {
+    kind: 'human',
+    id: adminState.userId ?? '',
+    email: adminState.email ?? '',
+  };
+  const callerRoles = await resolveRolesForPrincipalAsync(callerPrincipal, {
+    getUserRecord: async (email) => getUserRecord(await getUsersBlobStore(event), email),
+  });
+  if (!callerRoles.includes('admin')) return jsonResponse(403, { error: 'Admin access required' });
 
   let parsedBody: unknown;
   try {
@@ -324,6 +369,60 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
         });
         const result = await cancelRun({ chatStore, toolContext }, request.data.chat_id);
         return jsonResponse(result.status, result.body);
+      }
+
+      case 'list_profiles': {
+        const doc = await getProfilesDoc(await getAgentProfilesBlobStore(event), nowIso());
+        return jsonResponse(200, { profiles: Object.values(doc.profiles), assignments: doc.assignments });
+      }
+
+      case 'upsert_profile':
+      case 'assign_profile': {
+        // Owner-only management (§4a); reads stay open to any admin.
+        if (!isOwner(callerRoles)) return jsonResponse(403, { error: 'Managing agents requires the Owner role.' });
+
+        const profilesStore = await getAgentProfilesBlobStore(event);
+        const doc = await getProfilesDoc(profilesStore, nowIso());
+
+        if (request.data.action === 'upsert_profile') {
+          const input = request.data.profile;
+          const profileId = input.profile_id ?? `prof_${randomUUID().replaceAll('-', '').slice(0, 16)}`;
+          const existing = doc.profiles[profileId];
+          const profile = {
+            profile_id: profileId,
+            name: input.name,
+            ...(input.avatar_artifact ? { avatar_artifact: input.avatar_artifact } : {}),
+            provider: input.provider,
+            model: input.model,
+            system_prompt: input.system_prompt ?? existing?.system_prompt ?? '',
+            ...(input.tool_autonomy_overrides ? { tool_autonomy_overrides: input.tool_autonomy_overrides } : {}),
+            status: input.status ?? existing?.status ?? ('active' as const),
+            created_by: existing?.created_by ?? caller.email,
+            updated_at: nowIso(),
+          };
+          doc.profiles[profileId] = profile;
+          doc.updated_at = nowIso();
+          await putProfilesDoc(profilesStore, doc);
+          return jsonResponse(200, { profile });
+        }
+
+        const { target, profile_id: profileId } = request.data;
+        if (profileId !== null && !doc.profiles[profileId]) {
+          return jsonResponse(404, { error: `No profile "${profileId}".` });
+        }
+        if (target.kind === 'object') {
+          if (profileId === null) delete doc.assignments.objects[target.object_id];
+          else doc.assignments.objects[target.object_id] = profileId;
+        } else if (target.kind === 'type') {
+          if (profileId === null) delete doc.assignments.types[target.object_type];
+          else doc.assignments.types[target.object_type] = profileId;
+        } else {
+          if (profileId === null) delete doc.assignments.site_default;
+          else doc.assignments.site_default = profileId;
+        }
+        doc.updated_at = nowIso();
+        await putProfilesDoc(profilesStore, doc);
+        return jsonResponse(200, { assignments: doc.assignments });
       }
     }
   } catch (error) {
