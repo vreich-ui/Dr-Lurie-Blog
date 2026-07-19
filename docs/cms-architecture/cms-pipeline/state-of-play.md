@@ -7,6 +7,75 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 E (W13 CHUNK 1 BUILT: T13.1→T13.5 — tracking substrate code-complete to the render seam; T10.4 RATIFIED in-session; delivery via git bundle)
+
+Continuation of session D (same Cowork cloud sandbox, same branch
+`claude/w10-design-vocabulary`, same no-push/no-device-git constraints —
+delivery is `.tmp/w10-w13-progress.bundle`, superseded by the final chunk
+bundle). T10.4 rulings were collected interactively mid-session (recorded
+in `design-vocabulary-gaps.md` §7, commit `132328ce`): five mints approved
+(video folds into media), all five variants approved, axis set ratified
+as shipped — **T10.5/T10.6 are unblocked**. Then the W13 lane per the
+sequencing choice:
+
+- **T13.1 (`6bb7446a`)**: the shared `tracking` attribute on all ten bodies
+  - the uniform `set_tracking` op (one-writer funnel via forbidKeys ×7;
+    whole-block captures — first-set/removal/merge all invert exactly);
+    tracking_attribute criterion (§6 matrix via TRACKABLE_ACTIVITIES_BY_TYPE);
+    contract constraint; leak tests extended to label/tags sentinels.
+- **T13.2 (`82c7baa3`)**: `tracking_config` — the ELEVENTH governed type
+  (trk_drlurie): fixed-key provider registry with regex-pinned IDs (GTM
+  permanently unenables — OQ-W13-3), env-var-NAMES-never-URLs law, consent
+  - defaults blocks; trk\_ ids; set_tracking_config_fields; engine-enforced
+    per-site singleton (409); materializer → src/data/site/tracking.json +
+    collection; creation {agents: []} (empty allowlist now LEGAL = humans/
+    seeds only); publish AUTONOMOUS under the master (OQ-W13-2); full
+    contract. NOTE: objectTypes now has ELEVEN members.
+- **T13.3 (`3da00f7b`)**: tracking_event.v1 (client vs enriched shapes;
+  commerce_event rules verbatim) + /api/t relay: per-event drop, props
+  allowlist, id-grammar revalidation, daily vhash + 30-min shash (raw IP
+  discarded by construction), pinned geo accessor (x-nf-geo JSON/base64 →
+  x-country; city NEVER read), same-origin + token bucket, 2s no-retry
+  sink forward (env names from the config's own block, OQ-W13-6 defaults),
+  blob mirror (tracking-events store, replay-idempotent), region oracle.
+- **T13.4 (`a69184ac`)**: the loader — DOM-thin core (impression-once +
+  dwell, scroll buckets, visibility-aware engagement, read_progress/
+  completion, batch/flush policy, sampling on impressions/dwell only,
+  GPC-suppressed consent seam) + pure click classification + thin browser
+  binding (VT-safe: astro:page-load only trigger, before-swap flush).
+  SIZE BUDGET test: real esbuild bundle ≤4KB min+gzip (ceiling 6KB).
+- **T13.5 (`8860496a`)**: TrackingScripts.astro render seam — Layout swap
+  live and byte-invisible (no export exists → renders nothing; build-diff
+  EMPTY is the proof), #trk-config assembly + goal map, consent-bootstrap
+  skeleton, loader mounted as a real bundled script, own+plausible
+  adapters with the write+render regex double enforcement (drifted ID
+  FAILS THE BUILD); data-cms-track="off" at all three annotation sites;
+  Analytics/Splitbee/config.yaml-analytics/@astrolib-analytics RETIRED
+  (importers verified). Loader page context derives from the stamped
+  data-cms-\* DOM.
+
+**Verification at the chunk boundary:** suite **1562/1562 + 59/59**;
+`npm run check` green; build-diff EMPTY (80/80) after EVERY task —
+nothing here changes a public page until a tracking_config export exists
+(T13.10 seeds / T13.11 drive). Every W13 mark through T13.5 is BUILT,
+NOT CONVERTED (no store record — the five-criteria bar applies at T13.11).
+
+**Honest gaps (next builder):** the TrackingScripts component itself is
+tested through its pure halves + the build-diff gate; a fixture-export
+dist assertion (post-astro-compress #trk-config parse) should ride
+T13.10's seed roundtrip when a real export exists. The ingest function's
+sink-config store read is cached 5 min and falls back to
+TRACKING_SINK_URL/TOKEN env names on any failure.
+
+**Waiting on Wolf/vreich:** (1) fetch + review + push the bundle
+(`.tmp/w13-chunk1.bundle`, 14 commits, branch
+`claude/w10-design-vocabulary`) — CI runs on your push; (2) the standing
+human gates unchanged (T9.16 re-drive, T9.7, T9.23; now also the eventual
+T13.11 env provisioning per OQ-W13-6); (3) local repo cleanup one-liner
+from session D still applies. **Next in queue:** T13.6 (consent banner —
+auto), T13.7 (google_ads bridge — auto), T13.8+ / or W10 T10.5–T10.6
+(mints, now ratified) — both lanes open.
+
 ## Session 2026-07-19 D (W10 CHUNK 1: T10.1→T10.2→T10.3 built to the T10.4 checkpoint — token axes live in schema/render/verbs/contract; survey proposal awaiting ratification)
 
 Task (vreich): "check where we are on the conversion trail and continue"
