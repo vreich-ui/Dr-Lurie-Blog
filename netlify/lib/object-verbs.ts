@@ -1079,6 +1079,14 @@ export const handleObjectVerb = async (
         });
       }
 
+      // T9.18 (§8 matrix): a REAL apply by a HUMAN requires the Owner tier —
+      // dry_run stays open to any admin (preview is a read). Agent principals
+      // are unchanged (no roles by design; gated by the approval machinery
+      // and the privileged-op funnel — the W8.4 production path).
+      if (principal.kind === 'human' && !(options.roles ?? []).includes('owner')) {
+        return err(403, { error: 'Applying a theme requires the Owner role.' });
+      }
+
       // A REAL apply needs the caller's site checkout (schema-optional only
       // so dry_run can omit them).
       if (request.lock_token === undefined || request.expected_record_version === undefined) {
