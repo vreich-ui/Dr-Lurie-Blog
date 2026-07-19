@@ -90,6 +90,33 @@ const systemPrompt = (doc: ChatDoc, profile: RunProfile): string => {
   return lines.join('\n\n');
 };
 
+/** For creation tools, surface the created object's id + type on the
+ *  tool_result EVENT so the UI can route to the new object's workspace. */
+const CREATION_TOOL_TYPES: Record<string, (args: Record<string, unknown>) => string | undefined> = {
+  create_object: (args) => (typeof args.object_type === 'string' ? args.object_type : undefined),
+  create_variant: () => 'content_item',
+  instantiate_template: () => 'page',
+  instantiate_section_template: (args) =>
+    (args.target as { kind?: string } | undefined)?.kind === 'standalone' ? 'section' : undefined,
+};
+const resultObjectRef = (
+  toolName: string,
+  args: Record<string, unknown>,
+  content: string
+): { object_id: string; object_type?: string } | undefined => {
+  const typeOf = CREATION_TOOL_TYPES[toolName];
+  if (!typeOf) return undefined;
+  try {
+    const parsed = JSON.parse(content) as { record?: { object_id?: string }; object_id?: string };
+    const objectId = parsed.record?.object_id ?? parsed.object_id;
+    if (!objectId) return undefined;
+    const objectType = typeOf(args);
+    return { object_id: objectId, ...(objectType ? { object_type: objectType } : {}) };
+  } catch {
+    return undefined;
+  }
+};
+
 const finishRun = (doc: ChatDoc, at: string, outcome: 'completed' | 'error' | 'cancelled' | 'caps', chips: string[]) => {
   if (doc.run) {
     doc.runs.push({
@@ -235,11 +262,13 @@ export const runAgentLoop = async (
           content: result.content,
           ...(result.is_error ? { is_error: true } : {}),
         });
+        const created = result.is_error ? undefined : resultObjectRef(call.name, call.args, result.content);
         appendChatEvent(doc, now(deps), 'tool_result', {
           run_id: run.run_id,
           call_id: call.id,
           tool: call.name,
           is_error: result.is_error,
+          ...(created ?? {}),
         });
         await persist();
         if (await cancelledCheck()) return { ok: true, status: doc.status };
@@ -360,11 +389,13 @@ export const approvePendingTool = async (
     content: result.content,
     ...(result.is_error ? { is_error: true } : {}),
   });
+  const created = result.is_error ? undefined : resultObjectRef(pending.tool, args, result.content);
   appendChatEvent(doc, at(), 'tool_result', {
     run_id: doc.run.run_id,
     call_id: callId,
     tool: pending.tool,
     is_error: result.is_error,
+    ...(created ?? {}),
   });
   delete doc.run.pending;
 

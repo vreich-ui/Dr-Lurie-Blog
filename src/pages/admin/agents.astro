@@ -1,0 +1,11 @@
+---
+// CMS Agents hub (T9.17) — cross-object conversations with the §4 creation
+// starters. Static shell + client island; the wall is server-side in
+// admin-agent-chat (identity + admin allowlist).
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import AgentsHub from '~/components/admin-ui/AgentsHub';
+---
+
+<AdminLayout title="Admin — CMS Agents">
+  <AgentsHub client:load />
+</AdminLayout>
