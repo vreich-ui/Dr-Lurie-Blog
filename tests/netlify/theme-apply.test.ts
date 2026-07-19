@@ -372,3 +372,52 @@ test('a theme missing a consumed color key warns while drafting and blocks at pu
   assert.equal(publish.find((criterion) => criterion.id === 'theme_token_keys')?.status, 'missing');
   assert.equal(publish.find((criterion) => criterion.id === 'theme_token_unknown_keys')?.status, 'warning');
 });
+
+// ─── T9.18: verb-level Owner gate on a REAL human apply (§8 matrix) ──────────
+
+test('a REAL apply by a human requires the owner role; dry_run stays open; agents unchanged', async () => {
+  const store = createMemoryStore();
+  await seedSite(store);
+  await seedObject(store, 'theme', 'thm_midnight', altThemeBody());
+  const verbStore = store as unknown as ObjectVerbStore;
+  const validationContext = await buildStoreValidationContext(verbStore);
+  const human: Principal = { kind: 'human', id: 'id-adm', email: 'admin@example.com' };
+
+  // Admin-tier human (no owner role): real apply → 403 BEFORE any lock check.
+  const denied = await handleObjectVerb(
+    verbStore,
+    { action: 'apply_theme', theme_id: 'thm_midnight', site_id: 'site_drlurie', lock_token: 'x', expected_record_version: 1 },
+    human,
+    { nowMs: NOW, validationContext, roles: ['admin'] }
+  );
+  assert.equal(denied.status, 403);
+  assert.match(String(denied.body.error), /Owner role/);
+
+  // Same human: dry_run is a read — allowed.
+  const preview = await handleObjectVerb(
+    verbStore,
+    { action: 'apply_theme', theme_id: 'thm_midnight', site_id: 'site_drlurie', dry_run: true },
+    human,
+    { nowMs: NOW, validationContext, roles: ['admin'] }
+  );
+  assert.equal(preview.status, 200);
+
+  // Owner-tier human: passes the gate (fails later only on lock, which is the point).
+  const ownerAttempt = await handleObjectVerb(
+    verbStore,
+    { action: 'apply_theme', theme_id: 'thm_midnight', site_id: 'site_drlurie', lock_token: 'x', expected_record_version: 1 },
+    human,
+    { nowMs: NOW, validationContext, roles: ['owner', 'admin'] }
+  );
+  assert.equal(ownerAttempt.status, 423); // gate passed; lock check speaks
+
+  // Agent principal with no roles: unchanged behavior (423 on bad lock, not 403).
+  const agentAttempt = await call(store, {
+    action: 'apply_theme',
+    theme_id: 'thm_midnight',
+    site_id: 'site_drlurie',
+    lock_token: 'x',
+    expected_record_version: 1,
+  });
+  assert.equal(agentAttempt.status, 423);
+});

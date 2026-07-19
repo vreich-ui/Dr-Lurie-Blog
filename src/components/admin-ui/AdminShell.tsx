@@ -57,9 +57,9 @@ const NAV: NavGroup[] = [
   {
     items: [
       { label: 'Home', href: '/admin', icon: IconHome },
-      { label: 'Content', href: '/admin/content', icon: IconLibrary, soon: true },
-      { label: 'Agents', href: '/admin/agents', icon: IconSparkles, soon: true },
-      { label: 'Studio', href: '/admin/studio', icon: IconPalette, soon: true },
+      { label: 'Content', href: '/admin/content', icon: IconLibrary },
+      { label: 'Agents', href: '/admin/agents', icon: IconSparkles },
+      { label: 'Studio', href: '/admin/studio', icon: IconPalette },
       { label: 'Component kit', href: '/admin/kit', icon: IconLibrary },
     ],
   },

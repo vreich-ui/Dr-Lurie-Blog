@@ -7,6 +7,150 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 (W9 REMAINDER BUILT: T9.12→T9.13→T9.14→T9.17→T9.18→T9.26→T9.20→T9.21→T9.22 + both human-gate preps — the queue's outstanding work fished before W10; chat system code-complete, gates pending)
+
+Task (vreich): "Work along queue.tsv. Before we get to the new client wide
+phases i prefer to fish all that is outstanding or has been passed over."
+Session model switched to Fable 5 for the `notify` rows (T9.12/T9.13 run
+in-session at designated model per autonomous-run B2). Branch
+`claude/queue-tsv-outstanding-wghuhd`; one task = one commit throughout.
+**Everything below is code-complete and suite-proven; NOTHING here counts as
+shipped until the T9.16 + T9.23 production drives pass (house convention).**
+
+- **T9.12 spike (commit `9979b4f`)**: the chat-first premise proven —
+  pause on an ask-gated tool call, persist to a blob event-log doc, resume on
+  a later invocation with the stored call re-verified (args re-hash; client
+  args never read on plain approve). 4/4 local proof against the real
+  `handleObjectVerb`; forged resumes (wrong call_id / tampered args / token
+  replay) 409; deny feeds a refusal; human-principal attribution + clean lock
+  cycle. **Deploy-level timing NOT exercised** (branch has no deploy) — the
+  ≥60 s pause acceptance rides the T9.16 drive; findings note
+  (`T9.12-findings.md`) carries the validated design: single-doc event log,
+  single-writer state machine (no CAS on Blobs), one-shot trigger tokens,
+  provider-neutral transcript with stateless re-send, call_queue for
+  multi-tool turns, caps, and the two recovery gaps (stuck-queued /
+  stuck-running) T9.13 closed with stale-takeover. Spike files deleted by
+  T9.13 (importer-grep clean).
+- **T9.13 runtime (commit `0f64865`)**: `netlify/lib/agent/{chat-store,
+profiles,provider,tools,loop,context}.ts` + `admin-agent-chat.ts`
+  (create_chat/list_chats/get_chat?since_seq/send/approve_tool [with
+  edit-and-approve, schema-revalidated]/deny_tool/cancel) +
+  `admin-agent-chat-run-background.ts` (15-min hop, trigger-token gated).
+  BOTH provider adapters v1 (OQ-W9-3): Anthropic (`claude-opus-4-8` seed
+  default; no sampling params — 400 on Opus 4.7+; thinking omitted v1 so the
+  neutral transcript round-trips; parallel tool_results merge into ONE user
+  turn) and OpenAI (`gpt-5` seed; arguments JSON parsed defensively) — both
+  behind one interface, provider/model from the resolved profile, NEVER
+  hardcoded. §4 registry: reads auto; draft/creation/publication ask;
+  creation + apply_theme dry-run-FIRST (server-computed preview rides the
+  approval card); apply_theme Owner-gated AT EXECUTION independent of
+  autonomy; patch ops constrained to the type's agent-authored contract ops;
+  args zod-validated BEFORE any pause. Governance `chat_tools` consumed
+  (T9.15's seam closed) + per-profile overrides; autonomy frozen per run.
+  Every execution carries the SAME store validation context + policies as
+  admin-object — no new write paths. Deps added: `@anthropic-ai/sdk@0.112`,
+  `openai@6.48`. 18 protocol/conformance tests.
+- **T9.14 chat UI (commit `d3d2cac`)**: chat primitives
+  (`src/components/admin-ui/chat.tsx` — ChatThread/ToolCallCard/ApprovalCard
+  with Approve / Edit-and-approve / Deny + dry-run verdict/AgentChip/
+  ChatComposer with the readiness strip directly above + suggested prompts
+  from missing criteria) + `useChat` since_seq polling (~1.2 s live / 5 s
+  idle; "Waking the agent…" covers cold starts) + the LAYOUT FLIP: chat
+  center, live preview right (refreshes on every accepted write), the T9.9
+  inspector + History + Raw one click away in a Details drawer.
+- **T9.17 hub (commit `f08e14d`)**: `/admin/agents` — session list with human
+  titles + outcome chips (created/published/edited N, from run summaries),
+  resume, four starters (article / page-from-template REUSE-FIRST / section
+  template / Owner-only retheme). Creation tool_result events now carry the
+  created object's id+type → one-click "Open <id>" into its workspace.
+- **T9.18 studio (commit `e60bf4c`)**: `/admin/studio` — tpl/stpl/thm
+  galleries with the REQUIRED metadata trio (tpl_fieldtest wears the visible
+  "needs backfill (422 on patch)" badge); dry-run-first instantiate + apply
+  flows; theme apply = dry-run token diff → typed APPLY confirm → real
+  apply under a site checkout. **SECURITY FIX found en route: the verb core
+  had NO owner gate on a human real `apply_theme`** (§8 matrix said
+  "verb-level owner check") — added: humans need `owner` (403), dry_run open,
+  AGENT principals byte-unchanged (W8.4 path preserved); +1 test, 12/12.
+- **T9.26 roster (commit `e6b2cdc`)**: §4a closed — roster UI (Owner
+  create/edit: name/provider/model/prompt/status; site-default + per-type
+  assignment selects), per-object "Dedicated agent" selector in the
+  workspace drawer, run records stamp the resolved profile (mid-run
+  reassignment never switches — tested), and the canvas Ask-AI re-pointed
+  through profile resolution: `ask-ai-object.ts` gained an Anthropic
+  transport (forced tool_choice) beside OpenAI; hardcoded OPENAI_MODEL/
+  gpt-4o gone from `admin-ask-ai-object.ts`. ALSO: `admin-agent-chat`'s
+  front door now follows the T9.4 pattern (resolved ROLES, not env isAdmin)
+  so invited store-tier admins can chat. +3 tests over real local stores.
+- **T9.20 article settings (commit `489b47e`)**: canvas panel "Article
+  settings" accordion (article panels only) + workspace-drawer parity card:
+  slug (edit-time candidate-validate BEFORE the lock — collisions surface at
+  edit, not publish), description, category select + tags datalist from the
+  tax_drlurie REGISTRY object (novel terms flagged inline pre-publish), SEO
+  description with counter — one `set_article_meta` op under EditSession.
+  **Honesty notes for the T9.23 drive: 'author' has NO object-model field**
+  (legacy frontmatter concept; row-3 decision left to Wolf) and 'date' =
+  the publish timestamp (T9.21's option).
+- **T9.21 tray finishers (commit `6161fcc`)**: per-row readiness gate (a
+  validate round-trip must report eligible; blockers hold the button with
+  the criterion text inline; validation-unreachable fails OPEN to the server
+  gate), publish now / explicit-timestamp (`EditSession.publish(time?)`
+  additive; OQ-2 honored — no scheduling/unpublish), and the `--dlem-*`
+  token bridge: every VALUE resolves through `--adm-*` first, falling back
+  to the original `--aw-*` chain on the public canvas (values only, zero
+  selector change).
+- **T9.22 publisher re-point (commit `51e9d2c`, closes W7.5)**: the
+  5-agent workflow's final stage targets the object substrate —
+  content_item create (article_body.v1 nodes pass VERBATIM, strategy
+  annotations intact in private.\*) → taxonomy/SEO → validate with the live
+  context → publish under the gate → checkin; release NOT fired. Publish-key
+  callers act as agent `publisher-workflow`; admin sessions as the human.
+  **`publish-article.ts` + `admin-workflow-lock.ts` byte-untouched (git
+  diff empty); the legacy path receives ZERO writes — pinned by a
+  source-level test.** Legacy overwrite semantics retired (slug uniqueness
+  refuses). +3 tests incl. mocked GitHub committer end-to-end.
+- **Human-gate preps (this commit)**: `T9.16-chat-drive-checklist.md` (8
+  steps + the T9.12 deploy-level acceptance carried in) and
+  `T9.23-parity-signoff-checklist.md` (§5's 11 rows as drive steps; OQ-W9-5
+  slot). **Waiting on Wolf/vreich** — see "Waiting on" below.
+- **Verification**: full suite **1489/1489 + 59/59**; `npm run check` green
+  throughout; **build-diff vs branch base (`601b8ab`): all 70 public pages
+  byte-identical** — the 8 diffs are `/admin/*` only (2 new pages + 6 admin
+  pages the tasks deliberately changed), i.e. the public-EMPTY criterion
+  holds exactly.
+
+**Waiting on Wolf/vreich (ordered):**
+
+1. **Merge + deploy this branch** (PR from
+   `claude/queue-tsv-outstanding-wghuhd`), with `ANTHROPIC_API_KEY` present
+   in Netlify env (OPENAI_API_KEY already there).
+2. **T9.7 drive** — the RBAC credentialed verification (runbook committed
+   2026-07-17) apparently still awaits its production run; it precedes the
+   chat drive naturally.
+3. **T9.16 drive** — the chat credentialed run (checklist above). Wave-exit
+   record in this file.
+4. **T9.23 sign-off** — the 11-row parity drive + the row-3 author ruling +
+   OQ-W9-5. Unblocks T9.24 legacy deletion → T9.25 close-out (both auto).
+5. Standing smaller items still open: `tpl_fieldtest` metadata backfill or
+   retirement (now VISIBLE in the studio as a badge); the stale-queue wipe
+   (operator-gated, checklist in the 07-19 artifact entry); OQ-W9-2/-4/-6/-7
+   remain as recorded.
+
+**Gotchas found this session (for the next builder):**
+
+- Netlify checkout responses carry the token as top-level `lockToken`
+  (`body.lock` is sanitized — never the token); guessing `lock.token` costs
+  a debugging pass.
+- `EditSession.lockState` is private — UI code doing raw verb composition
+  (studio theme apply) should checkout via `callObjectVerb` directly.
+- The eslint config has no react-hooks plugin — a
+  `react-hooks/exhaustive-deps` disable comment is itself a lint ERROR.
+- Astro page ↔ island name collision: a page named `studio.astro` cannot
+  import a component named `Studio` (ts2440); alias the import.
+- The publish gate resolves human roles via the SYNC env resolver inside
+  `publish_by_time` — tests must set `ADMIN_EMAILS`, and the T9.4 async
+  store-tier roles do NOT feed that gate yet (worth a look when the roles
+  migration continues).
+
 ## Session 2026-07-19 (W10–W12 PLANNED: platformization pipeline — design vocabulary, multi-tenant core, site capture; docs only, no code, nothing converted)
 
 Task (vreich): analyze the conversion roadmap, agents' template-creation range

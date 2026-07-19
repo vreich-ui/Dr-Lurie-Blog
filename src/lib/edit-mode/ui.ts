@@ -42,6 +42,7 @@ import { mediaPolicyConfig } from '../../config/media-policy.js';
 import { previewFieldChange, restoreRegion, snapshotRegion, type RegionSnapshot } from './preview.js';
 import {
   askAiSuggestion,
+  callObjectVerb,
   canExecutePublish,
   EditSession,
   ensureBlobBackedImage,
@@ -62,7 +63,7 @@ const MODE_KEY = 'dl-edit-mode';
 export type MountOptions = { email: string; roles: string[]; getToken: GetToken };
 
 /** What the panel is doing: AI chat, manual text form, the image tool, or the role/annotation editor. */
-type PanelMode = 'ai' | 'edit' | 'image' | 'role';
+type PanelMode = 'ai' | 'edit' | 'image' | 'role' | 'meta';
 
 type PanelState = {
   target: EditTarget;
@@ -79,6 +80,8 @@ type PanelState = {
   navBody?: NavigationBody;
   /** Article-node targets: the node's current annotations (the role editor's before-state). */
   nodePrivate?: { strategy?: string; intent?: string; agentNotes?: string };
+  /** Article targets: the body-level metadata the settings form edits (T9.20). */
+  articleMeta?: Record<string, unknown>;
   suggestion?: Record<string, unknown>;
   changes?: FieldChange[];
   snapshot?: RegionSnapshot;
@@ -132,18 +135,18 @@ let activeController: AbortController | undefined;
 // accent(green)=save/ok, secondary(rust)=delete/danger, primary=action.
 const STYLES = `
 :root{
-  --dlem-accent:var(--aw-color-primary,rgb(20 122 140));
-  --dlem-accent-ink:#fff;
-  --dlem-surface:var(--aw-color-bg-page,#fff);
-  --dlem-surface-2:var(--aw-color-bg-surface,#f1f5f4);
-  --dlem-text:var(--aw-color-text-default,rgb(36 41 46));
-  --dlem-heading:var(--aw-color-text-heading,rgb(18 33 38));
-  --dlem-muted:var(--aw-color-text-muted,rgb(58 65 73 / 76%));
-  --dlem-border:color-mix(in srgb,var(--aw-color-text-muted,rgb(58 65 73)) 24%,transparent);
-  --dlem-draft:var(--aw-color-gold,#b45309);
-  --dlem-ok:var(--aw-color-accent,#15803d);
-  --dlem-danger:var(--aw-color-secondary,#b91c1c);
-  --dlem-font:var(--aw-font-sans,ui-sans-serif,system-ui,sans-serif);
+  --dlem-accent:var(--adm-accent,var(--aw-color-primary,rgb(20 122 140)));
+  --dlem-accent-ink:var(--adm-text-on-accent,#fff);
+  --dlem-surface:var(--adm-surface-page,var(--aw-color-bg-page,#fff));
+  --dlem-surface-2:var(--adm-surface-sunken,var(--aw-color-bg-surface,#f1f5f4));
+  --dlem-text:var(--adm-text,var(--aw-color-text-default,rgb(36 41 46)));
+  --dlem-heading:var(--adm-text-heading,var(--aw-color-text-heading,rgb(18 33 38)));
+  --dlem-muted:var(--adm-text-muted,var(--aw-color-text-muted,rgb(58 65 73 / 76%)));
+  --dlem-border:var(--adm-border,color-mix(in srgb,var(--aw-color-text-muted,rgb(58 65 73)) 24%,transparent));
+  --dlem-draft:var(--adm-warning,var(--aw-color-gold,#b45309));
+  --dlem-ok:var(--adm-success,var(--aw-color-accent,#15803d));
+  --dlem-danger:var(--adm-danger,var(--aw-color-secondary,#b91c1c));
+  --dlem-font:var(--adm-font-sans,var(--aw-font-sans,ui-sans-serif,system-ui,sans-serif));
   --dlem-font-head:var(--aw-font-heading,var(--dlem-font));
   --dlem-shadow:0 14px 40px rgba(0,0,0,.24);
   /* The sparkle stars: deliberately brighter than the rest of the toolbar so
@@ -325,6 +328,7 @@ body.dl-em-on .dl-em-gaplayer{display:block}
 .dl-em-panel:not(.dl-em-has-image) .dl-em-acc[data-em-acc="image"]{display:none}
 /* The role/annotation editor applies to article blocks only. */
 .dl-em-panel:not(.dl-em-article) .dl-em-acc[data-em-acc="role"]{display:none}
+.dl-em-panel:not(.dl-em-article) .dl-em-acc[data-em-acc="meta"]{display:none}
 .dl-em-rolefoot{display:flex;gap:8px;align-items:center}
 .dl-em-form select{background:var(--dlem-surface-2);color:var(--dlem-text);border:1px solid var(--dlem-border);
   border-radius:8px;padding:7px 9px;font:12.5px var(--dlem-font)}
@@ -527,6 +531,8 @@ export const mountEditMode = (options: MountOptions): void => {
     `<div class="dl-em-acc-body" data-em-acc-body="image"></div></section>` +
     `<section class="dl-em-acc" data-em-acc="role">${accHead('role', ICON_TAG, 'Role & intent')}` +
     `<div class="dl-em-acc-body" data-em-acc-body="role"></div></section>` +
+    `<section class="dl-em-acc" data-em-acc="meta">${accHead('meta', ICON_TAG, 'Article settings')}` +
+    `<div class="dl-em-acc-body" data-em-acc-body="meta"></div></section>` +
     `</div>`;
   document.body.append(panel);
   // Single reusable form node, moved into whichever section (edit/image) is open.
@@ -1002,31 +1008,107 @@ export const mountEditMode = (options: MountOptions): void => {
       const publishBtn = document.createElement('button');
       publishBtn.className = 'dl-em-btn';
       publishBtn.textContent = 'Publish';
-      publishBtn.disabled = !allowPublish;
-      publishBtn.addEventListener('click', async () => {
+      // T9.21 (capability #9): the readiness gate moves into the tray — the
+      // button stays disabled until validate reports eligible; blockers show
+      // inline in the human criterion text.
+      publishBtn.disabled = true;
+      publishBtn.title = 'Checking readiness…';
+      const timeBtn = document.createElement('button');
+      timeBtn.className = 'dl-em-btn dl-em-ghost';
+      timeBtn.textContent = '🕓';
+      timeBtn.title = 'Publish with an explicit timestamp';
+      timeBtn.setAttribute('aria-label', 'Publish with an explicit timestamp');
+      timeBtn.disabled = true;
+
+      const doPublish = async (publishedTime?: string): Promise<void> => {
         publishBtn.disabled = true;
+        timeBtn.disabled = true;
         publishBtn.textContent = 'Publishing…';
         const objectSession = session(row.object_type, row.object_id);
         const checkout = await objectSession.ensureCheckout();
         if (!checkout.ok) {
           publishBtn.textContent = 'Publish';
           publishBtn.disabled = false;
+          timeBtn.disabled = false;
           setStatus(`Locked by ${checkout.heldBy ?? 'another editor'} — try again later.`);
           return;
         }
-        const result = await objectSession.publish();
+        const result = await objectSession.publish(publishedTime);
         await objectSession.checkin();
         if (result.status === 200) {
           invalidateRecord(row.object_type, row.object_id);
-          setStatus(`${row.object_id} published — committed, not yet deployed. Release when ready.`);
+          setStatus(
+            `${row.object_id} published${publishedTime ? ` (as of ${publishedTime})` : ''} — committed, not yet deployed. Release when ready.`
+          );
           await refreshPending();
         } else {
           setStatus(`${row.object_id}: ${(result.body.error as string) ?? `publish failed (${result.status})`}`);
           publishBtn.textContent = 'Publish';
           publishBtn.disabled = false;
+          timeBtn.disabled = false;
         }
+      };
+
+      publishBtn.addEventListener('click', () => void doPublish());
+      timeBtn.addEventListener('click', () => {
+        // Inline "publish as of" mini-form (capability #10) — surfaces only
+        // what publish_by_time allows: now, or an explicit timestamp.
+        const existing = rowEl.querySelector('[data-em-timeform]');
+        if (existing) {
+          existing.remove();
+          return;
+        }
+        const form = document.createElement('div');
+        form.setAttribute('data-em-timeform', '');
+        form.className = 'dl-em-formrow';
+        form.innerHTML =
+          `<input type="datetime-local" data-em-time-input>` +
+          `<button class="dl-em-btn" data-em-time-go>Publish at time</button>`;
+        form.querySelector('[data-em-time-go]')?.addEventListener('click', () => {
+          const value = form.querySelector<HTMLInputElement>('[data-em-time-input]')?.value;
+          if (!value) return;
+          form.remove();
+          void doPublish(new Date(value).toISOString());
+        });
+        rowEl.append(form);
       });
-      rowEl.append(publishBtn);
+
+      // Readiness check (async, per row): blockers hold the gate with the
+      // criterion text; a clean validate arms both publish paths.
+      void (async () => {
+        try {
+          const verdict = await callObjectVerb(getToken, {
+            action: 'validate',
+            object_type: row.object_type,
+            object_id: row.object_id,
+          });
+          const summary = (verdict.body as { summary?: { eligible?: boolean; blockers?: string[] } }).summary;
+          if (summary?.eligible === false) {
+            const blockers = summary.blockers ?? [];
+            publishBtn.title = blockers.join('\n') || 'Validation blockers.';
+            const note = rowEl.querySelector('[data-em-traynote]');
+            if (note) {
+              const blockText = document.createElement('div');
+              blockText.className = 'dl-em-note';
+              blockText.style.color = 'var(--dlem-danger)';
+              blockText.textContent = `Not ready: ${blockers[0] ?? 'validation blockers'}${blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}`;
+              note.append(blockText);
+            }
+            return; // stays disabled — the readiness gate
+          }
+          publishBtn.disabled = !allowPublish;
+          timeBtn.disabled = !allowPublish;
+          publishBtn.title = allowPublish ? '' : 'Requires publisher role';
+        } catch {
+          // Validation unreachable: fail open to the server gate (publish
+          // re-validates) rather than wedging the tray.
+          publishBtn.disabled = !allowPublish;
+          timeBtn.disabled = !allowPublish;
+          publishBtn.title = '';
+        }
+      })();
+
+      rowEl.append(publishBtn, timeBtn);
       rowsEl.append(rowEl);
     }
   };
@@ -1694,7 +1776,7 @@ export const mountEditMode = (options: MountOptions): void => {
     });
     panel.classList.toggle('dl-em-mode-edit', mode === 'edit');
     panel.classList.toggle('dl-em-mode-image', mode === 'image');
-    panel.classList.toggle('dl-em-mode-role', mode === 'role');
+    panel.classList.toggle('dl-em-mode-role', mode === 'role' || mode === 'meta');
   };
 
   // Accordion heads switch tools on the SAME section; clicking the open head
@@ -1827,6 +1909,7 @@ export const mountEditMode = (options: MountOptions): void => {
     let currentData: Record<string, unknown> | undefined;
     let patchSectionId: string | undefined;
     let nodePrivate: PanelState['nodePrivate'];
+    let articleMeta: PanelState['articleMeta'];
     if (target.objectType === 'page') {
       const sectionList = (body.sections as Array<{ id: string; data: Record<string, unknown> }> | undefined) ?? [];
       const instance = sectionList.find((entry) => entry.id === target.sectionId);
@@ -1848,6 +1931,12 @@ export const mountEditMode = (options: MountOptions): void => {
       currentData = node?.public;
       patchSectionId = node?.id;
       nodePrivate = node?.private;
+      articleMeta = {
+        slug: body.slug,
+        description: body.description,
+        taxonomy: body.taxonomy,
+        seo: body.seo,
+      };
       // The record is in hand — fill the header role synchronously.
       const role = roleOf(node);
       const roleEl = identEl.querySelector('[data-em-role]');
@@ -1861,7 +1950,16 @@ export const mountEditMode = (options: MountOptions): void => {
       log('sys', 'Not in the draft record yet — edit via /admin/objects.');
       return;
     }
-    panelState = { target, region, mode, currentData, patchSectionId, selectedText: selected, nodePrivate };
+    panelState = {
+      target,
+      region,
+      mode,
+      currentData,
+      patchSectionId,
+      selectedText: selected,
+      nodePrivate,
+      articleMeta,
+    };
     logEl.innerHTML = '';
     if (mode === 'ai') {
       inputEl.placeholder = selected ? 'Refine the selection…' : 'Describe the change…';
@@ -1872,6 +1970,8 @@ export const mountEditMode = (options: MountOptions): void => {
       renderImageRefChips(panelState);
     } else if (mode === 'role') {
       renderRoleForm(panelState);
+    } else if (mode === 'meta') {
+      void renderArticleMetaForm(panelState);
     } else {
       renderForm(panelState);
     }
@@ -2229,6 +2329,201 @@ export const mountEditMode = (options: MountOptions): void => {
     state.region.classList.add('dl-em-draft');
     log('sys', `${ICON_CHECK} Role saved as a draft — <strong>not published</strong>. Readers never see annotations.`);
     setStatus(`${state.target.objectId}: annotation draft saved.`);
+    await refreshPending();
+  };
+
+  // ── article settings form (T9.20, capability #3/#4) ──────────────────────
+  // Body-level metadata via set_article_meta under the SAME EditSession:
+  // slug (contract-validated at edit time), description, category + tags
+  // against the tax_drlurie registry (novel terms are FLAGGED here, before
+  // publish — the publish hook enforces), SEO description with a counter.
+  // Author and publish date deliberately absent: the object model carries no
+  // author field, and the publish timestamp is the tray's publish-time option
+  // (T9.21) — the panel surfaces only what the contract allows.
+
+  const taxonomyRegistry = async (): Promise<{ categories: string[]; tags: string[] }> => {
+    try {
+      const result = await cachedRecord('taxonomy', 'tax_drlurie');
+      const kinds = ((result.record?.body as Record<string, unknown> | undefined)?.kinds ?? {}) as Record<
+        string,
+        { terms?: Array<{ slug?: string }> }
+      >;
+      const slugs = (kind: string): string[] =>
+        (kinds[kind]?.terms ?? []).map((term) => term.slug ?? '').filter(Boolean);
+      return { categories: slugs('category'), tags: slugs('tag') };
+    } catch {
+      return { categories: [], tags: [] };
+    }
+  };
+
+  const renderArticleMetaForm = async (state: PanelState): Promise<void> => {
+    const meta = state.articleMeta ?? {};
+    const taxonomy = (meta.taxonomy ?? {}) as { category?: string; tags?: string[] };
+    const seo = (meta.seo ?? {}) as { description?: string };
+    const registry = await taxonomyRegistry();
+    if (panelState !== state) return; // panel moved on while the registry loaded
+    const categoryOptions =
+      `<option value=""${taxonomy.category ? '' : ' selected'}>—</option>` +
+      [...new Set([...registry.categories, ...(taxonomy.category ? [taxonomy.category] : [])])]
+        .map(
+          (slug) =>
+            `<option value="${escapeHtml(slug)}"${slug === taxonomy.category ? ' selected' : ''}>${escapeHtml(slug)}${
+              registry.categories.includes(slug) ? '' : ' (not in registry)'
+            }</option>`
+        )
+        .join('');
+    formEl.innerHTML =
+      `<div class="dl-em-formrow"><label>Slug</label>` +
+      `<input type="text" data-em-meta-field="slug" value="${escapeHtml(String(meta.slug ?? ''))}" spellcheck="false">` +
+      `<span class="dl-em-fieldnote" data-em-meta-slugnote>lowercase-hyphen; must be unique across articles.</span></div>` +
+      `<div class="dl-em-formrow"><label>Description (deck)</label>` +
+      `<textarea data-em-meta-field="description">${escapeHtml(String(meta.description ?? ''))}</textarea>` +
+      `<span class="dl-em-fieldnote">Shown on listings.</span></div>` +
+      `<div class="dl-em-formrow"><label>Category</label>` +
+      `<select data-em-meta-field="category">${categoryOptions}</select>` +
+      `<span class="dl-em-fieldnote">From the taxonomy registry.</span></div>` +
+      `<div class="dl-em-formrow"><label>Tags</label>` +
+      `<input type="text" data-em-meta-field="tags" value="${escapeHtml((taxonomy.tags ?? []).join(', '))}" spellcheck="false" list="dl-em-tag-list">` +
+      `<datalist id="dl-em-tag-list">${registry.tags.map((tag) => `<option value="${escapeHtml(tag)}">`).join('')}</datalist>` +
+      `<span class="dl-em-fieldnote" data-em-meta-tagnote>Comma-separated; registry terms resolve at publish.</span></div>` +
+      `<div class="dl-em-formrow"><label>SEO description</label>` +
+      `<textarea data-em-meta-field="seo_description">${escapeHtml(seo.description ?? '')}</textarea>` +
+      `<span class="dl-em-fieldnote"><span data-em-meta-seocount>${(seo.description ?? '').length}</span>/160 characters.</span></div>`;
+
+    const seoField = formEl.querySelector<HTMLTextAreaElement>('[data-em-meta-field="seo_description"]');
+    const seoCount = formEl.querySelector<HTMLElement>('[data-em-meta-seocount]');
+    seoField?.addEventListener('input', () => {
+      if (seoCount) seoCount.textContent = String(seoField.value.length);
+    });
+    const slugField = formEl.querySelector<HTMLInputElement>('[data-em-meta-field="slug"]');
+    const slugNote = formEl.querySelector<HTMLElement>('[data-em-meta-slugnote]');
+    slugField?.addEventListener('input', () => {
+      const ok = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slugField.value.trim());
+      if (slugNote) {
+        slugNote.textContent = ok
+          ? 'lowercase-hyphen; must be unique across articles.'
+          : 'Not a valid slug: lowercase letters, digits, single hyphens.';
+        slugNote.style.color = ok ? '' : 'var(--dlem-danger, #b3261e)';
+      }
+    });
+    const tagsField = formEl.querySelector<HTMLInputElement>('[data-em-meta-field="tags"]');
+    const tagNote = formEl.querySelector<HTMLElement>('[data-em-meta-tagnote]');
+    const flagNovelTerms = () => {
+      const entered = (tagsField?.value ?? '')
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+      const novel = entered.filter((tag) => !registry.tags.includes(tag));
+      if (tagNote) {
+        tagNote.textContent =
+          novel.length > 0
+            ? `Not in the registry (will need it before publish): ${novel.join(', ')}`
+            : 'Comma-separated; registry terms resolve at publish.';
+        tagNote.style.color = novel.length > 0 ? 'var(--dlem-warning, #8a6d00)' : '';
+      }
+    };
+    tagsField?.addEventListener('input', flagNovelTerms);
+    flagNovelTerms();
+
+    const foot = document.createElement('div');
+    foot.className = 'dl-em-formfoot';
+    foot.innerHTML =
+      `<button class="dl-em-btn dl-em-save dl-em-ico" data-em-form-save>${ICON_CHECK} Save draft</button>` +
+      `<button class="dl-em-btn dl-em-ghost dl-em-ico" data-em-form-cancel title="Cancel" aria-label="Cancel">${ICON_CLOSE}</button>`;
+    foot.querySelector('[data-em-form-save]')?.addEventListener('click', () => void saveArticleMetaForm(state));
+    foot.querySelector('[data-em-form-cancel]')?.addEventListener('click', closePanel);
+    formEl.append(foot);
+    captureSaveBaseline();
+  };
+
+  const saveArticleMetaForm = async (state: PanelState): Promise<void> => {
+    const read = (key: string): string =>
+      formEl.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(`[data-em-meta-field="${key}"]`)
+        ?.value ?? '';
+    const before = state.articleMeta ?? {};
+    const beforeTaxonomy = (before.taxonomy ?? {}) as { category?: string; tags?: string[] };
+    const beforeSeo = (before.seo ?? {}) as { description?: string };
+
+    const fields: Record<string, unknown> = {};
+    const slug = read('slug').trim();
+    if (slug && slug !== before.slug) fields.slug = slug;
+    const description = read('description').trim();
+    if (description !== (before.description ?? '')) fields.description = description === '' ? null : description;
+    const category = read('category').trim();
+    const tags = read('tags')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+    const taxonomyChanged =
+      category !== (beforeTaxonomy.category ?? '') || tags.join('\n') !== (beforeTaxonomy.tags ?? []).join('\n');
+    if (taxonomyChanged) {
+      fields.taxonomy = {
+        ...(category ? { category } : { category: null }),
+        tags, // arrays replace wholesale under deep-merge
+      };
+    }
+    const seoDescription = read('seo_description').trim();
+    if (seoDescription !== (beforeSeo.description ?? '')) {
+      fields.seo = { description: seoDescription === '' ? null : seoDescription };
+    }
+    if (Object.keys(fields).length === 0) {
+      log('sys', 'No changes to save.');
+      return;
+    }
+
+    const saveButton = buttonBusy(formEl.querySelector<HTMLButtonElement>('[data-em-form-save]'));
+    const working = busy('Saving…');
+    const objectSession = session(state.target.objectType, state.target.objectId);
+
+    // Edit-time contract validation (no lock needed): slug uniqueness against
+    // committed posts + format come back as blockers BEFORE anything persists.
+    const candidate = await callObjectVerb(getToken, {
+      action: 'validate',
+      object_type: state.target.objectType,
+      object_id: state.target.objectId,
+      candidate_patch: [{ op: 'set_article_meta', fields }],
+    });
+    const eligible = (candidate.body as { eligible?: boolean }).eligible;
+    if (candidate.status === 200 && eligible === false) {
+      working.remove();
+      saveButton.done(false);
+      const groups = ((
+        candidate.body as { validation?: Array<{ items?: Array<{ severity?: string; message?: string }> }> }
+      ).validation ?? []) as Array<{ items?: Array<{ severity?: string; message?: string }> }>;
+      const blockers = groups
+        .flatMap((group) => group.items ?? [])
+        .filter((item) => item.severity === 'block')
+        .map((item) => item.message ?? '');
+      log('sys', `Not saved — fix first:<br>${blockers.map(escapeHtml).join('<br>') || 'validation failed.'}`);
+      return;
+    }
+
+    const checkout = await objectSession.ensureCheckout();
+    if (!checkout.ok) {
+      working.remove();
+      saveButton.done(false);
+      log('sys', `Locked by ${escapeHtml(checkout.heldBy ?? 'another editor')} — try again when the lock frees.`);
+      return;
+    }
+    const outcome = await objectSession.patch([{ op: 'set_article_meta', fields }]);
+    working.remove();
+    saveButton.done(outcome.ok);
+    if (!outcome.ok) {
+      const blockers = outcome.blockers?.length ? `<br>${outcome.blockers.map(escapeHtml).join('<br>')}` : '';
+      log('sys', `Not saved: ${escapeHtml(outcome.error)}${blockers}`);
+      return;
+    }
+    state.articleMeta = {
+      ...before,
+      ...(fields.slug !== undefined ? { slug: fields.slug } : {}),
+      ...(fields.description !== undefined ? { description: fields.description ?? undefined } : {}),
+      ...(fields.taxonomy !== undefined ? { taxonomy: { category: category || undefined, tags } } : {}),
+      ...(fields.seo !== undefined ? { seo: { description: seoDescription || undefined } } : {}),
+    };
+    invalidateRecord(state.target.objectType, state.target.objectId);
+    state.region.classList.add('dl-em-draft');
+    log('sys', `${ICON_CHECK} Article settings saved as a draft — <strong>not published</strong>.`);
+    setStatus(`${state.target.objectId}: settings draft saved.`);
     await refreshPending();
   };
 

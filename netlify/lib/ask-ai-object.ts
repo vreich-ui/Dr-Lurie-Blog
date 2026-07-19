@@ -51,6 +51,8 @@ import { contentItemNodePublicSchema, type ContentItemNode } from '../../src/sch
 import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
 const MAX_TOKENS = 1500;
 
 export type AskAiObjectStore = { get(key: string): Promise<string | null> };
@@ -77,6 +79,12 @@ export interface AskAiObjectRequest {
 export interface AskAiObjectDeps {
   apiKey: string;
   model: string;
+  /**
+   * T9.26 (§4a): the transport comes from the object's resolved agent profile
+   * — never hardcoded. Defaults to 'openai' for existing callers/tests; the
+   * wrapper passes the profile's provider.
+   */
+  provider?: 'anthropic' | 'openai';
   /** Injected for tests; defaults to globalThis.fetch. */
   fetchImpl?: typeof fetch;
 }
@@ -183,6 +191,47 @@ const buildNodeUserMessage = (record: ObjectRecord, node: ContentItemNode, reque
   ]
     .filter((line) => line !== '')
     .join('\n');
+};
+
+/** Anthropic Messages transport — same forced-tool contract as the OpenAI
+ *  path: the zod-derived JSON Schema is the tool's input_schema and
+ *  tool_choice pins that one tool, so the reply is a structured tool call. */
+const callAnthropic = async (
+  userMessage: string,
+  tool: AskAiTool,
+  deps: AskAiObjectDeps
+): Promise<{ ok: true; input: Record<string, unknown> } | { ok: false; status: number; error: string }> => {
+  const fetchImpl = deps.fetchImpl ?? globalThis.fetch;
+  const response = await fetchImpl(ANTHROPIC_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': deps.apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify({
+      model: deps.model,
+      max_tokens: MAX_TOKENS,
+      messages: [{ role: 'user', content: userMessage }],
+      tools: [{ name: tool.name, description: tool.description, input_schema: tool.input_schema }],
+      tool_choice: { type: 'tool', name: tool.name },
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    return { ok: false, status: 502, error: `Anthropic API ${response.status}: ${text.slice(0, 200)}` };
+  }
+
+  const payload = (await response.json()) as {
+    content?: Array<{ type?: string; name?: string; input?: Record<string, unknown> }>;
+  };
+  const call = payload.content?.find((block) => block.type === 'tool_use' && block.name === tool.name);
+  if (!call?.input || typeof call.input !== 'object') {
+    return { ok: false, status: 502, error: 'AI did not return a structured suggestion' };
+  }
+  // Anthropic returns the tool input as a parsed object — no JSON.parse step.
+  return { ok: true, input: call.input };
 };
 
 const callOpenAI = async (
@@ -361,7 +410,8 @@ export const askAiForObject = async (
     userMessage = buildUserMessage(record, request);
   }
 
-  const aiResult = await callOpenAI(userMessage, tool, deps);
+  const aiResult =
+    deps.provider === 'anthropic' ? await callAnthropic(userMessage, tool, deps) : await callOpenAI(userMessage, tool, deps);
   if (!aiResult.ok) return err(aiResult.status, { error: aiResult.error });
 
   // Strip null/undefined (as the article version does) AND, on the copy-only

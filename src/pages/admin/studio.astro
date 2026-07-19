@@ -1,0 +1,11 @@
+---
+// Templates & Themes studio (T9.18) — the visual layer over the W8 recipe
+// family. Owner-tier flows; server-side walls live in admin-object (incl. the
+// verb-level Owner gate on real apply_theme).
+import AdminLayout from '~/layouts/AdminLayout.astro';
+import StudioApp from '~/components/admin-ui/Studio';
+---
+
+<AdminLayout title="Admin — Templates & Themes">
+  <StudioApp client:load />
+</AdminLayout>

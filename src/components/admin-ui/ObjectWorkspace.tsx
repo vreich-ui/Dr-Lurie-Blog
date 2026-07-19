@@ -18,10 +18,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminShell } from './AdminShell';
 import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
 import { Tabs } from './menus';
-import { ConfirmDialog, useToast } from './overlays';
+import { Input, Select, Textarea } from './forms';
+import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
 import { ObjectPreview } from './ObjectPreview';
-import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket } from './icons';
+import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
+import { createObjectChat } from '../../lib/admin/chat-client';
+import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '../../schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '../../lib/admin/readiness-criteria';
@@ -150,6 +153,225 @@ function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] 
   return [{ id: 'validation', label: 'Validation', criteria }];
 }
 
+// ─── article settings (T9.20 workspace parity with the canvas panel) ─────────
+// Same fields, same registry-backed pickers, same edit-time contract
+// validation — all through set_article_meta under EditSession.
+
+function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => void }) {
+  const { toast } = useToast();
+  const body = record.body ?? {};
+  const taxonomy = (body.taxonomy ?? {}) as { category?: string; tags?: string[] };
+  const seo = (body.seo ?? {}) as { description?: string };
+  const [slug, setSlug] = useState(String(body.slug ?? ''));
+  const [description, setDescription] = useState(String(body.description ?? ''));
+  const [category, setCategory] = useState(taxonomy.category ?? '');
+  const [tags, setTags] = useState((taxonomy.tags ?? []).join(', '));
+  const [seoDescription, setSeoDescription] = useState(seo.description ?? '');
+  const [registry, setRegistry] = useState<{ categories: string[]; tags: string[] }>({ categories: [], tags: [] });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+        const res = await callObjectVerb(getToken, {
+          action: 'get',
+          object_type: 'taxonomy',
+          object_id: 'tax_drlurie',
+        });
+        const kinds = ((res.body as { record?: { body?: { kinds?: Record<string, { terms?: { slug?: string }[] }> } } })
+          .record?.body?.kinds ?? {}) as Record<string, { terms?: { slug?: string }[] }>;
+        setRegistry({
+          categories: (kinds.category?.terms ?? []).map((term) => term.slug ?? '').filter(Boolean),
+          tags: (kinds.tag?.terms ?? []).map((term) => term.slug ?? '').filter(Boolean),
+        });
+      } catch {
+        /* registry unavailable — free text still validates at publish */
+      }
+    })();
+  }, []);
+
+  const slugValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim());
+  const enteredTags = tags
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const novelTags = enteredTags.filter((tag) => registry.tags.length > 0 && !registry.tags.includes(tag));
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const fields: Record<string, unknown> = {};
+      if (slug.trim() && slug.trim() !== body.slug) fields.slug = slug.trim();
+      if (description.trim() !== String(body.description ?? '')) {
+        fields.description = description.trim() === '' ? null : description.trim();
+      }
+      if (category !== (taxonomy.category ?? '') || enteredTags.join('\n') !== (taxonomy.tags ?? []).join('\n')) {
+        fields.taxonomy = { ...(category ? { category } : { category: null }), tags: enteredTags };
+      }
+      if (seoDescription.trim() !== (seo.description ?? '')) {
+        fields.seo = { description: seoDescription.trim() === '' ? null : seoDescription.trim() };
+      }
+      if (Object.keys(fields).length === 0) {
+        toast({ title: 'Nothing changed', tone: 'info' });
+        return;
+      }
+      const { callObjectVerb, EditSession } = await import('../../lib/edit-mode/verbs-client');
+      // Edit-time contract validation (slug uniqueness vs committed posts) —
+      // the same shared validation messages the canvas panel shows.
+      const candidate = await callObjectVerb(getToken, {
+        action: 'validate',
+        object_type: record.object_type,
+        object_id: record.object_id,
+        candidate_patch: [{ op: 'set_article_meta', fields }],
+      });
+      if (candidate.status === 200 && (candidate.body as { eligible?: boolean }).eligible === false) {
+        const groups = ((candidate.body as { validation?: { items?: { severity?: string; message?: string }[] }[] })
+          .validation ?? []) as { items?: { severity?: string; message?: string }[] }[];
+        const blockers = groups
+          .flatMap((group) => group.items ?? [])
+          .filter((item) => item.severity === 'block')
+          .map((item) => item.message ?? '');
+        toast({
+          title: 'Fix before saving',
+          description: blockers.join(' · ') || 'Validation failed.',
+          tone: 'danger',
+        });
+        return;
+      }
+      const session = new EditSession(record.object_type, record.object_id, getToken);
+      const checkout = await session.ensureCheckout();
+      if (!checkout.ok) {
+        toast({
+          title: 'Locked',
+          description: checkout.heldBy ? `Held by ${checkout.heldBy}.` : undefined,
+          tone: 'warning',
+        });
+        return;
+      }
+      const outcome = await session.patch([{ op: 'set_article_meta', fields }]);
+      await session.checkin();
+      if (outcome.ok) {
+        toast({ title: 'Article settings saved as a draft', tone: 'success' });
+        onSaved();
+      } else {
+        toast({ title: 'Not saved', description: outcome.error, tone: 'danger' });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)] p-3">
+      <p className="text-[length:var(--adm-text-sm)] font-semibold text-[var(--adm-text-heading)]">Article settings</p>
+      <Input
+        label="Slug"
+        value={slug}
+        onChange={(event) => setSlug(event.target.value)}
+        error={slug && !slugValid ? 'Lowercase letters, digits, single hyphens.' : undefined}
+        hint="Unique across articles; validated on save."
+      />
+      <Textarea
+        label="Description (deck)"
+        rows={2}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+      <Select
+        label="Category"
+        value={category}
+        onChange={(event) => setCategory(event.target.value)}
+        options={[
+          { value: '', label: '—' },
+          ...[...new Set([...registry.categories, ...(category ? [category] : [])])].map((slugValue) => ({
+            value: slugValue,
+            label: registry.categories.includes(slugValue) ? slugValue : `${slugValue} (not in registry)`,
+          })),
+        ]}
+        hint="From the taxonomy registry."
+      />
+      <Input
+        label="Tags"
+        value={tags}
+        onChange={(event) => setTags(event.target.value)}
+        hint={
+          novelTags.length > 0
+            ? `Not in the registry (needed before publish): ${novelTags.join(', ')}`
+            : 'Comma-separated; registry terms resolve at publish.'
+        }
+      />
+      <Textarea
+        label="SEO description"
+        rows={2}
+        value={seoDescription}
+        onChange={(event) => setSeoDescription(event.target.value)}
+        hint={`${seoDescription.length}/160 characters.`}
+      />
+      <Button size="sm" className="self-start" onClick={() => void save()} loading={busy}>
+        Save draft
+      </Button>
+    </div>
+  );
+}
+
+// ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads) ────────
+
+function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: boolean }) {
+  const [profiles, setProfiles] = useState<{ profile_id: string; name: string; status: string }[]>([]);
+  const [assigned, setAssigned] = useState<string>('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { listProfiles } = await import('../../lib/admin/chat-client');
+        const res = await listProfiles(getToken);
+        setProfiles(res.profiles);
+        setAssigned(res.assignments.objects[objectId] ?? '');
+      } catch {
+        /* roster unavailable — the resolved chip in the chat header still shows the agent */
+      }
+    })();
+  }, [objectId]);
+
+  if (profiles.length === 0) return null;
+  const options = [
+    { value: '', label: '— inherit (type default → site default) —' },
+    ...profiles
+      .filter((profile) => profile.status === 'active')
+      .map((profile) => ({ value: profile.profile_id, label: profile.name })),
+  ];
+  if (!owner) {
+    const name = profiles.find((profile) => profile.profile_id === assigned)?.name;
+    return (
+      <p className="text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
+        Dedicated agent: <span className="text-[var(--adm-text)]">{name ?? 'inherited'}</span>
+      </p>
+    );
+  }
+  return (
+    <Select
+      label="Dedicated agent"
+      hint="New conversations on this object use this agent (live runs keep the agent they started with)."
+      value={assigned}
+      disabled={busy}
+      onChange={async (event) => {
+        const next = event.target.value;
+        setBusy(true);
+        try {
+          const { assignProfile } = await import('../../lib/admin/chat-client');
+          await assignProfile(getToken, { kind: 'object', object_id: objectId }, next || null);
+          setAssigned(next);
+        } finally {
+          setBusy(false);
+        }
+      }}
+      options={options}
+    />
+  );
+}
+
 // ─── workspace body ───────────────────────────────────────────────────────────
 
 function WorkspaceBody() {
@@ -161,8 +383,11 @@ function WorkspaceBody() {
   const [busy, setBusy] = useState(false);
   const [owner, setOwner] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [now, setNow] = useState(0);
+  const [chatId, setChatId] = useState<string | undefined>(undefined);
   const [loc] = useState(() => (typeof window === 'undefined' ? { id: '', type: undefined } : parseLocation()));
+  const chat = useChat(getToken, chatId);
 
   const load = async () => {
     if (!loc.id || !loc.type) {
@@ -203,7 +428,19 @@ function WorkspaceBody() {
       setError(e instanceof Error ? e.message : 'Could not load this object.');
       setLoading(false);
     });
+    // Chat-first (T9.14): the per-object conversation opens with the page.
+    if (loc.id && loc.type) {
+      createObjectChat(getToken, loc.type, loc.id)
+        .then(({ chat: created }) => setChatId(created.chat_id))
+        .catch(() => setChatId(undefined));
+    }
   }, []);
+
+  // Every accepted write refreshes the record — the preview re-renders and
+  // readiness re-computes on each approved patch.
+  useEffect(() => {
+    if (chat.writeStamp > 0) void load();
+  }, [chat.writeStamp]);
 
   const runAction = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -307,6 +544,24 @@ function WorkspaceBody() {
     [record]
   );
 
+  // Suggested prompts (plan §4): seeded from missing readiness criteria, with
+  // generic starters as the floor.
+  const readinessOpenItems = useMemo(
+    () =>
+      (readiness ?? [])
+        .flatMap((group) => group.criteria)
+        .filter((criterion) => criterion.status === 'missing' || criterion.status === 'warning').length,
+    [readiness]
+  );
+  const suggestions = useMemo(() => {
+    const fromReadiness = (readiness ?? [])
+      .flatMap((group) => group.criteria)
+      .filter((criterion) => criterion.status === 'missing')
+      .slice(0, 2)
+      .map((criterion) => `${criterion.label} needs attention — can you take care of it?`);
+    return [...fromReadiness, 'Summarize this object and anything that looks off.', 'What would you improve here?'];
+  }, [readiness]);
+
   if (loading) return <Skeleton variant="rect" height={320} />;
   if (error || !record) {
     return (
@@ -387,30 +642,96 @@ function WorkspaceBody() {
         />
       ) : null}
 
-      {/* Readiness */}
-      {readiness ? (
-        <Card kicker="Readiness" title="Publish readiness">
-          <ReadinessList groups={readiness} />
+      {/* Chat-first layout (T9.14): conversation center, live preview right,
+          the classic forms one click away in the Details drawer. */}
+      <div className="grid min-h-0 gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Card className="flex min-h-[28rem] flex-col lg:max-h-[calc(100vh-18rem)]">
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-[var(--adm-border)] pb-3">
+            <AgentChip agent={chat.agent} />
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<IconWrench size={16} />}
+              onClick={() => setDetailsOpen(true)}
+            >
+              Details
+            </Button>
+          </div>
+          <ChatThread
+            events={chat.events}
+            status={chat.status}
+            pending={chat.pending}
+            busy={chat.busy}
+            onApprove={(editedArgs) => chat.pending && void chat.approve(chat.pending.call_id, editedArgs)}
+            onDeny={(reason) => chat.pending && void chat.deny(chat.pending.call_id, reason)}
+            emptyHint={
+              <EmptyState
+                title={`Talk to ${chat.agent?.name ?? 'the site agent'} about this ${objectTypeLabel(record.object_type).toLowerCase()}`}
+                message="It reads the object and its contract, proposes changes, and every write waits for your approval."
+              />
+            }
+          />
+          {chat.error ? (
+            <p className="mt-2 text-[length:var(--adm-text-xs)] text-[var(--adm-danger)]">{chat.error}</p>
+          ) : null}
+          <div className="mt-3 border-t border-[var(--adm-border)] pt-3">
+            <ChatComposer
+              status={chat.status}
+              busy={chat.busy}
+              onSend={(text) => void chat.send(text)}
+              onCancel={() => void chat.cancel()}
+              suggestions={suggestions}
+              above={
+                readiness && readinessOpenItems > 0 ? (
+                  <details className="rounded-[var(--adm-radius-md)] border border-[var(--adm-border)] bg-[var(--adm-surface-sunken)] px-3 py-2">
+                    <summary className="cursor-pointer select-none text-[length:var(--adm-text-xs)] font-medium text-[var(--adm-warning)]">
+                      {readinessOpenItems} readiness item{readinessOpenItems === 1 ? '' : 's'} before publish
+                    </summary>
+                    <div className="mt-2">
+                      <ReadinessList groups={readiness} />
+                    </div>
+                  </details>
+                ) : null
+              }
+            />
+          </div>
         </Card>
-      ) : null}
 
-      {/* Tabs */}
-      <Tabs
-        tabs={[
-          { id: 'preview', label: 'Preview', content: <ObjectPreview record={record} /> },
-          { id: 'details', label: 'Details', content: <GeneratedInspector record={record} onEditOnSite={url} /> },
-          { id: 'history', label: 'History', content: <HistoryTimeline entries={history} now={now || undefined} /> },
-          {
-            id: 'raw',
-            label: 'Raw',
-            content: (
-              <pre className="max-h-[28rem] overflow-auto rounded-[var(--adm-radius-md)] bg-[var(--adm-surface-sunken)] p-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text)]">
-                {JSON.stringify(record, null, 2)}
-              </pre>
-            ),
-          },
-        ]}
-      />
+        <div className="flex min-h-0 flex-col gap-3">
+          <Card
+            kicker="Live preview"
+            title={undefined}
+            className="min-h-[20rem] overflow-auto lg:max-h-[calc(100vh-18rem)]"
+          >
+            <ObjectPreview record={record} />
+          </Card>
+        </div>
+      </div>
+
+      {/* Details drawer — the classic CMS forms, one click away, never gone. */}
+      <Drawer open={detailsOpen} onClose={() => setDetailsOpen(false)} title="Details" width={560}>
+        <div className="mb-4">
+          <DedicatedAgentPicker objectId={record.object_id} owner={owner} />
+        </div>
+        {record.object_type === 'content_item' ? (
+          <ArticleSettingsCard record={record} onSaved={() => void load()} />
+        ) : null}
+        <Tabs
+          tabs={[
+            { id: 'details', label: 'Details', content: <GeneratedInspector record={record} onEditOnSite={url} /> },
+            { id: 'history', label: 'History', content: <HistoryTimeline entries={history} now={now || undefined} /> },
+            {
+              id: 'raw',
+              label: 'Raw',
+              content: (
+                <pre className="max-h-[28rem] overflow-auto rounded-[var(--adm-radius-md)] bg-[var(--adm-surface-sunken)] p-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text)]">
+                  {JSON.stringify(record, null, 2)}
+                </pre>
+              ),
+            },
+          ]}
+        />
+      </Drawer>
 
       {/* Secondary actions */}
       <div className="flex flex-wrap items-center gap-2 border-t border-[var(--adm-border)] pt-4">
