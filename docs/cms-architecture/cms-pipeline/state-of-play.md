@@ -7,6 +7,53 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 D (W10 CHUNK 1: T10.1→T10.2→T10.3 built to the T10.4 checkpoint — token axes live in schema/render/verbs/contract; survey proposal awaiting ratification)
+
+Task (vreich): "check where we are on the conversion trail and continue"
+(both lanes chosen: W10 to the checkpoint, then W13 pulled forward per the
+queue's reorder sanction). Session ran in a Cowork cloud sandbox with NO
+GitHub push credential and NO device-git write path (the desktop mount
+forbids unlink — git index.lock operations fail), so delivery is a **git
+bundle** of branch `claude/w10-design-vocabulary` handed to Wolf to fetch,
+review, push; CI runs on his push. One task = one commit throughout
+(autonomous-run C3, adapted: bundle instead of self-merged PR).
+
+- **T10.1 (`5650f695`)**: bounded layout/shape/type axes on brandTokens —
+  additive-optional enum groups on the SHARED schema (theme inherits by
+  identity); `THEME_AXES` registry in theme-tokens.ts is the one source of
+  truth (schema enums derive from it; every value maps to a pre-built
+  custom-property set — rule 6, values never reach the CSS grammar);
+  tailwind.css tiers read `var(--dl-…, <old literal>)` with byte-equal
+  fallbacks; CustomStyles emits vars ONLY for non-default axes. Defaults
+  byte-identical BY CONSTRUCTION: build-diff EMPTY (80/80). 7 tests.
+- **T10.2 (`9a6af92b`)**: axes governed — site_apply_theme exact-replace at
+  axis-key granularity (theme axis → copied; absent axis/group → site axis
+  UNSET, defaults win), dry_run reflects axes, privileged-op inverse
+  restores pre-apply byte-exactly (tested); shared brand_token_axes
+  validation criteria on theme AND site (invalid enum blocks with readable
+  copy; unknown axis keys warn inert; colors-totality posture NOT extended
+  to axes); contract constraint DERIVED from THEME_AXES on both types;
+  reconcile still excludes brandTokens whole (axes covered, test extended).
+  7 tests. Suite 1510/1510 + 59/59; build-diff EMPTY.
+- **T10.3 (`5dc47545`)**: `design-vocabulary-gaps.md` — survey over three
+  representative archetypes (Wolf named no reference targets; disclosed in
+  the doc; nothing crawled). Proposal: 6 mints ×2 batches (media, brand_row,
+  stats / timeline, comparison_table, video_embed with a fold-into-media
+  toggle), 5 bounded variants, `type.measure` named as the one axis ADD
+  candidate, 3 composite-evidence cases for T10.7. Ends with the OQ-W10-1/-2
+  question block. Docs only.
+
+**T10.4 checkpoint (next)**: rulings collected interactively this session
+(Wolf present) instead of the async-review 24h window; recorded in
+design-vocabulary-gaps.md as the RATIFIED section when answered.
+
+**Waiting on Wolf/vreich:** (1) fetch + push the bundle (branch
+`claude/w10-design-vocabulary`), CI + merge per house flow; (2) T10.4
+rulings if not yet answered in-session; (3) the standing T9.16 re-drive /
+T9.7 / T9.23 human gates (unchanged, see Session 2026-07-19 entries above);
+(4) local repo cleanup: `rm -f .git/index.lock && git checkout main &&
+git branch -D __wt_test && rm -rf _to_delete` (session probe leftovers).
+
 ## Session 2026-07-19 C (W13 RULINGS: OQ-W13-1…6 all answered — queue unblocked, T13.12/T13.13 added; docs only)
 
 Task (vreich): walk the six OQ-W13 questions interactively and record the
