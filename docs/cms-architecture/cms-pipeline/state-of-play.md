@@ -7,6 +7,58 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 (W10–W12 PLANNED: platformization pipeline — design vocabulary, multi-tenant core, site capture; docs only, no code, nothing converted)
+
+Task (vreich): analyze the conversion roadmap, agents' template-creation range
+toward multi-site cloning, and the multi-tenant path — then "formalize parts 2
+and 3 to be able to run auto with flexible AI model allocation." Deliverables
+on `claude/conversion-roadmap-cms-strategy-hgplp8`:
+
+- **Plan doc:** `docs/cms-architecture/11-platformization-plan.md` — three
+  waves, constitution unchanged (rules 1/5/6 stand; the plan widens BOUNDED
+  surfaces and relocates code, never puts CSS/page-kinds/free layout in data):
+  - **W10 design vocabulary** (parallel-safe with the W9 tail): bounded
+    layout/shape/type token axes on `brandTokens` (byte-identical defaults);
+    evidence-driven palette mints + bounded variants (survey → Wolf ratifies at
+    the T10.4 checkpoint); composite decision package assembling the
+    OQ-W8-1…4 evidence (memo only); starter-recipe refresh + T10.9
+    credentialed run (all five criteria — no half measures).
+  - **W11 platformization** (GATED on T9.24 + the T11.0 checkpoint):
+    monorepo `packages/core` + `sites/<client>`; tenant boundary = one Netlify
+    site per client (stores/creds/deploys isolated); de-hardcoding incl.
+    per-site `tax_<site>` resolution in `taxonomy-enforcement.ts`
+    (**`publish-article.ts` stays byte-untouched** — the legacy path remains
+    drlurie-bound until its separate retirement); provisioning CLI
+    (`create-site`); fleet CI matrix; schema-migration harness + merge gate;
+    per-site governance + the minimal OQ-3 per-agent-credential slice
+    (OQ-W11-5); T11.11 second-site acceptance proof (one core commit rebuilds
+    both sites — the "canonical changes update all clients" property,
+    demonstrated).
+  - **W12 site capture** (authorized targets ONLY — owned/licensed/explicitly
+    approved, blocking precondition in every brief): crawl → snapshot →
+    decompose onto the section palette (+ palette-gap reports feeding the W10
+    growth loop) → theme extraction quantized to the token surface → emission
+    as DRAFTS through the governed verbs into the staging client → bounded
+    fidelity loop scored against the OQ-W12-2 rubric → T12.6 Wolf sign-off.
+- **28 briefs** (`T10.1`–`T12.6`) + queue.tsv rows appended after T9.25.
+  Runner semantics: W9 remainder runs first by default; W10 rows may be moved
+  ahead (reordering queue.tsv IS the scheduler); modes — `auto` default,
+  `notify` on security-boundary/Fable tasks (T11.3/5/9/10, T12.1/2),
+  `checkpoint` T10.4 + T11.0 (T11.0 also verifies T9.24 actually landed),
+  `human_gate` T10.9/T11.11/T12.6. **Flexible model allocation = the queue's
+  per-row model/effort columns** (fable/opus/sonnet ladder per the W9
+  convention; plan §4 records the reallocation + budget-cap rules).
+- **OQs for Wolf (plan §6):** OQ-W10-1…3 (mint list, token axes, composite),
+  OQ-W11-1…5 (repo strategy, exports location, per-site admin, tenant
+  boundary, OQ-3 scope), OQ-W12-1…3 (capture authorization rule, fidelity
+  bar, pre-W11 landing zone).
+- **Noted en route:** the 2026-07-17 W9 merges (PRs #454/#455 — T9.1–T9.11,
+  T9.15, T9.19 built) have no state-of-play entries yet; per the W9 plan,
+  records concentrate at T9.25 — flagged here so the log's silence isn't
+  misread as "W9 not started." The strategy analysis itself (roadmap position,
+  the full deferred/open register, coupling inventory) was delivered in the
+  session conversation and is condensed into the plan doc's premises.
+
 ## Session 2026-07-19 (artifact-publishing hardening: CMS-Agent ↔ Dr-Lurie ↔ pdf-tool triangle)
 
 Task (vreich): analyze the artifact-production/publishing triangle (CMS-Agent
@@ -58,8 +110,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   `mediaEntries[].src`, `artifactReferences[].blobKey`, index-trusted but NOT
   in agent_outputs, real sha) now pinned green against `patch_canonical_input`
   (`tests/netlify/canonical-input-trust-replay.test.ts`) — confirming #327
-  holds for every shape that actually failed. (`netlify/lib/artifact-trust.ts`
-  +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
+  holds for every shape that actually failed. (`netlify/lib/artifact-trust.ts` +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
   `object-validate.ts`, both entry functions; +9 tests.)
 
 - **Fix 2 — content_item media path + hero rules (SHIPPED; bug ② closed on the
@@ -79,7 +130,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   now pinned by a render-matrix test). `object_contract("content_item")` gained
   image/PDF `auxiliary_inputs` rows (grant-first flow, public-path rule,
   never-a-PDF-hero), and the stale `create_artifact_upload_intent` hints on
-  *AssetRef/product-fulfillment guidance now point at the storage-grant path.
+  \*AssetRef/product-fulfillment guidance now point at the storage-grant path.
   (`netlify/lib/object-validate.ts`, `src/lib/registry/object-contract.ts`;
   +6 validation tests, +1 renderer test.)
 
@@ -88,7 +139,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   permalink pattern, proven by /object-model-demo), and the MCP wrapper's
   `production` block adds `verify_after_release` — the exact deploy_status
   (ready AND productionConfirmed) → `verify_article_images {url,
-  expectedImages: [/img/... node paths], commit}` follow-up — so agents verify
+expectedImages: [/img/... node paths], commit}` follow-up — so agents verify
   the real URL instead of guessing routes (the post-publish-404 class).
   `verify_article_images`' description now distinguishes legacy display-path
   matching from object-article `/img/` exact matching.
@@ -134,7 +185,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   `n_demoartifacts` image + `n_demoworksheet` PDF CTA; rev 15, ready) →
   `object_publish` → commit `3cea365` dark (`deploy_status` showed NO deploy —
   the [skip netlify] deferral held) → checkin. **(C)** `release_to_production
-  {commit}` — the MCP response was LOST to a proxy 502, and the
+{commit}` — the MCP response was LOST to a proxy 502, and the
   state-check-first discipline (deploy_status BEFORE any retry) proved the
   hook HAD fired: production-context deploy `6a5cb1c4…` ready in 38 s, no
   duplicate build wasted. `verify_article_images` → **verified:true,
@@ -149,7 +200,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
 - **Stale-queue disposition (Fix 6) — BLOCKED ON OPERATOR, documented.** The
   60 stale workflow records (50 pending pre-W7 drafts of wiped articles + 10
   failed June-smoke evidence) should be wiped via `wipe_blob_stores
-  {prefixes:['workflows/']}` (dry-run → review sampleKeys → confirm
+{prefixes:['workflows/']}` (dry-run → review sampleKeys → confirm
   WIPE_BLOBS). The session connection CANNOT run it — the tool answered
   "Unauthorized: a valid server publish key is required" even on dry-run —
   so deletion stays operator-gated. Fixture payloads for the four class-3
@@ -314,6 +365,7 @@ site-family reconcile would have rolled the live branding back to the seed.
   driver's site branch still EXCLUDES it (theme-only governance) — the palette
   heals via a theme apply, never the seed. Gates: 1294 + 57 green, check +
   build-diff clean/EMPTY.
+
 ## Session 2026-07-15 D (pdf-tool storage-grant provider: get_pdf_tool_storage_grant SHIPPED — stateless pdf-tool writes into OUR blob stores)
 
 Task (Wolf): make Dr-Lurie the storage-grant provider for the now-stateless
@@ -452,9 +504,9 @@ Wolf reset the MCP connector ("connection is reset. continue") — the fresh
 registry exposed `object_instantiate_section_template` and
 `site_apply_theme`, unblocking the four proofs deferred from Session E.
 
-- **Stamp proofs (per-object, the W2.5 precedent):** dry_run in BOTH modes
+- **Stamp proofs (per-object, the W2.5 precedent):** dry*run in BOTH modes
   (standalone + page mode onto page_object_showcase) for EACH of the five
-  `stpl_*` records — 10/10 `eligible: true`, zero blockers; deterministic
+  `stpl*\*`records — 10/10`eligible: true`, zero blockers; deterministic
   minted section ids; PageType law / route uniqueness / placeability all
   exercised on the page-mode candidate patch.
 - **Theme proofs:** `site_apply_theme` dry_run (computed exact-replace
@@ -544,11 +596,11 @@ session MCP connection against production, strictly sequential ops.
   create/patch/publish in this run had actually landed.
 - Docs updated in this change (RELEASED framing, per the Codex-flagged
   no-half-measures call): object-inventory (W8 section → RELEASED table 🔵
-  + tpl backfill note), conversion-map (🔵 marks + W8 row with the open
-  gate), CLAUDE.md (count stays forty-one + "6 RELEASED pending proofs"),
-  09-plan (status header, W8.4 row, tpl caveat RESOLVED). `tpl_fieldtest`
-  stays trio-less (fieldtest family) — patching it 422s until backfilled
-  or retired.
+  - tpl backfill note), conversion-map (🔵 marks + W8 row with the open
+    gate), CLAUDE.md (count stays forty-one + "6 RELEASED pending proofs"),
+    09-plan (status header, W8.4 row, tpl caveat RESOLVED). `tpl_fieldtest`
+    stays trio-less (fieldtest family) — patching it 422s until backfilled
+    or retired.
 
 ## Session 2026-07-14 D (W8.3b BUILT: recipe metadata + creation-policy seam + reuse-first surfacing — NOT converted; W8.4 awaits Wolf's go, now with a tpl backfill Step 0)
 
@@ -734,7 +786,7 @@ it's a recipe); push the design branch, no PR.
   `{name, description?, blueprint: sectionInstance}`, 3 ops with inverses,
   `object_instantiate_section_template` stamping into a page under the
   caller's lock or minting a standalone `sec_*`; 5 planned seeds), `theme →
-  site.brandTokens` (NEW, eleventh type: `set_theme_fields` +
+site.brandTokens` (NEW, eleventh type: `set_theme_fields` +
   `site_apply_theme` computing ONE exact-replace `set_site_fields` op with
   stale-key unsets). Page templates gain slot-level `blueprintRef` →
   section_template (deref + deep-copy at instantiation only). Provenance
@@ -802,7 +854,7 @@ server-side despite a client-side 60s timeout, so every step was verified via
   - **VALIDATION-GAP FINDING (logged, not yet fixed): a standalone `card`
     section passes `object_validate` but breaks the production build.** The
     first showcase build failed (exit 2, "No component registered for section
-    type 'card'"): `card` is a grid *leaf* (rendered only inside a
+    type 'card'"): `card` is a grid _leaf_ (rendered only inside a
     `content_grid` via its `cards` source) and has no standalone component, yet
     validation admitted it as a top-level page section. Fixed the page by
     replacing the standalone `s_card` with an `s_cards` `content_grid`

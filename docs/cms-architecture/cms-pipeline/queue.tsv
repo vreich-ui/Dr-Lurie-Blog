@@ -48,3 +48,37 @@ T9.22	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.22-repoi
 T9.23	human_gate	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.23-parity-signoff.md
 T9.24	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.24-legacy-deletion.md
 T9.25	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.25-records-closeout.md
+#
+# W10-W12 — platformization pipeline (plan: docs/cms-architecture/11-platformization-plan.md, 2026-07-19).
+# Ordering: W9 remainder runs first by default (W11 gates on T9.24). W10 is parallel-safe with the W9 tail —
+# to start it early, move the T10.* rows above the remaining T9.* rows; reordering this file IS the scheduler.
+# T12.1 (spike) may be pulled forward anytime; T12.4+ need a landing zone (OQ-W12-3).
+# Model/effort per row = the flexible-allocation mechanism (plan §4): edit a row to reallocate; briefs carry the recommended default.
+T10.1	auto	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T10.1-theme-token-axes.md
+T10.2	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T10.2-token-axes-apply-validate.md
+T10.3	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T10.3-design-vocabulary-survey.md
+T10.4	checkpoint	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T10.4-mint-list-checkpoint.md
+T10.5	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T10.5-mint-sections-batch-1.md
+T10.6	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T10.6-mint-sections-batch-2-variants.md
+T10.7	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T10.7-composite-decision-package.md
+T10.8	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T10.8-starter-recipe-refresh.md
+T10.9	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T10.9-w10-credentialed-run.md
+T11.0	checkpoint	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T11.0-platform-rulings-checkpoint.md
+T11.1	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T11.1-workspace-scaffold.md
+T11.2	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T11.2-core-extraction-pure-libs.md
+T11.3	notify	claude-fable-5	xhigh	docs/cms-architecture/cms-pipeline/T11.3-core-extraction-server-layer.md
+T11.4	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T11.4-core-extraction-renderer-admin.md
+T11.5	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T11.5-desite-hardcodes.md
+T11.6	auto	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T11.6-seeds-exports-relocation.md
+T11.7	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T11.7-provisioning-cli.md
+T11.8	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T11.8-fleet-ci.md
+T11.9	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T11.9-schema-migration-harness.md
+T11.10	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T11.10-per-site-governance-credentials.md
+T11.11	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T11.11-second-site-acceptance.md
+T11.12	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T11.12-w11-records-closeout.md
+T12.1	notify	claude-fable-5	high	docs/cms-architecture/cms-pipeline/T12.1-capture-spike.md
+T12.2	notify	claude-fable-5	xhigh	docs/cms-architecture/cms-pipeline/T12.2-decomposition-mapper.md
+T12.3	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T12.3-theme-extraction.md
+T12.4	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T12.4-emission-pipeline.md
+T12.5	auto	claude-opus-4-8	high	docs/cms-architecture/cms-pipeline/T12.5-fidelity-loop.md
+T12.6	human_gate	claude-sonnet-5	medium	docs/cms-architecture/cms-pipeline/T12.6-capture-acceptance-run.md
