@@ -7,6 +7,58 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 (W10–W12 PLANNED: platformization pipeline — design vocabulary, multi-tenant core, site capture; docs only, no code, nothing converted)
+
+Task (vreich): analyze the conversion roadmap, agents' template-creation range
+toward multi-site cloning, and the multi-tenant path — then "formalize parts 2
+and 3 to be able to run auto with flexible AI model allocation." Deliverables
+on `claude/conversion-roadmap-cms-strategy-hgplp8`:
+
+- **Plan doc:** `docs/cms-architecture/11-platformization-plan.md` — three
+  waves, constitution unchanged (rules 1/5/6 stand; the plan widens BOUNDED
+  surfaces and relocates code, never puts CSS/page-kinds/free layout in data):
+  - **W10 design vocabulary** (parallel-safe with the W9 tail): bounded
+    layout/shape/type token axes on `brandTokens` (byte-identical defaults);
+    evidence-driven palette mints + bounded variants (survey → Wolf ratifies at
+    the T10.4 checkpoint); composite decision package assembling the
+    OQ-W8-1…4 evidence (memo only); starter-recipe refresh + T10.9
+    credentialed run (all five criteria — no half measures).
+  - **W11 platformization** (GATED on T9.24 + the T11.0 checkpoint):
+    monorepo `packages/core` + `sites/<client>`; tenant boundary = one Netlify
+    site per client (stores/creds/deploys isolated); de-hardcoding incl.
+    per-site `tax_<site>` resolution in `taxonomy-enforcement.ts`
+    (**`publish-article.ts` stays byte-untouched** — the legacy path remains
+    drlurie-bound until its separate retirement); provisioning CLI
+    (`create-site`); fleet CI matrix; schema-migration harness + merge gate;
+    per-site governance + the minimal OQ-3 per-agent-credential slice
+    (OQ-W11-5); T11.11 second-site acceptance proof (one core commit rebuilds
+    both sites — the "canonical changes update all clients" property,
+    demonstrated).
+  - **W12 site capture** (authorized targets ONLY — owned/licensed/explicitly
+    approved, blocking precondition in every brief): crawl → snapshot →
+    decompose onto the section palette (+ palette-gap reports feeding the W10
+    growth loop) → theme extraction quantized to the token surface → emission
+    as DRAFTS through the governed verbs into the staging client → bounded
+    fidelity loop scored against the OQ-W12-2 rubric → T12.6 Wolf sign-off.
+- **28 briefs** (`T10.1`–`T12.6`) + queue.tsv rows appended after T9.25.
+  Runner semantics: W9 remainder runs first by default; W10 rows may be moved
+  ahead (reordering queue.tsv IS the scheduler); modes — `auto` default,
+  `notify` on security-boundary/Fable tasks (T11.3/5/9/10, T12.1/2),
+  `checkpoint` T10.4 + T11.0 (T11.0 also verifies T9.24 actually landed),
+  `human_gate` T10.9/T11.11/T12.6. **Flexible model allocation = the queue's
+  per-row model/effort columns** (fable/opus/sonnet ladder per the W9
+  convention; plan §4 records the reallocation + budget-cap rules).
+- **OQs for Wolf (plan §6):** OQ-W10-1…3 (mint list, token axes, composite),
+  OQ-W11-1…5 (repo strategy, exports location, per-site admin, tenant
+  boundary, OQ-3 scope), OQ-W12-1…3 (capture authorization rule, fidelity
+  bar, pre-W11 landing zone).
+- **Noted en route:** the 2026-07-17 W9 merges (PRs #454/#455 — T9.1–T9.11,
+  T9.15, T9.19 built) have no state-of-play entries yet; per the W9 plan,
+  records concentrate at T9.25 — flagged here so the log's silence isn't
+  misread as "W9 not started." The strategy analysis itself (roadmap position,
+  the full deferred/open register, coupling inventory) was delivered in the
+  session conversation and is condensed into the plan doc's premises.
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for
