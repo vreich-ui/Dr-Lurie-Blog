@@ -243,3 +243,30 @@ test('a multi-image block renders each image in order; empty srcs render nothing
   assert.match(html, /<figcaption>Second<\/figcaption>/);
   assert.equal(html.includes('Placeholder'), false, 'an empty src renders nothing, not a broken img');
 });
+
+test('media render matrix: image media renders <img>, document media renders an honest download link', () => {
+  const sha = 'f'.repeat(64);
+  const body = article({
+    nodes: [
+      {
+        id: 'n_a1',
+        kind: 'content',
+        public: {
+          body: 'Copy.',
+          media: { type: 'image', src: `/img/req_render_20260719_01/${sha}.webp`, alt: 'A calm flatlay' },
+        },
+      },
+      {
+        id: 'n_a2',
+        kind: 'content',
+        public: {
+          body: 'Get the guide.',
+          media: { type: 'document', src: `/pdf/req_render_20260719_01/${sha}.pdf`, title: 'Flare tracker' },
+        },
+      },
+    ],
+  });
+  const { html } = renderArticleNodes('req_render_20260719_01', body);
+  assert.match(html, new RegExp(`<img src="/img/req_render_20260719_01/${sha}\\.webp" alt="A calm flatlay"`));
+  assert.match(html, new RegExp(`<a href="/pdf/req_render_20260719_01/${sha}\\.pdf"[^>]*>Flare tracker</a>`));
+});

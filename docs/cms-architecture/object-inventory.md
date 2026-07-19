@@ -535,7 +535,13 @@ MCP gateway. `page_article` (`content_detail`) gained a `content_grid`
 `s_related` (`source:{kind:"related",algorithm:"tag_similarity"}`, limit 3,
 columns 3, "More to read") at position 0, so every article renders a selectable
 related-tile block. The demo (`req_agent_object_model_demo_20260713_01`) stays
-LIVE at `/object-model-demo` as the annotation showcase.
+LIVE at `/object-model-demo` as the annotation showcase — enriched 2026-07-19
+by the artifact-pipeline drill: two new nodes (`n_demoartifacts`, a
+pdf-tool-generated `/img/` webp image with caption; `n_demoworksheet`, an
+action CTA to a pdf-tool-generated `/pdf/` worksheet), generated under a
+storage grant, `verify_agent_artifact` 5/5, published (commit `3cea365`),
+released, and verified live (`verify_article_images` verified:true
+deployReady:true; the PDF URL serves 200 from production).
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 

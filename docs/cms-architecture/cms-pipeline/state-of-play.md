@@ -7,6 +7,158 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-19 (artifact-publishing hardening: CMS-Agent ↔ Dr-Lurie ↔ pdf-tool triangle)
+
+Task (vreich): analyze the artifact-production/publishing triangle (CMS-Agent
+MCP orchestrator, this repo's Dr_Lurie MCP, pdf-tool) and make image/PDF
+publishing smooth and bug-free. Branch
+`claude/cms-agent-artifacts-publishing-12g3tk`. Live-state evidence gathered
+first: 10 failed queue records (2026-06-30..07-02 smokes) triaged into six
+failure classes (post-publish 404 / pdf-tool 429 / ×4 canonical-input trust
+rejections / ×2 "PDF template not found" / self-referential URL 422 / PDF
+media entry 422); CMS-Agent's dr-lurie project is read-only allowlist +
+`publishEnabled=false`; both external MCP legs showed >60 s cold starts.
+User-ratified decisions: the OBJECT path (`content_item` → `object_publish` →
+`release_to_production`) is the canonical artifact route; legacy stays frozen.
+
+- **Fix 1 — release truth signal (SHIPPED).** `released:true` used to mean "a
+  ready deploy exists for the commit", which under locked Netlify Auto
+  Publishing can be a ready-but-unpublished deploy (the documented
+  `production-release.ts` risk; failure class 1's ambiguity).
+  `releaseToProduction` now consults `getPublishedProductionDeploy` (the same
+  authoritative signal `verify_article_images` adopted on 07-16): published
+  commit match ⇒ `released:true` + `productionConfirmed:true` (published wins
+  even if the receipt poll never saw ready); ready-but-unpublished ⇒ new status
+  `build_ready_not_published` with unlock guidance; site lookup unavailable ⇒
+  prior ready-by-commit behavior with `productionConfirmed:false` ("not
+  independently proven live"). `deploy_status` additively returns
+  `publishedDeploy` + `productionConfirmed` (absent = unknown, never "not
+  live"); both tool descriptions now teach "poll until ready AND
+  productionConfirmed". (`netlify/lib/production-release.ts`,
+  `netlify/functions/deploy-status.ts`, mcp.ts descriptions; +4
+  production-release tests, +3 new `deploy-status.test.ts`.)
+
+- **Fix 3 — object-path artifact EXISTENCE trust (SHIPPED).** The object path's
+  `*AssetRef`/`fulfillment.artifact_ref` checks ran shape-only in production —
+  `trustedAssetRefs` had no writer, so a typo'd sha or soft-deleted artifact
+  published clean and 404'd live. `buildStoreValidationContext` now accepts the
+  artifact-index store + the raw request payload, sweeps payload + every loaded
+  record body for Major-Key refs (raw or `/img|/pdf` public-path form,
+  normalized via the new `rawArtifactRefForPublicPath`), pre-resolves exactly
+  those against the index (one `readArtifactReference` each; ≤200/write), and
+  exposes a sync `resolveArtifactRef` (exists/deleted/sizeBytes/contentType).
+  `validateAssetRef` consults it when no `trustedAssetRefs` set is injected:
+  absent/deleted artifacts BLOCK at publish and WARN while drafting (an agent
+  mid-assembly may upload next); shape/trust problems still always block; index
+  unavailable degrades to "not verified" — never a failed write. Trust unit is
+  EXISTENCE, not same-request (canvas uploads legitimately cross requests).
+  Wired in `object-store.ts` + `admin-object.ts`. ALSO: class-3 replay
+  regression — the four 06-30..07-02 failed-record shapes (node
+  `public_media_src`, `promote_publish_payload.featuredImage`,
+  `mediaEntries[].src`, `artifactReferences[].blobKey`, index-trusted but NOT
+  in agent_outputs, real sha) now pinned green against `patch_canonical_input`
+  (`tests/netlify/canonical-input-trust-replay.test.ts`) — confirming #327
+  holds for every shape that actually failed. (`netlify/lib/artifact-trust.ts`
+  +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
+  `object-validate.ts`, both entry functions; +9 tests.)
+
+- **Fix 2 — content_item media path + hero rules (SHIPPED; bug ② closed on the
+  object path).** Node media srcs were schema-unconstrained strings: a mistyped
+  path 404'd live, and a PDF in the hero (`body.image.src`) would reach Astro's
+  getImage at build — the object-path analogue of the legacy
+  PDF-as-featuredImage bug. New `article_media` criterion (structure group):
+  image media/`images[]` srcs take the `/img/{id}/{sha}.{ext}` public path and
+  document media + `/pdf/` ctaLinks take `/pdf/{id}/{sha}.pdf` — both
+  EXISTENCE-checked through Fix 3's `resolveArtifactRef` (absent/deleted →
+  publish blocker, draft warning); remote https and site-static paths WARN
+  (renderable but ungoverned — remote warn-vs-block flagged for Wolf); data
+  URIs, legacy `src/assets/` paths, and bare relative paths BLOCK; the hero
+  must be an IMAGE — `/pdf/`/.pdf there blocks with the build-breaker message.
+  video/audio/embed srcs stay out of scope until they render richer than a
+  link. Renderer unchanged (document→honest link is the sanctioned rendering;
+  now pinned by a render-matrix test). `object_contract("content_item")` gained
+  image/PDF `auxiliary_inputs` rows (grant-first flow, public-path rule,
+  never-a-PDF-hero), and the stale `create_artifact_upload_intent` hints on
+  *AssetRef/product-fulfillment guidance now point at the storage-grant path.
+  (`netlify/lib/object-validate.ts`, `src/lib/registry/object-contract.ts`;
+  +6 validation tests, +1 renderer test.)
+
+- **Fix 4 — publish receipt carries the live article URL (SHIPPED).** A
+  content_item `object_publish` now returns `article_path: "/<slug>"` (the blog
+  permalink pattern, proven by /object-model-demo), and the MCP wrapper's
+  `production` block adds `verify_after_release` — the exact deploy_status
+  (ready AND productionConfirmed) → `verify_article_images {url,
+  expectedImages: [/img/... node paths], commit}` follow-up — so agents verify
+  the real URL instead of guessing routes (the post-publish-404 class).
+  `verify_article_images`' description now distinguishes legacy display-path
+  matching from object-article `/img/` exact matching.
+  (`netlify/lib/object-publish.ts`, mcp.ts; +1 test.)
+
+- **Fix 5 — image byte budget surfaced at validation (SHIPPED).** The 150 KB
+  webp budget rode the grant and object_contract but nothing on the write path
+  surfaced an over-budget artifact (a default 1024×1024 PNG ships ~10× over,
+  silently). New `media_budget` criterion (artifact_trust group): every
+  resolved image ref (`/img/` path or raw `image/` Major Key) with
+  `sizeBytes` over `activeMediaPolicy().maxImageBytes` reports — severity
+  follows the committed policy (`overBudget:'warn'` → warning;
+  flipping to `'block'` makes it a publish blocker with zero code). Over-budget
+  only — format stays generation guidance, so existing .jpg canvas uploads
+  don't nag. (`netlify/lib/object-validate.ts`; +2 tests. External half —
+  pdf-tool defaulting generation to the grant `limits` — goes in the Track 2
+  contract doc.)
+
+- **Fix 7 — CI hardening (SHIPPED).** Node 20 added to the build matrix
+  (Netlify production builds on 20 via netlify.toml; CI only exercised 22/24 —
+  a Node-20-only failure shipped uncaught). The check job now runs the
+  site-seed drift guard (`sync-site-seed.mjs --check`) and the T2.0 build-diff
+  harness self-test. FOUND EN ROUTE: the self-test itself had rotted — its
+  planted needle ("Five simple places to begin.") no longer exists since
+  index.astro became a thin PageObjectRenderer loader; re-pointed at the
+  page_home EXPORT copy (the string that actually reaches rendered HTML),
+  self-test 2/2 PASS again. (`.github/workflows/actions.yaml`,
+  `scripts/build-diff.mjs`.)
+
+- **E2E ARTIFACT DRILL — FULL LIVE PROOF (2026-07-19, session MCP connection;
+  the drill ran against the DEPLOYED server — this branch's fixes ship with
+  the PR and are proven by the local suite meanwhile).** Modes A→B→C:
+  **(A)** grant fetched → pdf-tool `list_pdf_templates` preflight (11
+  templates, 4 active — failure-class 4 was remediated 2026-06-30, the
+  `smoke-symptom-worksheet-v1` template landed minutes after the smokes
+  failed) → image job (gpt-image-1, webp, **50,372 bytes — under the 150 KB
+  budget**) + PDF job (pdfme, 9,506 bytes, 1 page A4) both complete →
+  `verify_agent_artifact` **5/5 checks** on both → both visible in
+  `list_artifacts_for_request req_artifact_drill_20260719_01` →
+  `object_validate` candidate patch on the demo article **eligible:true**;
+  negative probe (raw Major Key in `media.src`) correctly REFUSED by the
+  deployed `render_image_ref` check. **(B)** checkout → patch (two nodes:
+  `n_demoartifacts` image + `n_demoworksheet` PDF CTA; rev 15, ready) →
+  `object_publish` → commit `3cea365` dark (`deploy_status` showed NO deploy —
+  the [skip netlify] deferral held) → checkin. **(C)** `release_to_production
+  {commit}` — the MCP response was LOST to a proxy 502, and the
+  state-check-first discipline (deploy_status BEFORE any retry) proved the
+  hook HAD fired: production-context deploy `6a5cb1c4…` ready in 38 s, no
+  duplicate build wasted. `verify_article_images` → **verified:true,
+  deployReady:true**, all three `/img/` exact-matched and fetching 200
+  `image/*`; the `/pdf/` worksheet URL serves **200** from production; the
+  released export carries both nodes byte-exact. The demo article at
+  `/object-model-demo` now demonstrates agent-produced binary artifacts
+  end-to-end. Cold-start note: two 60 s first-call timeouts (CMS-Agent
+  registration read; one object_validate under a concurrent pair) — both
+  succeeded on single retry; keepalive recommendation stands.
+
+- **Stale-queue disposition (Fix 6) — BLOCKED ON OPERATOR, documented.** The
+  60 stale workflow records (50 pending pre-W7 drafts of wiped articles + 10
+  failed June-smoke evidence) should be wiped via `wipe_blob_stores
+  {prefixes:['workflows/']}` (dry-run → review sampleKeys → confirm
+  WIPE_BLOBS). The session connection CANNOT run it — the tool answered
+  "Unauthorized: a valid server publish key is required" even on dry-run —
+  so deletion stays operator-gated. Fixture payloads for the four class-3
+  failure shapes were extracted FIRST and are pinned as committed regression
+  tests (`canonical-input-trust-replay.test.ts`), so the wipe loses no
+  evidence. Operator checklist: (1) dry-run, (2) confirm the sampleKeys are
+  all `workflows/…`, (3) live run with `confirm:"WIPE_BLOBS"`, (4) note the
+  count here.
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for
