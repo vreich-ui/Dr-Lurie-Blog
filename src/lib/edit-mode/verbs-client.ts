@@ -301,13 +301,17 @@ export class EditSession {
   }
 
   /** Publish the object's current draft (export-first commit; NOT a deploy). */
-  async publish(): Promise<VerbResult> {
+  async publish(publishedTime?: string): Promise<VerbResult> {
     if (!this.lockState.held) return { status: 423, body: { error: 'Lock not held' } };
     const result = await callObjectVerb(this.getToken, {
       action: 'publish_by_time',
       object_type: this.objectType,
       object_id: this.objectId,
       lock_token: this.lockState.held ? this.lockState.lockToken : '',
+      // T9.21 (capability #10): omitted = "now"; an explicit ISO timestamp
+      // back/forward-stamps. Scheduling/unpublish stay rejected per OQ-2 —
+      // the UI surfaces only what the verb allows.
+      ...(publishedTime !== undefined ? { published_time: publishedTime } : {}),
     });
     if (result.status === 200) this.recordVersion = undefined; // publish bumps version; refetch lazily
     return result;

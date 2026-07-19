@@ -135,18 +135,18 @@ let activeController: AbortController | undefined;
 // accent(green)=save/ok, secondary(rust)=delete/danger, primary=action.
 const STYLES = `
 :root{
-  --dlem-accent:var(--aw-color-primary,rgb(20 122 140));
-  --dlem-accent-ink:#fff;
-  --dlem-surface:var(--aw-color-bg-page,#fff);
-  --dlem-surface-2:var(--aw-color-bg-surface,#f1f5f4);
-  --dlem-text:var(--aw-color-text-default,rgb(36 41 46));
-  --dlem-heading:var(--aw-color-text-heading,rgb(18 33 38));
-  --dlem-muted:var(--aw-color-text-muted,rgb(58 65 73 / 76%));
-  --dlem-border:color-mix(in srgb,var(--aw-color-text-muted,rgb(58 65 73)) 24%,transparent);
-  --dlem-draft:var(--aw-color-gold,#b45309);
-  --dlem-ok:var(--aw-color-accent,#15803d);
-  --dlem-danger:var(--aw-color-secondary,#b91c1c);
-  --dlem-font:var(--aw-font-sans,ui-sans-serif,system-ui,sans-serif);
+  --dlem-accent:var(--adm-accent,var(--aw-color-primary,rgb(20 122 140)));
+  --dlem-accent-ink:var(--adm-text-on-accent,#fff);
+  --dlem-surface:var(--adm-surface-page,var(--aw-color-bg-page,#fff));
+  --dlem-surface-2:var(--adm-surface-sunken,var(--aw-color-bg-surface,#f1f5f4));
+  --dlem-text:var(--adm-text,var(--aw-color-text-default,rgb(36 41 46)));
+  --dlem-heading:var(--adm-text-heading,var(--aw-color-text-heading,rgb(18 33 38)));
+  --dlem-muted:var(--adm-text-muted,var(--aw-color-text-muted,rgb(58 65 73 / 76%)));
+  --dlem-border:var(--adm-border,color-mix(in srgb,var(--aw-color-text-muted,rgb(58 65 73)) 24%,transparent));
+  --dlem-draft:var(--adm-warning,var(--aw-color-gold,#b45309));
+  --dlem-ok:var(--adm-success,var(--aw-color-accent,#15803d));
+  --dlem-danger:var(--adm-danger,var(--aw-color-secondary,#b91c1c));
+  --dlem-font:var(--adm-font-sans,var(--aw-font-sans,ui-sans-serif,system-ui,sans-serif));
   --dlem-font-head:var(--aw-font-heading,var(--dlem-font));
   --dlem-shadow:0 14px 40px rgba(0,0,0,.24);
   /* The sparkle stars: deliberately brighter than the rest of the toolbar so
@@ -1008,31 +1008,107 @@ export const mountEditMode = (options: MountOptions): void => {
       const publishBtn = document.createElement('button');
       publishBtn.className = 'dl-em-btn';
       publishBtn.textContent = 'Publish';
-      publishBtn.disabled = !allowPublish;
-      publishBtn.addEventListener('click', async () => {
+      // T9.21 (capability #9): the readiness gate moves into the tray — the
+      // button stays disabled until validate reports eligible; blockers show
+      // inline in the human criterion text.
+      publishBtn.disabled = true;
+      publishBtn.title = 'Checking readiness…';
+      const timeBtn = document.createElement('button');
+      timeBtn.className = 'dl-em-btn dl-em-ghost';
+      timeBtn.textContent = '🕓';
+      timeBtn.title = 'Publish with an explicit timestamp';
+      timeBtn.setAttribute('aria-label', 'Publish with an explicit timestamp');
+      timeBtn.disabled = true;
+
+      const doPublish = async (publishedTime?: string): Promise<void> => {
         publishBtn.disabled = true;
+        timeBtn.disabled = true;
         publishBtn.textContent = 'Publishing…';
         const objectSession = session(row.object_type, row.object_id);
         const checkout = await objectSession.ensureCheckout();
         if (!checkout.ok) {
           publishBtn.textContent = 'Publish';
           publishBtn.disabled = false;
+          timeBtn.disabled = false;
           setStatus(`Locked by ${checkout.heldBy ?? 'another editor'} — try again later.`);
           return;
         }
-        const result = await objectSession.publish();
+        const result = await objectSession.publish(publishedTime);
         await objectSession.checkin();
         if (result.status === 200) {
           invalidateRecord(row.object_type, row.object_id);
-          setStatus(`${row.object_id} published — committed, not yet deployed. Release when ready.`);
+          setStatus(
+            `${row.object_id} published${publishedTime ? ` (as of ${publishedTime})` : ''} — committed, not yet deployed. Release when ready.`
+          );
           await refreshPending();
         } else {
           setStatus(`${row.object_id}: ${(result.body.error as string) ?? `publish failed (${result.status})`}`);
           publishBtn.textContent = 'Publish';
           publishBtn.disabled = false;
+          timeBtn.disabled = false;
         }
+      };
+
+      publishBtn.addEventListener('click', () => void doPublish());
+      timeBtn.addEventListener('click', () => {
+        // Inline "publish as of" mini-form (capability #10) — surfaces only
+        // what publish_by_time allows: now, or an explicit timestamp.
+        const existing = rowEl.querySelector('[data-em-timeform]');
+        if (existing) {
+          existing.remove();
+          return;
+        }
+        const form = document.createElement('div');
+        form.setAttribute('data-em-timeform', '');
+        form.className = 'dl-em-formrow';
+        form.innerHTML =
+          `<input type="datetime-local" data-em-time-input>` +
+          `<button class="dl-em-btn" data-em-time-go>Publish at time</button>`;
+        form.querySelector('[data-em-time-go]')?.addEventListener('click', () => {
+          const value = form.querySelector<HTMLInputElement>('[data-em-time-input]')?.value;
+          if (!value) return;
+          form.remove();
+          void doPublish(new Date(value).toISOString());
+        });
+        rowEl.append(form);
       });
-      rowEl.append(publishBtn);
+
+      // Readiness check (async, per row): blockers hold the gate with the
+      // criterion text; a clean validate arms both publish paths.
+      void (async () => {
+        try {
+          const verdict = await callObjectVerb(getToken, {
+            action: 'validate',
+            object_type: row.object_type,
+            object_id: row.object_id,
+          });
+          const summary = (verdict.body as { summary?: { eligible?: boolean; blockers?: string[] } }).summary;
+          if (summary?.eligible === false) {
+            const blockers = summary.blockers ?? [];
+            publishBtn.title = blockers.join('\n') || 'Validation blockers.';
+            const note = rowEl.querySelector('[data-em-traynote]');
+            if (note) {
+              const blockText = document.createElement('div');
+              blockText.className = 'dl-em-note';
+              blockText.style.color = 'var(--dlem-danger)';
+              blockText.textContent = `Not ready: ${blockers[0] ?? 'validation blockers'}${blockers.length > 1 ? ` (+${blockers.length - 1} more)` : ''}`;
+              note.append(blockText);
+            }
+            return; // stays disabled — the readiness gate
+          }
+          publishBtn.disabled = !allowPublish;
+          timeBtn.disabled = !allowPublish;
+          publishBtn.title = allowPublish ? '' : 'Requires publisher role';
+        } catch {
+          // Validation unreachable: fail open to the server gate (publish
+          // re-validates) rather than wedging the tray.
+          publishBtn.disabled = !allowPublish;
+          timeBtn.disabled = !allowPublish;
+          publishBtn.title = '';
+        }
+      })();
+
+      rowEl.append(publishBtn, timeBtn);
       rowsEl.append(rowEl);
     }
   };
