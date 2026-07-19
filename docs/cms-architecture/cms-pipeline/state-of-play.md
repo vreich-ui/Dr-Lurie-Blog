@@ -58,8 +58,8 @@ on `claude/conversion-roadmap-cms-strategy-hgplp8`:
   misread as "W9 not started." The strategy analysis itself (roadmap position,
   the full deferred/open register, coupling inventory) was delivered in the
   session conversation and is condensed into the plan doc's premises.
-## Session 2026-07-19 (artifact-publishing hardening: CMS-Agent ↔ Dr-Lurie ↔ pdf-tool triangle)
 
+## Session 2026-07-19 (artifact-publishing hardening: CMS-Agent ↔ Dr-Lurie ↔ pdf-tool triangle)
 
 Task (vreich): analyze the artifact-production/publishing triangle (CMS-Agent
 MCP orchestrator, this repo's Dr_Lurie MCP, pdf-tool) and make image/PDF
@@ -110,8 +110,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   `mediaEntries[].src`, `artifactReferences[].blobKey`, index-trusted but NOT
   in agent_outputs, real sha) now pinned green against `patch_canonical_input`
   (`tests/netlify/canonical-input-trust-replay.test.ts`) — confirming #327
-  holds for every shape that actually failed. (`netlify/lib/artifact-trust.ts`
-  +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
+  holds for every shape that actually failed. (`netlify/lib/artifact-trust.ts` +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
   `object-validate.ts`, both entry functions; +9 tests.)
 
 - **Fix 2 — content_item media path + hero rules (SHIPPED; bug ② closed on the
@@ -131,7 +130,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   now pinned by a render-matrix test). `object_contract("content_item")` gained
   image/PDF `auxiliary_inputs` rows (grant-first flow, public-path rule,
   never-a-PDF-hero), and the stale `create_artifact_upload_intent` hints on
-  *AssetRef/product-fulfillment guidance now point at the storage-grant path.
+  \*AssetRef/product-fulfillment guidance now point at the storage-grant path.
   (`netlify/lib/object-validate.ts`, `src/lib/registry/object-contract.ts`;
   +6 validation tests, +1 renderer test.)
 
@@ -140,7 +139,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   permalink pattern, proven by /object-model-demo), and the MCP wrapper's
   `production` block adds `verify_after_release` — the exact deploy_status
   (ready AND productionConfirmed) → `verify_article_images {url,
-  expectedImages: [/img/... node paths], commit}` follow-up — so agents verify
+expectedImages: [/img/... node paths], commit}` follow-up — so agents verify
   the real URL instead of guessing routes (the post-publish-404 class).
   `verify_article_images`' description now distinguishes legacy display-path
   matching from object-article `/img/` exact matching.
@@ -186,7 +185,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   `n_demoartifacts` image + `n_demoworksheet` PDF CTA; rev 15, ready) →
   `object_publish` → commit `3cea365` dark (`deploy_status` showed NO deploy —
   the [skip netlify] deferral held) → checkin. **(C)** `release_to_production
-  {commit}` — the MCP response was LOST to a proxy 502, and the
+{commit}` — the MCP response was LOST to a proxy 502, and the
   state-check-first discipline (deploy_status BEFORE any retry) proved the
   hook HAD fired: production-context deploy `6a5cb1c4…` ready in 38 s, no
   duplicate build wasted. `verify_article_images` → **verified:true,
@@ -201,7 +200,7 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
 - **Stale-queue disposition (Fix 6) — BLOCKED ON OPERATOR, documented.** The
   60 stale workflow records (50 pending pre-W7 drafts of wiped articles + 10
   failed June-smoke evidence) should be wiped via `wipe_blob_stores
-  {prefixes:['workflows/']}` (dry-run → review sampleKeys → confirm
+{prefixes:['workflows/']}` (dry-run → review sampleKeys → confirm
   WIPE_BLOBS). The session connection CANNOT run it — the tool answered
   "Unauthorized: a valid server publish key is required" even on dry-run —
   so deletion stays operator-gated. Fixture payloads for the four class-3
