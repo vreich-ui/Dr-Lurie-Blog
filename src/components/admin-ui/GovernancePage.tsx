@@ -19,11 +19,14 @@ import type { ObjectType } from '../../schema/object-record-v1';
 import {
   fetchGovernance,
   setApprovalOverride,
+  setChatToolsOverride,
   revertGovernance,
   effectiveApprovalMode,
   type GovernanceState,
   type ApprovalConfig,
   type ApprovalMode,
+  type ChatToolCatalogEntry,
+  type ToolAutonomy,
 } from '../../lib/admin/governance-client';
 
 async function getToken(): Promise<string> {
@@ -210,13 +213,194 @@ function GovernanceBody() {
         </p>
       </Card>
 
-      <Card kicker="Chat tool autonomy" title="Per-tool autonomy (auto / ask / off)">
-        <p className="text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
-          This table configures whether each chat tool runs automatically, asks first, or is disabled. It activates with
-          the CMS Agents chat runtime.
-        </p>
-      </Card>
+      <ChatToolAutonomyCard
+        catalog={gov.chat_tools_catalog ?? []}
+        current={gov.doc?.chat_tools ?? {}}
+        owner={owner}
+        onSaved={refresh}
+      />
     </div>
+  );
+}
+
+// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────
+
+const AUTONOMY_TONE: Record<ToolAutonomy, 'success' | 'warning' | 'neutral'> = {
+  auto: 'success',
+  ask: 'warning',
+  off: 'neutral',
+};
+const AUTONOMY_LABEL: Record<ToolAutonomy, string> = { auto: 'Auto', ask: 'Ask', off: 'Off' };
+
+const TOOL_CLASS_ORDER: ChatToolCatalogEntry['tool_class'][] = [
+  'read',
+  'draft',
+  'creation',
+  'publication',
+  'privileged',
+];
+const TOOL_CLASS_LABEL: Record<ChatToolCatalogEntry['tool_class'], string> = {
+  read: 'Read',
+  draft: 'Draft & edit',
+  creation: 'Creation',
+  publication: 'Publication',
+  privileged: 'Privileged',
+};
+
+const sameOverride = (a: Record<string, ToolAutonomy>, b: Record<string, ToolAutonomy>) =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+function ChatToolAutonomyCard({
+  catalog,
+  current,
+  owner,
+  onSaved,
+}: {
+  catalog: ChatToolCatalogEntry[];
+  current: Record<string, ToolAutonomy>;
+  owner: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [draft, setDraft] = useState<Record<string, ToolAutonomy>>(current);
+  const [saving, setSaving] = useState(false);
+
+  // Re-sync the local draft whenever the persisted override changes (the parent
+  // refreshes `current` after a save/revert; keying on the serialized map
+  // leaves in-progress edits untouched while nothing has been persisted).
+  const currentKey = JSON.stringify(current);
+  useEffect(() => {
+    setDraft(JSON.parse(currentKey) as Record<string, ToolAutonomy>);
+  }, [currentKey]);
+
+  const dirty = useMemo(() => !sameOverride(draft, current), [draft, current]);
+  const overridden = Object.keys(current).length > 0;
+
+  const setToolMode = (name: string, value: 'default' | ToolAutonomy) => {
+    const next = { ...draft };
+    if (value === 'default') delete next[name];
+    else next[name] = value;
+    setDraft(next);
+  };
+
+  const onSave = async () => {
+    setSaving(true);
+    try {
+      await setChatToolsOverride(getToken, draft);
+      await onSaved();
+      toast({ title: 'Chat tool autonomy updated', tone: 'success' });
+    } catch (err) {
+      toast({ title: 'Save failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onRevert = async () => {
+    setSaving(true);
+    try {
+      await revertGovernance(getToken, 'chat_tools');
+      await onSaved();
+      toast({ title: 'Reverted to the class defaults', tone: 'success' });
+    } catch (err) {
+      toast({ title: 'Revert failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const grouped = TOOL_CLASS_ORDER.map((cls) => ({
+    cls,
+    tools: catalog.filter((tool) => tool.tool_class === cls),
+  })).filter((group) => group.tools.length > 0);
+
+  return (
+    <Card
+      kicker="Chat tool autonomy"
+      title="Per-tool autonomy (auto / ask / off)"
+      actions={
+        <Badge tone={overridden ? 'accent' : 'neutral'}>{overridden ? 'Runtime override' : 'Class defaults'}</Badge>
+      }
+    >
+      <p className="mb-4 text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
+        Each CMS Agents chat tool runs <strong>auto</strong> (no approval card), <strong>ask</strong> (pauses for a
+        human to approve), or <strong>off</strong> (hidden from the agent entirely). Reads default to auto; every write
+        defaults to ask. Autonomy is resolved at the start of each run, so a live run keeps the setting it started with.
+      </p>
+
+      {catalog.length === 0 ? (
+        <EmptyState
+          icon={<IconAlertTriangle size={22} />}
+          title="No chat tools"
+          message="The tool catalog came back empty."
+        />
+      ) : (
+        <div className="flex flex-col gap-4">
+          {grouped.map((group) => (
+            <div key={group.cls}>
+              <p className="mb-1 px-1 text-[length:var(--adm-text-xs)] font-semibold uppercase tracking-wide text-[var(--adm-text-muted)]">
+                {TOOL_CLASS_LABEL[group.cls]}
+              </p>
+              <div className="overflow-hidden rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)]">
+                {group.tools.map((tool) => {
+                  const effective = draft[tool.name] ?? tool.default;
+                  return (
+                    <div
+                      key={tool.name}
+                      className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--adm-border)] px-4 py-2.5 last:border-0"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <code
+                          title={tool.description}
+                          className="rounded bg-[var(--adm-surface-sunken)] px-1.5 py-0.5 text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)]"
+                        >
+                          {tool.name}
+                        </code>
+                        <Badge tone={AUTONOMY_TONE[effective]}>{AUTONOMY_LABEL[effective]}</Badge>
+                      </div>
+                      <div className="w-56">
+                        <Select
+                          aria-label={`Autonomy for ${tool.name}`}
+                          value={draft[tool.name] ?? 'default'}
+                          disabled={!owner}
+                          onChange={(e) => setToolMode(tool.name, e.target.value as 'default' | ToolAutonomy)}
+                          options={[
+                            { value: 'default', label: `Default (${tool.default})` },
+                            { value: 'auto', label: 'Auto — run without asking' },
+                            { value: 'ask', label: 'Ask — approve first' },
+                            { value: 'off', label: 'Off — disable' },
+                          ]}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+        <code>apply_theme</code> also requires the Owner role at execution — that gate is independent of this setting,
+        so even <strong>auto</strong> cannot bypass it.
+      </p>
+
+      {owner ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button onClick={onSave} loading={saving} disabled={!dirty || saving}>
+            Save changes
+          </Button>
+          <Button variant="secondary" onClick={onRevert} disabled={saving || !overridden}>
+            Revert to defaults
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-4 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+          Only Owners can change chat tool autonomy.
+        </p>
+      )}
+    </Card>
   );
 }
 

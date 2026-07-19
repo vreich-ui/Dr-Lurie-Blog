@@ -14,10 +14,24 @@ export interface ApprovalConfig {
   overrides: Partial<Record<string, ApprovalMode>>;
 }
 
+/** Per-chat-tool autonomy (T9.13 run loop): run immediately / pause for
+ *  approval / hide from the tool list entirely. */
+export type ToolAutonomy = 'auto' | 'ask' | 'off';
+
+/** One row of the guardrails chat-tool table, from the server (CHAT_TOOLS is
+ *  the single source, so the UI never drifts from the wired tools). */
+export interface ChatToolCatalogEntry {
+  name: string;
+  tool_class: 'read' | 'draft' | 'creation' | 'publication' | 'privileged';
+  default: ToolAutonomy;
+  description: string;
+}
+
 export interface GovernanceState {
-  doc: { approval?: ApprovalConfig; creation?: unknown; chat_tools?: Record<string, string> } | null;
+  doc: { approval?: ApprovalConfig; creation?: unknown; chat_tools?: Record<string, ToolAutonomy> } | null;
   committed: { approval: ApprovalConfig; creation: unknown };
   active: { approval: ApprovalConfig; creation: unknown; provenance: { approval: string; creation: string } };
+  chat_tools_catalog?: ChatToolCatalogEntry[];
 }
 
 async function post<T>(getToken: GetToken, body: Record<string, unknown>): Promise<T> {
@@ -36,6 +50,11 @@ export const fetchGovernance = (getToken: GetToken) => post<GovernanceState>(get
 
 export const setApprovalOverride = (getToken: GetToken, approval: ApprovalConfig) =>
   post<GovernanceState>(getToken, { verb: 'set', approval });
+
+/** Write the chat-tool autonomy override map (partial — omitted tools fall back
+ *  to their class default in the run loop). Owner-only server-side. */
+export const setChatToolsOverride = (getToken: GetToken, chatTools: Record<string, ToolAutonomy>) =>
+  post<GovernanceState>(getToken, { verb: 'set', chat_tools: chatTools });
 
 export const revertGovernance = (getToken: GetToken, target: 'approval' | 'creation' | 'chat_tools' | 'all') =>
   post<GovernanceState>(getToken, { verb: 'revert', target });

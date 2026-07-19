@@ -134,6 +134,64 @@ test('rich_text.v1 document bodies render through the W7.1 substrate', () => {
   assert.match(html, /<blockquote><p>Quoted\.<\/p><\/blockquote>/);
 });
 
+test('a node title is not double-headed when the body already opens with a heading-2 (T9.16)', () => {
+  const heading = 'What changes in the barrier after 40';
+  const richBody = (firstBlock: Record<string, unknown>) => ({
+    nodeType: 'document',
+    data: {},
+    content: [
+      firstBlock,
+      { nodeType: 'paragraph', data: {}, content: [{ nodeType: 'text', value: 'Body copy.', marks: [], data: {} }] },
+    ],
+  });
+
+  // Body opens with a heading-2 (matching the title): only ONE heading renders.
+  const deduped = renderArticleNodes(
+    'req_x',
+    article({
+      nodes: [
+        {
+          id: 'n_dup',
+          kind: 'content',
+          public: {
+            title: heading,
+            body: richBody({
+              nodeType: 'heading-2',
+              data: {},
+              content: [{ nodeType: 'text', value: heading, marks: [], data: {} }],
+            }),
+          },
+        },
+      ],
+    })
+  ).html;
+  const headings = deduped.match(/<h2>What changes in the barrier after 40<\/h2>/g) ?? [];
+  assert.equal(headings.length, 1, `expected the section heading exactly once, got ${headings.length}`);
+
+  // Body opens with a paragraph (no leading heading-2): the title STILL renders
+  // as the section heading — the fix only suppresses a duplicate, never a title.
+  const kept = renderArticleNodes(
+    'req_x',
+    article({
+      nodes: [
+        {
+          id: 'n_titled',
+          kind: 'content',
+          public: {
+            title: heading,
+            body: richBody({
+              nodeType: 'paragraph',
+              data: {},
+              content: [{ nodeType: 'text', value: 'Lede paragraph.', marks: [], data: {} }],
+            }),
+          },
+        },
+      ],
+    })
+  ).html;
+  assert.match(kept, /<h2>What changes in the barrier after 40<\/h2>/);
+});
+
 test('offer placements render with their disclosure; unsafe hrefs degrade to text', () => {
   const { html } = renderArticleNodes(
     'req_x',

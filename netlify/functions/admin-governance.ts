@@ -21,6 +21,7 @@ import {
   chatToolAutonomySchema,
   type GovernanceDoc,
 } from '../lib/governance-store.js';
+import { CHAT_TOOLS, defaultAutonomyFor } from '../lib/agent/tools.js';
 import { approvalPolicyConfigSchema, activeApprovalPolicy } from '../../src/lib/approval-policy.js';
 import { creationPolicyConfigSchema, activeCreationPolicy } from '../../src/lib/creation-policy.js';
 
@@ -62,6 +63,17 @@ const safeJsonParse = (event: LambdaEvent): { ok: true; value: unknown } | { ok:
 const nowIso = () => new Date().toISOString();
 const committed = () => ({ approval: activeApprovalPolicy(), creation: activeCreationPolicy() });
 
+/** The chat-tool catalog for the guardrails table — the SINGLE source is
+ *  CHAT_TOOLS, so the UI can never drift from the tools the run loop actually
+ *  wires. Each entry carries the class-derived default the override layers on
+ *  top of (resolveAutonomy in agent/tools.ts). Static, so computed once. */
+const chatToolsCatalog = CHAT_TOOLS.map((tool) => ({
+  name: tool.name,
+  tool_class: tool.toolClass,
+  default: defaultAutonomyFor(tool),
+  description: tool.description,
+}));
+
 export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
 
@@ -87,6 +99,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
         doc: await getGovernanceDoc(store),
         committed: committed(),
         active: await resolveActivePolicies(store),
+        chat_tools_catalog: chatToolsCatalog,
       });
     }
 
@@ -126,7 +139,12 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     }
 
     await putGovernanceDoc(store, next);
-    return jsonResponse(200, { doc: next, committed: committed(), active: await resolveActivePolicies(store) });
+    return jsonResponse(200, {
+      doc: next,
+      committed: committed(),
+      active: await resolveActivePolicies(store),
+      chat_tools_catalog: chatToolsCatalog,
+    });
   } catch (error) {
     console.error('Admin_Governance request failed.', error);
     return jsonResponse(500, { error: 'Governance request could not be processed.' });
