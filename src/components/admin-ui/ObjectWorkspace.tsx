@@ -18,7 +18,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AdminShell } from './AdminShell';
 import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
 import { Tabs } from './menus';
-import { Select } from './forms';
+import { Input, Select, Textarea } from './forms';
 import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
 import { ObjectPreview } from './ObjectPreview';
@@ -151,6 +151,168 @@ function readinessFromValidate(body: Record<string, unknown>): ReadinessGroup[] 
     });
   }
   return [{ id: 'validation', label: 'Validation', criteria }];
+}
+
+// ─── article settings (T9.20 workspace parity with the canvas panel) ─────────
+// Same fields, same registry-backed pickers, same edit-time contract
+// validation — all through set_article_meta under EditSession.
+
+function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => void }) {
+  const { toast } = useToast();
+  const body = record.body ?? {};
+  const taxonomy = (body.taxonomy ?? {}) as { category?: string; tags?: string[] };
+  const seo = (body.seo ?? {}) as { description?: string };
+  const [slug, setSlug] = useState(String(body.slug ?? ''));
+  const [description, setDescription] = useState(String(body.description ?? ''));
+  const [category, setCategory] = useState(taxonomy.category ?? '');
+  const [tags, setTags] = useState((taxonomy.tags ?? []).join(', '));
+  const [seoDescription, setSeoDescription] = useState(seo.description ?? '');
+  const [registry, setRegistry] = useState<{ categories: string[]; tags: string[] }>({ categories: [], tags: [] });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+        const res = await callObjectVerb(getToken, {
+          action: 'get',
+          object_type: 'taxonomy',
+          object_id: 'tax_drlurie',
+        });
+        const kinds = ((res.body as { record?: { body?: { kinds?: Record<string, { terms?: { slug?: string }[] }> } } })
+          .record?.body?.kinds ?? {}) as Record<string, { terms?: { slug?: string }[] }>;
+        setRegistry({
+          categories: (kinds.category?.terms ?? []).map((term) => term.slug ?? '').filter(Boolean),
+          tags: (kinds.tag?.terms ?? []).map((term) => term.slug ?? '').filter(Boolean),
+        });
+      } catch {
+        /* registry unavailable — free text still validates at publish */
+      }
+    })();
+  }, []);
+
+  const slugValid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug.trim());
+  const enteredTags = tags
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  const novelTags = enteredTags.filter((tag) => registry.tags.length > 0 && !registry.tags.includes(tag));
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const fields: Record<string, unknown> = {};
+      if (slug.trim() && slug.trim() !== body.slug) fields.slug = slug.trim();
+      if (description.trim() !== String(body.description ?? '')) {
+        fields.description = description.trim() === '' ? null : description.trim();
+      }
+      if (category !== (taxonomy.category ?? '') || enteredTags.join('\n') !== (taxonomy.tags ?? []).join('\n')) {
+        fields.taxonomy = { ...(category ? { category } : { category: null }), tags: enteredTags };
+      }
+      if (seoDescription.trim() !== (seo.description ?? '')) {
+        fields.seo = { description: seoDescription.trim() === '' ? null : seoDescription.trim() };
+      }
+      if (Object.keys(fields).length === 0) {
+        toast({ title: 'Nothing changed', tone: 'info' });
+        return;
+      }
+      const { callObjectVerb, EditSession } = await import('../../lib/edit-mode/verbs-client');
+      // Edit-time contract validation (slug uniqueness vs committed posts) —
+      // the same shared validation messages the canvas panel shows.
+      const candidate = await callObjectVerb(getToken, {
+        action: 'validate',
+        object_type: record.object_type,
+        object_id: record.object_id,
+        candidate_patch: [{ op: 'set_article_meta', fields }],
+      });
+      if (candidate.status === 200 && (candidate.body as { eligible?: boolean }).eligible === false) {
+        const groups = ((candidate.body as { validation?: { items?: { severity?: string; message?: string }[] }[] })
+          .validation ?? []) as { items?: { severity?: string; message?: string }[] }[];
+        const blockers = groups
+          .flatMap((group) => group.items ?? [])
+          .filter((item) => item.severity === 'block')
+          .map((item) => item.message ?? '');
+        toast({
+          title: 'Fix before saving',
+          description: blockers.join(' · ') || 'Validation failed.',
+          tone: 'danger',
+        });
+        return;
+      }
+      const session = new EditSession(record.object_type, record.object_id, getToken);
+      const checkout = await session.ensureCheckout();
+      if (!checkout.ok) {
+        toast({
+          title: 'Locked',
+          description: checkout.heldBy ? `Held by ${checkout.heldBy}.` : undefined,
+          tone: 'warning',
+        });
+        return;
+      }
+      const outcome = await session.patch([{ op: 'set_article_meta', fields }]);
+      await session.checkin();
+      if (outcome.ok) {
+        toast({ title: 'Article settings saved as a draft', tone: 'success' });
+        onSaved();
+      } else {
+        toast({ title: 'Not saved', description: outcome.error, tone: 'danger' });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 flex flex-col gap-3 rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)] p-3">
+      <p className="text-[length:var(--adm-text-sm)] font-semibold text-[var(--adm-text-heading)]">Article settings</p>
+      <Input
+        label="Slug"
+        value={slug}
+        onChange={(event) => setSlug(event.target.value)}
+        error={slug && !slugValid ? 'Lowercase letters, digits, single hyphens.' : undefined}
+        hint="Unique across articles; validated on save."
+      />
+      <Textarea
+        label="Description (deck)"
+        rows={2}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+      <Select
+        label="Category"
+        value={category}
+        onChange={(event) => setCategory(event.target.value)}
+        options={[
+          { value: '', label: '—' },
+          ...[...new Set([...registry.categories, ...(category ? [category] : [])])].map((slugValue) => ({
+            value: slugValue,
+            label: registry.categories.includes(slugValue) ? slugValue : `${slugValue} (not in registry)`,
+          })),
+        ]}
+        hint="From the taxonomy registry."
+      />
+      <Input
+        label="Tags"
+        value={tags}
+        onChange={(event) => setTags(event.target.value)}
+        hint={
+          novelTags.length > 0
+            ? `Not in the registry (needed before publish): ${novelTags.join(', ')}`
+            : 'Comma-separated; registry terms resolve at publish.'
+        }
+      />
+      <Textarea
+        label="SEO description"
+        rows={2}
+        value={seoDescription}
+        onChange={(event) => setSeoDescription(event.target.value)}
+        hint={`${seoDescription.length}/160 characters.`}
+      />
+      <Button size="sm" className="self-start" onClick={() => void save()} loading={busy}>
+        Save draft
+      </Button>
+    </div>
+  );
 }
 
 // ─── dedicated-agent selector (T9.26 §4a; Owner assigns, Admin reads) ────────
@@ -551,6 +713,9 @@ function WorkspaceBody() {
         <div className="mb-4">
           <DedicatedAgentPicker objectId={record.object_id} owner={owner} />
         </div>
+        {record.object_type === 'content_item' ? (
+          <ArticleSettingsCard record={record} onSaved={() => void load()} />
+        ) : null}
         <Tabs
           tabs={[
             { id: 'details', label: 'Details', content: <GeneratedInspector record={record} onEditOnSite={url} /> },
