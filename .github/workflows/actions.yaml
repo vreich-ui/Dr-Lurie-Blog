@@ -14,6 +14,9 @@ jobs:
     strategy:
       matrix:
         node-version:
+          # 20 is what Netlify production builds on (netlify.toml NODE_VERSION)
+          # — CI must exercise it or a Node-20-only build failure ships uncaught.
+          - 20
           - 22
           - 24
     steps:
@@ -38,3 +41,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      # The site-seed drift guard: seed module must match the committed export
+      # (run scripts/sync-site-seed.mjs after any sanctioned site change).
+      - run: node scripts/sync-site-seed.mjs --check
+      # The T2.0 cutover-diff harness self-test (cheap; the full two-build diff
+      # stays a manual per-cutover gate).
+      - run: node scripts/build-diff.mjs --self-test

@@ -228,9 +228,12 @@ const printSummary = (result) => {
 
 // One-character copy change applied inside the self-test worktree only. The
 // haystack is homepage copy; if it ever changes upstream, update both strings.
-const SELF_TEST_FILE = 'src/pages/index.astro';
-const SELF_TEST_NEEDLE = 'Five simple places to begin.';
-const SELF_TEST_MUTATION = 'Five simple places to begin!';
+// The homepage renders from the page_home object export (src/pages/index.astro
+// is a thin PageObjectRenderer loader since the W-waves), so the planted
+// mutation lives in the export copy that actually reaches rendered HTML.
+const SELF_TEST_FILE = 'src/data/site/pages/page_home.json';
+const SELF_TEST_NEEDLE = 'A few next steps, kept deliberately small.';
+const SELF_TEST_MUTATION = 'A few next steps, kept deliberately small!';
 
 const runSelfTest = () => {
   log('self-test: build #1 (baseline), build #2 (no-op rebuild), build #3 (one-char copy change)');

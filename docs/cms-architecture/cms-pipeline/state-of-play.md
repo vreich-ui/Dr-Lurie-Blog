@@ -107,6 +107,17 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   pdf-tool defaulting generation to the grant `limits` — goes in the Track 2
   contract doc.)
 
+- **Fix 7 — CI hardening (SHIPPED).** Node 20 added to the build matrix
+  (Netlify production builds on 20 via netlify.toml; CI only exercised 22/24 —
+  a Node-20-only failure shipped uncaught). The check job now runs the
+  site-seed drift guard (`sync-site-seed.mjs --check`) and the T2.0 build-diff
+  harness self-test. FOUND EN ROUTE: the self-test itself had rotted — its
+  planted needle ("Five simple places to begin.") no longer exists since
+  index.astro became a thin PageObjectRenderer loader; re-pointed at the
+  page_home EXPORT copy (the string that actually reaches rendered HTML),
+  self-test 2/2 PASS again. (`.github/workflows/actions.yaml`,
+  `scripts/build-diff.mjs`.)
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for
