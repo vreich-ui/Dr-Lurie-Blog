@@ -94,6 +94,19 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   matching from object-article `/img/` exact matching.
   (`netlify/lib/object-publish.ts`, mcp.ts; +1 test.)
 
+- **Fix 5 — image byte budget surfaced at validation (SHIPPED).** The 150 KB
+  webp budget rode the grant and object_contract but nothing on the write path
+  surfaced an over-budget artifact (a default 1024×1024 PNG ships ~10× over,
+  silently). New `media_budget` criterion (artifact_trust group): every
+  resolved image ref (`/img/` path or raw `image/` Major Key) with
+  `sizeBytes` over `activeMediaPolicy().maxImageBytes` reports — severity
+  follows the committed policy (`overBudget:'warn'` → warning;
+  flipping to `'block'` makes it a publish blocker with zero code). Over-budget
+  only — format stays generation guidance, so existing .jpg canvas uploads
+  don't nag. (`netlify/lib/object-validate.ts`; +2 tests. External half —
+  pdf-tool defaulting generation to the grant `limits` — goes in the Track 2
+  contract doc.)
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for

@@ -73,6 +73,7 @@ import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import type { ObjectRecord, ObjectType, Principal } from '../../src/schema/object-record-v1.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE, publicPathForArtifactRef, rawArtifactRefForPublicPath } from './artifact-trust.js';
+import { activeMediaPolicy, type MediaPolicy } from '../../src/lib/media-policy.js';
 
 export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
 
@@ -684,6 +685,58 @@ export const checkArtifactTrust = (
   if (!sawAssetRef)
     return [crit('artifact_trust', 'Media / artifact trust', 'optional', 'No asset references present.')];
   return [crit('artifact_trust', 'Media / artifact trust', 'complete', '')];
+};
+
+// ─── check 5c: image byte budget (src/config/media-policy.ts) ────────────────
+//
+// The budget rides the pdf-tool storage grant and object_contract, but nothing
+// on the write path surfaced an over-budget artifact — a 1024×1024 PNG from
+// default generation settings ships silently at ~10× the 150 KB webp budget.
+// Uses the artifact-index resolver's metadata (sizeBytes). Severity follows
+// the committed policy: overBudget 'warn' → warning; 'block' → publish blocker
+// (draft warning) — flipping the config upgrades enforcement with zero code.
+// Only image artifacts are budgeted (PDFs carry no byte budget), and only
+// over-budget is reported — format is generation guidance, not a write nag.
+
+const BUDGET_IMG_PUBLIC_PATH_RE = /^\/img\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+
+export const checkMediaBudget = (
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish = false,
+  policyOverride?: MediaPolicy
+): ReadinessCriterion[] => {
+  if (!context.resolveArtifactRef) return []; // no size metadata — nothing to report
+  const policy = policyOverride ?? activeMediaPolicy();
+  const over: string[] = [];
+  const reported = new Set<string>();
+  let sawResolvedImage = false;
+
+  walkStrings(body, (path, value) => {
+    if (path.includes('notes')) return;
+    let raw: string | undefined;
+    if (BUDGET_IMG_PUBLIC_PATH_RE.test(value)) raw = rawArtifactRefForPublicPath(value);
+    else if (MAJOR_KEY_ARTIFACT_REF_RE.test(value) && value.toLowerCase().startsWith('image/')) raw = value;
+    if (!raw || reported.has(raw)) return;
+
+    const resolution = context.resolveArtifactRef?.(raw);
+    if (!resolution?.exists || typeof resolution.sizeBytes !== 'number') return;
+    sawResolvedImage = true;
+    if (resolution.sizeBytes > policy.maxImageBytes) {
+      reported.add(raw);
+      over.push(
+        `${path.join('.')} "${value}" is ${resolution.sizeBytes} bytes — over the ${policy.maxImageBytes}-byte ` +
+          `image budget. Ask pdf-tool to shrink it under the budget (preferred format: ${policy.preferredImageFormat}).`
+      );
+    }
+  });
+
+  if (over.length > 0) {
+    const status: CriterionStatus = policy.overBudget === 'block' && atPublish ? 'missing' : 'warning';
+    return [crit('media_budget', 'Image byte budget', status, over.slice(0, 5).join(' '))];
+  }
+  if (sawResolvedImage) return [crit('media_budget', 'Image byte budget', 'complete', '')];
+  return [];
 };
 
 // ─── check 5b: raw artifact refs in RENDERABLE fields (build-breaker guard) ───
@@ -2278,7 +2331,10 @@ export const validateObject = (
     {
       id: 'artifact_trust',
       label: 'Media / artifact trust',
-      criteria: checkArtifactTrust(input.body, context, atPublish),
+      criteria: [
+        ...checkArtifactTrust(input.body, context, atPublish),
+        ...checkMediaBudget(input.body, context, atPublish),
+      ],
     },
     {
       id: 'structure',

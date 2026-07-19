@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   checkArtifactTrust,
   checkIdDiscipline,
+  checkMediaBudget,
   checkProduct,
   checkReaderSafety,
   checkReferenceIntegrity,
@@ -1110,4 +1111,37 @@ test('article media: gallery images[] entries are validated like single media; n
 
   const none = articleStructure(articleBodyWith({}));
   assert.equal(none.find((c) => c.id === 'article_media'), undefined);
+});
+
+// ═══ check 5c: image byte budget (media-policy surfacing) ════════════════════
+
+test('media budget: an over-budget /img/ image warns under the committed warn policy; under-budget is complete', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const oversize: ObjectValidationContext = {
+    resolveArtifactRef: () => ({ exists: true, sizeBytes: 900_000, contentType: 'image/png' }),
+  };
+  const over = checkMediaBudget(body, oversize, true);
+  assert.equal(statusOf(over, 'media_budget'), 'warning');
+  assert.match(over.find((c) => c.id === 'media_budget')!.message, /image budget/);
+
+  const fine: ObjectValidationContext = {
+    resolveArtifactRef: () => ({ exists: true, sizeBytes: 90_000, contentType: 'image/webp' }),
+  };
+  assert.equal(statusOf(checkMediaBudget(body, fine, true), 'media_budget'), 'complete');
+});
+
+test('media budget: a block policy makes over-budget a publish blocker (draft still warns); no resolver → silent', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const oversize: ObjectValidationContext = {
+    resolveArtifactRef: () => ({ exists: true, sizeBytes: 900_000 }),
+  };
+  const blockPolicy = { maxImageBytes: 153_600, overBudget: 'block' as const, preferredImageFormat: 'webp' as const };
+  assert.equal(statusOf(checkMediaBudget(body, oversize, true, blockPolicy), 'media_budget'), 'missing');
+  assert.equal(statusOf(checkMediaBudget(body, oversize, false, blockPolicy), 'media_budget'), 'warning');
+
+  assert.deepEqual(checkMediaBudget(body, {}, true), []);
 });
