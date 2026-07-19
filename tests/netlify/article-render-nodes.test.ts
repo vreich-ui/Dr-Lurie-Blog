@@ -17,6 +17,13 @@ const article = (overrides: Record<string, unknown> = {}): ContentItemBody =>
   contentItemBodySchema.parse({
     slug: 'barrier-myths',
     title: 'Five barrier myths',
+    // T13.1 leak seed: label/tags are reporting-only and must NEVER render.
+    tracking: {
+      enabled: true,
+      label: 'TRKLABELSENTINEL retarget the anxious-buyer cohort',
+      tags: ['TRKTAGSENTINEL_q3_push'],
+      goals: [{ goal: 'opt_in', on: 'completion' }],
+    },
     nodes: [
       {
         id: 'n_a1',
@@ -64,7 +71,20 @@ test('renders public nodes with canvas identity; internal/hidden nodes never rea
 
 test('THE LEAK RULE: no strategy vocabulary or annotation field names in the output', () => {
   const { html } = renderArticleNodes('req_agent_barrier_myths_20260713_01', article());
-  for (const forbidden of ['hook', 'agitation', 'persuade', 'convert', 'agentNotes', 'private', 'strategy']) {
+  // T13.1: tracking.label / tracking.tags join the forbidden set — reporting
+  // vocabulary, same never-render discipline as strategy annotations.
+  for (const forbidden of [
+    'hook',
+    'agitation',
+    'persuade',
+    'convert',
+    'agentNotes',
+    'private',
+    'strategy',
+    'TRKLABELSENTINEL',
+    'TRKTAGSENTINEL',
+    'anxious-buyer',
+  ]) {
     assert.equal(
       html.toLowerCase().includes(forbidden.toLowerCase()),
       false,

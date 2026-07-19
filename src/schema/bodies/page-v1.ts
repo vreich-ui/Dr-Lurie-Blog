@@ -18,6 +18,7 @@
 import { z } from 'zod';
 
 import { sectionInstanceSchema } from './section-v1.js';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const PAGE_SCHEMA_VERSION = 'page.v1';
 
@@ -27,6 +28,8 @@ export type PageTypeId = z.infer<typeof pageTypeIdSchema>;
 
 export const pageBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     route: z.string().min(1), // '/', '/about', '/start-here', …
     pageType: pageTypeIdSchema,
     title: z.string().min(1),

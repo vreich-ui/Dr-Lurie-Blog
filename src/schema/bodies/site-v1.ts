@@ -14,6 +14,7 @@
 import { z } from 'zod';
 
 import { THEME_AXES } from '../../lib/registry/theme-tokens.js';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const SITE_SCHEMA_VERSION = 'site.v1';
 
@@ -65,6 +66,8 @@ export type BrandTokens = z.infer<typeof brandTokensSchema>;
 
 export const siteBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     name: z.string().min(1),
     logo: z
       .object({

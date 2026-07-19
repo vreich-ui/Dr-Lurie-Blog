@@ -18,11 +18,14 @@ import { z } from 'zod';
 
 import { recipeMetadataShape } from './recipe-metadata-v1.js';
 import { brandTokensSchema } from './site-v1.js';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const THEME_SCHEMA_VERSION = 'theme.v1';
 
 export const themeBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     name: z.string().min(1),
     // Self-description (W8.3b): schema-optional, required to publish.
     ...recipeMetadataShape,

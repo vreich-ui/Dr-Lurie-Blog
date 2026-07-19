@@ -67,7 +67,17 @@ import { sectionBodySchema, type SectionInstance, type SectionType } from '../..
 import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { checkBrandTokenValue, THEME_AXES, THEME_AXIS_GROUPS, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
+import {
+  checkBrandTokenValue,
+  THEME_AXES,
+  THEME_AXIS_GROUPS,
+  THEME_COLOR_KEYS,
+} from '../../src/lib/registry/theme-tokens.js';
+import {
+  CONVERSION_LABEL_RE,
+  GOAL_KEY_RE,
+  TRACKABLE_ACTIVITIES_BY_TYPE,
+} from '../../src/schema/bodies/tracking-attribute-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -613,14 +623,24 @@ type AssetRefProblem = {
   kind: 'shape' | 'trust' | 'existence';
 };
 
-const validateAssetRef = (path: string, value: string, context: ObjectValidationContext): AssetRefProblem | undefined => {
+const validateAssetRef = (
+  path: string,
+  value: string,
+  context: ObjectValidationContext
+): AssetRefProblem | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return { kind: 'shape', message: `${path} must not be a data URI.` };
   if (LEGACY_REPO_PATH_RE.test(value))
     return { kind: 'shape', message: `${path} is a legacy repo path. Provide a Major Key artifact reference.` };
   if (REMOTE_URL_RE.test(value))
-    return { kind: 'shape', message: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.` };
+    return {
+      kind: 'shape',
+      message: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`,
+    };
   if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value))
-    return { kind: 'shape', message: `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).` };
+    return {
+      kind: 'shape',
+      message: `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`,
+    };
   if (context.trustedAssetRefs) {
     return context.trustedAssetRefs.has(value)
       ? undefined
@@ -1727,7 +1747,10 @@ const classifyArticleImageSrc = (
 ): ArticleMediaProblem | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return { kind: 'block', message: `${path} must not be a data URI.` };
   if (LEGACY_REPO_PATH_RE.test(value))
-    return { kind: 'block', message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.` };
+    return {
+      kind: 'block',
+      message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.`,
+    };
   if (MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return undefined; // check 5b reports raw keys with the canonical message
   if (forbidPdf && (PDF_PUBLIC_PATH_RE.test(value) || /\.pdf$/i.test(value))) {
     return {
@@ -1763,7 +1786,10 @@ const classifyArticleDocumentSrc = (
 ): ArticleMediaProblem | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return { kind: 'block', message: `${path} must not be a data URI.` };
   if (LEGACY_REPO_PATH_RE.test(value))
-    return { kind: 'block', message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.` };
+    return {
+      kind: 'block',
+      message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.`,
+    };
   if (MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return undefined; // check 5b reports raw keys
   if (PDF_PUBLIC_PATH_RE.test(value)) return resolvePublicPathExistence(path, value, context);
   if (REMOTE_URL_RE.test(value)) {
@@ -1821,8 +1847,7 @@ const checkContentItemMedia = (
   const existence = problems.filter((problem) => problem.kind === 'existence').map((problem) => problem.message);
   const warns = problems.filter((problem) => problem.kind === 'warn').map((problem) => problem.message);
 
-  if (blocks.length > 0)
-    return [crit('article_media', 'Article media paths', 'missing', blocks.slice(0, 5).join(' '))];
+  if (blocks.length > 0) return [crit('article_media', 'Article media paths', 'missing', blocks.slice(0, 5).join(' '))];
   if (existence.length > 0) {
     return [
       crit('article_media', 'Article media paths', atPublish ? 'missing' : 'warning', existence.slice(0, 5).join(' ')),
@@ -1902,7 +1927,72 @@ const checkContentItemStructure = (
   return criteria;
 };
 
+/**
+ * T13.1 — the shared `tracking` attribute criterion, uniform across all ten
+ * types (12-plan §2). Regex conformance always (mirrors the zod bounds with
+ * readable copy); a goal whose `on` activity is not COLLECTABLE for this
+ * object type per the §6 matrix (TRACKABLE_ACTIVITIES_BY_TYPE — the shared
+ * table validation and the T13.5 renderer both read) warns while drafting
+ * and blocks at publish. Store-independent: never reads trk_drlurie —
+ * disabled providers are simply skipped at render.
+ */
+const checkTrackingAttribute = (objectType: ObjectType, body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  const tracking = isRecord(body) ? body.tracking : undefined;
+  if (tracking === undefined) return [];
+  const label = 'Tracking attribute';
+  if (!isRecord(tracking)) {
+    return [crit('tracking_attribute', label, 'missing', 'tracking must be an object (see schema check).')];
+  }
+  const hard: string[] = [];
+  const activityProblems: string[] = [];
+  const goals = Array.isArray(tracking.goals) ? tracking.goals : [];
+  const collectable = TRACKABLE_ACTIVITIES_BY_TYPE[objectType] ?? [];
+  goals.filter(isRecord).forEach((goal, index) => {
+    const key = typeof goal.goal === 'string' ? goal.goal : '';
+    if (!GOAL_KEY_RE.test(key)) {
+      hard.push(
+        `tracking.goals[${index}].goal ${JSON.stringify(goal.goal)} must be a neutral slug (${String(GOAL_KEY_RE)}) — goal keys reach the page.`
+      );
+    }
+    const conversions = Array.isArray(goal.provider_conversions) ? goal.provider_conversions : [];
+    conversions.filter(isRecord).forEach((conversion, conversionIndex) => {
+      if (typeof conversion.label !== 'string' || !CONVERSION_LABEL_RE.test(conversion.label)) {
+        hard.push(
+          `tracking.goals[${index}].provider_conversions[${conversionIndex}].label must match ${String(CONVERSION_LABEL_RE)}.`
+        );
+      }
+    });
+    if (typeof goal.on === 'string' && !(collectable as readonly string[]).includes(goal.on)) {
+      activityProblems.push(
+        `tracking.goals[${index}] binds on '${goal.on}', which is not collectable for ${objectType} (${
+          collectable.length > 0 ? `collectable: ${collectable.join(', ')}` : 'this type has no reader events'
+        }) — the goal can never fire.`
+      );
+    }
+  });
+  if (hard.length > 0) {
+    return [crit('tracking_attribute', label, 'missing', hard.slice(0, 3).join(' '))];
+  }
+  if (activityProblems.length > 0) {
+    return [
+      crit('tracking_attribute', label, atPublish ? 'missing' : 'warning', activityProblems.slice(0, 3).join(' ')),
+    ];
+  }
+  return [crit('tracking_attribute', label, 'complete', '')];
+};
+
 export const checkStructuralInvariants = (
+  objectType: ObjectType,
+  objectId: string,
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish: boolean
+): ReadinessCriterion[] => [
+  ...checkTrackingAttribute(objectType, body, atPublish),
+  ...checkStructuralInvariantsByType(objectType, objectId, body, context, atPublish),
+];
+
+const checkStructuralInvariantsByType = (
   objectType: ObjectType,
   objectId: string,
   body: unknown,
@@ -1924,10 +2014,7 @@ export const checkStructuralInvariants = (
   // value safety applies on every site write too (the 09 §7.3 gap).
   if (objectType === 'site') {
     const siteTokens = isRecord(body) ? body.brandTokens : undefined;
-    return [
-      brandTokenValueCriterion(siteTokens, 'brandTokens'),
-      ...brandTokenAxisCriteria(siteTokens, 'brandTokens'),
-    ];
+    return [brandTokenValueCriterion(siteTokens, 'brandTokens'), ...brandTokenAxisCriteria(siteTokens, 'brandTokens')];
   }
 
   // content_grid card/limit sanity applies to any body that can carry a grid —

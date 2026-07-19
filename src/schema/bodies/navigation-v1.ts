@@ -26,6 +26,7 @@
  * pipeline's job (T0.7), not this schema's.
  */
 import { z } from 'zod';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const NAVIGATION_SCHEMA_VERSION = 'navigation.v1';
 
@@ -110,6 +111,8 @@ export type NavGroup = z.infer<typeof navGroupSchema>;
 
 export const navigationBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     role: z.enum(['header', 'footer', 'secondary', 'social']),
     brand: z
       .object({

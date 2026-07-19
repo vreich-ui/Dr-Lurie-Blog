@@ -1044,6 +1044,29 @@ const applyOp = (objectType: ObjectType, body: UnknownRecord, op: PatchOp): Patc
     case 'set_theme_fields':
       return applyFieldsOp(op, body, op.fields as UnknownRecord);
 
+    // ——— tracking (W13, 12-plan §2) ———
+    // The uniform writer of the shared `tracking` block on all ten types.
+    // Captures are WHOLE-BLOCK ({tracking: <tree|null>} on both sides, null =
+    // absent) so removal, first-set, and merge all invert exactly — the
+    // inverse derivation computes the precise merge tree (or fields: null)
+    // from the two snapshots. Guards are whole-block shaped for the same
+    // reason: the unit this op touches is the block, not individual keys.
+    case 'set_tracking': {
+      const snapshot = (): FieldsTree => ({
+        tracking: body.tracking === undefined ? null : (deepCloneJson(body.tracking) as PatchJsonValue),
+      });
+      const before = snapshot();
+      checkGuard(op, before);
+      if (op.fields === null) {
+        delete body.tracking;
+      } else {
+        if (body.tracking === undefined) body.tracking = {};
+        const unit = expectPlainObject(body.tracking, 'body.tracking');
+        mergeFields(unit, op.fields as UnknownRecord);
+      }
+      return { kind: 'fields', before, after: snapshot() };
+    }
+
     // ——— section-template family (W8) ———
     // The body wraps exactly ONE blueprint (a SectionInstance), so the family
     // mirrors the shared-section wrapper: fields on the envelope, whole-unit
@@ -1157,6 +1180,29 @@ const expectCaptureKind = <TKind extends PatchOpCapture['kind']>(
   return capture as Extract<PatchOpCapture, { kind: TKind }>;
 };
 
+/**
+ * The exact merge tree that turns `after` back into `before` under the
+ * grammar's deep-merge rules (set_tracking inverse): keys the forward op
+ * added become explicit nulls (unset), changed plain-object keys recurse,
+ * changed arrays/scalars restore the before value wholesale.
+ */
+const trackingInverseTree = (after: UnknownRecord, before: UnknownRecord): FieldsTree => {
+  const out: FieldsTree = {};
+  for (const key of Object.keys(after)) {
+    if (!(key in before)) out[key] = null;
+  }
+  for (const [key, beforeValue] of Object.entries(before)) {
+    const afterValue = after[key];
+    if (deepEqualJson(afterValue, beforeValue)) continue;
+    if (isPlainObject(afterValue) && isPlainObject(beforeValue)) {
+      out[key] = trackingInverseTree(afterValue, beforeValue);
+    } else {
+      out[key] = deepCloneJson(beforeValue) as PatchJsonValue;
+    }
+  }
+  return out;
+};
+
 const guardOf = (expected: unknown): { guard: { expected: unknown } } => ({
   guard: { expected: deepCloneJson(expected) },
 });
@@ -1216,6 +1262,27 @@ export const derivePatchInverse = (op: PatchOp, capture: PatchOpCapture): PatchO
     case 'set_theme_fields': {
       const fieldsCapture = expectCaptureKind(op, capture, 'fields');
       return patchOpSchema.parse({ op: op.op, fields: fieldsCapture.before, ...guardOf(fieldsCapture.after) });
+    }
+
+    case 'set_tracking': {
+      const fieldsCapture = expectCaptureKind(op, capture, 'fields');
+      const beforeTracking = fieldsCapture.before.tracking;
+      const afterTracking = fieldsCapture.after.tracking;
+      // Absent before → the exact inverse of a first-set is whole-block
+      // removal. Absent after (forward removal) → merging the full prior
+      // tree onto the now-absent block reproduces it exactly. Otherwise →
+      // the computed merge tree that turns the after-tree back into the
+      // before-tree (nulls unset keys the forward op added).
+      const fields =
+        beforeTracking === null || beforeTracking === undefined
+          ? null
+          : afterTracking === null || afterTracking === undefined
+            ? deepCloneJson(beforeTracking)
+            : trackingInverseTree(
+                expectPlainObject(afterTracking, 'set_tracking capture.after.tracking'),
+                expectPlainObject(beforeTracking, 'set_tracking capture.before.tracking')
+              );
+      return patchOpSchema.parse({ op: 'set_tracking', fields, ...guardOf(fieldsCapture.after) });
     }
 
     case 'replace_blueprint': {

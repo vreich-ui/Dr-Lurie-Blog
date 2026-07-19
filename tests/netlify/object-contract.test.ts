@@ -98,7 +98,15 @@ test('content_item carries the node op family (W7.3 — articles are governed ob
     buildObjectContract('content_item')
       .patch_ops.map((o) => o.op)
       .sort(),
-    ['move_node', 'remove_node', 'set_article_meta', 'set_node_visibility', 'update_node', 'upsert_node']
+    [
+      'move_node',
+      'remove_node',
+      'set_article_meta',
+      'set_node_visibility',
+      'set_tracking',
+      'update_node',
+      'upsert_node',
+    ]
   );
 });
 
@@ -147,7 +155,7 @@ test('section_template carries the blueprint op family, section vocabulary, and 
   assert.equal(contract.governed, true);
   assert.deepEqual(
     contract.patch_ops.map((op) => op.op),
-    ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data']
+    ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data', 'set_tracking']
   );
   assert.equal(
     contract.patch_ops.find((op) => op.op === 'replace_blueprint')?.minted_id_field,

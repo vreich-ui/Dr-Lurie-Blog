@@ -270,6 +270,17 @@ const COMMON_CONSTRAINTS: Constraint[] = [
       'Reader-visible strings must be reader-safe (no internal/strategy leakage). `notes` fields are private and exempt.',
   },
   {
+    id: 'tracking_attribute',
+    severity: 'blocks_publish',
+    enforced_live: true,
+    description:
+      'The optional `tracking` block (enabled/label/tags/goals — W13, 12-plan §2) is written ONLY by set_tracking; ' +
+      'the seven open fields ops refuse the key (one-writer funnel). Goal keys and provider conversion labels are ' +
+      'PUBLIC by construction (they reach the page in the loader config), so they must be neutral slugs — strategy ' +
+      'vocabulary belongs in private.* or tracking.label/tags, which NEVER render. A goal bound to an activity not ' +
+      'collectable for this object type warns while drafting and blocks publish.',
+  },
+  {
     id: 'artifact_trust',
     severity: 'blocks_write',
     enforced_live: true,
