@@ -40,6 +40,15 @@
   status = 200
   force = true
 
+# W13 (12-plan §5.3): first-party tracking ingest — same-origin, generic
+# path (ad-blocker posture). GET ?mode=region doubles as the consent gate's
+# region oracle.
+[[redirects]]
+  from = "/api/t"
+  to = "/.netlify/functions/track-ingest"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/admin/review/*"
   to = "/admin/review/draft"

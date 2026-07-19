@@ -208,3 +208,9 @@ export const getCommerceBlobStore = async (event: unknown): Promise<BlobStore> =
 export const getCommerceEventsBlobStore = async (event: unknown): Promise<BlobStore> => {
   return getNetlifyBlobStore('commerce-events', event);
 };
+
+/** W13 (12-plan §5.3): the tracking-event mirror — replay substrate ONLY,
+ *  never a reporting surface. */
+export const getTrackingEventsBlobStore = async (event: unknown): Promise<BlobStore> => {
+  return getNetlifyBlobStore('tracking-events', event);
+};
