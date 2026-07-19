@@ -346,6 +346,18 @@ export const publishObject = async (
     });
   }
 
+  // The live permalink for a content_item (blog pattern /%slug%) — the publish
+  // receipt tells the agent WHERE the article goes live instead of leaving the
+  // route to be guessed (the post-publish-404 failure class).
+  const articleSlug =
+    input.object_type === 'content_item' &&
+    fresh.body &&
+    typeof fresh.body === 'object' &&
+    !Array.isArray(fresh.body) &&
+    typeof (fresh.body as { slug?: unknown }).slug === 'string'
+      ? (fresh.body as { slug: string }).slug
+      : undefined;
+
   return ok({
     published: true,
     object_type: input.object_type,
@@ -354,5 +366,6 @@ export const publishObject = async (
     receipt,
     version: stamped.version,
     content_revision: stamped.content_revision,
+    ...(articleSlug ? { article_path: `/${articleSlug}` } : {}),
   });
 };

@@ -797,6 +797,16 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
         input: 'strategy annotations',
         when: 'every node (strongly recommended)',
         how: 'Set node.private.strategy (hook/agitation/context/explanation/proof/example/comparison/myth/step/recommendation/resolution/summary) and node.private.intent (educate/persuade/reassure/convert/navigate) so agents can judge, score, and build variants. Never rendered to readers.',
+      },
+      {
+        input: 'image artifacts',
+        when: 'node public.media {type:"image"}, public.images[], hero body.image',
+        how: 'Generate through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant), then set src to the PUBLIC path of the returned blobKey: image/{id}/{sha256}.{ext} → /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.',
+      },
+      {
+        input: 'PDF artifacts',
+        when: 'node public.media {type:"document"} or a /pdf/ ctaLink',
+        how: 'Generate the PDF through pdf-tool under a storage grant, then use its public path /pdf/{id}/{sha256}.pdf as the document media src (renders as a download link) or the action-node ctaLink. Missing/deleted artifacts block publish.',
       }
     );
   }
@@ -805,7 +815,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
     inputs.push({
       input: 'artifact ref',
       when: 'any *AssetRef field',
-      how: 'Upload via create_artifact_upload_intent first, then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected.',
+      how: 'Generate/store the asset through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant — the sanctioned artifact transfer path), then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.',
     });
   }
   if (objectType === 'page' || objectType === 'navigation' || objectType === 'site') {
@@ -820,7 +830,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'fulfillment artifact ref',
         when: 'fulfillment.kind "download"',
-        how: 'Upload the deliverable to the PRIVATE artifacts store first (create_artifact_upload_intent), then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.',
+        how: 'Produce the deliverable through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant) so it lands in the artifacts store, then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.',
       },
       {
         input: 'long-form page',

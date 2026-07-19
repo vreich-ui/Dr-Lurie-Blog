@@ -6,6 +6,7 @@ import { getHeader } from '../lib/admin-auth.js';
 import {
   getDeployReceiptByCommit,
   getDeployReceiptByDeployId,
+  getPublishedProductionDeploy,
   isNetlifyDeployLookupConfigured,
   type DeployReceipt,
 } from '../lib/netlify-deploys.js';
@@ -123,7 +124,19 @@ export const handler = async (event: LambdaEvent) => {
   try {
     const receipt = commit ? await getDeployReceiptByCommit(commit) : await getDeployReceiptByDeployId(deployId ?? '');
 
-    return jsonResponse(200, receipt ?? getQueuedReceipt({ commit, deployId }));
+    // The published deploy is what production actually serves — a "ready"
+    // receipt alone can be a ready-but-unpublished deploy under locked Auto
+    // Publishing. Absent fields (site lookup unavailable) mean "unknown",
+    // never "not live".
+    const publishedDeploy = await getPublishedProductionDeploy();
+    const productionConfirmed = publishedDeploy
+      ? Boolean((commit && publishedDeploy.commit === commit) || (deployId && publishedDeploy.deployId === deployId))
+      : undefined;
+
+    return jsonResponse(200, {
+      ...(receipt ?? getQueuedReceipt({ commit, deployId })),
+      ...(publishedDeploy ? { publishedDeploy, productionConfirmed } : {}),
+    });
   } catch (error) {
     console.warn('Netlify deploy status lookup failed.', { commit, deployId, error });
 

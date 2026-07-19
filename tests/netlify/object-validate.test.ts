@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   checkArtifactTrust,
   checkIdDiscipline,
+  checkMediaBudget,
   checkProduct,
   checkReaderSafety,
   checkReferenceIntegrity,
@@ -254,6 +255,40 @@ test('check5 artifact trust REJECTION: data URIs, remote URLs, legacy paths, and
     statusOf(checkArtifactTrust(body, { trustedAssetRefs: new Set([TRUSTED_REF]) }), 'artifact_trust'),
     'missing'
   );
+});
+
+test('check5 artifact trust: resolver-backed existence — absent artifact warns while drafting, blocks at publish', () => {
+  const body = validPageBody();
+  (body.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef = TRUSTED_REF;
+  const context: ObjectValidationContext = { resolveArtifactRef: () => ({ exists: false }) };
+  assert.equal(statusOf(checkArtifactTrust(body, context), 'artifact_trust'), 'warning');
+  assert.equal(statusOf(checkArtifactTrust(body, context, true), 'artifact_trust'), 'missing');
+});
+
+test('check5 artifact trust: resolver-backed existence — soft-deleted named, confirmed passes, unanswered stays shape-only', () => {
+  const body = validPageBody();
+  (body.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef = TRUSTED_REF;
+
+  const deleted = checkArtifactTrust(body, { resolveArtifactRef: () => ({ exists: true, deleted: true }) }, true);
+  assert.equal(statusOf(deleted, 'artifact_trust'), 'missing');
+  assert.match(deleted[0]!.message, /soft-deleted/);
+
+  const confirmed = checkArtifactTrust(body, { resolveArtifactRef: () => ({ exists: true }) }, true);
+  assert.equal(statusOf(confirmed, 'artifact_trust'), 'complete');
+
+  // Resolver cannot answer (ref not pre-loaded / index unavailable) → shape-only, as before.
+  const unanswered = checkArtifactTrust(body, { resolveArtifactRef: () => undefined }, true);
+  assert.equal(statusOf(unanswered, 'artifact_trust'), 'complete');
+});
+
+test('check5 artifact trust: an injected trustedAssetRefs set takes precedence over the resolver', () => {
+  const body = validPageBody();
+  (body.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef = TRUSTED_REF;
+  const context: ObjectValidationContext = {
+    trustedAssetRefs: new Set([TRUSTED_REF]),
+    resolveArtifactRef: () => ({ exists: false }),
+  };
+  assert.equal(statusOf(checkArtifactTrust(body, context, true), 'artifact_trust'), 'complete');
 });
 
 // ═══ check 5b: raw artifact refs in renderable fields (build-breaker guard) ═══
@@ -983,4 +1018,130 @@ test('product: validateObject dispatches the product criteria through the struct
   const structure = groups.find((group) => group.id === 'structure');
   assert.ok(structure && statusOf(structure.criteria, 'product_slug') === 'complete');
   assert.equal(summarizeValidation(groups).eligible, true);
+});
+
+// ═══ content_item media paths + hero rules (bug ② object-path closure) ═══════
+
+const ART_SHA = 'f'.repeat(64);
+const ART_IMG_PATH = `/img/req_probe_media_20260719_01/${ART_SHA}.webp`;
+const ART_PDF_PATH = `/pdf/req_probe_media_20260719_01/${ART_SHA}.pdf`;
+
+const articleBodyWith = (overrides: Record<string, unknown>) => ({
+  slug: 'probe-article',
+  title: 'Probe',
+  nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' } }],
+  ...overrides,
+});
+
+const articleStructure = (body: unknown, context: ObjectValidationContext = {}, atPublish = true) =>
+  checkStructuralInvariants('content_item', 'req_probe_media_20260719_01', body, context, atPublish);
+
+test('article media: /img/ public-path image with a confirmed artifact passes', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const criteria = articleStructure(body, { resolveArtifactRef: () => ({ exists: true }) });
+  assert.equal(statusOf(criteria, 'article_media'), 'complete');
+});
+
+test('article media: a mistyped /img/ path (no artifact behind it) warns while drafting, blocks at publish', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const context: ObjectValidationContext = { resolveArtifactRef: () => ({ exists: false }) };
+  assert.equal(statusOf(articleStructure(body, context, false), 'article_media'), 'warning');
+  const atPublish = articleStructure(body, context, true);
+  assert.equal(statusOf(atPublish, 'article_media'), 'missing');
+  assert.match(atPublish.find((c) => c.id === 'article_media')!.message, /404 on the live page/);
+});
+
+test('article media: document media and /pdf/ ctaLinks take the /pdf/ public path; junk paths block', () => {
+  const good = articleBodyWith({
+    nodes: [
+      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'document', src: ART_PDF_PATH, title: 'Guide' } } },
+      { id: 'n_m2', kind: 'action', public: { ctaText: 'Download', ctaLink: ART_PDF_PATH } },
+    ],
+  });
+  assert.equal(statusOf(articleStructure(good, { resolveArtifactRef: () => ({ exists: true }) }), 'article_media'), 'complete');
+
+  const junkCta = articleBodyWith({
+    nodes: [{ id: 'n_m2', kind: 'action', public: { ctaText: 'Download', ctaLink: '/pdf/not-a-real-key.pdf' } }],
+  });
+  assert.equal(statusOf(articleStructure(junkCta), 'article_media'), 'missing');
+});
+
+test('article media REJECTION: a PDF in the hero image field blocks with the build-breaker message', () => {
+  const body = articleBodyWith({ image: { src: ART_PDF_PATH, alt: 'Guide' } });
+  const criteria = articleStructure(body);
+  assert.equal(statusOf(criteria, 'article_media'), 'missing');
+  assert.match(criteria.find((c) => c.id === 'article_media')!.message, /must hold an IMAGE|fails the whole build/);
+});
+
+test('article media: remote https and site-static image srcs warn (ungoverned), data URIs and bare paths block', () => {
+  const remote = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'https://example.com/x.jpg' } } }],
+  });
+  assert.equal(statusOf(articleStructure(remote), 'article_media'), 'warning');
+
+  const siteStatic = articleBodyWith({ image: { src: '/images/dr-lurie-portrait4.jpeg' } });
+  assert.equal(statusOf(articleStructure(siteStatic), 'article_media'), 'warning');
+
+  const dataUri = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'data:image/png;base64,AAAA' } } }],
+  });
+  assert.equal(statusOf(articleStructure(dataUri), 'article_media'), 'missing');
+
+  const bare = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'hero.png' } } }],
+  });
+  assert.equal(statusOf(articleStructure(bare), 'article_media'), 'missing');
+});
+
+test('article media: gallery images[] entries are validated like single media; no media → no criterion', () => {
+  const gallery = articleBodyWith({
+    nodes: [
+      {
+        id: 'n_m1',
+        kind: 'content',
+        public: { body: 'Copy.', images: [{ type: 'image', src: ART_IMG_PATH }, { type: 'image', src: 'data:x' }] },
+      },
+    ],
+  });
+  assert.equal(statusOf(articleStructure(gallery), 'article_media'), 'missing');
+
+  const none = articleStructure(articleBodyWith({}));
+  assert.equal(none.find((c) => c.id === 'article_media'), undefined);
+});
+
+// ═══ check 5c: image byte budget (media-policy surfacing) ════════════════════
+
+test('media budget: an over-budget /img/ image warns under the committed warn policy; under-budget is complete', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const oversize: ObjectValidationContext = {
+    resolveArtifactRef: () => ({ exists: true, sizeBytes: 900_000, contentType: 'image/png' }),
+  };
+  const over = checkMediaBudget(body, oversize, true);
+  assert.equal(statusOf(over, 'media_budget'), 'warning');
+  assert.match(over.find((c) => c.id === 'media_budget')!.message, /image budget/);
+
+  const fine: ObjectValidationContext = {
+    resolveArtifactRef: () => ({ exists: true, sizeBytes: 90_000, contentType: 'image/webp' }),
+  };
+  assert.equal(statusOf(checkMediaBudget(body, fine, true), 'media_budget'), 'complete');
+});
+
+test('media budget: a block policy makes over-budget a publish blocker (draft still warns); no resolver → silent', () => {
+  const body = articleBodyWith({
+    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+  });
+  const oversize: ObjectValidationContext = {
+    resolveArtifactRef: () => ({ exists: true, sizeBytes: 900_000 }),
+  };
+  const blockPolicy = { maxImageBytes: 153_600, overBudget: 'block' as const, preferredImageFormat: 'webp' as const };
+  assert.equal(statusOf(checkMediaBudget(body, oversize, true, blockPolicy), 'media_budget'), 'missing');
+  assert.equal(statusOf(checkMediaBudget(body, oversize, false, blockPolicy), 'media_budget'), 'warning');
+
+  assert.deepEqual(checkMediaBudget(body, {}, true), []);
 });

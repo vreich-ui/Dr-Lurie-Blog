@@ -30,6 +30,87 @@ const makeStore = (records: Array<{ type: string; id: string; body: unknown; pub
   } as never;
 };
 
+const REF_SHA = 'c'.repeat(64);
+const REF_REQUEST = 'req_ctx_artifacts_20260719_01';
+const REF_KEY = `image/${REF_REQUEST}/${REF_SHA}.png`;
+
+const makeArtifactIndexStore = (references: Array<Record<string, unknown>>) => {
+  const blobs = new Map<string, string>();
+  for (const reference of references) {
+    const requestId = String(reference.blobKey).split('/')[1] ?? '';
+    blobs.set(`request-artifacts/${encodeURIComponent(requestId)}/${reference.sha256}.json`, JSON.stringify(reference));
+  }
+  return {
+    async get(key: string) {
+      return blobs.get(key) ?? null;
+    },
+    async setJSON() {},
+    async list() {
+      return { blobs: [], directories: [] };
+    },
+  } as never;
+};
+
+test('resolveArtifactRef: refs from the request payload and record bodies pre-resolve against the artifact index', async () => {
+  const missingKey = `image/${REF_REQUEST}/${'d'.repeat(64)}.png`;
+  const indexStore = makeArtifactIndexStore([
+    {
+      blobKey: REF_KEY,
+      sha256: REF_SHA,
+      sizeBytes: 111,
+      contentType: 'image/png',
+      createdAtISO: '2026-07-19T00:00:00.000Z',
+      artifactKind: 'image',
+    },
+  ]);
+  // A record body referencing the artifact by its PUBLIC path — the sweep must
+  // normalize it back to the raw key.
+  const store = makeStore([
+    { type: 'section', id: 'sec_x', body: { section: { type: 'bio', data: { portrait: { src: `/img/${REF_REQUEST}/${REF_SHA}.png` } } } } },
+  ]);
+
+  const context = await buildStoreValidationContext(store, {
+    artifactIndexStore: indexStore,
+    artifactRefSources: [{ ops: [{ op: 'set_section_fields', fields: { portraitAssetRef: missingKey } }] }],
+  });
+
+  assert.deepEqual(context.resolveArtifactRef?.(REF_KEY), {
+    exists: true,
+    sizeBytes: 111,
+    contentType: 'image/png',
+  });
+  assert.deepEqual(context.resolveArtifactRef?.(missingKey), { exists: false });
+  // A key that appeared nowhere in the swept sources is unanswered, not failed.
+  assert.equal(context.resolveArtifactRef?.(`image/${REF_REQUEST}/${'e'.repeat(64)}.png`), undefined);
+});
+
+test('resolveArtifactRef: soft-deleted references resolve with deleted:true; no index store → no resolver', async () => {
+  const indexStore = makeArtifactIndexStore([
+    {
+      blobKey: REF_KEY,
+      sha256: REF_SHA,
+      sizeBytes: 111,
+      contentType: 'image/png',
+      createdAtISO: '2026-07-19T00:00:00.000Z',
+      artifactKind: 'image',
+      deletedAtISO: '2026-07-19T01:00:00.000Z',
+    },
+  ]);
+  const context = await buildStoreValidationContext(makeStore([]), {
+    artifactIndexStore: indexStore,
+    artifactRefSources: [REF_KEY],
+  });
+  assert.deepEqual(context.resolveArtifactRef?.(REF_KEY), {
+    exists: true,
+    deleted: true,
+    sizeBytes: 111,
+    contentType: 'image/png',
+  });
+
+  const withoutIndex = await buildStoreValidationContext(makeStore([]), { artifactRefSources: [REF_KEY] });
+  assert.equal(withoutIndex.resolveArtifactRef, undefined);
+});
+
 test('resolveObject: hit reports exists+published; miss reports not-exists', async () => {
   const store = makeStore([
     { type: 'page', id: 'page_home', body: { route: '/' }, published: true },

@@ -19,6 +19,19 @@ export const publicPathForArtifactRef = (ref: string): string => {
   return ref.startsWith('pdf/') ? `/pdf/${ref.slice('pdf/'.length)}` : `/img/${ref.slice('image/'.length)}`;
 };
 
+/** Matches the PUBLIC servable path form: /img|/pdf/{id}/{sha256}.{ext} (see publicPathForArtifactRef). */
+export const PUBLIC_ARTIFACT_PATH_RE = /^\/(img|pdf)\/[^/]+\/[0-9a-f]{64}\.[a-z]+$/i;
+
+/**
+ * The inverse of publicPathForArtifactRef: a /img|/pdf public path back to its
+ * raw Major Key blobKey (for artifact-index lookups). Returns the input
+ * unchanged when it is not a public artifact path.
+ */
+export const rawArtifactRefForPublicPath = (path: string): string => {
+  if (!PUBLIC_ARTIFACT_PATH_RE.test(path)) return path;
+  return path.startsWith('/pdf/') ? `pdf/${path.slice('/pdf/'.length)}` : `image/${path.slice('/img/'.length)}`;
+};
+
 /**
  * The trust state for one workflow record's artifact references.
  *

@@ -1064,7 +1064,8 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'deploy_status',
-    description: 'Read-only Netlify deploy receipt lookup by commit or deploy id.',
+    description:
+      'Read-only Netlify deploy receipt lookup by commit or deploy id. Besides the receipt, the response carries publishedDeploy (the deploy production is actually serving) and productionConfirmed (whether that published deploy matches the commit/deployId you asked about) whenever the site lookup is available. A deploy can be deployStatus:"ready" without being what production serves (locked Auto Publishing) — treat a release as live only when deployStatus is "ready" AND productionConfirmed is true. Absent publishedDeploy/productionConfirmed fields mean the published-deploy signal was unavailable (unknown), not "not live".',
     inputSchema: objectSchema({
       commit: stringSchema('Commit SHA to look up in saved Netlify deploy receipts.'),
       deployId: stringSchema('Netlify deploy id to look up in saved Netlify deploy receipts.'),
@@ -1073,7 +1074,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'verify_article_images',
     description:
-      'Verify that a published article page contains the expected images and that each is fetchable as an image. DEPLOY-AWARE TIMING: pass the publish commit as "commit" and this tool correlates the check to that commit\'s Netlify deploy — image assertions run only once that deploy is confirmed "ready", and a page still served by a stale/previous deploy comes back inconclusive:true (deploy timing), never a false missing-image defect. deployReady:true in the response means the target deploy is live and the result is definitive. Without a commit it falls back to the legacy heuristic (poll deploy_status until deployStatus is "ready" yourself first; an immediate check may hit the previous deploy). A response with inconclusive:true means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png). Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem; each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
+      'Verify that a published article page contains the expected images and that each is fetchable as an image. DEPLOY-AWARE TIMING: pass the publish commit as "commit" and this tool correlates the check to that commit\'s Netlify deploy — image assertions run only once that deploy is confirmed "ready", and a page still served by a stale/previous deploy comes back inconclusive:true (deploy timing), never a false missing-image defect. deployReady:true in the response means the target deploy is live and the result is definitive. Without a commit it falls back to the legacy heuristic (poll deploy_status until deployStatus is "ready" yourself first; an immediate check may hit the previous deploy). A response with inconclusive:true means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: for LEGACY committed-asset articles pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png) — Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem. For OBJECT articles (content_item) pass the node media PUBLIC paths (/img/{id}/{sha256}.{ext}) — they appear verbatim as the rendered <img> src, and the object_publish response\'s production.article_path gives the page URL. Each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
     inputSchema: objectSchema(
       {
         url: stringSchema('Published article URL to fetch and inspect for <img> src/srcset sources.'),
@@ -1116,7 +1117,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'release_to_production',
     description:
-      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when a ready production deploy matches the target commit; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). WAIT BUDGET: the in-call wait is capped to this serverless function\'s remaining invocation time (seconds, not the full build duration), so a normal 30-120s production build usually returns build_not_confirmed_live on the first call — that is the expected flow, not an error. Do not retry release_to_production; poll deploy_status with the returned targetCommit until the deploy is ready. One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes. NOTE: if the site\'s Netlify "Auto Publishing" is Locked, the build succeeds as a deploy preview but does NOT update production until it is unlocked or the deploy is published manually.',
+      'Release accumulated CMS object exports to production. Object publishes commit to main with [skip netlify], so they do NOT deploy on their own — this is the explicit release that makes them live, and the ONLY thing that fires a production build for them. Steps: resolve the target commit (defaults to the content-branch HEAD, which includes every accumulated skipped export commit), POST the server-side production build hook ONCE (the same hook trigger_netlify_build uses; the only allowed production-build trigger), then poll Netlify deploy receipts until the deploy for that commit is terminal, and report whether production actually reflects it. Returns released:true only when the site\'s PUBLISHED deploy (what production actually serves) reflects the target commit — confirmed as productionConfirmed:true; released:false with status build_not_confirmed_live means the build did not finish within the wait budget (re-check deploy_status). status build_ready_not_published means the build IS ready but production still serves an older commit — Netlify "Auto Publishing" is likely locked; unlock it or publish the deploy manually, then re-check deploy_status. When the published-deploy lookup is unavailable, the tool degrades to ready-by-commit with productionConfirmed:false — treat that as "not independently proven live". WAIT BUDGET: the in-call wait is capped to this serverless function\'s remaining invocation time (seconds, not the full build duration), so a normal 30-120s production build usually returns build_not_confirmed_live on the first call — that is the expected flow, not an error. Do not retry release_to_production; poll deploy_status with the returned targetCommit until deployStatus is "ready" AND productionConfirmed is true. One release deploys every skipped commit at once, so batch publishes and release once — it consumes real build minutes.',
     inputSchema: objectSchema({
       commit: stringSchema(
         'Optional commit SHA the live production deploy must reflect. Defaults to the current content branch HEAD.'
@@ -2929,6 +2930,15 @@ const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unk
 
   if ('isError' in result) return result;
 
+  // For articles the publish result carries the live permalink — surface it
+  // with the exact follow-up so the agent verifies the real URL after release
+  // instead of guessing routes (the post-publish-404 failure class).
+  const articlePath = typeof result.article_path === 'string' ? result.article_path : undefined;
+  const receiptCommit =
+    result.receipt && typeof result.receipt === 'object' && !Array.isArray(result.receipt)
+      ? (result.receipt as { commit_sha?: unknown }).commit_sha
+      : undefined;
+
   return toolResult({
     ...result,
     production: {
@@ -2937,6 +2947,15 @@ const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unk
       deploy_deferred: true,
       requires_explicit_release: true,
       note: OBJECT_PUBLISH_LIVE_NOTE,
+      ...(articlePath
+        ? {
+            article_path: articlePath,
+            verify_after_release:
+              `After release_to_production, poll deploy_status {commit: "${typeof receiptCommit === 'string' ? receiptCommit : '<receipt.commit_sha>'}"} ` +
+              `until deployStatus is "ready" AND productionConfirmed is true, then call verify_article_images ` +
+              `{ url: "<site-origin>${articlePath}", expectedImages: [each node media /img/... path], commit: the same sha } for the definitive live check.`,
+          }
+        : {}),
     },
   });
 };
