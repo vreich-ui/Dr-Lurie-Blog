@@ -1074,7 +1074,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'verify_article_images',
     description:
-      'Verify that a published article page contains the expected images and that each is fetchable as an image. DEPLOY-AWARE TIMING: pass the publish commit as "commit" and this tool correlates the check to that commit\'s Netlify deploy — image assertions run only once that deploy is confirmed "ready", and a page still served by a stale/previous deploy comes back inconclusive:true (deploy timing), never a false missing-image defect. deployReady:true in the response means the target deploy is live and the result is definitive. Without a commit it falls back to the legacy heuristic (poll deploy_status until deployStatus is "ready" yourself first; an immediate check may hit the previous deploy). A response with inconclusive:true means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png). Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem; each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
+      'Verify that a published article page contains the expected images and that each is fetchable as an image. DEPLOY-AWARE TIMING: pass the publish commit as "commit" and this tool correlates the check to that commit\'s Netlify deploy — image assertions run only once that deploy is confirmed "ready", and a page still served by a stale/previous deploy comes back inconclusive:true (deploy timing), never a false missing-image defect. deployReady:true in the response means the target deploy is live and the result is definitive. Without a commit it falls back to the legacy heuristic (poll deploy_status until deployStatus is "ready" yourself first; an immediate check may hit the previous deploy). A response with inconclusive:true means the deploy is probably not live yet — retry later; it is NOT a proven image defect. MATCHING: for LEGACY committed-asset articles pass the display paths from the publish response (e.g. ~/assets/images/uploads/{slug}/{file}.png) — Astro rewrites committed assets to hashed build URLs (/_astro/{file}.{hash}.{ext}), so matching falls back from exact URL to filename-stem. For OBJECT articles (content_item) pass the node media PUBLIC paths (/img/{id}/{sha256}.{ext}) — they appear verbatim as the rendered <img> src, and the object_publish response\'s production.article_path gives the page URL. Each result reports matchedUrl/matchedBy. Server-only publish credentials are never accepted as inputs or returned.',
     inputSchema: objectSchema(
       {
         url: stringSchema('Published article URL to fetch and inspect for <img> src/srcset sources.'),
@@ -2930,6 +2930,15 @@ const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unk
 
   if ('isError' in result) return result;
 
+  // For articles the publish result carries the live permalink — surface it
+  // with the exact follow-up so the agent verifies the real URL after release
+  // instead of guessing routes (the post-publish-404 failure class).
+  const articlePath = typeof result.article_path === 'string' ? result.article_path : undefined;
+  const receiptCommit =
+    result.receipt && typeof result.receipt === 'object' && !Array.isArray(result.receipt)
+      ? (result.receipt as { commit_sha?: unknown }).commit_sha
+      : undefined;
+
   return toolResult({
     ...result,
     production: {
@@ -2938,6 +2947,15 @@ const callObjectPublish = async (event: LambdaEvent, payload: Record<string, unk
       deploy_deferred: true,
       requires_explicit_release: true,
       note: OBJECT_PUBLISH_LIVE_NOTE,
+      ...(articlePath
+        ? {
+            article_path: articlePath,
+            verify_after_release:
+              `After release_to_production, poll deploy_status {commit: "${typeof receiptCommit === 'string' ? receiptCommit : '<receipt.commit_sha>'}"} ` +
+              `until deployStatus is "ready" AND productionConfirmed is true, then call verify_article_images ` +
+              `{ url: "<site-origin>${articlePath}", expectedImages: [each node media /img/... path], commit: the same sha } for the definitive live check.`,
+          }
+        : {}),
     },
   });
 };

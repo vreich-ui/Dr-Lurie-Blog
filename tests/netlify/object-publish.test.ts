@@ -545,3 +545,38 @@ test('body drift during the commit window is detected at stamp time and never st
     assert.notEqual(github.getHead().sha, 'head0', 'the export commit had already landed — the residual is documented');
   });
 });
+
+test('a content_item publish returns the live article_path derived from the body slug', async () => {
+  await withGitHubEnv(async () => {
+    const events: PublishEvent[] = [];
+    const github = createGitHubApiMock(events);
+    const store = createStore(events);
+    store.seed({
+      ...navRecord(),
+      object_id: 'req_probe_publish_20260719_01',
+      object_type: 'content_item',
+      schema_version: 'content_item.v1',
+      body: {
+        slug: 'probe-artifact-drill',
+        title: 'Probe artifact drill',
+        nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' } }],
+      },
+    } as never);
+
+    const result = await publishNav(store, github.fetchImpl, {
+      object_type: 'content_item',
+      object_id: 'req_probe_publish_20260719_01',
+    });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.article_path, '/probe-artifact-drill');
+
+    // Non-article publishes carry no article_path.
+    const navEvents: PublishEvent[] = [];
+    const navGitHub = createGitHubApiMock(navEvents);
+    const navStore = createStore(navEvents);
+    navStore.seed(navRecord());
+    const navResult = await publishNav(navStore, navGitHub.fetchImpl);
+    assert.equal(navResult.status, 200);
+    assert.equal('article_path' in navResult.body, false);
+  });
+});

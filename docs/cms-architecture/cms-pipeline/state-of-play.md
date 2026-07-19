@@ -83,6 +83,17 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   (`netlify/lib/object-validate.ts`, `src/lib/registry/object-contract.ts`;
   +6 validation tests, +1 renderer test.)
 
+- **Fix 4 — publish receipt carries the live article URL (SHIPPED).** A
+  content_item `object_publish` now returns `article_path: "/<slug>"` (the blog
+  permalink pattern, proven by /object-model-demo), and the MCP wrapper's
+  `production` block adds `verify_after_release` — the exact deploy_status
+  (ready AND productionConfirmed) → `verify_article_images {url,
+  expectedImages: [/img/... node paths], commit}` follow-up — so agents verify
+  the real URL instead of guessing routes (the post-publish-404 class).
+  `verify_article_images`' description now distinguishes legacy display-path
+  matching from object-article `/img/` exact matching.
+  (`netlify/lib/object-publish.ts`, mcp.ts; +1 test.)
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for
