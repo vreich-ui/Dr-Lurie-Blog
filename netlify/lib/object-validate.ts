@@ -81,6 +81,8 @@ export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../
 export type ObjectResolution = { exists: boolean; published?: boolean };
 export type TaxonomyResolution = { active: boolean };
 export type TaxonomyUsage = { inUse: boolean };
+/** Resolution of one Major-Key blobKey against the artifact index. */
+export type ArtifactRefResolution = { exists: boolean; deleted?: boolean; sizeBytes?: number; contentType?: string };
 
 export type PageTypeConstraint = {
   id?: string;
@@ -151,6 +153,15 @@ export type ObjectValidationContext = {
   resolveStripePrice?: (priceId: string) => { amount_cents: number; currency: string } | undefined;
   /** Major-Key blobKeys trusted for this object's asset refs (A§2.12). */
   trustedAssetRefs?: Set<string>;
+  /**
+   * Resolve a Major-Key blobKey against the artifact index (existence,
+   * soft-deletion, size, content type). Consulted only when `trustedAssetRefs`
+   * is absent. Return undefined for "cannot answer" (ref not pre-loaded /
+   * index unavailable) — existence is then not verified rather than failed.
+   * The object path's trust unit is EXISTENCE, not same-request: canvas
+   * uploads mint their own request ids and legitimately cross objects.
+   */
+  resolveArtifactRef?: (blobKey: string) => ArtifactRefResolution | undefined;
   /** The PageType definition for a page's `pageType` (registry is code, D§3.4/OQ-4). */
   pageType?: PageTypeConstraint;
   /**
@@ -591,33 +602,85 @@ const BASE64_DATA_URI_RE = /^data:/i;
 const LEGACY_REPO_PATH_RE = /^src\/assets\//;
 const REMOTE_URL_RE = /^https?:\/\//i;
 
-const validateAssetRef = (path: string, value: string, trusted: Set<string> | undefined): string | undefined => {
-  if (BASE64_DATA_URI_RE.test(value)) return `${path} must not be a data URI.`;
-  if (LEGACY_REPO_PATH_RE.test(value)) return `${path} is a legacy repo path. Provide a Major Key artifact reference.`;
+type AssetRefProblem = {
+  message: string;
+  /**
+   * `shape`/`trust` problems always block the write (prior behavior).
+   * `existence` problems (resolver-backed) block only at publish and warn while
+   * drafting — an agent mid-assembly may reference an artifact it uploads next.
+   */
+  kind: 'shape' | 'trust' | 'existence';
+};
+
+const validateAssetRef = (path: string, value: string, context: ObjectValidationContext): AssetRefProblem | undefined => {
+  if (BASE64_DATA_URI_RE.test(value)) return { kind: 'shape', message: `${path} must not be a data URI.` };
+  if (LEGACY_REPO_PATH_RE.test(value))
+    return { kind: 'shape', message: `${path} is a legacy repo path. Provide a Major Key artifact reference.` };
   if (REMOTE_URL_RE.test(value))
-    return `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`;
+    return { kind: 'shape', message: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.` };
   if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value))
-    return `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`;
-  if (trusted && !trusted.has(value)) return `${path} "${value}" is not an index-trusted artifact reference.`;
+    return { kind: 'shape', message: `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).` };
+  if (context.trustedAssetRefs) {
+    return context.trustedAssetRefs.has(value)
+      ? undefined
+      : { kind: 'trust', message: `${path} "${value}" is not an index-trusted artifact reference.` };
+  }
+  const resolution = context.resolveArtifactRef?.(value);
+  if (!resolution) return undefined; // existence not verifiable — shape checks stand on their own
+  if (resolution.deleted) {
+    return {
+      kind: 'existence',
+      message:
+        `${path} "${value}" refers to a soft-deleted artifact — excluded from listing, trust, and serving. ` +
+        `Re-upload the exact bytes (or ask an admin to run restore_artifact), then retry.`,
+    };
+  }
+  if (!resolution.exists) {
+    return {
+      kind: 'existence',
+      message:
+        `${path} "${value}" is not in the artifact index (never uploaded, or the key is mistyped). ` +
+        `Generate it through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant) and use the ` +
+        `exact returned ArtifactReference blobKey — list_artifacts_for_request shows what exists.`,
+    };
+  }
   return undefined;
 };
 
 const ASSET_REF_KEY_RE = /assetref$/i; // imageAssetRef, portraitAssetRef, … (the *AssetRef convention)
 
-export const checkArtifactTrust = (body: unknown, context: ObjectValidationContext): ReadinessCriterion[] => {
-  const problems: string[] = [];
+export const checkArtifactTrust = (
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish = false
+): ReadinessCriterion[] => {
+  const blocking: string[] = [];
+  const existence: string[] = [];
   let sawAssetRef = false;
 
   walkStrings(body, (path, value) => {
     const key = path[path.length - 1] ?? '';
     if (!ASSET_REF_KEY_RE.test(key) || !value) return;
     sawAssetRef = true;
-    const err = validateAssetRef(path.join('.'), value, context.trustedAssetRefs);
-    if (err) problems.push(err);
+    const problem = validateAssetRef(path.join('.'), value, context);
+    if (!problem) return;
+    (problem.kind === 'existence' ? existence : blocking).push(problem.message);
   });
 
-  if (problems.length > 0)
-    return [crit('artifact_trust', 'Media / artifact trust', 'missing', problems.slice(0, 5).join(' '))];
+  if (blocking.length > 0)
+    return [crit('artifact_trust', 'Media / artifact trust', 'missing', blocking.slice(0, 5).join(' '))];
+  if (existence.length > 0) {
+    // Missing/deleted artifacts break the live page, not the draft: block the
+    // publish, warn while drafting.
+    return [
+      crit(
+        'artifact_trust',
+        'Media / artifact trust',
+        atPublish ? 'missing' : 'warning',
+        existence.slice(0, 5).join(' ')
+      ),
+    ];
+  }
   if (!sawAssetRef)
     return [crit('artifact_trust', 'Media / artifact trust', 'optional', 'No asset references present.')];
   return [crit('artifact_trust', 'Media / artifact trust', 'complete', '')];
@@ -1443,10 +1506,15 @@ export const checkProduct = (
   // the trust set is supplied).
   const fulfillment = isRecord(body.fulfillment) ? body.fulfillment : undefined;
   if (fulfillment?.kind === 'download' && typeof fulfillment.artifact_ref === 'string') {
-    const err = validateAssetRef('fulfillment.artifact_ref', fulfillment.artifact_ref, context.trustedAssetRefs);
+    const problem = validateAssetRef('fulfillment.artifact_ref', fulfillment.artifact_ref, context);
     criteria.push(
-      err
-        ? crit('product_artifact', 'Fulfillment artifact trust', 'missing', err)
+      problem
+        ? crit(
+            'product_artifact',
+            'Fulfillment artifact trust',
+            problem.kind === 'existence' && !atPublish ? 'warning' : 'missing',
+            problem.message
+          )
         : crit('product_artifact', 'Fulfillment artifact trust', 'complete', '')
     );
   } else {
@@ -2047,7 +2115,11 @@ export const validateObject = (
       criteria: [...checkRenderability(input.objectType, input.body), ...checkRenderableImageRefs(input.body)],
     },
     { id: 'deploy_safety', label: 'Deploy safety', criteria: checkDeploySafety(input.body) },
-    { id: 'artifact_trust', label: 'Media / artifact trust', criteria: checkArtifactTrust(input.body, context) },
+    {
+      id: 'artifact_trust',
+      label: 'Media / artifact trust',
+      criteria: checkArtifactTrust(input.body, context, atPublish),
+    },
     {
       id: 'structure',
       label: 'Structural invariants',

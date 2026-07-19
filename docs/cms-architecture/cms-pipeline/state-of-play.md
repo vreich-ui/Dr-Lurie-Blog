@@ -38,6 +38,30 @@ User-ratified decisions: the OBJECT path (`content_item` → `object_publish` �
   `netlify/functions/deploy-status.ts`, mcp.ts descriptions; +4
   production-release tests, +3 new `deploy-status.test.ts`.)
 
+- **Fix 3 — object-path artifact EXISTENCE trust (SHIPPED).** The object path's
+  `*AssetRef`/`fulfillment.artifact_ref` checks ran shape-only in production —
+  `trustedAssetRefs` had no writer, so a typo'd sha or soft-deleted artifact
+  published clean and 404'd live. `buildStoreValidationContext` now accepts the
+  artifact-index store + the raw request payload, sweeps payload + every loaded
+  record body for Major-Key refs (raw or `/img|/pdf` public-path form,
+  normalized via the new `rawArtifactRefForPublicPath`), pre-resolves exactly
+  those against the index (one `readArtifactReference` each; ≤200/write), and
+  exposes a sync `resolveArtifactRef` (exists/deleted/sizeBytes/contentType).
+  `validateAssetRef` consults it when no `trustedAssetRefs` set is injected:
+  absent/deleted artifacts BLOCK at publish and WARN while drafting (an agent
+  mid-assembly may upload next); shape/trust problems still always block; index
+  unavailable degrades to "not verified" — never a failed write. Trust unit is
+  EXISTENCE, not same-request (canvas uploads legitimately cross requests).
+  Wired in `object-store.ts` + `admin-object.ts`. ALSO: class-3 replay
+  regression — the four 06-30..07-02 failed-record shapes (node
+  `public_media_src`, `promote_publish_payload.featuredImage`,
+  `mediaEntries[].src`, `artifactReferences[].blobKey`, index-trusted but NOT
+  in agent_outputs, real sha) now pinned green against `patch_canonical_input`
+  (`tests/netlify/canonical-input-trust-replay.test.ts`) — confirming #327
+  holds for every shape that actually failed. (`netlify/lib/artifact-trust.ts`
+  +`PUBLIC_ARTIFACT_PATH_RE`/inverse, `object-validation-context.ts`,
+  `object-validate.ts`, both entry functions; +9 tests.)
+
 ## Session 2026-07-16 (publishing-backend hardening: article_body-only canonical input, grant-only artifacts, deploy-aware verification, extended live-publish approval pin)
 
 Task (vreich): "implement the Dr. Lurie publishing backend changes needed for

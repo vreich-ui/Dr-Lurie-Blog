@@ -256,6 +256,40 @@ test('check5 artifact trust REJECTION: data URIs, remote URLs, legacy paths, and
   );
 });
 
+test('check5 artifact trust: resolver-backed existence — absent artifact warns while drafting, blocks at publish', () => {
+  const body = validPageBody();
+  (body.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef = TRUSTED_REF;
+  const context: ObjectValidationContext = { resolveArtifactRef: () => ({ exists: false }) };
+  assert.equal(statusOf(checkArtifactTrust(body, context), 'artifact_trust'), 'warning');
+  assert.equal(statusOf(checkArtifactTrust(body, context, true), 'artifact_trust'), 'missing');
+});
+
+test('check5 artifact trust: resolver-backed existence — soft-deleted named, confirmed passes, unanswered stays shape-only', () => {
+  const body = validPageBody();
+  (body.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef = TRUSTED_REF;
+
+  const deleted = checkArtifactTrust(body, { resolveArtifactRef: () => ({ exists: true, deleted: true }) }, true);
+  assert.equal(statusOf(deleted, 'artifact_trust'), 'missing');
+  assert.match(deleted[0]!.message, /soft-deleted/);
+
+  const confirmed = checkArtifactTrust(body, { resolveArtifactRef: () => ({ exists: true }) }, true);
+  assert.equal(statusOf(confirmed, 'artifact_trust'), 'complete');
+
+  // Resolver cannot answer (ref not pre-loaded / index unavailable) → shape-only, as before.
+  const unanswered = checkArtifactTrust(body, { resolveArtifactRef: () => undefined }, true);
+  assert.equal(statusOf(unanswered, 'artifact_trust'), 'complete');
+});
+
+test('check5 artifact trust: an injected trustedAssetRefs set takes precedence over the resolver', () => {
+  const body = validPageBody();
+  (body.sections[1].data as { portraitAssetRef?: string }).portraitAssetRef = TRUSTED_REF;
+  const context: ObjectValidationContext = {
+    trustedAssetRefs: new Set([TRUSTED_REF]),
+    resolveArtifactRef: () => ({ exists: false }),
+  };
+  assert.equal(statusOf(checkArtifactTrust(body, context, true), 'artifact_trust'), 'complete');
+});
+
 // ═══ check 5b: raw artifact refs in renderable fields (build-breaker guard) ═══
 
 test('publicPathForArtifactRef maps raw keys to their servable path (inverse of the netlify redirect)', () => {

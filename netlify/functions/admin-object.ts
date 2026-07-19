@@ -15,7 +15,8 @@
  * no code path that touches the shared secret. Enforced by a dedicated test.
  */
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import type { ArtifactIndexStore } from '../lib/artifact-index.js';
+import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
 import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
@@ -76,9 +77,16 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     // instantiate_section (W8.2) validates the TARGET page under its own id —
     // without the self ref, route uniqueness would flag the page's own route.
     const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
+    // Artifact existence checks — same wiring as object-store.ts; an
+    // unavailable index store degrades to "existence not verified".
+    const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(
+      () => undefined
+    )) as unknown as ArtifactIndexStore | undefined;
     const validationContext = await buildStoreValidationContext(store, {
       selfObjectId: requestData.object_id ?? targetPageId,
       selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
+      ...(artifactIndexStore ? { artifactIndexStore } : {}),
+      artifactRefSources: [parsed.value],
     });
     // T9.4: resolve the acting human's roles server-side so owner-only verb
     // options (checkin{force}) are gated by the real tier, not client claims.

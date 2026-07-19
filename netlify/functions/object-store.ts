@@ -17,7 +17,8 @@
 import { timingSafeEqual } from 'node:crypto';
 
 import { getHeader } from '../lib/admin-auth.js';
-import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
+import type { ArtifactIndexStore } from '../lib/artifact-index.js';
+import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
@@ -98,9 +99,17 @@ export const handler = async (event: LambdaEvent) => {
     // instantiate_section (W8.2) validates the TARGET page under its own id —
     // without the self ref, route uniqueness would flag the page's own route.
     const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
+    // Artifact existence checks (Fix: asset refs were shape-only in production).
+    // An unavailable index store degrades to "existence not verified", never a
+    // failed write.
+    const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(
+      () => undefined
+    )) as unknown as ArtifactIndexStore | undefined;
     const validationContext = await buildStoreValidationContext(store, {
       selfObjectId: requestData.object_id ?? targetPageId,
       selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),
+      ...(artifactIndexStore ? { artifactIndexStore } : {}),
+      artifactRefSources: [parsed.value],
     });
     const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value), { validationContext });
     return jsonResponse(result.status, result.body);
