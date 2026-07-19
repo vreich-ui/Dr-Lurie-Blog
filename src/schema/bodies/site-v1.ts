@@ -13,12 +13,20 @@
  */
 import { z } from 'zod';
 
+import { THEME_AXES } from '../../lib/registry/theme-tokens.js';
+
 export const SITE_SCHEMA_VERSION = 'site.v1';
 
 // Shared with theme.v1 (W8.3): a theme is a preset FOR this exact shape, so
 // the two cannot drift. Colors are keyed by CSS var name minus `--aw-color-`
 // (`dark:`-prefixed keys carry the .dark overrides); the consumed key list
 // lives in src/lib/registry/theme-tokens.ts.
+//
+// T10.1: the layout/shape/type axis objects are additive-optional bounded
+// enums (11-platformization-plan §1.1). The allowed values come from the
+// THEME_AXES registry — the SAME module the renderer's var mappings live in —
+// so schema and render cannot drift. An absent axis (or group) means "the
+// default look"; no axis value ever carries CSS.
 export const brandTokensSchema = z
   .object({
     colors: z.record(z.string(), z.string()),
@@ -29,6 +37,28 @@ export const brandTokensSchema = z
         heading: z.string(),
       })
       .strict(),
+    layout: z
+      .object({
+        containerWidth: z.enum(THEME_AXES.layout.containerWidth.values).optional(),
+        sectionRhythm: z.enum(THEME_AXES.layout.sectionRhythm.values).optional(),
+      })
+      .strict()
+      .optional(),
+    shape: z
+      .object({
+        radius: z.enum(THEME_AXES.shape.radius.values).optional(),
+        buttonShape: z.enum(THEME_AXES.shape.buttonShape.values).optional(),
+        shadow: z.enum(THEME_AXES.shape.shadow.values).optional(),
+      })
+      .strict()
+      .optional(),
+    type: z
+      .object({
+        scale: z.enum(THEME_AXES.type.scale.values).optional(),
+        headingWeight: z.enum(THEME_AXES.type.headingWeight.values).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type BrandTokens = z.infer<typeof brandTokensSchema>;

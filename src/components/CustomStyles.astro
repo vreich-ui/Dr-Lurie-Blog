@@ -1,7 +1,7 @@
 ---
 import '@fontsource-variable/inter';
 
-import { FALLBACK_COLORS, FALLBACK_FONTS } from '~/lib/registry/theme-tokens';
+import { FALLBACK_COLORS, FALLBACK_FONTS, resolveAxisVars } from '~/lib/registry/theme-tokens';
 import { getSiteObject } from '~/utils/site-object';
 
 // 'DM Sans'
@@ -45,9 +45,18 @@ const color = (key: string): string => tokens?.colors[key] ?? FALLBACK_COLORS[ke
 const darkColor = (key: string): string =>
   tokens?.colors[`dark:${key}`] ?? tokens?.colors[key] ?? FALLBACK_COLORS[`dark:${key}`] ?? FALLBACK_COLORS[key];
 
+// T10.1 axis vars: emitted ONLY when an axis is set to a non-default value
+// (the mapping tables in theme-tokens.ts are the single source of truth).
+// With no axes set this block is the empty string, keeping the emitted CSS —
+// which build-diff compares as bytes — exactly the pre-axis literal.
+const axisVars = resolveAxisVars(tokens);
+const axisCss = Object.entries(axisVars)
+  .map(([name, value]) => `    ${name}: ${value};\n`)
+  .join('');
+
 const css = `
   :root {
-    --aw-font-sans: ${font('sans')};
+${axisCss}    --aw-font-sans: ${font('sans')};
     --aw-font-serif: ${font('serif')};
     --aw-font-heading: ${font('heading')};
 
