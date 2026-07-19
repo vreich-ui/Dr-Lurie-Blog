@@ -567,9 +567,13 @@ const updateBlueprintDataSchema = z.strictObject({
 
 // The set_site_fields idiom: deep-merge over the theme body (null unsets).
 // The whole surface is one op — `tokens` is an open color record + a strict
-// fonts trio, exactly siteBodySchema.brandTokens (one shared shape). Applying
-// a theme to the site is NOT a theme op: `site_apply_theme` computes ONE
-// exact-replace set_site_fields op under the caller's site checkout.
+// fonts trio + the T10.1 bounded axis groups, exactly siteBodySchema's
+// brandTokens (one shared shape — axis enums validate at the body-schema
+// level after merge, so this generic fields bag picks them up with zero
+// hand-written drift). Applying a theme to the site is NOT a theme op:
+// `site_apply_theme` computes ONE exact-replace set_site_brand_tokens op
+// (colors, fonts, and axes — omitted axes unset) under the caller's site
+// checkout.
 const setThemeFieldsSchema = z.strictObject({
   op: z.literal('set_theme_fields'),
   fields: fieldsSchema,

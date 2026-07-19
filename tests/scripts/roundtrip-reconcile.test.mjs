@@ -223,13 +223,23 @@ test('reconcileOps for a site EXCLUDES brandTokens — the palette is theme-gove
   // brandTokens drifts alongside a real field; the driver heals the field but
   // NEVER emits brandTokens (set_site_fields refuses it). Palette drift heals
   // via site_apply_theme, not reconcile.
-  const target = { name: 'Dr. Lurié', brandTokens: { colors: { primary: 'rgb(31 98 112)' } } };
-  const current = { name: 'DRIFTED', brandTokens: { colors: { primary: 'rgb(9 9 9)' } } };
+  // T10.2: the T10.1 axes live INSIDE brandTokens, so the whole-field
+  // exclusion covers them automatically — axis drift heals via
+  // site_apply_theme too, never via reconcile. Both sides carry drifted axes
+  // to prove the driver still emits nothing for the field.
+  const target = {
+    name: 'Dr. Lurié',
+    brandTokens: { colors: { primary: 'rgb(31 98 112)' }, shape: { radius: 'round' } },
+  };
+  const current = {
+    name: 'DRIFTED',
+    brandTokens: { colors: { primary: 'rgb(9 9 9)' }, shape: { radius: 'sharp' }, layout: { sectionRhythm: 'airy' } },
+  };
   const ops = reconcileOps({ objectType: 'site', objectId: 'site_drlurie', body: target }, current);
   assert.equal(ops.length, 1);
   assert.equal(ops[0].op, 'set_site_fields');
   assert.equal(ops[0].fields.name, 'Dr. Lurié');
-  assert.ok(!('brandTokens' in ops[0].fields), 'brandTokens never appears in a reconcile op');
+  assert.ok(!('brandTokens' in ops[0].fields), 'brandTokens (incl. axes) never appears in a reconcile op');
 });
 
 test('reconcileOps for a template heals the W8.3b metadata trio (the tpl_* backfill mechanism)', () => {

@@ -54,6 +54,7 @@ import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
 import { navActionCapacity } from './structural-capacity.js';
+import { THEME_AXES, THEME_AXIS_GROUPS } from './theme-tokens.js';
 import { contentItemBodySchema } from '../../schema/bodies/content-item-v1.js';
 import { pageBodySchema } from '../../schema/bodies/page-v1.js';
 import { productBodySchema } from '../../schema/bodies/product-v1.js';
@@ -222,6 +223,27 @@ const RECIPE_METADATA_CONSTRAINT: Constraint = {
     'built for a single project) are required to publish and warn while drafting. Schema-optional (older records ' +
     'parse); editable via this type’s meta/fields op. These fields feed the object_inventory recipe summaries — ' +
     'the reuse-first index.',
+};
+
+// Shared by theme and site (T10.1/T10.2): the bounded design axes on
+// brandTokens. The key list and enum values are DERIVED from THEME_AXES —
+// the same registry the schema enums and the renderer's var mappings read —
+// so this description cannot drift from enforcement.
+const BRAND_TOKEN_AXES_CONSTRAINT: Constraint = {
+  id: 'brand_token_axes',
+  severity: 'blocks_write',
+  enforced_live: true,
+  description:
+    'Bounded design axes on brandTokens (additive-optional): ' +
+    THEME_AXIS_GROUPS.map((group) =>
+      Object.entries(THEME_AXES[group] as Record<string, { values: readonly string[]; default: string }>)
+        .map(([key, spec]) => `${group}.${key}: ${spec.values.join('|')} (default ${spec.default})`)
+        .join('; ')
+    ).join('; ') +
+    '. Values are enums that index into code-owned class/var mappings — no axis value ever carries CSS, and the ' +
+    'value-safety grammar is untouched. A theme MAY omit any axis or group: omission means "the default look", and ' +
+    'site_apply_theme UNSETS site axes the theme lacks (exact-replace at axis granularity). Invalid values reject ' +
+    'at write (strict schema); unknown axis keys are inert and warn at validation.',
 };
 
 // Boundaries every governed type shares.
@@ -550,6 +572,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'safe-CSS grammar (hex / rgb()/rgba()/hsl()/hsla()/oklch()/color() / bare keyword; plain font stacks); ' +
             'values carrying ;, {, }, <, >, url(, or @import are rejected. The SAME rule gates site.brandTokens.',
         },
+        BRAND_TOKEN_AXES_CONSTRAINT,
         RECIPE_METADATA_CONSTRAINT,
       ];
     case 'site':
@@ -574,6 +597,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'auditable, revertible theme, and theme creation is restrictable to a maker agent via the creation ' +
             'policy (Wolf 2026-07-15).',
         },
+        BRAND_TOKEN_AXES_CONSTRAINT,
       ];
     case 'section_template':
       return [
@@ -752,12 +776,12 @@ const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
     // W8.3, 09-plan §6.4: applying a theme is a SITE write, not a theme op.
     ...(objectType === 'theme'
       ? [
-          'site_apply_theme (theme_id + site_id + lock_token + expected_record_version) → computes ONE exact-replace set_site_fields op (every color key the theme lacks is unset — no stale palette) and applies it through the standard patch path under YOUR site checkout; dry_run: true previews the computed op + validation without persisting. The site copies the tokens — nothing live-binds to a theme; publish the site separately to go live.',
+          'site_apply_theme (theme_id + site_id + lock_token + expected_record_version) → computes ONE exact-replace set_site_brand_tokens op (every color key AND design axis the theme lacks is unset — no stale palette, defaults win on omitted axes) and applies it through the standard patch path under YOUR site checkout; dry_run: true previews the computed op + validation without persisting. The site copies the tokens — nothing live-binds to a theme; publish the site separately to go live.',
         ]
       : []),
     ...(objectType === 'site'
       ? [
-          'site_apply_theme (theme_id + this site id + lock_token + expected_record_version) — alternative brandTokens edit: replace the token set with a theme preset in one atomic op (dry_run previews).',
+          'site_apply_theme (theme_id + this site id + lock_token + expected_record_version) — alternative brandTokens edit: replace the token set (colors, fonts, AND the layout/shape/type design axes — omitted theme axes reset the site to defaults) with a theme preset in one atomic op (dry_run previews).',
         ]
       : []),
     'object_checkout → lock_token + record_version',
@@ -882,7 +906,7 @@ export const buildObjectContract = (
         : objectType === 'section_template'
           ? 'A section recipe (W8, design-principles rule 5): one named, pre-configured section blueprint agents create and evolve freely, then stamp into pages or mint as standalone shared sections. Instantiation deep-copies the blueprint and re-mints its id — nothing live-binds to a recipe, and a recipe renders nothing itself.'
           : objectType === 'theme'
-            ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys unset). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
+            ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values plus the bounded layout/shape/type design axes (T10.1) agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys and omitted axes unset — defaults win). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
             : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
     body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),

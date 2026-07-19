@@ -67,7 +67,7 @@ import { sectionBodySchema, type SectionInstance, type SectionType } from '../..
 import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { checkBrandTokenValue, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
+import { checkBrandTokenValue, THEME_AXES, THEME_AXIS_GROUPS, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -1185,6 +1185,58 @@ const brandTokenValueCriterion = (tokens: unknown, at: string): ReadinessCriteri
 };
 
 /**
+ * T10.2 — axis rules over a brandTokens tree, shared by `theme` bodies and
+ * the `site` singleton (both carry the T10.1 layout/shape/type axes). An
+ * invalid enum value mirrors the zod rejection with human-readable copy
+ * (blocks at write via the schema; this criterion keeps the WHY legible);
+ * an unknown axis key warns as inert (the registry-driven renderer never
+ * reads it — the strict schema refuses it on any new write, so this fires
+ * only on validate-time inspection of legacy/hand-edited bodies). Absent
+ * axes are always fine: omission means the default look at apply time — the
+ * 10-required-colors totality posture does NOT extend to axes.
+ */
+const brandTokenAxisCriteria = (tokens: unknown, at: string): ReadinessCriterion[] => {
+  if (!isRecord(tokens)) return [];
+  const problems: string[] = [];
+  const unknown: string[] = [];
+  for (const group of THEME_AXIS_GROUPS) {
+    const groupValue = tokens[group];
+    if (groupValue === undefined) continue;
+    if (!isRecord(groupValue)) {
+      problems.push(`${at}.${group}: must be an object of axis settings.`);
+      continue;
+    }
+    const axes = THEME_AXES[group] as Record<string, { values: readonly string[] }>;
+    for (const [key, value] of Object.entries(groupValue)) {
+      const spec = axes[key];
+      if (!spec) {
+        unknown.push(`${at}.${group}.${key}`);
+        continue;
+      }
+      if (typeof value !== 'string' || !spec.values.includes(value)) {
+        problems.push(`${at}.${group}.${key}: ${JSON.stringify(value)} is not one of ${spec.values.join(' | ')}.`);
+      }
+    }
+  }
+  const criteria: ReadinessCriterion[] = [
+    problems.length === 0
+      ? crit('brand_token_axes', 'Brand token axes', 'complete', '')
+      : crit('brand_token_axes', 'Brand token axes', 'missing', problems.slice(0, 3).join(' ')),
+  ];
+  if (unknown.length > 0) {
+    criteria.push(
+      crit(
+        'brand_token_axis_unknown_keys',
+        'Unknown axis keys',
+        'warning',
+        `Axis key(s) the renderer never reads: ${unknown.slice(0, 5).join(', ')} — inert (kept, but they style nothing).`
+      )
+    );
+  }
+  return criteria;
+};
+
+/**
  * Theme structural rules: every CustomStyles-consumed color key must be
  * present so `site_apply_theme` is TOTAL (exact-replace leaves no key to fall
  * back) — publish-gated, warns while drafting; unknown color keys warn
@@ -1230,6 +1282,7 @@ export const checkTheme = (body: unknown, atPublish: boolean): ReadinessCriterio
   }
 
   criteria.push(brandTokenValueCriterion(tokens, 'tokens'));
+  criteria.push(...brandTokenAxisCriteria(tokens, 'tokens'));
   criteria.push(...checkRecipeMetadata(body, atPublish));
   return criteria;
 };
@@ -1870,7 +1923,11 @@ export const checkStructuralInvariants = (
   // The site singleton's brandTokens feed the SAME inline <style> as themes —
   // value safety applies on every site write too (the 09 §7.3 gap).
   if (objectType === 'site') {
-    return [brandTokenValueCriterion(isRecord(body) ? body.brandTokens : undefined, 'brandTokens')];
+    const siteTokens = isRecord(body) ? body.brandTokens : undefined;
+    return [
+      brandTokenValueCriterion(siteTokens, 'brandTokens'),
+      ...brandTokenAxisCriteria(siteTokens, 'brandTokens'),
+    ];
   }
 
   // content_grid card/limit sanity applies to any body that can carry a grid —

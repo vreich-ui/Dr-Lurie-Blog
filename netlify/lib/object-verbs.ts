@@ -57,7 +57,7 @@ import type { SectionInstance } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
-import { THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
+import { THEME_AXIS_GROUPS, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
 import {
   objectTypes,
   objectTypeSchema,
@@ -1056,12 +1056,37 @@ export const handleObjectVerb = async (
           .filter((key) => !(key in themeColors))
           .map((key) => [key, null])
       );
+      // T10.2: exact-replace extends to the T10.1 axes at axis-key
+      // granularity — a theme axis present is copied; an axis (or a whole
+      // group) the theme lacks is UNSET on the site, so the code-side
+      // defaults win (a theme MAY omit axes; omission means "the default
+      // look", never "keep whatever the site had").
+      const axisFields: Record<string, Record<string, string | null> | null> = {};
+      for (const group of THEME_AXIS_GROUPS) {
+        const themeGroup: Record<string, string | undefined> = parsedTheme.data.tokens[group] ?? {};
+        const siteGroup: Record<string, string | undefined> | undefined = parsedSite.data.brandTokens[group];
+        const themeAxes = Object.fromEntries(
+          Object.entries(themeGroup).filter(([, value]) => typeof value === 'string')
+        ) as Record<string, string>;
+        if (Object.keys(themeAxes).length === 0) {
+          // Theme carries nothing for this group — unset it if the site has it.
+          if (siteGroup !== undefined) axisFields[group] = null;
+          continue;
+        }
+        const staleAxisUnsets = Object.fromEntries(
+          Object.keys(siteGroup ?? {})
+            .filter((key) => !(key in themeAxes))
+            .map((key) => [key, null])
+        );
+        axisFields[group] = { ...staleAxisUnsets, ...themeAxes };
+      }
       const op = {
         op: 'set_site_brand_tokens',
         fields: {
           brandTokens: {
             colors: { ...staleUnsets, ...themeColors },
             fonts: { ...parsedTheme.data.tokens.fonts },
+            ...axisFields,
           },
         },
       };
