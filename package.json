@@ -26,6 +26,7 @@
     "agent:publish": "node scripts/agent-builder-publish-dry-run.mjs --send"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.3",
     "@astrojs/rss": "^4.0.12",
     "@astrojs/sitemap": "^3.4.2",
     "@astrolib/analytics": "^0.6.1",
@@ -44,6 +45,7 @@
     "diff": "^9.0.0",
     "limax": "4.1.0",
     "lodash.merge": "^4.6.2",
+    "openai": "^6.48.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "stripe": "^22.3.1",
