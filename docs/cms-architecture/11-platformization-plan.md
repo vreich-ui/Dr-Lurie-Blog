@@ -37,16 +37,16 @@ sections stay SPEC-ONLY behind OQ-W8-1…4; W10 only assembles the evidence.
 
 **Three waves, and why in this order:**
 
-| Wave | What | Gate to start |
-| ---- | ---- | ------------- |
-| **W10** Design vocabulary | Bounded theme token axes + section-palette growth + per-type variants + the composite decision package | none (parallel-safe with the W9 tail; pure single-repo code with byte-identical defaults) |
-| **W11** Platformization | Monorepo split (`packages/core` + `sites/<client>`), de-hardcoding, provisioning, fleet CI + schema-migration harness, per-site governance, second-site proof | **W9 T9.24 done** (legacy deletion — extract the shrunken core, not code about to be deleted) + Wolf's OQ-W11 rulings |
-| **W12** Site capture | Crawl → decompose → theme-extract → emit recipes/pages via MCP → fidelity loop → gap reports | W10 (vocabulary worth mapping to) + W11 (a staging client to clone into); the T12.1 spike may be pulled forward anytime |
+| Wave                      | What                                                                                                                                                          | Gate to start                                                                                                           |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **W10** Design vocabulary | Bounded theme token axes + section-palette growth + per-type variants + the composite decision package                                                        | none (parallel-safe with the W9 tail; pure single-repo code with byte-identical defaults)                               |
+| **W11** Platformization   | Monorepo split (`packages/core` + `sites/<client>`), de-hardcoding, provisioning, fleet CI + schema-migration harness, per-site governance, second-site proof | **W9 T9.24 done** (legacy deletion — extract the shrunken core, not code about to be deleted) + Wolf's OQ-W11 rulings   |
+| **W12** Site capture      | Crawl → decompose → theme-extract → emit recipes/pages via MCP → fidelity loop → gap reports                                                                  | W10 (vocabulary worth mapping to) + W11 (a staging client to clone into); the T12.1 spike may be pulled forward anytime |
 
-The dependency logic: W10 makes clones *look* right (today's visual surface
+The dependency logic: W10 makes clones _look_ right (today's visual surface
 is 10 color tokens + 3 fonts over a fixed design system — a theme can
 re-skin Dr-Lurie, not produce a different design language). W11 gives clones
-somewhere to *live* (today every object lands in the one Dr-Lurie store).
+somewhere to _live_ (today every object lands in the one Dr-Lurie store).
 W12 is then a pure agent workflow whose entire output is data — recipes and
 objects through the existing governed verbs — which is what keeps every
 cloned site fully administrable afterwards (the actual point).
@@ -67,11 +67,15 @@ default render is **byte-identical**:
 ```jsonc
 // brandTokens v2 sketch (additive; final shape is T10.1's to settle)
 {
-  "colors": { /* unchanged */ },
-  "fonts":  { /* unchanged */ },
+  "colors": {
+    /* unchanged */
+  },
+  "fonts": {
+    /* unchanged */
+  },
   "layout": { "containerWidth": "narrow|default|wide", "sectionRhythm": "compact|default|airy" },
-  "shape":  { "radius": "sharp|soft|round|pill", "buttonShape": "rect|soft|pill", "shadow": "none|soft|elevated" },
-  "type":   { "scale": "compact|default|editorial", "headingWeight": "regular|medium|bold" }
+  "shape": { "radius": "sharp|soft|round|pill", "buttonShape": "rect|soft|pill", "shadow": "none|soft|elevated" },
+  "type": { "scale": "compact|default|editorial", "headingWeight": "regular|medium|bold" },
 }
 ```
 
@@ -315,11 +319,18 @@ reserved for T11.3-class and T12.2-class problems).
 
 ## 7. Queue integration (how this runs auto)
 
+> **Standing execution instruction:**
+> [`cms-pipeline/autonomous-run.md`](cms-pipeline/autonomous-run.md) — the
+> paste-able/Routine-attachable instruction that runs this queue at maximum
+> autonomy (async-review checkpoints, wave-PR merge policy, hard stops).
+> Effective once merged by the owner; Wolf edits its AUTHORIZATIONS block
+> to widen or narrow autonomy.
+
 - Rows appended to `cms-pipeline/queue.tsv` after T9.25, in order
-  T10.* → T11.* → T12.*. The runner executes the first not-done row, so
+  T10._ → T11._ → T12._. The runner executes the first not-done row, so
   **W9's remainder runs first by default** — correct, since W11 gates on
   T9.24. W10 is parallel-safe with the W9 tail: to start it early, move the
-  T10.* rows above the remaining T9.* rows (or run them interactively) —
+  T10._ rows above the remaining T9.\* rows (or run them interactively) —
   reordering the file IS the scheduling mechanism.
 - `checkpoint` rows (T10.4, T11.0) halt the runner until Wolf's answers are
   recorded; `human_gate` rows (T10.9, T11.11, T12.6) are prepared by agents

@@ -214,6 +214,7 @@ site-family reconcile would have rolled the live branding back to the seed.
   driver's site branch still EXCLUDES it (theme-only governance) — the palette
   heals via a theme apply, never the seed. Gates: 1294 + 57 green, check +
   build-diff clean/EMPTY.
+
 ## Session 2026-07-15 D (pdf-tool storage-grant provider: get_pdf_tool_storage_grant SHIPPED — stateless pdf-tool writes into OUR blob stores)
 
 Task (Wolf): make Dr-Lurie the storage-grant provider for the now-stateless
@@ -352,9 +353,9 @@ Wolf reset the MCP connector ("connection is reset. continue") — the fresh
 registry exposed `object_instantiate_section_template` and
 `site_apply_theme`, unblocking the four proofs deferred from Session E.
 
-- **Stamp proofs (per-object, the W2.5 precedent):** dry_run in BOTH modes
+- **Stamp proofs (per-object, the W2.5 precedent):** dry*run in BOTH modes
   (standalone + page mode onto page_object_showcase) for EACH of the five
-  `stpl_*` records — 10/10 `eligible: true`, zero blockers; deterministic
+  `stpl*\*`records — 10/10`eligible: true`, zero blockers; deterministic
   minted section ids; PageType law / route uniqueness / placeability all
   exercised on the page-mode candidate patch.
 - **Theme proofs:** `site_apply_theme` dry_run (computed exact-replace
@@ -444,11 +445,11 @@ session MCP connection against production, strictly sequential ops.
   create/patch/publish in this run had actually landed.
 - Docs updated in this change (RELEASED framing, per the Codex-flagged
   no-half-measures call): object-inventory (W8 section → RELEASED table 🔵
-  + tpl backfill note), conversion-map (🔵 marks + W8 row with the open
-  gate), CLAUDE.md (count stays forty-one + "6 RELEASED pending proofs"),
-  09-plan (status header, W8.4 row, tpl caveat RESOLVED). `tpl_fieldtest`
-  stays trio-less (fieldtest family) — patching it 422s until backfilled
-  or retired.
+  - tpl backfill note), conversion-map (🔵 marks + W8 row with the open
+    gate), CLAUDE.md (count stays forty-one + "6 RELEASED pending proofs"),
+    09-plan (status header, W8.4 row, tpl caveat RESOLVED). `tpl_fieldtest`
+    stays trio-less (fieldtest family) — patching it 422s until backfilled
+    or retired.
 
 ## Session 2026-07-14 D (W8.3b BUILT: recipe metadata + creation-policy seam + reuse-first surfacing — NOT converted; W8.4 awaits Wolf's go, now with a tpl backfill Step 0)
 
@@ -634,7 +635,7 @@ it's a recipe); push the design branch, no PR.
   `{name, description?, blueprint: sectionInstance}`, 3 ops with inverses,
   `object_instantiate_section_template` stamping into a page under the
   caller's lock or minting a standalone `sec_*`; 5 planned seeds), `theme →
-  site.brandTokens` (NEW, eleventh type: `set_theme_fields` +
+site.brandTokens` (NEW, eleventh type: `set_theme_fields` +
   `site_apply_theme` computing ONE exact-replace `set_site_fields` op with
   stale-key unsets). Page templates gain slot-level `blueprintRef` →
   section_template (deref + deep-copy at instantiation only). Provenance
@@ -702,7 +703,7 @@ server-side despite a client-side 60s timeout, so every step was verified via
   - **VALIDATION-GAP FINDING (logged, not yet fixed): a standalone `card`
     section passes `object_validate` but breaks the production build.** The
     first showcase build failed (exit 2, "No component registered for section
-    type 'card'"): `card` is a grid *leaf* (rendered only inside a
+    type 'card'"): `card` is a grid _leaf_ (rendered only inside a
     `content_grid` via its `cards` source) and has no standalone component, yet
     validation admitted it as a top-level page section. Fixed the page by
     replacing the standalone `s_card` with an `s_cards` `content_grid`
