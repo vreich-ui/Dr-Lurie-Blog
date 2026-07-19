@@ -147,6 +147,8 @@ Standing principle from S-2 applies across all of these: where an option would i
 
 **Addendum (2026-07-14, W8):** OQ-4 remains REJECTED — W8's template-system expansion ([`09-template-system-plan.md`](09-template-system-plan.md)) gives agents section recipes and theme presets without making PageTypes data. T6.2's remaining "editor support" leftover is DESCOPED by Wolf (templates and section templates stay agent/MCP-first; canvas exposure waits on the admin-rethink ruling). W8's own open questions are tracked wave-locally as OQ-W8-1…4 in the 09 plan (the 06/08 convention), not here.
 
+**Addendum (2026-07-19, W13):** the object-tracking wave's open questions are tracked wave-locally as **OQ-W13-1…6** in the 12 plan ([`12-object-tracking-and-analytics.md`](12-object-tracking-and-analytics.md) §13), not here — same convention. Note that W13 supersedes the §1.7-6-era exclusion of analytics from the object model (the 12 plan §0 records the amendment).
+
 ---
 
 ## 4. Compliance notes

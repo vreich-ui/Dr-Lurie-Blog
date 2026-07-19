@@ -128,6 +128,8 @@ trail. Flip one file to change the posture per type.
 | **section_template** (W8)   | A section-level recipe: ONE pre-configured section blueprint (+ name/description/whenToUse/scope) an agent stamps into any page or mints as a standalone `sec_*` object via `object_instantiate_section_template` — copy at stamp time, never live-bound. Records CONVERTED (verb proofs 2026-07-15).                                                          | Blueprint must be a standalone-placeable registered type (no `card` leaf, no `shared_ref`, no manual content picks, no asset refs — self-contained); metadata trio (description/whenToUse/scope) REQUIRED TO PUBLISH; creation gated by `src/config/creation-policy.ts` (open today).                                     |
 | **theme** (W8)              | A brandTokens preset (name/description/whenToUse/scope + `tokens: {colors, fonts}`): agents draft/validate a palette, then `site_apply_theme` copies it onto the site singleton as ONE exact-replace `set_site_fields` op (stale keys unset). NOT taxonomy; the site never live-inherits. Record CONVERTED (verb proofs 2026-07-15; tokens = launch palette, see drift caveat).                             | Published themes must carry every renderer-consumed color key (apply is total); token values must pass the safe-CSS grammar (raw `<style>` interpolation — the same rule gates `site.brandTokens`); metadata trio REQUIRED TO PUBLISH; creation gated by the same committed policy.                                       |
 
+**Planned, not yet built — W13 (2026-07-19, see [`12-object-tracking-and-analytics.md`](12-object-tracking-and-analytics.md)):** an eleventh governed type **`tracking_config`** (`trk_drlurie` — the per-project tracker registry: provider switches with regex-pinned IDs, geo-adaptive consent posture, per-type collection defaults; require-approval + human-executed publish recommended, OQ-W13-2) plus a cross-type **`tracking` body attribute** on all ten existing types (enabled/label/tags/goals, written only by the new `set_tracking` op). NOTHING exists in schema or store yet — rows appear here only as objects convert. The 2026-07-19 directive supersedes the older "analytics stays in config.yaml" boundary recorded under Singletons below.
+
 **What goes _inside_ a page/section — the section-type palette.** A page's sections
 are each one of the registered section types (`hero`, `lede`, `prose`, `checklist`,
 `content_grid`, `bio`, `newsletter_signup`, `testimonial`, `cta_banner`, `faq`,
@@ -542,6 +544,21 @@ action CTA to a pdf-tool-generated `/pdf/` worksheet), generated under a
 storage grant, `verify_agent_artifact` 5/5, published (commit `3cea365`),
 released, and verified live (`verify_article_images` verified:true
 deployReady:true; the PDF URL serves 200 from production).
+
+### 7. Object tracking & analytics (W13) — ⚪ PLANNED (2026-07-19, nothing built)
+
+The 2026-07-19 directive: tracking as an attribute of every object + a
+`tracking_config` singleton (`trk_drlurie`) + an own first-party event
+pipeline (≤4KB loader riding the existing `data-cms-*` identity attributes →
+`/api/t` relay function → `tracking_event.v1` → owner DB with `pg_notify`
+triggers; Blobs mirror for replay) + vetted ad-platform adapters
+(google_ads/ga4/meta/taboola/outbrain/mgid; plausible dormant fallback; GTM
+recommended OUT) behind geo-adaptive consent (own tracker cookieless +
+consent-free; pixels Consent-Mode-v2-gated in restricted regions; GPC
+honored). Plan: [`12-object-tracking-and-analytics.md`](12-object-tracking-and-analytics.md);
+briefs `cms-pipeline/T13.1`–`T13.11` (Wolf checkpoints OQ-W13-1 consent /
+OQ-W13-3 provider set; the production drive is human-gated). This row flips
+only when the five criteria hold (T13.11 drive).
 
 ### Not on the MVP path (noted so they aren't mistaken for gaps)
 
