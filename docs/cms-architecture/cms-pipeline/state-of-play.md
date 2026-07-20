@@ -51,9 +51,30 @@ PR #462 MERGED (`d8171295`, 8/8 checks); continuation on a fresh branch.
   (the expected sandbox signal), contract advertised≡exercised, inventory
   returns trk_drlurie.
 
-**Remaining before the wave closes:** T13.11 (human_gate — env provisioning
-per OQ-W13-6 + `--production --release` + live beacon verification + the
-ten-type set_tracking MCP round-trip + CSP promotion call), T13.12, T13.13.
+- **T13.12 (`5414d701`)**: the OQ-W13-2 posture surface — a Tracking card
+  atop the guardrails page (T9.15's override layer IS built, so the toggle
+  variant): effective publish mode from the ACTIVE policy with provenance,
+  the creation posture from the live creation policy (humans + the seed
+  driver), Product beside it as the other pin, and an Owner-only quick
+  flip writing an explicit per-type pin through the SAME audit-logged
+  admin-governance override — no new write machinery. Pure view-model +
+  5 tests incl. a source-level no-bespoke-endpoint guard.
+- **T13.13 (`a9fe2740`)**: doc 12 §15 — the scores-feedback DESIGN
+  (OQ-W13-5 commission, nothing implemented): `metric:<framework>`
+  provenance with a required evidence base, the append-only
+  `append_scores` transport recommendation (owner DB computes, agent
+  submits through the governed grammar; automatic writers rejected until
+  OQ-3), hard guard rules (no cascade, leak rule untouched, n_sessions
+  floor, idempotent-by-refusal windows), lineage-family variant judging
+  with the no-A/B honesty rule, core-frameworks/site-thresholds split.
+  Ends with the OQ-W13-5b ANSWER line for Wolf.
+
+**EVERY W13 auto row is now BUILT (T13.1–T13.10, T13.12, T13.13).
+Remaining before the wave closes:** T13.11 ONLY (human_gate — env
+provisioning per OQ-W13-6 + `--production --release` + live beacon
+verification + the ten-type set_tracking MCP round-trip + the CSP
+promotion call). Open ANSWER lines on Wolf: OQ-W8-1…4
+(`composite-sections-decision.md`) and OQ-W13-5b (doc 12 §15).
 
 ## Session 2026-07-20 (POST-MERGE CONTINUATION: W10 tail T10.5→T10.8 + W13 consent/conversions T13.6→T13.7 — six commits on `claude/w10-mints-w13-consent`)
 
