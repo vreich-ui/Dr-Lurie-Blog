@@ -32,6 +32,7 @@ import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-templ
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
+import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import type { ObjectType } from '../../src/schema/object-record-v1.js';
 
@@ -65,6 +66,7 @@ export const ASK_AI_BODY_SCHEMAS = {
   theme: themeBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
+  tracking_config: trackingConfigBodySchema,
 } satisfies Record<AskAiObjectType, z.ZodType>;
 
 export const isAskAiObjectType = (value: string): value is AskAiObjectType =>

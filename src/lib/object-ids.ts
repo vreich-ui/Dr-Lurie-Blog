@@ -3,7 +3,7 @@ import type { ObjectType } from '../schema/object-record-v1.js';
 
 export type ObjectIdValidationResult = NamingValidationResult;
 
-export const OBJECT_ID_CEILING_RE = /^(site|page|tpl|stpl|sec|nav|tax|thm|prod|req)_[a-z0-9_]+$/;
+export const OBJECT_ID_CEILING_RE = /^(site|page|tpl|stpl|sec|nav|tax|thm|prod|req|trk)_[a-z0-9_]+$/;
 export const SECTION_INSTANCE_ID_RE = /^s_[a-z0-9]+$/;
 
 const OBJECT_ID_PATTERNS = {
@@ -16,6 +16,7 @@ const OBJECT_ID_PATTERNS = {
   section_template: /^stpl_[a-z0-9]+(?:_[a-z0-9]+)*$/,
   theme: /^thm_[a-z0-9]+(?:_[a-z0-9]+)*$/,
   product: /^prod_[a-z0-9]+(?:_[a-z0-9]+)*$/,
+  tracking_config: /^trk_[a-z0-9]+(?:_[a-z0-9]+)*$/,
 } satisfies Record<Exclude<ObjectType, 'content_item'>, RegExp>;
 
 const OBJECT_TYPE_PREFIXES = {
@@ -29,6 +30,7 @@ const OBJECT_TYPE_PREFIXES = {
   theme: 'thm_',
   product: 'prod_',
   content_item: 'req_',
+  tracking_config: 'trk_',
 } satisfies Record<ObjectType, string>;
 
 export const isObjectIdWithinCeiling = (value: string): boolean => OBJECT_ID_CEILING_RE.test(value);

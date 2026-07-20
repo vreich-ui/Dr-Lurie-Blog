@@ -73,6 +73,159 @@ export const FALLBACK_FONTS: Record<string, string> = {
   heading: "'Playfair Display', 'Times New Roman', serif",
 };
 
+// ─── Theme token axes (T10.1, 11-platformization-plan §1.1) ──────────────────
+//
+// Bounded enum axes widening brandTokens beyond colors + fonts: spacing
+// rhythm, container width, radii, shadows, type scale, heading weight.
+// Rule-6 mechanics: every axis VALUE maps to a pre-built code-side custom-
+// property set below — the enum value itself never reaches CSS; it only
+// indexes into these tables. The default value of every axis maps to the
+// literals hardcoded in src/assets/styles/tailwind.css today (each tier
+// there reads `var(--dl-…, <literal>)` with the SAME literal as fallback),
+// so an absent axis — or one set to its default — renders byte-identically
+// to the pre-T10.1 site. CustomStyles.astro emits vars ONLY for axes set to
+// a non-default value, keeping the default inline <style> byte-exact.
+//
+// Axis semantics (what each var drives — the wired tiers in tailwind.css):
+//   layout.containerWidth → `.dl-section` max-width
+//   layout.sectionRhythm  → `.dl-section` vertical padding (base / ≥640px)
+//   shape.radius          → `.dl-card` radius + form-control radius
+//   shape.buttonShape     → `.btn` radius
+//   shape.shadow          → `.dl-card` box-shadow
+//   type.scale            → editorial-prose / dl-reading font size (base /
+//                           ≥1024px) + line-height
+//   type.headingWeight    → base h1–h3 + editorial-prose heading weight
+//                           (explicit per-component weight utilities still
+//                           win — the axis drives the DEFAULT weight)
+
+type AxisSpec<Value extends string> = {
+  readonly values: readonly Value[];
+  readonly default: Value;
+  /** Per-value custom-property sets; every value maps the SAME var names. */
+  readonly vars: Readonly<Record<Value, Readonly<Record<string, string>>>>;
+};
+
+const axis = <const Value extends string>(spec: AxisSpec<Value>): AxisSpec<Value> => spec;
+
+export const THEME_AXES = {
+  layout: {
+    containerWidth: axis({
+      values: ['narrow', 'default', 'wide'],
+      default: 'default',
+      vars: {
+        narrow: { '--dl-container-max': '56rem' },
+        default: { '--dl-container-max': '72rem' }, // max-w-6xl, today's literal
+        wide: { '--dl-container-max': '80rem' },
+      },
+    }),
+    sectionRhythm: axis({
+      values: ['compact', 'default', 'airy'],
+      default: 'default',
+      vars: {
+        compact: { '--dl-section-py': '2.5rem', '--dl-section-py-sm': '3.5rem' },
+        default: { '--dl-section-py': '3.5rem', '--dl-section-py-sm': '5rem' }, // py-14 sm:py-20
+        airy: { '--dl-section-py': '4.5rem', '--dl-section-py-sm': '6.5rem' },
+      },
+    }),
+  },
+  shape: {
+    radius: axis({
+      values: ['sharp', 'soft', 'round', 'pill'],
+      default: 'round',
+      vars: {
+        sharp: { '--dl-radius-card': '0px', '--dl-radius-control': '0px' },
+        soft: { '--dl-radius-card': '0.5rem', '--dl-radius-control': '0.25rem' },
+        round: { '--dl-radius-card': '1rem', '--dl-radius-control': '0.375rem' }, // rounded-2xl / rounded-md
+        pill: { '--dl-radius-card': '1.5rem', '--dl-radius-control': '0.75rem' },
+      },
+    }),
+    buttonShape: axis({
+      values: ['rect', 'soft', 'pill'],
+      default: 'pill',
+      vars: {
+        rect: { '--dl-radius-btn': '0.375rem' },
+        soft: { '--dl-radius-btn': '0.75rem' },
+        pill: { '--dl-radius-btn': '9999px' }, // rounded-full, today's literal
+      },
+    }),
+    shadow: axis({
+      values: ['none', 'soft', 'elevated'],
+      default: 'soft',
+      vars: {
+        none: { '--dl-shadow-card': '0 0 #0000' },
+        soft: { '--dl-shadow-card': '0 1px 2px 0 rgb(15 23 42 / 0.05)' }, // shadow-sm shadow-slate-900/5
+        elevated: {
+          '--dl-shadow-card': '0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05)',
+        },
+      },
+    }),
+  },
+  type: {
+    scale: axis({
+      values: ['compact', 'default', 'editorial'],
+      default: 'default',
+      vars: {
+        compact: { '--dl-prose-size': '16px', '--dl-prose-size-lg': '18px', '--dl-prose-leading': '1.65' },
+        default: { '--dl-prose-size': '18px', '--dl-prose-size-lg': '20px', '--dl-prose-leading': '1.82' }, // today's literals
+        editorial: { '--dl-prose-size': '19px', '--dl-prose-size-lg': '21px', '--dl-prose-leading': '1.9' },
+      },
+    }),
+    headingWeight: axis({
+      values: ['regular', 'medium', 'bold'],
+      default: 'bold',
+      vars: {
+        regular: { '--dl-heading-weight': '400' },
+        medium: { '--dl-heading-weight': '500' },
+        bold: { '--dl-heading-weight': '700' }, // UA/prose bold, today's computed weight
+      },
+    }),
+  },
+} as const;
+
+export type ThemeAxisGroup = keyof typeof THEME_AXES;
+
+export const THEME_AXIS_GROUPS = Object.keys(THEME_AXES) as ThemeAxisGroup[];
+
+/** Dotted `group.axis` keys — the axis registry's key list (contract surface, T10.2). */
+export const THEME_AXIS_KEYS = THEME_AXIS_GROUPS.flatMap((group) =>
+  Object.keys(THEME_AXES[group]).map((key) => `${group}.${key}`)
+) as readonly string[];
+
+/**
+ * Resolve the custom properties a brandTokens record's axes ask for.
+ * Only axes set to a KNOWN, NON-DEFAULT value emit vars — absent axes,
+ * explicit defaults, and unknown values (schema-rejected anyway; belt and
+ * braces here) all resolve to nothing, so the default render stays
+ * byte-identical. Values come exclusively from the code-owned tables above;
+ * no input string is ever emitted.
+ */
+export const resolveAxisVars = (
+  tokens:
+    | {
+        colors?: unknown;
+        fonts?: unknown;
+        layout?: Record<string, string | undefined>;
+        shape?: Record<string, string | undefined>;
+        type?: Record<string, string | undefined>;
+      }
+    | undefined
+): Record<string, string> => {
+  const resolved: Record<string, string> = {};
+  if (!tokens) return resolved;
+  for (const group of THEME_AXIS_GROUPS) {
+    const groupValues = tokens[group];
+    if (!groupValues) continue;
+    for (const [axisKey, spec] of Object.entries(THEME_AXES[group]) as [string, AxisSpec<string>][]) {
+      const value = groupValues[axisKey];
+      if (value === undefined || value === spec.default) continue;
+      const varSet = Object.prototype.hasOwnProperty.call(spec.vars, value) ? spec.vars[value] : undefined;
+      if (!varSet) continue;
+      Object.assign(resolved, varSet);
+    }
+  }
+  return resolved;
+};
+
 // ─── CSS-value safety ─────────────────────────────────────────────────────────
 
 // Hard floor for ANY token value: characters/constructs that could terminate

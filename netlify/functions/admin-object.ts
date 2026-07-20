@@ -79,9 +79,9 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
     const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
     // Artifact existence checks — same wiring as object-store.ts; an
     // unavailable index store degrades to "existence not verified".
-    const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(
-      () => undefined
-    )) as unknown as ArtifactIndexStore | undefined;
+    const artifactIndexStore = (await getArtifactIndexBlobStore(event).catch(() => undefined)) as unknown as
+      | ArtifactIndexStore
+      | undefined;
     const validationContext = await buildStoreValidationContext(store, {
       selfObjectId: requestData.object_id ?? targetPageId,
       selfObjectType: requestData.object_type ?? (targetPageId ? 'page' : undefined),

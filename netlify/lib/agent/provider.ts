@@ -202,9 +202,7 @@ export const openaiAdapter = (options: AdapterOptions): ProviderAdapter => {
     const choice = response.choices[0];
     const message = choice?.message;
     const toolCalls: ChatToolCall[] = (message?.tool_calls ?? [])
-      .filter(
-        (call): call is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => call.type === 'function'
-      )
+      .filter((call): call is OpenAI.Chat.Completions.ChatCompletionMessageFunctionToolCall => call.type === 'function')
       .map((call) => ({ id: call.id, name: call.function.name, args: parseArgs(call.function.arguments) }));
     const text = message?.content ?? undefined;
     return {

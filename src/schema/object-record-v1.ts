@@ -15,6 +15,7 @@ export const objectTypes = [
   'theme',
   'product',
   'content_item',
+  'tracking_config',
 ] as const;
 export type ObjectType = (typeof objectTypes)[number];
 

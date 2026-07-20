@@ -53,7 +53,10 @@ const createFakeStore = (values = new Map<string, FakeStoreValue>()) => ({
 });
 
 const withBlobStores = async (
-  fn: (stores: { artifactValues: Map<string, FakeStoreValue>; indexValues: Map<string, FakeStoreValue> }) => Promise<void>
+  fn: (stores: {
+    artifactValues: Map<string, FakeStoreValue>;
+    indexValues: Map<string, FakeStoreValue>;
+  }) => Promise<void>
 ) => {
   const previousNetlify = process.env.NETLIFY;
   const previousSiteId = process.env.NETLIFY_SITE_ID;

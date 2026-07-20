@@ -44,7 +44,11 @@ type Store = ReturnType<typeof createMemoryStore>;
 // object_id, or — for instantiate_section page mode (W8.2) — the target page.
 const call = async (store: Store, request: ObjectVerbRequest, principal: Principal = AGENT) => {
   const verbStore = store as unknown as ObjectVerbStore;
-  const requestData = request as { object_id?: string; object_type?: string; target?: { kind?: string; page_id?: string } };
+  const requestData = request as {
+    object_id?: string;
+    object_type?: string;
+    target?: { kind?: string; page_id?: string };
+  };
   const targetPageId = requestData.target?.kind === 'page' ? requestData.target.page_id : undefined;
   const validationContext = await buildStoreValidationContext(verbStore, {
     selfObjectId: requestData.object_id ?? targetPageId,
@@ -81,7 +85,13 @@ const seedObject = async (
   id: string,
   body: Record<string, unknown>
 ) => {
-  const res = await call(store, { action: 'create', object_type: objectType, site: 'site_drlurie', body, requested_id: id });
+  const res = await call(store, {
+    action: 'create',
+    object_type: objectType,
+    site: 'site_drlurie',
+    body,
+    requested_id: id,
+  });
   assert.equal(res.status, 200, `${id}: ${JSON.stringify(res.body)}`);
   return res.body.record as ObjectRecord;
 };
@@ -106,7 +116,13 @@ test('page mode stamps a deep copy under the caller lock: fresh id, position hon
   const res = await call(store, {
     action: 'instantiate_section',
     section_template_id: 'stpl_hero_landing',
-    target: { kind: 'page', page_id: 'page_probe', position: 0, lock_token: lockToken, expected_record_version: recordVersion },
+    target: {
+      kind: 'page',
+      page_id: 'page_probe',
+      position: 0,
+      lock_token: lockToken,
+      expected_record_version: recordVersion,
+    },
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   assert.equal(res.body.instantiated_from, 'stpl_hero_landing');

@@ -1374,8 +1374,7 @@ export const checkoutRequest = async (store: WorkflowBlobStore, body: WorkflowRe
   // a blind write here is the race where both callers read "unlocked" and the
   // later write silently overwrites the earlier caller's brand-new lock.
   for (let attempt = 0; attempt < WORKFLOW_MUTATION_MAX_RETRIES; attempt += 1) {
-    const previousRecord =
-      attempt === 0 ? checkoutLoad.record : await loadLatestRecordForCheckin(store, requestId);
+    const previousRecord = attempt === 0 ? checkoutLoad.record : await loadLatestRecordForCheckin(store, requestId);
 
     if (!previousRecord) {
       return jsonResponse(404, { action: body.action, not_found: true, diagnostics });

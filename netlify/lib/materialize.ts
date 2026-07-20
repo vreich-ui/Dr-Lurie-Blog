@@ -25,6 +25,7 @@ import { materializeSite } from './materializers/site.js';
 import { materializeTaxonomy } from './materializers/taxonomy.js';
 import { materializeTemplate } from './materializers/template.js';
 import { materializeTheme } from './materializers/theme.js';
+import { materializeTrackingConfig } from './materializers/tracking-config.js';
 import type { MaterializeMeta, MaterializedFile } from './materializers/shared.js';
 
 export type { MaterializeMeta, MaterializedFile, GeneratedMarker } from './materializers/shared.js';
@@ -51,6 +52,8 @@ export function materialize(
       return materializeSectionTemplate(objectId, body, meta);
     case 'theme':
       return materializeTheme(objectId, body, meta);
+    case 'tracking_config':
+      return materializeTrackingConfig(objectId, body, meta);
     case 'section':
       return materializeSection(objectId, body, meta);
     case 'product':

@@ -58,9 +58,7 @@ const getHeroRequiredPublishHandler = async (): Promise<typeof publishHandler> =
   if (!heroRequiredPublishHandler) {
     const previous = process.env.HERO_IMAGE_REQUIRED;
     process.env.HERO_IMAGE_REQUIRED = 'true';
-    const mod = (await import(
-      '../../netlify/functions/publish-article.js' + '?heroImageRequired=true'
-    )) as {
+    const mod = (await import('../../netlify/functions/publish-article.js' + '?heroImageRequired=true')) as {
       handler: typeof publishHandler;
     };
     heroRequiredPublishHandler = mod.handler;

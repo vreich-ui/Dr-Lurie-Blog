@@ -21,6 +21,8 @@ export type SectionAnnotationAttrs = {
   'data-cms-object-id': string;
   'data-cms-section-id': string;
   'data-cms-section-type': string;
+  /** T13.5 (W13): the owning object set tracking.enabled:false. */
+  'data-cms-track'?: 'off';
   'data-cms-shared-object'?: string;
   'data-cms-related-algorithm'?: string;
   'data-cms-related-limit'?: string;
@@ -40,7 +42,8 @@ const relatedConfigOf = (
 
 export const sectionAnnotationAttrs = (
   pageObjectId: string,
-  section: Pick<RenderableSection, 'id' | 'type' | 'sharedObjectId'> & Partial<Pick<RenderableSection, 'data'>>
+  section: Pick<RenderableSection, 'id' | 'type' | 'sharedObjectId'> &
+    Partial<Pick<RenderableSection, 'data' | 'trackingOff'>>
 ): SectionAnnotationAttrs => {
   // A `related` grid announces its CURRENT algorithm + tile count + columns so
   // the canvas chip can offer the controls without a record round-trip.
@@ -49,6 +52,7 @@ export const sectionAnnotationAttrs = (
     'data-cms-object-id': pageObjectId,
     'data-cms-section-id': section.id,
     'data-cms-section-type': section.type,
+    ...(section.trackingOff ? { 'data-cms-track': 'off' as const } : {}),
     ...(section.sharedObjectId ? { 'data-cms-shared-object': section.sharedObjectId } : {}),
     ...(related ? { 'data-cms-related-algorithm': related.algorithm } : {}),
     ...(related?.limit !== undefined ? { 'data-cms-related-limit': String(related.limit) } : {}),

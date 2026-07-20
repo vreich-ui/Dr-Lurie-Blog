@@ -98,7 +98,15 @@ test('content_item carries the node op family (W7.3 — articles are governed ob
     buildObjectContract('content_item')
       .patch_ops.map((o) => o.op)
       .sort(),
-    ['move_node', 'remove_node', 'set_article_meta', 'set_node_visibility', 'update_node', 'upsert_node']
+    [
+      'move_node',
+      'remove_node',
+      'set_article_meta',
+      'set_node_visibility',
+      'set_tracking',
+      'update_node',
+      'upsert_node',
+    ]
   );
 });
 
@@ -137,6 +145,7 @@ test('anti-drift coverage guard: contract types match objectTypes exactly', () =
         'theme',
         'product',
         'content_item',
+        'tracking_config',
       ] as ObjectType[]),
     ].sort()
   );
@@ -147,7 +156,7 @@ test('section_template carries the blueprint op family, section vocabulary, and 
   assert.equal(contract.governed, true);
   assert.deepEqual(
     contract.patch_ops.map((op) => op.op),
-    ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data']
+    ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data', 'set_tracking']
   );
   assert.equal(
     contract.patch_ops.find((op) => op.op === 'replace_blueprint')?.minted_id_field,
@@ -186,7 +195,12 @@ test('W8.3b: creation_policy is served on every contract and reflects the inject
   for (const type of OBJECT_CONTRACT_TYPES) {
     const open = buildObjectContract(type).creation_policy;
     assert.equal(open.humans, 'always_allowed');
-    assert.equal(open.agents, 'open', `${type} is open under the committed default`);
+    if (type === 'tracking_config') {
+      // W13: human/seed-only under the committed default ({ agents: [] }).
+      assert.deepEqual(open.agents, { allowlist: [] }, 'tracking_config is agent-closed');
+    } else {
+      assert.equal(open.agents, 'open', `${type} is open under the committed default`);
+    }
     assert.match(open.note, /self-declared/);
   }
   const restricted = buildObjectContract('template', {

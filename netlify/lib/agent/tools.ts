@@ -65,10 +65,7 @@ export interface ChatTool {
 }
 
 const json = (body: unknown) => JSON.stringify(body);
-const verbResult = async (
-  ctx: ToolContext,
-  request: Record<string, unknown>
-): Promise<ToolResult> => {
+const verbResult = async (ctx: ToolContext, request: Record<string, unknown>): Promise<ToolResult> => {
   const result = await ctx.verb(request);
   return { content: json(result.body), is_error: result.status !== 200 };
 };
@@ -79,7 +76,10 @@ const zodParse =
     const parsed = schema.safeParse(args);
     return parsed.success
       ? { ok: true, value: parsed.data }
-      : { ok: false, error: `Invalid arguments: ${parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}` };
+      : {
+          ok: false,
+          error: `Invalid arguments: ${parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ')}`,
+        };
   };
 
 // Shared arg fragments.
@@ -201,7 +201,10 @@ const searchArtifacts: ChatTool = {
     additionalProperties: false,
   },
   parse: zodParse(z.object({ request_id: z.string().min(1) })),
-  execute: async (ctx, args) => ({ content: json(await ctx.listArtifacts(args.request_id as string)), is_error: false }),
+  execute: async (ctx, args) => ({
+    content: json(await ctx.listArtifacts(args.request_id as string)),
+    is_error: false,
+  }),
   describe: (args) => `List artifacts for ${args.request_id}`,
 };
 
@@ -233,7 +236,7 @@ const patch: ChatTool = {
   name: 'patch',
   toolClass: 'draft',
   description:
-    'Apply contract patch ops under YOUR checkout. TRAPS: `fields` DEEP-MERGES — set a key to null to remove it; switching a section variant requires nulling the old variant\'s keys explicitly. expected_record_version comes from checkout (and bumps on every write — re-read on 409). Ops must be ops the type\'s contract permits (get_contract).',
+    "Apply contract patch ops under YOUR checkout. TRAPS: `fields` DEEP-MERGES — set a key to null to remove it; switching a section variant requires nulling the old variant's keys explicitly. expected_record_version comes from checkout (and bumps on every write — re-read on 409). Ops must be ops the type's contract permits (get_contract).",
   input_schema: {
     type: 'object',
     properties: {
@@ -355,8 +358,7 @@ const createVariant: ChatTool = {
       requested_id: z.string().min(1).optional(),
     })
   ),
-  execute: (ctx, args) =>
-    verbResult(ctx, { action: 'create_variant', object_type: 'content_item', ...args }),
+  execute: (ctx, args) => verbResult(ctx, { action: 'create_variant', object_type: 'content_item', ...args }),
   dryRun: async (ctx, args) =>
     (await ctx.verb({ action: 'create_variant', object_type: 'content_item', ...args, dry_run: true })).body,
   describe: (args) => `Create a variant of ${args.source_object_id}`,
@@ -416,7 +418,8 @@ const instantiateSectionTemplate: ChatTool = {
       section_template_id: { type: 'string' },
       target: {
         type: 'object',
-        description: '{kind:"page", page_id, position?, lock_token?, expected_record_version?} or {kind:"standalone", requested_id?}',
+        description:
+          '{kind:"page", page_id, position?, lock_token?, expected_record_version?} or {kind:"standalone", requested_id?}',
       },
     },
     required: ['section_template_id', 'target'],
@@ -461,9 +464,7 @@ const publish: ChatTool = {
     required: ['object_type', 'object_id', 'lock_token'],
     additionalProperties: false,
   },
-  parse: zodParse(
-    z.object({ ...objectRef, lock_token: z.string().min(1), published_time: z.string().optional() })
-  ),
+  parse: zodParse(z.object({ ...objectRef, lock_token: z.string().min(1), published_time: z.string().optional() })),
   execute: (ctx, args) => verbResult(ctx, { action: 'publish_by_time', ...args }),
   describe: (args) => `Publish ${args.object_type} ${args.object_id}`,
 };
@@ -500,7 +501,7 @@ const applyTheme: ChatTool = {
   name: 'apply_theme',
   toolClass: 'privileged',
   description:
-    'OWNER-ONLY. Apply a theme\'s tokens to the site singleton (exact-replace; stale keys unset) under YOUR site checkout. The palette changes ONLY through this verb. Publish/release stay separate deliberate steps.',
+    "OWNER-ONLY. Apply a theme's tokens to the site singleton (exact-replace; stale keys unset) under YOUR site checkout. The palette changes ONLY through this verb. Publish/release stay separate deliberate steps.",
   input_schema: {
     type: 'object',
     properties: {
@@ -562,8 +563,7 @@ export const CHAT_TOOLS: readonly ChatTool[] = [
   applyTheme,
 ];
 
-export const chatToolByName = (name: string): ChatTool | undefined =>
-  CHAT_TOOLS.find((tool) => tool.name === name);
+export const chatToolByName = (name: string): ChatTool | undefined => CHAT_TOOLS.find((tool) => tool.name === name);
 
 /** §4 defaults by class. */
 export const defaultAutonomyFor = (tool: ChatTool): ToolAutonomy => (tool.toolClass === 'read' ? 'auto' : 'ask');
@@ -580,8 +580,7 @@ export const resolveAutonomy = (
 ): Record<string, ToolAutonomy> => {
   const autonomy: Record<string, ToolAutonomy> = {};
   for (const tool of CHAT_TOOLS) {
-    autonomy[tool.name] =
-      profileOverrides?.[tool.name] ?? governanceChatTools?.[tool.name] ?? defaultAutonomyFor(tool);
+    autonomy[tool.name] = profileOverrides?.[tool.name] ?? governanceChatTools?.[tool.name] ?? defaultAutonomyFor(tool);
   }
   return autonomy;
 };

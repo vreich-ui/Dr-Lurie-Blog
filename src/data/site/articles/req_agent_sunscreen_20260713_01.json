@@ -76,10 +76,7 @@
   "slug": "sunscreen-that-you-will-wear",
   "taxonomy": {
     "category": "ingredients",
-    "tags": [
-      "sun-protection",
-      "ingredients"
-    ]
+    "tags": ["sun-protection", "ingredients"]
   },
   "title": "The sunscreen you will actually wear"
 }

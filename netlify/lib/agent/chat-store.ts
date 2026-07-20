@@ -216,8 +216,7 @@ export const appendChatEvent = (
 
 /** A queued/running doc whose updated_at is older than STALE_RUN_MS is recoverable. */
 export const isRunStale = (doc: ChatDoc, nowMs: number): boolean =>
-  (doc.status === 'queued' || doc.status === 'running') &&
-  nowMs - Date.parse(doc.updated_at) > STALE_RUN_MS;
+  (doc.status === 'queued' || doc.status === 'running') && nowMs - Date.parse(doc.updated_at) > STALE_RUN_MS;
 
 export const getAgentChatBlobStore = (event: unknown): Promise<AgentChatStore> =>
   getNetlifyBlobStore({ name: 'agent-chats', consistency: 'strong' }, event) as unknown as Promise<AgentChatStore>;

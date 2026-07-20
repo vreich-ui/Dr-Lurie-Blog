@@ -69,8 +69,7 @@ test('the seed body matches the released production export (drift guard — run 
   const exported = JSON.parse(readFileSync(findExport(), 'utf8')) as Record<string, unknown>;
   delete exported.__generated;
   const drift = [...new Set([...Object.keys(exported), ...Object.keys(body as Record<string, unknown>)])].filter(
-    (key) =>
-      JSON.stringify(stable((body as Record<string, unknown>)[key])) !== JSON.stringify(stable(exported[key]))
+    (key) => JSON.stringify(stable((body as Record<string, unknown>)[key])) !== JSON.stringify(stable(exported[key]))
   );
   assert.deepEqual(
     drift,

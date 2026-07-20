@@ -39,6 +39,7 @@ import {
   commercialMetadataSchema,
 } from '../article-content-v1.js';
 import { richTextV1Schema } from '../../lib/richtext/rich-text-v1.js';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const CONTENT_ITEM_SCHEMA_VERSION = 'content_item.v1';
 
@@ -231,6 +232,8 @@ export const contentItemPublicationContextSchema = z
 
 export const contentItemBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     /** Route slug: /<permalink pattern>/<slug>, like a committed post's id. */
     slug: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, { message: 'slug must be lowercase-hyphen ([a-z0-9-]).' }),
     title: z.string().min(1),

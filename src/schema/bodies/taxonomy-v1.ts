@@ -14,6 +14,7 @@
  * (T0.6), not by this shape.
  */
 import { z } from 'zod';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const TAXONOMY_SCHEMA_VERSION = 'taxonomy.v1';
 
@@ -38,6 +39,8 @@ export type TaxonomyKind = z.infer<typeof taxonomyKindSchema>;
 
 export const taxonomyBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     kinds: z
       .object({
         category: z.object({ terms: z.array(termSchema) }).strict(),

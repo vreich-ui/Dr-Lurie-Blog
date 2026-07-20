@@ -171,17 +171,13 @@ test('validation rejects a fallback query naming an unknown taxonomy term', () =
 test('related source runs the algorithm resolver and caps at limit', () => {
   const calls: Array<{ algorithm: string; limit: number }> = [];
   const { resolvers } = makeResolvers();
-  const cards = resolveContentGridCards(
-    { kind: 'related', algorithm: 'tag_similarity' },
-    3,
-    {
-      ...resolvers,
-      runRelated: (algorithm, limit) => {
-        calls.push({ algorithm, limit });
-        return [card('req_r1'), card('req_r2'), card('req_r3'), card('req_r4')];
-      },
-    }
-  );
+  const cards = resolveContentGridCards({ kind: 'related', algorithm: 'tag_similarity' }, 3, {
+    ...resolvers,
+    runRelated: (algorithm, limit) => {
+      calls.push({ algorithm, limit });
+      return [card('req_r1'), card('req_r2'), card('req_r3'), card('req_r4')];
+    },
+  });
   assert.deepEqual(calls, [{ algorithm: 'tag_similarity', limit: 3 }]);
   assert.deepEqual(
     cards.map((c) => c.id),

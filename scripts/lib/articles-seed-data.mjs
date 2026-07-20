@@ -41,8 +41,7 @@ const ARTICLE_SEEDS = [
       // registry-gated and the isolated local store has no registry.
       taxonomy: { category: 'reflections', tags: ['reflections'] },
       seo: {
-        meta_description:
-          'A demonstration article published through the Dr. Lurié content object model.',
+        meta_description: 'A demonstration article published through the Dr. Lurié content object model.',
       },
       nodes: [
         {
@@ -50,8 +49,7 @@ const ARTICLE_SEEDS = [
           kind: 'content',
           public: {
             eyebrow: 'Behind the scenes',
-            body:
-              'Most articles hide how they were made. This one IS how it was made: every block you are reading lives in a content system that both humans and AI assistants can edit, safely, one block at a time.',
+            body: 'Most articles hide how they were made. This one IS how it was made: every block you are reading lives in a content system that both humans and AI assistants can edit, safely, one block at a time.',
           },
           private: { strategy: 'hook', intent: 'educate' },
         },
@@ -60,8 +58,7 @@ const ARTICLE_SEEDS = [
           kind: 'content',
           public: {
             title: 'Why blocks instead of one big page?',
-            body:
-              'Each block carries its own job: one opens the story, one carries the evidence, one closes with a next step. Editors see the text; the system also knows each block’s role, so suggestions and reviews respect the structure instead of flattening it.',
+            body: 'Each block carries its own job: one opens the story, one carries the evidence, one closes with a next step. Editors see the text; the system also knows each block’s role, so suggestions and reviews respect the structure instead of flattening it.',
           },
           private: { strategy: 'context', intent: 'educate' },
         },
@@ -82,8 +79,7 @@ const ARTICLE_SEEDS = [
           id: 'n_democlose',
           kind: 'content',
           public: {
-            body:
-              'If you can read this on the live site, the whole path worked: the article was created as data, reviewed, published, and rendered — with no page code written for it.',
+            body: 'If you can read this on the live site, the whole path worked: the article was created as data, reviewed, published, and rendered — with no page code written for it.',
           },
           private: { strategy: 'resolution', intent: 'reassure' },
         },

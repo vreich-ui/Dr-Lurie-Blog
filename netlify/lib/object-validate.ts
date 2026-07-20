@@ -67,7 +67,18 @@ import { sectionBodySchema, type SectionInstance, type SectionType } from '../..
 import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
 import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { checkBrandTokenValue, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
+import {
+  checkBrandTokenValue,
+  THEME_AXES,
+  THEME_AXIS_GROUPS,
+  THEME_COLOR_KEYS,
+} from '../../src/lib/registry/theme-tokens.js';
+import {
+  CONVERSION_LABEL_RE,
+  GOAL_KEY_RE,
+  TRACKABLE_ACTIVITIES_BY_TYPE,
+} from '../../src/schema/bodies/tracking-attribute-v1.js';
+import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
@@ -240,6 +251,7 @@ const BODY_SCHEMAS: Partial<Record<ObjectType, { safeParse: (v: unknown) => { su
     taxonomy: taxonomyBodySchema,
     product: productBodySchema,
     content_item: contentItemBodySchema,
+    tracking_config: trackingConfigBodySchema,
   };
 
 // Mirrors node-renderer.ts TIPTAP_ALLOWED (A§1.5): the only tags TipTap emits.
@@ -613,14 +625,24 @@ type AssetRefProblem = {
   kind: 'shape' | 'trust' | 'existence';
 };
 
-const validateAssetRef = (path: string, value: string, context: ObjectValidationContext): AssetRefProblem | undefined => {
+const validateAssetRef = (
+  path: string,
+  value: string,
+  context: ObjectValidationContext
+): AssetRefProblem | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return { kind: 'shape', message: `${path} must not be a data URI.` };
   if (LEGACY_REPO_PATH_RE.test(value))
     return { kind: 'shape', message: `${path} is a legacy repo path. Provide a Major Key artifact reference.` };
   if (REMOTE_URL_RE.test(value))
-    return { kind: 'shape', message: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.` };
+    return {
+      kind: 'shape',
+      message: `${path} is an arbitrary remote URL. Provide a Major Key artifact reference instead.`,
+    };
   if (!MAJOR_KEY_ARTIFACT_REF_RE.test(value))
-    return { kind: 'shape', message: `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).` };
+    return {
+      kind: 'shape',
+      message: `${path} must be a Major Key artifact reference ({image|pdf}/{id}/{sha256}.{ext}).`,
+    };
   if (context.trustedAssetRefs) {
     return context.trustedAssetRefs.has(value)
       ? undefined
@@ -1185,6 +1207,58 @@ const brandTokenValueCriterion = (tokens: unknown, at: string): ReadinessCriteri
 };
 
 /**
+ * T10.2 — axis rules over a brandTokens tree, shared by `theme` bodies and
+ * the `site` singleton (both carry the T10.1 layout/shape/type axes). An
+ * invalid enum value mirrors the zod rejection with human-readable copy
+ * (blocks at write via the schema; this criterion keeps the WHY legible);
+ * an unknown axis key warns as inert (the registry-driven renderer never
+ * reads it — the strict schema refuses it on any new write, so this fires
+ * only on validate-time inspection of legacy/hand-edited bodies). Absent
+ * axes are always fine: omission means the default look at apply time — the
+ * 10-required-colors totality posture does NOT extend to axes.
+ */
+const brandTokenAxisCriteria = (tokens: unknown, at: string): ReadinessCriterion[] => {
+  if (!isRecord(tokens)) return [];
+  const problems: string[] = [];
+  const unknown: string[] = [];
+  for (const group of THEME_AXIS_GROUPS) {
+    const groupValue = tokens[group];
+    if (groupValue === undefined) continue;
+    if (!isRecord(groupValue)) {
+      problems.push(`${at}.${group}: must be an object of axis settings.`);
+      continue;
+    }
+    const axes = THEME_AXES[group] as Record<string, { values: readonly string[] }>;
+    for (const [key, value] of Object.entries(groupValue)) {
+      const spec = axes[key];
+      if (!spec) {
+        unknown.push(`${at}.${group}.${key}`);
+        continue;
+      }
+      if (typeof value !== 'string' || !spec.values.includes(value)) {
+        problems.push(`${at}.${group}.${key}: ${JSON.stringify(value)} is not one of ${spec.values.join(' | ')}.`);
+      }
+    }
+  }
+  const criteria: ReadinessCriterion[] = [
+    problems.length === 0
+      ? crit('brand_token_axes', 'Brand token axes', 'complete', '')
+      : crit('brand_token_axes', 'Brand token axes', 'missing', problems.slice(0, 3).join(' ')),
+  ];
+  if (unknown.length > 0) {
+    criteria.push(
+      crit(
+        'brand_token_axis_unknown_keys',
+        'Unknown axis keys',
+        'warning',
+        `Axis key(s) the renderer never reads: ${unknown.slice(0, 5).join(', ')} — inert (kept, but they style nothing).`
+      )
+    );
+  }
+  return criteria;
+};
+
+/**
  * Theme structural rules: every CustomStyles-consumed color key must be
  * present so `site_apply_theme` is TOTAL (exact-replace leaves no key to fall
  * back) — publish-gated, warns while drafting; unknown color keys warn
@@ -1230,6 +1304,7 @@ export const checkTheme = (body: unknown, atPublish: boolean): ReadinessCriterio
   }
 
   criteria.push(brandTokenValueCriterion(tokens, 'tokens'));
+  criteria.push(...brandTokenAxisCriteria(tokens, 'tokens'));
   criteria.push(...checkRecipeMetadata(body, atPublish));
   return criteria;
 };
@@ -1674,7 +1749,10 @@ const classifyArticleImageSrc = (
 ): ArticleMediaProblem | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return { kind: 'block', message: `${path} must not be a data URI.` };
   if (LEGACY_REPO_PATH_RE.test(value))
-    return { kind: 'block', message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.` };
+    return {
+      kind: 'block',
+      message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.`,
+    };
   if (MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return undefined; // check 5b reports raw keys with the canonical message
   if (forbidPdf && (PDF_PUBLIC_PATH_RE.test(value) || /\.pdf$/i.test(value))) {
     return {
@@ -1710,7 +1788,10 @@ const classifyArticleDocumentSrc = (
 ): ArticleMediaProblem | undefined => {
   if (BASE64_DATA_URI_RE.test(value)) return { kind: 'block', message: `${path} must not be a data URI.` };
   if (LEGACY_REPO_PATH_RE.test(value))
-    return { kind: 'block', message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.` };
+    return {
+      kind: 'block',
+      message: `${path} is a legacy repo path (src/assets/…) — not servable from an article object.`,
+    };
   if (MAJOR_KEY_ARTIFACT_REF_RE.test(value)) return undefined; // check 5b reports raw keys
   if (PDF_PUBLIC_PATH_RE.test(value)) return resolvePublicPathExistence(path, value, context);
   if (REMOTE_URL_RE.test(value)) {
@@ -1768,8 +1849,7 @@ const checkContentItemMedia = (
   const existence = problems.filter((problem) => problem.kind === 'existence').map((problem) => problem.message);
   const warns = problems.filter((problem) => problem.kind === 'warn').map((problem) => problem.message);
 
-  if (blocks.length > 0)
-    return [crit('article_media', 'Article media paths', 'missing', blocks.slice(0, 5).join(' '))];
+  if (blocks.length > 0) return [crit('article_media', 'Article media paths', 'missing', blocks.slice(0, 5).join(' '))];
   if (existence.length > 0) {
     return [
       crit('article_media', 'Article media paths', atPublish ? 'missing' : 'warning', existence.slice(0, 5).join(' ')),
@@ -1849,7 +1929,151 @@ const checkContentItemStructure = (
   return criteria;
 };
 
+/**
+ * T13.1 — the shared `tracking` attribute criterion, uniform across all ten
+ * types (12-plan §2). Regex conformance always (mirrors the zod bounds with
+ * readable copy); a goal whose `on` activity is not COLLECTABLE for this
+ * object type per the §6 matrix (TRACKABLE_ACTIVITIES_BY_TYPE — the shared
+ * table validation and the T13.5 renderer both read) warns while drafting
+ * and blocks at publish. Store-independent: never reads trk_drlurie —
+ * disabled providers are simply skipped at render.
+ */
+const checkTrackingAttribute = (objectType: ObjectType, body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  const tracking = isRecord(body) ? body.tracking : undefined;
+  if (tracking === undefined) return [];
+  const label = 'Tracking attribute';
+  if (!isRecord(tracking)) {
+    return [crit('tracking_attribute', label, 'missing', 'tracking must be an object (see schema check).')];
+  }
+  const hard: string[] = [];
+  const activityProblems: string[] = [];
+  const goals = Array.isArray(tracking.goals) ? tracking.goals : [];
+  const collectable = TRACKABLE_ACTIVITIES_BY_TYPE[objectType] ?? [];
+  goals.filter(isRecord).forEach((goal, index) => {
+    const key = typeof goal.goal === 'string' ? goal.goal : '';
+    if (!GOAL_KEY_RE.test(key)) {
+      hard.push(
+        `tracking.goals[${index}].goal ${JSON.stringify(goal.goal)} must be a neutral slug (${String(GOAL_KEY_RE)}) — goal keys reach the page.`
+      );
+    }
+    const conversions = Array.isArray(goal.provider_conversions) ? goal.provider_conversions : [];
+    conversions.filter(isRecord).forEach((conversion, conversionIndex) => {
+      if (typeof conversion.label !== 'string' || !CONVERSION_LABEL_RE.test(conversion.label)) {
+        hard.push(
+          `tracking.goals[${index}].provider_conversions[${conversionIndex}].label must match ${String(CONVERSION_LABEL_RE)}.`
+        );
+      }
+    });
+    if (typeof goal.on === 'string' && !(collectable as readonly string[]).includes(goal.on)) {
+      activityProblems.push(
+        `tracking.goals[${index}] binds on '${goal.on}', which is not collectable for ${objectType} (${
+          collectable.length > 0 ? `collectable: ${collectable.join(', ')}` : 'this type has no reader events'
+        }) — the goal can never fire.`
+      );
+    }
+  });
+  if (hard.length > 0) {
+    return [crit('tracking_attribute', label, 'missing', hard.slice(0, 3).join(' '))];
+  }
+  if (activityProblems.length > 0) {
+    return [
+      crit('tracking_attribute', label, atPublish ? 'missing' : 'warning', activityProblems.slice(0, 3).join(' ')),
+    ];
+  }
+  return [crit('tracking_attribute', label, 'complete', '')];
+};
+
+/**
+ * T13.2 — `tracking_config_ready` (12-plan §3): the publish criterion for
+ * the tracker-registry singleton. Enabled providers must carry their
+ * regex-pinned id (the schema already blocks the write; the criterion keeps
+ * the WHY readable); banner copy must exist whenever any advertising-class
+ * provider is enabled under a posture that can show a banner (≠ 'us-first');
+ * `restricted_regions` must be non-empty under 'geo-adaptive'; GTM can never
+ * be enabled (permanently OUT, OQ-W13-3). Publish-gating rules warn while
+ * drafting. Store-independent — reads only the body.
+ */
+const checkTrackingConfig = (body: unknown, atPublish: boolean): ReadinessCriterion[] => {
+  const label = 'Tracking config readiness';
+  if (!isRecord(body) || !isRecord(body.providers) || !isRecord(body.consent)) {
+    return [crit('tracking_config_ready', label, 'optional', 'Body shape not recognized (see schema check).')];
+  }
+  const providers = body.providers;
+  const consent = body.consent;
+
+  const hard: string[] = [];
+  const publishProblems: string[] = [];
+
+  const idFieldByProvider: Record<string, string> = {
+    ga4: 'measurement_id',
+    gtm: 'container_id',
+    google_ads: 'conversion_id',
+    meta_pixel: 'pixel_id',
+    taboola: 'account_id',
+    outbrain: 'account_id',
+    mgid: 'account_id',
+    plausible: 'api_host',
+  };
+  let advertisingEnabled = false;
+  for (const [key, idField] of Object.entries(idFieldByProvider)) {
+    const block = providers[key];
+    if (!isRecord(block) || block.enabled !== true) continue;
+    if (key === 'gtm') {
+      hard.push('providers.gtm: GTM is permanently OUT (OQ-W13-3) — it can never be enabled.');
+      continue;
+    }
+    const id = block[idField];
+    if (typeof id !== 'string' || id.trim() === '') {
+      hard.push(`providers.${key}: enabled requires ${idField} to be set (regex-pinned; see the contract).`);
+    }
+    if (block.consent_class === 'advertising') advertisingEnabled = true;
+  }
+
+  const posture = typeof consent.posture === 'string' ? consent.posture : '';
+  const banner = consent.banner;
+  const bannerPresent =
+    isRecord(banner) &&
+    typeof banner.headline === 'string' &&
+    banner.headline.trim() !== '' &&
+    typeof banner.body === 'string' &&
+    banner.body.trim() !== '';
+  if (advertisingEnabled && posture !== 'us-first' && !bannerPresent) {
+    publishProblems.push(
+      `consent.banner: an advertising-class provider is enabled under posture '${posture}' — banner copy (headline + body) is required before publish.`
+    );
+  }
+  if (
+    posture === 'geo-adaptive' &&
+    (!Array.isArray(consent.restricted_regions) || consent.restricted_regions.length === 0)
+  ) {
+    publishProblems.push(
+      "consent.restricted_regions: must be non-empty under 'geo-adaptive' (seed = EEA-30 + UK + CH per OQ-W13-1)."
+    );
+  }
+
+  if (hard.length > 0) {
+    return [crit('tracking_config_ready', label, 'missing', hard.slice(0, 3).join(' '))];
+  }
+  if (publishProblems.length > 0) {
+    return [
+      crit('tracking_config_ready', label, atPublish ? 'missing' : 'warning', publishProblems.slice(0, 3).join(' ')),
+    ];
+  }
+  return [crit('tracking_config_ready', label, 'complete', '')];
+};
+
 export const checkStructuralInvariants = (
+  objectType: ObjectType,
+  objectId: string,
+  body: unknown,
+  context: ObjectValidationContext,
+  atPublish: boolean
+): ReadinessCriterion[] => [
+  ...checkTrackingAttribute(objectType, body, atPublish),
+  ...checkStructuralInvariantsByType(objectType, objectId, body, context, atPublish),
+];
+
+const checkStructuralInvariantsByType = (
   objectType: ObjectType,
   objectId: string,
   body: unknown,
@@ -1861,6 +2085,7 @@ export const checkStructuralInvariants = (
   // content_item carry their own rules (dispatched here so the pipeline keeps
   // its single 'structure' group).
   if (objectType === 'taxonomy') return checkTaxonomyRegistry(body, context);
+  if (objectType === 'tracking_config') return checkTrackingConfig(body, atPublish);
   if (objectType === 'template') return checkTemplate(body, context, atPublish);
   if (objectType === 'section_template') return checkSectionTemplate(body, atPublish);
   if (objectType === 'theme') return checkTheme(body, atPublish);
@@ -1870,7 +2095,8 @@ export const checkStructuralInvariants = (
   // The site singleton's brandTokens feed the SAME inline <style> as themes —
   // value safety applies on every site write too (the 09 §7.3 gap).
   if (objectType === 'site') {
-    return [brandTokenValueCriterion(isRecord(body) ? body.brandTokens : undefined, 'brandTokens')];
+    const siteTokens = isRecord(body) ? body.brandTokens : undefined;
+    return [brandTokenValueCriterion(siteTokens, 'brandTokens'), ...brandTokenAxisCriteria(siteTokens, 'brandTokens')];
   }
 
   // content_grid card/limit sanity applies to any body that can carry a grid —

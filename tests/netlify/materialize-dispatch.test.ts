@@ -82,6 +82,25 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
     },
     'src/data/site/products/prod_barrier_repair_guide.json',
   ],
+  [
+    'tracking_config',
+    'trk_drlurie',
+    {
+      providers: { own: { enabled: true, consent_class: 'essential', ingest_path: '/api/t' } },
+      consent: { posture: 'geo-adaptive', restricted_regions: ['DE', 'FR', 'GB', 'CH'], honor_gpc: true },
+      defaults: {
+        page: ['pageview', 'scroll_depth', 'engagement'],
+        section: ['section_impression', 'section_dwell', 'cta_click', 'form_start', 'form_submit'],
+        content_item: ['read_progress', 'node_impression', 'node_dwell', 'completion'],
+        product: ['buy_click'],
+        navigation: ['nav_click'],
+        taxonomy: ['term_view', 'tag_click'],
+        outbound_links: true,
+        utm_capture: true,
+      },
+    },
+    'src/data/site/tracking.json',
+  ],
 ];
 
 test('materialize routes each object type to its per-type materializer and path convention', () => {
@@ -98,9 +117,7 @@ test('materialize routes content_item to the article export path (W7.3)', () => 
     {
       slug: 'probe-article',
       title: 'Probe',
-      nodes: [
-        { id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' }, private: { strategy: 'summary' } },
-      ],
+      nodes: [{ id: 'n_a1', kind: 'content', public: { body: 'One paragraph.' }, private: { strategy: 'summary' } }],
     },
     meta
   );

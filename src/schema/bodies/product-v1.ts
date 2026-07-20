@@ -29,6 +29,7 @@
  * other body schema.
  */
 import { z } from 'zod';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const PRODUCT_SCHEMA_VERSION = 'product.v1';
 
@@ -168,6 +169,8 @@ export type ProductFulfillmentKind = ProductFulfillment['kind'];
 
 export const productBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     slug: z.string().min(1), // /shop/<slug>; shape + uniqueness are validation criteria (isProductSlugTaken)
     presentation: productPresentationSchema,
     commerce: productCommerceSchema,

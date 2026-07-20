@@ -83,10 +83,7 @@
           "alt": "Portrait of Dr. Lurié",
           "src": "/images/dr-lurie-portrait4.jpeg"
         },
-        "trustNotes": [
-          "Board-certified dermatologist",
-          "Twenty years in practice"
-        ]
+        "trustNotes": ["Board-certified dermatologist", "Twenty years in practice"]
       },
       "id": "s_bio",
       "type": "bio"
@@ -189,11 +186,7 @@
         "heading": "Product preview",
         "limit": 3,
         "source": {
-          "items": [
-            "prod_barrier_repair_guide",
-            "prod_starter_checklist",
-            "prod_support_the_work"
-          ],
+          "items": ["prod_barrier_repair_guide", "prod_starter_checklist", "prod_support_the_work"],
           "kind": "manual"
         }
       },
@@ -254,18 +247,12 @@
         "kicker": "Plans",
         "tiers": [
           {
-            "features": [
-              "The barrier repair guide",
-              "Instant download"
-            ],
+            "features": ["The barrier repair guide", "Instant download"],
             "highlighted": true,
             "product": "prod_barrier_repair_guide"
           },
           {
-            "features": [
-              "The starter checklist",
-              "Free"
-            ],
+            "features": ["The starter checklist", "Free"],
             "product": "prod_starter_checklist"
           }
         ]
@@ -425,9 +412,7 @@
         "body": "<p>A bio block with the portrait omitted, to see how the layout handles a missing image (it should not look like a broken link).</p>",
         "heading": "Bio — no portrait",
         "kicker": "About",
-        "trustNotes": [
-          "One trust note"
-        ]
+        "trustNotes": ["One trust note"]
       },
       "id": "s_bionoimg",
       "type": "bio"
@@ -475,9 +460,7 @@
     {
       "data": {
         "heading": "Checklist — one item",
-        "items": [
-          "The only item in the list"
-        ]
+        "items": ["The only item in the list"]
       },
       "id": "s_checkmin",
       "type": "checklist"
@@ -570,9 +553,7 @@
         "heading": "Pricing — one tier",
         "tiers": [
           {
-            "features": [
-              "Free"
-            ],
+            "features": ["Free"],
             "product": "prod_starter_checklist"
           }
         ]

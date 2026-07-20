@@ -50,6 +50,7 @@ export const governedObjectTypes = [
   'theme',
   'product',
   'content_item',
+  'tracking_config',
 ] as const;
 export type GovernedObjectType = (typeof governedObjectTypes)[number];
 
@@ -75,6 +76,7 @@ export const approvalPolicyConfigSchema = z.strictObject({
     theme: z.enum(['require-approval', 'autonomous']).optional(),
     product: z.enum(['require-approval', 'autonomous']).optional(),
     content_item: z.enum(['require-approval', 'autonomous']).optional(),
+    tracking_config: z.enum(['require-approval', 'autonomous']).optional(),
   }),
 });
 

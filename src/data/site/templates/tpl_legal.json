@@ -4,17 +4,13 @@
     "from": "objects/template/by-id/tpl_legal.json",
     "record_version": 28
   },
-  "appliesTo": [
-    "system"
-  ],
+  "appliesTo": ["system"],
   "description": "A minimal system-page recipe: one required prose slot with no blueprint — instantiation fills it from the prose registry defaultData (the standing proof of the fallback path).",
   "name": "Legal page",
   "scope": "evergreen",
   "slots": [
     {
-      "allowed": [
-        "prose"
-      ],
+      "allowed": ["prose"],
       "repeatable": true,
       "required": true,
       "slotId": "slot_body"

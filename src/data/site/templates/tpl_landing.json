@@ -4,17 +4,13 @@
     "from": "objects/template/by-id/tpl_landing.json",
     "record_version": 32
   },
-  "appliesTo": [
-    "standard"
-  ],
+  "appliesTo": ["standard"],
   "description": "The campaign/landing shape: hero opener, optional curated highlight grid, closing CTA banner.",
   "name": "Landing page",
   "scope": "evergreen",
   "slots": [
     {
-      "allowed": [
-        "hero"
-      ],
+      "allowed": ["hero"],
       "blueprint": {
         "data": {
           "actions": [],
@@ -28,9 +24,7 @@
       "slotId": "slot_hero"
     },
     {
-      "allowed": [
-        "content_grid"
-      ],
+      "allowed": ["content_grid"],
       "blueprint": {
         "data": {
           "heading": "Highlights",
@@ -55,9 +49,7 @@
       "slotId": "slot_grid"
     },
     {
-      "allowed": [
-        "cta_banner"
-      ],
+      "allowed": ["cta_banner"],
       "blueprint": {
         "data": {
           "actions": [],

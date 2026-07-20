@@ -7,9 +7,7 @@
   "claims": {
     "claim_list": [
       {
-        "node_ids": [
-          "n_demoproof"
-        ],
+        "node_ids": ["n_demoproof"],
         "notes": "The patch engine derives an inverse per op; history stores both.",
         "risk": "low",
         "status": "verified",
@@ -135,9 +133,7 @@
   "slug": "object-model-demo",
   "taxonomy": {
     "category": "reflections",
-    "tags": [
-      "reflections"
-    ]
+    "tags": ["reflections"]
   },
   "title": "How this article was made (a live demo of the new editor)"
 }

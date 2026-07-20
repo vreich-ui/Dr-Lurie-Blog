@@ -38,7 +38,12 @@ import {
   type ObjectLockStore,
 } from './object-lock.js';
 import type { Role } from './roles.js';
-import { objectRecordKey, objectStatusIndexKey, OBJECT_STORE_MARKER_VALUE } from './object-store-keys.js';
+import {
+  objectRecordKey,
+  objectStatusIndexKey,
+  objectStatusIndexPrefix,
+  OBJECT_STORE_MARKER_VALUE,
+} from './object-store-keys.js';
 import {
   summarizeValidation,
   validateCandidatePatch,
@@ -57,7 +62,7 @@ import type { SectionInstance } from '../../src/schema/bodies/section-v1.js';
 import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
 import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
 import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
-import { THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
+import { THEME_AXIS_GROUPS, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
 import {
   objectTypes,
   objectTypeSchema,
@@ -603,6 +608,24 @@ export const handleObjectVerb = async (
       const key = objectRecordKey(objectType, objectIdValue);
       if (await store.get(key)) return err(409, { error: 'Object already exists', object_id: objectIdValue });
 
+      // W13 (12-plan §3): tracking_config is a per-site SINGLETON (the
+      // site/taxonomy convention, but engine-enforced): creating a second
+      // active registry is refused regardless of its id — edit the existing
+      // one via set_tracking_config_fields instead.
+      if (objectType === 'tracking_config') {
+        const existing = await collectBlobListItems(
+          await store.list({ prefix: objectStatusIndexPrefix('tracking_config', 'active') })
+        );
+        if (existing.length > 0) {
+          const existingId = existing[0]!.key.split('/').at(-1);
+          return err(409, {
+            error: `A tracking_config singleton already exists (${existingId}) — edit it via set_tracking_config_fields; a site has exactly one tracker registry.`,
+            object_id: existingId,
+            singleton: true,
+          });
+        }
+      }
+
       const groups = validateObject({ objectType, objectId: objectIdValue, body: request.body }, context);
       const summary = summarizeValidation(groups);
       if (!summary.eligible) {
@@ -1056,12 +1079,37 @@ export const handleObjectVerb = async (
           .filter((key) => !(key in themeColors))
           .map((key) => [key, null])
       );
+      // T10.2: exact-replace extends to the T10.1 axes at axis-key
+      // granularity — a theme axis present is copied; an axis (or a whole
+      // group) the theme lacks is UNSET on the site, so the code-side
+      // defaults win (a theme MAY omit axes; omission means "the default
+      // look", never "keep whatever the site had").
+      const axisFields: Record<string, Record<string, string | null> | null> = {};
+      for (const group of THEME_AXIS_GROUPS) {
+        const themeGroup: Record<string, string | undefined> = parsedTheme.data.tokens[group] ?? {};
+        const siteGroup: Record<string, string | undefined> | undefined = parsedSite.data.brandTokens[group];
+        const themeAxes = Object.fromEntries(
+          Object.entries(themeGroup).filter(([, value]) => typeof value === 'string')
+        ) as Record<string, string>;
+        if (Object.keys(themeAxes).length === 0) {
+          // Theme carries nothing for this group — unset it if the site has it.
+          if (siteGroup !== undefined) axisFields[group] = null;
+          continue;
+        }
+        const staleAxisUnsets = Object.fromEntries(
+          Object.keys(siteGroup ?? {})
+            .filter((key) => !(key in themeAxes))
+            .map((key) => [key, null])
+        );
+        axisFields[group] = { ...staleAxisUnsets, ...themeAxes };
+      }
       const op = {
         op: 'set_site_brand_tokens',
         fields: {
           brandTokens: {
             colors: { ...staleUnsets, ...themeColors },
             fonts: { ...parsedTheme.data.tokens.fonts },
+            ...axisFields,
           },
         },
       };

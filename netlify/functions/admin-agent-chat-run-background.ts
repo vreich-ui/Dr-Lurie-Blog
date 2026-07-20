@@ -67,9 +67,7 @@ export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
       chatStore,
       toolContext,
       adapter: adapterForProfile(doc.run.profile),
-      ...(context?.getRemainingTimeInMillis
-        ? { remainingMs: () => context.getRemainingTimeInMillis!() }
-        : {}),
+      ...(context?.getRemainingTimeInMillis ? { remainingMs: () => context.getRemainingTimeInMillis!() } : {}),
     },
     parsed.chat_id,
     parsed.trigger_token

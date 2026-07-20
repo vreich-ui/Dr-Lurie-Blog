@@ -248,7 +248,12 @@ const conflictOp = (objectType: 'page' | 'navigation') =>
 
 const runConflictDrill = async (objectType: 'page' | 'navigation', objectId: string, body: Record<string, unknown>) => {
   await reset();
-  const created = await callTool('object_create', { object_type: objectType, site: 'site_drlurie', body, requested_id: objectId });
+  const created = await callTool('object_create', {
+    object_type: objectType,
+    site: 'site_drlurie',
+    body,
+    requested_id: objectId,
+  });
   assert.ok(!created.isError, JSON.stringify(created.structuredContent));
 
   // No lock held at all → 423.
@@ -289,7 +294,11 @@ const runConflictDrill = async (objectType: 'page' | 'navigation', objectId: str
   assert.equal(staleVersion.structuredContent?.statusCode, 409);
 
   // release the lease so the fixture doesn't leak a held lock.
-  const checkin = await callTool('object_checkin', { object_type: objectType, object_id: objectId, lock_token: lockToken });
+  const checkin = await callTool('object_checkin', {
+    object_type: objectType,
+    object_id: objectId,
+    lock_token: lockToken,
+  });
   assert.ok(!checkin.isError);
 };
 

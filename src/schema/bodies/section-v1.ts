@@ -33,6 +33,7 @@
 import { z } from 'zod';
 
 import { linkActionSchema, navTargetSchema, richTextSchema } from './navigation-v1.js';
+import { trackingAttributeShape } from './tracking-attribute-v1.js';
 
 export const SECTION_SCHEMA_VERSION = 'section.v1';
 
@@ -412,6 +413,8 @@ export type SectionType = SectionInstance['type'];
 // (T0.7), not by this shape.
 export const sectionBodySchema = z
   .object({
+    // W13: shared tracking attribute (12-plan §2) — set_tracking is its one writer.
+    ...trackingAttributeShape,
     section: sectionInstanceSchema,
   })
   .strict();

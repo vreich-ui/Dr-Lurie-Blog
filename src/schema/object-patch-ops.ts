@@ -138,7 +138,9 @@ export type TermPayload = z.infer<typeof termPayloadSchema>;
 const setPageMetaSchema = z
   .strictObject({
     op: z.literal('set_page_meta'),
-    fields: fieldsSchema.superRefine(forbidKeys(['sections'], 'set_page_meta (use the section ops)')),
+    fields: fieldsSchema
+      .superRefine(forbidKeys(['sections'], 'set_page_meta (use the section ops)'))
+      .superRefine(forbidKeys(['tracking'], 'set_page_meta (tracking changes only via set_tracking)')),
     ...guard,
   })
   .describe('Merge page meta fields (title/route/seo/…); sections are edited only via section ops.');
@@ -355,9 +357,9 @@ const removeTermSchema = z.strictObject({
 // set_product_fields ⇸ set_product_price funnel, applied to the site.
 const setSiteFieldsSchema = z.strictObject({
   op: z.literal('set_site_fields'),
-  fields: fieldsSchema.superRefine(
-    forbidKeys(['brandTokens'], 'set_site_fields (the palette changes only via site_apply_theme)')
-  ),
+  fields: fieldsSchema
+    .superRefine(forbidKeys(['brandTokens'], 'set_site_fields (the palette changes only via site_apply_theme)'))
+    .superRefine(forbidKeys(['tracking'], 'set_site_fields (tracking changes only via set_tracking)')),
   ...guard,
 });
 
@@ -386,22 +388,24 @@ const setSiteBrandTokensSchema = z.strictObject({
 // object_create only.
 const setProductFieldsSchema = z.strictObject({
   op: z.literal('set_product_fields'),
-  fields: fieldsSchema.superRefine((value, ctx) => {
-    const commerce = value.commerce;
-    if (commerce === null) {
-      ctx.addIssue({ code: 'custom', message: "'commerce' cannot be unset (products always carry it)." });
-      return;
-    }
-    if (commerce === undefined || typeof commerce !== 'object' || Array.isArray(commerce)) return;
-    for (const key of ['price', 'stripe', 'stripe_test'] as const) {
-      if (key in commerce) {
-        ctx.addIssue({
-          code: 'custom',
-          message: `'commerce.${key}' cannot be patched via set_product_fields — prices and Stripe linkage change only through product_set_price (§3).`,
-        });
+  fields: fieldsSchema
+    .superRefine((value, ctx) => {
+      const commerce = value.commerce;
+      if (commerce === null) {
+        ctx.addIssue({ code: 'custom', message: "'commerce' cannot be unset (products always carry it)." });
+        return;
       }
-    }
-  }),
+      if (commerce === undefined || typeof commerce !== 'object' || Array.isArray(commerce)) return;
+      for (const key of ['price', 'stripe', 'stripe_test'] as const) {
+        if (key in commerce) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `'commerce.${key}' cannot be patched via set_product_fields — prices and Stripe linkage change only through product_set_price (§3).`,
+          });
+        }
+      }
+    })
+    .superRefine(forbidKeys(['tracking'], 'set_product_fields (tracking changes only via set_tracking)')),
   ...guard,
 });
 
@@ -461,7 +465,9 @@ const setProductPriceSchema = z.strictObject({
 const setArticleMetaSchema = z
   .strictObject({
     op: z.literal('set_article_meta'),
-    fields: fieldsSchema.superRefine(forbidKeys(['nodes'], 'set_article_meta (use the node ops)')),
+    fields: fieldsSchema
+      .superRefine(forbidKeys(['nodes'], 'set_article_meta (use the node ops)'))
+      .superRefine(forbidKeys(['tracking'], 'set_article_meta (tracking changes only via set_tracking)')),
     ...guard,
   })
   .describe('Merge article meta fields (title/slug/taxonomy/seo/scores/…); nodes are edited only via node ops.');
@@ -511,7 +517,9 @@ const removeNodeSchema = z.strictObject({
 
 const setTemplateMetaSchema = z.strictObject({
   op: z.literal('set_template_meta'),
-  fields: fieldsSchema.superRefine(forbidKeys(['slots'], 'set_template_meta (use the slot ops)')),
+  fields: fieldsSchema
+    .superRefine(forbidKeys(['slots'], 'set_template_meta (use the slot ops)'))
+    .superRefine(forbidKeys(['tracking'], 'set_template_meta (tracking changes only via set_tracking)')),
   ...guard,
 });
 
@@ -545,7 +553,9 @@ const removeSlotSchema = z.strictObject({
 
 const setSectionTemplateMetaSchema = z.strictObject({
   op: z.literal('set_section_template_meta'),
-  fields: fieldsSchema.superRefine(forbidKeys(['blueprint'], 'set_section_template_meta (use the blueprint ops)')),
+  fields: fieldsSchema
+    .superRefine(forbidKeys(['blueprint'], 'set_section_template_meta (use the blueprint ops)'))
+    .superRefine(forbidKeys(['tracking'], 'set_section_template_meta (tracking changes only via set_tracking)')),
   ...guard,
 });
 
@@ -567,11 +577,50 @@ const updateBlueprintDataSchema = z.strictObject({
 
 // The set_site_fields idiom: deep-merge over the theme body (null unsets).
 // The whole surface is one op — `tokens` is an open color record + a strict
-// fonts trio, exactly siteBodySchema.brandTokens (one shared shape). Applying
-// a theme to the site is NOT a theme op: `site_apply_theme` computes ONE
-// exact-replace set_site_fields op under the caller's site checkout.
+// fonts trio + the T10.1 bounded axis groups, exactly siteBodySchema's
+// brandTokens (one shared shape — axis enums validate at the body-schema
+// level after merge, so this generic fields bag picks them up with zero
+// hand-written drift). Applying a theme to the site is NOT a theme op:
+// `site_apply_theme` computes ONE exact-replace set_site_brand_tokens op
+// (colors, fonts, and axes — omitted axes unset) under the caller's site
+// checkout.
 const setThemeFieldsSchema = z.strictObject({
   op: z.literal('set_theme_fields'),
+  fields: fieldsSchema.superRefine(
+    forbidKeys(['tracking'], 'set_theme_fields (tracking changes only via set_tracking)')
+  ),
+  ...guard,
+});
+
+// ——— Tracking (W13, 12-object-tracking-and-analytics §2) ———
+
+// The ONE writer of the shared `tracking` body attribute, uniform across all
+// ten types (set_nav_meta is hand-pinned strict; taxonomy/section have no
+// body-fields op — so piggybacking was impossible in three places, and one
+// op keeps the contract story identical everywhere). Deep-merge into
+// body.tracking (null-inside-fields unsets a key; arrays replace wholesale —
+// goals[] has no stale-key trap). Top-level `fields: null` removes
+// body.tracking entirely, so the inverse of a first-set on a bare object is
+// exact — no prune machinery needed. Agent-submittable (NOT privileged);
+// each type's normal publish gate still applies.
+const setTrackingSchema = z.strictObject({
+  op: z.literal('set_tracking'),
+  fields: z.union([fieldsSchema, z.null()]),
+  ...guard,
+});
+
+// ——— Tracking config (W13, 12-plan §3) ———
+
+// The set_site_fields idiom for the tracker registry singleton: open
+// deep-merge over the whole body (null unsets), NO forbidKeys — providers is
+// a fixed-key strict object, so plain merge edits one provider block without
+// upsert ops, and the body schema (regex-pinned IDs, env-var NAMES, the
+// gtm-permanently-out refinement) gates the merged result. Inverse = the
+// captured before-tree. This type does NOT get set_tracking and does NOT
+// carry the per-object tracking attribute — it is the registry the
+// attribute's goals resolve against.
+const setTrackingConfigFieldsSchema = z.strictObject({
+  op: z.literal('set_tracking_config_fields'),
   fields: fieldsSchema,
   ...guard,
 });
@@ -623,6 +672,8 @@ export const patchOpUnionSchema = z.discriminatedUnion('op', [
   replaceBlueprintSchema,
   updateBlueprintDataSchema,
   setThemeFieldsSchema,
+  setTrackingSchema,
+  setTrackingConfigFieldsSchema,
 ]);
 
 const requireMergedIntoOnlyWhenDeprecated = (term: TermPayload, ctx: z.RefinementCtx, path: (string | number)[]) => {
@@ -691,8 +742,9 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
     'move_section',
     'set_section_visibility',
     'remove_section',
+    'set_tracking',
   ],
-  section: ['upsert_section', 'update_section_data', 'set_section_visibility'],
+  section: ['upsert_section', 'update_section_data', 'set_section_visibility', 'set_tracking'],
   navigation: [
     'set_nav_meta',
     'upsert_group',
@@ -704,14 +756,24 @@ export const patchOpNamesByObjectType: Record<ObjectType, readonly PatchOpName[]
     'remove_item',
     'upsert_action',
     'remove_action',
+    'set_tracking',
   ],
-  taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term'],
-  site: ['set_site_fields'],
-  template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot'],
-  section_template: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data'],
-  theme: ['set_theme_fields'],
-  product: ['set_product_fields', 'set_product_price'],
-  content_item: ['set_article_meta', 'upsert_node', 'update_node', 'move_node', 'set_node_visibility', 'remove_node'],
+  taxonomy: ['add_term', 'update_term', 'deprecate_term', 'reactivate_term', 'remove_term', 'set_tracking'],
+  site: ['set_site_fields', 'set_tracking'],
+  template: ['set_template_meta', 'upsert_slot', 'move_slot', 'remove_slot', 'set_tracking'],
+  section_template: ['set_section_template_meta', 'replace_blueprint', 'update_blueprint_data', 'set_tracking'],
+  theme: ['set_theme_fields', 'set_tracking'],
+  product: ['set_product_fields', 'set_product_price', 'set_tracking'],
+  content_item: [
+    'set_article_meta',
+    'upsert_node',
+    'update_node',
+    'move_node',
+    'set_node_visibility',
+    'remove_node',
+    'set_tracking',
+  ],
+  tracking_config: ['set_tracking_config_fields'],
 };
 
 export const isPatchOpAllowedForObjectType = (objectType: ObjectType, opName: PatchOpName): boolean =>

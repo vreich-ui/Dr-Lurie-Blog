@@ -1,0 +1,107 @@
+---
+/**
+ * TrackingScripts — the single choke point where trackers attach (W13,
+ * 12-plan §4). Replaces the inert Analytics.astro mount.
+ *
+ * Behavior: bails on /admin (mandatory); renders NOTHING when no
+ * tracking_config export exists (today's reality — the byte-identical
+ * gate); otherwise emits, in order: (1) the static client config JSON
+ * (#trk-config — project id from the trk_<project> convention, batch/
+ * sampling knobs, defaults matrix, consent block, and the goal map
+ * aggregated from every collection's `tracking` fields), (2) the inline
+ * consent-bootstrap skeleton (§8 — T13.6 completes it; it already
+ * activates advertising-gated snippets on the trk:consent signal),
+ * (3) the own-tracker loader as a real Astro-bundled script (hashed
+ * same-origin asset), (4) enabled vetted adapters only (IDs re-asserted
+ * against the write-time regexes — an invalid ID FAILS THE BUILD).
+ */
+import { getCollection } from 'astro:content';
+
+import TrackingLoaderMount from '~/components/tracking/TrackingLoaderMount.astro';
+import {
+  assembleAdapterHeads,
+  buildTrackerClientConfig,
+  parseTrackingExport,
+  type GoalSource,
+} from '~/lib/tracking/assemble';
+import { getSiteObject } from '~/utils/site-object';
+
+/**
+ * Consent bootstrap skeleton (12-plan §8; T13.6 completes the geo-adaptive
+ * gate). Contract already honored: advertising-gated snippets ship as
+ * `type="text/plain" data-trk-gate="advertising"` and are activated ONLY
+ * through this hook (cloned to live scripts on the trk:consent signal).
+ * Kept as a frontmatter constant + set:html so the template carries no
+ * brace-bearing inline JS (the Astro expression parser trips on it).
+ */
+const CONSENT_BOOTSTRAP =
+  'window.__trkActivate=function(){document.querySelectorAll("script[data-trk-gate]").forEach(function(g){' +
+  'var l=document.createElement("script");for(var i=0;i<g.attributes.length;i++){var a=g.attributes[i];' +
+  'if(a.name!=="type"&&a.name!=="data-trk-gate")l.setAttribute(a.name,a.value)}l.text=g.text;g.replaceWith(l)})};' +
+  'document.addEventListener("trk:consent",function(e){if(e&&e.detail&&e.detail.ads)window.__trkActivate()});';
+
+const isAdmin = Astro.url.pathname.startsWith('/admin');
+
+const objectIdFromMarker = (marker: unknown): string | null => {
+  if (!marker || typeof marker !== 'object') return null;
+  const from = (marker as { from?: unknown }).from;
+  if (typeof from !== 'string') return null;
+  const last = from.split('/').at(-1);
+  return last ? last.replace(/\.json$/, '') : null;
+};
+
+let configJson: string | null = null;
+let adapterHeadHtml = '';
+
+if (!isAdmin) {
+  const entries = await getCollection('trackingConfigObject');
+  const entry = entries[0];
+  if (entry) {
+    const { __generated, ...body } = entry.data as Record<string, unknown>;
+    // Present-but-invalid export THROWS (drift must be loud — the
+    // site-object stance); absent export renders nothing.
+    const parsed = parseTrackingExport(body);
+    const objectId = objectIdFromMarker(__generated) ?? 'trk_site';
+
+    const goalSources: GoalSource[] = [];
+    const collectionNames = [
+      'siteObject',
+      'pageObject',
+      'sectionObject',
+      'navigationObject',
+      'taxonomyObject',
+      'templateObject',
+      'sectionTemplateObject',
+      'themeObject',
+      'productObject',
+      'articleObject',
+    ] as const;
+    for (const name of collectionNames) {
+      for (const other of await getCollection(name)) {
+        const data = other.data as Record<string, unknown>;
+        const id = objectIdFromMarker(data.__generated);
+        if (id && data.tracking) {
+          goalSources.push({ object_id: id, tracking: data.tracking as GoalSource['tracking'] });
+        }
+      }
+    }
+
+    configJson = JSON.stringify(buildTrackerClientConfig(objectId, parsed, goalSources));
+    const siteHost = getSiteObject()?.urls.canonicalHost ?? Astro.url.host;
+    adapterHeadHtml = assembleAdapterHeads(parsed, siteHost)
+      .map((result) => result.head)
+      .join('');
+  }
+}
+---
+
+{
+  configJson !== null && (
+    <>
+      <script type="application/json" id="trk-config" set:html={configJson} />
+      <script is:inline set:html={CONSENT_BOOTSTRAP} />
+      <TrackingLoaderMount />
+      {adapterHeadHtml !== '' && <Fragment set:html={adapterHeadHtml} />}
+    </>
+  )
+}

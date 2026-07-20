@@ -18,5 +18,9 @@ import type { CreationPolicyConfig } from '../lib/creation-policy.js';
 
 export const creationPolicyConfig = {
   master: 'open',
-  overrides: {},
+  // W13 (12-plan §3 governance, OQ-W13-2 ruling 2026-07-19): tracking_config
+  // is human/seed-minted ONLY — agents edit the singleton, they never mint
+  // one. Publish ships AUTONOMOUS (no approval-policy override; the master
+  // covers it); the posture gains an owner UI toggle in T13.12.
+  overrides: { tracking_config: { agents: [] } },
 } satisfies CreationPolicyConfig;

@@ -144,11 +144,7 @@ test('apply replaces brandTokens EXACTLY: theme values in, stale site keys unset
   const site = loadSite(store);
   const tokens = (site.body as SiteBody).brandTokens;
   assert.deepEqual(tokens, altThemeBody().tokens, 'site.brandTokens EQUALS the theme tokens — no stale keys');
-  assert.equal(
-    'dark:bg-surface' in tokens.colors,
-    false,
-    'a site key the theme does not carry is UNSET, not leaked'
-  );
+  assert.equal('dark:bg-surface' in tokens.colors, false, 'a site key the theme does not carry is UNSET, not leaked');
 
   const entry = site.history.at(-1)!;
   assert.equal(entry.action, 'set_site_brand_tokens');
@@ -290,7 +286,12 @@ test('REJECTION: an INCOMPLETE theme is not appliable — apply would delete con
 test('a missing theme is a 404 naming it', async () => {
   const store = createMemoryStore();
   await seedSite(store);
-  const res = await call(store, { action: 'apply_theme', theme_id: 'thm_ghost', site_id: 'site_drlurie', dry_run: true });
+  const res = await call(store, {
+    action: 'apply_theme',
+    theme_id: 'thm_ghost',
+    site_id: 'site_drlurie',
+    dry_run: true,
+  });
   assert.equal(res.status, 404);
   assert.equal(res.body.theme_id, 'thm_ghost');
 });
@@ -386,7 +387,13 @@ test('a REAL apply by a human requires the owner role; dry_run stays open; agent
   // Admin-tier human (no owner role): real apply → 403 BEFORE any lock check.
   const denied = await handleObjectVerb(
     verbStore,
-    { action: 'apply_theme', theme_id: 'thm_midnight', site_id: 'site_drlurie', lock_token: 'x', expected_record_version: 1 },
+    {
+      action: 'apply_theme',
+      theme_id: 'thm_midnight',
+      site_id: 'site_drlurie',
+      lock_token: 'x',
+      expected_record_version: 1,
+    },
     human,
     { nowMs: NOW, validationContext, roles: ['admin'] }
   );
@@ -405,7 +412,13 @@ test('a REAL apply by a human requires the owner role; dry_run stays open; agent
   // Owner-tier human: passes the gate (fails later only on lock, which is the point).
   const ownerAttempt = await handleObjectVerb(
     verbStore,
-    { action: 'apply_theme', theme_id: 'thm_midnight', site_id: 'site_drlurie', lock_token: 'x', expected_record_version: 1 },
+    {
+      action: 'apply_theme',
+      theme_id: 'thm_midnight',
+      site_id: 'site_drlurie',
+      lock_token: 'x',
+      expected_record_version: 1,
+    },
     human,
     { nowMs: NOW, validationContext, roles: ['owner', 'admin'] }
   );

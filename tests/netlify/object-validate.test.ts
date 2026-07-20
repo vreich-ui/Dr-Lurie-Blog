@@ -438,10 +438,7 @@ test('check6 structure: types without their own structural rules report optional
   // object-validate-navigation.test.ts). Site gained the brand-token value
   // check in W8.3 — a body without unsafe token values reports complete.
   assert.equal(statusOf(checkStructuralInvariants('navigation', 'nav_x', {}, {}, true), 'nav_structure'), 'optional');
-  assert.equal(
-    statusOf(checkStructuralInvariants('site', 'site_x', {}, {}, true), 'brand_token_values'),
-    'complete'
-  );
+  assert.equal(statusOf(checkStructuralInvariants('site', 'site_x', {}, {}, true), 'brand_token_values'), 'complete');
 });
 
 // Regression guard for the 2026-07-10 incident: four real production publishes
@@ -1038,7 +1035,9 @@ const articleStructure = (body: unknown, context: ObjectValidationContext = {}, 
 
 test('article media: /img/ public-path image with a confirmed artifact passes', () => {
   const body = articleBodyWith({
-    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+    nodes: [
+      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } },
+    ],
   });
   const criteria = articleStructure(body, { resolveArtifactRef: () => ({ exists: true }) });
   assert.equal(statusOf(criteria, 'article_media'), 'complete');
@@ -1046,7 +1045,9 @@ test('article media: /img/ public-path image with a confirmed artifact passes', 
 
 test('article media: a mistyped /img/ path (no artifact behind it) warns while drafting, blocks at publish', () => {
   const body = articleBodyWith({
-    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+    nodes: [
+      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } },
+    ],
   });
   const context: ObjectValidationContext = { resolveArtifactRef: () => ({ exists: false }) };
   assert.equal(statusOf(articleStructure(body, context, false), 'article_media'), 'warning');
@@ -1058,11 +1059,18 @@ test('article media: a mistyped /img/ path (no artifact behind it) warns while d
 test('article media: document media and /pdf/ ctaLinks take the /pdf/ public path; junk paths block', () => {
   const good = articleBodyWith({
     nodes: [
-      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'document', src: ART_PDF_PATH, title: 'Guide' } } },
+      {
+        id: 'n_m1',
+        kind: 'content',
+        public: { body: 'Copy.', media: { type: 'document', src: ART_PDF_PATH, title: 'Guide' } },
+      },
       { id: 'n_m2', kind: 'action', public: { ctaText: 'Download', ctaLink: ART_PDF_PATH } },
     ],
   });
-  assert.equal(statusOf(articleStructure(good, { resolveArtifactRef: () => ({ exists: true }) }), 'article_media'), 'complete');
+  assert.equal(
+    statusOf(articleStructure(good, { resolveArtifactRef: () => ({ exists: true }) }), 'article_media'),
+    'complete'
+  );
 
   const junkCta = articleBodyWith({
     nodes: [{ id: 'n_m2', kind: 'action', public: { ctaText: 'Download', ctaLink: '/pdf/not-a-real-key.pdf' } }],
@@ -1079,7 +1087,13 @@ test('article media REJECTION: a PDF in the hero image field blocks with the bui
 
 test('article media: remote https and site-static image srcs warn (ungoverned), data URIs and bare paths block', () => {
   const remote = articleBodyWith({
-    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'https://example.com/x.jpg' } } }],
+    nodes: [
+      {
+        id: 'n_m1',
+        kind: 'content',
+        public: { body: 'Copy.', media: { type: 'image', src: 'https://example.com/x.jpg' } },
+      },
+    ],
   });
   assert.equal(statusOf(articleStructure(remote), 'article_media'), 'warning');
 
@@ -1087,7 +1101,13 @@ test('article media: remote https and site-static image srcs warn (ungoverned), 
   assert.equal(statusOf(articleStructure(siteStatic), 'article_media'), 'warning');
 
   const dataUri = articleBodyWith({
-    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: 'data:image/png;base64,AAAA' } } }],
+    nodes: [
+      {
+        id: 'n_m1',
+        kind: 'content',
+        public: { body: 'Copy.', media: { type: 'image', src: 'data:image/png;base64,AAAA' } },
+      },
+    ],
   });
   assert.equal(statusOf(articleStructure(dataUri), 'article_media'), 'missing');
 
@@ -1103,21 +1123,32 @@ test('article media: gallery images[] entries are validated like single media; n
       {
         id: 'n_m1',
         kind: 'content',
-        public: { body: 'Copy.', images: [{ type: 'image', src: ART_IMG_PATH }, { type: 'image', src: 'data:x' }] },
+        public: {
+          body: 'Copy.',
+          images: [
+            { type: 'image', src: ART_IMG_PATH },
+            { type: 'image', src: 'data:x' },
+          ],
+        },
       },
     ],
   });
   assert.equal(statusOf(articleStructure(gallery), 'article_media'), 'missing');
 
   const none = articleStructure(articleBodyWith({}));
-  assert.equal(none.find((c) => c.id === 'article_media'), undefined);
+  assert.equal(
+    none.find((c) => c.id === 'article_media'),
+    undefined
+  );
 });
 
 // ═══ check 5c: image byte budget (media-policy surfacing) ════════════════════
 
 test('media budget: an over-budget /img/ image warns under the committed warn policy; under-budget is complete', () => {
   const body = articleBodyWith({
-    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+    nodes: [
+      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } },
+    ],
   });
   const oversize: ObjectValidationContext = {
     resolveArtifactRef: () => ({ exists: true, sizeBytes: 900_000, contentType: 'image/png' }),
@@ -1134,7 +1165,9 @@ test('media budget: an over-budget /img/ image warns under the committed warn po
 
 test('media budget: a block policy makes over-budget a publish blocker (draft still warns); no resolver → silent', () => {
   const body = articleBodyWith({
-    nodes: [{ id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } }],
+    nodes: [
+      { id: 'n_m1', kind: 'content', public: { body: 'Copy.', media: { type: 'image', src: ART_IMG_PATH, alt: 'x' } } },
+    ],
   });
   const oversize: ObjectValidationContext = {
     resolveArtifactRef: () => ({ exists: true, sizeBytes: 900_000 }),

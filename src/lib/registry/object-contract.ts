@@ -54,12 +54,14 @@ import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
 import { navActionCapacity } from './structural-capacity.js';
+import { THEME_AXES, THEME_AXIS_GROUPS } from './theme-tokens.js';
 import { contentItemBodySchema } from '../../schema/bodies/content-item-v1.js';
 import { pageBodySchema } from '../../schema/bodies/page-v1.js';
 import { productBodySchema } from '../../schema/bodies/product-v1.js';
 import { sectionBodySchema, sectionTypes, type SectionType } from '../../schema/bodies/section-v1.js';
 import { sectionTemplateBodySchema } from '../../schema/bodies/section-template-v1.js';
 import { themeBodySchema } from '../../schema/bodies/theme-v1.js';
+import { trackingConfigBodySchema } from '../../schema/bodies/tracking-config-v1.js';
 import { navigationBodySchema } from '../../schema/bodies/navigation-v1.js';
 import { siteBodySchema } from '../../schema/bodies/site-v1.js';
 import { taxonomyBodySchema } from '../../schema/bodies/taxonomy-v1.js';
@@ -89,6 +91,7 @@ const BODY_SCHEMA: Partial<Record<ObjectType, z.ZodType>> = {
   theme: themeBodySchema,
   product: productBodySchema,
   content_item: contentItemBodySchema,
+  tracking_config: trackingConfigBodySchema,
 };
 
 // ─── section-type editor hints (only the component-bound types carry them) ───
@@ -224,6 +227,27 @@ const RECIPE_METADATA_CONSTRAINT: Constraint = {
     'the reuse-first index.',
 };
 
+// Shared by theme and site (T10.1/T10.2): the bounded design axes on
+// brandTokens. The key list and enum values are DERIVED from THEME_AXES —
+// the same registry the schema enums and the renderer's var mappings read —
+// so this description cannot drift from enforcement.
+const BRAND_TOKEN_AXES_CONSTRAINT: Constraint = {
+  id: 'brand_token_axes',
+  severity: 'blocks_write',
+  enforced_live: true,
+  description:
+    'Bounded design axes on brandTokens (additive-optional): ' +
+    THEME_AXIS_GROUPS.map((group) =>
+      Object.entries(THEME_AXES[group] as Record<string, { values: readonly string[]; default: string }>)
+        .map(([key, spec]) => `${group}.${key}: ${spec.values.join('|')} (default ${spec.default})`)
+        .join('; ')
+    ).join('; ') +
+    '. Values are enums that index into code-owned class/var mappings — no axis value ever carries CSS, and the ' +
+    'value-safety grammar is untouched. A theme MAY omit any axis or group: omission means "the default look", and ' +
+    'site_apply_theme UNSETS site axes the theme lacks (exact-replace at axis granularity). Invalid values reject ' +
+    'at write (strict schema); unknown axis keys are inert and warn at validation.',
+};
+
 // Boundaries every governed type shares.
 const COMMON_CONSTRAINTS: Constraint[] = [
   {
@@ -246,6 +270,17 @@ const COMMON_CONSTRAINTS: Constraint[] = [
     enforced_live: true,
     description:
       'Reader-visible strings must be reader-safe (no internal/strategy leakage). `notes` fields are private and exempt.',
+  },
+  {
+    id: 'tracking_attribute',
+    severity: 'blocks_publish',
+    enforced_live: true,
+    description:
+      'The optional `tracking` block (enabled/label/tags/goals — W13, 12-plan §2) is written ONLY by set_tracking; ' +
+      'the seven open fields ops refuse the key (one-writer funnel). Goal keys and provider conversion labels are ' +
+      'PUBLIC by construction (they reach the page in the loader config), so they must be neutral slugs — strategy ' +
+      'vocabulary belongs in private.* or tracking.label/tags, which NEVER render. A goal bound to an activity not ' +
+      'collectable for this object type warns while drafting and blocks publish.',
   },
   {
     id: 'artifact_trust',
@@ -550,6 +585,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'safe-CSS grammar (hex / rgb()/rgba()/hsl()/hsla()/oklch()/color() / bare keyword; plain font stacks); ' +
             'values carrying ;, {, }, <, >, url(, or @import are rejected. The SAME rule gates site.brandTokens.',
         },
+        BRAND_TOKEN_AXES_CONSTRAINT,
         RECIPE_METADATA_CONSTRAINT,
       ];
     case 'site':
@@ -574,6 +610,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'auditable, revertible theme, and theme creation is restrictable to a maker agent via the creation ' +
             'policy (Wolf 2026-07-15).',
         },
+        BRAND_TOKEN_AXES_CONSTRAINT,
       ];
     case 'section_template':
       return [
@@ -588,6 +625,40 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
             'never aliases). The blueprint’s s_* id is a placeholder — instantiation always re-mints a fresh one.',
         },
         RECIPE_METADATA_CONSTRAINT,
+      ];
+    case 'tracking_config':
+      return [
+        {
+          id: 'tracking_config_safety',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'THE SAFETY LAW (the checkBrandTokenValue analogue): agents flip typed switches and supply regex-pinned ' +
+            'IDs — no script text or URL field exists anywhere in the body. The own tracker\u2019s endpoint/auth are ' +
+            'env-var NAMES (A-Z0-9_, never values or URLs); plausible.api_host is a bare-https origin. Code-owned ' +
+            'adapter templates re-assert every regex at render. GTM is permanently OUT (OQ-W13-3): the key exists ' +
+            'for shape stability but can never be enabled.',
+        },
+        {
+          id: 'tracking_config_singleton',
+          severity: 'blocks_write',
+          enforced_live: true,
+          description:
+            'One tracker registry per site (trk_<project>, the site_/tax_ convention) — creating a second active ' +
+            'tracking_config is refused (409); edit the existing one via set_tracking_config_fields. Creation is ' +
+            'human/seed-only ({agents: []} in the creation policy); agents EDIT the singleton, they never mint one. ' +
+            'Publish ships AUTONOMOUS under the master approval policy (OQ-W13-2, 2026-07-19) \u2014 the posture ' +
+            'gains an owner UI toggle (T13.12); flipping to require-approval stays a one-line lever.',
+        },
+        {
+          id: 'tracking_config_ready',
+          severity: 'blocks_publish',
+          enforced_live: true,
+          description:
+            'Publish readiness: every enabled provider carries its regex-pinned id; banner copy (headline + body) ' +
+            'must exist whenever any advertising-class provider is enabled under a posture other than us-first; ' +
+            'restricted_regions must be non-empty under geo-adaptive. Warns while drafting.',
+        },
       ];
     default:
       return [];
@@ -752,12 +823,12 @@ const workflow = (objectType: ObjectType, policy: ApprovalPolicy) => ({
     // W8.3, 09-plan §6.4: applying a theme is a SITE write, not a theme op.
     ...(objectType === 'theme'
       ? [
-          'site_apply_theme (theme_id + site_id + lock_token + expected_record_version) → computes ONE exact-replace set_site_fields op (every color key the theme lacks is unset — no stale palette) and applies it through the standard patch path under YOUR site checkout; dry_run: true previews the computed op + validation without persisting. The site copies the tokens — nothing live-binds to a theme; publish the site separately to go live.',
+          'site_apply_theme (theme_id + site_id + lock_token + expected_record_version) → computes ONE exact-replace set_site_brand_tokens op (every color key AND design axis the theme lacks is unset — no stale palette, defaults win on omitted axes) and applies it through the standard patch path under YOUR site checkout; dry_run: true previews the computed op + validation without persisting. The site copies the tokens — nothing live-binds to a theme; publish the site separately to go live.',
         ]
       : []),
     ...(objectType === 'site'
       ? [
-          'site_apply_theme (theme_id + this site id + lock_token + expected_record_version) — alternative brandTokens edit: replace the token set with a theme preset in one atomic op (dry_run previews).',
+          'site_apply_theme (theme_id + this site id + lock_token + expected_record_version) — alternative brandTokens edit: replace the token set (colors, fonts, AND the layout/shape/type design axes — omitted theme axes reset the site to defaults) with a theme preset in one atomic op (dry_run previews).',
         ]
       : []),
     'object_checkout → lock_token + record_version',
@@ -882,13 +953,22 @@ export const buildObjectContract = (
         : objectType === 'section_template'
           ? 'A section recipe (W8, design-principles rule 5): one named, pre-configured section blueprint agents create and evolve freely, then stamp into pages or mint as standalone shared sections. Instantiation deep-copies the blueprint and re-mints its id — nothing live-binds to a recipe, and a recipe renders nothing itself.'
           : objectType === 'theme'
-            ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys unset). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
-            : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
+            ? 'A brandTokens preset (W8.3, design-principles rule 5 — NOT taxonomy): named color/font token values plus the bounded layout/shape/type design axes (T10.1) agents draft and validate, then apply to the site singleton via site_apply_theme (exact-replace; stale keys and omitted axes unset — defaults win). Applied by COPY — the site never live-inherits from a theme, and a theme renders nothing itself.'
+            : objectType === 'tracking_config'
+              ? 'The per-project tracker registry singleton (W13, 12-plan §3): fixed-key provider blocks with regex-pinned IDs (never script/URLs), the consent posture (geo-adaptive seed per OQ-W13-1), and the per-type collection defaults matrix. Publishing it is the site-wide script switch: the export (src/data/site/tracking.json) decides which trackers execute on every page. Human/seed-minted; agents edit via set_tracking_config_fields.'
+              : `Everything an agent needs to create and edit a ${objectType} object: body schema, patch ops, constraints, publish policy, and required side-data.`,
     body_schema: schema ? toJson(schema) : { note: `${objectType} has no generic body schema.` },
     ...(includesSections ? { section_types: listSectionTypeContracts() } : {}),
     ...(objectType === 'page' ? { page_types: listPageTypeDefinitions() } : {}),
     patch_ops: patchOpContracts(objectType),
-    constraints: [...COMMON_CONSTRAINTS, ...perTypeConstraints(objectType)],
+    // tracking_config does not carry the per-object tracking attribute
+    // (schema-level) — the shared constraint would be a false promise there.
+    constraints: [
+      ...COMMON_CONSTRAINTS.filter(
+        (constraint) => !(objectType === 'tracking_config' && constraint.id === 'tracking_attribute')
+      ),
+      ...perTypeConstraints(objectType),
+    ],
     publish_policy: publishPolicy(objectType, policy),
     creation_policy: creationPolicyContract(objectType, creationPolicy),
     media_policy: mediaPolicyContract(mediaPolicy),

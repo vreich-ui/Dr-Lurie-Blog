@@ -1,0 +1,16 @@
+---
+/**
+ * The own-tracker loader mount (W13, 12-plan §5.1) — a dedicated component
+ * so the PROCESSED (Astro-bundled, hashed, same-origin) script can be
+ * conditionally included: TrackingScripts renders this child only when a
+ * tracking_config export exists. A <script> inside a template expression
+ * would be treated as unprocessed inline — this indirection keeps the
+ * loader a real module asset.
+ */
+---
+
+<script>
+  import { startTracker } from '~/lib/tracking/loader';
+
+  startTracker();
+</script>

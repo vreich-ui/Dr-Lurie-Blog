@@ -306,14 +306,24 @@ test('discard restores a LEGACY palette entry (pre-rollout set_site_fields{brand
   const legacyForwardOp = { op: 'set_site_fields', fields: { brandTokens: { colors: { primary: '#00ff00' } } } };
   const legacyCapture = {
     kind: 'fields',
-    before: { brandTokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } } },
+    before: {
+      brandTokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
+    },
     after: { brandTokens: { colors: { primary: '#00ff00' } } },
   };
   // Splice the legacy entry into history exactly as the old engine would have.
   const withLegacy: ObjectRecord = {
     ...original,
     body: { ...(original.body as object), brandTokens: { colors: { primary: '#00ff00' } } },
-    history: [...original.history, { at: AT, action: 'set_site_fields', actor: agentActor, details: { op: legacyForwardOp, capture: legacyCapture } }],
+    history: [
+      ...original.history,
+      {
+        at: AT,
+        action: 'set_site_fields',
+        actor: agentActor,
+        details: { op: legacyForwardOp, capture: legacyCapture },
+      },
+    ],
   };
   const result = discardProposal(withLegacy, {
     entries: [{ op: legacyForwardOp, capture: legacyCapture }],
@@ -339,7 +349,10 @@ test('discard restores a LEGACY palette entry (pre-rollout set_site_fields{brand
 
   // …and blind-revert is preserved: if the palette moved since the legacy edit
   // (the body no longer matches capture.after), discard refuses with a conflict.
-  const moved: ObjectRecord = { ...withLegacy, body: { ...(withLegacy.body as object), brandTokens: { colors: { primary: '#abcabc' } } } };
+  const moved: ObjectRecord = {
+    ...withLegacy,
+    body: { ...(withLegacy.body as object), brandTokens: { colors: { primary: '#abcabc' } } },
+  };
   const conflict = discardProposal(moved, {
     entries: [{ op: legacyForwardOp, capture: legacyCapture }],
     actor: reviewer,

@@ -37,7 +37,9 @@ import type { ObjectType, Principal } from '../schema/object-record-v1.js';
 import { isGovernedObjectType, type GovernedObjectType } from './approval-policy.js';
 
 /** 'open', or an allowlist of self-declared agent names (see the caveat above). */
-const creationRuleSchema = z.union([z.literal('open'), z.strictObject({ agents: z.array(z.string().min(1)).min(1) })]);
+// An EMPTY allowlist is legal and means "no agents at all" — humans/seeds
+// only (W13: tracking_config ships { agents: [] }; 12-plan §3 governance).
+const creationRuleSchema = z.union([z.literal('open'), z.strictObject({ agents: z.array(z.string().min(1)) })]);
 export type CreationRule = z.infer<typeof creationRuleSchema>;
 
 export const creationPolicyConfigSchema = z.strictObject({
@@ -59,6 +61,7 @@ export const creationPolicyConfigSchema = z.strictObject({
     theme: creationRuleSchema.optional(),
     product: creationRuleSchema.optional(),
     content_item: creationRuleSchema.optional(),
+    tracking_config: creationRuleSchema.optional(),
   }),
 });
 
