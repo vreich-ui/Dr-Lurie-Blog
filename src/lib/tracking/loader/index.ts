@@ -81,6 +81,17 @@ const send = (path: string, body: string): void => {
   }
 };
 
+// T13.7: the bridge's gtag transport — a REAL `arguments` object push
+// (gtag.js ignores plain-array dataLayer entries).
+const gtagPush = (args: unknown[]): void => {
+  const pusher = function (): void {
+    const scope = window as { dataLayer?: unknown[] };
+    // eslint-disable-next-line prefer-rest-params
+    (scope.dataLayer = scope.dataLayer || []).push(arguments);
+  };
+  (pusher as (...callArgs: unknown[]) => void)(...args);
+};
+
 const bindPage = (): void => {
   if (location.pathname.startsWith('/admin')) return;
   const configElement = document.getElementById('trk-config');
@@ -95,6 +106,7 @@ const bindPage = (): void => {
   if (!tracker) {
     tracker = createTracker(config, {
       send,
+      gtagPush,
       now: () => Date.now(),
       uuid: () => crypto.randomUUID(),
       random: () => Math.random(),
@@ -154,6 +166,28 @@ export const startTracker = (): void => {
     const detail = (rawEvent as CustomEvent<Partial<ConsentSnapshot>>).detail;
     applyConsent({ analytics: detail?.analytics === true, ads: detail?.ads === true, gpc: detail?.gpc === true });
   });
+  // T13.7: Netlify form success → the v1 goal vocabulary (the loader owns
+  // this listener so the inline opt-in capture stays byte-identical and the
+  // wiring exists ONLY when a tracking export mounts the loader). The same
+  // submit is the §6 form_submit activity signal.
+  document.addEventListener(
+    'submit',
+    (rawEvent) => {
+      if (!tracker) return;
+      const form = rawEvent.target as (ElementLike & { matches?: (selector: string) => boolean }) | null;
+      if (!form?.closest || !form.matches?.('form[data-netlify="true"]')) return;
+      const section = form.closest('[data-cms-section-id]');
+      const sectionType = section?.getAttribute('data-cms-section-type') ?? null;
+      const sectionId = section?.getAttribute('data-cms-section-id');
+      tracker.click(
+        'form_submit',
+        sectionId ? { kind: 'section', section_id: sectionId, section_type: sectionType } : null
+      );
+      tracker.goal(sectionType === 'contact_form' ? 'contact_submit' : 'opt_in');
+      tracker.flush(); // the form post navigates — don't leave the goal queued
+    },
+    { capture: true }
+  );
   // The module loads after astro:page-load fired for the first page — bind now.
   if (document.readyState !== 'loading') bindPage();
 };

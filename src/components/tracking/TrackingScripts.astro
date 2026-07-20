@@ -80,7 +80,15 @@ if (!isAdmin) {
         const data = other.data as Record<string, unknown>;
         const id = objectIdFromMarker(data.__generated);
         if (id && data.tracking) {
-          goalSources.push({ object_id: id, tracking: data.tracking as GoalSource['tracking'] });
+          const source: GoalSource = { object_id: id, tracking: data.tracking as GoalSource['tracking'] };
+          // T13.7: `value_source:'product_price'` resolves at BUILD from the
+          // product export's commerce price — never client-guessed.
+          const commerce = (data.commerce ?? null) as { price?: { amount_cents?: number; currency?: string } } | null;
+          if (name === 'productObject' && typeof commerce?.price?.amount_cents === 'number') {
+            source.price_cents = commerce.price.amount_cents;
+            if (commerce.price.currency) source.currency = commerce.price.currency;
+          }
+          goalSources.push(source);
         }
       }
     }
