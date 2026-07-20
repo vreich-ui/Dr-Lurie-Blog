@@ -37,7 +37,15 @@ export type GoalMapLike = Record<string, { enabled?: boolean; goals?: GoalBindin
 export type BridgeProviders = {
   google_ads?: { id: string };
   ga4?: { id: string };
+  meta_pixel?: { id: string };
+  taboola?: { id: string };
+  outbrain?: { id: string };
+  mgid?: { id: string };
 };
+
+/** One native-platform conversion call: the browser binding routes `args`
+ *  to the provider's queue/function (fbq / _tfa / obApi / _mgq). */
+export type NativeCall = { provider: string; args: unknown[] };
 
 /** Event kind → the goal-activity vocabulary (`tracking.goals[].on`).
  *  nav_click projects to the navigation object's `cta_click` activity —
@@ -116,8 +124,52 @@ export const providerCalls = (
         seen.add(dedupeKey);
         calls.push(['event', conversion.label, { send_to: providers.ga4.id }]);
       }
-      // meta_pixel/taboola/outbrain/mgid: T13.8's adapters consume the same
-      // bindings — unknown providers are skipped, never guessed.
+      // Native platforms fan out via nativeCalls; unknown providers are
+      // skipped, never guessed.
+    }
+  }
+  return calls;
+};
+
+/**
+ * The native-platform half of the fan-out (T13.8): meta_pixel mirrors the
+ * conversion label as a standard event (`fbq('track', label, {value?})` —
+ * value in currency units when build-resolved); taboola notifies its event
+ * queue with the account id; outbrain tracks the label; mgid invokes the
+ * sensor. Enabled providers only, deduped per provider+label — the exact
+ * providerCalls contract.
+ */
+export const nativeCalls = (bindings: readonly GoalBinding[], providers: BridgeProviders | undefined): NativeCall[] => {
+  if (!providers) return [];
+  const calls: NativeCall[] = [];
+  const seen = new Set<string>();
+  for (const binding of bindings) {
+    for (const conversion of binding.conversions ?? []) {
+      const dedupeKey = `${conversion.provider}:${conversion.label}`;
+      if (seen.has(dedupeKey)) continue;
+      const value = typeof conversion.value_cents === 'number' ? conversion.value_cents / 100 : undefined;
+      if (conversion.provider === 'meta_pixel' && providers.meta_pixel?.id) {
+        seen.add(dedupeKey);
+        calls.push({
+          provider: 'meta_pixel',
+          args:
+            value === undefined
+              ? ['track', conversion.label]
+              : ['track', conversion.label, { value, currency: conversion.currency ?? 'USD' }],
+        });
+      } else if (conversion.provider === 'taboola' && providers.taboola?.id) {
+        seen.add(dedupeKey);
+        calls.push({
+          provider: 'taboola',
+          args: [{ notify: 'event', name: conversion.label, id: providers.taboola.id }],
+        });
+      } else if (conversion.provider === 'outbrain' && providers.outbrain?.id) {
+        seen.add(dedupeKey);
+        calls.push({ provider: 'outbrain', args: ['track', conversion.label] });
+      } else if (conversion.provider === 'mgid' && providers.mgid?.id) {
+        seen.add(dedupeKey);
+        calls.push({ provider: 'mgid', args: [['MgSensorInvoke', conversion.label]] });
+      }
     }
   }
   return calls;

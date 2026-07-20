@@ -92,6 +92,24 @@ const gtagPush = (args: unknown[]): void => {
   (pusher as (...callArgs: unknown[]) => void)(...args);
 };
 
+// T13.8: route a native-platform conversion to its queue/function. Queue
+// providers (_tfa/_mgq) accept pushes before their gated script activates
+// (inert if it never does); function providers (fbq/obApi) are skipped
+// until their bootstrap defines them — consent gating upstream means an
+// activated provider is defined by the time conversions can fire.
+const nativePush = (provider: string, args: unknown[]): void => {
+  const scope = window as {
+    fbq?: (...callArgs: unknown[]) => void;
+    obApi?: (...callArgs: unknown[]) => void;
+    _tfa?: unknown[];
+    _mgq?: unknown[];
+  };
+  if (provider === 'meta_pixel' && typeof scope.fbq === 'function') scope.fbq(...args);
+  else if (provider === 'outbrain' && typeof scope.obApi === 'function') scope.obApi(...args);
+  else if (provider === 'taboola') (scope._tfa = scope._tfa || []).push(args[0]);
+  else if (provider === 'mgid') (scope._mgq = scope._mgq || []).push(args[0]);
+};
+
 const bindPage = (): void => {
   if (location.pathname.startsWith('/admin')) return;
   const configElement = document.getElementById('trk-config');
@@ -107,6 +125,7 @@ const bindPage = (): void => {
     tracker = createTracker(config, {
       send,
       gtagPush,
+      nativePush,
       now: () => Date.now(),
       uuid: () => crypto.randomUUID(),
       random: () => Math.random(),
