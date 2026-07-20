@@ -24,21 +24,20 @@ import {
   parseTrackingExport,
   type GoalSource,
 } from '~/lib/tracking/assemble';
+import { consentBootstrapScript } from '~/lib/tracking/consent/runtime';
 import { getSiteObject } from '~/utils/site-object';
 
 /**
- * Consent bootstrap skeleton (12-plan §8; T13.6 completes the geo-adaptive
- * gate). Contract already honored: advertising-gated snippets ship as
- * `type="text/plain" data-trk-gate="advertising"` and are activated ONLY
- * through this hook (cloned to live scripts on the trk:consent signal).
- * Kept as a frontmatter constant + set:html so the template carries no
- * brace-bearing inline JS (the Astro expression parser trips on it).
+ * Consent bootstrap (12-plan §8, completed by T13.6): the serialized
+ * consent runtime — geo-adaptive gating, Consent Mode v2 denied defaults
+ * BEFORE any vendor head, GPC, the banner wiring, and gated-script
+ * activation (`type="text/plain" data-trk-gate="advertising"` snippets are
+ * activated ONLY by this runtime, on region-clear or grant). Serialized
+ * from the very function the gate-matrix tests execute; kept as a
+ * frontmatter constant + set:html so the template carries no brace-bearing
+ * inline JS (the Astro expression parser trips on it).
  */
-const CONSENT_BOOTSTRAP =
-  'window.__trkActivate=function(){document.querySelectorAll("script[data-trk-gate]").forEach(function(g){' +
-  'var l=document.createElement("script");for(var i=0;i<g.attributes.length;i++){var a=g.attributes[i];' +
-  'if(a.name!=="type"&&a.name!=="data-trk-gate")l.setAttribute(a.name,a.value)}l.text=g.text;g.replaceWith(l)})};' +
-  'document.addEventListener("trk:consent",function(e){if(e&&e.detail&&e.detail.ads)window.__trkActivate()});';
+const CONSENT_BOOTSTRAP = consentBootstrapScript();
 
 const isAdmin = Astro.url.pathname.startsWith('/admin');
 

@@ -13,9 +13,36 @@
  */
 import { createTracker, parseTrackerConfig, type PageContext, type Tracker } from './core.js';
 import { classifyClick, trackableRefOf, type ElementLike } from './dom.js';
+import { clearPersistentId, readOrMintPersistentId } from './persistent-id.js';
 
 let tracker: Tracker | null = null;
 let observer: IntersectionObserver | null = null;
+
+// ── consent wiring (T13.6) — the runtime owns policy; the loader reacts ──────
+type ConsentSnapshot = { analytics: boolean; ads: boolean; gpc: boolean };
+
+/** The effective state the consent runtime maintains at window.__trk.consent. */
+const readConsentSnapshot = (): ConsentSnapshot => {
+  const trk = (window as { __trk?: { consent?: Record<string, unknown> } }).__trk;
+  const state = trk?.consent;
+  return {
+    analytics: state?.analytics === true,
+    ads: state?.ads === true,
+    gpc: state?.gpc === true,
+  };
+};
+
+const applyConsent = (snapshot: ConsentSnapshot): void => {
+  if (!tracker) return;
+  tracker.setConsent({ analytics: snapshot.analytics, ads: snapshot.ads });
+  if (snapshot.analytics && !snapshot.gpc) {
+    // Analytics grant, GPC off — the ONLY path that ever stores an id.
+    tracker.setVisitor(readOrMintPersistentId(localStorage, Date.now(), () => crypto.randomUUID()));
+  } else {
+    tracker.setVisitor(null);
+    clearPersistentId(localStorage); // refusal/revocation clears the device
+  }
+};
 
 // Page identity is derived from the DOM the render path already stamps
 // (data-cms-object-id / data-cms-node-id) — the config JSON stays static
@@ -77,6 +104,7 @@ const bindPage = (): void => {
       gpc: (navigator as { globalPrivacyControl?: boolean }).globalPrivacyControl === true,
     });
   }
+  applyConsent(readConsentSnapshot());
   tracker.pageLoad(readPageContext(), location.search);
 
   observer?.disconnect();
@@ -121,6 +149,10 @@ export const startTracker = (): void => {
   document.addEventListener('trk:goal', (rawEvent) => {
     const detail = (rawEvent as CustomEvent<{ goal?: string; value_cents?: number }>).detail;
     if (detail?.goal) tracker?.goal(detail.goal, detail.value_cents);
+  });
+  document.addEventListener('trk:consent', (rawEvent) => {
+    const detail = (rawEvent as CustomEvent<Partial<ConsentSnapshot>>).detail;
+    applyConsent({ analytics: detail?.analytics === true, ads: detail?.ads === true, gpc: detail?.gpc === true });
   });
   // The module loads after astro:page-load fired for the first page — bind now.
   if (document.readyState !== 'loading') bindPage();

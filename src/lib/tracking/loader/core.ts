@@ -115,6 +115,7 @@ export const createTracker = (
   let pageEnded = false;
 
   const consent = { analytics: false, ads: false, gpc: env.gpc };
+  let visitorId: string | null = null;
 
   const collects = (type: string, activity: string): boolean =>
     Array.isArray(config.defaults[type]) && (config.defaults[type] as readonly string[]).includes(activity);
@@ -154,7 +155,9 @@ export const createTracker = (
       event,
       url: { path: page.path, route: page.route },
       consent: { ...consent },
-      visitor: { mode: 'cookieless' },
+      // Consented mode ONLY while an upgrade id stands (T13.6): analytics
+      // grant, GPC off — index.ts owns mint/clear; this stays a pure read.
+      visitor: visitorId ? { mode: 'consented', vid: visitorId } : { mode: 'cookieless' },
     };
     const object = extraObject ?? objectOf(ref);
     if (object) shaped.object = object;
@@ -318,10 +321,17 @@ export const createTracker = (
       push('goal', null, props);
     },
 
-    /** T13.6 seam — inert until the consent banner wires it. */
+    /** Consent flags on outgoing events (GPC beats grant — T13.6 wires this). */
     setConsent(next: { analytics?: boolean; ads?: boolean }): void {
       if (typeof next.analytics === 'boolean') consent.analytics = next.analytics && !consent.gpc;
       if (typeof next.ads === 'boolean') consent.ads = next.ads && !consent.gpc;
+    },
+
+    /** The consented-id upgrade (T13.6): a standing `_dlid` flips visitor
+     *  mode to `consented`; null (no grant / GPC / revocation) reverts to
+     *  cookieless. GPC is absolute — an id can never be set under it. */
+    setVisitor(vid: string | null): void {
+      visitorId = !consent.gpc && typeof vid === 'string' && vid.length > 0 ? vid : null;
     },
 
     /** pagehide / astro:before-swap — report dwell + engagement + progress, flush. */

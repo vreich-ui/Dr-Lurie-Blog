@@ -1,0 +1,35 @@
+---
+/**
+ * ConsentBanner (W13 T13.6, 12-plan §8) — the body-mounted half of the
+ * consent surface (TrackingScripts is a <head> component and cannot hold a
+ * dialog, so Layout mounts this beside it, gated identically on the export).
+ *
+ * Renders NOTHING unless a tracking_config export exists AND carries banner
+ * copy (the byte-identical gate: today's repo has no export, so every page
+ * is untouched). The markup ships `hidden`; the consent runtime (the inline
+ * bootstrap TrackingScripts emits) owns reveal, clicks, and storage —
+ * see src/lib/tracking/consent/runtime.ts.
+ */
+import { getCollection } from 'astro:content';
+
+import { parseTrackingExport } from '~/lib/tracking/assemble';
+import { buildConsentBannerHtml } from '~/lib/tracking/consent/banner-html';
+
+const isAdmin = Astro.url.pathname.startsWith('/admin');
+
+let bannerHtml: string | null = null;
+if (!isAdmin) {
+  const entries = await getCollection('trackingConfigObject');
+  const entry = entries[0];
+  if (entry) {
+    const body = { ...(entry.data as Record<string, unknown>) };
+    delete body.__generated;
+    // Present-but-invalid export THROWS (drift must be loud — the same
+    // stance TrackingScripts takes on this exact export).
+    const parsed = parseTrackingExport(body);
+    if (parsed.consent.banner) bannerHtml = buildConsentBannerHtml(parsed.consent.banner);
+  }
+}
+---
+
+{bannerHtml !== null && <Fragment set:html={bannerHtml} />}
