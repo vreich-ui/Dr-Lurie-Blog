@@ -108,11 +108,23 @@ if (!Array.isArray(PAGE_HOME_SEEDS) || PAGE_HOME_SEEDS.length === 0 || !PAGE_HOM
   console.error(`[roundtrip] ${seedsPath} must export CONVERSION_SEEDS (non-empty array) and SEED_SITE.`);
   process.exit(2);
 }
-const SUPPORTED_SEED_TYPES = new Set(['page', 'section', 'template', 'taxonomy', 'site', 'product', 'content_item']);
+// T10.8: section_template + theme joined — drillOpsForSeed and reconcileOps
+// have carried both since W8; this gate list had simply not caught up.
+const SUPPORTED_SEED_TYPES = new Set([
+  'page',
+  'section',
+  'template',
+  'taxonomy',
+  'site',
+  'product',
+  'content_item',
+  'section_template',
+  'theme',
+]);
 const unsupported = PAGE_HOME_SEEDS.filter((seed) => !SUPPORTED_SEED_TYPES.has(seed.objectType));
 if (unsupported.length > 0) {
   console.error(
-    `[roundtrip] the driver drills page/section/template/taxonomy/site/product/content_item objects only; extend drillOps for: ${unsupported
+    `[roundtrip] unsupported seed object types — extend drillOps/reconcileOps for: ${unsupported
       .map((seed) => `${seed.objectId} (${seed.objectType})`)
       .join(', ')}`
   );

@@ -26,4 +26,27 @@ export const themeDefaultBody = {
   tokens: structuredClone(siteBody.brandTokens),
 };
 
-export const CONVERSION_SEEDS = [{ objectType: 'theme', objectId: 'thm_drlurie_default', body: themeDefaultBody }];
+// W10 T10.8: a variant preset exercising the T10.1 token axes — the same
+// canonical palette (colors/fonts untouched) with a narrow, airy, editorial
+// posture. Applying it is the axis demonstration: palette identical, feel
+// shifts. thm_drlurie_default stays byte-identical to production (the
+// sync/drift-guard posture is untouched).
+export const themeEditorialAiryBody = {
+  name: 'Editorial airy',
+  description:
+    'The canonical palette with the reading posture shifted: narrow container, airy section rhythm, editorial type scale, soft radii. A token-axis demonstration preset.',
+  whenToUse:
+    'Apply to preview the T10.1 design axes on the live palette \u2014 a demonstration preset, not a rebrand. Revert with thm_drlurie_default.',
+  scope: 'evergreen',
+  tokens: {
+    ...structuredClone(siteBody.brandTokens),
+    layout: { containerWidth: 'narrow', sectionRhythm: 'airy' },
+    shape: { radius: 'soft' },
+    type: { scale: 'editorial' },
+  },
+};
+
+export const CONVERSION_SEEDS = [
+  { objectType: 'theme', objectId: 'thm_drlurie_default', body: themeDefaultBody },
+  { objectType: 'theme', objectId: 'thm_editorial_airy', body: themeEditorialAiryBody },
+];

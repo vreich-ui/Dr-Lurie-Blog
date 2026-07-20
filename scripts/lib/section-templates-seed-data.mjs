@@ -121,6 +121,93 @@ export const sectionTemplateCtaBannerBody = {
   },
 };
 
+// ─── W10 T10.8: starters for the ratified mints ──────────────────────────────
+// One per minted type that warrants a generic starter. DELIBERATELY SKIPPED:
+// `brand_row` (logo strips are inherently site-specific assets — a starter
+// would stamp placeholder marks that read as broken; agents compose it
+// directly) and `comparison_table`'s pricing cousin (pricing_table stays
+// product-bound). Every blueprint below is self-contained: plain site-asset
+// placeholder paths only, no *AssetRef, no object/taxonomy refs.
+
+export const sectionTemplateStatsBandBody = {
+  name: 'Stats band',
+  description: 'A row of headline numbers (value + label + optional sublabel) — the trust/metrics band.',
+  whenToUse:
+    'Stamp between content sections to anchor credibility with 2–6 numbers ("10k readers · 97% satisfaction"). Replace the starter figures before publishing — never ship placeholder metrics.',
+  scope: 'evergreen',
+  blueprint: {
+    id: 's_stplstats',
+    type: 'stats',
+    data: {
+      kicker: 'By the numbers',
+      items: [
+        { value: '10k+', label: 'Readers' },
+        { value: '97%', label: 'Satisfaction' },
+        { value: '5★', label: 'Average rating' },
+      ],
+    },
+  },
+};
+
+export const sectionTemplateExpectationsTimelineBody = {
+  name: 'Expectations timeline',
+  description: 'An ordered "what to expect" milestone rail over time (label + period + short description).',
+  whenToUse:
+    'Any change-over-time narrative — a routine\u2019s first 12 weeks, an onboarding arc. Use the steps recipe for a procedure the reader performs; this one is time, not tasks.',
+  scope: 'evergreen',
+  blueprint: {
+    id: 's_stpltimeline',
+    type: 'timeline',
+    data: {
+      kicker: 'What to expect',
+      milestones: [
+        { label: 'Adjustment', period: 'Weeks 1\u20132', description: 'Starter copy: what happens first.' },
+        { label: 'Early change', period: 'Weeks 3\u20136', description: 'Starter copy: the first visible shift.' },
+        { label: 'Steady state', period: 'Week 12', description: 'Starter copy: where this settles.' },
+      ],
+    },
+  },
+};
+
+export const sectionTemplateComparisonBody = {
+  name: 'Comparison matrix',
+  description: 'A bounded us-vs-them feature matrix (2\u20134 columns, yes/no or short-text cells).',
+  whenToUse:
+    'Positioning pages comparing approaches or offerings feature-by-feature. Use pricing_table when the columns are purchasable products \u2014 money truth stays object-bound.',
+  scope: 'evergreen',
+  blueprint: {
+    id: 's_stplcomparison',
+    type: 'comparison_table',
+    data: {
+      heading: 'How this compares',
+      columns: [{ label: 'This approach', highlighted: true }, { label: 'The usual way' }],
+      rows: [
+        { label: 'Evidence-based', cells: [true, false] },
+        { label: 'Starter row \u2014 replace', cells: ['Yes', 'Sometimes'] },
+      ],
+    },
+  },
+};
+
+export const sectionTemplateMediaGalleryBody = {
+  name: 'Media gallery',
+  description: 'A standalone image gallery block (grid layout starter; swap items for single figures or video).',
+  whenToUse:
+    'Visual evidence between prose \u2014 result galleries, product-in-use shots, a video feature (switch an item to kind:\u2019video\u2019 with a provider + video ID). Replace the placeholder images before publishing.',
+  scope: 'evergreen',
+  blueprint: {
+    id: 's_stplmedia',
+    type: 'media',
+    data: {
+      layout: 'grid',
+      items: [
+        { kind: 'image', src: '/images/default.png', alt: 'Placeholder \u2014 replace', caption: 'Starter caption' },
+        { kind: 'image', src: '/images/default.png', alt: 'Placeholder \u2014 replace' },
+      ],
+    },
+  },
+};
+
 // ─── driver contract ─────────────────────────────────────────────────────────
 
 export const CONVERSION_SEEDS = [
@@ -129,4 +216,13 @@ export const CONVERSION_SEEDS = [
   { objectType: 'section_template', objectId: 'stpl_related_articles', body: sectionTemplateRelatedArticlesBody },
   { objectType: 'section_template', objectId: 'stpl_newsletter_cta', body: sectionTemplateNewsletterCtaBody },
   { objectType: 'section_template', objectId: 'stpl_cta_banner', body: sectionTemplateCtaBannerBody },
+  // W10 T10.8 — starters for the ratified mints.
+  { objectType: 'section_template', objectId: 'stpl_stats_band', body: sectionTemplateStatsBandBody },
+  {
+    objectType: 'section_template',
+    objectId: 'stpl_expectations_timeline',
+    body: sectionTemplateExpectationsTimelineBody,
+  },
+  { objectType: 'section_template', objectId: 'stpl_comparison_matrix', body: sectionTemplateComparisonBody },
+  { objectType: 'section_template', objectId: 'stpl_media_gallery', body: sectionTemplateMediaGalleryBody },
 ];

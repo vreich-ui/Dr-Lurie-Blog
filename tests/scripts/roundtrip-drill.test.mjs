@@ -258,12 +258,13 @@ test('drillOpsForSeed dispatches by object type', () => {
     'upsert_section',
     'update_section_data',
     'set_section_visibility',
+    'set_tracking',
   ]);
   const pageSeed = {
     objectType: 'page',
     body: { title: 'P', sections: [{ id: 's_h', type: 'hero', data: { heading: 'H', actions: [] } }] },
   };
-  assert.equal(drillOpsForSeed(pageSeed).expected.length, 6);
+  assert.equal(drillOpsForSeed(pageSeed).expected.length, 7);
   const templateSeed = {
     objectType: 'template',
     body: {
@@ -274,7 +275,7 @@ test('drillOpsForSeed dispatches by object type', () => {
     },
   };
   const templateDrill = drillOpsForSeed(templateSeed);
-  assert.equal(templateDrill.expected.length, 4);
+  assert.equal(templateDrill.expected.length, 5);
   assert.equal(templateDrill.ops.find((op) => op.op === 'upsert_slot').slot.slotId, 'slot_rtprobe2');
 });
 
@@ -309,6 +310,7 @@ test('drillOpsForSeed dispatches a section_template seed', () => {
     'set_section_template_meta',
     'replace_blueprint',
     'update_blueprint_data',
+    'set_tracking',
   ]);
 });
 
@@ -324,7 +326,7 @@ test('themeDrillOps pokes and restores the name — set_theme_fields is the only
 
 test('drillOpsForSeed dispatches a theme seed', () => {
   const seed = { objectType: 'theme', body: { name: 'D', tokens: { colors: {}, fonts: {} } } };
-  assert.deepEqual(drillOpsForSeed(seed).expected, ['set_theme_fields']);
+  assert.deepEqual(drillOpsForSeed(seed).expected, ['set_theme_fields', 'set_tracking']);
 });
 
 test('siteDrillOps pokes and restores the name — set_site_fields is the only site op', () => {
@@ -339,5 +341,38 @@ test('siteDrillOps pokes and restores the name — set_site_fields is the only s
 
 test('drillOpsForSeed dispatches a site seed to siteDrillOps', () => {
   const seed = { objectType: 'site', body: { name: 'Dr. Lurié' } };
-  assert.deepEqual(drillOpsForSeed(seed).expected, ['set_site_fields']);
+  assert.deepEqual(drillOpsForSeed(seed).expected, ['set_site_fields', 'set_tracking']);
+});
+
+test('every drill appends the W13 set_tracking probe, restoring byte-exactly (T10.8)', () => {
+  // A body with NO tracking block: the restore is `fields: null` — removes
+  // body.tracking entirely (the grammar's exact first-set inverse).
+  const bare = drillOpsForSeed({ objectType: 'site', body: { name: 'S' } });
+  const bareTracking = bare.ops.filter((op) => op.op === 'set_tracking');
+  assert.deepEqual(bareTracking, [
+    { op: 'set_tracking', fields: { label: 'RT probe' } },
+    { op: 'set_tracking', fields: null },
+  ]);
+  assert.equal(bare.ops.at(-1).op, 'set_tracking', 'tracking probe runs last');
+
+  // A body WITH a tracking label: the restore writes the original back.
+  const labeled = drillOpsForSeed({
+    objectType: 'theme',
+    body: { name: 'D', tokens: { colors: {}, fonts: {} }, tracking: { label: 'Theme reporting' } },
+  });
+  assert.deepEqual(
+    labeled.ops.filter((op) => op.op === 'set_tracking'),
+    [
+      { op: 'set_tracking', fields: { label: 'RT probe' } },
+      { op: 'set_tracking', fields: { label: 'Theme reporting' } },
+    ]
+  );
+
+  // A tracking block WITHOUT a label key: restore unsets the probe's label
+  // (deep-merge would otherwise leave it behind).
+  const unlabeled = drillOpsForSeed({
+    objectType: 'site',
+    body: { name: 'S', tracking: { enabled: true } },
+  });
+  assert.deepEqual(unlabeled.ops.at(-1), { op: 'set_tracking', fields: { label: null } });
 });
