@@ -248,7 +248,12 @@ test('tracking_config_ready: complete on the valid body; banner/regions rules wa
 test('object_contract(tracking_config) is complete: governed, agent-closed creation, the three constraints', () => {
   const contract = buildObjectContract('tracking_config');
   assert.equal(contract.governed, true);
-  assert.deepEqual(contract.creation_policy.agents, { allowlist: [] }, 'human/seed-minted only');
+  // T13.10: "seeds mint" has a name — the conversion-factory driver.
+  assert.deepEqual(
+    contract.creation_policy.agents,
+    { allowlist: ['object-conversion-roundtrip'] },
+    'human/seed-minted only (the driver is the seed identity)'
+  );
   assert.equal(contract.publish_policy.requires_approval, false, 'ships AUTONOMOUS (OQ-W13-2)');
   assert.deepEqual(
     contract.patch_ops.map((op) => op.op),

@@ -120,9 +120,9 @@ test('the product drill exercises both ops where coherent and always restores by
     };
     if (body.commerce.mode === 'fixed') {
       // Fixed products also drill the §3 writer: cache poked one cent, then
-      // cache + linkage restored exactly. (+2 W13 set_tracking probe ops.)
+      // cache + linkage restored exactly. (+3 T13.10 set_tracking drill ops.)
       assert.deepEqual(drill.expected, ['set_product_fields', 'set_product_price', 'set_tracking'], seed.objectId);
-      assert.equal(drill.ops.length, 6);
+      assert.equal(drill.ops.length, 7);
       assert.deepEqual(drill.ops[3].fields, {
         commerce: { price: body.commerce.price, stripe_test: body.commerce.stripe_test },
       });
@@ -130,7 +130,7 @@ test('the product drill exercises both ops where coherent and always restores by
       // pwyw/free products cannot legally carry a price — fields op only;
       // the driver unions exercised ops across the family for the contract check.
       assert.deepEqual(drill.expected, ['set_product_fields', 'set_tracking'], seed.objectId);
-      assert.equal(drill.ops.length, 4);
+      assert.equal(drill.ops.length, 5);
     }
     for (const op of drill.ops) {
       if (op.op === 'set_product_fields') {

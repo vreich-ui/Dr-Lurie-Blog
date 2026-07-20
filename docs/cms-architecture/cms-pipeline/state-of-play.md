@@ -7,6 +7,54 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-20 B (W13 TAIL: T13.8→T13.10 — natives+CSP, sink kit, seeds+roundtrip; branch `claude/w13-natives-tail` off the merged #462)
+
+PR #462 MERGED (`d8171295`, 8/8 checks); continuation on a fresh branch.
+
+- **T13.8 (`d82ce433`)**: meta_pixel/taboola/outbrain/mgid adapters — all
+  ALWAYS advertising-gated; mgid validates but never interpolates its id
+  (dashboard-resolved; snippet/hosts flagged for re-verification at first
+  enablement). `nativeCalls` bridge fan-in (provider-correct shapes,
+  build-resolved values, dedupe), core fan-out as one consent-gated unit,
+  and the fbq/\_tfa/obApi/\_mgq routing in the browser binding. The site's
+  FIRST CSP: `Content-Security-Policy-Report-Only` in netlify.toml at the
+  all-disabled baseline (promotion = T13.11 after a clean soak) with the
+  hosts-drift test pinning script/connect/frame = baseline ∪ enabled
+  adapters' cspHosts (reads src/data/site/tracking.json when it exists);
+  drift fails BOTH directions. Loader pin 4.5→5KB (ceiling 6KB).
+- **T13.9 (`8fb3a64e`)**: the owner-DB reference kit
+  (`docs/cms-architecture/tracking-sink-reference/`): receiver contract
+  (NDJSON + Bearer + fast 202, idempotent on event_id, additive-only),
+  OQ-W13-6 env contract, the blessed strategy-join recipe; schema.sql
+  (tracking_events UNIQUE event_id + 4 indexes + pg_notify trigger +
+  node_strategy + worked query); `scripts/tracking-mirror-replay.mjs`
+  (dry-run default, in-run dedupe, abort-on-non-202, idempotent re-run;
+  6 unit tests; rehearsed against the local store).
+- **T13.10 (this commit)**: `scripts/lib/tracking-config-seed-data.mjs` —
+  the ratified trk_drlurie body (geo-adaptive; EEA-30+UK+CH ×32; GPC;
+  banner copy; ALL pixels disabled; own enabled with the OQ-W13-6 env
+  names; the §6 defaults matrix). Driver support: tracking_config drill
+  (set_tracking_config_fields flip/flip-back), reconcile branch
+  (deep-merge diff, trap-2 stray-nulling), SUPPORTED_SEED_TYPES. The
+  set_tracking probe upgraded to the FULL set→mutate→unset drill; a
+  ten-type engine test proves it byte-identical with exact inverses on
+  every attribute-carrying type. Creation policy: the ruling's "seeds
+  mint" got its name — `tracking_config: { agents:
+['object-conversion-roundtrip'] }` (the conversion-factory driver IS the
+  seed identity; casual agents stay excluded; flag for Wolf's veto).
+  FOUND+FIXED en route: the loader gated section impressions on
+  `collects('section','impression')` — a word NO schema-legal export can
+  carry (the §6 matrix says `section_impression`); production section
+  impressions could never have fired. Local rehearsal:
+  `--seeds tracking-config-seed-data.mjs` all-green — created (the seed
+  identity), drilled, validated, publish blocked at export_commit_failed
+  (the expected sandbox signal), contract advertised≡exercised, inventory
+  returns trk_drlurie.
+
+**Remaining before the wave closes:** T13.11 (human_gate — env provisioning
+per OQ-W13-6 + `--production --release` + live beacon verification + the
+ten-type set_tracking MCP round-trip + CSP promotion call), T13.12, T13.13.
+
 ## Session 2026-07-20 (POST-MERGE CONTINUATION: W10 tail T10.5→T10.8 + W13 consent/conversions T13.6→T13.7 — six commits on `claude/w10-mints-w13-consent`)
 
 PR #461 (the session D/E bundle) MERGED to main (`3ecde204`); Wolf said

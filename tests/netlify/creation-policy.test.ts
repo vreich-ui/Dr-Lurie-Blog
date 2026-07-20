@@ -39,7 +39,12 @@ const TEMPLATES_RESTRICTED: CreationPolicy = {
 
 test('the committed config parses: open master, tracking_config human/seed-only (W13)', () => {
   const policy = resolveCreationPolicy(creationPolicyConfig);
-  assert.deepEqual(policy, { master: 'open', overrides: { tracking_config: { agents: [] } } });
+  // T13.10: the conversion-factory driver is the ONE named seed identity —
+  // "seeds mint" (OQ-W13-2) made concrete; casual agents stay excluded.
+  assert.deepEqual(policy, {
+    master: 'open',
+    overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
+  });
   assert.deepEqual(activeCreationPolicy(), policy);
 });
 

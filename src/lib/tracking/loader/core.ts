@@ -316,7 +316,11 @@ export const createTracker = (
         dwellStart.set(key, nowMs);
         if (!impressed.has(key)) {
           impressed.add(key);
-          if (ref.kind === 'section' && collects('section', 'impression') && sampled()) {
+          // Gate on the EVENT KIND ('section_impression') — the schema-legal
+          // defaults vocabulary (TRACKING_EVENT_KINDS); bare 'impression' is
+          // the goal-activity word, which no valid export can carry here
+          // (found by the T13.10 seed: the old gate could never open).
+          if (ref.kind === 'section' && collects('section', 'section_impression') && sampled()) {
             push('section_impression', ref);
           }
           if (ref.kind === 'node') {

@@ -33,7 +33,9 @@ import { classifyClick, trackableRefOf, type ElementLike } from '../../src/lib/t
 
 const DEFAULTS = {
   page: ['pageview', 'scroll_depth', 'engagement'],
-  section: ['impression', 'section_impression', 'section_dwell', 'cta_click', 'form_start', 'form_submit'],
+  // Schema-legal event kinds ONLY (bare 'impression' is goal-activity vocab
+  // and can never appear in a validated export — the T13.10 gate fix).
+  section: ['section_impression', 'section_dwell', 'cta_click', 'form_start', 'form_submit'],
   content_item: ['node_impression', 'node_dwell', 'read_progress', 'completion'],
   product: ['buy_click'],
   navigation: ['nav_click'],

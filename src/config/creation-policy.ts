@@ -22,5 +22,9 @@ export const creationPolicyConfig = {
   // is human/seed-minted ONLY — agents edit the singleton, they never mint
   // one. Publish ships AUTONOMOUS (no approval-policy override; the master
   // covers it); the posture gains an owner UI toggle in T13.12.
-  overrides: { tracking_config: { agents: [] } },
+  // T13.10: 'object-conversion-roundtrip' IS the sanctioned seed identity —
+  // the ruling's "seeds mint" needs a name, and the conversion-factory
+  // driver is the seed machinery (self-declared until OQ-3: coordination,
+  // not security). Casual agents remain excluded.
+  overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
 } satisfies CreationPolicyConfig;
