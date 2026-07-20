@@ -103,6 +103,41 @@ export const productPreviewSourceSchema = z.discriminatedUnion('kind', [
 ]);
 export type ProductPreviewSource = z.infer<typeof productPreviewSourceSchema>;
 
+// ─── media items (W10 T10.5) ─────────────────────────────────────────────────
+// Image or provider-allowlisted video. The video carries provider + ID only
+// (regex-pinned); the embed URL is a CODE-owned template in Media.astro —
+// data never carries a playable URL (the write+render safety posture).
+export const MEDIA_MAX_ITEMS = 8;
+export const BRAND_ROW_MAX_LOGOS = 8;
+export const STATS_MAX_ITEMS = 6;
+
+export const MEDIA_VIDEO_ID_RE = /^[A-Za-z0-9_-]{4,20}$/;
+
+const mediaImageItemSchema = z
+  .object({
+    kind: z.literal('image'),
+    src: z.string().min(1),
+    alt: z.string().min(1),
+    caption: z.string().optional(),
+  })
+  .strict();
+const mediaVideoItemSchema = z
+  .object({
+    kind: z.literal('video'),
+    provider: z.enum(['youtube', 'vimeo']),
+    videoId: z.string().regex(MEDIA_VIDEO_ID_RE),
+    /** Accessible name for the embed frame. */
+    title: z.string().min(1),
+    poster: z
+      .object({ src: z.string().min(1), alt: z.string().min(1) })
+      .strict()
+      .optional(),
+    caption: z.string().optional(),
+  })
+  .strict();
+export const mediaItemSchema = z.discriminatedUnion('kind', [mediaImageItemSchema, mediaVideoItemSchema]);
+export type MediaItem = z.infer<typeof mediaItemSchema>;
+
 const sectionVariant = <TType extends string, TData extends z.ZodRawShape>(type: TType, data: TData) =>
   z
     .object({
@@ -349,6 +384,56 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
           .strict()
       )
       .min(1),
+  }),
+  // W10 batch-1 mints (T10.5, ratified list — design-vocabulary-gaps.md §7).
+  // `media`: standalone image/gallery/video section (survey B2+C3). Video is
+  // provider-allowlisted BY ID — no URL field exists (the tracking_config
+  // safety posture): the renderer builds the embed URL from a code-owned
+  // template per provider, so data can never smuggle a src.
+  sectionVariant('media', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    /** Rendered arrangement; absent = 'single' (rule-6 bounded enum). */
+    layout: z.enum(['single', 'grid', 'strip']).optional(),
+    items: z.array(mediaItemSchema).min(1).max(MEDIA_MAX_ITEMS),
+    anchor: z.string().optional(),
+  }),
+  // `brand_row`: logo strip (survey A2+C4 — press logos, certifications,
+  // partner marks). 2–8 small images, optional label, optional per-logo
+  // targets (resolved like hero actions).
+  sectionVariant('brand_row', {
+    heading: z.string().optional(),
+    logos: z
+      .array(
+        z
+          .object({
+            src: z.string().min(1),
+            alt: z.string().min(1),
+            target: navTargetSchema.optional(),
+          })
+          .strict()
+      )
+      .min(2)
+      .max(BRAND_ROW_MAX_LOGOS),
+    anchor: z.string().optional(),
+  }),
+  // `stats`: number band (survey A4+C6) — large value + label (+ sublabel).
+  sectionVariant('stats', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    items: z
+      .array(
+        z
+          .object({
+            value: z.string().min(1).max(24),
+            label: z.string().min(1).max(64),
+            sublabel: z.string().max(96).optional(),
+          })
+          .strict()
+      )
+      .min(2)
+      .max(STATS_MAX_ITEMS),
+    anchor: z.string().optional(),
   }),
   // T3.13 extensibility drill: a reader/expert quote grid. No audited markup
   // on the live site — this exists to prove a NEW section type is insertable

@@ -50,6 +50,9 @@ import { isRegisteredSectionType } from './components/registered-types.js';
 import { formConfirmationDefinition } from './components/form-confirmation.js';
 import { searchDefinition } from './components/search.js';
 import { stepsDefinition } from './components/steps.js';
+import { brandRowDefinition } from './components/brand-row.js';
+import { mediaDefinition } from './components/media.js';
+import { statsDefinition } from './components/stats.js';
 import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
@@ -116,6 +119,9 @@ const SECTION_EDITORS = {
   steps: stepsDefinition.editor,
   content_split: contentSplitDefinition.editor,
   pricing_table: pricingTableDefinition.editor,
+  media: mediaDefinition.editor,
+  brand_row: brandRowDefinition.editor,
+  stats: statsDefinition.editor,
 } as const;
 
 /**

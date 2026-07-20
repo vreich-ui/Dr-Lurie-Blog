@@ -29,6 +29,9 @@ import { productPreviewDefinition } from '../../src/lib/registry/components/prod
 import { proseDefinition } from '../../src/lib/registry/components/prose.js';
 import { formConfirmationDefinition } from '../../src/lib/registry/components/form-confirmation.js';
 import { searchDefinition } from '../../src/lib/registry/components/search.js';
+import { brandRowDefinition } from '../../src/lib/registry/components/brand-row.js';
+import { mediaDefinition } from '../../src/lib/registry/components/media.js';
+import { statsDefinition } from '../../src/lib/registry/components/stats.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
 import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
 import {
@@ -60,6 +63,10 @@ const DEFINITIONS = [
   searchDefinition,
   contentEmbedDefinition,
   formConfirmationDefinition,
+  // W10 T10.5 mints (ratified batch 1) — held to the SAME invariants.
+  mediaDefinition,
+  brandRowDefinition,
+  statsDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({

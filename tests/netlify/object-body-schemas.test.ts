@@ -317,6 +317,40 @@ const sectionFixtures: SectionInstance[] = [
     data: { title: 'What Healthy Skin Means', description: 'A plain-language starting point.' },
   },
   { id: 's_shared', type: 'shared_ref', data: { section: 'sec_newsletter_signup' } },
+  {
+    id: 's_media1',
+    type: 'media',
+    data: {
+      heading: 'Gallery',
+      layout: 'grid',
+      items: [
+        { kind: 'image', src: '/images/a.jpg', alt: 'A figure', caption: 'Caption' },
+        { kind: 'video', provider: 'youtube', videoId: 'dQw4w9WgXcQ', title: 'Routine walkthrough' },
+      ],
+    },
+  },
+  {
+    id: 's_brandrow1',
+    type: 'brand_row',
+    data: {
+      heading: 'As seen in',
+      logos: [
+        { src: '/logos/a.svg', alt: 'Journal A', target: { kind: 'route', href: '/start-here' } },
+        { src: '/logos/b.svg', alt: 'Journal B' },
+      ],
+    },
+  },
+  {
+    id: 's_stats1',
+    type: 'stats',
+    data: {
+      kicker: 'By the numbers',
+      items: [
+        { value: '10k+', label: 'Readers', sublabel: 'monthly' },
+        { value: '97%', label: 'Satisfaction' },
+      ],
+    },
+  },
 ];
 
 test('sections: every union member parses from a seed fixture', () => {
@@ -329,6 +363,7 @@ test('sections: every union member parses from a seed fixture', () => {
   // The union covers exactly the documented types.
   assert.deepEqual([...sectionTypes].sort(), [
     'bio',
+    'brand_row',
     'card',
     'checklist',
     'contact_form',
@@ -341,12 +376,14 @@ test('sections: every union member parses from a seed fixture', () => {
     'hero',
     'lede',
     'link_list',
+    'media',
     'newsletter_signup',
     'pricing_table',
     'product_preview',
     'prose',
     'search',
     'shared_ref',
+    'stats',
     'steps',
     'testimonial',
   ]);
