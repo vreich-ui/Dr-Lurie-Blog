@@ -351,6 +351,29 @@ const sectionFixtures: SectionInstance[] = [
       ],
     },
   },
+  {
+    id: 's_timeline1',
+    type: 'timeline',
+    data: {
+      heading: 'What to expect',
+      milestones: [
+        { label: 'Getting started', period: 'Week 1', description: 'Skin adjusts.' },
+        { label: 'Visible change', period: 'Week 8', description: 'Texture evens out.' },
+      ],
+    },
+  },
+  {
+    id: 's_comparison1',
+    type: 'comparison_table',
+    data: {
+      heading: 'How we compare',
+      columns: [{ label: 'Us', highlighted: true }, { label: 'Them' }],
+      rows: [
+        { label: 'Evidence-based', cells: [true, false] },
+        { label: 'Response time', cells: ['24h', '5 days'] },
+      ],
+    },
+  },
 ];
 
 test('sections: every union member parses from a seed fixture', () => {
@@ -366,6 +389,7 @@ test('sections: every union member parses from a seed fixture', () => {
     'brand_row',
     'card',
     'checklist',
+    'comparison_table',
     'contact_form',
     'content_embed',
     'content_grid',
@@ -386,6 +410,7 @@ test('sections: every union member parses from a seed fixture', () => {
     'stats',
     'steps',
     'testimonial',
+    'timeline',
   ]);
 });
 

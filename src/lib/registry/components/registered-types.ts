@@ -35,6 +35,8 @@ export const REGISTERED_SECTION_TYPES = [
   'media',
   'brand_row',
   'stats',
+  'timeline',
+  'comparison_table',
 ] as const satisfies readonly SectionType[];
 
 export type RegisteredSectionType = (typeof REGISTERED_SECTION_TYPES)[number];

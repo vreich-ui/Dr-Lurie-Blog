@@ -51,8 +51,10 @@ import { formConfirmationDefinition } from './components/form-confirmation.js';
 import { searchDefinition } from './components/search.js';
 import { stepsDefinition } from './components/steps.js';
 import { brandRowDefinition } from './components/brand-row.js';
+import { comparisonTableDefinition } from './components/comparison-table.js';
 import { mediaDefinition } from './components/media.js';
 import { statsDefinition } from './components/stats.js';
+import { timelineDefinition } from './components/timeline.js';
 import { testimonialDefinition } from './components/testimonial.js';
 import { sectionVariantDataSchema } from './components/types.js';
 import { listPageTypeDefinitions } from './page-types.js';
@@ -122,6 +124,8 @@ const SECTION_EDITORS = {
   media: mediaDefinition.editor,
   brand_row: brandRowDefinition.editor,
   stats: statsDefinition.editor,
+  timeline: timelineDefinition.editor,
+  comparison_table: comparisonTableDefinition.editor,
 } as const;
 
 /**

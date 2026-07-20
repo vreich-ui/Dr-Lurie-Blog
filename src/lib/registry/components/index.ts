@@ -32,8 +32,10 @@ import FormConfirmation from '~/components/sections/FormConfirmation.astro';
 import Search from '~/components/sections/Search.astro';
 import Steps from '~/components/sections/Steps.astro';
 import BrandRow from '~/components/sections/BrandRow.astro';
+import ComparisonTable from '~/components/sections/ComparisonTable.astro';
 import Media from '~/components/sections/Media.astro';
 import Stats from '~/components/sections/Stats.astro';
+import Timeline from '~/components/sections/Timeline.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 
 import { bioDefinition } from './bio.js';
@@ -55,8 +57,10 @@ import { formConfirmationDefinition } from './form-confirmation.js';
 import { searchDefinition } from './search.js';
 import { stepsDefinition } from './steps.js';
 import { brandRowDefinition } from './brand-row.js';
+import { comparisonTableDefinition } from './comparison-table.js';
 import { mediaDefinition } from './media.js';
 import { statsDefinition } from './stats.js';
+import { timelineDefinition } from './timeline.js';
 import { testimonialDefinition } from './testimonial.js';
 import type { RegisteredSectionType } from './registered-types.js';
 import type { SectionComponentDefinition, SectionType } from './types.js';
@@ -97,6 +101,8 @@ export const componentRegistry: Record<RegisteredSectionType, RegisteredComponen
   media: bind(mediaDefinition, Media),
   brand_row: bind(brandRowDefinition, BrandRow),
   stats: bind(statsDefinition, Stats),
+  timeline: bind(timelineDefinition, Timeline),
+  comparison_table: bind(comparisonTableDefinition, ComparisonTable),
   content_split: bind(contentSplitDefinition, ContentSplit),
   pricing_table: bind(pricingTableDefinition, PricingTable),
 };

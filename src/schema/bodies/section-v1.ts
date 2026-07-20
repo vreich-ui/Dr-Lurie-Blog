@@ -110,6 +110,9 @@ export type ProductPreviewSource = z.infer<typeof productPreviewSourceSchema>;
 export const MEDIA_MAX_ITEMS = 8;
 export const BRAND_ROW_MAX_LOGOS = 8;
 export const STATS_MAX_ITEMS = 6;
+export const TIMELINE_MAX_MILESTONES = 8;
+export const COMPARISON_MAX_COLUMNS = 4;
+export const COMPARISON_MAX_ROWS = 12;
 
 export const MEDIA_VIDEO_ID_RE = /^[A-Za-z0-9_-]{4,20}$/;
 
@@ -226,6 +229,9 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     heading: z.string().min(1),
     body: richTextSchema.optional(),
     actions: z.array(linkActionSchema),
+    // T10.6 ratified variant (rule 6): pre-built class mappings in Hero.astro.
+    // Absent = 'center' = today's render byte-exactly.
+    variant: z.enum(['center', 'split', 'background']).optional(),
   }),
   sectionVariant('prose', {
     body: richTextSchema,
@@ -316,6 +322,8 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     heading: z.string().optional(),
     body: richTextSchema.optional(),
     actions: z.array(linkActionSchema),
+    // T10.6 ratified variant: slim spacing preset (absent = today's render).
+    compact: z.boolean().optional(),
   }),
   sectionVariant('faq', {
     heading: z.string().optional(),
@@ -350,6 +358,8 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
           .strict()
       )
       .min(1),
+    // T10.6 ratified variant: responsive column count (absent = 3 = today).
+    columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
   }),
   // Text + media split (W5 shop-preview conversion, plan §4): kicker/heading/
   // paragraph body/actions beside 1–2 images. `reverse` flips the columns —
@@ -361,6 +371,9 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     actions: z.array(linkActionSchema),
     images: z.array(z.object({ src: z.string().min(1), alt: z.string().min(1) }).strict()).max(2),
     reverse: z.boolean().optional(),
+    // T10.6 ratified variant: 'stagger' (today's offset second image) or
+    // 'stack' (both images flush). Absent = 'stagger' = today byte-exactly.
+    imageLayout: z.enum(['stagger', 'stack']).optional(),
   }),
   // Product-linked pricing tiers (W5 /pricing, plan §4): each tier REFERENCES
   // a product object — price badge + availability resolve from the SAME
@@ -435,6 +448,53 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
       .max(STATS_MAX_ITEMS),
     anchor: z.string().optional(),
   }),
+  // `timeline` (T10.6 mint, survey B7): ordered milestones on a time axis —
+  // "what to expect over 12 weeks". Plain-text blurbs v1 (a rich body joins
+  // on demand with its splitter wiring, rule 1).
+  sectionVariant('timeline', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    milestones: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(64),
+            period: z.string().max(48).optional(),
+            description: z.string().min(1),
+          })
+          .strict()
+      )
+      .min(2)
+      .max(TIMELINE_MAX_MILESTONES),
+    anchor: z.string().optional(),
+  }),
+  // `comparison_table` (T10.6 mint, survey A12): a bounded feature matrix —
+  // 2–4 columns, ≤12 rows; cells are booleans (check/dash) or short strings.
+  // The renderer aligns cells to columns index-wise and renders '—' for a
+  // missing cell (defensive; no cross-length schema coupling).
+  sectionVariant('comparison_table', {
+    kicker: z.string().optional(),
+    heading: z.string().optional(),
+    columns: z
+      .array(z.object({ label: z.string().min(1).max(32), highlighted: z.boolean().optional() }).strict())
+      .min(2)
+      .max(COMPARISON_MAX_COLUMNS),
+    rows: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1).max(64),
+            cells: z
+              .array(z.union([z.boolean(), z.string().max(48)]))
+              .min(1)
+              .max(COMPARISON_MAX_COLUMNS),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(COMPARISON_MAX_ROWS),
+    anchor: z.string().optional(),
+  }),
   // T3.13 extensibility drill: a reader/expert quote grid. No audited markup
   // on the live site — this exists to prove a NEW section type is insertable
   // through the registry pattern (one union member + one module + one
@@ -444,6 +504,11 @@ export const sectionInstanceSchema = z.discriminatedUnion('type', [
     heading: z.string().optional(),
     quotes: z.array(z.object({ quote: z.string().min(1), attribution: z.string().optional() }).strict()),
     anchor: z.string().optional(),
+    // T10.6 ratified variants: layout 'single' (one spotlight column) or
+    // 'wall' (3-col card wall); presentation 'quote' (cards) or 'pullquote'
+    // (large serif pull-quotes). Absent = today's 2-col cards byte-exactly.
+    layout: z.enum(['single', 'wall']).optional(),
+    variant: z.enum(['quote', 'pullquote']).optional(),
   }),
   // Extracts the hardcoded Header search overlay (A§2.8).
   sectionVariant('search', {

@@ -30,6 +30,8 @@ import { proseDefinition } from '../../src/lib/registry/components/prose.js';
 import { formConfirmationDefinition } from '../../src/lib/registry/components/form-confirmation.js';
 import { searchDefinition } from '../../src/lib/registry/components/search.js';
 import { brandRowDefinition } from '../../src/lib/registry/components/brand-row.js';
+import { comparisonTableDefinition } from '../../src/lib/registry/components/comparison-table.js';
+import { timelineDefinition } from '../../src/lib/registry/components/timeline.js';
 import { mediaDefinition } from '../../src/lib/registry/components/media.js';
 import { statsDefinition } from '../../src/lib/registry/components/stats.js';
 import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
@@ -67,6 +69,9 @@ const DEFINITIONS = [
   mediaDefinition,
   brandRowDefinition,
   statsDefinition,
+  // W10 T10.6 mints (ratified batch 2).
+  timelineDefinition,
+  comparisonTableDefinition,
 ] as const;
 
 const asInstance = (type: string, data: unknown, index: number) => ({
