@@ -6,6 +6,13 @@
  * the renderer; this file owns only layout and classes. The first body
  * paragraph renders larger than the rest — a class decision this component
  * owns, applied per paragraph via the rich-text splitter.
+ *
+ * T10.6 ratified variant (rule 6 — pre-built branches, never free classes):
+ * 'center' (= absent) keeps the audited markup BYTE-EXACTLY (its branch is
+ * the untouched original); 'split' widens the shell and seats the action
+ * stack beside the copy at lg; 'background' wraps the hero in a tinted
+ * band. The branches deliberately duplicate the copy block — a shared
+ * wrapper would add an element to the default path and break the byte gate.
  */
 import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
 import type { HeroResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
@@ -18,38 +25,91 @@ type Props = {
 
 const { data, resolved } = Astro.props;
 const paragraphs = splitRichTextParagraphs(data.body ?? '');
+const variant = data.variant ?? 'center';
 const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
   style === 'secondary' ? 'btn-secondary' : style === 'link' ? 'btn-link' : 'btn-primary';
 ---
 
-<section class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-20">
-  {data.kicker && <p class="mb-4 text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
-  <h1 class="max-w-3xl text-4xl font-bold tracking-tight text-heading sm:text-5xl">
-    {data.heading}
-  </h1>
-  {
-    paragraphs.map((paragraph, index) =>
-      index === 0 ? (
-        <p class="mt-6 max-w-2xl text-xl leading-8 text-default" set:html={paragraph} />
-      ) : (
-        <p class="mt-5 max-w-2xl text-base leading-7 text-muted" set:html={paragraph} />
-      )
-    )
-  }
-  {
-    /* Whitespace inside an inline <a> widens its underline, so none may leak
-       in: set:text keeps the label free of template whitespace regardless of
-       formatting, and the explicit ' ' expression is the single space BETWEEN
-       sibling anchors (array-adjacent map items emit none on their own). */
-    data.actions.length > 0 && (
-      <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-        {data.actions.map((action, index) => (
-          <Fragment>
-            {index > 0 && ' '}
-            <a class={actionClass(action.style)} href={resolved.actionHrefs[index]} set:text={action.label} />
-          </Fragment>
-        ))}
+{
+  variant === 'center' && (
+    <section class="mx-auto max-w-4xl px-4 py-16 sm:px-6 sm:py-20">
+      {data.kicker && <p class="mb-4 text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+      <h1 class="max-w-3xl text-4xl font-bold tracking-tight text-heading sm:text-5xl">{data.heading}</h1>
+      {paragraphs.map((paragraph, index) =>
+        index === 0 ? (
+          <p class="mt-6 max-w-2xl text-xl leading-8 text-default" set:html={paragraph} />
+        ) : (
+          <p class="mt-5 max-w-2xl text-base leading-7 text-muted" set:html={paragraph} />
+        )
+      )}
+      {/* Whitespace inside an inline <a> widens its underline, so none may
+          leak in: set:text keeps the label free of template whitespace, and
+          the explicit ' ' expression is the single space BETWEEN sibling
+          anchors (array-adjacent map items emit none on their own). */}
+      {data.actions.length > 0 && (
+        <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+          {data.actions.map((action, index) => (
+            <Fragment>
+              {index > 0 && ' '}
+              <a class={actionClass(action.style)} href={resolved.actionHrefs[index]} set:text={action.label} />
+            </Fragment>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+{
+  variant === 'split' && (
+    <section class="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:grid lg:grid-cols-[1fr_auto] lg:items-center lg:gap-x-16">
+      <div>
+        {data.kicker && <p class="mb-4 text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+        <h1 class="max-w-3xl text-4xl font-bold tracking-tight text-heading sm:text-5xl">{data.heading}</h1>
+        {paragraphs.map((paragraph, index) =>
+          index === 0 ? (
+            <p class="mt-6 max-w-2xl text-xl leading-8 text-default" set:html={paragraph} />
+          ) : (
+            <p class="mt-5 max-w-2xl text-base leading-7 text-muted" set:html={paragraph} />
+          )
+        )}
       </div>
-    )
-  }
-</section>
+      {data.actions.length > 0 && (
+        <div class="mt-8 flex flex-col gap-3 lg:mt-0">
+          {data.actions.map((action, index) => (
+            <Fragment>
+              {index > 0 && ' '}
+              <a class={actionClass(action.style)} href={resolved.actionHrefs[index]} set:text={action.label} />
+            </Fragment>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+{
+  variant === 'background' && (
+    <section class="bg-surface">
+      <div class="mx-auto max-w-4xl px-4 py-20 sm:px-6 sm:py-24">
+        {data.kicker && <p class="mb-4 text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+        <h1 class="max-w-3xl text-4xl font-bold tracking-tight text-heading sm:text-5xl">{data.heading}</h1>
+        {paragraphs.map((paragraph, index) =>
+          index === 0 ? (
+            <p class="mt-6 max-w-2xl text-xl leading-8 text-default" set:html={paragraph} />
+          ) : (
+            <p class="mt-5 max-w-2xl text-base leading-7 text-muted" set:html={paragraph} />
+          )
+        )}
+        {data.actions.length > 0 && (
+          <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+            {data.actions.map((action, index) => (
+              <Fragment>
+                {index > 0 && ' '}
+                <a class={actionClass(action.style)} href={resolved.actionHrefs[index]} set:text={action.label} />
+              </Fragment>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}

@@ -188,6 +188,11 @@ const resolvedFor = (type: SectionType, data: unknown, deps: ResolvePageDeps): u
     }
     return { cards: resolveContentGridCards(source, limit, deps.productGrid) };
   }
+  // brand_row (T10.5): per-logo optional targets resolve like actions.
+  if (type === 'brand_row') {
+    const logos = (data as { logos?: Array<{ target?: NavTarget }> }).logos ?? [];
+    return { logoHrefs: logos.map((logo) => (logo.target ? deps.resolveActionHref(logo.target) : undefined)) };
+  }
   // content_split shares the action-hrefs policy.
   if (type === 'content_split') {
     return {

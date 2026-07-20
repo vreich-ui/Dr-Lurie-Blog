@@ -10,6 +10,7 @@ import ApplyColorMode from '~/components/common/ApplyColorMode.astro';
 import Metadata from '~/components/common/Metadata.astro';
 import SiteVerification from '~/components/common/SiteVerification.astro';
 import TrackingScripts from '~/components/tracking/TrackingScripts.astro';
+import ConsentBanner from '~/components/tracking/ConsentBanner.astro';
 import BasicScripts from '~/components/common/BasicScripts.astro';
 import EditMode from '~/components/common/EditMode.astro';
 import NetlifyOptInCapture from '~/components/common/NetlifyOptInCapture.astro';
@@ -47,6 +48,7 @@ const { language, textDirection } = I18N;
     <slot />
 
     <BackToTop />
+    <ConsentBanner />
     <NetlifyOptInCapture />
     <BasicScripts />
     <EditMode />

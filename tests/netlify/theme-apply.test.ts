@@ -109,18 +109,35 @@ const altThemeBody = (): ThemeBody => ({
 
 // ═══ seed verification ════════════════════════════════════════════════════════
 
-test('the default theme seed parses, ids validate, and its tokens are byte-identical to the site seed', () => {
-  assert.equal(CONVERSION_SEEDS.length, 1);
-  const seed = CONVERSION_SEEDS[0]! as { objectType: string; objectId: string; body: ThemeBody };
-  assert.equal(seed.objectType, 'theme');
-  assert.ok(validateObjectIdForType('theme', seed.objectId).ok);
-  assert.ok(themeBodySchema.safeParse(seed.body).success);
-  assert.deepEqual(seed.body.tokens, siteBody.brandTokens, 'default theme === production palette (cannot drift)');
-
-  const summary = summarizeValidation(
-    validateObject({ objectType: 'theme', objectId: seed.objectId, body: seed.body }, {})
+test('the theme seeds parse and validate; the DEFAULT stays byte-identical to the site seed', () => {
+  // T10.8 added the axis-demo variant; the default remains seed[0] and its
+  // palette lockstep with production is unchanged (the drift-guard posture).
+  assert.equal(CONVERSION_SEEDS.length, 2);
+  for (const raw of CONVERSION_SEEDS) {
+    const seed = raw as { objectType: string; objectId: string; body: ThemeBody };
+    assert.equal(seed.objectType, 'theme');
+    assert.ok(validateObjectIdForType('theme', seed.objectId).ok);
+    assert.ok(themeBodySchema.safeParse(seed.body).success, seed.objectId);
+    const summary = summarizeValidation(
+      validateObject({ objectType: 'theme', objectId: seed.objectId, body: seed.body }, {})
+    );
+    assert.deepEqual(summary.blockers, [], `${seed.objectId}: ${JSON.stringify(summary.blockers)}`);
+  }
+  const defaultSeed = CONVERSION_SEEDS[0]! as { objectId: string; body: ThemeBody };
+  assert.equal(defaultSeed.objectId, 'thm_drlurie_default');
+  assert.deepEqual(
+    defaultSeed.body.tokens,
+    siteBody.brandTokens,
+    'default theme === production palette (cannot drift)'
   );
-  assert.deepEqual(summary.blockers, [], JSON.stringify(summary.blockers));
+  const variant = CONVERSION_SEEDS[1]! as { objectId: string; body: ThemeBody };
+  assert.equal(variant.objectId, 'thm_editorial_airy');
+  assert.deepEqual(
+    variant.body.tokens.colors,
+    siteBody.brandTokens.colors,
+    'the variant keeps the palette — axes only'
+  );
+  assert.deepEqual(variant.body.tokens.layout, { containerWidth: 'narrow', sectionRhythm: 'airy' });
 });
 
 // ═══ the apply drill ══════════════════════════════════════════════════════════

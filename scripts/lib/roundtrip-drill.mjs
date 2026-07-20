@@ -337,8 +337,41 @@ export const articleDrillOps = (body, probeNodeId) => {
   };
 };
 
-/** Dispatch: build the drill for one seed (page, section, template, section_template, taxonomy, site, product, or content_item). */
-export const drillOpsForSeed = (seed) => {
+/**
+ * `set_tracking` probe ops (W13) — the uniform one-writer op every governed
+ * type advertises (12-plan §2), so every family's drill must exercise it to
+ * satisfy the driver's advertised ≡ exercised contract gate. Poke the
+ * reporting `label` (never rendered — leak-safe on every type), then restore
+ * byte-exactly: a body that carried NO tracking block gets `fields: null`,
+ * which removes `body.tracking` entirely (the grammar's exact first-set
+ * inverse); a body WITH one gets its original label back (a `null` unset if
+ * the label key was absent — deep-merge would otherwise leave the probe).
+ */
+export const trackingProbeOps = (body) => {
+  const tracking = isRecord(body?.tracking) ? body.tracking : undefined;
+  const poke = { op: 'set_tracking', fields: { label: 'RT probe' } };
+  if (!tracking) {
+    return [poke, { op: 'set_tracking', fields: null }];
+  }
+  return [poke, { op: 'set_tracking', fields: { label: tracking.label ?? null } }];
+};
+
+const withTrackingProbe = (drill, body) => ({
+  expected: [...drill.expected, 'set_tracking'],
+  ops: [...drill.ops, ...trackingProbeOps(body)],
+});
+
+/**
+ * Dispatch: build the drill for one seed (page, section, template,
+ * section_template, taxonomy, site, product, theme, or content_item). Every
+ * branch gets the W13 `set_tracking` probe appended — the attribute lives at
+ * body top level on ALL these types. (If `tracking_config` ever joins the
+ * driver it must BYPASS the wrapper: it neither carries the attribute nor
+ * advertises the op.)
+ */
+export const drillOpsForSeed = (seed) => withTrackingProbe(baseDrillOpsForSeed(seed), seed.body);
+
+const baseDrillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {
     const existingIds = (Array.isArray(seed.body.sections) ? seed.body.sections : [])
       .map((section) => section?.id)

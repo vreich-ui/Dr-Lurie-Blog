@@ -16,6 +16,16 @@
  * (double-guarded: boot bail + per-event path check server-side).
  */
 
+import {
+  EVENT_ACTIVITY,
+  matchActivityGoals,
+  matchNamedGoals,
+  providerCalls,
+  type BridgeProviders,
+  type GoalBinding,
+  type GoalMapLike,
+} from './bridge.js';
+
 export type TrackerDefaults = Partial<Record<string, readonly string[]>> & {
   outbound_links?: boolean;
   utm_capture?: boolean;
@@ -26,6 +36,9 @@ export type TrackerConfig = {
   batch: { max_events: number; max_wait_ms: number };
   sample_rate: number;
   defaults: TrackerDefaults;
+  /** T13.7: the build-resolved goal map + enabled gtag-family providers. */
+  goals?: GoalMapLike;
+  providers?: BridgeProviders;
 };
 
 export type PageContext = {
@@ -46,6 +59,10 @@ export type ClientEventShape = Record<string, unknown>;
 export type TrackerEnv = {
   /** Deliver one tracking_batch.v1 payload (sendBeacon / fetch-keepalive). */
   send: (path: string, body: string) => void;
+  /** T13.7: push one gtag call tuple as a REAL `arguments` object onto
+   *  window.dataLayer (gtag.js ignores plain-array pushes). Absent = no
+   *  provider fan-out (tests, non-browser). */
+  gtagPush?: (args: unknown[]) => void;
   now: () => number;
   uuid: () => string;
   random: () => number;
@@ -67,6 +84,10 @@ export const parseTrackerConfig = (raw: unknown): TrackerConfig => {
     batch: { max_events: maxEvents, max_wait_ms: maxWait },
     sample_rate: sample,
     defaults: (record.defaults && typeof record.defaults === 'object' ? record.defaults : {}) as TrackerDefaults,
+    goals: (record.goals && typeof record.goals === 'object' ? record.goals : undefined) as GoalMapLike | undefined,
+    providers: (record.providers && typeof record.providers === 'object' ? record.providers : undefined) as
+      | BridgeProviders
+      | undefined,
   };
 };
 
@@ -115,6 +136,7 @@ export const createTracker = (
   let pageEnded = false;
 
   const consent = { analytics: false, ads: false, gpc: env.gpc };
+  let visitorId: string | null = null;
 
   const collects = (type: string, activity: string): boolean =>
     Array.isArray(config.defaults[type]) && (config.defaults[type] as readonly string[]).includes(activity);
@@ -154,7 +176,9 @@ export const createTracker = (
       event,
       url: { path: page.path, route: page.route },
       consent: { ...consent },
-      visitor: { mode: 'cookieless' },
+      // Consented mode ONLY while an upgrade id stands (T13.6): analytics
+      // grant, GPC off — index.ts owns mint/clear; this stays a pure read.
+      visitor: visitorId ? { mode: 'consented', vid: visitorId } : { mode: 'cookieless' },
     };
     const object = extraObject ?? objectOf(ref);
     if (object) shaped.object = object;
@@ -209,6 +233,40 @@ export const createTracker = (
     }
   };
 
+  // ── the T13.7 goal→conversion bridge ───────────────────────────────────────
+  // Declared goals are never sampled and never gated by the collection matrix
+  // (a declared conversion is intent, not telemetry); provider fan-out fires
+  // ONLY under an ads-released consent state (unrestricted/granted, GPC off) —
+  // the own `goal` event is consent-free like the rest of the cookieless
+  // pipeline.
+  const fireGoalBindings = (
+    bindings: readonly GoalBinding[],
+    ref: TrackableRef | null,
+    extraObject?: Record<string, string>
+  ): void => {
+    if (bindings.length === 0) return;
+    for (const binding of bindings) {
+      const props: Record<string, unknown> = { goal: binding.goal };
+      const valueCents = binding.conversions?.find(
+        (conversion) => typeof conversion.value_cents === 'number'
+      )?.value_cents;
+      if (typeof valueCents === 'number') props.value_cents = valueCents;
+      push('goal', ref, props, extraObject);
+    }
+    if (consent.ads && env.gtagPush) {
+      for (const call of providerCalls(bindings, config.providers)) env.gtagPush(call);
+    }
+  };
+
+  const bridgeActivity = (activity: string, ref: TrackableRef | null, extraObject?: Record<string, string>): void => {
+    const object = extraObject ?? objectOf(ref);
+    fireGoalBindings(
+      matchActivityGoals(config.goals, activity, [object?.object_id, object?.section_id, object?.term_id]),
+      ref,
+      extraObject
+    );
+  };
+
   return {
     /** astro:page-load — reset per-page state, emit the pageview. */
     pageLoad(context: PageContext, search = ''): void {
@@ -227,6 +285,13 @@ export const createTracker = (
       if (collects(page.object?.object_type ?? 'page', 'pageview') || collects('page', 'pageview')) {
         push('pageview', null);
       }
+      // T13.7: page-scoped `view` goals + ga4's manual page_view
+      // (send_page_view:false in its config — the loader owns navigation
+      // truth, so View-Transition swaps count correctly).
+      bridgeActivity('view', null);
+      if (config.providers?.ga4?.id && env.gtagPush) {
+        env.gtagPush(['event', 'page_view', { send_to: config.providers.ga4.id }]);
+      }
     },
 
     /** IntersectionObserver signal: an element crossed the 0.5 threshold. */
@@ -244,14 +309,13 @@ export const createTracker = (
           if (ref.kind === 'node') {
             seenNodes.add(ref.node_id);
             if (collects('content_item', 'node_impression') && sampled()) push('node_impression', ref);
-            if (
-              page.article?.last_node_id &&
-              ref.node_id === page.article.last_node_id &&
-              !completionSent &&
-              collects('content_item', 'completion')
-            ) {
+          }
+          bridgeActivity('impression', ref); // declared goals ride the raw signal
+          if (ref.kind === 'node' && page.article?.last_node_id && ref.node_id === page.article.last_node_id) {
+            if (!completionSent) {
               completionSent = true;
-              push('completion', ref);
+              if (collects('content_item', 'completion')) push('completion', ref);
+              bridgeActivity('completion', ref);
             }
           }
         }
@@ -301,6 +365,11 @@ export const createTracker = (
         form_start: ['section', 'form_start'],
         form_submit: ['section', 'form_submit'],
       };
+      // T13.7: declared goals ride the raw click signal, independent of the
+      // collection matrix (EVENT_ACTIVITY projects nav_click → cta_click;
+      // kinds without a goal activity fall through).
+      const activity = EVENT_ACTIVITY[kind];
+      if (activity && activity !== 'view') bridgeActivity(activity, ref, extraObject);
       const rule = gate[kind];
       if (rule && !collects(rule[0], rule[1])) {
         if (!(kind === 'outbound_click' && config.defaults.outbound_links)) return;
@@ -308,7 +377,9 @@ export const createTracker = (
       push(kind, ref, props, extraObject);
     },
 
-    /** trk:goal CustomEvent (the T13.7 bridge input). */
+    /** trk:goal CustomEvent — the by-NAME bridge path (T13.7): the own goal
+     *  event always; provider conversions only for map-declared goals under
+     *  a released ads-consent state. */
     goal(name: string, valueCents?: number): void {
       if (page.path.startsWith('/admin')) return;
       if (!/^[a-z][a-z0-9_]{1,31}$/.test(name)) return;
@@ -316,12 +387,24 @@ export const createTracker = (
       if (typeof valueCents === 'number' && Number.isInteger(valueCents) && valueCents >= 0)
         props.value_cents = valueCents;
       push('goal', null, props);
+      if (consent.ads && env.gtagPush) {
+        for (const call of providerCalls(matchNamedGoals(config.goals, name), config.providers)) {
+          env.gtagPush(call);
+        }
+      }
     },
 
-    /** T13.6 seam — inert until the consent banner wires it. */
+    /** Consent flags on outgoing events (GPC beats grant — T13.6 wires this). */
     setConsent(next: { analytics?: boolean; ads?: boolean }): void {
       if (typeof next.analytics === 'boolean') consent.analytics = next.analytics && !consent.gpc;
       if (typeof next.ads === 'boolean') consent.ads = next.ads && !consent.gpc;
+    },
+
+    /** The consented-id upgrade (T13.6): a standing `_dlid` flips visitor
+     *  mode to `consented`; null (no grant / GPC / revocation) reverts to
+     *  cookieless. GPC is absolute — an id can never be set under it. */
+    setVisitor(vid: string | null): void {
+      visitorId = !consent.gpc && typeof vid === 'string' && vid.length > 0 ? vid : null;
     },
 
     /** pagehide / astro:before-swap — report dwell + engagement + progress, flush. */

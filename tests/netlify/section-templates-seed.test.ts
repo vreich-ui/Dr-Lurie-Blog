@@ -42,6 +42,11 @@ test('the batch is five section templates for site_drlurie', () => {
       ['section_template', 'stpl_related_articles'],
       ['section_template', 'stpl_newsletter_cta'],
       ['section_template', 'stpl_cta_banner'],
+      // W10 T10.8 — starters for the ratified mints.
+      ['section_template', 'stpl_stats_band'],
+      ['section_template', 'stpl_expectations_timeline'],
+      ['section_template', 'stpl_comparison_matrix'],
+      ['section_template', 'stpl_media_gallery'],
     ]
   );
 });

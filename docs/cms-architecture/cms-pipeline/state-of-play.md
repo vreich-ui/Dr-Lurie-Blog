@@ -7,6 +7,84 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-20 (POST-MERGE CONTINUATION: W10 tail T10.5→T10.8 + W13 consent/conversions T13.6→T13.7 — six commits on `claude/w10-mints-w13-consent`)
+
+PR #461 (the session D/E bundle) MERGED to main (`3ecde204`); Wolf said
+"continue" — new branch `claude/w10-mints-w13-consent` off merged main,
+same cloud-sandbox delivery constraints (git bundle → Wolf fetch/push).
+One task = one commit; every task gated on suite + check + build-diff.
+
+- **T10.5 (`80e49a68`)**: mint batch 1 per the T10.4 ratification — `media`
+  (image/video discriminated items; video FOLDED IN: provider enum
+  youtube|vimeo, regex-pinned videoId re-asserted at render — the embed
+  template throws on drift), `brand_row` (2–8 logos, nav-target hrefs
+  resolved via the renderer seam), `stats` (2–6 bounded stat cells).
+  Union 21→24; registry modules + components + editor hints + contract.
+- **T10.6 (`ccc40980`)**: mint batch 2 — `timeline` (2–8 milestones),
+  `comparison_table` (2–4 columns ≤12 rows, boolean-or-short-string cells)
+  — union 24→26 — plus ALL FIVE ratified variant fields (hero.variant
+  center|split|background with the center branch the untouched audited
+  markup; cta_banner.compact; content_split.imageLayout stagger|stack;
+  steps.columns 2|3|4; testimonial.layout single|wall + variant
+  quote|pullquote). Every variant additive-optional: the exact pre-variant
+  shapes still parse (mint-batch-2 test pins this).
+- **T10.7 (`2f6ae2a8`)**: `composite-sections-decision.md` — the OQ-W8-1…4
+  decision package, re-scored AFTER the mints: gate NOT cleanly cleared
+  (bento + overlap genuine static-composition cases; the pricing toggle is
+  interactivity §8 would not fix) → recommend composite STAYS GATED until
+  W12 capture evidence; build-ready answers for W8-2/3/4 if Wolf overrides.
+  Four ANSWER lines await Wolf. Docs only.
+- **T10.8 (`de0e9ad6`)**: starter recipes — stpl_stats_band /
+  stpl_expectations_timeline / stpl_comparison_matrix / stpl_media_gallery
+  (brand_row skipped: no licensed logo assets) + `thm_editorial_airy`, the
+  first theme variant carrying T10.1 axes (narrow/airy/soft/editorial).
+  Found+fixed two stale driver gates: SUPPORTED_SEED_TYPES never admitted
+  section_template/theme seeds, and the advertised≡exercised contract gate
+  broke on W13's `set_tracking` (now a uniform tracking probe on EVERY
+  family drill, byte-exact restore). Both local rehearsals all-green.
+- **T13.6 (`91e13cbe`)**: consent per OQ-W13-1 — the runtime is ONE
+  self-contained function serialized into the inline bootstrap (the page
+  ships the very function the 22-test gate matrix executes): geo-adaptive/
+  consent-first/us-first from one enum, unknown-region hold, oracle via
+  sessionStorage→GET /api/t?mode=region, Intl heuristic keep-held-only,
+  Consent Mode v2 denied defaults + redaction + url_passthrough BEFORE any
+  vendor head, gated-script activation, GPC absolute (beats grant, blocks
+  id), ad_personalization permanently denied (no TCF CMP). ConsentBanner
+  is a code component (validated config copy, escaped; hidden until the
+  runtime reveals; any `#privacy-choices` footer nav link re-opens it —
+  document for the nav edit, zero code). Consented-id upgrade: `_dlid`
+  minted only on analytics grant with GPC off, 13-month cap FIXED at mint,
+  cleared on refusal; loader flips visitor mode consented/cookieless.
+- **T13.7 (`750ddbb9`)**: the google_ads (always-gated,
+  send_page_view:false) and ga4 (gated only as advertising class; manual
+  page_view per pageLoad) adapters, the one-gtag.js-loader rule, and the
+  §7 bridge in the loader core: (object_id, on) activity matching and
+  trk:goal by-name matching → the own `goal` event (never sampled) plus
+  declared provider conversions ONLY, under a released ads-consent state;
+  product_price values build-resolved into the goal map; enhanced
+  conversions OFF (asserted). v1 wiring: opt_in / contact_submit via a
+  LOADER-owned submit listener on data-netlify forms (also the §6
+  form_submit signal — exists only when a tracking export mounts the
+  loader, so the inline opt-in capture stays byte-identical); purchase
+  dispatched from the checkout success confirmation. Loader size pin
+  4KB→4.5KB (documented in the test; ceiling 6KB unchanged).
+
+**Verification at the chunk boundary:** suite **1608/1608 + 60/60**;
+`npm run check` green; build-diff vs merged main: EMPTY for every task
+except ONE RECORDED DEVIATION on T13.7 — `/shop/thank-you/index.html`
+changed, inline-script-only (Astro inlines the hand-coded S1c page script;
+rendered DOM byte-identical): the brief's own commissioned purchase
+dispatch. All 79 other pages byte-identical.
+
+**Waiting on Wolf/vreich:** (1) fetch + review + push the bundle (branch
+`claude/w10-mints-w13-consent`, 7 commits incl. the records commit); (2)
+the four OQ-W8 ANSWER lines in `composite-sections-decision.md`; (3)
+standing human gates unchanged (T9.16 re-drive, T9.7, T9.23, T10.9
+credentialed seed run, eventual T13.11 env provisioning per OQ-W13-6).
+**Next in queue:** T13.8 (native adapters + CSP — auto/opus), T13.9
+(owner-DB kit — auto/sonnet), T13.10 (tracking seeds + roundtrip —
+auto/opus), T13.12/T13.13 (auto/opus).
+
 ## Session 2026-07-19 E (W13 CHUNK 1 BUILT: T13.1→T13.5 — tracking substrate code-complete to the render seam; T10.4 RATIFIED in-session; delivery via git bundle)
 
 Continuation of session D (same Cowork cloud sandbox, same branch

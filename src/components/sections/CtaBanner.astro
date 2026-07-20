@@ -20,18 +20,25 @@ type Props = {
 
 const { data, resolved } = Astro.props;
 const paragraphs = splitRichTextParagraphs(data.body ?? '');
+// T10.6 ratified variant: compact = slim spacing + smaller heading (pre-built
+// class sets; absent/false = today's classes byte-exactly).
+const sectionClass = data.compact ? 'mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10' : 'dl-section';
+const headingClass = data.compact
+  ? 'text-2xl font-bold tracking-tight text-heading sm:text-3xl'
+  : 'text-3xl font-bold tracking-tight text-heading sm:text-4xl';
+const actionsMarginClass = data.compact ? 'mt-5' : 'mt-8';
 const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
   style === 'secondary' ? 'btn-secondary' : style === 'link' ? 'btn-link' : 'btn-primary';
 ---
 
-<section class="dl-section">
-  {data.heading && <h2 class="text-3xl font-bold tracking-tight text-heading sm:text-4xl">{data.heading}</h2>}
+<section class={sectionClass}>
+  {data.heading && <h2 class={headingClass}>{data.heading}</h2>}
   {paragraphs.map((paragraph) => <p class="mt-4 max-w-2xl text-lg text-muted" set:html={paragraph} />)}
   {
     /* Whitespace inside an inline <a> widens its underline; keep it out with
        set:text and the explicit ' ' between sibling anchors (see Hero.astro). */
     data.actions.length > 0 && (
-      <div class:list={['mt-8', { 'flex flex-col gap-3 sm:flex-row': data.actions.length > 1 }]}>
+      <div class:list={[actionsMarginClass, { 'flex flex-col gap-3 sm:flex-row': data.actions.length > 1 }]}>
         {data.actions.map((action, index) => (
           <Fragment>
             {index > 0 && ' '}

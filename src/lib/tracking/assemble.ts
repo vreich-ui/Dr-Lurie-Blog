@@ -11,19 +11,40 @@
  * nothing else from `tracking` (label/tags NEVER leave the export).
  */
 import { trackingConfigBodySchema, type TrackingConfigBody } from '../../schema/bodies/tracking-config-v1.js';
+import { ga4Adapter } from './adapters/ga4.js';
+import { googleAdsAdapter } from './adapters/google-ads.js';
 import { ownAdapter } from './adapters/own.js';
 import { plausibleAdapter } from './adapters/plausible.js';
 import type { AdapterResult } from './adapters/types.js';
+
+export type GoalSourceConversion = {
+  provider: string;
+  label: string;
+  value_source?: string;
+};
 
 export type GoalSource = {
   object_id: string;
   tracking?: {
     enabled?: boolean;
-    goals?: { goal: string; on?: string }[];
+    goals?: { goal: string; on?: string; provider_conversions?: GoalSourceConversion[] }[];
   } | null;
+  /** Product sources only (T13.7): the export's commerce price — the ONLY
+   *  origin of `value_source:'product_price'` values (never client-guessed). */
+  price_cents?: number;
+  currency?: string;
 };
 
-export type TrackerGoalMap = Record<string, { enabled?: false; goals?: { goal: string; on?: string }[] }>;
+export type TrackerGoalConversion = {
+  provider: string;
+  label: string;
+  value_cents?: number;
+  currency?: string;
+};
+
+export type TrackerGoal = { goal: string; on?: string; conversions?: TrackerGoalConversion[] };
+
+export type TrackerGoalMap = Record<string, { enabled?: false; goals?: TrackerGoal[] }>;
 
 /** {object_id → goals/off} — only entries that change loader behavior. */
 export const buildGoalMap = (sources: readonly GoalSource[]): TrackerGoalMap => {
@@ -34,7 +55,23 @@ export const buildGoalMap = (sources: readonly GoalSource[]): TrackerGoalMap => 
     const entry: TrackerGoalMap[string] = {};
     if (tracking.enabled === false) entry.enabled = false;
     if (Array.isArray(tracking.goals) && tracking.goals.length > 0) {
-      entry.goals = tracking.goals.map((goal) => ({ goal: goal.goal, ...(goal.on ? { on: goal.on } : {}) }));
+      entry.goals = tracking.goals.map((goal) => {
+        const shaped: TrackerGoal = { goal: goal.goal, ...(goal.on ? { on: goal.on } : {}) };
+        // provider_conversions are PUBLIC by construction (§2 — regex-pinned
+        // labels); value_source:'product_price' resolves HERE, at build,
+        // from the declaring product's export.
+        if (Array.isArray(goal.provider_conversions) && goal.provider_conversions.length > 0) {
+          shaped.conversions = goal.provider_conversions.map((conversion) => {
+            const resolved: TrackerGoalConversion = { provider: conversion.provider, label: conversion.label };
+            if (conversion.value_source === 'product_price' && typeof source.price_cents === 'number') {
+              resolved.value_cents = source.price_cents;
+              if (source.currency) resolved.currency = source.currency;
+            }
+            return resolved;
+          });
+        }
+        return shaped;
+      });
     }
     if (Object.keys(entry).length > 0) map[source.object_id] = entry;
   }
@@ -49,6 +86,9 @@ export type TrackerClientConfig = {
   defaults: TrackingConfigBody['defaults'];
   consent: { posture: string; regions: string[]; gpc: boolean };
   goals: TrackerGoalMap;
+  /** Enabled gtag-family providers the T13.7 bridge may call (ids are
+   *  already public — they sit in the head snippets). */
+  providers?: { google_ads?: { id: string }; ga4?: { id: string } };
 };
 
 /**
@@ -61,25 +101,44 @@ export const buildTrackerClientConfig = (
   objectId: string,
   body: TrackingConfigBody,
   goalSources: readonly GoalSource[]
-): TrackerClientConfig => ({
-  // trk_<project> — the site_/tax_ naming convention IS the project id.
-  project: objectId.replace(/^trk_/, ''),
-  ingest_path: body.providers.own?.ingest_path ?? '/api/t',
-  batch: body.providers.own?.batch ?? { max_events: 20, max_wait_ms: 10000 },
-  sample_rate: body.providers.own?.sample_rate ?? 1,
-  defaults: body.defaults,
-  consent: {
-    posture: body.consent.posture,
-    regions: body.consent.restricted_regions,
-    gpc: body.consent.honor_gpc,
-  },
-  goals: buildGoalMap(goalSources),
-});
+): TrackerClientConfig => {
+  const config: TrackerClientConfig = {
+    // trk_<project> — the site_/tax_ naming convention IS the project id.
+    project: objectId.replace(/^trk_/, ''),
+    ingest_path: body.providers.own?.ingest_path ?? '/api/t',
+    batch: body.providers.own?.batch ?? { max_events: 20, max_wait_ms: 10000 },
+    sample_rate: body.providers.own?.sample_rate ?? 1,
+    defaults: body.defaults,
+    consent: {
+      posture: body.consent.posture,
+      regions: body.consent.restricted_regions,
+      gpc: body.consent.honor_gpc,
+    },
+    goals: buildGoalMap(goalSources),
+  };
+  const providers: NonNullable<TrackerClientConfig['providers']> = {};
+  if (body.providers.google_ads?.enabled && body.providers.google_ads.conversion_id) {
+    providers.google_ads = { id: body.providers.google_ads.conversion_id };
+  }
+  if (body.providers.ga4?.enabled && body.providers.ga4.measurement_id) {
+    providers.ga4 = { id: body.providers.ga4.measurement_id };
+  }
+  if (Object.keys(providers).length > 0) config.providers = providers;
+  return config;
+};
 
-/** Enabled adapters only, in emission order (own first, natives via T13.7/8). */
+/** Enabled adapters only, in emission order (own first; natives via T13.8). */
 export const assembleAdapterHeads = (body: TrackingConfigBody, siteHost: string): AdapterResult[] => {
   const results: AdapterResult[] = [];
   results.push(ownAdapter(body.providers.own));
   results.push(plausibleAdapter(body.providers.plausible, { siteHost }));
+  // One gtag.js loader per page: it rides the LEAST-gated enabled consumer
+  // (an ungated analytics-class ga4 must load immediately; a gated-only
+  // family loads on activation).
+  const googleAds = body.providers.google_ads;
+  const ga4 = body.providers.ga4;
+  const ga4Live = ga4?.enabled === true && ga4.consent_class !== 'advertising';
+  results.push(googleAdsAdapter(googleAds, { includeLoader: googleAds?.enabled === true && !ga4Live }));
+  results.push(ga4Adapter(ga4, { includeLoader: ga4?.enabled === true && (ga4Live || googleAds?.enabled !== true) }));
   return results.filter((result) => result.head !== '' || result.cspHosts.script.length > 0);
 };

@@ -21,6 +21,9 @@ const paragraphs = splitRichTextParagraphs(data.body);
 const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
   style === 'secondary' ? 'btn-secondary' : style === 'link' ? 'btn-link' : 'btn-primary';
 const hasImages = data.images.length > 0;
+// T10.6 ratified variant: 'stagger' (= absent, today's offset second image
+// byte-exactly) or 'stack' (both images flush, second visible on mobile).
+const stagger = (data.imageLayout ?? 'stagger') === 'stagger';
 ---
 
 <section class="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
@@ -53,7 +56,7 @@ const hasImages = data.images.length > 0;
             <figure
               class:list={[
                 'overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900',
-                index === 1 ? 'hidden sm:block lg:translate-y-8' : '',
+                index === 1 ? (stagger ? 'hidden sm:block lg:translate-y-8' : '') : '',
               ]}
             >
               <img

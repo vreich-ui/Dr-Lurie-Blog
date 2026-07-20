@@ -80,6 +80,10 @@ const metadata = {
           );
           continue;
         }
+        // W13 T13.7: the checkout is CONFIRMED (order_ready) — bridge the
+        // `purchase` goal; value resolves from the goal map (build-time
+        // product_price — never client-guessed).
+        document.dispatchEvent(new CustomEvent('trk:goal', { detail: { goal: 'purchase' } }));
         if (status.download && downloadWrap && downloadLink instanceof HTMLAnchorElement) {
           downloadLink.href = status.download.url;
           downloadLink.textContent = `Download ${status.download.filename}`;

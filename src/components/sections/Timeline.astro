@@ -1,0 +1,42 @@
+---
+/**
+ * `timeline` section component (W10 T10.6). A vertical milestone list with
+ * a connecting rail — label + optional period + short description.
+ */
+import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'timeline'>;
+  resolved: EmptyResolved;
+  ctx: RenderCtx;
+};
+
+const { data } = Astro.props;
+---
+
+<section id={data.anchor} class="mx-auto max-w-5xl border-t border-gray-200 px-4 py-14 sm:px-6 dark:border-gray-800">
+  {
+    (data.kicker || data.heading) && (
+      <div class="max-w-2xl">
+        {data.kicker && <p class="text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+        {data.heading && (
+          <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">{data.heading}</h2>
+        )}
+      </div>
+    )
+  }
+  <ol class="mt-8 space-y-8 border-l border-gray-200 pl-6 dark:border-gray-800">
+    {
+      data.milestones.map((milestone) => (
+        <li class="relative">
+          <span class="absolute -left-[1.85rem] top-1.5 h-3 w-3 rounded-full border-2 border-accent bg-page" />
+          {milestone.period && (
+            <p class="text-xs font-medium uppercase tracking-[0.14em] text-muted">{milestone.period}</p>
+          )}
+          <h3 class="mt-0.5 text-lg font-semibold text-heading">{milestone.label}</h3>
+          <p class="mt-1 max-w-2xl text-muted">{milestone.description}</p>
+        </li>
+      ))
+    }
+  </ol>
+</section>
