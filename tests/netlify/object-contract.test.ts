@@ -196,8 +196,13 @@ test('W8.3b: creation_policy is served on every contract and reflects the inject
     const open = buildObjectContract(type).creation_policy;
     assert.equal(open.humans, 'always_allowed');
     if (type === 'tracking_config') {
-      // W13: human/seed-only under the committed default ({ agents: [] }).
-      assert.deepEqual(open.agents, { allowlist: [] }, 'tracking_config is agent-closed');
+      // W13: human/seed-only — the conversion-factory driver is the one
+      // named seed identity (T13.10); casual agents stay excluded.
+      assert.deepEqual(
+        open.agents,
+        { allowlist: ['object-conversion-roundtrip'] },
+        'tracking_config allows only the seed driver'
+      );
     } else {
       assert.equal(open.agents, 'open', `${type} is open under the committed default`);
     }

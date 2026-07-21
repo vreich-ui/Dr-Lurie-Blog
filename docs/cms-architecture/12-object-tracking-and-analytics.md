@@ -83,24 +83,29 @@ schema-optional so **all pre-W13 records keep parsing** (the additive
 guarantee). Spread `...trackingAttributeShape` into all ten body schemas.
 
 ```ts
-export const GOAL_KEY_RE = /^[a-z][a-z0-9_]{1,31}$/;        // neutral slugs — these reach HTML
+export const GOAL_KEY_RE = /^[a-z][a-z0-9_]{1,31}$/; // neutral slugs — these reach HTML
 export const CONVERSION_LABEL_RE = /^[A-Za-z0-9_-]{4,64}$/; // provider conversion label/id
 
 export const trackingGoalSchema = z.strictObject({
-  goal: z.string().regex(GOAL_KEY_RE),            // own-tracker goal key ('buy_click', 'opt_in', …)
-  on: z.enum(['view', 'impression', 'cta_click', 'form_submit',
-              'buy_click', 'completion', 'outbound_click']).optional(),
-  provider_conversions: z.array(z.strictObject({
-    provider: z.enum(['google_ads', 'ga4', 'meta_pixel', 'taboola', 'outbrain', 'mgid']),
-    label: z.string().regex(CONVERSION_LABEL_RE),
-    value_source: z.enum(['none', 'product_price']).optional(),
-  })).optional(),
+  goal: z.string().regex(GOAL_KEY_RE), // own-tracker goal key ('buy_click', 'opt_in', …)
+  on: z
+    .enum(['view', 'impression', 'cta_click', 'form_submit', 'buy_click', 'completion', 'outbound_click'])
+    .optional(),
+  provider_conversions: z
+    .array(
+      z.strictObject({
+        provider: z.enum(['google_ads', 'ga4', 'meta_pixel', 'taboola', 'outbrain', 'mgid']),
+        label: z.string().regex(CONVERSION_LABEL_RE),
+        value_source: z.enum(['none', 'product_price']).optional(),
+      })
+    )
+    .optional(),
 });
 
 export const trackingAttributeSchema = z.strictObject({
-  enabled: z.boolean().optional(),   // absent = inherit the per-type default from tracking_config
-  label: z.string().max(120).optional(),                    // reporting name — NEVER rendered
-  tags: z.array(z.string().max(48)).max(12).optional(),     // reporting grouping — NEVER rendered
+  enabled: z.boolean().optional(), // absent = inherit the per-type default from tracking_config
+  label: z.string().max(120).optional(), // reporting name — NEVER rendered
+  tags: z.array(z.string().max(48)).max(12).optional(), // reporting grouping — NEVER rendered
   goals: z.array(trackingGoalSchema).max(8).optional(),
 });
 
@@ -172,21 +177,21 @@ materializer, content collection, contract, seeds, tests).
   deep-merge edits one provider without upsert ops): `own`, `ga4`, `gtm`,
   `google_ads`, `meta_pixel`, `taboola`, `outbrain`, `mgid`, `plausible`.
   Every block: `{ enabled: boolean, <typed id field>, consent_class:
-  'essential'|'analytics'|'advertising' }` with per-provider regex-pinned
-  IDs — `AW-\d{6,12}` (google_ads.conversion_id), `G-[A-Z0-9]{4,14}`
+'essential'|'analytics'|'advertising' }` with per-provider regex-pinned
+  IDs — `AW-\d{6,12}` (google*ads.conversion_id), `G-[A-Z0-9]{4,14}`
   (ga4.measurement_id), `GTM-[A-Z0-9]{4,10}`, `\d{8,20}` (meta pixel_id),
   numeric account ids for the natives, bare-https origin for
   `plausible.api_host`. `own` additionally carries `ingest_path`
-  (default `/api/t`), `endpoint_env` / `auth_env` (**env-var NAMES matching
-  `/^[A-Z][A-Z0-9_]{2,63}$/`, never values or URLs** — the CMS-Agent
-  house pattern), `sample_rate` (0–1), `batch { max_events ≤25,
+  (default `/api/t`), `endpoint_env` / `auth_env` (\*\*env-var NAMES matching
+  `/^[A-Z]A-Z0-9*]{2,63}$/`, never values or URLs** — the CMS-Agent
+house pattern), `sample_rate`(0–1),`batch { max_events ≤25,
   max_wait_ms }`, `blob_mirror: 'fallback'|'always'|'off'`. Refinements:
-  `enabled: true` requires the id field non-empty; env fields must not
-  contain `://`.
+`enabled: true`requires the id field non-empty; env fields must not
+contain`://`.
 - **`consent`** — `{ posture: 'geo-adaptive'|'consent-first'|'us-first',
-  restricted_regions: ISO-3166-alpha-2[] (seed = EEA + UK + CH),
-  honor_gpc: boolean, banner: { headline ≤120, body ≤600, accept_label,
-  reject_label, manage_label? } }` — plain validated strings; the banner
+restricted_regions: ISO-3166-alpha-2[] (seed = EEA + UK + CH),
+honor_gpc: boolean, banner: { headline ≤120, body ≤600, accept_label,
+reject_label, manage_label? } }` — plain validated strings; the banner
   itself is a code component (§8).
 - **`defaults`** — the per-object-type collection matrix (§6): which
   activities are collected for page / section / content_item / product /
@@ -237,9 +242,10 @@ toggle) whenever wanted.
 
 All code under `src/lib/tracking/` + `src/components/tracking/` — core
 machinery in the doc-11 sense (fleet-propagates); the `trk_<client>` record
-+ Netlify env values are per-site data (never propagate).
 
-- **`src/components/tracking/TrackingScripts.astro`** replaces the inert
+- Netlify env values are per-site data (never propagate).
+
+* **`src/components/tracking/TrackingScripts.astro`** replaces the inert
   `Analytics.astro` mount in `src/layouts/Layout.astro` (the
   `config.yaml analytics:` block and `SplitbeeAnalytics.astro` retire with
   it — importers verified first, per the deletion gotcha). Behavior:
@@ -251,29 +257,29 @@ machinery in the doc-11 sense (fleet-propagates); the `trk_<client>` record
   block, defaults matrix, and the **goal map** `{object_id → goals[]}`
   aggregated from every collection's `tracking` field. No per-element goal
   attributes in HTML.
-- **Emission order:** (1) inline consent bootstrap (§8) — always before any
+* **Emission order:** (1) inline consent bootstrap (§8) — always before any
   vendor tag; (2) own-tracker loader (§5); (3) adapters for enabled
   providers only.
-- **Adapters** `src/lib/tracking/adapters/{own,ga4,gtm,google-ads,meta-pixel,taboola,outbrain,mgid,plausible}.ts`:
+* **Adapters** `src/lib/tracking/adapters/{own,ga4,gtm,google-ads,meta-pixel,taboola,outbrain,mgid,plausible}.ts`:
   pure `(providerConfig, consentPolicy) → { head: string, cspHosts: {script,
-  connect, img, frame} }`. Fixed, pre-minified snippet templates; only
+connect, img, frame} }`. Fixed, pre-minified snippet templates; only
   regex-revalidated IDs are interpolated (throw at build otherwise).
   `advertising`-class snippets emit as `<script type="text/plain"
-  data-trk-gate="advertising">` and are activated (cloned to real scripts)
+data-trk-gate="advertising">` and are activated (cloned to real scripts)
   by the bootstrap on region-clear or consent grant.
-- **Partytown: stays OFF in v1** (`hasExternalScripts=false` unchanged).
+* **Partytown: stays OFF in v1** (`hasExternalScripts=false` unchanged).
   Main-thread gtag is deliberate — Consent Mode v2 ordering and conversion
   accuracy are the whole point of the Google Ads adapter. Escape hatch
   recorded: if the native pixels degrade INP, flip `hasExternalScripts` and
   forward `dataLayer.push`/`_tfa.push` for those adapters only — its own
   decision later, not v1.
-- **View Transitions discipline** (`<ClientRouter>` is live):
+* **View Transitions discipline** (`<ClientRouter>` is live):
   **`astro:page-load` is the ONLY pageview trigger** (fires on first load
   AND every swap — the double-fire guard); `send_page_view: false` +
   manual page_view for gtag/ga4; plausible manual mode; the loader re-binds
   observers on `astro:page-load` and flushes + disconnects on
   `astro:before-swap`; all listeners registered once at module scope.
-- **CSP (net-new):** `netlify.toml` gains a `[[headers]] for = "/*"` block —
+* **CSP (net-new):** `netlify.toml` gains a `[[headers]] for = "/*"` block —
   **`Content-Security-Policy-Report-Only` first** (T13.8), promoted to
   enforcing only after a clean soak (T13.11). Inline scripts + astro-compress
   force `script-src 'self' 'unsafe-inline'`; the real value is
@@ -282,7 +288,7 @@ machinery in the doc-11 sense (fleet-propagates); the `trk_<client>` record
   a repo test compares the union for the enabled set in
   `src/data/site/tracking.json` against `netlify.toml` and **fails on
   drift** — CSP updates ride the same change that enables a provider.
-- **astro-compress:** adapter snippets ship pre-minified so build diffs stay
+* **astro-compress:** adapter snippets ship pre-minified so build diffs stay
   stable; a dist test asserts `#trk-config` still parses as JSON
   post-compress and the loader asset stays within budget.
 
@@ -430,15 +436,15 @@ the authoritative denominator for money events.
 
 ## 6. Object type × activity matrix (the `defaults` block)
 
-| Type | Collected (v1 defaults) | Notes |
-| --- | --- | --- |
-| **page** | pageview, scroll_depth, engagement | web-vitals deferred (loader budget) |
-| **section** | impression, dwell, cta_click, form_start/form_submit | keyed off existing `data-cms-section-id`/`-type`; shared sections carry their `sec_*` id |
-| **content_item** (+nodes) | read_progress (pct of public nodes seen), node_impression, node_dwell, completion (last-node impression) | events carry node_id/kind ONLY; strategy joins in the owner DB (§5.4); shares optional later |
-| **product** | buy_click (+ pageview via its page) | `product_viewed`/`checkout_*` stay commerce events — **commerce_event = money truth, tracking_event = behavior truth**; no double-logging |
-| **navigation** | nav_click (header/footer, item href/label slug in props) | via `data-cms-nav-object`/`-nav-role` |
-| **taxonomy** | term_view (term routes → term_id), tag_click | |
-| **site / theme / template / section_template** | — (no reader events) | agent-side usage derivable from `history[]`; explicit non-goal. The attribute still parses on them (uniform schema); `label`/`tags` remain meaningful for reporting |
+| Type                                           | Collected (v1 defaults)                                                                                  | Notes                                                                                                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **page**                                       | pageview, scroll_depth, engagement                                                                       | web-vitals deferred (loader budget)                                                                                                                                 |
+| **section**                                    | impression, dwell, cta_click, form_start/form_submit                                                     | keyed off existing `data-cms-section-id`/`-type`; shared sections carry their `sec_*` id                                                                            |
+| **content_item** (+nodes)                      | read_progress (pct of public nodes seen), node_impression, node_dwell, completion (last-node impression) | events carry node_id/kind ONLY; strategy joins in the owner DB (§5.4); shares optional later                                                                        |
+| **product**                                    | buy_click (+ pageview via its page)                                                                      | `product_viewed`/`checkout_*` stay commerce events — **commerce_event = money truth, tracking_event = behavior truth**; no double-logging                           |
+| **navigation**                                 | nav_click (header/footer, item href/label slug in props)                                                 | via `data-cms-nav-object`/`-nav-role`                                                                                                                               |
+| **taxonomy**                                   | term_view (term routes → term_id), tag_click                                                             |                                                                                                                                                                     |
+| **site / theme / template / section_template** | — (no reader events)                                                                                     | agent-side usage derivable from `history[]`; explicit non-goal. The attribute still parses on them (uniform schema); `label`/`tags` remain meaningful for reporting |
 
 Per-object `tracking.enabled: false` beats the type default;
 `tracking.goals[].on` binds a goal to one of these activities (validated
@@ -451,7 +457,7 @@ per type, §2).
   surface (value from `value_source:'product_price'`, resolved at build from
   the product export — store-backed, no client guessing); `opt_in` bridged
   from `NetlifyOptInCapture` success via `document.dispatchEvent(new
-  CustomEvent('trk:goal', …))` (the loader consumes the same bridge);
+CustomEvent('trk:goal', …))` (the loader consumes the same bridge);
   `contact_submit` from contact_form success. **Consent Mode v2:** defaults
   denied (`ad_storage`, `ad_user_data`, `ad_personalization`,
   `analytics_storage`) in restricted regions, `ads_data_redaction: true`,
@@ -481,12 +487,12 @@ per type, §2).
   which is why the default mode stores NOTHING on the device** (daily-hash
   identity, §5.1). No banner needed for it anywhere.
 - **Advertising pixels:** auto-fire outside `restricted_regions` (seed: EEA
-  + UK + CH). Inside: Consent Mode v2 defaults denied + the own lightweight
-  banner; grant → consent update + gated-script activation + consented-id
-  upgrade. **Unknown region = restricted** until the region oracle answers
-  (~50–150ms once per session, then cached; the pageview beacon response
-  carries it thereafter). A client `Intl` timezone heuristic may only KEEP
-  pixels held, never release them.
+  - UK + CH). Inside: Consent Mode v2 defaults denied + the own lightweight
+    banner; grant → consent update + gated-script activation + consented-id
+    upgrade. **Unknown region = restricted** until the region oracle answers
+    (~50–150ms once per session, then cached; the pageview beacon response
+    carries it thereafter). A client `Intl` timezone heuristic may only KEEP
+    pixels held, never release them.
 - **GPC honored everywhere** (`honor_gpc: true`): treated as ad-consent
   refusal + no persistent-id upgrade, regardless of region or banner state.
 - **The banner** (`src/components/tracking/ConsentBanner.astro`) is a CODE
@@ -547,8 +553,8 @@ per type, §2).
 ## 11. Risk register
 
 1. **Docs-exclusion regression** — the §0 amendment is the guard; inventory
-   + conversion-map rows updated this session so no future wave "cleans up"
-   tracking as scope creep.
+   - conversion-map rows updated this session so no future wave "cleans up"
+     tracking as scope creep.
 2. **Script-injection blast radius** — typed regex IDs only; fixed adapter
    templates re-validated at render; require-approval + human-executed
    publish (OQ-W13-2); **GTM recommended permanently OUT** (an
@@ -588,21 +594,21 @@ the wave's deliberate render change lands in T13.5, which must itself be
 byte-identical while no `tracking_config` export exists), one commit, no PR
 unless asked.
 
-| ID | Scope | mode | depends_on |
-| --- | --- | --- | --- |
-| T13.1 | `tracking` attribute: shape file, spread ×10 bodies, `set_tracking` op + inverse + forbidKeys ×7, `tracking_attribute` criterion, contract lines, leak tests | auto | — |
-| T13.2 | `tracking_config` type end-to-end (theme-pattern file surface → `src/data/site/tracking.json`; policies; singleton rule) | auto | T13.1 |
-| T13.3 | `tracking_event.v1`/batch schemas, `tracking-events` lib + blob store, `track-ingest` function (validate/enrich/forward/mirror), `/api/t` redirect, region oracle, abuse guards | auto | T13.2 |
-| T13.4 | Own loader client (observers off `data-cms-*`, batching, VT-safe lifecycle, identity modes, size budget) | auto | T13.3 |
-| T13.5 | `TrackingScripts.astro` (Layout swap, `/admin` bail, config+goal-map assembly) + `own`/`plausible` adapters + consent bootstrap skeleton; retire `Analytics.astro`/`SplitbeeAnalytics.astro`/config.yaml analytics | auto | T13.4 |
-| T13.6 | `ConsentBanner` + geo-adaptive gating + GPC + Consent Mode v2 defaults | auto (OQ-W13-1 answered 2026-07-19) | T13.5 |
-| T13.7 | `google_ads` + `ga4` adapters + goal→conversion bridge (purchase/opt_in/contact_submit) | auto (OQ-W13-3 answered 2026-07-19) | T13.6 |
-| T13.8 | `meta_pixel`/`taboola`/`outbrain`/`mgid` adapters; CSP Report-Only block + hosts-drift test + dist integrity tests | auto | T13.7 |
-| T13.9 | Owner-DB reference kit (DDL + NOTIFY trigger + NDJSON receiver contract + mirror replay script — docs/SQL only) | auto | T13.3 |
-| T13.10 | Seeds (`tracking-config-seed-data.mjs`) + roundtrip drill/reconcile: `set_tracking` on ALL ten types + the trk singleton; inventory/map/state-of-play records same change | auto | T13.2 |
-| T13.11 | **Credentialed production drive**: env vars set; human-executed publish of `trk_drlurie`; release; live beacons verified at sink/mirror; the five converted-criteria proven for `tracking_config` AND a `set_tracking` round-trip on one object of each of the ten types via MCP; CSP promoted from Report-Only if the soak is clean | **human_gate** | T13.6–T13.10 |
-| T13.12 | Admin governance toggle for tracking (owner-only posture surface; rides the T9.15 override-layer outcome) — OQ-W13-2 ruling | auto | T13.2 |
-| T13.13 | Scores-feedback design (metrics-derived `scores[]` — design-only; §15 appendix deliverable) — OQ-W13-5 ruling | auto | T13.3 |
+| ID     | Scope                                                                                                                                                                                                                                                                                                                                | mode                                | depends_on   |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- | ------------ |
+| T13.1  | `tracking` attribute: shape file, spread ×10 bodies, `set_tracking` op + inverse + forbidKeys ×7, `tracking_attribute` criterion, contract lines, leak tests                                                                                                                                                                         | auto                                | —            |
+| T13.2  | `tracking_config` type end-to-end (theme-pattern file surface → `src/data/site/tracking.json`; policies; singleton rule)                                                                                                                                                                                                             | auto                                | T13.1        |
+| T13.3  | `tracking_event.v1`/batch schemas, `tracking-events` lib + blob store, `track-ingest` function (validate/enrich/forward/mirror), `/api/t` redirect, region oracle, abuse guards                                                                                                                                                      | auto                                | T13.2        |
+| T13.4  | Own loader client (observers off `data-cms-*`, batching, VT-safe lifecycle, identity modes, size budget)                                                                                                                                                                                                                             | auto                                | T13.3        |
+| T13.5  | `TrackingScripts.astro` (Layout swap, `/admin` bail, config+goal-map assembly) + `own`/`plausible` adapters + consent bootstrap skeleton; retire `Analytics.astro`/`SplitbeeAnalytics.astro`/config.yaml analytics                                                                                                                   | auto                                | T13.4        |
+| T13.6  | `ConsentBanner` + geo-adaptive gating + GPC + Consent Mode v2 defaults                                                                                                                                                                                                                                                               | auto (OQ-W13-1 answered 2026-07-19) | T13.5        |
+| T13.7  | `google_ads` + `ga4` adapters + goal→conversion bridge (purchase/opt_in/contact_submit)                                                                                                                                                                                                                                              | auto (OQ-W13-3 answered 2026-07-19) | T13.6        |
+| T13.8  | `meta_pixel`/`taboola`/`outbrain`/`mgid` adapters; CSP Report-Only block + hosts-drift test + dist integrity tests                                                                                                                                                                                                                   | auto                                | T13.7        |
+| T13.9  | Owner-DB reference kit (DDL + NOTIFY trigger + NDJSON receiver contract + mirror replay script — docs/SQL only)                                                                                                                                                                                                                      | auto                                | T13.3        |
+| T13.10 | Seeds (`tracking-config-seed-data.mjs`) + roundtrip drill/reconcile: `set_tracking` on ALL ten types + the trk singleton; inventory/map/state-of-play records same change                                                                                                                                                            | auto                                | T13.2        |
+| T13.11 | **Credentialed production drive**: env vars set; human-executed publish of `trk_drlurie`; release; live beacons verified at sink/mirror; the five converted-criteria proven for `tracking_config` AND a `set_tracking` round-trip on one object of each of the ten types via MCP; CSP promoted from Report-Only if the soak is clean | **human_gate**                      | T13.6–T13.10 |
+| T13.12 | Admin governance toggle for tracking (owner-only posture surface; rides the T9.15 override-layer outcome) — OQ-W13-2 ruling                                                                                                                                                                                                          | auto                                | T13.2        |
+| T13.13 | Scores-feedback design (metrics-derived `scores[]` — design-only; §15 appendix deliverable) — OQ-W13-5 ruling                                                                                                                                                                                                                        | auto                                | T13.3        |
 
 **Schema-vintage trap applies to T13.11:** every schema/grammar change must
 be merged and deployed to main before the credentialed run (playbook trap 12).
@@ -686,3 +692,113 @@ question text kept for history; each ruling is GOVERNING for W13.
   the owner sink (or mirror) with correct object identity, project_id,
   vhash rotation, and consent flags; a restricted-region simulation shows
   pixels held + Consent Mode denied defaults; GPC suppression verified.
+
+## 15. Scores-feedback design (T13.13, commissioned by OQ-W13-5 — DESIGN ONLY, nothing implemented)
+
+**Status: a proposal awaiting Wolf's ruling.** Today `scores[]`
+(`body.revision_control.scores[]`, §2.4 of the 08 plan) is exclusively
+agent-authored judgment against the strategy annotations. This section
+designs the next step — tracking metrics authoring score entries — without
+changing anything until ruled on. Implementation is NOT commissioned by
+this section existing.
+
+### 15.1 Provenance — a metric score is distinguishable forever
+
+A metric-derived entry uses the SAME `contentItemScoreSchema` shape (no
+schema fork) with a namespaced identity and a mandatory evidence base:
+
+- `scored_by: "metric:<framework>"` — the `metric:` prefix is the permanent
+  provenance marker (agent judgments keep bare agent names; the namespace
+  can never collide because agent names are self-declared WITHOUT colons
+  today — validation would pin `^[^:]+$` for agent-authored entries the
+  moment this ships).
+- `framework: "engagement.v1"` (the metric framework, code-defined — §15.5);
+  `dimension`: the §6 activity the score summarizes (`dwell`, `completion`,
+  `read_progress`, `cta_click`).
+- `rationale` (REQUIRED for metric entries, structured JSON string):
+  `{window_start, window_end, n_sessions, source: "tracking_event.v1",
+statistic: "p75_dwell_ms", value, threshold_profile}` — a score is never
+  quotable without its evidence window and sample size. Structured-in-
+  rationale keeps the schema additive-free in v1; IF Wolf prefers first-
+  class fields, the additive alternative is an optional `evidence` object on
+  `contentItemScoreSchema` (still additive — old entries parse untouched).
+
+### 15.2 Transport — who writes, through what
+
+**Recommended: (a) the owner DB computes; an agent submits through the
+normal `object_patch` path.** A scheduled owner-side job (or a human) runs
+the §5.4 join, renders proposed score entries, and an agent applies them
+with an ordinary `update_node`-style patch op — concretely a new bounded op
+`append_scores` (append-only by grammar; see §15.3) — through checkout →
+validate → publish. Every write stays inside the governed grammar, the
+approval policy, locks, history, and inverses. Nothing new to trust.
+
+Weighed and not recommended:
+
+- (b) a dedicated MCP tool (`article_record_metric_score`) — adds a
+  privileged writer surface for no gain over (a); the funnel pattern
+  (set_product_price) exists for CANONICALITY problems, and scores have no
+  canonicality problem — append-only composition suffices.
+- (c) a fully automatic writer (sink-triggered) — rejected for v1: OQ-3
+  per-agent credentials do not exist yet, so an unattended writer would be
+  an unattributable principal with publish-adjacent power; and the trust
+  model treats the owner DB as OUTSIDE the CMS boundary (env-name-only
+  coupling, §3). Reconsider only after OQ-3 lands.
+
+### 15.3 Guard rules (hard — these are the law of the feature)
+
+1. **Append-only:** metric writers may only APPEND `scores[]` entries —
+   never mutate or delete existing entries (agent or metric), never touch
+   any other field. The proposed `append_scores` op encodes this in the
+   GRAMMAR (its only argument is the new entries array; capture = appended
+   ids; inverse = remove-those-appended — exact).
+2. **No cascade:** appending scores never triggers publish/release; the
+   entry lands in the draft record like any patch and rides the normal
+   publish flow. A metric score on a PUBLISHED record still requires the
+   standard checkout/publish cycle to become part of the published body.
+3. **Leak rule untouched:** `scores[]` stays non-rendered (the reader-
+   projection scan already pins revision_control out of HTML — no change).
+4. **Sample floor:** `n_sessions >= 50` (per-site threshold data, §15.5)
+   or validation BLOCKS the entry — noisy small-sample scores cannot flood
+   the envelope. Plus a per-(framework, dimension, window) uniqueness rule:
+   re-runs replace nothing; a duplicate window is a validation blocker, so
+   backfills are idempotent by refusal.
+5. **Bounded volume:** ≤ N metric entries per record per window run (N=8
+   proposed) — the envelope is a judgment ledger, not a metrics warehouse;
+   the warehouse is the owner DB.
+
+### 15.4 Variant judging (the create_variant / A-B loop this serves)
+
+Scores on a variant (`lineage.parent_content_id` set) compare against the
+parent's scores on the SAME `(framework, dimension)` with OVERLAPPING or
+adjacent windows — the comparison is a read-side join over the family
+(`object_inventory {variants_of}` already lists it), not new state.
+**Honesty rule, stated on every comparison surface:** OQ-W7-2 (traffic
+splitting) stays deferred, so parent and variant windows are SEQUENTIAL or
+organic exposure — never concurrent randomized arms. Metric comparisons
+are therefore directional evidence, not experiments; the design refuses
+any UI/tooling copy that calls them A/B tests. What the loop buys today:
+draft variant → publish → window passes → metric scores land on both →
+an agent (or Wolf) judges with real reader behavior cited, and publishing
+the winner stays one `object_publish`.
+
+### 15.5 Multi-project
+
+Framework definitions (`engagement.v1`: which statistics over which §6
+activities, the statistic vocabulary) live in CORE CODE — one
+implementation for every site (doc-11 alignment). Per-site knobs are DATA:
+the sample floor, window lengths, and threshold profiles live in the
+site's `trk_<project>` record (an additive optional `scoring` block —
+schema change only when implementation is commissioned) so tenants tune
+sensitivity without code.
+
+### 15.6 What a YES commissions (so the ruling is scoped)
+
+The `append_scores` op + grammar/inverse/tests; the metric-entry
+validation rules (§15.3's floor/uniqueness/volume + the `scored_by`
+namespace pin); the owner-side reference SQL for computing entries (an
+extension of the §5.4 kit); and the agent runbook for the submit leg.
+Explicitly NOT commissioned even by a YES: automatic writers (§15.2c),
+traffic splitting (OQ-W7-2), rendering scores anywhere public.
+
+**OQ-W13-5b — ANSWER (Wolf): ruling on §15 (adopt / adopt-with-changes / reject):** **\*\***\_\_\_**\*\***

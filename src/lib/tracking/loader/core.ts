@@ -20,6 +20,7 @@ import {
   EVENT_ACTIVITY,
   matchActivityGoals,
   matchNamedGoals,
+  nativeCalls,
   providerCalls,
   type BridgeProviders,
   type GoalBinding,
@@ -63,6 +64,9 @@ export type TrackerEnv = {
    *  window.dataLayer (gtag.js ignores plain-array pushes). Absent = no
    *  provider fan-out (tests, non-browser). */
   gtagPush?: (args: unknown[]) => void;
+  /** T13.8: route one native-platform conversion call to the provider's
+   *  queue/function (fbq/_tfa/obApi/_mgq). Absent = no native fan-out. */
+  nativePush?: (provider: string, args: unknown[]) => void;
   now: () => number;
   uuid: () => string;
   random: () => number;
@@ -253,8 +257,17 @@ export const createTracker = (
       if (typeof valueCents === 'number') props.value_cents = valueCents;
       push('goal', ref, props, extraObject);
     }
-    if (consent.ads && env.gtagPush) {
+    fanOutProviders(bindings);
+  };
+
+  // Both fan-out halves (gtag + native queues), consent-gated as one unit.
+  const fanOutProviders = (bindings: readonly GoalBinding[]): void => {
+    if (!consent.ads || bindings.length === 0) return;
+    if (env.gtagPush) {
       for (const call of providerCalls(bindings, config.providers)) env.gtagPush(call);
+    }
+    if (env.nativePush) {
+      for (const call of nativeCalls(bindings, config.providers)) env.nativePush(call.provider, call.args);
     }
   };
 
@@ -303,7 +316,11 @@ export const createTracker = (
         dwellStart.set(key, nowMs);
         if (!impressed.has(key)) {
           impressed.add(key);
-          if (ref.kind === 'section' && collects('section', 'impression') && sampled()) {
+          // Gate on the EVENT KIND ('section_impression') — the schema-legal
+          // defaults vocabulary (TRACKING_EVENT_KINDS); bare 'impression' is
+          // the goal-activity word, which no valid export can carry here
+          // (found by the T13.10 seed: the old gate could never open).
+          if (ref.kind === 'section' && collects('section', 'section_impression') && sampled()) {
             push('section_impression', ref);
           }
           if (ref.kind === 'node') {
@@ -387,11 +404,7 @@ export const createTracker = (
       if (typeof valueCents === 'number' && Number.isInteger(valueCents) && valueCents >= 0)
         props.value_cents = valueCents;
       push('goal', null, props);
-      if (consent.ads && env.gtagPush) {
-        for (const call of providerCalls(matchNamedGoals(config.goals, name), config.providers)) {
-          env.gtagPush(call);
-        }
-      }
+      fanOutProviders(matchNamedGoals(config.goals, name));
     },
 
     /** Consent flags on outgoing events (GPC beats grant — T13.6 wires this). */

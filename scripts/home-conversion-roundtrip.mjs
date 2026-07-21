@@ -120,6 +120,7 @@ const SUPPORTED_SEED_TYPES = new Set([
   'content_item',
   'section_template',
   'theme',
+  'tracking_config',
 ]);
 const unsupported = PAGE_HOME_SEEDS.filter((seed) => !SUPPORTED_SEED_TYPES.has(seed.objectType));
 if (unsupported.length > 0) {

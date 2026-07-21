@@ -344,13 +344,14 @@ test('drillOpsForSeed dispatches a site seed to siteDrillOps', () => {
   assert.deepEqual(drillOpsForSeed(seed).expected, ['set_site_fields', 'set_tracking']);
 });
 
-test('every drill appends the W13 set_tracking probe, restoring byte-exactly (T10.8)', () => {
-  // A body with NO tracking block: the restore is `fields: null` — removes
-  // body.tracking entirely (the grammar's exact first-set inverse).
+test('every drill appends the W13 set_tracking probe, restoring byte-exactly (T10.8/T13.10)', () => {
+  // A body with NO tracking block gets the FULL T13.10 drill: set → mutate →
+  // unset-to-null (removes body.tracking entirely — byte-identical end).
   const bare = drillOpsForSeed({ objectType: 'site', body: { name: 'S' } });
   const bareTracking = bare.ops.filter((op) => op.op === 'set_tracking');
   assert.deepEqual(bareTracking, [
     { op: 'set_tracking', fields: { label: 'RT probe' } },
+    { op: 'set_tracking', fields: { label: 'RT probe [poked]', tags: ['rt-probe'] } },
     { op: 'set_tracking', fields: null },
   ]);
   assert.equal(bare.ops.at(-1).op, 'set_tracking', 'tracking probe runs last');
@@ -375,4 +376,26 @@ test('every drill appends the W13 set_tracking probe, restoring byte-exactly (T1
     body: { name: 'S', tracking: { enabled: true } },
   });
   assert.deepEqual(unlabeled.ops.at(-1), { op: 'set_tracking', fields: { label: null } });
+});
+
+test('tracking_config drill (T13.10): set_tracking_config_fields only — the wrapper is BYPASSED', () => {
+  const seed = {
+    objectType: 'tracking_config',
+    objectId: 'trk_drlurie',
+    body: {
+      providers: {},
+      consent: { posture: 'geo-adaptive', restricted_regions: ['DE'], honor_gpc: true },
+      defaults: {},
+    },
+  };
+  const { expected, ops } = drillOpsForSeed(seed);
+  assert.deepEqual(expected, ['set_tracking_config_fields'], 'no set_tracking on the registry singleton');
+  assert.deepEqual(ops, [
+    { op: 'set_tracking_config_fields', fields: { consent: { honor_gpc: false } } },
+    { op: 'set_tracking_config_fields', fields: { consent: { honor_gpc: true } } },
+  ]);
+  assert.ok(
+    ops.every((op) => op.op !== 'set_tracking'),
+    'the singleton never receives the attribute probe'
+  );
 });

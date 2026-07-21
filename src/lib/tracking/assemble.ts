@@ -13,8 +13,12 @@
 import { trackingConfigBodySchema, type TrackingConfigBody } from '../../schema/bodies/tracking-config-v1.js';
 import { ga4Adapter } from './adapters/ga4.js';
 import { googleAdsAdapter } from './adapters/google-ads.js';
+import { metaPixelAdapter } from './adapters/meta-pixel.js';
+import { mgidAdapter } from './adapters/mgid.js';
+import { outbrainAdapter } from './adapters/outbrain.js';
 import { ownAdapter } from './adapters/own.js';
 import { plausibleAdapter } from './adapters/plausible.js';
+import { taboolaAdapter } from './adapters/taboola.js';
 import type { AdapterResult } from './adapters/types.js';
 
 export type GoalSourceConversion = {
@@ -86,9 +90,16 @@ export type TrackerClientConfig = {
   defaults: TrackingConfigBody['defaults'];
   consent: { posture: string; regions: string[]; gpc: boolean };
   goals: TrackerGoalMap;
-  /** Enabled gtag-family providers the T13.7 bridge may call (ids are
+  /** Enabled ad providers the T13.7/T13.8 bridge may call (ids are
    *  already public — they sit in the head snippets). */
-  providers?: { google_ads?: { id: string }; ga4?: { id: string } };
+  providers?: {
+    google_ads?: { id: string };
+    ga4?: { id: string };
+    meta_pixel?: { id: string };
+    taboola?: { id: string };
+    outbrain?: { id: string };
+    mgid?: { id: string };
+  };
 };
 
 /**
@@ -123,6 +134,18 @@ export const buildTrackerClientConfig = (
   if (body.providers.ga4?.enabled && body.providers.ga4.measurement_id) {
     providers.ga4 = { id: body.providers.ga4.measurement_id };
   }
+  if (body.providers.meta_pixel?.enabled && body.providers.meta_pixel.pixel_id) {
+    providers.meta_pixel = { id: body.providers.meta_pixel.pixel_id };
+  }
+  if (body.providers.taboola?.enabled && body.providers.taboola.account_id) {
+    providers.taboola = { id: body.providers.taboola.account_id };
+  }
+  if (body.providers.outbrain?.enabled && body.providers.outbrain.account_id) {
+    providers.outbrain = { id: body.providers.outbrain.account_id };
+  }
+  if (body.providers.mgid?.enabled && body.providers.mgid.account_id) {
+    providers.mgid = { id: body.providers.mgid.account_id };
+  }
   if (Object.keys(providers).length > 0) config.providers = providers;
   return config;
 };
@@ -140,5 +163,10 @@ export const assembleAdapterHeads = (body: TrackingConfigBody, siteHost: string)
   const ga4Live = ga4?.enabled === true && ga4.consent_class !== 'advertising';
   results.push(googleAdsAdapter(googleAds, { includeLoader: googleAds?.enabled === true && !ga4Live }));
   results.push(ga4Adapter(ga4, { includeLoader: ga4?.enabled === true && (ga4Live || googleAds?.enabled !== true) }));
+  // T13.8: the native pixels — all advertising-gated identically.
+  results.push(metaPixelAdapter(body.providers.meta_pixel));
+  results.push(taboolaAdapter(body.providers.taboola));
+  results.push(outbrainAdapter(body.providers.outbrain));
+  results.push(mgidAdapter(body.providers.mgid));
   return results.filter((result) => result.head !== '' || result.cspHosts.script.length > 0);
 };

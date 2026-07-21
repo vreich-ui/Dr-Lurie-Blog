@@ -340,18 +340,25 @@ export const articleDrillOps = (body, probeNodeId) => {
 /**
  * `set_tracking` probe ops (W13) — the uniform one-writer op every governed
  * type advertises (12-plan §2), so every family's drill must exercise it to
- * satisfy the driver's advertised ≡ exercised contract gate. Poke the
- * reporting `label` (never rendered — leak-safe on every type), then restore
- * byte-exactly: a body that carried NO tracking block gets `fields: null`,
- * which removes `body.tracking` entirely (the grammar's exact first-set
- * inverse); a body WITH one gets its original label back (a `null` unset if
- * the label key was absent — deep-merge would otherwise leave the probe).
+ * satisfy the driver's advertised ≡ exercised contract gate. The T13.10
+ * shape is the full set → mutate → unset drill on a body with NO tracking
+ * block (every current seed): first-set, a real deep-merge mutation, then
+ * top-level `fields: null` removing `body.tracking` entirely — three ops,
+ * each with an exact inverse, ending byte-identical. A body that ALREADY
+ * carries tracking gets the conservative poke/restore instead (unset would
+ * destroy real data): label poked, then the original written back (a `null`
+ * unset if the label key was absent — deep-merge would otherwise leave the
+ * probe behind).
  */
 export const trackingProbeOps = (body) => {
   const tracking = isRecord(body?.tracking) ? body.tracking : undefined;
   const poke = { op: 'set_tracking', fields: { label: 'RT probe' } };
   if (!tracking) {
-    return [poke, { op: 'set_tracking', fields: null }];
+    return [
+      poke, // set (first-set inverse = removal)
+      { op: 'set_tracking', fields: { label: 'RT probe [poked]', tags: ['rt-probe'] } }, // mutate (merge inverse)
+      { op: 'set_tracking', fields: null }, // unset-to-null (removal inverse = full restore)
+    ];
   }
   return [poke, { op: 'set_tracking', fields: { label: tracking.label ?? null } }];
 };
@@ -362,14 +369,34 @@ const withTrackingProbe = (drill, body) => ({
 });
 
 /**
- * Dispatch: build the drill for one seed (page, section, template,
- * section_template, taxonomy, site, product, theme, or content_item). Every
- * branch gets the W13 `set_tracking` probe appended — the attribute lives at
- * body top level on ALL these types. (If `tracking_config` ever joins the
- * driver it must BYPASS the wrapper: it neither carries the attribute nor
- * advertises the op.)
+ * Drill the `tracking_config` singleton (T13.10): `set_tracking_config_fields`
+ * is the type's ONLY op (the set_site_fields idiom — open deep-merge). Flip
+ * `consent.honor_gpc` and flip it back — two real merges, byte-identical,
+ * valid on ANY schema-legal body (honor_gpc is required boolean).
  */
-export const drillOpsForSeed = (seed) => withTrackingProbe(baseDrillOpsForSeed(seed), seed.body);
+export const trackingConfigDrillOps = (body) => {
+  const honorGpc = body.consent.honor_gpc;
+  return {
+    expected: ['set_tracking_config_fields'],
+    ops: [
+      { op: 'set_tracking_config_fields', fields: { consent: { honor_gpc: !honorGpc } } },
+      { op: 'set_tracking_config_fields', fields: { consent: { honor_gpc: honorGpc } } },
+    ],
+  };
+};
+
+/**
+ * Dispatch: build the drill for one seed (page, section, template,
+ * section_template, taxonomy, site, product, theme, content_item, or
+ * tracking_config). Every branch gets the W13 `set_tracking` probe appended —
+ * the attribute lives at body top level on ALL these types — EXCEPT
+ * `tracking_config`, which bypasses the wrapper: the registry singleton
+ * neither carries the attribute nor advertises the op.
+ */
+export const drillOpsForSeed = (seed) => {
+  if (seed.objectType === 'tracking_config') return trackingConfigDrillOps(seed.body);
+  return withTrackingProbe(baseDrillOpsForSeed(seed), seed.body);
+};
 
 const baseDrillOpsForSeed = (seed) => {
   if (seed.objectType === 'page') {

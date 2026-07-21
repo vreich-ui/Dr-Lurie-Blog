@@ -28,6 +28,11 @@ import {
   type ChatToolCatalogEntry,
   type ToolAutonomy,
 } from '../../lib/admin/governance-client';
+import {
+  describeTrackingGovernance,
+  withTrackingPublishMode,
+  type CreationPolicyLike,
+} from '../../lib/admin/tracking-governance';
 
 async function getToken(): Promise<string> {
   const m = await import('../../utils/goTrueClient');
@@ -120,6 +125,8 @@ function GovernanceBody() {
 
   return (
     <div className="flex max-w-3xl flex-col gap-6">
+      <TrackingGovernanceCard gov={gov} owner={owner} onSaved={refresh} />
+
       <Card
         kicker="Approval policy"
         title="Who approves publishes"
@@ -220,6 +227,107 @@ function GovernanceBody() {
         onSaved={refresh}
       />
     </div>
+  );
+}
+
+// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ────────────
+
+function TrackingGovernanceCard({
+  gov,
+  owner,
+  onSaved,
+}: {
+  gov: GovernanceState;
+  owner: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const view = describeTrackingGovernance(
+    gov.active.approval,
+    gov.active.provenance.approval,
+    gov.active.creation as CreationPolicyLike,
+    gov.active.provenance.creation
+  );
+
+  const flipTo = async (mode: ApprovalMode) => {
+    setSaving(true);
+    try {
+      // An explicit per-type pin through the SAME audit-logged override the
+      // matrix below edits — never a silent master change.
+      await setApprovalOverride(getToken, withTrackingPublishMode(gov.active.approval, mode));
+      await onSaved();
+      toast({
+        title: `Tracking publishes are now ${mode === 'autonomous' ? 'autonomous' : 'approval-gated'}`,
+        tone: 'success',
+      });
+    } catch (err) {
+      toast({ title: 'Flip failed', description: err instanceof Error ? err.message : undefined, tone: 'danger' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card
+      kicker="Tracking"
+      title="Who controls the tracker registry"
+      actions={
+        <Badge tone={view.approvalProvenance === 'override' ? 'accent' : 'neutral'}>
+          {view.approvalProvenance === 'override' ? 'Runtime override' : 'Committed default'}
+        </Badge>
+      }
+    >
+      <p className="mb-4 text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
+        Publishing <code>trk_drlurie</code> changes which third-party scripts run on every page. This card answers
+        &ldquo;who may publish it right now?&rdquo; and flips the posture; <strong>Product</strong> is shown beside it
+        as the other pinned type. The full per-type matrix sits below.
+      </p>
+
+      <div className="overflow-hidden rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)]">
+        {view.rows.map((row) => (
+          <div
+            key={row.type}
+            className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--adm-border)] px-4 py-2.5 last:border-0"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-[length:var(--adm-text-sm)] font-medium text-[var(--adm-text)]">{row.label}</span>
+              <Badge tone={row.publish === 'require-approval' ? 'warning' : 'success'}>
+                {row.publish === 'require-approval' ? 'Publish requires approval' : 'Publishes autonomously'}
+              </Badge>
+              {row.pinned && <Badge tone="neutral">Pinned</Badge>}
+            </div>
+            {row.type === 'tracking_config' && owner && (
+              <Button
+                variant="secondary"
+                loading={saving}
+                disabled={saving}
+                onClick={() => flipTo(row.publish === 'autonomous' ? 'require-approval' : 'autonomous')}
+              >
+                {row.publish === 'autonomous' ? 'Require approval' : 'Make autonomous'}
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+        Creation: humans always;{' '}
+        {view.creation.agents === 'open'
+          ? 'agent creation is open'
+          : view.creation.agents.length === 0
+            ? 'no agents may create it'
+            : `agent creation is limited to ${view.creation.agents.join(', ')} (the seed driver)`}{' '}
+        — {view.creation.creationProvenance === 'override' ? 'runtime override' : 'committed policy'}. Editing the
+        record itself happens in the normal object workspace.
+      </p>
+
+      {!owner && (
+        <p className="mt-3 text-[length:var(--adm-text-xs)] text-[var(--adm-text-muted)]">
+          Only Owners can flip the posture.
+        </p>
+      )}
+    </Card>
   );
 }
 

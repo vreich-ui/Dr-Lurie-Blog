@@ -122,6 +122,12 @@ export const reconcileOps = (seed, currentBody) => {
     // One fields bag and set_theme_fields is its only op — the site idiom.
     return [{ op: 'set_theme_fields', fields: diffFieldsForMerge(seed.body, currentBody) }];
   }
+  if (seed.objectType === 'tracking_config') {
+    // The registry singleton (T13.10): set_tracking_config_fields is the
+    // whole surface — open deep-merge over the body, strays nulled at every
+    // depth (trap 2). The fixed-key providers object makes plain merge safe.
+    return [{ op: 'set_tracking_config_fields', fields: diffFieldsForMerge(seed.body, currentBody) }];
+  }
   if (seed.objectType === 'template') {
     const target = seed.body;
     const current = isPlainObject(currentBody) ? currentBody : {};

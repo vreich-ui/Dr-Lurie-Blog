@@ -8,10 +8,10 @@
  * read_progress/completion for articles, delegated click classification
  * (fake elements), goal bridge, batch/flush semantics (max_events,
  * max_wait_ms timer, page-end flush), sampling on impressions/dwell only,
- * /admin hard bail, and the ≤4.5KB min+gzip size budget on the real built
- * chunk (hard ceiling 6KB; the T13.4 target was 4KB — T13.6/T13.7 grew the
- * chunk deliberately: the consent/id wiring and the goal→conversion
- * bridge).
+ * /admin hard bail, and the ≤5KB min+gzip size budget on the real built
+ * chunk (hard ceiling 6KB; the T13.4 target was 4KB — T13.6/T13.7/T13.8
+ * grew the chunk deliberately: consent/id wiring, the goal→conversion
+ * bridge, and the native-platform fan-out).
  */
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -33,7 +33,9 @@ import { classifyClick, trackableRefOf, type ElementLike } from '../../src/lib/t
 
 const DEFAULTS = {
   page: ['pageview', 'scroll_depth', 'engagement'],
-  section: ['impression', 'section_impression', 'section_dwell', 'cta_click', 'form_start', 'form_submit'],
+  // Schema-legal event kinds ONLY (bare 'impression' is goal-activity vocab
+  // and can never appear in a validated export — the T13.10 gate fix).
+  section: ['section_impression', 'section_dwell', 'cta_click', 'form_start', 'form_submit'],
   content_item: ['node_impression', 'node_dwell', 'read_progress', 'completion'],
   product: ['buy_click'],
   navigation: ['nav_click'],
@@ -356,7 +358,7 @@ test('slugify and hostOf are bounded and conservative', () => {
   assert.equal(hostOf('javascript:alert(1)'), null);
 });
 
-test('SIZE BUDGET: the built loader chunk is ≤4.5KB min+gzip (hard ceiling 6KB)', () => {
+test('SIZE BUDGET: the built loader chunk is ≤5KB min+gzip (hard ceiling 6KB)', () => {
   // Under the ci-test harness this file runs COMPILED from .tmp/ci-test, so
   // resolve the REAL repo root (the nearest ancestor with a package.json that
   // is not the harness dir) and bundle the actual TS source — the exact bytes
@@ -385,7 +387,8 @@ test('SIZE BUDGET: the built loader chunk is ≤4.5KB min+gzip (hard ceiling 6KB
   const code = built.outputFiles[0]!.contents;
   const gzipped = gzipSync(code).byteLength;
   assert.ok(gzipped <= 6144, `HARD CEILING: loader is ${gzipped}B min+gzip (>6KB)`);
-  // 4KB was the T13.4 pre-bridge target; T13.6 (consent/id wiring) and
-  // T13.7 (the goal→conversion bridge) grew the chunk deliberately.
-  assert.ok(gzipped <= 4608, `BUDGET: loader is ${gzipped}B min+gzip (>4.5KB target)`);
+  // 4KB was the T13.4 pre-bridge target; T13.6 (consent/id wiring), T13.7
+  // (the goal→conversion bridge), and T13.8 (native fan-out) grew the chunk
+  // deliberately — the 6KB ceiling is the hard line.
+  assert.ok(gzipped <= 5120, `BUDGET: loader is ${gzipped}B min+gzip (>5KB target)`);
 });
