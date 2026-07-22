@@ -21,7 +21,13 @@
  * Neither value may ever reach client-side code, logs, or any stored record
  * (workflow JSON, drafts, blobs). Rotation needs no code change: the tool
  * always serves the current env values.
+ *
+ * The grant's projectId namespaces this site inside pdf-tool's stores. It
+ * comes from the site-identity seam (env PDF_TOOL_PROJECT_ID, else the site
+ * slug — 'dr-lurie' here), read at call time like the credentials; the wire
+ * format is unchanged.
  */
+import { getSiteIdentity } from '../../src/lib/site-identity.js';
 import { activeMediaPolicy, mediaPolicyLimits, type MediaPolicyLimits } from '../../src/lib/media-policy.js';
 
 /** Store handles pdf-tool writes through a grant, keyed by grant field name. */
@@ -39,7 +45,7 @@ export type PdfToolStorageStores = { [K in keyof typeof pdfToolStorageStores]: (
 export type PdfToolStorageGrant = {
   grantVersion: 1;
   grantType: 'netlify-pat';
-  projectId: 'dr-lurie';
+  projectId: string;
   siteId: string;
   token: string;
   stores: PdfToolStorageStores;
@@ -87,7 +93,7 @@ export const buildPdfToolStorageGrant = (now: Date = new Date()): BuildPdfToolSt
     grant: {
       grantVersion: 1,
       grantType: 'netlify-pat',
-      projectId: 'dr-lurie',
+      projectId: getSiteIdentity().pdfToolProjectId,
       siteId,
       token,
       stores: { ...pdfToolStorageStores },
