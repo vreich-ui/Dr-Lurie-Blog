@@ -2,6 +2,7 @@ import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/ad
 import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/publisher-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
 import { articleBodyV1Schema, type ArticleBodyNode } from '../../src/schema/article-content-v1.js';
+import { getSiteIdentity } from '../../src/lib/site-identity.js';
 import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
@@ -208,7 +209,7 @@ const slugify = (value: string) =>
     .normalize('NFKD')
     .toLowerCase()
     .trim()
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
@@ -331,7 +332,7 @@ export const publishArticleObject = async (
 
   const created = await handleObjectVerb(
     objectStore,
-    { action: 'create', object_type: 'content_item', site: 'site_drlurie', body },
+    { action: 'create', object_type: 'content_item', site: getSiteIdentity().siteId, body },
     principal,
     options
   );
@@ -461,9 +462,9 @@ export const createPublisherAgent = ({
   onPublishResult?: (result: PublishToolResult) => void;
 }) =>
   new Agent({
-    name: 'Dr. Lurie Server-Side Publisher',
+    name: `${getSiteIdentity().brandName} Server-Side Publisher`,
     instructions: [
-      'You run server-side publishing for already-approved Dr. Lurié article data.',
+      `You run server-side publishing for already-approved ${getSiteIdentity().brandName} article data.`,
       'Articles are governed content_item objects: structured nodes (article_body.v1 shape) with strategy annotations in private.*.',
       'If you receive a flat markdown body, you must split it into appropriate article_body.nodes before calling the publish tool.',
       'Do not rewrite, summarize, or otherwise alter the approved article content.',

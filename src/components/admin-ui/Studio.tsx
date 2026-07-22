@@ -15,6 +15,7 @@ import { Input } from './forms';
 import { Dialog, ConfirmDialog, useToast } from './overlays';
 import { IconAlertTriangle, IconPalette, IconSparkles } from './icons';
 import type { ObjectRecord, ObjectType } from '../../schema/object-record-v1';
+import { getSiteIdentity } from '../../lib/site-identity';
 
 async function getToken(): Promise<string> {
   const m = await import('../../utils/goTrueClient');
@@ -303,7 +304,7 @@ function ThemeGallery({ themes, owner }: { themes: Rec[]; owner: boolean }) {
   const [diff, setDiff] = useState<Record<string, unknown> | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const SITE_ID = 'site_drlurie';
+  const SITE_ID = getSiteIdentity().siteId;
 
   const dryRun = async (record: Rec) => {
     setTarget(record);
