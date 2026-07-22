@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import { getSiteIdentity } from '../../lib/site-identity';
 import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Select } from './forms';
 import { useToast } from './overlays';
@@ -230,7 +231,7 @@ function GovernanceBody() {
   );
 }
 
-// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ────────────
+// ─── tracking governance card (W13 T13.12 — the OQ-W13-2 surface) ──────────
 
 function TrackingGovernanceCard({
   gov,
@@ -279,9 +280,9 @@ function TrackingGovernanceCard({
       }
     >
       <p className="mb-4 text-[length:var(--adm-text-sm)] text-[var(--adm-text-muted)]">
-        Publishing <code>trk_drlurie</code> changes which third-party scripts run on every page. This card answers
-        &ldquo;who may publish it right now?&rdquo; and flips the posture; <strong>Product</strong> is shown beside it
-        as the other pinned type. The full per-type matrix sits below.
+        Publishing <code>{getSiteIdentity().trackingProjectId}</code> changes which third-party scripts run on every
+        page. This card answers &ldquo;who may publish it right now?&rdquo; and flips the posture;{' '}
+        <strong>Product</strong> is shown beside it as the other pinned type. The full per-type matrix sits below.
       </p>
 
       <div className="overflow-hidden rounded-[var(--adm-radius-lg)] border border-[var(--adm-border)]">
@@ -331,7 +332,7 @@ function TrackingGovernanceCard({
   );
 }
 
-// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────
+// ─── chat tool autonomy table (T9.13 chat_tools override) ────────────────────────
 
 const AUTONOMY_TONE: Record<ToolAutonomy, 'success' | 'warning' | 'neutral'> = {
   auto: 'success',
