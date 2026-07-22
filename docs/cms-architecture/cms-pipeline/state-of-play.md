@@ -7,6 +7,57 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-22 (DOCS-ONLY: W11/W12 platformization + capture rulings propagation; branch `claude/platformization-rulings-propagate-p8ebha`)
+
+No source or test changes. Propagated Wolf's 2026-07-22 rulings (OQ-W11-6,
+the lint exit-bar carve-out, and the ratified OQ-W12-1/-2/-3) into the task
+briefs, env table, and plan so W11/W12 start with a consistent work
+breakdown. `npm run check` unaffected (docs only; check touches `src/**` +
+`scripts/**`).
+
+**Reconciliation note:** the propagation brief told me to cite a decision
+record and read §6 ANSWER lines that did not exist in the repo (T11.0's
+RATIFIED artifact was never committed). Since every deliverable cites that
+record, I created it from Wolf's ruling text and filled §6 — this session
+also stands in for T11.0's deliverable #2. T11.0's OTHER gate (verify T9.24
+legacy deletion actually landed) is untouched and still owned by T11.0.
+
+**Files touched:**
+
+- ✚ `docs/cms-architecture/decisions/2026-07-22-platformization-and-capture-rulings.md`
+  — new decision record (the citable authority): OQ-W11-1…6, the lint
+  carve-out, OQ-W12-1…3, verbatim-in-intent + consequences.
+- `docs/cms-architecture/11-platformization-plan.md` — §6 ANSWER lines +
+  §6.1 RATIFIED block + new OQ-W11-6 bullet; §3.2 old authorization rule
+  annotated **SUPERSEDED** (kept, struck) with the new per-project/
+  contract-owned rule + the per-project governance/limits-block
+  implementation pointer beside `contentContract`/`toolPolicies`/
+  `publishingPolicy`.
+- `cms-pipeline/T11.5-desite-hardcodes.md` — 2026-07-22 census folded into
+  an explicit target list (EXTENDS §2.3): admin-UI hardcodes (Studio SITE_ID,
+  ObjectWorkspace/ui.ts `tax_drlurie`, GovernancePage `trk_drlurie`),
+  run-publisher-agent, track-ingest fallback, MCP server strings
+  (`mcp.ts:121-122`), Favicons/bio kugelmedia, pdf-tool `projectId` (the
+  SECOND tenancy axis), GitHub User-Agent, and the agent-facing example ids
+  in `object-contract.ts`/`agent/tools.ts`/`mcp.ts` descriptions. Items 1–9
+  marked **FRONT-LOADED — verify absent** (the `pre-W11 dehardcode (N/11)`
+  work, PRs #466/#467); the tool-description example ids are the one
+  **PENDING** item (~9 `drlurie` still live in `mcp.ts`; planned items 10–11
+  never committed). Added the lint exit-bar carve-out (tests/ fixtures EXEMPT
+  for v1) and the OQ-W11-6 `save-json-blob-mcp` "retire, don't extract" note.
+- `cms-pipeline/T11.7-provisioning-cli.md` — replaced the illustrative env
+  list with the REAL per-site env table (census of every
+  `process.env.*`/`env.*`/`Netlify.env.get` read across `src/`+`netlify/`+
+  `mcp/`; ~35 config vars), each classed per-site / fleet-shared / optional /
+  platform-injected; shared with T11.10.
+- `cms-pipeline/T12.1,T12.2,T12.4,T12.5,T12.6` — authorization language
+  rewritten to the ratified OQ-W12-1 (per-project, contract-owned; model
+  hard refusals the sole floor; no built-in ownership precondition); OQ-W12-2
+  (coverage default, per-project overridable) and OQ-W12-3 (never-released
+  drafts in the target project's own store; T12.1 spike local) reflected;
+  per-project governance/limits-block seam pointer added to T12.1.
+- `cms-pipeline/state-of-play.md` — this entry.
+
 ## Session 2026-07-20 B (W13 TAIL: T13.8→T13.10 — natives+CSP, sink kit, seeds+roundtrip; branch `claude/w13-natives-tail` off the merged #462)
 
 PR #462 MERGED (`d8171295`, 8/8 checks); continuation on a fresh branch.

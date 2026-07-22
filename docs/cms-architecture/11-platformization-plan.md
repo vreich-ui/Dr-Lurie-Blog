@@ -233,11 +233,36 @@ administrable afterwards," with the vocabulary growing deliberately via the
 gap-report loop — not pixel-perfect replication, which would require
 exactly the free-form styling the constitution forbids.
 
-**Authorization rule (OQ-W12-1, blocking precondition in every T12 brief):**
+> **SUPERSEDED (OQ-W12-1, 2026-07-22).** The rule below is retained for
+> history but no longer governs. Capture authorization is now **per-project
+> and contract-owned**, not a global built-in precondition — see the current
+> rule immediately after this block and
+> [`decisions/2026-07-22-platformization-and-capture-rulings.md`](decisions/2026-07-22-platformization-and-capture-rulings.md).
+
+_~~**Authorization rule (OQ-W12-1, blocking precondition in every T12 brief):**
 capture targets are properties Wolf owns, licenses, or explicitly
 authorizes. The pipeline reproduces structure/layout vocabulary and
 extracts palette values; body copy and media are regenerated as original
-content unless content rights are held. Agent sessions refuse other targets.
+content unless content rights are held. Agent sessions refuse other targets.~~_
+
+**Authorization rule (OQ-W12-1, RATIFIED 2026-07-22 — per-project,
+contract-owned):** the capture pipeline carries **no built-in ownership
+precondition**. The model's own hard refusals are the **sole universal
+floor**. Every other limit — what may be captured, from where, and what may
+be done with the result (including copy-rights / regenerate-vs-keep) — is a
+**setting the target client repo owns** and declares through **its MCP
+contract**. The pipeline **reads those contract-declared bounds and stays
+inside them**. Fidelity expectations (OQ-W12-2) are a coverage-based
+**default the project may override** through the same seam; captures land as
+**never-released drafts in the target project's own store** (OQ-W12-3).
+
+**Implementation consequence (the seam the pipeline reads):** CMS-Agent's
+project registry needs a **per-project governance/limits block** beside the
+existing `contentContract` / `toolPolicies` / `publishingPolicy`. Each client
+declares its capture settings there, exposed via `registry_get` /
+`object_contract`; the pipeline reads that block to learn the bounds it must
+honor (tracked in T12.1). This replaces the old "agent sessions refuse other
+targets" global gate.
 
 ## 4. Model allocation — flexible by construction
 
@@ -289,33 +314,76 @@ reserved for T11.3-class and T12.2-class problems).
 
 ## 6. Open questions for Wolf
 
+> **RATIFIED (2026-07-22).** The W11 + W12 questions below are answered — see
+> the ANSWER lines inline and the consolidated RATIFIED block in §6.1. Do not
+> re-open; cite
+> [`decisions/2026-07-22-platformization-and-capture-rulings.md`](decisions/2026-07-22-platformization-and-capture-rulings.md).
+> The W10 questions (OQ-W10-1…3) are NOT part of this record — they are
+> governed by the earlier T10.4 ratification, and OQ-W10-3 (composite)
+> remains open in `composite-sections-decision.md`.
+
 - **OQ-W10-1 — Mint list:** ratify/edit T10.3's proposed new section types
   and variant fields (gates T10.5/T10.6).
+  > _Governed by T10.4 (mint batch ratified; T10.5–T10.8 executed) — not this record._
 - **OQ-W10-2 — Token axes:** ratify the axis set + enum values of §1.1
   (gates T10.1's final shape; the sketch above is the recommendation).
+  > _Governed by the W10 checkpoint — not this record._
 - **OQ-W10-3 — Composite:** T10.7's decision memo IS the OQ-W8-1…4
   package — answer there; any composite build is a new wave.
+  > _STILL OPEN in `composite-sections-decision.md` — not this record._
 - **OQ-W11-1 — Repo strategy:** one monorepo (`packages/core` +
   `sites/<client>`), recommended — or split repos with published packages?
+  > **ANSWER (2026-07-22): monorepo** (`packages/core` + `sites/<client>`), as recommended. Split-repos/published-packages is a later graduation, not v1.
 - **OQ-W11-2 — Content exports location:** per-client dirs in the monorepo
   (recommended for v1) or per-client content repos?
+  > **ANSWER (2026-07-22): per-client dirs in the monorepo** for v1. Per-client content repos deferred.
 - **OQ-W11-3 — Admin console:** per-site admin (recommended v1, matches
   "the system is site-wide") vs one console over many sites (new auth
   architecture — defer)?
+  > **ANSWER (2026-07-22): per-site admin** for v1. One-console-over-many-sites deferred (new auth architecture).
 - **OQ-W11-4 — Tenant boundary:** confirm one Netlify site per client
   (stores/creds/deploys isolated), no key-namespacing inside one store.
+  > **ANSWER (2026-07-22): confirmed — one Netlify site per client.** No key-namespacing inside one store; no shared credential surface across clients.
 - **OQ-W11-5 — OQ-3 scope:** is the minimal per-agent-credential slice in
   scope for T11.10 (recommended) or a separate wave?
+  > **ANSWER (2026-07-22): in scope for T11.10** — the minimal verifiable-per-agent-token slice (not a full IAM).
+- **OQ-W11-6 — `mcp/save-json-blob-mcp/` disposition (added 2026-07-22):**
+  is the legacy save-json-blob MCP extracted into `packages/core`?
+  > **ANSWER (2026-07-22): NO — retire it with the legacy pipeline** (T9.22/T9.24 line), importer-check first; it is NOT carried into `packages/core`. Treated as legacy-bound like `publish-article.ts` by the extraction (T11.2–T11.4) and de-hardcode (T11.5–T11.6) tasks.
+- **Lint exit-bar carve-out (ratified 2026-07-22):** does the zero-`drlurie`
+  core lint apply to `tests/` fixtures?
+  > **ANSWER (2026-07-22): NO — `tests/` fixtures are EXEMPT for v1** (application code only). Parameterizing fixtures is deferred. The §8/W11 exit criterion reads against application code.
 - **OQ-W12-1 — Capture authorization:** confirm the §3.2 rule (owned/
   licensed/explicitly authorized targets only; structure + tokens, original
   copy unless rights held).
+  > **ANSWER (2026-07-22): OVERRIDDEN — authorization is PER-PROJECT and CONTRACT-OWNED, not a global rule.** The model's own hard refusals are the sole universal floor; every other limit is a setting the target client repo owns and surfaces through its MCP contract, and the pipeline reads those contract-declared bounds and stays inside them (no built-in ownership precondition). This supersedes the §3.2 "blocking precondition" text.
 - **OQ-W12-2 — Fidelity bar:** what score counts as "a copy within
   reasonable limits"? (Recommendation: section-mapping coverage ≥ 90%,
   token extraction complete, layout gaps enumerated in the report — not a
   pixel threshold.)
-- **OQ-W12-3 — Pre-W11 landing zone:** clones land in the T11.11 staging
+  > **ANSWER (2026-07-22): coverage-based default, per-project overridable** — coverage ≥ 90% + tokens complete + gaps enumerated (not a pixel threshold), as the DEFAULT each project may override via its own contract-declared settings.
+- **OQ-W12-3 — Landing zone:** clones land in the T11.11 staging
   client (recommended); if W12 is pulled ahead of W11, they land as
   never-released drafts in the Dr-Lurie store — acceptable?
+  > **ANSWER (2026-07-22): never-released drafts in the TARGET PROJECT'S OWN store** (the T11.11 staging client when W11 is in place; otherwise the target project's store directly — not a Dr-Lurie-only fallback). The T12.1 spike runs LOCAL (no store writes). Nothing auto-publishes.
+
+### 6.1 RATIFIED block — 2026-07-22 platform & capture rulings
+
+Recorded verbatim-in-intent from Wolf's rulings; full text and rationale in
+[`decisions/2026-07-22-platformization-and-capture-rulings.md`](decisions/2026-07-22-platformization-and-capture-rulings.md).
+
+| OQ            | Ruling                                                                                                                                   |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| OQ-W11-1      | Monorepo (`packages/core` + `sites/<client>`).                                                                                           |
+| OQ-W11-2      | Per-client dirs in the monorepo (v1).                                                                                                    |
+| OQ-W11-3      | Per-site admin (v1).                                                                                                                     |
+| OQ-W11-4      | One Netlify site per client; no key-namespacing inside a store.                                                                          |
+| OQ-W11-5      | Minimal per-agent-credential slice in T11.10 scope.                                                                                      |
+| OQ-W11-6      | `save-json-blob-mcp` retired with the legacy pipeline (importer-check first); NOT extracted into `packages/core`.                        |
+| Lint carve-out | Zero-`drlurie` core lint = application code only; `tests/` fixtures EXEMPT for v1 (parameterization deferred).                          |
+| OQ-W12-1      | Capture authorization is per-project and contract-owned; model hard refusals are the sole universal floor; no built-in ownership gate.   |
+| OQ-W12-2      | Coverage-based fidelity default (≥ 90% + tokens complete + gaps enumerated), per-project overridable.                                    |
+| OQ-W12-3      | Captures = never-released drafts in the target project's own store; T12.1 spike local.                                                   |
 
 ## 7. Queue integration (how this runs auto)
 
