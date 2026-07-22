@@ -18,7 +18,7 @@
 
 ---
 
-**Status: v2 proposed — 2026-07-22. Derived from code and docs in `vreich-ui/Dr-Lurie-Blog` (at PR #463) and `vreich-ui/CMS-Agent`. Every rule cites the enforcing code or the authoritative doc. Where this policy disagrees with an older doc in either repo, this policy names that doc stale and wins. v2 adds the operational layer (discovery map, locks/versions, error catalog, dedup/variants, taxonomy authoring, attribution, limits) so agents look answers up instead of burning tokens probing for them.**
+**Status: v2 proposed — 2026-07-22. Derived from code and docs in the `Dr-Lurie-Blog` repo (at PR #463) and the `CMS-Agent` repo. Every rule cites the enforcing code or the authoritative doc. Where this policy disagrees with an older doc in either repo, this policy names that doc stale and wins. v2 adds the operational layer (discovery map, locks/versions, error catalog, dedup/variants, taxonomy authoring, attribution, limits) so agents look answers up instead of burning tokens probing for them.**
 
 This is the policy an agent needs *beyond* the MCP tool contract: which pipeline to use, where its JSON goes, what shape the content must have, what the gates are, how to recover from every error class, what costs money, and which mechanisms are stale and must never be used.
 
