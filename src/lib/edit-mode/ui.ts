@@ -2033,7 +2033,7 @@ export const mountEditMode = (options: MountOptions): void => {
       'sys',
       `<span class="dl-em-repill">Re: ${escapeHtml(entry.name)}</span> armed` +
         `${result.mirrored ? ' — mirrored into blobs' : ''}: <code>${escapeHtml(result.publicPath)}</code>. ` +
-        'Requests now carry this image's public URL.'
+        'Requests now carry this image’s public URL.'
     );
     inputEl.focus();
   };
