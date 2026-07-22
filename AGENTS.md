@@ -92,6 +92,7 @@ change, it's a replica, not backbone — generalize it. Full rule + consequences
 - Before starting Codex work, identify the correct base branch and dependency chain.
 - For related or multi-step work, prefer an integration branch or the latest dependent branch instead of assuming `main`.
 - Keep page-specific guidance in focused docs under `docs/agents/`.
+- Before publishing any `content_item` article, read `docs/agents/publishing-policy.md` — the authoritative agent publishing policy (object path, functional blocks, media/`/img` rules, publish→release batching, gates, error recovery). It supersedes the legacy tool sequences in the older `docs/agents/*.md`.
 
 ## Repository Notes
 
