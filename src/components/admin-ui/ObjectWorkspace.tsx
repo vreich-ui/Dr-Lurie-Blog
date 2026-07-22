@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
+import { getSiteIdentity } from '../../lib/site-identity';
 import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
 import { Tabs } from './menus';
 import { Input, Select, Textarea } from './forms';
@@ -177,7 +178,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
         const res = await callObjectVerb(getToken, {
           action: 'get',
           object_type: 'taxonomy',
-          object_id: 'tax_drlurie',
+          object_id: getSiteIdentity().taxonomyId,
         });
         const kinds = ((res.body as { record?: { body?: { kinds?: Record<string, { terms?: { slug?: string }[] }> } } })
           .record?.body?.kinds ?? {}) as Record<string, { terms?: { slug?: string }[] }>;
