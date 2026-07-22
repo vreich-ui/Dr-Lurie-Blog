@@ -39,6 +39,7 @@ import {
 import { applyNavChangesToBody, navChangesToOps, navEditFieldsFor, type NavEditField } from './nav-editor.js';
 import type { NavigationBody } from '../../schema/bodies/navigation-v1.js';
 import { mediaPolicyConfig } from '../../config/media-policy.js';
+import { getSiteIdentity } from '../site-identity.js';
 import { previewFieldChange, restoreRegion, snapshotRegion, type RegionSnapshot } from './preview.js';
 import {
   askAiSuggestion,
@@ -605,9 +606,9 @@ export const mountEditMode = (options: MountOptions): void => {
           el.getAttribute('data-em-field') ??
           el.getAttribute('data-em-role-field') ??
           el.getAttribute('data-em-nav-field');
-        parts.push(`${key}${el.value}`);
+        parts.push(`${key}${el.value}`);
       });
-    return parts.join('');
+    return parts.join('');
   };
   let saveBaseline = '';
   const saveButtonEl = (): HTMLButtonElement | null => formEl.querySelector('[data-em-form-save]');
@@ -1599,7 +1600,7 @@ export const mountEditMode = (options: MountOptions): void => {
         target,
         region,
         { source: { kind: 'related', algorithm: (event.target as HTMLSelectElement).value } },
-        `selection “${ALGORITHM_LABELS[(event.target as HTMLSelectElement).value] ?? 'updated'}”`
+        `selection "${ALGORITHM_LABELS[(event.target as HTMLSelectElement).value] ?? 'updated'}"`
       );
     });
     chip.querySelector<HTMLInputElement>('[data-em-tiles]')?.addEventListener('change', (event) => {
@@ -2032,7 +2033,7 @@ export const mountEditMode = (options: MountOptions): void => {
       'sys',
       `<span class="dl-em-repill">Re: ${escapeHtml(entry.name)}</span> armed` +
         `${result.mirrored ? ' — mirrored into blobs' : ''}: <code>${escapeHtml(result.publicPath)}</code>. ` +
-        'Requests now carry this image’s public URL.'
+        'Requests now carry this image's public URL.'
     );
     inputEl.focus();
   };
@@ -2335,7 +2336,7 @@ export const mountEditMode = (options: MountOptions): void => {
   // ── article settings form (T9.20, capability #3/#4) ──────────────────────
   // Body-level metadata via set_article_meta under the SAME EditSession:
   // slug (contract-validated at edit time), description, category + tags
-  // against the tax_drlurie registry (novel terms are FLAGGED here, before
+  // against the site taxonomy registry (novel terms are FLAGGED here, before
   // publish — the publish hook enforces), SEO description with a counter.
   // Author and publish date deliberately absent: the object model carries no
   // author field, and the publish timestamp is the tray's publish-time option
@@ -2343,7 +2344,7 @@ export const mountEditMode = (options: MountOptions): void => {
 
   const taxonomyRegistry = async (): Promise<{ categories: string[]; tags: string[] }> => {
     try {
-      const result = await cachedRecord('taxonomy', 'tax_drlurie');
+      const result = await cachedRecord('taxonomy', getSiteIdentity().taxonomyId);
       const kinds = ((result.record?.body as Record<string, unknown> | undefined)?.kinds ?? {}) as Record<
         string,
         { terms?: Array<{ slug?: string }> }
