@@ -18,8 +18,11 @@
  * deduplicated.
  */
 
+import { getSiteIdentity } from '../../src/lib/site-identity.js';
+
 const CONTENT_DIR = 'src/data/post';
 const GITHUB_API_ROOT = 'https://api.github.com';
+const USER_AGENT = `${getSiteIdentity().siteSlug}-content-item-index`;
 const TTL_MS = 60_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -59,7 +62,7 @@ export const loadContentItemIds = async (fetchImpl: typeof fetch = fetch): Promi
           headers: {
             Accept: 'application/vnd.github+json',
             Authorization: `Bearer ${token}`,
-            'User-Agent': 'dr-lurie-content-item-index',
+            'User-Agent': USER_AGENT,
             'X-GitHub-Api-Version': '2022-11-28',
           },
         }

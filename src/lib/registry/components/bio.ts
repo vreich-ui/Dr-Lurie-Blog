@@ -4,7 +4,10 @@
  * `portrait` ({src, alt}) renders a photo by URL; `portraitAssetRef` remains
  * the trusted-artifact path, still unrendered. No references resolved in v1.
  */
+import { getSiteIdentity } from '../../site-identity.js';
 import { sectionVariantDataSchema, type EmptyResolved, type SectionComponentDefinition } from './types.js';
+
+const { assetHost, assetFolder } = getSiteIdentity();
 
 export const bioDefinition: SectionComponentDefinition<'bio', EmptyResolved> = {
   type: 'bio',
@@ -21,7 +24,7 @@ export const bioDefinition: SectionComponentDefinition<'bio', EmptyResolved> = {
         label: 'Portrait',
         help:
           'Optional photo shown under the heading (image URL + alt text). Use a site asset URL ' +
-          '(https://kugelmedia.netlify.app/drlurieblog/… or a first-party /images/… path). NEVER link ' +
+          `(${assetHost}/${assetFolder}/… or a first-party /images/… path). NEVER link ` +
           'repository files (raw.githubusercontent.com, images.weserv.nl or other proxies of the repo): ' +
           'the deploy secrets scanner blocks EVERY production deploy when the repo slug appears in ' +
           'published content.',

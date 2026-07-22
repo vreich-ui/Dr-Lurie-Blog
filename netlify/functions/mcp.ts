@@ -58,6 +58,7 @@ import {
 } from '../lib/artifact-index.js';
 import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
 import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
+import { getSiteIdentity } from '../../src/lib/site-identity.js';
 import {
   listPageTypeDefinitions,
   pageTypeDefinitionJsonSchema,
@@ -118,8 +119,12 @@ type ToolDefinition = {
   inputSchema: Record<string, unknown>;
 };
 
-const SERVER_NAME = 'Dr_Lurie_MCP_Server';
-const SERVER_DIAGNOSTIC_NAME = 'Dr_Lurie_Science_MCP';
+// Derived from the site-identity seam; for Dr-Lurie the resolved values are
+// byte-identical to the historical literals ('Dr_Lurie_MCP_Server' /
+// 'Dr_Lurie_Science_MCP') — external connectors key on serverInfo.name, so
+// the identity config must never change them casually.
+const SERVER_NAME = getSiteIdentity().mcpServerName;
+const SERVER_DIAGNOSTIC_NAME = getSiteIdentity().mcpDiagnosticName;
 const PROTOCOL_VERSION = '2025-06-18';
 
 // Cold-start observability: a fresh runtime instance means the caller just

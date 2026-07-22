@@ -15,6 +15,15 @@ import { Input } from './forms';
 import { Dialog, ConfirmDialog, useToast } from './overlays';
 import { IconAlertTriangle, IconPalette, IconSparkles } from './icons';
 import type { ObjectRecord, ObjectType } from '../../schema/object-record-v1';
+// NOTE: this component hydrates client:load, so getSiteIdentity() here only
+// ever sees the COMMITTED config (src/config/site-identity.ts) — browsers
+// have no process.env, so SITE_OBJECT_ID and other env overrides do not
+// reach client-rendered admin surfaces. A tenant that wants env-only
+// configuration must still edit the committed config for any
+// client-bundled surface to agree with the server. Pre-existing
+// limitation (the literal this replaced had the same ceiling); not
+// addressed here since bridging server config into client bundles is new
+// infrastructure beyond this dehardcode pass.
 import { getSiteIdentity } from '../../lib/site-identity';
 
 async function getToken(): Promise<string> {

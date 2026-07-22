@@ -30,9 +30,11 @@
  * GITHUB_REPOSITORY, GITHUB_BRANCH (?? BRANCH ?? 'main'),
  * GITHUB_COMMIT_AUTHOR_NAME/EMAIL.
  */
+import { getSiteIdentity } from '../../src/lib/site-identity.js';
 import type { MaterializedFile } from './materialize.js';
 
 const GITHUB_API_ROOT = 'https://api.github.com';
+const USER_AGENT = `${getSiteIdentity().siteSlug}-object-publisher`;
 const DEFAULT_MAX_ATTEMPTS = 4;
 const DEFAULT_BACKOFF_BASE_MS = 250;
 
@@ -128,7 +130,7 @@ const githubRequest = async <T>(
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'dr-lurie-object-publisher',
+      'User-Agent': USER_AGENT,
       'X-GitHub-Api-Version': '2022-11-28',
       ...init.headers,
     },

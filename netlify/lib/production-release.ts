@@ -36,8 +36,10 @@ import {
   triggerNetlifyBuild,
   type DeployReceipt,
 } from './netlify-deploys.js';
+import { getSiteIdentity } from '../../src/lib/site-identity.js';
 
 const GITHUB_API_ROOT = 'https://api.github.com';
+const USER_AGENT = `${getSiteIdentity().siteSlug}-production-release`;
 
 export type ReleaseToProductionOptions = {
   /** Commit the live deploy must reflect. Defaults to the content branch HEAD. */
@@ -103,7 +105,7 @@ export const resolveBranchHeadCommit = async (fetchImpl: typeof fetch = fetch): 
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
-        'User-Agent': 'dr-lurie-production-release',
+        'User-Agent': USER_AGENT,
         'X-GitHub-Api-Version': '2022-11-28',
       },
     });

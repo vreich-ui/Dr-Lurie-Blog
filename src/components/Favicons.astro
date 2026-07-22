@@ -1,5 +1,7 @@
 ---
-const favIcon = 'https://kugelmedia.netlify.app/favicon.png';
+import { getSiteIdentity } from '~/lib/site-identity';
+
+const favIcon = `${getSiteIdentity().assetHost}/favicon.png`;
 ---
 
 <link rel="icon" type="image/png" href={favIcon} />

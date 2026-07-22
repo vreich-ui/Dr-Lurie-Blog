@@ -36,6 +36,7 @@ import {
   type SinkConfig,
 } from '../lib/tracking-events.js';
 import { trackingBatchSchema, type TrackingEvent } from '../../src/schema/tracking-event-v1.js';
+import { resolveSiteIdentity } from '../../src/lib/site-identity.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const SINK_TIMEOUT_MS = 2000;
@@ -63,7 +64,7 @@ const getHeader = (headers: Record<string, string | undefined> | undefined, name
   return found?.[1];
 };
 
-// ─── geo (the pinned accessor) ───────────────────────────────────────────────
+// ─── geo (the pinned accessor) ────────────────────────────────────────────────
 
 export type GeoReading = { country: string | null; subdivision: string | null };
 
@@ -104,7 +105,7 @@ const codeOf = (value: unknown): string | null => {
   return null;
 };
 
-// ─── instance-local token bucket ─────────────────────────────────────────────
+// ─── instance-local token bucket ────────────────────────────────────────────
 
 const BUCKET_CAPACITY = 60;
 const BUCKET_REFILL_PER_SECOND = 10;
@@ -161,7 +162,7 @@ export const resetSinkConfigCacheForTests = (): void => {
   cachedSink = null;
 };
 
-// ─── the handler (deps injectable for tests) ─────────────────────────────────
+// ─── the handler (deps injectable for tests) ──────────────────────────────────────
 
 export type TrackIngestDeps = {
   fetchImpl?: typeof fetch;
@@ -176,6 +177,10 @@ export type TrackIngestDeps = {
   nowMs?: () => number;
   env?: Record<string, string | undefined>;
 };
+
+// Warn once per runtime instance, not per beacon — an unset project id is a
+// deploy misconfiguration, not per-event news.
+let warnedMissingTrackingProjectId = false;
 
 export const createTrackIngestHandler =
   (deps: TrackIngestDeps = {}) =>
@@ -225,7 +230,12 @@ export const createTrackIngestHandler =
       getHeader(event.headers, 'x-nf-client-connection-ip') ??
       getHeader(event.headers, 'x-forwarded-for')?.split(',')[0]?.trim() ??
       '';
-    const projectId = env.TRACKING_PROJECT_ID?.trim() || 'drlurie';
+    const envProjectId = env.TRACKING_PROJECT_ID?.trim();
+    if (!envProjectId && !warnedMissingTrackingProjectId) {
+      warnedMissingTrackingProjectId = true;
+      console.warn('[track-ingest] TRACKING_PROJECT_ID is unset — tagging events with the site-identity fallback.');
+    }
+    const projectId = envProjectId || resolveSiteIdentity(env).siteShortId;
     const salt = env.TRACKING_SALT?.trim() || 'dev-salt-unset';
     const utcDate = new Date(nowMs).toISOString().slice(0, 10);
     const { vhash, shash } = computeVisitorHashes({ salt, utcDate, ip, ua: ua ?? '', projectId, nowMs });
