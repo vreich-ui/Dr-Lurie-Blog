@@ -1600,7 +1600,7 @@ export const mountEditMode = (options: MountOptions): void => {
         target,
         region,
         { source: { kind: 'related', algorithm: (event.target as HTMLSelectElement).value } },
-        `selection "${ALGORITHM_LABELS[(event.target as HTMLSelectElement).value] ?? 'updated'}"`
+        `selection “${ALGORITHM_LABELS[(event.target as HTMLSelectElement).value] ?? 'updated'}”`
       );
     });
     chip.querySelector<HTMLInputElement>('[data-em-tiles]')?.addEventListener('change', (event) => {
