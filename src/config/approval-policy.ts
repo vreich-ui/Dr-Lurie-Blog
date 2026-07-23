@@ -19,9 +19,10 @@
  *                                         all-require-approval master.
  *
  * When a type requires approval: an agent proposes → the change waits → a
- * human approves (in /admin/objects/…) → the AGENT publishes. Any body edit
- * after the approval invalidates it (content_revision moves) and the change
- * waits again. There is no separate "human executes the publish" step.
+ * human approves (in the object workspace, /admin/content/<id>) → the AGENT
+ * publishes. Any body edit after the approval invalidates it (content_revision
+ * moves) and the change waits again. There is no separate "human executes the
+ * publish" step.
  *
  * Articles (content_item) joined the governed set at W7.3 and stay Tier 1
  * (OQ-W7-4, Wolf 2026-07-12): autonomous under the master — agents publish

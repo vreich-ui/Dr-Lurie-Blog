@@ -6,7 +6,8 @@
  * (shell chrome + page widgets) lives in one React tree and shares the Toast
  * context and palette.
  *
- * Legacy pages remain reachable under the "Legacy" group until W9.g (T9.24).
+ * The "Legacy" group (publish/drafts/agent-admin/library/blobs) retired in
+ * W9.g (T9.24) — every capability now lives on the surfaces below.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -27,7 +28,6 @@ import {
   IconMenu,
   IconLogout,
   IconSearch,
-  IconExternalLink,
   IconRocket,
   type IconProps,
 } from './icons';
@@ -70,16 +70,6 @@ const NAV: NavGroup[] = [
       { label: 'Admins', href: '/admin/settings/admins', icon: IconUser },
       { label: 'Profile', href: '/admin/profile', icon: IconUser },
       { label: 'Maintenance', href: '/admin/maintenance', icon: IconWrench, soon: true },
-    ],
-  },
-  {
-    label: 'Legacy',
-    items: [
-      { label: 'Publish', href: '/admin/publish', icon: IconExternalLink },
-      { label: 'Drafts', href: '/admin/drafts', icon: IconExternalLink },
-      { label: 'AI Publisher', href: '/admin/agent-admin', icon: IconExternalLink },
-      { label: 'Library', href: '/admin/library', icon: IconExternalLink },
-      { label: 'Blobs', href: '/admin/blobs', icon: IconExternalLink },
     ],
   },
 ];
@@ -238,7 +228,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
       group: 'Actions',
       icon: <IconSparkles size={16} />,
       keywords: ['agent', 'ai'],
-      onSelect: () => window.location.assign('/admin/agent-admin'),
+      onSelect: () => window.location.assign('/admin/agents'),
     },
   ];
 

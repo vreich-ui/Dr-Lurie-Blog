@@ -1,5 +1,6 @@
 ---
-import AdminNav from '~/components/admin/AdminNav.astro';
+// T9.24 interim: AdminNav retires in this commit; the full AdminLayout +
+// Owner-gated reskin (this page -> maintenance.astro) is a separate commit.
 import Layout from '~/layouts/PageLayout.astro';
 
 const pageTitle = 'Blob Store Manager';
@@ -25,8 +26,6 @@ const metadata = {
     </header>
 
     <p class="auth-status" data-auth-status aria-live="polite" role="status"></p>
-
-    <AdminNav />
 
     <section class="blobs-shell" data-auth-gated hidden>
       <div class="blobs-toolbar">

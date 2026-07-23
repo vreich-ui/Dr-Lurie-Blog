@@ -1950,7 +1950,7 @@ export const mountEditMode = (options: MountOptions): void => {
       patchSectionId = inner?.id;
     }
     if (!currentData || !patchSectionId) {
-      log('sys', 'Not in the draft record yet — edit via /admin/objects.');
+      log('sys', `Not in the draft record yet — edit via /admin/content/${escapeHtml(target.objectId)}.`);
       return;
     }
     panelState = {

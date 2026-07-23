@@ -18,7 +18,7 @@ import { useToast } from './overlays';
 import {
   IconRocket,
   IconFilePlus,
-  IconSparkles,
+  IconPalette,
   IconLibrary,
   IconClock,
   IconInfo,
@@ -197,20 +197,20 @@ function QuickActions() {
   const actions = [
     {
       label: 'New article',
-      description: 'Draft and publish a Markdown article',
-      href: '/admin/publish',
+      description: 'Start a draft with a CMS Agent',
+      href: '/admin/agents',
       icon: IconFilePlus,
     },
     {
-      label: 'AI publisher',
-      description: 'Prepare a payload with the assistant',
-      href: '/admin/agent-admin',
-      icon: IconSparkles,
+      label: 'Studio',
+      description: 'Build from a template, theme, or recipe',
+      href: '/admin/studio',
+      icon: IconPalette,
     },
     {
       label: 'Content library',
-      description: 'Browse published articles and drafts',
-      href: '/admin/library',
+      description: 'Browse everything by type',
+      href: '/admin/content',
       icon: IconLibrary,
     },
   ];

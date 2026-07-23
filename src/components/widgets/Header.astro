@@ -293,7 +293,7 @@ const currentPath = `/${trimSlash(new URL(Astro.url).pathname)}`;
 <style>
   /* M-9: admin-only nav items ship hidden and are revealed client-side only for
      signed-in admins (header-auth script toggles [hidden]). Explicit rule so the
-     flex `<li>` stays collapsed until then — same guard AdminNav uses. */
+     flex `<li>` stays collapsed until then. */
   [data-admin-only][hidden] {
     display: none;
   }
