@@ -47,3 +47,25 @@ jobs:
       # The T2.0 cutover-diff harness self-test (cheap; the full two-build diff
       # stays a manual per-cutover gate).
       - run: node scripts/build-diff.mjs --self-test
+
+  # --- T11.1: placeholder fleet matrix ---
+  # Currently one site (drlurie), built from the existing root layout — this is
+  # the SAME build the `build` job runs, so it stays green and behavior-neutral.
+  # T11.8 replaces this with the real per-site matrix (build + test + build-diff +
+  # seed-drift) once sites/<client> carry their own build. Do not add sites here
+  # until they exist as buildable workspaces.
+  fleet:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        site:
+          - drlurie
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
