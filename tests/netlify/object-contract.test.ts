@@ -110,6 +110,16 @@ test('content_item carries the node op family (W7.3 — articles are governed ob
   );
 });
 
+test('content_item contract advertises the author field and its set action (T9.23a)', () => {
+  const contract = buildObjectContract('content_item');
+  const properties = (contract.body_schema as { properties?: Record<string, unknown> }).properties ?? {};
+  assert.ok('author' in properties, 'body_schema must list author (derived from the zod body schema)');
+
+  const setArticleMeta = contract.patch_ops.find((op) => op.op === 'set_article_meta');
+  assert.ok(setArticleMeta, 'set_article_meta must be a content_item patch op');
+  assert.match(String(setArticleMeta?.arg_schema?.description ?? ''), /author/);
+});
+
 test('requires_approval is computed from the policy, not hardcoded', () => {
   const gated: ApprovalPolicy = { master: 'all-require-approval', overrides: {} };
   const autonomous: ApprovalPolicy = { master: 'all-autonomous', overrides: {} };

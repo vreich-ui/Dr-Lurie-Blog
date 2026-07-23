@@ -583,6 +583,7 @@ const contentItemReaderProjection = (body: unknown): unknown => {
     title: article.title,
     deck: article.deck,
     description: article.description,
+    author: article.author,
     image: article.image,
     seo: article.seo,
     nodes: article.nodes

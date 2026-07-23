@@ -164,6 +164,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
   const taxonomy = (body.taxonomy ?? {}) as { category?: string; tags?: string[] };
   const seo = (body.seo ?? {}) as { description?: string };
   const [slug, setSlug] = useState(String(body.slug ?? ''));
+  const [author, setAuthor] = useState(String(body.author ?? ''));
   const [description, setDescription] = useState(String(body.description ?? ''));
   const [category, setCategory] = useState(taxonomy.category ?? '');
   const [tags, setTags] = useState((taxonomy.tags ?? []).join(', '));
@@ -204,6 +205,9 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
     try {
       const fields: Record<string, unknown> = {};
       if (slug.trim() && slug.trim() !== body.slug) fields.slug = slug.trim();
+      if (author.trim() !== String(body.author ?? '')) {
+        fields.author = author.trim() === '' ? null : author.trim();
+      }
       if (description.trim() !== String(body.description ?? '')) {
         fields.description = description.trim() === '' ? null : description.trim();
       }
@@ -272,6 +276,13 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
         onChange={(event) => setSlug(event.target.value)}
         error={slug && !slugValid ? 'Lowercase letters, digits, single hyphens.' : undefined}
         hint="Unique across articles; validated on save."
+      />
+      <Input
+        label="Author"
+        value={author}
+        maxLength={120}
+        onChange={(event) => setAuthor(event.target.value)}
+        hint="Shown as the byline; leave blank to omit."
       />
       <Textarea
         label="Description (deck)"

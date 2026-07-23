@@ -310,3 +310,31 @@ test('a full validateObject pass on a clean article is publish-eligible', () => 
   const summary = summarizeValidation(groups);
   assert.equal(summary.eligible, true, JSON.stringify(summary.blockers));
 });
+
+// ─── author field (T9.23a — the T9.23 parity-drive gap) ───────────────────────
+
+test('author is additive-optional: a pre-T9.23a record (no author) still parses', () => {
+  const body = articleBody();
+  assert.equal('author' in body, false);
+  assert.equal(contentItemBodySchema.safeParse(body).success, true);
+});
+
+test('author accepts a plain byline up to 120 chars and rejects longer strings', () => {
+  const withAuthor = contentItemBodySchema.safeParse({ ...articleBody(), author: 'Dr. Lurie' });
+  assert.equal(withAuthor.success, true);
+  assert.equal(withAuthor.success && withAuthor.data.author, 'Dr. Lurie');
+
+  const atLimit = contentItemBodySchema.safeParse({ ...articleBody(), author: 'A'.repeat(120) });
+  assert.equal(atLimit.success, true);
+
+  const overLimit = contentItemBodySchema.safeParse({ ...articleBody(), author: 'A'.repeat(121) });
+  assert.equal(overLimit.success, false);
+});
+
+test('author joins the reader-safety projection: a leaked strategy word in it blocks, same as title/deck', () => {
+  const clean = checkReaderSafety({ ...articleBody(), author: 'Dr. Lurie' }, 'content_item');
+  assert.equal(statusOf(clean, 'reader_safety'), 'complete');
+
+  const leaking = checkReaderSafety({ ...articleBody(), author: 'agentNotes: ghostwritten' }, 'content_item');
+  assert.equal(statusOf(leaking, 'reader_safety'), 'missing');
+});

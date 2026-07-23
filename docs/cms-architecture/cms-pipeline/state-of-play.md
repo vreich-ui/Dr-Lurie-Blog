@@ -7,6 +7,87 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-23 (T9.23a: content_item author field — the T9.23 parity gap closed; branch `claude/content-item-author-field-kgazza`)
+
+Wolf's 2026-07-23 ruling: the legacy `/admin/publish` exposed an author; the
+object model never carried one — add the field (not retire). This was the
+sole gap the T9.23 parity drive found (row 3, author); T9.24 (legacy
+deletion) was blocked on it landing.
+
+**Scope — v1, deliberately minimal**, shipped end to end through the
+governed substrate. No new patch op: `author` rides the existing
+`set_article_meta` fields grammar generically, exactly like every other
+article-settings scalar (slug/title/deck/description/taxonomy/seo).
+
+- `src/schema/bodies/content-item-v1.ts` — `author?: string` (`.max(120)`),
+  additive-optional, in the same public-settings envelope as slug/deck/
+  description. Every existing record (none carry it) still parses.
+- `src/schema/object-patch-ops.ts` — `set_article_meta`'s `.describe()` now
+  names `author` alongside title/slug/taxonomy/seo/scores, for contract
+  discoverability. No grammar change: the op already deep-merges any
+  body-level field except `nodes`/`tracking`, and its inverse derivation
+  (`derivePatchInverse`) is generic over the captured before/after tree —
+  both already covered a new scalar field for free.
+- `netlify/lib/object-validate.ts` — `contentItemReaderProjection` (the
+  reader-safety leak scan specific to content_item) now includes `author`,
+  because it is now a RENDERED field. Without this an agent could leak
+  strategy vocabulary (`private`/`agentNotes`/…) through the byline
+  undetected — the projection is a curated allowlist of what actually
+  reaches readers, not the whole body. Length/plain-text bounds are the
+  schema's `.max(120)`, enforced generically by the existing `checkSchema`
+  pass at every patch/create/publish — no new validation code needed.
+- Editor parity on BOTH surfaces (matching every other article-settings
+  field, since T9.20 built them as two hand-kept-in-sync implementations):
+  `src/lib/edit-mode/ui.ts` (canvas panel "Article settings" accordion —
+  `renderArticleMetaForm`/`saveArticleMetaForm`) and
+  `src/components/admin-ui/ObjectWorkspace.tsx` (`ArticleSettingsCard` in
+  the "Details" drawer) — an Author input beside Slug/Category/Tags/SEO in
+  both, saved through the same `set_article_meta`/EditSession path. The
+  stale "author deliberately absent" comment in `ui.ts` is corrected.
+- Render: `src/utils/blog.ts` (`loadArticleObjectPosts` now carries
+  `article.author` onto the shared `Post.author` field — already declared
+  on the `Post` type, previously populated only by the legacy `.md` path)
+  + `src/components/blog/SinglePost.astro` (the article meta line renders
+  `By <author>` between the date and category when set; renders nothing
+  when absent — matches the existing typography exactly, no icon, no new
+  layout).
+- Tests (all new, all green): schema additive-parse + max-length bound, and
+  reader-safety leak-scan coverage
+  (`tests/netlify/content-item-object.test.ts`); a `set_article_meta`
+  set/inverse round-trip on `author` through the real engine
+  (`src/lib/object-patch-apply.test.ts`); `object_contract('content_item')`
+  advertising `author` in `body_schema` and in `set_article_meta`'s
+  description (`tests/netlify/object-contract.test.ts`).
+
+**Verification:** `npm run check` (astro check 0 errors/0 warnings, eslint
+clean, prettier clean) + `npm test` green — 1705 tests, 0 failures.
+`scripts/build-diff.mjs` (working tree vs `HEAD`): **80/80 pages identical,
+EMPTY DIFF** — none of the 12 live articles carry an author, so the
+conditional byline moved zero pixels; this was the acceptance gate.
+
+**Found, not fixed — flagged per CLAUDE.md rather than bundled in:** the
+canvas panel's Article-settings Save-draft button has a dirty-state bug
+predating this task. `serializeForm()` (`ui.ts`, the shared save-button
+dirty tracker) queries only
+`[data-em-field],[data-em-role-field],[data-em-nav-field]`; the Article
+Settings form's inputs (slug/author/description/category/tags/seo) all
+carry `[data-em-meta-field]` instead, which that selector never matches. So
+`serializeForm()` always returns `''` for this form regardless of what's
+typed, `saveBaseline` is also always `''`, and
+`button.disabled = serializeForm() === saveBaseline` never flips false —
+the Save button reads as permanently disabled in the CANVAS panel for every
+Article-settings field, not just the new one (pre-existing since T9.20, not
+introduced here). The workspace Details-drawer's save button
+(`ObjectWorkspace.tsx`) has no such gate and is unaffected. Worth its own
+fix task before T9.23's sign-off treats capability #3/#4 as proven on the
+canvas surface specifically.
+
+**Records (same commit):** `object-inventory.md` (content_item row) +
+`conversion-map.md` (content_item attributes line) updated.
+
+**T9.23a author field — the T9.23 parity gap closed; T9.24 unblocked
+(pending the recorded sign-off).**
+
 ## Session 2026-07-22 (DOCS-ONLY: W11/W12 platformization + capture rulings propagation; branch `claude/platformization-rulings-propagate-p8ebha`)
 
 No source or test changes. Propagated Wolf's 2026-07-22 rulings (OQ-W11-6,

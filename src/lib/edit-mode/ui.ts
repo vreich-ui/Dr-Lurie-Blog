@@ -1934,6 +1934,7 @@ export const mountEditMode = (options: MountOptions): void => {
       nodePrivate = node?.private;
       articleMeta = {
         slug: body.slug,
+        author: body.author,
         description: body.description,
         taxonomy: body.taxonomy,
         seo: body.seo,
@@ -2333,14 +2334,14 @@ export const mountEditMode = (options: MountOptions): void => {
     await refreshPending();
   };
 
-  // ── article settings form (T9.20, capability #3/#4) ──────────────────────
+  // ── article settings form (T9.20, capability #3/#4; author: T9.23a) ──────
   // Body-level metadata via set_article_meta under the SAME EditSession:
-  // slug (contract-validated at edit time), description, category + tags
-  // against the site taxonomy registry (novel terms are FLAGGED here, before
-  // publish — the publish hook enforces), SEO description with a counter.
-  // Author and publish date deliberately absent: the object model carries no
-  // author field, and the publish timestamp is the tray's publish-time option
-  // (T9.21) — the panel surfaces only what the contract allows.
+  // slug (contract-validated at edit time), author (free-text byline),
+  // description, category + tags against the site taxonomy registry (novel
+  // terms are FLAGGED here, before publish — the publish hook enforces), SEO
+  // description with a counter. Publish date stays absent: the tray's
+  // publish-time option (T9.21) owns it — the panel surfaces only what the
+  // contract allows.
 
   const taxonomyRegistry = async (): Promise<{ categories: string[]; tags: string[] }> => {
     try {
@@ -2377,6 +2378,9 @@ export const mountEditMode = (options: MountOptions): void => {
       `<div class="dl-em-formrow"><label>Slug</label>` +
       `<input type="text" data-em-meta-field="slug" value="${escapeHtml(String(meta.slug ?? ''))}" spellcheck="false">` +
       `<span class="dl-em-fieldnote" data-em-meta-slugnote>lowercase-hyphen; must be unique across articles.</span></div>` +
+      `<div class="dl-em-formrow"><label>Author</label>` +
+      `<input type="text" data-em-meta-field="author" value="${escapeHtml(String(meta.author ?? ''))}" maxlength="120">` +
+      `<span class="dl-em-fieldnote">Shown as the byline; leave blank to omit.</span></div>` +
       `<div class="dl-em-formrow"><label>Description (deck)</label>` +
       `<textarea data-em-meta-field="description">${escapeHtml(String(meta.description ?? ''))}</textarea>` +
       `<span class="dl-em-fieldnote">Shown on listings.</span></div>` +
@@ -2448,6 +2452,8 @@ export const mountEditMode = (options: MountOptions): void => {
     const fields: Record<string, unknown> = {};
     const slug = read('slug').trim();
     if (slug && slug !== before.slug) fields.slug = slug;
+    const author = read('author').trim();
+    if (author !== (before.author ?? '')) fields.author = author === '' ? null : author;
     const description = read('description').trim();
     if (description !== (before.description ?? '')) fields.description = description === '' ? null : description;
     const category = read('category').trim();
@@ -2517,6 +2523,7 @@ export const mountEditMode = (options: MountOptions): void => {
     state.articleMeta = {
       ...before,
       ...(fields.slug !== undefined ? { slug: fields.slug } : {}),
+      ...(fields.author !== undefined ? { author: fields.author ?? undefined } : {}),
       ...(fields.description !== undefined ? { description: fields.description ?? undefined } : {}),
       ...(fields.taxonomy !== undefined ? { taxonomy: { category: category || undefined, tags } } : {}),
       ...(fields.seo !== undefined ? { seo: { description: seoDescription || undefined } } : {}),
