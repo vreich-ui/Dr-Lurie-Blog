@@ -1,8 +1,8 @@
 {
   "__generated": {
-    "at": "2026-07-14T10:45:23.130Z",
+    "at": "2026-07-23T10:32:42.958Z",
     "from": "objects/navigation/by-id/nav_header.json",
-    "record_version": 86
+    "record_version": 94
   },
   "actions": [
     {
@@ -135,47 +135,29 @@
           }
         },
         {
-          "description": "Review and publish queued content.",
-          "id": "i_admin_publish",
-          "label": "Publish",
-          "target": {
-            "href": "/admin/publish",
-            "kind": "route"
-          }
-        },
-        {
-          "description": "Work in progress awaiting review.",
-          "id": "i_admin_drafts",
-          "label": "Drafts",
-          "target": {
-            "href": "/admin/drafts",
-            "kind": "route"
-          }
-        },
-        {
-          "description": "All content in one place.",
+          "description": "Browse everything by human name — pages, articles, sections, and more.",
           "id": "i_admin_library",
-          "label": "Library",
+          "label": "Content library",
           "target": {
-            "href": "/admin/library",
+            "href": "/admin/content",
             "kind": "route"
           }
         },
         {
-          "description": "Agent-assisted drafting and publishing.",
+          "description": "Chat with CMS Agents across any object.",
           "id": "i_admin_ai",
-          "label": "AI Publisher",
+          "label": "Agents",
           "target": {
-            "href": "/admin/agent-admin",
+            "href": "/admin/agents",
             "kind": "route"
           }
         },
         {
-          "description": "Inspect the Netlify Blobs object store.",
+          "description": "Blob browser, diagnostics, and wipe tools (Owner-only).",
           "id": "i_admin_blobs",
-          "label": "Blob Store",
+          "label": "Maintenance",
           "target": {
-            "href": "/admin/blobs",
+            "href": "/admin/maintenance",
             "kind": "route"
           }
         },
