@@ -394,12 +394,12 @@ const publishOutcome = async (seed, lockToken) => {
   // Review-gated types (product, shop-plan §0.4): an agent-executed publish is
   // DENIED until a human approves — that denial is the drill's expected
   // terminal signal, in the sandbox AND in production. The human approves in
-  // /admin/objects and the approved publish is re-executed; the driver must
-  // never work around the gate.
+  // the object workspace (/admin/content/<id>, T9.24) and the approved
+  // publish is re-executed; the driver must never work around the gate.
   if (text.includes('approval_required')) {
     return {
       ok: true,
-      detail: 'blocked at approval_required — the review-required gate; a human approves in /admin/objects',
+      detail: 'blocked at approval_required — the review-required gate; a human approves in /admin/content/<id>',
     };
   }
   return { ok: false, detail: text };

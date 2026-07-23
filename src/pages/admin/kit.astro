@@ -1,7 +1,6 @@
 ---
 import '~/assets/styles/admin-tokens.css';
 import KitGallery from '~/components/admin-ui/KitGallery';
-import AdminNav from '~/components/admin/AdminNav.astro';
 import Layout from '~/layouts/PageLayout.astro';
 
 // T9.1 → T9.2 — the admin UI kit gallery. Uses the same client-side auth gate
@@ -47,8 +46,6 @@ const metadata = {
 
     <!-- Shown when signed-in admin -->
     <div data-admin-shell hidden>
-      <AdminNav />
-
       <section class="kit-island" data-auth-gated hidden>
         <KitGallery client:load />
       </section>

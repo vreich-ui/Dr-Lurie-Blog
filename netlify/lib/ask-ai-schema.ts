@@ -1,10 +1,11 @@
 /**
  * Ask-AI tool-schema derivation (T1.6).
  *
- * The article Ask-AI (admin-ask-ai-node.ts, A§1.4) hand-writes the forced
- * tool's `input_schema` as a literal listing the editable node.public fields.
- * That is exactly the per-type-agreement cost the CMS design set out to remove
- * (A§1.9): a seventh object type would mean a seventh hand-maintained schema.
+ * The legacy article Ask-AI (admin-ask-ai-node.ts, A§1.4, retired T9.24)
+ * hand-wrote the forced tool's `input_schema` as a literal listing the
+ * editable node.public fields. That was exactly the per-type-agreement cost
+ * the CMS design set out to remove (A§1.9): a seventh object type would mean
+ * a seventh hand-maintained schema.
  *
  * Instead, the tool schema is DERIVED from the object type's own zod body
  * schema (the T0.2 modules) at request time. `deriveAskAiToolSchema` takes any
@@ -12,9 +13,10 @@
  * (`{name, description, input_schema}` — plain JSON Schema, which the caller
  * hands to OpenAI as a function's `parameters`) — so adding a new object type
  * needs nothing here beyond its zod schema existing. The function
- * is deliberately type-agnostic; the only thing that knows the six concrete
- * types is the `ASK_AI_BODY_SCHEMAS` registry below, which simply re-exports
- * the T0.2 schemas (content_item is excluded — articles keep their own path).
+ * is deliberately type-agnostic; the only thing that knows the concrete types
+ * is the `ASK_AI_BODY_SCHEMAS` registry below, which simply re-exports the
+ * T0.2 schemas (content_item joined at W7.8 — whole-object asks serve the
+ * admin surface; the canvas asks node-scoped via ask-ai-object.ts).
  *
  * "Partial" is the whole point: the AI returns ONLY the fields it changed, the
  * same contract the article tool states ("include only fields that should

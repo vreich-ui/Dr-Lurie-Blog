@@ -1,15 +1,24 @@
 # 10 — Admin Workspace Plan (W9): the chat-first admin conversion — workspace, CMS Agents, two-tier rights, canvas ports, legacy retirement
 
-> **Status (2026-07-16): PLANNED — docs only, nothing built.**
+> **Status (2026-07-23): SHIPPED.** Every wave (T9.1–T9.26) is built; T9.23's
+> parity sign-off passed (2026-07-23, rows 1–10 pass/confirmed-present, OQ-W9-5
+> ruled); T9.24 retired every legacy admin surface (publish/drafts/library/
+> agent-admin/review/objects pages, AdminNav, the nine §6 functions,
+> `/admin/blobs` → Owner-only `/admin/maintenance`) — see the T9.24/T9.25
+> `state-of-play.md` entries for the run record. This doc stays the reference
+> for the route map (§2), RBAC model (§8), and what retired (§6) — read it
+> before touching `/admin/*`, don't assume it's still a plan.
 > Commissioned by Wolf's direct request ("overhaul the admin UX/UA section …
 > make this into a plan Admin section conversion"). This is the "admin area
 > rethink" that two standing rulings were waiting on: _"ignore the old admin
 > editor in favor of this [canvas] UX"_ (state-of-play 2026-07-13 G) and
 > _"the W7.7 remainder is ON HOLD — the admin area is being rethought"_
-> (07-canvas-editing.md §4). T9.19 formally lifts that hold.
+> (07-canvas-editing.md §4). T9.19 formally lifted that hold; T9.24 then
+> deleted the old admin-editor UI the hold was protecting against, closing it
+> for good.
 > Task briefs: `cms-pipeline/T9.1-*.md` … `T9.26-*.md`; queue rows appended
-> to `cms-pipeline/queue.tsv`. Open questions for Wolf: §11 (OQ-W9-1…8;
-> -3 resolved same day).
+> to `cms-pipeline/queue.tsv`. Open questions for Wolf: §11 (OQ-W9-1…8; -3
+> resolved same day at commissioning; -1 and -5 RESOLVED 2026-07-23 — see §11).
 > Decisions already taken by Wolf at commissioning (2026-07-16, via session
 > Q&A): deliverable = this plan + briefs; UI stack = React islands scoped to
 > /admin; CMS Agents = in-house agent endpoint; roles = two tiers
@@ -84,8 +93,8 @@ All pages remain static Astro shells, client-gated via `fetchAdminAuthState`
 with the real wall in each function (`getAdminStateFromEvent` + roles) —
 the existing pattern, unchanged. New shell: `src/layouts/AdminLayout.astro`
 + `src/components/admin-ui/AdminShell.tsx` (sidebar, topbar with user chip,
-Cmd-K command palette). `src/components/admin/AdminNav.astro` retires with
-the legacy pages (T9.24).
+Cmd-K command palette). `src/components/admin/AdminNav.astro` retired with
+the legacy pages (T9.24, 2026-07-23).
 
 | Route | Purpose | Primary widgets | Powered by (existing → new) |
 |---|---|---|---|
@@ -285,7 +294,7 @@ under `tests/netlify/`.
 | **Governance overrides** | `netlify/lib/governance-store.ts`, `netlify/functions/admin-governance.ts`; new blob store `governance`, single doc `overrides.v1`: `{ approval?, creation?, chat_tools?, updated_by, updated_at, history[] }`, zod-validated with the existing config schemas | read: Admin; write: Owner | New resolver `resolveActivePolicies(store)` — store override if valid, else committed config; consumed by the verb publish/create paths and the chat tool loop. The committed files remain the defaults and the disaster fallback; the page labels "committed default" vs "runtime override" with one-click revert. **Security boundary** (decides who approves what): Fable task; **gated on OQ-W9-2** because it changes Wolf's one-file-lever governance model. |
 | **Audit feed** | `netlify/lib/audit-feed.ts`, `netlify/functions/admin-audit.ts` | Admin | Read-only aggregation of recent object-history entries (via the store, no new writes) + chat run outcomes; powers the home activity widget and per-member audit views. |
 | **AI publisher re-point** | `netlify/functions/run-publisher-agent.ts` re-targeted to create content_item objects via `handleObjectVerb` (create → node upserts → validate → publish under the existing gate) instead of the legacy markdown `publish-article` path | existing | Closes open W7.5. `publish-article.ts` and `admin-workflow-lock.ts` are NOT modified (off-limits); only their caller changes. ChatKit page fate = OQ-W9-1. |
-| **Retirements** | Delete after T9.23 sign-off: `admin-ask-ai-node.ts`, `get-article-for-edit.ts`, `admin-update-node.ts`, `admin-patch-workflow.ts`, `list-draft-articles.ts`, `admin-save-json-draft.ts`, `admin-get-json-draft.ts`, `admin-list-json-drafts.ts`, `toggle-article-publish.ts` | — | Callers first, functions second, each with importer verification (grep + tests + full build). `publish-article.ts`, `admin-workflow-lock.ts`, and the `save-json-blob` MCP surface stay (off-limits / agent-facing until Wolf retires those separately). |
+| **Retirements — DONE (T9.24, 2026-07-23)** | Deleted: `admin-ask-ai-node.ts`, `get-article-for-edit.ts`, `admin-update-node.ts`, `admin-patch-workflow.ts`, `list-draft-articles.ts`, `admin-save-json-draft.ts`, `admin-get-json-draft.ts`, `admin-list-json-drafts.ts`, `toggle-article-publish.ts`, plus `create-chatkit-session.ts` (OQ-W9-1) and the orphaned `src/lib/admin/ai-suggestion.ts`. Six pages + `AdminNav.astro` + the Legacy nav group also went (see `state-of-play.md`). | — | Callers first, functions second, each with importer verification (grep + tests + full build) — see the T9.24 commits for the grep evidence. `publish-article.ts`, `admin-workflow-lock.ts`, and the `save-json-blob` MCP surface stayed untouched (off-limits / agent-facing until Wolf retires those separately; verified byte-identical via `git diff --stat`). |
 
 ## 7. Adjustable guardrails — what the settings page controls
 
@@ -447,9 +456,9 @@ up when in doubt):**
 
 ## 11. Open questions for Wolf (OQ-W9)
 
-1. **OQ-W9-1 — ChatKit fate:** retire the hosted OpenAI ChatKit
-   `/admin/agent-admin` in favor of the in-house Agents hub (recommended —
-   one chat system), or keep it during a transition?
+1. **OQ-W9-1 — RESOLVED (Wolf, 2026-07-23): RETIRE.** ChatKit's hosted
+   `/admin/agent-admin` and `create-chatkit-session.ts` retired at T9.24 in
+   favor of the in-house Agents hub (`/admin/agents`) — one chat system.
 2. **OQ-W9-2 — Runtime guardrail overrides:** the guardrails page implies
    a runtime override layer over your committed one-file levers
    (`approval-policy.ts` / `creation-policy.ts`). Accept the
@@ -463,8 +472,10 @@ up when in doubt):**
 4. **OQ-W9-4 — Third tier:** should `editor`/`publisher` become a visible
    third workspace tier now, or stay env-only vocabulary under the
    two-tier UI (recommended)?
-5. **OQ-W9-5 — Canonical-input promotion:** retire without an object-model
-   port (variants + discard cover the intent)? (Recommended: yes.)
+5. **OQ-W9-5 — RESOLVED (Wolf, via the T9.23 sign-off, 2026-07-23): retire
+   without an object-model port.** `create_variant` lineage + Discard
+   (history inverses) cover the intent; no canonical-input surface exists
+   on the object substrate.
 6. **OQ-W9-6 — Unpublish:** stand by OQ-2 (no unpublish in the workspace)?
    (Recommended: yes.)
 7. **OQ-W9-7 — Agent attribution:** workspace chat always runs under the

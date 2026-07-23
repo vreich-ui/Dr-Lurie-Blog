@@ -208,6 +208,49 @@ Do not skip this because the task instructions in front of you look self-contain
 - File-deletion tasks require verifying every importer first — never delete a file just because a task says to; confirm nothing else references it.
 - The taxonomy source of truth is committed frontmatter, not the blob draft aggregation — using the wrong source reintroduces the exact drift the project exists to fix (see `docs/cms-architecture/02-architecture-and-schema.md` §5.5).
 - `route`-kind navigation targets are a deliberate transitional type, not a bug — don't "fix" them to `page`-kind before the corresponding Page object actually exists.
+- **Never write a literal `https://github.com/vreich-ui/Dr-Lurie-Blog/...` URL (or the bare `vreich-ui/Dr-Lurie-Blog` string) into committed content.** Netlify's build-time secrets scanner fails the ENTIRE build on any appearance of a configured build env var's literal value anywhere in scanned files — and `GITHUB_REPOSITORY` (the CMS's own git-write mechanism) is set to exactly that string, so an ordinary GitHub PR/issue link in a doc is enough to hard-fail every future build once it's merged (hit for real: T9.24/T9.25 PR #470, from a pre-existing link in `state-of-play.md`). `GITHUB_REPOSITORY` is now in `netlify.toml`'s `SECRETS_SCAN_OMIT_KEYS`, but don't rely on that alone — reference PRs/issues by bare number (`PR #469`, `#469`), never a full URL, in anything that gets committed. The same caution applies to any other configured secret env var whose value is a plain, typeable string rather than a random token.
+
+## Admin workspace — read [`docs/cms-architecture/10-admin-workspace-plan.md`](docs/cms-architecture/10-admin-workspace-plan.md) before touching `/admin/*`
+
+The W9 program (SHIPPED 2026-07-23) rebuilt the admin UI from scratch on a
+React component kit (`src/components/admin-ui/`: `AdminShell`/
+`AdminLayout`/`ObjectWorkspace`/`ContentLibrary`/`MaintenancePage`/etc.) —
+the plan doc is the map of what exists and why. Current route surface
+(non-exhaustive): `/admin` (home), `/admin/content` and `/admin/content/<id>`
+(library + the object workspace — checkout/patch/publish for any governed
+object type), `/admin/agents` (the in-house chat/agent hub, ChatKit's
+replacement), `/admin/studio` (templates/themes), `/admin/users`
+(invites/roles), `/admin/maintenance` (Owner-only blob store browser + wipe
+tools, ex-`/admin/blobs`), `/admin/kit` (component gallery).
+
+**T9.24 (2026-07-23) deleted the legacy vanilla-JS admin surface for
+good** — do not resurrect, re-link, or pattern-match against `publish.astro`,
+`drafts.astro`, `library.astro`, `agent-admin.astro`,
+`review/[draftId].astro`, `objects/[objectId].astro`, `AdminNav.astro`,
+`admin-ask-ai-node.ts`, `get-article-for-edit.ts`, `admin-update-node.ts`,
+`admin-patch-workflow.ts`, `list-draft-articles.ts`,
+`admin-save-json-draft.ts`, `admin-get-json-draft.ts`,
+`admin-list-json-drafts.ts`, `toggle-article-publish.ts`, or
+`create-chatkit-session.ts` — all gone, none have a successor alias. A doc
+or comment that still mentions one is describing history, not a live
+surface.
+
+**Two-tier rights model (T9.4):** `Owner` vs `Admin`, resolved server-side
+via `resolveRolesFromEvent` + `isOwner(roles)` (`netlify/lib/roles.ts` /
+`netlify/lib/request-roles.js`); bootstrap Owners come from the
+`ADMIN_EMAILS` env fallback. Owner-gated client surfaces follow the
+`AdminUsers.tsx`/`MaintenancePage.tsx` pattern (`fetchMe(getToken)` → check
+`roles.includes('owner')` → render an `EmptyState` otherwise) — the server
+403s a non-owner regardless; the client gate is UX, not the security
+boundary.
+
+**Guardrails now live on the object substrate, not bespoke admin code**:
+`validateObject` (`netlify/lib/object-validate.ts`) blocks unsafe writes at
+patch/create/publish time (protected-env leakage, hotlink URLs,
+per-component rich-text vocabulary, the reader-projection leak scan). The
+publish-safety stack (`publish-article.ts`, `admin-workflow-lock.ts`) is
+untouched and off-limits as always — the T9.24-deleted functions were an
+old parallel path around that stack, never the stack itself.
 
 ## Project basics
 

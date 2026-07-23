@@ -358,6 +358,12 @@ earlier drives re-run green):
 the old admin-editor UI is stale and the admin area is being rethought; no
 TipTap panel work or /admin/publish re-wire until that lands.
 
+**Hold CLOSED (2026-07-23).** T9.19 (canvas document-body editing) formally
+lifted it once the rethought admin area landed; T9.24 then deleted the old
+admin-editor UI this hold existed to protect against (`/admin/publish` and
+the rest of the legacy admin surface) — there is nothing left to re-wire.
+See `docs/cms-architecture/10-admin-workspace-plan.md`.
+
 ### 3j. The tile mechanic (2026-07-13, Slice C): delete everywhere, glass tiles, right rail, tile → accordion morph
 
 Wolf's third round — the tile becomes an interaction system (15-assertion

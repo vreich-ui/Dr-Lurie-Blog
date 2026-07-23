@@ -9,10 +9,13 @@
  * reviewer applies through the object_patch verb (the T1.4 review path); it
  * never writes the record directly.
  *
- * This is a SEPARATE endpoint from the article admin-ask-ai-node.ts, which is
- * deliberately untouched (Tier 1 keeps its own path). Shared behavior — the
- * selection-based UX, the forced-tool call, null-stripping — is reused via the
- * core, not by modifying the article file.
+ * This endpoint was deliberately kept separate from the legacy article
+ * admin-ask-ai-node.ts (Tier 1 had its own path) rather than modifying that
+ * file; admin-ask-ai-node.ts retired at T9.24 once every article moved onto
+ * the content_item object substrate, and this generic path now serves them
+ * too — shared behavior (selection-based UX, the forced-tool call,
+ * null-stripping) always lived in the reusable core, never in the article
+ * file.
  *
  * POST body: { object_type, object_id, section_id?, node_id?, selected_text?, image_ref?, instruction }
  * (`section_id` scopes a PAGE request to one section instance; `node_id`

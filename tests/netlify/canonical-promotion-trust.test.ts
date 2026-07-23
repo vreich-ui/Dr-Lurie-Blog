@@ -7,7 +7,6 @@ import {
   patchCanonicalInput,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
-import { handlePatchCanonicalInput } from '../../netlify/functions/admin-patch-workflow.js';
 import { writeArtifactReferenceIndexes, type ArtifactIndexStore } from '../../netlify/lib/artifact-index.js';
 import type { ArtifactReference } from '../../netlify/lib/artifacts.js';
 
@@ -194,89 +193,6 @@ describe('patch_canonical_input rejection messages are reason-specific', () => {
     // artifact transfer protocol), not the legacy upload tools.
     assert.match(error, /get_pdf_tool_storage_grant|storage grant/);
     assert.match(error, /list_artifacts_for_request/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Stage 3.1 / diagnostics §4B — the admin path shares the unified trust source
-// ---------------------------------------------------------------------------
-
-describe('admin-patch-workflow trusts the artifact index like the agent path', () => {
-  const REQUEST_ID = 'req_promotion_trust_20260703_10';
-  const RECORD_KEY = `workflows/by-id/${REQUEST_ID}.json`;
-  const LOCK_TOKEN = 'tok_admin_trust_test';
-
-  const makeAdminRecord = () => ({
-    request_id: REQUEST_ID,
-    created_at: '2026-01-01T00:00:00.000Z',
-    updated_at: '2026-01-01T00:00:00.000Z',
-    workflow_status: 'in_progress',
-    current_stage: null,
-    next_agent: null,
-    completed_agents: [],
-    failed_agents: [],
-    last_error: null,
-    needs_review: false,
-    input: {
-      record_type: 'content_source',
-      schema_version: 'content_source.v1',
-      content: { title: 'Admin Trust Test' },
-      publication: { schema_version: 'publication.v2', published_time: null },
-    },
-    agent_outputs: {},
-    lock: {
-      token: LOCK_TOKEN,
-      owner_id: 'admin_test',
-      owner_label: 'Test admin',
-      acquired_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 900_000).toISOString(),
-    },
-    history: [],
-    version: 1,
-  });
-
-  it('accepts an index-trusted blobKey that is NOT in agent_outputs', async () => {
-    const store = createMemoryStore();
-    const indexStore = createMemoryStore() as unknown as ArtifactIndexStore;
-    const ref = makeImageRef(REQUEST_ID, 'd');
-    await writeArtifactReferenceIndexes(indexStore, REQUEST_ID, ref);
-    await store.setJSON(RECORD_KEY, makeAdminRecord());
-
-    const resp = await handlePatchCanonicalInput(
-      store,
-      {
-        action: 'patch_canonical_input',
-        request_id: REQUEST_ID,
-        lock_token: LOCK_TOKEN,
-        expected_record_version: 1,
-        promote_publish_payload: { slug: 'admin-trust-test', title: 'Admin Trust Test', featuredImage: ref.blobKey },
-      },
-      indexStore
-    );
-
-    assert.equal(resp.statusCode, 200, resp.body);
-  });
-
-  it('rejects a cross-request blobKey with the reason-specific message', async () => {
-    const store = createMemoryStore();
-    const indexStore = createMemoryStore() as unknown as ArtifactIndexStore;
-    await store.setJSON(RECORD_KEY, makeAdminRecord());
-
-    const foreignRef = `image/req_other_flow_topic_20260703_11/${hexSha('e')}.png`;
-    const resp = await handlePatchCanonicalInput(
-      store,
-      {
-        action: 'patch_canonical_input',
-        request_id: REQUEST_ID,
-        lock_token: LOCK_TOKEN,
-        expected_record_version: 1,
-        promote_publish_payload: { slug: 'admin-trust-test', title: 'Admin Trust Test', featuredImage: foreignRef },
-      },
-      indexStore
-    );
-
-    assert.equal(resp.statusCode, 400, resp.body);
-    assert.match(String(parseBody(resp).error), /belongs to request 'req_other_flow_topic_20260703_11'/);
   });
 });
 

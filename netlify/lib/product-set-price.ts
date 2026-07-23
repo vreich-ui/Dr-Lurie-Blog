@@ -170,6 +170,7 @@ export const productSetPrice = async (
     record_version: (patch.body as { record_version?: number }).record_version ?? recordVersion + 1,
     note:
       'The record now carries the new price cache + linkage as an UNPUBLISHED revision. Publishing stays ' +
-      'review-required (§0.4): submit for review, a human approves in /admin/objects, then object_publish.',
+      'review-required (§0.4): submit for review, a human approves in the object workspace ' +
+      '(/admin/content/<id>), then object_publish.',
   };
 };
