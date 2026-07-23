@@ -600,12 +600,13 @@ export const mountEditMode = (options: MountOptions): void => {
     formEl
       .querySelectorAll<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-      >('[data-em-field],[data-em-role-field],[data-em-nav-field]')
+      >('[data-em-field],[data-em-role-field],[data-em-nav-field],[data-em-meta-field]')
       .forEach((el) => {
         const key =
           el.getAttribute('data-em-field') ??
           el.getAttribute('data-em-role-field') ??
-          el.getAttribute('data-em-nav-field');
+          el.getAttribute('data-em-nav-field') ??
+          el.getAttribute('data-em-meta-field');
         parts.push(`${key}${el.value}`);
       });
     return parts.join('');
