@@ -48,6 +48,9 @@ T9.22	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.22-repoi
 T9.23	human_gate	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.23-parity-signoff.md
 T9.24	auto	claude-opus-4-8	medium	docs/cms-architecture/cms-pipeline/T9.24-legacy-deletion.md
 T9.25	auto	claude-sonnet-5	low	docs/cms-architecture/cms-pipeline/T9.25-records-closeout.md
+# T9.24 + T9.25 COMPLETE (2026-07-23) — legacy admin pages/functions deleted,
+# /admin/blobs reskinned to /admin/maintenance; full record in state-of-play.md.
+# T9.26's status is untouched by this note — don't infer it from W9's completion here.
 #
 # W10-W12 — platformization pipeline (plan: docs/cms-architecture/11-platformization-plan.md, 2026-07-19).
 # Ordering: W9 remainder runs first by default (W11 gates on T9.24). W10 is parallel-safe with the W9 tail —

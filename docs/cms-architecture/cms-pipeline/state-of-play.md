@@ -7,6 +7,108 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-23 (T9.24 legacy deletion + maintenance reskin; T9.25 records close-out; branch `claude/t9.24-legacy-deletion`)
+
+**T9.24 is DONE.** The T9.23 sign-off below unblocked it; all three groups
+landed as their own commits, each with importer-grep evidence in the commit
+body, `npm run check` + `npm test` + `npm run build` green after every one,
+off-limits files proven byte-untouched throughout.
+
+- **STEP 1 (`eada6ed`)** — deleted `src/pages/admin/{publish,drafts,
+  library,agent-admin}.astro`, `review/[draftId].astro`,
+  `objects/[objectId].astro`, and `src/components/admin/AdminNav.astro`;
+  removed the 5-item "Legacy" nav group from `AdminShell`; removed the dead
+  `/admin/review/*` and `/admin/objects/*` redirects from `netlify.toml`.
+  `agent-admin.astro` (ChatKit) retired per **OQ-W9-1, Wolf 2026-07-23:
+  RETIRE** — one chat system going forward, the in-house Agents hub.
+  Every live route reference the grep turned up was repointed in the same
+  commit: `AdminShell`'s Cmd-K "New chat" + Quick Actions, `edit-mode/ui.ts`'s
+  fallback message, `kit.astro`'s AdminNav import (interim fix — STEP 3
+  rewrites the file it briefly touched), a stray comment in `Header.astro`,
+  doc comments in `approval-policy.ts`/`home-conversion-roundtrip.mjs`, and
+  a live tool-response string in `product-set-price.ts` — all now point at
+  `/admin/content/<id>` / `/admin/agents`. `npm run check` clean, `npm test`
+  1705/1705, `npm run build` 73 pages (down from 79 — exactly the 6 deleted
+  pages).
+- **STEP 2 (`3111f2a`)** — deleted `admin-ask-ai-node.ts`,
+  `get-article-for-edit.ts`, `admin-update-node.ts`, `admin-patch-workflow.ts`,
+  `list-draft-articles.ts`, `admin-save-json-draft.ts`,
+  `admin-get-json-draft.ts`, `admin-list-json-drafts.ts`,
+  `toggle-article-publish.ts`, `create-chatkit-session.ts`, plus the orphaned
+  `src/lib/admin/ai-suggestion.ts` (sole importer was the already-deleted
+  `publish.astro`) and the 3 dedicated test files for the deleted functions.
+  **The importer-grep discipline caught a real miss**: a first pass excluded
+  `tests/` from one grep loop, so `tests/netlify/canonical-promotion-trust.test.ts`'s
+  import of `handlePatchCanonicalInput` (from `admin-patch-workflow.ts`) only
+  surfaced as a `npm run check` TS2307 error. Fixed surgically — removed
+  only the affected import + its `describe` block, leaving that same file's
+  off-limits `save-json-blob.ts` coverage (Stage 3.3/3.4) byte-for-byte
+  untouched. All 9 functions' shared libs confirmed to have live importers
+  outside this deleted set — none orphaned beyond `ai-suggestion.ts`.
+  `npm test` 1619/1619 (the 19-test drop = 3 deleted test files + 2 removed
+  cases from the surgical fix), `npm run build` 73 pages (unchanged —
+  function deletions don't touch Astro output).
+- **STEP 3 (`d62db1d`)** — `src/pages/admin/blobs.astro` (1200 lines of
+  vanilla JS) rebuilt as `src/pages/admin/maintenance.astro` on
+  AdminLayout/AdminShell: new `src/lib/admin/maintenance-client.ts` (typed
+  wrappers over `admin-blob-manager`/`admin-blob-store-diagnostics`,
+  mirroring `users-client.ts`) and `src/components/admin-ui/MaintenancePage.tsx`
+  (Owner-gated the same way `AdminUsers.tsx` is — `fetchMe` →
+  `roles.includes('owner')` — on top of the server-side Owner check T9.4
+  already enforces on both functions; human-framed DataTable with a "Raw"
+  tab in the Drawer for actual payloads; Danger Zone wipe-store/wipe-all
+  behind `ConfirmDialog requireTyped`). `AdminShell`'s Maintenance nav entry
+  lost `soon: true`. `npm run check` clean (fixed 4 real lint issues along
+  the way: an unused import, 3 dead `react-hooks/exhaustive-deps` disable
+  comments this project's eslint config doesn't register), `npm test`
+  1619/1619, `npm run build` 73 pages (unchanged, 1:1 replacement).
+  Playwright + curl confirmed all 7 deleted/renamed routes 404 and
+  `/admin/maintenance` 200s; the signed-in-as-Owner render path couldn't be
+  exercised in this sandbox (no real Identity credentials) — disclosed, not
+  assumed.
+- **Found, ruled out, not fixed:** `/admin/kit` throws React hydration
+  errors (minified #418/#423/#425) under Playwright. A/B tested by
+  temporarily restoring the exact pre-STEP-1 `kit.astro` + `AdminNav.astro`
+  and rebuilding — identical errors reproduce with `AdminNav` present,
+  proving this is a pre-existing `KitGallery.tsx` bug, not a regression from
+  this task. Left alone; worth its own fix task.
+- **Live production fix (MCP, not a git commit in these three):**
+  `nav_header`'s admin-only dropdown still pointed at 5 routes this task
+  deleted or renamed. Flagged to Wolf mid-task (a live object-store write is
+  a different risk class than the git-scoped deletion work) —
+  **Wolf: "Patch it live now."** Checked out, removed the Publish/Drafts
+  items, relabeled Library → "Content library" (`/admin/content`),
+  AI Publisher → "Agents" (`/admin/agents`), Blob Store → "Maintenance"
+  (`/admin/maintenance`); published to `main` (`612cda1`, `[skip netlify]`).
+  **`release_to_production` deliberately NOT called** — publish only moves
+  the git export; the live site still serves the prior export until a
+  release. `612cda1` has since been merged into this branch (`origin/main`
+  was one commit ahead, no conflicts — this branch never touched
+  `nav_header.json`). Wolf to decide when to release; nothing breaks in the
+  meantime, the dead links would only 404.
+- **Off-limits verification (all three groups + the merge):** `git diff
+  --stat` against `main` is empty for `netlify/functions/publish-article.ts`,
+  `netlify/functions/admin-workflow-lock.ts`, and
+  `netlify/functions/save-json-blob.ts` (its MCP surface included) — checked
+  after every commit and re-checked after merging `origin/main` in. The
+  `workflows` blob store's data was never touched (code paths only).
+  `mcp/save-json-blob-mcp/` was not touched — explicitly out of this task's
+  scope, deferred to the W11 window per the brief.
+
+**T9.24 DONE.** T11.0's "verify T9.24 legacy deletion actually landed" gate
+(flagged as untouched/still-owned-by-T11.0 in the 2026-07-22 platformization
+session below) **is now satisfiable** — T9.24 is in git on this branch, PR
+pending against `main`.
+
+**T9.25 records close-out (this session, same branch):** this entry;
+`docs/cms-architecture/10-admin-workspace-plan.md` (status flipped
+PLANNED → SHIPPED, OQ-W9-1 and OQ-W9-5 resolved, §6 Retirements marked
+DONE, the §2 AdminNav mention updated to past tense); `CLAUDE.md` (new
+admin-surface pointer section); `docs/cms-architecture/07-canvas-editing.md`
+(the W7.7-remainder ON HOLD ruling annotated: lifted by T9.19, closed by
+T9.24); `docs/cms-architecture/cms-pipeline/queue.tsv` (W9-complete
+comment).
+
 ## Session 2026-07-23 (T9.23 parity sign-off recorded; branch `claude/t9.24-legacy-deletion`)
 
 **T9.23's retirement gate has passed.** Full drive:
