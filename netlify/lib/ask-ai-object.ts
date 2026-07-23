@@ -1,7 +1,8 @@
 /**
- * Generic Ask-AI core (T1.6) — the article Ask-AI (admin-ask-ai-node.ts,
- * A§1.4) generalized to any object type, with the tool schema DERIVED from the
- * type's zod body schema (ask-ai-schema.ts) instead of hand-written.
+ * Generic Ask-AI core (T1.6) — the legacy article Ask-AI (admin-ask-ai-node.ts,
+ * A§1.4, retired T9.24) generalized to any object type, with the tool schema
+ * DERIVED from the type's zod body schema (ask-ai-schema.ts) instead of
+ * hand-written.
  *
  * Same contract as the article version, deliberately:
  *   - Read-only. Takes no lock and writes NOTHING to the store. The proposed
@@ -23,9 +24,9 @@
  *   - NODE SCOPE (W7.8 canvas): `node_id` narrows a content_item request to
  *     one article node. The tool schema is the node's PUBLIC copy grammar
  *     (annotations, media, and links are outside it), and the suggestion maps
- *     1:1 onto an `update_node` op's `fields.public`. The LEGACY article
- *     Ask-AI (admin-ask-ai-node.ts, workflow records) is untouched — it keeps
- *     serving the committed .md pipeline.
+ *     1:1 onto an `update_node` op's `fields.public`. The legacy article
+ *     Ask-AI (admin-ask-ai-node.ts, workflow records) is gone (T9.24) — every
+ *     article is a content_item object now, served by this path.
  *
  * Provider: OpenAI Chat Completions function-calling (OPENAI_API_KEY /
  * OPENAI_MODEL, injected by the wrapper). The zod-derived tool schema is plain
