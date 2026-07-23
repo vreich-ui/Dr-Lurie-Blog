@@ -134,8 +134,7 @@ all-☐ PREPARED state it carried since 2026-07-19).
   `content_item.author` (optional, ≤120 chars, plain text) end-to-end —
   schema, `set_article_meta` grammar, reader-safety leak-scan coverage, both
   editor surfaces (canvas panel + workspace Details drawer), an optional
-  byline render, and `object_contract` discovery. Merged
-  [PR #469](https://github.com/vreich-ui/Dr-Lurie-Blog/pull/469)
+  byline render, and `object_contract` discovery. Merged PR #469
   (`ebe2779`), `scripts/build-diff.mjs` empty (80/80 pages) since none of
   the 12 live articles carry one. A pre-existing (T9.20) dirty-tracking bug
   in the canvas Article-settings Save button (found while landing the

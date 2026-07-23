@@ -3,6 +3,13 @@
   command = "npm run build"
 [build.environment]
   NODE_VERSION = "20"
+  # GITHUB_REPOSITORY's value is just this repo's own public "owner/repo"
+  # name (used by the CMS's git-write mechanism) -- not a real secret, but
+  # Netlify's build-time secrets scanner fails the build on ANY appearance
+  # of a configured env var's literal value anywhere in scanned content,
+  # including ordinary doc prose (e.g. a GitHub PR URL). Omit it from the
+  # scan rather than relying on nobody ever typing the repo's own name.
+  SECRETS_SCAN_OMIT_KEYS = "GITHUB_REPOSITORY"
 
 [build.processing.html]
   pretty_urls = false
