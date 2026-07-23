@@ -7,6 +7,42 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-23 (T9.23 parity sign-off recorded; branch `claude/t9.24-legacy-deletion`)
+
+**T9.23's retirement gate has passed.** Full drive:
+`docs/cms-architecture/cms-pipeline/T9.23-parity-signoff-checklist.md`
+(updated same commit — every row now ✅ checked or waived, in place of the
+all-☐ PREPARED state it carried since 2026-07-19).
+
+- **Rows 1–7: PASS.** Draft picker, title/lede editing, metadata
+  (author/date/category — author closed by T9.23a below), tags/SEO/path,
+  save-with-undo, per-node TipTap editing, and per-node Ask-AI word-diff all
+  drive cleanly on the new `/admin/content`+canvas+workspace surfaces.
+- **Rows 8–10: confirmed-present/waivable** on the strength of their prior
+  credentialed builds and test coverage (T9.4 force-checkin + LockBanner;
+  T9.21 readiness strip + publish-by-time) rather than a fresh live
+  click-through session — the built surfaces and their tests stand as the
+  evidence.
+- **Row 11 — OQ-W9-5 RULED: retire without port.** Canonical-input
+  promotion (the legacy `req_*` workflow concept) has no object-model
+  analogue and needs none — `create_variant` lineage + Discard (history
+  inverses) cover the intent. No canonical-input surface will be built on
+  the object substrate.
+- **The one gap the drive found (row 3, author) is CLOSED:** T9.23a added
+  `content_item.author` (optional, ≤120 chars, plain text) end-to-end —
+  schema, `set_article_meta` grammar, reader-safety leak-scan coverage, both
+  editor surfaces (canvas panel + workspace Details drawer), an optional
+  byline render, and `object_contract` discovery. Merged
+  [PR #469](https://github.com/vreich-ui/Dr-Lurie-Blog/pull/469)
+  (`ebe2779`), `scripts/build-diff.mjs` empty (80/80 pages) since none of
+  the 12 live articles carry one. A pre-existing (T9.20) dirty-tracking bug
+  in the canvas Article-settings Save button (found while landing the
+  author field) was fixed in the same PR.
+
+**T9.24 (legacy deletion + maintenance reskin) is now unblocked** and runs
+in this same branch, followed by T9.25 records close-out — each group's
+commit prepends its own entry above this one as it lands.
+
 ## Session 2026-07-23 (T9.23a: content_item author field — the T9.23 parity gap closed; branch `claude/content-item-author-field-kgazza`)
 
 Wolf's 2026-07-23 ruling: the legacy `/admin/publish` exposed an author; the
