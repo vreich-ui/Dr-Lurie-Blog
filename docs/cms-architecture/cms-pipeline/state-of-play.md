@@ -7,6 +7,32 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-23 (T11.0 checkpoint close — platform rulings + W9 completion gate)
+
+**T11.0 is DONE.** Both gates verified against `main` (not docs):
+
+- **Gate (a) — T9.24 legacy deletion landed.** Confirmed on `main` @ `5d74ad19`
+  (PR #470; branch step-commits `eada6ed`/`3111f2a` squash-flattened in).
+  ABSENT: `src/pages/admin/{publish,drafts,library,agent-admin}.astro`,
+  `review/[draftId].astro`, `objects/[objectId].astro`,
+  `src/components/admin/AdminNav.astro`,
+  `netlify/functions/toggle-article-publish.ts` (+ the STEP-2 legacy MCP
+  functions). `AdminShell` retained as the edited island
+  `src/components/admin-ui/AdminShell.tsx`. HARD-STOP files intact/untouched:
+  `netlify/functions/publish-article.ts`, `admin-workflow-lock.ts`.
+  `mcp/save-json-blob-mcp/` retained in place per OQ-W11-6 (retired-not-
+  extracted; must NOT enter `packages/core`).
+- **Gate (b) — OQ-W11-1…6 rulings ratified** 2026-07-22, recorded in
+  `11-platformization-plan.md` §6 + §6.1 (and
+  `decisions/2026-07-22-platformization-and-capture-rulings.md`).
+
+**Disposition:** closed under autonomous-run A1 async-review; **owner ratified
+in-session (2026-07-23, "Close T11.0 now, then continue") — the 24h objection
+window is waived by that instruction.** W11 extraction is unblocked; the next
+not-done queue row is **T11.1** (`depends_on: T11.0`, satisfied here). The
+"begin at T11.1" launch assumption was one row early: T11.0 had no closing
+commit until this entry.
+
 ## Session 2026-07-23 (T9.24 legacy deletion + maintenance reskin; T9.25 records close-out; branch `claude/t9.24-legacy-deletion`)
 
 **T9.24 is DONE.** The T9.23 sign-off below unblocked it; all three groups

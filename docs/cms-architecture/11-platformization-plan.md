@@ -385,6 +385,14 @@ Recorded verbatim-in-intent from Wolf's rulings; full text and rationale in
 | OQ-W12-2      | Coverage-based fidelity default (≥ 90% + tokens complete + gaps enumerated), per-project overridable.                                    |
 | OQ-W12-3      | Captures = never-released drafts in the target project's own store; T12.1 spike local.                                                   |
 
+> **T11.0 CLOSED (2026-07-23).** Checkpoint gates both met: (a) T9.24 legacy
+> deletion verified landed on `main` @ `5d74ad19` (PR #470) — deleted admin
+> pages/functions absent, HARD-STOP files (`publish-article.ts`,
+> `admin-workflow-lock.ts`) intact, `save-json-blob-mcp` retained per OQ-W11-6;
+> (b) the OQ-W11-1…6 rulings above are recorded and dated. Owner-ratified
+> in-session (A1 async-review; 24h objection window waived). W11 extraction
+> (T11.1→) unblocked.
+
 ## 7. Queue integration (how this runs auto)
 
 > **Standing execution instruction:**
