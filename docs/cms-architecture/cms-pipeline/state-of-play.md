@@ -7,6 +7,31 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-23 (W11 scaffold repair — package-lock out of sync with T11.1 workspaces; `main` was red)
+
+**Discrepancy found and fixed (prerequisite to the W11 extraction wave).** The
+T11.1 scaffold added `workspaces: ["packages/*", "sites/*"]` to `package.json`
+plus the two placeholder manifests (`@drlurie/core`, `@drlurie/site-drlurie`)
+but did NOT update `package-lock.json` in the same change (the T11.1 commit
+body deferred its gates — "gates … to be run on apply"). Consequence: **every
+CI job on `main` was failing at `npm ci`** ("Missing: @drlurie/core@0.0.0 from
+lock file"), across all three jobs (`build`, `check`, `fleet`) — all run
+`npm ci`. This blocks green CI on any W11 wave-chunk PR.
+
+**Fix (this change):** `npm install` lock sync only — adds the root
+`workspaces` array and the two workspace link/package entries to
+`package-lock.json` (23 insertions, 0 deletions, **no dependency version
+changes**). No source touched. Verified green on the synced tree: `npm run
+check` (0 errors/0 warnings/4 pre-existing hints, eslint + prettier clean),
+`npm test` (all suites pass), `node scripts/build-diff.mjs --self-test` PASS,
+`node scripts/sync-site-seed.mjs --check` clean. So `main`'s only defect was
+the lockfile; with this, the scaffold actually installs.
+
+**Governance note:** landed as its own isolated repair commit (not bundled
+into any queue task), per autonomous-run "land [missing scaffold pieces]
+first" + "one task, one commit." Recorded here per E5. Does not advance the
+queue; the next not-done row remains **T11.2**.
+
 ## Session 2026-07-23 (T11.0 checkpoint close — platform rulings + W9 completion gate)
 
 **T11.0 is DONE.** Both gates verified against `main` (not docs):
