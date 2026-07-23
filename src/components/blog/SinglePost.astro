@@ -49,6 +49,14 @@ const heroImageAspect = (() => {
           {post.readingTime && <span aria-hidden="true">·</span>}
           <time datetime={String(post.publishDate)}>{getFormattedMonthYear(post.publishDate)}</time>
           {
+            post.author && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>By {post.author}</span>
+              </>
+            )
+          }
+          {
             post.category && (
               <>
                 <span aria-hidden="true">·</span>

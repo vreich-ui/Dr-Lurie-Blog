@@ -470,7 +470,7 @@ const setArticleMetaSchema = z
       .superRefine(forbidKeys(['tracking'], 'set_article_meta (tracking changes only via set_tracking)')),
     ...guard,
   })
-  .describe('Merge article meta fields (title/slug/taxonomy/seo/scores/…); nodes are edited only via node ops.');
+  .describe('Merge article meta fields (title/slug/author/taxonomy/seo/scores/…); nodes are edited only via node ops.');
 
 const upsertNodeSchema = z.strictObject({
   op: z.literal('upsert_node'),

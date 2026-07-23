@@ -211,8 +211,9 @@ site_drlurie ─ SITE SINGLETON ─ 🟢 CONVERTED (W4, credentialed run 2026-07
 │       category) was created → published → released in one build; page_article gained a
 │       related content_grid ("More to read", tag_similarity). All articles are now objects.
 │     NEW articles are objects (W7.4/W7.6 waived; see [`08-articles-plan.md`](08-articles-plan.md) §0.5)
-│     attributes: slug · title · deck? · description? · image? · taxonomy{category?,tags[]} · seo ·
-│       nodes[] (the ANNOTATED node list — every block carries private.strategy hook/agitation/…/
+│     attributes: slug · title · deck? · description? · author? (T9.23a, ≤120 chars, free-text byline —
+│       renders as "By <author>" when set, no byline otherwise) · image? · taxonomy{category?,tags[]} ·
+│       seo · nodes[] (the ANNOTATED node list — every block carries private.strategy hook/agitation/…/
 │       resolution + intent, plus commercial/rendering/chat/visibility; public.body = plain text |
 │       rich_text.v1) · envelope judge/score substrate: claims/sources/compliance/emotional_strategy/
 │       scores[]/lineage. Legacy .md frontmatter (title/slug/excerpt/category/tags/…) unchanged.

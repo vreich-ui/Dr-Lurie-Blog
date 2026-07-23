@@ -196,6 +196,7 @@ const loadArticleObjectPosts = async (takenSlugs: Set<string>): Promise<Post[]> 
       image: article.image?.src,
       category,
       tags,
+      author: article.author,
       draft: false,
       published_time: publishDate,
       metadata: {

@@ -592,6 +592,15 @@ const ROUND_TRIP_CASES: RoundTripCase[] = [
     op: { op: 'set_article_meta', fields: { title: 'Six barrier myths', deck: null, seo: { meta_title: 'Myths' } } },
   },
   {
+    // T9.23a: author starts absent (articleBody carries none) — the same
+    // generic fields-op inverse that unsets deck/seo above must unset a
+    // freshly-set author exactly, restoring "absent" rather than "".
+    name: 'set_article_meta sets an author (T9.23a); inverse unsets it exactly',
+    objectType: 'content_item',
+    body: articleBody,
+    op: { op: 'set_article_meta', fields: { author: 'Dr. Lurie' } },
+  },
+  {
     name: 'upsert_node inserts at a position',
     objectType: 'content_item',
     body: articleBody,

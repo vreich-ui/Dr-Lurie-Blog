@@ -239,6 +239,14 @@ export const contentItemBodySchema = z
     title: z.string().min(1),
     deck: z.string().optional(),
     description: z.string().optional(),
+    /**
+     * Free-text byline (T9.23a — the one T9.23 parity gap: legacy
+     * `/admin/publish` exposed an author, the object model didn't carry one).
+     * v1 is deliberately a bare name, not a users/admins reference — plain
+     * text, no rich text/HTML (the schema-wide RichText allowlist scan
+     * already covers that). Optional: omitted renders no byline at all.
+     */
+    author: z.string().max(120).optional(),
     /** Hero image, rendered exactly once by the article furniture (bug ③). */
     image: contentItemImageSchema.optional(),
     taxonomy: contentItemTaxonomySchema.optional(),
