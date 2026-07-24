@@ -173,7 +173,7 @@ test('both paths share one store: an agent-created record is readable through th
 // ═══ security invariant: the browser path never sees the publish key ═════════
 
 test('admin-object source references the publish key nowhere (never receives/reads/forwards it)', () => {
-  const source = readFileSync(join(REPO_ROOT, 'netlify/functions/admin-object.ts'), 'utf8');
+  const source = readFileSync(join(REPO_ROOT, 'packages/core/server/functions/admin-object.ts'), 'utf8');
   // Allow the doc-comment sentence that NAMES the invariant; strip comments first.
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/PUBLISH_SECRET/i.test(code), 'admin-object must not reference PUBLISH_SECRET');

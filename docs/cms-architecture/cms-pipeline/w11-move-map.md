@@ -64,6 +64,37 @@ admin/cli) -> T11.5 (de-hardcode + site.config/netlify.toml) -> T11.6 (seeds +
 exports relocation). Each is one commit, build-diff EMPTY, `packages/core` and
 `sites/drlurie` building green from root.
 
+## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
+
+Landed as three gated step-commits (T9.24 precedent), each check+test+
+build-diff-EMPTY green. Step 1: pure .ts remainders (renderer, edit-mode,
+admin libs, richtext/article remainders, contentSource*,
+publishArticleFromPayload, goTrueClient → core/lib/admin/). Step 2: 24
+section components → `core/components/sections/`, the registry barrel
+rejoined `core/lib/registry/components/`, admin workspace →
+`core/admin/**`; the SITE-SHELL SEAM stays site-side by the brief's own
+no-globbing invariant (PageObjectRenderer.astro, section-resolve-deps.ts,
+ObjectSections.astro, CustomStyles.astro, EditMode.astro — all
+astro:content/site-util coupling lives there). Harness extension (disclosed +
+test-pinned): astro-island `uid` values are path-derived hashes; normalized
+like chunk names. Step 3: the consolidated function-factory pass — 32
+functions (all but the 4 frozen + mcp.ts) → `core/server/functions/*` as
+`createHandler(binding)` factories; `netlify/functions/*` are now per-site
+shims (policy-bindings + `createHandler(drlurieSiteBinding)`; `export *`
+keeps named internals for tests). Direct secret reads in
+object-store/admin-get-blob-pdf/deploy-status/run-publisher-agent/
+save-artifact now route through `readBoundEnv(PLATFORM_ENV_NAMES.publishSecret)`.
+Source-scan invariants repointed at the implementations (admin-object
+publish-key absence, admin-governance Owner gate, publisher-repoint absence
+scans).
+
+**Residuals (recorded, not dropped):** `mcp.ts` split still waits on the
+legacy article path's retirement (T11.3 amendment); pages-as-shells + the
+`src/data/site` loader seam compose with T11.5–T11.6 (site.config/netlify.toml
+and exports relocation — moving pages twice would churn); `cli/` relocation
+rides T11.7 where site-parameterization makes the move meaningful (today it
+would only churn CI paths + package.json).
+
 ## T11.3 execution amendment (2026-07-24 — per this file's amend clause)
 
 **Moved:** `netlify/lib/**` (68 modules incl. `agent/`, `materializers/`,

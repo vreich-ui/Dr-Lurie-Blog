@@ -161,7 +161,7 @@ test('the legacy markdown path receives ZERO writes from this flow (source-level
       root = join(root, '..');
     }
   }
-  const source = await readFile(join(root, 'netlify/functions/run-publisher-agent.ts'), 'utf8');
+  const source = await readFile(join(root, 'packages/core/server/functions/run-publisher-agent.ts'), 'utf8');
   assert.ok(!source.includes('NETLIFY_PUBLISH_ENDPOINT'), 'no publish endpoint env');
   assert.ok(!/fetch\([^)]*publish-article/.test(source), 'no fetch to publish-article');
   assert.ok(!source.includes("'x-publish-key': publishSecret"), 'no forwarded publish secret');

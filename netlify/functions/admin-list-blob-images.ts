@@ -1,99 +1,12 @@
-import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
-import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
-import { isArtifactReference, isDeletedArtifactReference, type ArtifactReference } from '../../packages/core/server/lib/artifacts.js';
-import { listArtifactIndexKeys, resolveArtifactPointer, type ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
-import { getArtifactIndexBlobStore } from '../../packages/core/server/lib/blob-store.js';
+/**
+ * Site shim (W11 T11.4): instantiates the core `admin-list-blob-images` handler with the
+ * Dr-Lurie SiteBinding. The implementation is fleet law in
+ * packages/core/server/functions/admin-list-blob-images.ts; this file is the per-site wire.
+ */
+import '../../src/config/policy-bindings.js';
+import { createHandler } from '../../packages/core/server/functions/admin-list-blob-images.js';
+import { drlurieSiteBinding } from '../../src/config/site-binding.js';
 
-const jsonHeaders = {
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
-};
+export * from '../../packages/core/server/functions/admin-list-blob-images.js';
 
-type LambdaEvent = {
-  blobs?: string;
-  headers?: Record<string, string | undefined>;
-  httpMethod?: string;
-  queryStringParameters?: Record<string, string | undefined> | null;
-};
-
-const requestArtifactPrefix = 'request-artifacts/';
-const imageArtifactKind = 'image';
-
-const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
-  statusCode,
-  headers: jsonHeaders,
-  body: JSON.stringify({ ok: statusCode >= 200 && statusCode < 300, status: statusCode, ...body }),
-});
-
-const getRequestArtifactPrefix = (requestId: string | undefined) => {
-  const trimmed = requestId?.trim();
-
-  return trimmed ? `${requestArtifactPrefix}${encodeURIComponent(trimmed)}/` : requestArtifactPrefix;
-};
-
-const getImageArtifactPointerPrefix = (requestId: string | undefined) => {
-  const trimmed = requestId?.trim();
-
-  return trimmed ? `by-request/${encodeURIComponent(trimmed)}/${imageArtifactKind}/` : `by-kind/${imageArtifactKind}/`;
-};
-
-const parseJsonBlob = async (store: ArtifactIndexStore, key: string) => {
-  const raw = await store.get(key);
-  if (!raw) return undefined;
-
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return undefined;
-  }
-};
-
-const isImageArtifactReference = (reference: ArtifactReference) => {
-  return reference.contentType.toLowerCase().startsWith('image/') || reference.blobKey.startsWith('image/');
-};
-
-const listImageArtifacts = async (indexStore: ArtifactIndexStore, requestId: string | undefined) => {
-  const pointerKeys = await listArtifactIndexKeys(indexStore, getImageArtifactPointerPrefix(requestId));
-  const candidates = pointerKeys.length
-    ? await Promise.all(
-        pointerKeys.map(async (key) => resolveArtifactPointer(indexStore, await parseJsonBlob(indexStore, key)))
-      )
-    : await Promise.all(
-        (await listArtifactIndexKeys(indexStore, getRequestArtifactPrefix(requestId))).map(async (key) => {
-          const parsed = await parseJsonBlob(indexStore, key);
-          return isArtifactReference(parsed) ? parsed : undefined;
-        })
-      );
-
-  return candidates.filter((reference): reference is ArtifactReference =>
-    Boolean(reference && !isDeletedArtifactReference(reference) && isImageArtifactReference(reference))
-  );
-};
-
-export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
-  if (event.httpMethod !== 'GET') {
-    return jsonResponse(405, { error: 'Method not allowed' });
-  }
-
-  const adminState = await getAdminStateFromEvent(event, context);
-  if (!adminState.authenticated) {
-    return jsonResponse(401, {
-      error: adminState.error || 'Authentication is required.',
-    });
-  }
-
-  if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This user is not authorized to list blob image artifacts.' });
-  }
-
-  try {
-    const indexStore = (await getArtifactIndexBlobStore(event)) as unknown as ArtifactIndexStore;
-    const images = await listImageArtifacts(indexStore, event.queryStringParameters?.requestId);
-
-    return jsonResponse(200, { images, skipped: 0 });
-  } catch (error) {
-    console.error('Failed to list admin blob image artifacts.', error);
-
-    return jsonResponse(500, { error: 'Blob image artifacts could not be listed.' });
-  }
-};
+export const handler = createHandler(drlurieSiteBinding);

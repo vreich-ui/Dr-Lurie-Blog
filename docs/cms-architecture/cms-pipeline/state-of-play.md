@@ -7,6 +7,23 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.4 step 3/3 — function-factory pass; T11.4 CLOSED with recorded residuals)
+
+**T11.4 is DONE** (3 gated step-commits). Step 3: 32 functions →
+`packages/core/server/functions/*` as `createHandler(binding)` factories;
+`netlify/functions/*` reduced to per-site shims (site providers +
+`createHandler(drlurieSiteBinding)`; `export *` preserves named internals).
+The 4 frozen functions + mcp.ts stay byte-identical/site-side. Direct
+publish-secret reads in 5 functions now resolve through the binding module.
+Security source-scans repointed at implementations (admin-object secret
+absence, admin-governance Owner gate, publisher-repoint absences).
+
+Residuals recorded in the move-map amendment: mcp split (waits on legacy
+retirement), pages-shells + data-root seam (compose with T11.5–T11.6), cli
+relocation (T11.7). Gates: check 0 errors; tests 1624/1624 + 69/69;
+build-diff EMPTY vs step 2; frozen files byte-identical to main; core app
+code imports nothing from src/netlify.
+
 ## Session 2026-07-24 (T11.4 step 2/3 — sections + registry barrel + admin workspace into core)
 
 **Step 2 committed.** Moved: the 24 `src/components/sections/*.astro` →

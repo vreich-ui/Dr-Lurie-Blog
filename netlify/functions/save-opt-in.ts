@@ -1,75 +1,12 @@
-import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
-import { randomUUID } from 'node:crypto';
+/**
+ * Site shim (W11 T11.4): instantiates the core `save-opt-in` handler with the
+ * Dr-Lurie SiteBinding. The implementation is fleet law in
+ * packages/core/server/functions/save-opt-in.ts; this file is the per-site wire.
+ */
+import '../../src/config/policy-bindings.js';
+import { createHandler } from '../../packages/core/server/functions/save-opt-in.js';
+import { drlurieSiteBinding } from '../../src/config/site-binding.js';
 
-import { getOptInBlobStore } from '../../packages/core/server/lib/blob-store.js';
-import { buildRecord, getHeader, isParseBodyFailure, parseBody } from '../../packages/core/server/lib/opt-in-record.js';
+export * from '../../packages/core/server/functions/save-opt-in.js';
 
-type LambdaEvent = {
-  blobs?: string;
-  body?: string | null;
-  headers?: Record<string, string | undefined>;
-  httpMethod?: string;
-  isBase64Encoded?: boolean;
-};
-
-const jsonHeaders = {
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
-};
-
-export const handler = async (event: LambdaEvent) => {
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers: jsonHeaders,
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
-  }
-
-  const input = parseBody(event);
-
-  if (isParseBodyFailure(input)) {
-    return {
-      statusCode: 400,
-      headers: jsonHeaders,
-      body: JSON.stringify({ error: 'Invalid request body' }),
-    };
-  }
-
-  const record = input ? buildRecord(input, getHeader(event.headers, 'user-agent')) : undefined;
-
-  if (!record) {
-    return {
-      statusCode: 400,
-      headers: jsonHeaders,
-      body: JSON.stringify({ error: 'A formName is required to save opt-in metadata.' }),
-    };
-  }
-
-  try {
-    const date = record.submittedAt.slice(0, 10);
-    const key = `opt-ins/${date}/${randomUUID()}.json`;
-    const store = await getOptInBlobStore(event);
-
-    await store.setJSON(key, record, {
-      metadata: {
-        formName: record.formName,
-        submittedAt: record.submittedAt,
-      },
-    });
-
-    return {
-      statusCode: 202,
-      headers: jsonHeaders,
-      body: JSON.stringify({ key, ok: true }),
-    };
-  } catch (error) {
-    console.error('Failed to save opt-in metadata to Netlify Blobs.', error);
-
-    return {
-      statusCode: 500,
-      headers: jsonHeaders,
-      body: JSON.stringify({ error: 'Opt-in metadata could not be saved.' }),
-    };
-  }
-};
+export const handler = createHandler(drlurieSiteBinding);
