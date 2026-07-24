@@ -14,13 +14,15 @@
  *     divergence impossible to land, which is the invariant that matters).
  *   - identity + policy posture stay in `src/config/*` (registered through
  *     `src/config/policy-bindings.ts`); this module re-exports the identity
- *     config and the SiteBinding so a future `sites/<client>` consumer has ONE
- *     import surface. T11.6 relocates seeds/exports beside this file; T11.7
- *     provisions new clients by emitting a sibling of this module.
+ *     config and the SiteBinding (built + owned by `src/config/site-binding.ts`
+ *     — not reconstructed here, T11.6 fix) so a future `sites/<client>`
+ *     consumer has ONE import surface. T11.6 relocated seeds/exports beside
+ *     this file (`seeds/`, `data/site/`) and threaded `dataRoot` onto the
+ *     binding so the publish path writes into this tree; T11.7 provisions new
+ *     clients by emitting a sibling of this module.
  */
 import { z } from 'zod';
 
-import { PLATFORM_ENV_NAMES, type SiteBinding } from '../../packages/core/server/lib/site-binding.js';
 import { siteIdentityConfig } from '../../src/config/site-identity.js';
 
 const redirectSchema = z.strictObject({
@@ -61,4 +63,4 @@ export const siteConfig: SiteConfig = siteConfigSchema.parse({
 
 /** One import surface for site-side wiring (identity + server binding). */
 export { siteIdentityConfig };
-export const siteBinding: SiteBinding = { siteId: siteIdentityConfig.siteId, env: PLATFORM_ENV_NAMES };
+export { drlurieSiteBinding as siteBinding } from '../../src/config/site-binding.js';

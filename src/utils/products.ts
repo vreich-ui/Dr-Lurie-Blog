@@ -4,7 +4,8 @@
  * anything else that renders commerce data at build time.
  *
  * Reads are collection-based (`getCollection('productObject')` over
- * src/data/site/products/*.json) and ASYNC — used only in route
+ * sites/drlurie/data/site/products/*.json — W11 T11.6 relocated the export
+ * root) and ASYNC — used only in route
  * getStaticPaths/frontmatter and the async deps builder, never inside
  * previously-synchronous chrome components (the site-object.ts sync rule).
  */

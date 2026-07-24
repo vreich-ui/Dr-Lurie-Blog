@@ -10,9 +10,11 @@
  * produces the content to be committed.
  *
  * `content_item` joined at W7.3 (08-articles-plan §2.3): article OBJECTS
- * materialize to JSON exports under src/data/site/articles/. The legacy
- * committed posts (src/data/post/*.md) and their to-markdown materializer are
- * untouched — the two families coexist; only object-backed articles flow here.
+ * materialize to JSON exports under `<exportRoot>/articles/` (W11 T11.6:
+ * exportRoot is caller-supplied, e.g. sites/drlurie/data/site — this module
+ * hardcodes no client's tree). The legacy committed posts (src/data/post/*.md)
+ * and their to-markdown materializer are untouched — the two families
+ * coexist; only object-backed articles flow here.
  */
 import type { ObjectType } from '../../schema/object-record-v1.js';
 import { materializeContentItem } from './materializers/content-item.js';

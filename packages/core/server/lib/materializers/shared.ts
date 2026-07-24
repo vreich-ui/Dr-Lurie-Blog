@@ -11,6 +11,13 @@
  * `at`/`record_version` are caller-supplied inputs, never generated in this
  * module — a materializer that called Date.now() itself could never be
  * deterministic across two calls.
+ *
+ * `exportRoot` (W11 T11.6) is likewise a caller-supplied input, never a core
+ * default: `packages/core` must not hardcode any client's tree (the exports
+ * this module writes were `src/data/site/**` pre-W11; each site now owns its
+ * own `<site>/data/site/**`, e.g. `sites/drlurie/data/site`). The caller
+ * resolves it from the SiteBinding (`dataRoot`) and passes it through
+ * unchanged — same determinism contract as `at`/`record_version`.
  */
 import { objectRecordKey } from '../object-store-keys.js';
 import type { ObjectType } from '../../../schema/object-record-v1.js';
@@ -20,7 +27,13 @@ export interface MaterializeMeta {
   at: string;
   /** ObjectRecord.version at the moment of materialization. */
   record_version: number;
+  /** The site's export root (from its SiteBinding.dataRoot), e.g. `sites/drlurie/data/site`. */
+  exportRoot: string;
 }
+
+/** Join the site's export root with the per-type path segments (no leading/trailing slash logic needed — callers pass plain segments). */
+export const exportPath = (meta: Pick<MaterializeMeta, 'exportRoot'>, ...segments: string[]): string =>
+  [meta.exportRoot, ...segments].join('/');
 
 export interface GeneratedMarker {
   from: string;

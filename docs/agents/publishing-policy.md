@@ -108,7 +108,7 @@ Expected non-errors an agent must not "fix":
 
 ### 5.1 Where it lands
 
-A published `content_item` materializes to **`src/data/site/articles/{request_id}.json`** in Dr-Lurie-Blog (`netlify/lib/materializers/content-item.ts:18`). Agents never write this file — it is the server-side export of `object_publish`. The reader URL comes back in the publish response (`production.article_path`, `object-publish.ts:369`); use that plus `verify_after_release` — never hand-construct reader URLs (legacy `/post/<slug>` is dead, §12).
+A published `content_item` materializes to **`sites/drlurie/data/site/articles/{request_id}.json`** in Dr-Lurie-Blog (W11 T11.6 relocated the export root out of `src/data/site`; the writer is `packages/core/server/lib/materializers/content-item.ts`, site-parameterized via `SiteBinding.dataRoot`). Agents never write this file — it is the server-side export of `object_publish`. The reader URL comes back in the publish response (`production.article_path`, `object-publish.ts`); use that plus `verify_after_release` — never hand-construct reader URLs (legacy `/post/<slug>` is dead, §12).
 
 ### 5.2 Body envelope (`content_item.v1` — `src/schema/bodies/content-item-v1.ts:233`)
 
@@ -327,7 +327,7 @@ The blog's post collection was wiped (83 markdown posts deleted; `src/data/post/
 | Stale mechanism | Status | Replacement |
 |---|---|---|
 | `save_json_blob_*` tool family (create/checkout/patch/publish_by_time/checkin, `{agent}_update_output`…) | Frozen legacy; zero new writes; **do not allowlist** | `object_create/checkout/patch/validate/publish/checkin` |
-| `publish-article.ts` markdown commits to `src/data/post/{slug}.md`; reader URLs `/post/<slug>` | Collection wiped; dead end | content_item JSON export `src/data/site/articles/{req_id}.json`; URL from publish response `article_path` |
+| `publish-article.ts` markdown commits to `src/data/post/{slug}.md`; reader URLs `/post/<slug>` | Collection wiped; dead end | content_item JSON export `sites/drlurie/data/site/articles/{req_id}.json` (W11 T11.6); URL from publish response `article_path` |
 | `article_body.v1` `schema_version` label sent to the client | content_item body has **no** `schema_version`; strict schema rejects it | drop at mapping (§5.6) |
 | Raw blobKey in `media.src` (old rule: "src MUST be the raw pointer") | **Inverted** — now a write-blocker in renderable fields | public `/img/…`, `/pdf/…` paths (§6.3) |
 | `featuredImage` publish argument + frontmatter `image:` | Legacy publish payload | body-level `image {src, alt}` |

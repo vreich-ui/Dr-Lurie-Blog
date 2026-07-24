@@ -1,6 +1,7 @@
 /**
  * Site singleton loader (W4) — the one place renderers read the published
- * site export (src/data/site/site.json, materialized from `site_drlurie`).
+ * site export (sites/drlurie/data/site/site.json — W11 T11.6 relocated this
+ * from src/data/site/site.json — materialized from `site_drlurie`).
  *
  * Absent export → undefined: every consumer falls back to the value it
  * hardcoded before the conversion (design rule 3 — the site object is chrome
@@ -19,10 +20,10 @@
  */
 import { siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1';
 
-const exports = import.meta.glob('../data/site/site.json', { eager: true, import: 'default' }) as Record<
-  string,
-  unknown
->;
+const exports = import.meta.glob('../../sites/drlurie/data/site/site.json', {
+  eager: true,
+  import: 'default',
+}) as Record<string, unknown>;
 
 const load = (): SiteBody | undefined => {
   const [exported] = Object.values(exports);

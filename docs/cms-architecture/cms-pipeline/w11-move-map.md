@@ -64,6 +64,65 @@ admin/cli) -> T11.5 (de-hardcode + site.config/netlify.toml) -> T11.6 (seeds +
 exports relocation). Each is one commit, build-diff EMPTY, `packages/core` and
 `sites/drlurie` building green from root.
 
+## T11.6 execution amendment (2026-07-24 — per this file's amend clause)
+
+Landed as gated step-commits (the T11.4 precedent). **Step 1** (prior commit
+`f2569175`, now merged to `main` via PR #471): seeds → `sites/drlurie/seeds/`.
+**Step 2** (this amendment): committed exports `git mv`'d `src/data/site/**` →
+`sites/drlurie/data/site/**` (verbatim — same tree shape, only the root moved)
+and the publish-time materializer paths were PARAMETERIZED rather than
+re-hardcoded to the new literal:
+
+- `MaterializeMeta` (`packages/core/server/lib/materializers/shared.ts`) gained
+  a required `exportRoot: string` field + an `exportPath(meta, ...segments)`
+  helper; all 11 per-type materializers build their `path` from it instead of
+  a literal `src/data/site/...` template string. Core hardcodes no client's
+  tree — a materialize call with no exportRoot fails loudly (same stance as
+  the T11.2 policy-provider seams), so a future second site can never collide
+  on Dr-Lurie's export tree by omission.
+- `SiteBinding` (`packages/core/server/lib/site-binding.ts`, T11.3's seam)
+  gained a `dataRoot: string` field — the site's export root, e.g.
+  `sites/drlurie/data/site`. `src/config/site-binding.ts`'s `drlurieSiteBinding`
+  sets it; `object-publish.ts`'s `PublishObjectDeps.exportRoot` is threaded
+  from there through every publish-reaching call site: the two publish-key/
+  admin function factories (`object-store.ts`, `admin-object.ts`), the
+  publisher-agent factory (`run-publisher-agent.ts`), and the agent-chat tool
+  context (`agent/context.ts`, wired from both `admin-agent-chat.ts` and
+  `admin-agent-chat-run-background.ts`). All five factories' previously-inert
+  `_binding` parameter (a T11.4 residual — `createHandler(_binding)` ignored
+  it) now actually closes over it; the other ~27 factories that never reach
+  publish are untouched.
+- **Fixed in passing, not scope creep:** T11.5 had left TWO divergent
+  `SiteBinding`-shaped values — the real one at `src/config/site-binding.ts`
+  (wired into every netlify shim) and an unused duplicate reconstructed in
+  `sites/drlurie/site.config.ts`. Threading `dataRoot` onto two copies would
+  have been the exact drift this seam exists to prevent, so
+  `site.config.ts` now re-exports the real binding instead of rebuilding one.
+- Readers updated (relative `import.meta.glob` in `site-object.ts`; the 11
+  `astro:content` collection `base` globs in `src/content/config.ts`; comment-
+  only path mentions in `products.ts`/`blog.ts`/`section-resolve-deps.ts`/
+  `PageObjectRenderer.astro`/`CustomStyles.astro`/`PageLayout.astro` — none of
+  these had a second hardcoded path, only prose).
+- Test fixtures updated: 19 test files either asserted a materializer path
+  literal, located a real committed export by walking up the directory tree,
+  or passed a bare `{at, record_version}` meta/publishDeps object that now
+  needs `exportRoot`. Two hard stops upheld while doing this: (1) the
+  zero-drlurie lint caught a literal `sites/drlurie/data/site` EXAMPLE inside
+  a thrown-error string in `object-publish.ts` — fixed by making the message
+  generic (comments are exempt, runtime strings are not); (2) the T11.5
+  apostrophe-in-single-quoted-string bug recurred in `object-contract.ts`'s
+  tracking_config description (`the site's <exportRoot>` broke the parser
+  identically to the T11.5 incident) — fixed by rewording rather than
+  escaping, twice, until zero apostrophes remained in that literal.
+
+**Step 3 (not yet executed):** driver scripts (`scripts/build-diff.mjs`,
+`scripts/home-conversion-roundtrip.mjs`, `scripts/lib/roundtrip-reconcile.mjs`)
+move to `packages/core/cli/` with explicit `--site sites/drlurie`
+parameterization; the site-seed drift-guard test runs per site. T11.6 is not
+committed as done until step 3 lands and the acceptance criteria (full suite
+green, build-diff EMPTY, a local `--local --site sites/drlurie` driver
+rehearsal green end-to-end) all hold.
+
 ## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
 
 Landed as three gated step-commits (T9.24 precedent), each check+test+

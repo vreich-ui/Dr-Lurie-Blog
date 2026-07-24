@@ -634,7 +634,7 @@ test('the publish stamp itself does NOT invalidate the approval (T1.3 writes ver
         tree_sha: 'tree1',
         no_op: false,
         attempts: 1,
-        files: ['src/data/site/pages/page_x.json'],
+        files: ['sites/drlurie/data/site/pages/page_x.json'],
         content_revision: record.content_revision,
         exported_at: AT,
       },

@@ -94,7 +94,11 @@ const createGitHubApiMock = () => {
   return { fetchImpl };
 };
 
-const publishDeps = { fetchImpl: createGitHubApiMock().fetchImpl, sleep: async () => {} };
+const publishDeps = {
+  fetchImpl: createGitHubApiMock().fetchImpl,
+  sleep: async () => {},
+  exportRoot: 'sites/drlurie/data/site',
+};
 
 test('publishArticleObject: object created with verbatim nodes + taxonomy, published under the gate, no release', async () => {
   const store = createMemoryStore();

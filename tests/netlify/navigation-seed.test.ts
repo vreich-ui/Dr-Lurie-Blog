@@ -181,11 +181,11 @@ test('nav_footer_home matches the C§1.4 table: brand, groups, home-specific lab
 // ── materializer round-trip ──────────────────────────────────────────────────
 
 test('each seed materializes deterministically to its loader path with the __generated marker', () => {
-  const meta = { at: '2026-07-06T00:00:00.000Z', record_version: 1 };
+  const meta = { at: '2026-07-06T00:00:00.000Z', record_version: 1, exportRoot: 'sites/drlurie/data/site' };
   for (const seed of seeds) {
     const first = materializeNavigation(seed.objectId, seed.body, meta);
     const second = materializeNavigation(seed.objectId, seed.body, meta);
-    assert.equal(first.path, `src/data/site/navigation/${seed.objectId}.json`);
+    assert.equal(first.path, `sites/drlurie/data/site/navigation/${seed.objectId}.json`);
     assert.equal(first.content, second.content, 'byte-identical re-materialization');
     const parsed = JSON.parse(first.content) as Record<string, unknown>;
     assert.deepEqual(parsed.__generated, {

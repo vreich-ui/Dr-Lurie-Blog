@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { materialize } from '../../packages/core/server/lib/materialize.js';
 
-const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 7 };
+const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 7, exportRoot: 'sites/drlurie/data/site' };
 
 test('determinism: materializing the same body twice produces byte-identical output (per type)', () => {
   const bodies: Array<[Parameters<typeof materialize>[0], string, unknown]> = [

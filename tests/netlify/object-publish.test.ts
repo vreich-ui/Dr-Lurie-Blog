@@ -48,7 +48,11 @@ const navRecord = (): ObjectRecord => ({
 });
 
 const expectedExport = () =>
-  materialize('navigation', 'nav_footer', navRecord().body, { at: PUBLISHED_TIME, record_version: 5 });
+  materialize('navigation', 'nav_footer', navRecord().body, {
+    at: PUBLISHED_TIME,
+    record_version: 5,
+    exportRoot: 'sites/drlurie/data/site',
+  });
 
 // ─── git-faithful GitHub API mock ────────────────────────────────────────────
 // Tree shas are content-addressed over the RESULTING tree (base + entries
@@ -182,7 +186,7 @@ const publishNav = (
       actor,
       ...overrides,
     },
-    { nowMs: NOW, fetchImpl, sleep: async () => {}, ...deps }
+    { nowMs: NOW, fetchImpl, sleep: async () => {}, exportRoot: 'sites/drlurie/data/site', ...deps }
   );
 
 test('the object export commit carries [skip netlify] so the push does not deploy', async () => {

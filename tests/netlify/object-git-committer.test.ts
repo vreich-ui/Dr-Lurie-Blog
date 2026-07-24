@@ -12,8 +12,8 @@ import {
 } from '../../packages/core/server/lib/object-git-committer.js';
 
 const FILES = [
-  { path: 'src/data/site/navigation/nav_footer.json', content: '{"role":"footer"}\n' },
-  { path: 'src/data/site/site.json', content: '{"name":"Dr. Lurié"}\n' },
+  { path: 'sites/drlurie/data/site/navigation/nav_footer.json', content: '{"role":"footer"}\n' },
+  { path: 'sites/drlurie/data/site/site.json', content: '{"name":"Dr. Lurié"}\n' },
 ];
 
 const sha1 = (value: string) => createHash('sha1').update(value).digest('hex');

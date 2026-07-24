@@ -51,7 +51,7 @@ const safeJsonParse = (event: LambdaEvent): { ok: true; value: unknown } | { ok:
   }
 };
 
-const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
+const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
 
   const adminState = await getAdminStateFromEvent(event, context);
@@ -102,6 +102,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
       roles,
       approvalPolicy: approval,
       creationPolicy: creation,
+      publishDeps: { exportRoot: binding.dataRoot },
     });
     return jsonResponse(result.status, result.body);
   } catch (error) {
@@ -110,5 +111,5 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   }
 };
 
-/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. */
-export const createHandler = (_binding: SiteBinding) => handlerImpl;
+/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. T11.6: threads dataRoot to the publish path. */
+export const createHandler = (binding: SiteBinding) => buildHandlerImpl(binding);

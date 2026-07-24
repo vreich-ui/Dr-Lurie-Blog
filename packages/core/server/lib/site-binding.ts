@@ -15,6 +15,13 @@
  * tests, unusual topologies) and so core never hardcodes the lookup.
  *
  * The Dr-Lurie instance lives site-side in `src/config/site-binding.ts`.
+ *
+ * `dataRoot` (W11 T11.6) is the site's committed-export tree — where the
+ * publish-time materializers write (`materialize.ts` /
+ * `materializers/shared.ts`'s `exportPath`). Unlike the env-var NAME lists
+ * above, this is a literal path, not a secret or a platform convention: core
+ * never defaults it (a materializer call with no exportRoot fails loudly),
+ * so a fleet of sites can never collide on one another's export tree.
  */
 
 /** Env-var name lists, first non-empty value wins (mirrors the pre-W11 `A || B` chains). */
@@ -45,6 +52,8 @@ export type SiteBinding = {
   /** The site singleton object id (identity, not a secret), e.g. 'site_drlurie'. */
   readonly siteId: string;
   readonly env: SiteBindingEnvNames;
+  /** This site's committed-export root, e.g. 'sites/drlurie/data/site' (W11 T11.6). */
+  readonly dataRoot: string;
 };
 
 /**

@@ -74,7 +74,7 @@ const agentPrincipal = (payload: unknown): Principal => {
   return { kind: 'agent', agent_name: declared || 'unattributed-agent', auth: 'publish_key' };
 };
 
-const handlerImpl = async (event: LambdaEvent) => {
+const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
 
   const authFailure = verifyPublishKey(event);
@@ -112,7 +112,10 @@ const handlerImpl = async (event: LambdaEvent) => {
       ...(artifactIndexStore ? { artifactIndexStore } : {}),
       artifactRefSources: [parsed.value],
     });
-    const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value), { validationContext });
+    const result = await handleObjectVerb(store, request.data, agentPrincipal(parsed.value), {
+      validationContext,
+      publishDeps: { exportRoot: binding.dataRoot },
+    });
     return jsonResponse(result.status, result.body);
   } catch (error) {
     console.error('Object_Store request failed.', error);
@@ -120,5 +123,5 @@ const handlerImpl = async (event: LambdaEvent) => {
   }
 };
 
-/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. */
-export const createHandler = (_binding: SiteBinding) => handlerImpl;
+/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. T11.6: threads dataRoot to the publish path. */
+export const createHandler = (binding: SiteBinding) => buildHandlerImpl(binding);

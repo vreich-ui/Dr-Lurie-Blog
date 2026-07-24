@@ -7,6 +7,63 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.6 step 2/3 — committed exports → sites/drlurie/data/site/, materializer paths parameterized)
+
+**Also this session:** the T11.6-step-1 branch's 8 commits landed on `main`
+via PR #471 (merged by Wolf using the delivered `w11-land.zip` bundle+scripts —
+push access for this session remains read-only as established; nothing
+changed on that front, the user applied it with their own credentials).
+Confirmed via `git merge-base HEAD origin/main` == `f2569175` before
+continuing — this branch's step-1 commit is exactly `main`'s tip's parent, so
+step 2 builds cleanly on the real landed state, not a stale local guess.
+
+**T11.6 step 2 committed.** `git mv src/data/site sites/drlurie/data/site`
+(verbatim tree, only the root moved) plus the parameterization the brief
+calls for ("update the export-root loader seam ... and materializer output
+paths via the site binding") — NOT built in T11.4 as the brief's phrasing
+implies (verified: no `exportRoot`/loader-seam existed anywhere pre-this-
+session; T11.4's amendment explicitly deferred it to compose with T11.5-6).
+Built now: `MaterializeMeta.exportRoot` (required, no core default) + an
+`exportPath()` helper in `materializers/shared.ts`; all 11 materializers
+route through it. `SiteBinding.dataRoot` (T11.3's seam) carries the value;
+`src/config/site-binding.ts` sets it to `sites/drlurie/data/site`;
+`object-publish.ts`'s `PublishObjectDeps.exportRoot` threads from there
+through every publish-reaching factory (object-store, admin-object,
+run-publisher-agent, both agent-chat functions via `agent/context.ts`) — the
+5 of ~32 T11.4 `createHandler(_binding)` factories that actually reach
+`publish_by_time` now use their binding instead of discarding it. Fixed in
+passing: T11.5 had left a second, unused, divergent `SiteBinding` reconstructed
+in `sites/drlurie/site.config.ts` — now re-exports the real one from
+`src/config/site-binding.ts` instead (the exact drift this seam exists to
+prevent, caught before it could diverge further).
+
+Two hard-stop-adjacent findings, both fixed rather than worked around: (1) the
+zero-drlurie lint (T11.5) failed on a literal `sites/drlurie/data/site` EXAMPLE
+inside a thrown-error string in `object-publish.ts` — the lint is working
+exactly as designed; genericized the message. (2) the T11.5 apostrophe-in-
+single-quoted-string bug (an unescaped `'` inside a description string breaks
+the TS parser with a wall of cascading errors) recurred verbatim in
+`object-contract.ts`'s tracking_config description — same fix pattern, reworded
+until zero apostrophes remained.
+
+Full move-map detail: see the T11.6 amendment above. Readers updated: 1
+`import.meta.glob`, 11 `astro:content` collection globs, 6 comment-only path
+mentions. Test fixtures updated: 19 files (path assertions, real-file
+directory walks, or bare `{at, record_version}` meta/publishDeps objects that
+now need `exportRoot`).
+
+**Gates:** `astro check` 0 errors; `tsc -p tsconfig.test.json` clean;
+`eslint .` clean; `prettier --check` (project's covered globs) clean; full
+test suite **1627/1627 + 70/70**; `build-diff.mjs --self-test` PASS;
+`build-diff.mjs --base origin/main` (working tree, all step-2 changes
+included) — **74/74 pages byte-identical, EMPTY diff**.
+
+**Remaining for T11.6:** step 3 (driver scripts → `packages/core/cli/` with
+`--site` parameterization; per-site seed drift-guard) — not yet started. T11.6
+is not "done" (queue-advance, next-task pickup) until step 3 lands and the
+brief's full acceptance criteria hold, including the local
+`--local --site sites/drlurie` driver rehearsal.
+
 ## Session 2026-07-24 (T11.6 step 1/3 — seeds into sites/drlurie/seeds/)
 
 **T11.6 step 1 committed.** All 17 `scripts/lib/*-seed-data.mjs` modules +

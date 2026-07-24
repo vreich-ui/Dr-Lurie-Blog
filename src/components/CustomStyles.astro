@@ -22,7 +22,8 @@ import { getSiteObject } from '~/utils/site-object';
 // Urbanist
 
 // W4: the custom-property VALUES come from the site object's brandTokens
-// (src/data/site/site.json), falling back to the pre-conversion literals when
+// (sites/drlurie/data/site/site.json — W11 T11.6 relocated the export root),
+// falling back to the pre-conversion literals when
 // the export is absent. The emitted CSS keeps the exact pre-conversion layout
 // — build-diff treats <style> contents as opaque bytes, so the template below
 // is the old literal with only the values interpolated. Colors are keyed by

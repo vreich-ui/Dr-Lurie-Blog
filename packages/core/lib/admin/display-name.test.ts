@@ -5,8 +5,9 @@ import { objectDisplayName, objectTypeLabel, deSlug, principalName, verbToPhrase
 import type { ObjectType } from '../../schema/object-record-v1.js';
 
 /**
- * Fixtures mirror the real seed bodies under src/data/site/* (values copied
- * verbatim from disk on 2026-07-17) so the derivation is tested against the
+ * Fixtures mirror the real seed bodies under sites/drlurie/data/site/*
+ * (values copied verbatim from disk on 2026-07-17, before the W11 T11.6
+ * relocation out of src/data/site) so the derivation is tested against the
  * shapes it will actually see, not invented ones.
  */
 const fixture = (object_type: ObjectType, object_id: string, body: unknown) => ({ object_type, object_id, body });

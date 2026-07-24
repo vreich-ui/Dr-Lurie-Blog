@@ -2,8 +2,9 @@
  * T13.8 — the CSP hosts-drift gate (12-plan §4): the netlify.toml
  * Content-Security-Policy-Report-Only value must equal the documented
  * baseline PLUS exactly the union of the ENABLED providers' cspHosts (from
- * `src/data/site/tracking.json` when that export exists — none is
- * committed today). Drift fails in BOTH directions: an enabled provider
+ * `sites/drlurie/data/site/tracking.json` — W11 T11.6 relocated the export
+ * root — when that export exists — none is committed today). Drift fails in
+ * BOTH directions: an enabled provider
  * whose hosts are missing, and an unexplained host nobody enabled. CSP
  * updates therefore ride the same change that enables a provider.
  */
@@ -71,7 +72,7 @@ const readPolicy = (): Record<string, string[]> => {
 
 /** Enabled ad-provider keys per the committed export (absent = none). */
 const enabledProviders = (): { keys: string[]; plausibleHost?: string } => {
-  const exportPath = path.join(repoRoot(), 'src/data/site/tracking.json');
+  const exportPath = path.join(repoRoot(), 'sites/drlurie/data/site/tracking.json');
   if (!existsSync(exportPath)) return { keys: [] };
   const raw = JSON.parse(readFileSync(exportPath, 'utf8')) as Record<string, unknown>;
   delete raw.__generated;

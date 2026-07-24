@@ -106,6 +106,13 @@ export type PublishObjectDeps = {
   sleep?: (ms: number) => Promise<void>;
   backoffMs?: (attempt: number) => number;
   maxAttempts?: number;
+  /**
+   * The site's committed-export root (SiteBinding.dataRoot, W11 T11.6), e.g.
+   * 'sites/drlurie/data/site'. Required at call time — core has no default,
+   * so a caller that forgets it fails loudly at materialize (below) rather
+   * than silently writing to some hardcoded tree.
+   */
+  exportRoot?: string;
 };
 
 export type PublishFailureCode =
@@ -237,9 +244,15 @@ export const publishObject = async (
   const contentRevisionAtMaterialize = record.content_revision;
   let file: MaterializedFile;
   try {
+    if (!deps.exportRoot) {
+      throw new Error(
+        'publishObject: deps.exportRoot is required (the site export root from its SiteBinding.dataRoot).'
+      );
+    }
     file = materialize(objectType, input.object_id, record.body, {
       at: effectivePublishedTime,
       record_version: record.version,
+      exportRoot: deps.exportRoot,
     });
     if (!file.path || !file.content) throw new Error('Materializer returned an empty export.');
   } catch (error) {
