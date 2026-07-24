@@ -7,6 +7,91 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.7 — provisioning CLI: `create-site`; scaffold + runbook committed, live Netlify path unverified — no credential)
+
+**Built `packages/core/cli/create-site.mjs`** per the standalone brief's
+Scope (not the move-map's `cli/` row, which additionally assigns the
+physical relocation of `build-diff.mjs`/`home-conversion-roundtrip.mjs` to
+land here — the brief itself doesn't ask for that move; see the recorded
+discrepancy in the T11.7 move-map amendment, left for T11.12 to reconcile).
+`--name <client>` scaffolds `sites/<client>/`: its own self-contained
+`config/site-identity.ts` + `config/site-binding.ts` + `site.config.ts`
+(importing only from `packages/core` — cleaner than Dr-Lurie's own shell,
+which re-exports singletons from `src/config/*`, a location that's
+Dr-Lurie's alone), `netlify.toml`, `package.json`, an empty committed-export
+tree (`data/site/**/.gitkeep`), and a baseline seed pack: a starter site
+singleton (generic branding/palette), a two-item nav skeleton, an empty
+taxonomy registry, a default theme, and the five canonical starter
+section-template recipes (same ids as Dr-Lurie's `stpl_*` — their blueprint
+copy carries no client-specific content). `--dry-run` prints the full plan
+touching neither disk nor network; `--netlify-token` additionally creates
+the Netlify site, probes this site's 8 blob stores (write→read→delete, the
+`provision-pdf-tool-stores.mjs` pattern), and pushes generated per-site
+secrets (`PUBLISH_SECRET`, `MCP_HTTP_AUTH_TOKEN`,
+`ARTIFACT_UPLOAD_TOKEN_SECRET`, `TRACKING_SALT`) straight to the new site's
+env store — never printed. Idempotent: an existing `sites/<client>/` is
+detected and left untouched.
+
+**Two real bugs caught by validating the baseline pack's seed bodies
+against the actual `packages/core/schema/bodies/*` zod schemas** (not
+assumed valid): `content_grid`'s `related` source needs an `algorithm`
+field, not a bare `related_articles` kind literal; `newsletter_signup`
+needs `formName`, not `formAction`. Both fixed before commit.
+
+**Unit tests** (`packages/core/cli/create-site.test.ts`, co-located per the
+`packages/core` precedent so schema-validating assertions get a normal
+relative import instead of reaching into `.tmp/ci-test` by a fragile path):
+id-scoping (`site_<client>`/`tax_<client>`/`thm_<client>_default`, no
+cross-client collision), the full baseline-pack file list, the 8-store list
+pinned against `blob-store.ts`/`governance-store.ts`/`users-store.ts`/
+`chat-store.ts`'s literals, the env checklist covers every per-site row from
+the brief's table (not an illustrative subset), no secret-shaped value ever
+appears in dry-run output or in files actually written to disk (a real
+scratch-scaffold-then-read-back check, cleaned up after), and the dry-run
+report byte-matches a committed fixture
+(`tests/fixtures/create-site-dry-run-acme.mjs` — an `.mjs` module wrapping
+the text, not a raw `.txt`, so it gets pulled into the compiled test tree
+the same way `sites/drlurie`'s seed `.mjs` files do for other tests, instead
+of needing a real-repo-root guess from a compiled test's `import.meta.url`).
+10 new tests, all passing.
+
+**`docs/cms-architecture/site-provisioning-runbook.md`** (new): the human
+half — scaffold, create+provision, then the by-hand steps (GitHub repo
+binding, build hook, Identity/roles, tenancy axes, AI keys — reuse the
+fleet's, Stripe if the client sells, DNS, secret-rotation debt pointer to
+T11.10) — plus an explicit note that wiring an actual SECOND live deployment
+to read from its own `sites/<client>/` (rather than `sites/drlurie/`) is
+T11.11's job, not this scaffold's: today exactly one Netlify build (Dr-Lurie's)
+reads any `site.config.ts` at build time.
+
+**Recorded limitation, not a halt:** the `--netlify-token` path (real site
+creation, the store probe, generated-secret push) is built against the
+documented Netlify API shape (`POST /api/v1/sites`, `POST
+/api/v1/accounts/:id/env`) but has never run against a live account —
+`NETLIFY_API_TOKEN` isn't available in this session, exactly the prerequisite
+autonomous-run.md already flags as "needed from T11.7 on." Per the standing
+instruction that credential unavailability doesn't block building, this is
+recorded rather than treated as a stop: the brief's actual acceptance
+criteria (unit tests over scaffold output, a committed dry-run fixture, no
+secret material in any artifact) don't require a live run, and the brief's
+own non-goals rule out creating a real second site here. The control flow
+(`executeNetlifyProvisioning`) takes an injectable `fetchImpl`/`getStoreImpl`
+seam (the `object-publish.ts`/`provision-pdf-tool-stores.mjs` testing-seam
+precedent) so it's unit-testable without credentials, but the live wire
+shapes are only as verified as Netlify's current public docs — T11.11's
+provisioning step is this path's real first proof.
+
+**Gates:** `astro check` 0 errors; `eslint .` / `prettier --check` clean
+(including `packages/core/cli/**` — not covered by the project's
+`check:prettier` npm script glob, verified separately); full test suite
+**1637/1637 + 70/70** (10 new); `build-diff.mjs --self-test --site
+sites/drlurie` PASS; `build-diff.mjs HEAD origin/main --site sites/drlurie`
+— **74/74 pages byte-identical, EMPTY diff** (unaffected — nothing in
+Dr-Lurie's own build path imports anything new here). Committed `T11.7: …`;
+no PR (per the brief).
+
+**Next in queue:** T11.8 (Fleet CI, opus/medium, auto).
+
 ## Session 2026-07-24 (T11.6 step 3/3 — driver-script `--site` parameterization; T11.6 CLOSED)
 
 **T11.6 step 3 committed, closing T11.6.** Scope call recorded up front: the

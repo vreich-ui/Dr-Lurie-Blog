@@ -176,6 +176,72 @@ behavior of that flag — it writes fresh-store rehearsal data with different
 
 T11.6 is done as of this amendment.
 
+## T11.7 execution amendment (2026-07-24 — per this file's amend clause)
+
+Built per `T11.7-provisioning-cli.md`'s own Scope section (the standalone
+brief), which lists only `packages/core/cli/create-site.mjs` +
+`docs/cms-architecture/site-provisioning-runbook.md` — it does NOT itself
+call for moving `scripts/build-diff.mjs` /
+`scripts/home-conversion-roundtrip.mjs` / `scripts/lib/roundtrip-reconcile.mjs`
+into `packages/core/cli/`, even though this file's own `cli/` row (above,
+under T11.4) assigns that relocation to land "site-parameterized in T11.7."
+**Recorded discrepancy, not improvised scope:** the two planning docs
+disagree (this move-map's row vs. the concrete T11.7 brief); per
+autonomous-run.md's evidence-over-doc rule, the standalone brief governs
+what a task actually does, and moving three scripts ~40 other task briefs
+reference at their current literal path is exactly the kind of scope
+addition the "one task, one commit, minimal diff" rule warns against absent
+an explicit instruction. Left for T11.12 records close-out to reconcile
+which planning doc wins, rather than guessing. `create-site.mjs` is
+`cli/`'s first real inhabitant either way — the directory placement itself
+is not in question, only whether the pre-existing driver scripts join it.
+
+`create-site.mjs` scaffolds `sites/<client>/` as **fully self-contained**
+(its own `config/site-identity.ts` + `config/site-binding.ts` +
+`site.config.ts`, importing only from `packages/core`) rather than
+following Dr-Lurie's shell (`sites/drlurie/site.config.ts` re-exports
+identity/binding singletons from `src/config/*`, T11.6's fix for a T11.5
+residual) — that location is Dr-Lurie's OWN committed config, not a shared
+core seam a second client could import from. This is the cleaner target
+shape for every *subsequent* client; Dr-Lurie's own wiring is untouched
+(no reason to touch a working, tested, byte-identical setup for this task).
+
+Baseline seed pack: site singleton (generic starter branding/palette, not
+Dr-Lurie's), a two-item nav skeleton (`nav_header`/`nav_footer`, each one
+"Home" link), an empty taxonomy registry (`tax_<client>`, zero terms — a
+new client has no vocabulary yet), a default theme (`thm_<client>_default`,
+tokens imported from the site seed, same no-op-apply pattern as
+`thm_drlurie_default`), and the same five starter section-template recipes
+Dr-Lurie's `stpl_*` set uses (their blueprint copy carries no client-specific
+content, so there is no reason for a client's copy to diverge from the
+canonical starter set). All five body shapes verified against the real
+`packages/core/schema/bodies/*` zod schemas — two real bugs caught this way
+and fixed: `content_grid`'s `related` source needs `algorithm`, not a bare
+`related_articles` kind; `newsletter_signup` needs `formName`, not
+`formAction`.
+
+`--netlify-token` execution (site creation, the 8-store write/read/delete
+probe — `site-objects`/`workflows`/`artifacts`/`artifact-index`/`commerce`/
+`agent-chats`/`governance`/`users`, mirroring
+`scripts/provision-pdf-tool-stores.mjs`'s pattern for the separate pdf-tool
+stores — and pushing generated per-site secrets straight to the new site's
+env store) is built against the documented Netlify API shape but **UNVERIFIED
+against a live account**: `NETLIFY_API_TOKEN` is not available in this
+session (autonomous-run.md's own prerequisites list already flag it as
+"needed from T11.7 on"). Per the standing "credential unavailability isn't a
+blocker" instruction, this is recorded as a limitation, not treated as a
+halt — the brief's actual acceptance criteria (unit tests over scaffold
+output, dry-run fixture, no secret material in any artifact) don't require a
+live run, and non-goal explicitly rules out creating a real second site in
+this task. `executeNetlifyProvisioning` is written with an injectable
+`fetchImpl`/`getStoreImpl` seam so the control flow itself is testable
+without live credentials, matching the `object-publish.ts` /
+`provision-pdf-tool-stores.mjs` testing-seam precedent — but the actual
+Netlify wire shapes (`POST /api/v1/sites`, `POST /api/v1/accounts/:id/env`)
+are only as verified as the current public docs describe; a first live
+`--netlify-token` run (naturally, T11.11's provisioning step) is this path's
+real proof.
+
 ## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
 
 Landed as three gated step-commits (T9.24 precedent), each check+test+
