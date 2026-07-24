@@ -26,7 +26,7 @@ import {
   navFooterBody,
   navFooterHomeBody,
   navHeaderBody,
-} from '../../scripts/lib/navigation-seed-data.mjs';
+} from '../../sites/drlurie/seeds/navigation-seed-data.mjs';
 
 type Seed = { objectId: string; body: unknown; expectedWarningIds: string[] };
 const seeds = NAVIGATION_SEEDS as Seed[];

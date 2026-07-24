@@ -19,7 +19,7 @@ import { isRegisteredSectionType } from '../../packages/core/lib/registry/compon
 import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-forms-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/pages-forms-seed-data.mjs';
 
 type Seed = {
   objectType: string;

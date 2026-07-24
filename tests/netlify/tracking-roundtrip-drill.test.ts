@@ -16,7 +16,7 @@ import {
   CONVERSION_SEEDS,
   RESTRICTED_REGIONS,
   trackingConfigBody,
-} from '../../scripts/lib/tracking-config-seed-data.mjs';
+} from '../../sites/drlurie/seeds/tracking-config-seed-data.mjs';
 import {
   applyPatchOps,
   deepEqualJson,

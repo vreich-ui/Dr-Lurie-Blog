@@ -19,7 +19,7 @@ import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-typ
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { sectionBodySchema, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';
-import { CONVERSION_SEEDS, PAGE_ABOUT_ID, pageAboutBody } from '../../scripts/lib/page-about-seed-data.mjs';
+import { CONVERSION_SEEDS, PAGE_ABOUT_ID, pageAboutBody } from '../../sites/drlurie/seeds/page-about-seed-data.mjs';
 
 const sectionSeeds = CONVERSION_SEEDS.filter((seed) => seed.objectType === 'section');
 const sharedTypes = new Map<string, SectionType>(

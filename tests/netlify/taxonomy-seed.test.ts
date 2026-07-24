@@ -19,7 +19,7 @@ import test from 'node:test';
 import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { taxonomyBodySchema, type TaxonomyBody } from '../../packages/core/schema/bodies/taxonomy-v1.js';
-import { CONVERSION_SEEDS, RAW_TO_CANONICAL, SEED_SITE, taxonomyBody } from '../../scripts/lib/taxonomy-seed-data.mjs';
+import { CONVERSION_SEEDS, RAW_TO_CANONICAL, SEED_SITE, taxonomyBody } from '../../sites/drlurie/seeds/taxonomy-seed-data.mjs';
 
 const body = taxonomyBody as TaxonomyBody;
 const kinds = ['category', 'tag'] as const;

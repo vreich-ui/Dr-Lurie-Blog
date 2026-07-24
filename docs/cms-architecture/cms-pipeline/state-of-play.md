@@ -7,6 +7,22 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.6 step 1/3 — seeds into sites/drlurie/seeds/)
+
+**T11.6 step 1 committed.** All 17 `scripts/lib/*-seed-data.mjs` modules +
+`sync-site-seed.mjs` → `sites/drlurie/seeds/` (git mv; seeds are client data —
+copy semantics, never fleet-propagated). ~40 importers rewritten
+(tests/scripts); sync-site-seed's repo-root/seed paths updated; CI's
+seed-drift step now runs `sites/drlurie/seeds/sync-site-seed.mjs --check`
+(green from the new home). One regex miss caught by the suite
+(`pages-w5-seed-data` — digit in the name) and fixed.
+
+Gates: check 0 errors; tests 1627/1627 + 70/70; seed drift-guard green;
+build-diff EMPTY. Remaining T11.6 steps: (2) committed exports →
+`sites/drlurie/data/site/` with collection-glob/utils/materializer-path
+parameterization (the production write-path slice); (3) driver-script CLI
+move with `--site`.
+
 ## Session 2026-07-24 (T11.5 — de-hardcode site identity; NOTIFY row run at fable/high)
 
 **T11.5 DONE** (branch `claude/t11.5-desite-hardcodes`). Core is site-agnostic,

@@ -26,7 +26,7 @@ import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-typ
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { sectionTemplateBodySchema, type SectionTemplateBody } from '../../packages/core/schema/bodies/section-template-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/section-templates-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/section-templates-seed-data.mjs';
 
 type Seed = { objectType: string; objectId: string; body: SectionTemplateBody };
 const seeds = CONVERSION_SEEDS as Seed[];

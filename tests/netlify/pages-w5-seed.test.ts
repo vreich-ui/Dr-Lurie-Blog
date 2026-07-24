@@ -23,8 +23,8 @@ import { isRegisteredSectionType } from '../../packages/core/lib/registry/compon
 import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-w5-seed-data.mjs';
-import { CONVERSION_SEEDS as SHOP_SEEDS } from '../../scripts/lib/pages-shop-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/pages-w5-seed-data.mjs';
+import { CONVERSION_SEEDS as SHOP_SEEDS } from '../../sites/drlurie/seeds/pages-shop-seed-data.mjs';
 
 type Seed = { objectType: 'page' | 'product'; objectId: string; body: Record<string, unknown> };
 type SectionInstance = { id: string; type: string; data: Record<string, unknown> };

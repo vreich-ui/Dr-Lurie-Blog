@@ -17,7 +17,7 @@ import { summarizeValidation, validateObject } from '../../packages/core/server/
 import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-interior-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/pages-interior-seed-data.mjs';
 
 type Seed = { objectType: string; objectId: string; body: { pageType: string } };
 const seeds = CONVERSION_SEEDS as Seed[];

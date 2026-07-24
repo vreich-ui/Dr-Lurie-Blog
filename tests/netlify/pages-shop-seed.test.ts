@@ -23,7 +23,7 @@ import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-typ
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { productBodySchema, type ProductBody } from '../../packages/core/schema/bodies/product-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-shop-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/pages-shop-seed-data.mjs';
 import { drillOpsForSeed } from '../../scripts/lib/roundtrip-drill.mjs';
 
 type Seed = {

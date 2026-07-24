@@ -40,7 +40,7 @@ import { productBodySchema } from '../../packages/core/schema/bodies/product-v1.
 import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
 import { patchOpSchema, patchOpNamesByObjectType } from '../../packages/core/schema/object-patch-ops.js';
 import { objectTypes, type ObjectRecord, type ObjectType, type Principal } from '../../packages/core/schema/object-record-v1.js';
-import { siteBody } from '../../scripts/lib/site-seed-data.mjs';
+import { siteBody } from '../../sites/drlurie/seeds/site-seed-data.mjs';
 
 const ACTOR: Principal = { kind: 'agent', agent_name: 'tracking-test', auth: 'publish_key' };
 const AT = '2026-07-19T00:00:00.000Z';

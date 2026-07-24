@@ -14,7 +14,7 @@ import test from 'node:test';
 import { validateCandidatePatch, summarizeValidation } from '../../packages/core/server/lib/object-validate.js';
 import { applyPatchOps } from '../../packages/core/lib/object-patch-apply.js';
 import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
-import { navHeaderBody } from '../../scripts/lib/navigation-seed-data.mjs';
+import { navHeaderBody } from '../../sites/drlurie/seeds/navigation-seed-data.mjs';
 import {
   NAV_HEADER_T28_T29_OPS,
   classifyNavHeaderPatchState,

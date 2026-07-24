@@ -23,7 +23,7 @@ import test from 'node:test';
 import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE, siteBody } from '../../scripts/lib/site-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE, siteBody } from '../../sites/drlurie/seeds/site-seed-data.mjs';
 
 const body = siteBody as SiteBody;
 
@@ -66,7 +66,7 @@ test('the batch is the single site_drlurie singleton owning itself', () => {
   );
 });
 
-test('the seed body matches the released production export (drift guard — run scripts/sync-site-seed.mjs)', () => {
+test('the seed body matches the released production export (drift guard — run sites/drlurie/seeds/sync-site-seed.mjs)', () => {
   const exported = JSON.parse(readFileSync(findExport(), 'utf8')) as Record<string, unknown>;
   delete exported.__generated;
   const drift = [...new Set([...Object.keys(exported), ...Object.keys(body as Record<string, unknown>)])].filter(
@@ -75,7 +75,7 @@ test('the seed body matches the released production export (drift guard — run 
   assert.deepEqual(
     drift,
     [],
-    `site seed drifted from production on: ${drift.join(', ')} — run \`node scripts/sync-site-seed.mjs\` to resync`
+    `site seed drifted from production on: ${drift.join(', ')} — run \`node sites/drlurie/seeds/sync-site-seed.mjs\` to resync`
   );
 });
 

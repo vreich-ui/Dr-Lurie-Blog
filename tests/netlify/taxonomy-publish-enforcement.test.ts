@@ -20,7 +20,7 @@ import { handler as publishHandler } from '../../netlify/functions/publish-artic
 import { getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
 import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
 import { TAXONOMY_RECORD_KEY } from '../../packages/core/server/lib/taxonomy-enforcement.js';
-import { taxonomyBody } from '../../scripts/lib/taxonomy-seed-data.mjs';
+import { taxonomyBody } from '../../sites/drlurie/seeds/taxonomy-seed-data.mjs';
 
 const publishSecret = 'taxonomy-publish-test-secret';
 

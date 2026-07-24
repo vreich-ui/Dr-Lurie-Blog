@@ -31,9 +31,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const EXPORT_PATH = path.join(repoRoot, 'src', 'data', 'site', 'site.json');
-const SEED_PATH = path.join(repoRoot, 'scripts', 'lib', 'site-seed-data.mjs');
+const SEED_PATH = path.join(repoRoot, 'sites', 'drlurie', 'seeds', 'site-seed-data.mjs');
 
 const checkOnly = process.argv.slice(2).includes('--check');
 
@@ -131,5 +131,5 @@ if (!pattern.test(source)) {
 fs.writeFileSync(SEED_PATH, source.replace(pattern, block));
 console.log(`[sync-site-seed] rewrote ${path.relative(repoRoot, SEED_PATH)} from the production export.`);
 console.log(
-  '[sync-site-seed] run `npx prettier --write scripts/lib/site-seed-data.mjs` to normalize, then re-run the seed test.'
+  '[sync-site-seed] run `npx prettier --write sites/drlurie/seeds/site-seed-data.mjs` to normalize, then re-run the seed test.'
 );

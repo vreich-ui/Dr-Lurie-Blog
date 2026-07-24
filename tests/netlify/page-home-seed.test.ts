@@ -40,7 +40,7 @@ import {
   sectionHomeAudienceGridBody,
   sectionHomeStartGridBody,
   sectionNewsletterSignupBody,
-} from '../../scripts/lib/page-home-seed-data.mjs';
+} from '../../sites/drlurie/seeds/page-home-seed-data.mjs';
 
 const SECTION_SEEDS = [
   { id: SECTION_NEWSLETTER_SIGNUP_ID, body: sectionNewsletterSignupBody, type: 'newsletter_signup' as const },

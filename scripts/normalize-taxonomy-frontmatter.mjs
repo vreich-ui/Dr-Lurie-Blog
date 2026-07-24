@@ -28,7 +28,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { RAW_TO_CANONICAL } from './lib/taxonomy-seed-data.mjs';
+import { RAW_TO_CANONICAL } from '../sites/drlurie/seeds/taxonomy-seed-data.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const postsDir = path.join(repoRoot, 'src', 'data', 'post');

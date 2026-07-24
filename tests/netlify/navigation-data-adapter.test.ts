@@ -24,7 +24,7 @@ import {
 } from '../../src/utils/navigation-data.js';
 import { materializeNavigation } from '../../packages/core/server/lib/materializers/navigation.js';
 import { navigationBodySchema } from '../../packages/core/schema/bodies/navigation-v1.js';
-import { navFooterBody, navFooterHomeBody, navHeaderBody } from '../../scripts/lib/navigation-seed-data.mjs';
+import { navFooterBody, navFooterHomeBody, navHeaderBody } from '../../sites/drlurie/seeds/navigation-seed-data.mjs';
 
 const resolve = createNavTargetResolver({ blogPermalink: '/learn/library' });
 const FOOT_NOTE = '\n    Educational content only — not medical advice. © Dr. Lurié.\n  ';

@@ -24,7 +24,7 @@ import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-typ
 import { applyListingTerm } from '../../packages/core/lib/renderer/listing-term.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-listing-seed-data.mjs';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/pages-listing-seed-data.mjs';
 
 type Seed = {
   objectType: string;

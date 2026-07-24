@@ -23,8 +23,8 @@ import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';
 import { themeBodySchema, type ThemeBody } from '../../packages/core/schema/bodies/theme-v1.js';
 import type { SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
 import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
-import { CONVERSION_SEEDS, themeDefaultBody } from '../../scripts/lib/themes-seed-data.mjs';
-import { siteBody } from '../../scripts/lib/site-seed-data.mjs';
+import { CONVERSION_SEEDS, themeDefaultBody } from '../../sites/drlurie/seeds/themes-seed-data.mjs';
+import { siteBody } from '../../sites/drlurie/seeds/site-seed-data.mjs';
 
 const NOW = Date.parse('2026-07-14T12:00:00.000Z');
 const AGENT: Principal = { kind: 'agent', agent_name: 'theme-test', auth: 'publish_key' };
