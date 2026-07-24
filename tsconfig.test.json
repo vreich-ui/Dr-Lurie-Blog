@@ -16,7 +16,8 @@
     "src/netlify-blobs.d.ts",
     "src/**/*.test.ts",
     "tests/netlify/**/*.ts",
-    "packages/core/**/*.ts"
+    "packages/core/**/*.ts",
+    "sites/**/*.ts"
   ],
   "exclude": [
     "packages/core/admin/**/*.tsx",

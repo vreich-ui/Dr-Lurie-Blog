@@ -7,7 +7,6 @@
  * gate on real apply_theme; UI-level gating elsewhere — creation stays on the
  * governed verbs either way). REUSE-FIRST made visual.
  */
-import '~/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { useEffect, useState } from 'react';
 
 import { AdminShell } from './AdminShell';

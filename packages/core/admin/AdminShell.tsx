@@ -9,6 +9,7 @@
  * The "Legacy" group (publish/drafts/agent-admin/library/blobs) retired in
  * W9.g (T9.24) — every capability now lives on the surfaces below.
  */
+import { getSiteIdentity } from '../lib/site-identity.js';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -253,7 +254,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
               L
             </span>
             <span className="text-[length:var(--adm-text-sm)] font-semibold text-[var(--adm-text-heading)]">
-              Dr. Lurié admin
+              {getSiteIdentity().adminLabel}
             </span>
           </a>
           <NavList currentPath={currentPath} />
@@ -295,7 +296,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
         </div>
 
         {/* Sidebar (mobile drawer) */}
-        <Drawer open={mobileNav} onClose={() => setMobileNav(false)} title="Dr. Lurié admin" side="left" width={280}>
+        <Drawer open={mobileNav} onClose={() => setMobileNav(false)} title={getSiteIdentity().adminLabel} side="left" width={280}>
           <NavList currentPath={currentPath} onNavigate={() => setMobileNav(false)} />
         </Drawer>
 

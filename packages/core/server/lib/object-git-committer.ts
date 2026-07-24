@@ -114,10 +114,15 @@ const resolveGitHubConfig = (envNames: SiteBindingEnvNames = PLATFORM_ENV_NAMES)
   return { token, repo, branch };
 };
 
-const resolveAuthor = () => ({
-  name: process.env.GITHUB_COMMIT_AUTHOR_NAME ?? 'Dr. Lurié Publisher',
-  email: process.env.GITHUB_COMMIT_AUTHOR_EMAIL ?? 'publisher@drlurie.local',
-});
+const resolveAuthor = () => {
+  // W11 T11.5: fallback author from the site identity seam (env overrides win,
+  // as before). Byte-identical for Dr-Lurie via its committed site config.
+  const identity = getSiteIdentity();
+  return {
+    name: process.env.GITHUB_COMMIT_AUTHOR_NAME ?? identity.committerName,
+    email: process.env.GITHUB_COMMIT_AUTHOR_EMAIL ?? identity.committerEmail,
+  };
+};
 
 const githubRequest = async <T>(
   fetchImpl: typeof fetch,

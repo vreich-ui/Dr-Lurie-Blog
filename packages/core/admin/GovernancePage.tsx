@@ -6,7 +6,6 @@
  * shown with provenance; chat-tool autonomy activates with the chat loop
  * (T9.13).
  */
-import '~/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';

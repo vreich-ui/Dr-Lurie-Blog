@@ -4,6 +4,7 @@
  * brief-writers' reference. It also demonstrates the identity module by
  * running objectDisplayName over sample records of all ten object types.
  */
+import { getSiteIdentity } from '../lib/site-identity.js';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 
@@ -142,11 +143,11 @@ const DISPLAY_SAMPLES: Array<{ object_type: ObjectType; object_id: string; body:
     body: { section: { id: 's_blog', data: { body: '<h2>Why This Blog Exists</h2>' } } },
   },
   { object_type: 'navigation', object_id: 'nav_footer', body: { role: 'footer', brand: {} } },
-  { object_type: 'taxonomy', object_id: 'tax_drlurie', body: { kinds: { category: {}, tag: {} } } },
-  { object_type: 'site', object_id: 'site_drlurie', body: { name: 'Dr. Lurié Skincare' } },
+  { object_type: 'taxonomy', object_id: getSiteIdentity().taxonomyId, body: { kinds: { category: {}, tag: {} } } },
+  { object_type: 'site', object_id: getSiteIdentity().siteId, body: { name: getSiteIdentity().brandName } },
   { object_type: 'template', object_id: 'tpl_interior', body: { name: 'Interior page' } },
   { object_type: 'section_template', object_id: 'stpl_audience_grid', body: { name: 'Audience grid' } },
-  { object_type: 'theme', object_id: 'thm_drlurie_default', body: { name: 'Dr. Lurié default' } },
+  { object_type: 'theme', object_id: `thm_${getSiteIdentity().siteShortId}_default`, body: { name: 'Default theme' } },
   {
     object_type: 'product',
     object_id: 'prod_barrier',

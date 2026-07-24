@@ -13,7 +13,6 @@
  * (the brief's scripted per-type drive) — until then the inspector generates a
  * read view and points visual edits at the canvas.
  */
-import '~/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';

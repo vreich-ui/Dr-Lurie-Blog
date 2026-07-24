@@ -24,6 +24,7 @@
  * deep-merge patch semantics, explicit key-nulling on variant switches,
  * checkout-before-patch, version threading.
  */
+import { getSiteIdentity } from '../../../lib/site-identity.js';
 import { z } from 'zod';
 
 import type { Role } from '../roles.js';
@@ -322,7 +323,7 @@ const createObject: ChatTool = {
     type: 'object',
     properties: {
       object_type: objectRefJson.object_type,
-      site: { type: 'string', description: 'Site id, e.g. site_drlurie.' },
+      site: { type: 'string', description: `Site id, e.g. ${getSiteIdentity().siteId}.` },
       body: { type: 'object' },
       requested_id: { type: 'string' },
     },

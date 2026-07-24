@@ -7,6 +7,49 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.5 — de-hardcode site identity; NOTIFY row run at fable/high)
+
+**T11.5 DONE** (branch `claude/t11.5-desite-hardcodes`). Core is site-agnostic,
+**lint-enforced**: new `tests/scripts/core-no-site-literals.test.mjs` fails on
+any `drlurie|kugelmedia|Lurié` literal in `packages/core` APPLICATION code
+(comments + `*.test.ts` exempt per the ratified carve-out) — passing.
+
+**De-hardcoded through the identity seam (byte-identical for Dr-Lurie):**
+`TAXONOMY_RECORD_KEY` (→ `taxonomyId`), git-committer fallback author (→ new
+`committerName/committerEmail` config fields, env still wins), AdminShell
+label (→ new `adminLabel` field pinned to 'Dr. Lurié admin'), goTrueClient
+browser-storage keys (→ lazy `${siteSlug}-…`, sessions survive), agent persona
+(brandName), tools/object-contract example ids (resolver-derived
+`site_drlurie`/`tax_drlurie` at runtime), storage-grant copy neutralized,
+KitGallery samples via identity. `strategy_drlurie` was already comment-only
+(front-load verified). All 11 FRONT-LOADED census items verified absent.
+
+**New architecture pieces:** `sites/drlurie/site.config.ts` (zod-validated:
+canonical host, image domains, the 10-row redirect table, site id + binding
+re-export — the FIRST real sites/ module); `astro.config.ts` reads
+host/domains from it; **drift guards** instead of generation
+(`tests/netlify/site-config-drift.test.ts`: netlify.toml redirect table ==
+site.config, config.yaml site URL == canonicalHost). **Island-entry seam:**
+10 site wrappers under `src/admin/*` register providers then re-export core
+admin components — fixing 3 pre-existing core→site `~/config` imports the
+step-2 purity grep missed (it only checked relative paths).
+
+**Gates:** check 0 errors; tests **1627/1627 + 70/70** (incl. the new lint,
+drift guards, extended byte-compat gate); build-diff: **73/74 byte-identical —
+ONE intentional diff**, `/admin/kit` (dev component gallery): sample theme
+name 'Dr. Lurié default' → 'Default theme', one `<td>`. Server-rendered
+sample copy cannot be de-hardcoded byte-identically; accepted + disclosed
+rather than faked with brand-string surgery. All admin pages otherwise
+identical (proves adminLabel/fixtures resolve byte-exactly).
+
+**Residuals (enumerated per the brief):** `publish-article.ts` +
+`save-json-blob.ts` + `verify-article-images.ts` + `admin-workflow-lock.ts`
+stay drlurie-bound (frozen; retire with the legacy path);
+`mcp/save-json-blob-mcp/` untouched (OQ-W11-6); `mcp.ts` example ids stay
+(formally a SITE file now — its future core factory split must neutralize);
+`verify-section-components.mjs`'s `~` import was already unresolvable outside
+Vite (manual tool; rides T11.7 cli work) — out-of-scope finding.
+
 ## Session 2026-07-24 (T11.4 step 3/3 — function-factory pass; T11.4 CLOSED with recorded residuals)
 
 **T11.4 is DONE** (3 gated step-commits). Step 3: 32 functions →

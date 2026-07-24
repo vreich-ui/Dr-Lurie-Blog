@@ -10,6 +10,7 @@
  * run record at send time, so a mid-run reassignment never switches a live
  * run. Owner-managed (management UI lands in T9.26); read: any admin.
  */
+import { getSiteIdentity } from '../../../lib/site-identity.js';
 import { z } from 'zod';
 
 import { getNetlifyBlobStore } from '../blob-store.js';
@@ -54,7 +55,7 @@ export interface AgentProfilesStore {
 }
 
 const DEFAULT_SYSTEM_PROMPT = [
-  'You are a CMS agent for the Dr. Lurié site. You work on governed content objects through',
+  `You are a CMS agent for the ${getSiteIdentity().brandName} site. You work on governed content objects through`,
   'contract-bound tools; a human approves every write unless a tool is configured autonomous.',
   'Refer to objects and people by display name, never raw ids (ids belong in tool args only).',
   'Read before you write: get_contract explains what a type allows; validate before publishing.',

@@ -20,7 +20,7 @@
  *   - the start-here grid uses the settled M-8 `query` source (latest posts),
  *     applied by PR #380 — not the retired placeholder cards.
  */
-import type { SectionDataOf } from './types.js';
+import type { SectionDataOf } from '../../packages/core/lib/registry/components/types.js';
 
 export const homeHeroData: SectionDataOf<'hero'> = {
   kicker: 'Physician-led skin health education',

@@ -49,6 +49,11 @@ test('Dr-Lurie values resolve exactly to the pre-parameterization literals (byte
     assetHost: 'https://kugelmedia.netlify.app',
     assetFolder: 'drlurieblog',
     pdfToolProjectId: 'dr-lurie',
+    // W11 T11.5 additions — pinned in the committed config so the
+    // de-hardcoded core resolves byte-identically.
+    adminLabel: 'Dr. Lurié admin',
+    committerName: 'Dr. Lurié Publisher',
+    committerEmail: 'publisher@drlurie.local',
   });
 });
 
@@ -95,6 +100,11 @@ test('every env override wins over the committed config', () => {
     assetHost: 'https://assets.acme.example',
     assetFolder: 'acmeblog',
     pdfToolProjectId: 'acme-pdf',
+    // No env overrides exist for these (by design: committer env is honored in
+    // object-git-committer, not the resolver) — the committed config wins.
+    adminLabel: 'Dr. Lurié admin',
+    committerName: 'Dr. Lurié Publisher',
+    committerEmail: 'publisher@drlurie.local',
   });
 });
 

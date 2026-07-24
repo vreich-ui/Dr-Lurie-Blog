@@ -21,8 +21,14 @@
  * The record's own free strings stay lossy input (§3.10 protects the article
  * agent contract) — only the COMMITTED frontmatter is normalized.
  */
+import { getSiteIdentity } from '../../lib/site-identity.js';
 
-export const TAXONOMY_RECORD_KEY = 'objects/taxonomy/by-id/tax_drlurie.json';
+// W11 T11.5: derived from the site identity seam (tax_<siteShortId>, env-overridable
+// via SITE_TAXONOMY_ID) — byte-identical to the old 'tax_drlurie' literal for
+// Dr-Lurie. Module-load resolution is safe: every entry that can reach this
+// module (incl. the frozen publish-article path, via its netlify/lib shim)
+// registers the site providers first.
+export const TAXONOMY_RECORD_KEY = `objects/taxonomy/by-id/${getSiteIdentity().taxonomyId}.json`;
 
 type Term = {
   term_id?: string;

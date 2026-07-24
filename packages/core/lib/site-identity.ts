@@ -47,7 +47,7 @@ export const setSiteIdentityConfigProvider = (provider: () => unknown): void => 
 const activeSiteIdentityConfig = (): unknown => {
   if (!siteIdentityConfigProvider) {
     throw new Error(
-      'Site identity config provider not configured — import the site policy bindings (src/config/policy-bindings) before resolving site identity without an explicit config.',
+      'Site identity config provider not configured — import the site policy bindings (src/config/policy-bindings) before resolving site identity without an explicit config.'
     );
   }
   return siteIdentityConfigProvider();
@@ -70,6 +70,11 @@ export const siteIdentityConfigSchema = z.strictObject({
   assetHost: nonEmpty.regex(/^https:\/\/[^\s/]+$/),
   /** This site's folder on assetHost. */
   assetFolder: nonEmpty.regex(/^[a-z0-9][a-z0-9-]*$/),
+  /** W11 T11.5: admin console label (defaults to `${brandName} admin`). */
+  adminLabel: nonEmpty.optional(),
+  /** W11 T11.5: git committer fallback (env GITHUB_COMMIT_AUTHOR_* wins). */
+  committerName: nonEmpty.optional(),
+  committerEmail: nonEmpty.optional(),
 });
 
 export type SiteIdentityConfig = z.infer<typeof siteIdentityConfigSchema>;
@@ -83,6 +88,9 @@ export type SiteIdentity = SiteIdentityConfig & {
   trackingProjectId: string;
   /** pdf-tool storage-grant projectId (env PDF_TOOL_PROJECT_ID, else the slug). */
   pdfToolProjectId: string;
+  adminLabel: string;
+  committerName: string;
+  committerEmail: string;
 };
 
 type EnvSource = Record<string, string | undefined>;
@@ -125,6 +133,9 @@ export const resolveSiteIdentity = (
     assetHost: envValue(env, 'SITE_ASSET_HOST') ?? parsed.data.assetHost,
     assetFolder: envValue(env, 'SITE_ASSET_FOLDER') ?? parsed.data.assetFolder,
     pdfToolProjectId: envValue(env, 'PDF_TOOL_PROJECT_ID') ?? siteSlug,
+    adminLabel: parsed.data.adminLabel ?? `${parsed.data.brandName} admin`,
+    committerName: parsed.data.committerName ?? `${parsed.data.brandName} Publisher`,
+    committerEmail: parsed.data.committerEmail ?? `publisher@${siteSlug}.local`,
   };
 };
 

@@ -43,7 +43,7 @@ import {
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '~/lib/registry/components/home-fixture-data';
+} from '../src/fixtures/home-fixture-data';
 import { fetchPosts } from '~/utils/blog';
 import { getPermalink } from '~/utils/permalinks';
 

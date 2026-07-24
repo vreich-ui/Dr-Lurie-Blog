@@ -1,5 +1,11 @@
-const STORAGE_KEY = 'dr-lurie-gotrue-user';
-const KEEP_KEY = 'dr-lurie-keep-signed-in';
+import { getSiteIdentity } from '../site-identity.js';
+
+// W11 T11.5: browser-persisted keys derived from the site slug at CALL time
+// (lazy — the admin islands register the site identity provider before any
+// auth call runs). For Dr-Lurie these resolve to the exact pre-W11 literals
+// ('dr-lurie-…'), so existing signed-in admin sessions survive the change.
+const STORAGE_KEY = () => `${getSiteIdentity().siteSlug}-gotrue-user`;
+const KEEP_KEY = () => `${getSiteIdentity().siteSlug}-keep-signed-in`;
 
 export type GoTrueUser = {
   id: string;
@@ -38,7 +44,7 @@ const getBase = () => {
 
 const writeStorage = (user: GoTrueUser) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    localStorage.setItem(STORAGE_KEY(), JSON.stringify(user));
   } catch {
     // ignored
   }
@@ -46,7 +52,7 @@ const writeStorage = (user: GoTrueUser) => {
 
 const clearStorage = () => {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY());
   } catch {
     // ignored
   }
@@ -54,7 +60,7 @@ const clearStorage = () => {
 
 export const currentUser = (): GoTrueUser | null => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY());
     if (!raw) return null;
     const user = JSON.parse(raw) as GoTrueUser;
     if (user.token.expires_at && Date.now() >= user.token.expires_at) return null;
@@ -66,7 +72,7 @@ export const currentUser = (): GoTrueUser | null => {
 
 export const isKeepSignedIn = () => {
   try {
-    return localStorage.getItem(KEEP_KEY) === '1';
+    return localStorage.getItem(KEEP_KEY()) === '1';
   } catch {
     return false;
   }
@@ -74,8 +80,8 @@ export const isKeepSignedIn = () => {
 
 export const setKeepSignedIn = (keep: boolean) => {
   try {
-    if (keep) localStorage.setItem(KEEP_KEY, '1');
-    else localStorage.removeItem(KEEP_KEY);
+    if (keep) localStorage.setItem(KEEP_KEY(), '1');
+    else localStorage.removeItem(KEEP_KEY());
   } catch {
     // ignored
   }
@@ -139,7 +145,7 @@ export const logout = async (): Promise<void> => {
 
 export const refreshUser = async (): Promise<GoTrueUser | null> => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY());
     if (!raw) return null;
     const stored = JSON.parse(raw) as GoTrueUser;
     if (!stored.token.refresh_token) return null;

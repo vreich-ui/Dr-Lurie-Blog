@@ -43,7 +43,7 @@ import {
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../packages/core/lib/registry/components/home-fixture-data.js';
+} from '../../src/fixtures/home-fixture-data.js';
 import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 
 const DEFINITIONS = [

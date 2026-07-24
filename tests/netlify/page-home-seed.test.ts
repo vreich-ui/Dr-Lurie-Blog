@@ -26,7 +26,7 @@ import {
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../packages/core/lib/registry/components/home-fixture-data.js';
+} from '../../src/fixtures/home-fixture-data.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { sectionBodySchema, type SectionInstance, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';

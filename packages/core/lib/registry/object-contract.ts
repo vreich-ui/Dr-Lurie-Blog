@@ -19,6 +19,7 @@
  * DESCRIPTION data — the authoritative machine schemas (body / patch args) stay
  * fully derived; only human-readable boundary notes are restated.
  */
+import { getSiteIdentity } from '../site-identity.js';
 import { z } from 'zod';
 
 import {
@@ -528,7 +529,7 @@ const perTypeConstraints = (objectType: ObjectType): Constraint[] => {
           severity: 'blocks_write',
           enforced_live: true,
           description:
-            'taxonomy.category and taxonomy.tags resolve against the tax_drlurie registry when it exists ' +
+            `taxonomy.category and taxonomy.tags resolve against the ${getSiteIdentity().taxonomyId} registry when it exists ` +
             '(merged_into aliases followed); unknown terms are blockers.',
         },
         {
@@ -866,13 +867,13 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       how: 'From object_checkout; also gives record_version for expected_record_version.',
     },
   ];
-  inputs.push({ input: 'site', when: 'object_create', how: 'The owning site object id, e.g. site_drlurie.' });
+  inputs.push({ input: 'site', when: 'object_create', how: `The owning site object id, e.g. ${getSiteIdentity().siteId}.` });
   if (objectType === 'content_item') {
     inputs.push(
       {
         input: 'taxonomy terms',
         when: 'taxonomy.category / taxonomy.tags',
-        how: 'Slugs from the tax_drlurie registry (registry_get / object_contract("taxonomy")); merged_into aliases resolve, unknown terms block.',
+        how: `Slugs from the ${getSiteIdentity().taxonomyId} registry (registry_get / object_contract("taxonomy")); merged_into aliases resolve, unknown terms block.`,
       },
       {
         input: 'strategy annotations',
@@ -882,7 +883,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'image artifacts',
         when: 'node public.media {type:"image"}, public.images[], hero body.image',
-        how: 'Generate through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant), then set src to the PUBLIC path of the returned blobKey: image/{id}/{sha256}.{ext} → /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.',
+        how: 'Generate through pdf-tool under the site\'s storage grant (get_pdf_tool_storage_grant), then set src to the PUBLIC path of the returned blobKey: image/{id}/{sha256}.{ext} → /img/{id}/{sha256}.{ext}. Raw blobKeys, data URIs, and src/assets paths are rejected; remote https URLs warn (ungoverned). The hero must be an IMAGE — a PDF there fails the whole build.',
       },
       {
         input: 'PDF artifacts',
@@ -896,7 +897,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
     inputs.push({
       input: 'artifact ref',
       when: 'any *AssetRef field',
-      how: 'Generate/store the asset through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant — the sanctioned artifact transfer path), then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.',
+      how: 'Generate/store the asset through pdf-tool under the site\'s storage grant (get_pdf_tool_storage_grant — the sanctioned artifact transfer path), then use the returned Major-Key ref (image|pdf/{id}/{sha256}.{ext}). URLs/data:/src/assets are rejected; refs are checked against the artifact index at publish.',
     });
   }
   if (objectType === 'page' || objectType === 'navigation' || objectType === 'site') {
@@ -911,7 +912,7 @@ const auxiliaryInputs = (objectType: ObjectType): AuxiliaryInput[] => {
       {
         input: 'fulfillment artifact ref',
         when: 'fulfillment.kind "download"',
-        how: 'Produce the deliverable through pdf-tool under a Dr-Lurie storage grant (get_pdf_tool_storage_grant) so it lands in the artifacts store, then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.',
+        how: 'Produce the deliverable through pdf-tool under the site\'s storage grant (get_pdf_tool_storage_grant) so it lands in the artifacts store, then use the returned Major-Key ref. It is delivered only through token-gated purchase links, never a public URL.',
       },
       {
         input: 'long-form page',

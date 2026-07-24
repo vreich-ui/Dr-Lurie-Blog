@@ -4,7 +4,7 @@
 // every /admin/content/<id>, and the island reads the id client-side from the
 // URL (same pattern as /admin/objects/*).
 import AdminLayout from '~/layouts/AdminLayout.astro';
-import ObjectWorkspace from '@core/admin/ObjectWorkspace';
+import ObjectWorkspace from '~/admin/ObjectWorkspace';
 
 export function getStaticPaths() {
   return [{ params: { objectId: '__workspace' } }];
