@@ -8,7 +8,7 @@ import {
   resolvePageMetadata,
   resolvePageSections,
   type ResolvePageDeps,
-} from '../../src/lib/renderer/resolve.js';
+} from '../../packages/core/lib/renderer/resolve.js';
 import type { NavTarget } from '../../packages/core/schema/bodies/navigation-v1.js';
 
 // A minimal page export mirroring the page_home shape: hero (route-kind

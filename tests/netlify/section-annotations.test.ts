@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { sectionAnnotationAttrs } from '../../src/lib/renderer/section-annotations.js';
+import { sectionAnnotationAttrs } from '../../packages/core/lib/renderer/section-annotations.js';
 
 test('an inline section is annotated with the page identity only', () => {
   const attrs = sectionAnnotationAttrs('page_home', { id: 's_hero', type: 'hero' });

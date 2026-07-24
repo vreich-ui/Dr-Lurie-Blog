@@ -16,7 +16,7 @@
  */
 import { getEntry } from 'astro:content';
 
-import { parseSharedSectionExport, type ResolvePageDeps } from '~/lib/renderer/resolve';
+import { parseSharedSectionExport, type ResolvePageDeps } from '../../../packages/core/lib/renderer/resolve';
 import type { NavTarget } from '../../../packages/core/schema/bodies/navigation-v1';
 import type { ContentQuery, SectionInstance } from '../../../packages/core/schema/bodies/section-v1';
 import { getBlogPermalink, getPermalink } from '~/utils/permalinks';

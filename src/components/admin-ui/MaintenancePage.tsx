@@ -22,7 +22,7 @@ import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { DataTable, type Column } from './data';
 import { Tabs } from './menus';
 import { IconAlertTriangle, IconPlus, IconTrash, IconUser, IconWrench } from './icons';
-import { fetchMe } from '../../lib/admin/users-client';
+import { fetchMe } from '@core/lib/admin/users-client';
 import {
   deleteBlob,
   duplicateBlob,
@@ -37,10 +37,10 @@ import {
   wipeStore,
   type BlobArtifactMetadata,
   type StoreDiagnostic,
-} from '../../lib/admin/maintenance-client';
+} from '@core/lib/admin/maintenance-client';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 

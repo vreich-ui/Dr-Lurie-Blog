@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { SECTION_PALETTE, insertPositionFor, paletteEntry } from '../../src/lib/edit-mode/sections-palette.js';
+import { SECTION_PALETTE, insertPositionFor, paletteEntry } from '../../packages/core/lib/edit-mode/sections-palette.js';
 import { splitRichTextBlocks, splitRichTextParagraphs } from '../../packages/core/lib/richtext/paragraphs.js';
 import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 

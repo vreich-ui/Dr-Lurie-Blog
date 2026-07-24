@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { NODE_PALETTE, nodePaletteEntry, MOCK_AD_CREATIVES } from '../../src/lib/edit-mode/nodes-palette.js';
+import { NODE_PALETTE, nodePaletteEntry, MOCK_AD_CREATIVES } from '../../packages/core/lib/edit-mode/nodes-palette.js';
 import { contentItemNodeSchema } from '../../packages/core/schema/bodies/content-item-v1.js';
-import { renderArticleNodes } from '../../src/lib/article-object/render-nodes.js';
+import { renderArticleNodes } from '../../packages/core/lib/article-object/render-nodes.js';
 import type { ContentItemBody } from '../../packages/core/schema/bodies/content-item-v1.js';
 
 test('every palette starter parses as a valid node once an id is minted', () => {

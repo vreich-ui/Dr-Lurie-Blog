@@ -23,12 +23,12 @@ import {
   typeCounts,
   type LibraryRow,
   type ReadinessDot,
-} from '../../lib/admin/library-logic';
+} from '@core/lib/admin/library-logic';
 import { objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import type { ObjectType } from '@core/schema/object-record-v1';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -125,7 +125,7 @@ function ContentLibraryBody() {
     let alive = true;
     (async () => {
       try {
-        const { fetchInventoryRows } = await import('../../lib/admin/library-client');
+        const { fetchInventoryRows } = await import('@core/lib/admin/library-client');
         const fetched = await fetchInventoryRows(getToken);
         if (alive) {
           setRows(fetched);

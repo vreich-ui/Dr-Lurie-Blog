@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { applyListingTerm, LISTING_TERM_TOKEN } from '../../src/lib/renderer/listing-term.js';
+import { applyListingTerm, LISTING_TERM_TOKEN } from '../../packages/core/lib/renderer/listing-term.js';
 
 test('replaces the token in nested objects, arrays, and rich-text strings — keys untouched', () => {
   const body = {

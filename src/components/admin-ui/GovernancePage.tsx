@@ -29,15 +29,15 @@ import {
   type ApprovalMode,
   type ChatToolCatalogEntry,
   type ToolAutonomy,
-} from '../../lib/admin/governance-client';
+} from '@core/lib/admin/governance-client';
 import {
   describeTrackingGovernance,
   withTrackingPublishMode,
   type CreationPolicyLike,
-} from '../../lib/admin/tracking-governance';
+} from '@core/lib/admin/tracking-governance';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -61,7 +61,7 @@ function GovernanceBody() {
   useEffect(() => {
     (async () => {
       try {
-        const { fetchMe } = await import('../../lib/admin/users-client');
+        const { fetchMe } = await import('@core/lib/admin/users-client');
         const me = await fetchMe(getToken);
         setOwner(me.roles.includes('owner'));
         await refresh();

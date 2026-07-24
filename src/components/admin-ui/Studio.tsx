@@ -28,7 +28,7 @@ import type { ObjectRecord, ObjectType } from '@core/schema/object-record-v1';
 import { getSiteIdentity } from '@core/lib/site-identity';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -58,7 +58,7 @@ const missingTrio = (record: Rec): boolean => {
 };
 
 async function verb(request: Record<string, unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
-  const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+  const { callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
   return callObjectVerb(getToken, request) as Promise<{ status: number; body: Record<string, unknown> }>;
 }
 
@@ -488,7 +488,7 @@ function StudioBody() {
   useEffect(() => {
     (async () => {
       try {
-        const { fetchMe } = await import('../../lib/admin/users-client');
+        const { fetchMe } = await import('@core/lib/admin/users-client');
         const me = await fetchMe(getToken);
         setOwner(me.roles.includes('owner'));
       } catch {

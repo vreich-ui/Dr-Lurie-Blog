@@ -17,10 +17,10 @@ import {
   describeTrackingGovernance,
   withTrackingPublishMode,
   type CreationPolicyLike,
-} from '../../src/lib/admin/tracking-governance.js';
+} from '../../packages/core/lib/admin/tracking-governance.js';
 import { activeCreationPolicy } from '../../packages/core/lib/creation-policy.js';
 import { activeApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
-import type { ApprovalConfig } from '../../src/lib/admin/governance-client.js';
+import type { ApprovalConfig } from '../../packages/core/lib/admin/governance-client.js';
 
 const OPEN_CREATION: CreationPolicyLike = { master: 'open', overrides: {} };
 

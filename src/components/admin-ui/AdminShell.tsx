@@ -32,10 +32,10 @@ import {
   type IconProps,
 } from './icons';
 import { objectTypeLabel } from '@core/lib/admin/display-name';
-import type { LibraryRow } from '../../lib/admin/library-logic';
+import type { LibraryRow } from '@core/lib/admin/library-logic';
 
 async function shellToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -155,7 +155,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
 
   useEffect(() => {
     let alive = true;
-    import('../../utils/goTrueClient')
+    import('@core/lib/admin/goTrueClient')
       .then((m) => {
         if (alive) setEmail(m.currentUser()?.email ?? null);
       })
@@ -184,7 +184,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
     let alive = true;
     (async () => {
       try {
-        const { fetchInventoryRows } = await import('../../lib/admin/library-client');
+        const { fetchInventoryRows } = await import('@core/lib/admin/library-client');
         const rows = await fetchInventoryRows(shellToken);
         if (alive) setObjectRows(rows);
       } catch {
@@ -197,7 +197,7 @@ export function AdminShell({ currentPath, title, children }: AdminShellProps) {
   }, [paletteOpen]);
 
   const onLogout = () => {
-    import('../../utils/goTrueClient')
+    import('@core/lib/admin/goTrueClient')
       .then((m) => m.logout())
       .catch(() => {})
       .finally(() => window.location.assign('/admin'));

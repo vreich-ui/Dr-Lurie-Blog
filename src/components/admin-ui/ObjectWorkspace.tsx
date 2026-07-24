@@ -25,14 +25,14 @@ import { ConfirmDialog, Drawer, useToast } from './overlays';
 import { LockBanner, HistoryTimeline, ReadinessList } from './data';
 import { ObjectPreview } from './ObjectPreview';
 import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
-import { createObjectChat } from '../../lib/admin/chat-client';
+import { createObjectChat } from '@core/lib/admin/chat-client';
 import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '@core/lib/admin/readiness-criteria';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -176,7 +176,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
   useEffect(() => {
     (async () => {
       try {
-        const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+        const { callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
         const res = await callObjectVerb(getToken, {
           action: 'get',
           object_type: 'taxonomy',
@@ -222,7 +222,7 @@ function ArticleSettingsCard({ record, onSaved }: { record: Rec; onSaved: () => 
         toast({ title: 'Nothing changed', tone: 'info' });
         return;
       }
-      const { callObjectVerb, EditSession } = await import('../../lib/edit-mode/verbs-client');
+      const { callObjectVerb, EditSession } = await import('@core/lib/edit-mode/verbs-client');
       // Edit-time contract validation (slug uniqueness vs committed posts) —
       // the same shared validation messages the canvas panel shows.
       const candidate = await callObjectVerb(getToken, {
@@ -338,7 +338,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
   useEffect(() => {
     (async () => {
       try {
-        const { listProfiles } = await import('../../lib/admin/chat-client');
+        const { listProfiles } = await import('@core/lib/admin/chat-client');
         const res = await listProfiles(getToken);
         setProfiles(res.profiles);
         setAssigned(res.assignments.objects[objectId] ?? '');
@@ -373,7 +373,7 @@ function DedicatedAgentPicker({ objectId, owner }: { objectId: string; owner: bo
         const next = event.target.value;
         setBusy(true);
         try {
-          const { assignProfile } = await import('../../lib/admin/chat-client');
+          const { assignProfile } = await import('@core/lib/admin/chat-client');
           await assignProfile(getToken, { kind: 'object', object_id: objectId }, next || null);
           setAssigned(next);
         } finally {
@@ -408,7 +408,7 @@ function WorkspaceBody() {
       setLoading(false);
       return;
     }
-    const { getObjectRecord, callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+    const { getObjectRecord, callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
     const { record } = await getObjectRecord(getToken, loc.type, loc.id);
     if (!record) {
       setError(`${objectTypeLabel(loc.type)} "${loc.id}" was not found.`);
@@ -430,7 +430,7 @@ function WorkspaceBody() {
     setNow(Date.now());
     (async () => {
       try {
-        const { fetchMe } = await import('../../lib/admin/users-client');
+        const { fetchMe } = await import('@core/lib/admin/users-client');
         const me = await fetchMe(getToken);
         setOwner(me.roles.includes('owner'));
       } catch {
@@ -467,7 +467,7 @@ function WorkspaceBody() {
   const doPublish = () =>
     runAction(async () => {
       if (!record) return;
-      const { EditSession } = await import('../../lib/edit-mode/verbs-client');
+      const { EditSession } = await import('@core/lib/edit-mode/verbs-client');
       const session = new EditSession(record.object_type, record.object_id, getToken);
       const co = await session.ensureCheckout();
       if (!co.ok) {
@@ -491,7 +491,7 @@ function WorkspaceBody() {
   const doDiscard = () =>
     runAction(async () => {
       if (!record) return;
-      const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+      const { callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
       const res = await callObjectVerb(getToken, {
         action: 'discard',
         object_type: record.object_type,
@@ -513,7 +513,7 @@ function WorkspaceBody() {
   const doTakeOver = () =>
     runAction(async () => {
       if (!record) return;
-      const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+      const { callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
       const res = await callObjectVerb(getToken, {
         action: 'checkin',
         object_type: record.object_type,
@@ -535,7 +535,7 @@ function WorkspaceBody() {
   const doNewVariant = () =>
     runAction(async () => {
       if (!record) return;
-      const { callObjectVerb } = await import('../../lib/edit-mode/verbs-client');
+      const { callObjectVerb } = await import('@core/lib/edit-mode/verbs-client');
       const res = await callObjectVerb(getToken, { action: 'create_variant', source_object_id: record.object_id });
       const newId =
         (res.body as { object?: { object_id?: string }; object_id?: string }).object?.object_id ??

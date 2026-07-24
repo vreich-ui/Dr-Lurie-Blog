@@ -23,8 +23,8 @@ import {
   type ChatStatus,
   type ChatView,
   type PendingView,
-} from '../../lib/admin/chat-client';
-import type { GetToken } from '../../lib/edit-mode/verbs-client';
+} from '@core/lib/admin/chat-client';
+import type { GetToken } from '@core/lib/edit-mode/verbs-client';
 
 // ─── useChat: since_seq polling over get_chat ────────────────────────────────
 

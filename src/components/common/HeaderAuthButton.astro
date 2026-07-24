@@ -154,7 +154,7 @@ const { variant = 'desktop' } = Astro.props;
     handleOAuthCallback,
     handleRecoveryCallback,
     getAccessToken,
-  } from '~/utils/goTrueClient';
+  } from '@core/lib/admin/goTrueClient';
 
   (() => {
     if (!window.__drLurieHeaderAuth) {

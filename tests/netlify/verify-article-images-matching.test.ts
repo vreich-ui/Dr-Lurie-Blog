@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { handler as verifyHandler } from '../../netlify/functions/verify-article-images.js';
-import { createAdminArtifactPreviewLoader, getAdminBlobImageEndpoint } from '../../src/lib/admin/artifact-preview.js';
+import { createAdminArtifactPreviewLoader, getAdminBlobImageEndpoint } from '../../packages/core/lib/admin/artifact-preview.js';
 
 const publishSecret = 'verify-images-matching-test-secret';
 

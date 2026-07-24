@@ -21,7 +21,7 @@ import test from 'node:test';
 import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { isRegisteredSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
 import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
-import { applyListingTerm } from '../../src/lib/renderer/listing-term.js';
+import { applyListingTerm } from '../../packages/core/lib/renderer/listing-term.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-listing-seed-data.mjs';

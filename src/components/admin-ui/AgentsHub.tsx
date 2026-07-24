@@ -25,10 +25,10 @@ import {
   type ChatStatus,
   type ChatSummaryView,
   type ProfileUpsertInput,
-} from '../../lib/admin/chat-client';
+} from '@core/lib/admin/chat-client';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -327,7 +327,7 @@ function HubBody() {
     void reloadList();
     (async () => {
       try {
-        const { fetchMe } = await import('../../lib/admin/users-client');
+        const { fetchMe } = await import('@core/lib/admin/users-client');
         const me = await fetchMe(getToken);
         setOwner(me.roles.includes('owner'));
       } catch {
@@ -347,7 +347,7 @@ function HubBody() {
       const { chat: created } = await createFreeChat(getToken, starter.label);
       setActiveId(created.chat_id);
       // Seed the conversation once the chat exists.
-      const { sendChatMessage } = await import('../../lib/admin/chat-client');
+      const { sendChatMessage } = await import('@core/lib/admin/chat-client');
       await sendChatMessage(getToken, created.chat_id, starter.prompt);
       await reloadList();
     } finally {

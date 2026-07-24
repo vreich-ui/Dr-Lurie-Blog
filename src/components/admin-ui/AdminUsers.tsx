@@ -23,10 +23,10 @@ import {
   avatarSrc,
   type UserView,
   type UserRole,
-} from '../../lib/admin/users-client';
+} from '@core/lib/admin/users-client';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 

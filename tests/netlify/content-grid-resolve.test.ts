@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
-import { resolveContentGridCards } from '../../src/lib/renderer/resolve-content-grid.js';
+import { resolveContentGridCards } from '../../packages/core/lib/renderer/resolve-content-grid.js';
 import type { ContentQuery } from '../../packages/core/schema/bodies/section-v1.js';
 
 type Card = { id: string; title: string };

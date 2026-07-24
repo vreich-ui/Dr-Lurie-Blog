@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { applyNavChangesToBody, navChangesToOps, navEditFieldsFor } from '../../src/lib/edit-mode/nav-editor.js';
+import { applyNavChangesToBody, navChangesToOps, navEditFieldsFor } from '../../packages/core/lib/edit-mode/nav-editor.js';
 import { navigationBodySchema, type NavigationBody } from '../../packages/core/schema/bodies/navigation-v1.js';
 import { isPatchOpAllowedForObjectType } from '../../packages/core/schema/object-patch-ops.js';
 

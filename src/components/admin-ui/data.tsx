@@ -23,7 +23,7 @@ import {
   IconLock,
 } from './icons';
 import { Avatar, EmptyState } from './primitives';
-import { renderFieldDiff } from '../../lib/admin/field-diff';
+import { renderFieldDiff } from '@core/lib/admin/field-diff';
 import type { ReadinessGroup, ReadinessCriterion, CriterionStatus } from '@core/lib/admin/readiness-criteria';
 import type { HistoryEntry } from '@core/schema/object-record-v1';
 import { verbToPhrase, principalName } from '@core/lib/admin/display-name';

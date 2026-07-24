@@ -19,7 +19,7 @@ import { brandRowDefinition } from '../../packages/core/lib/registry/components/
 import { mediaDefinition } from '../../packages/core/lib/registry/components/media.js';
 import { statsDefinition } from '../../packages/core/lib/registry/components/stats.js';
 import { isStandalonePlaceableSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
-import { resolveSections, type ResolvePageDeps } from '../../src/lib/renderer/resolve.js';
+import { resolveSections, type ResolvePageDeps } from '../../packages/core/lib/renderer/resolve.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { MEDIA_VIDEO_ID_RE, sectionInstanceSchema, sectionTypes } from '../../packages/core/schema/bodies/section-v1.js';
 

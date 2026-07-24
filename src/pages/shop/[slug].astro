@@ -21,7 +21,7 @@ import merge from 'lodash.merge';
 
 import ObjectSections from '~/components/cms/ObjectSections.astro';
 import Layout from '~/layouts/PageLayout.astro';
-import { parsePageExport } from '~/lib/renderer/resolve';
+import { parsePageExport } from '@core/lib/renderer/resolve';
 import type { MetaData } from '~/types';
 import { loadAvailableProducts, productPriceBadge } from '~/utils/products';
 import { loadRoutePageObject } from '~/utils/route-page-object';

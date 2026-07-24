@@ -36,7 +36,7 @@ import {
   type PendingReviewItem,
   type UnpublishedChangeItem,
   type HeldLockItem,
-} from '../../lib/admin/audit-client';
+} from '@core/lib/admin/audit-client';
 
 const RELEASE_ENDPOINT = '/.netlify/functions/admin-release';
 const DEPLOY_STATUS_ENDPOINT = '/.netlify/functions/deploy-status';
@@ -44,7 +44,7 @@ const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 24; // ~2 minutes before we hand the wait back to the user
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
@@ -243,7 +243,7 @@ function QuickActions() {
 }
 
 async function homeToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 

@@ -19,8 +19,8 @@
  */
 import { buildSectionResolveDeps, type SectionResolveContext } from '~/components/cms/section-resolve-deps';
 import { getRegisteredComponent } from '~/lib/registry/components/index';
-import { resolveSections } from '~/lib/renderer/resolve';
-import { sectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
+import { resolveSections } from '@core/lib/renderer/resolve';
+import { sectionAnnotationAttrs } from '@core/lib/renderer/section-annotations';
 import type { SectionInstance } from '@core/schema/bodies/section-v1';
 
 interface Props {

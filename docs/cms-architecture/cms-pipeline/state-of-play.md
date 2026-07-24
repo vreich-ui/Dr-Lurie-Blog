@@ -7,6 +7,31 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.4 IN PROGRESS — step 1/3: pure .ts remainders into core; gated step-commits per the T9.24 precedent)
+
+**T11.4 step 1 committed** (branch `claude/t11.4-core-extraction-renderer-admin`).
+Moved (55 renames): `src/lib/{renderer,edit-mode}/**`, the `src/lib/admin/**`
+remainder (clients, node-editor/renderer, review-ui, diffs, lock-manager…),
+`article-object/render-nodes`, `article-content` remainder (input-bank +
+tests), `richtext` remainder (prosemirror, render-html + tests), the
+T11.2-deferred `contentSourceBody`/`contentSourceImportFormData`/
+`publishArticleFromPayload`, and `src/utils/goTrueClient` →
+`packages/core/lib/admin/goTrueClient.ts` (self-contained Identity client —
+admin machinery). `src/lib` now holds ONLY the 2 frozen-path stubs + the
+registry barrel (moves in step 2 with the components).
+
+Seam fixes en route: `edit-mode/ui.ts` dropped its raw `mediaPolicyConfig`
+import for `activeMediaPolicy()` (the T11.2 provider); provider registration
+re-homed from moved libs to entry points; `object-review-ui.test` registers
+the site bindings as a live-policy gate (carve-out); `taxonomy-lookup-guard`
+source-scan path updated.
+
+Gates (step 1): check 0 errors, eslint+prettier clean; tests **1624/1624 +
+67/67**; build-diff vs T11.3 **EMPTY** (74 pages). Remaining T11.4 steps:
+(2) components/PageObjectRenderer/canvas + admin-ui islands + pages shells +
+the `src/data/site` loader seam + registry barrel; (3) the consolidated
+function-factory pass + cli relocation.
+
 ## Session 2026-07-24 (T11.3 — core extraction: server layer + SiteBinding seam; NOTIFY row run at fable/xhigh)
 
 **T11.3 DONE** (branch `claude/t11.3-core-extraction-server-layer`, on T11.2).

@@ -12,10 +12,10 @@ import { Avatar, Badge, Button, Card, EmptyState, Skeleton, StatusPill } from '.
 import { Input, Select, Switch } from './forms';
 import { useToast } from './overlays';
 import { IconAlertTriangle } from './icons';
-import { fetchMe, updateMe, avatarSrc, type UserView } from '../../lib/admin/users-client';
+import { fetchMe, updateMe, avatarSrc, type UserView } from '@core/lib/admin/users-client';
 
 async function getToken(): Promise<string> {
-  const m = await import('../../utils/goTrueClient');
+  const m = await import('@core/lib/admin/goTrueClient');
   return (await m.getAccessToken()) ?? '';
 }
 
