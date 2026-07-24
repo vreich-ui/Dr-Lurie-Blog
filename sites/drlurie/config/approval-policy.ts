@@ -34,8 +34,13 @@
  *
  * Dev-stage default: all-autonomous, with `product` pinned to
  * require-approval (commerce never publishes without a human eye).
+ *
+ * W11 T11.10: relocated from `src/config/approval-policy.ts` — this IS
+ * Dr-Lurie's per-site posture file now (values unchanged, verbatim); a
+ * freshly-scaffolded client (T11.7's create-site.mjs) gets its own copy at
+ * this same `sites/<client>/config/` path from day one.
  */
-import type { ApprovalPolicyConfig } from '../../packages/core/lib/approval-policy.js';
+import type { ApprovalPolicyConfig } from '../../../packages/core/lib/approval-policy.js';
 
 export const approvalPolicyConfig = {
   master: 'all-autonomous',

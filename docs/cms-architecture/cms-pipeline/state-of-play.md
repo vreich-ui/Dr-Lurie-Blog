@@ -7,6 +7,113 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.10 — Per-site governance, secrets, and the minimal per-agent-credential slice)
+
+**Per-agent credentials (ratified in scope by OQ-W11-5 — verifiable tokens,
+not a full IAM)** — new `packages/core/server/lib/agent-keys.ts`: a
+`agent-keys.v1` doc living as a SIBLING key in the SAME `governance` blob
+store `admin-governance.ts` already owns (no new blob store, T11.7's
+`CORE_BLOB_STORES` pin untouched). Records are `{agent_name, token_hash
+(sha256), status, site, created_by, created_at, revoked_at?}` — the raw
+token is minted (`crypto.randomBytes(32).toString('base64url')`), returned
+exactly once to the caller, and never persisted or logged. One ACTIVE key
+per `(agent_name, site)`: minting a replacement auto-revokes the prior one.
+`resolveVerifiedAgentName(token, site, doc)` is a PURE function (no store
+access, timing-safe hash compare) — fails closed on every adversarial case:
+forged token, revoked key, wrong site, null doc, empty-string token. 13
+tests in `agent-keys.test.ts`.
+
+**Admin surface** — `admin-governance.ts` gained three verbs:
+`agent_keys_list` (Admin, strips `token_hash` via `describeAgentKeys`),
+`agent_keys_create`/`agent_keys_revoke` (Owner-only, same bar as every
+other governance write there). `create` is the only response in the whole
+handler that ever carries a raw token. `requestSchema` is now exported so
+the request CONTRACT is testable directly; the owner-gating WIRING is
+proven with a source-level regex assertion, matching this file's own
+established `tracking-governance.test.ts` precedent (no test-injection seam
+exists for `getAdminStateFromEvent`, the same gap that file already worked
+around). 5 tests in `admin-governance.test.ts`.
+
+**MCP auth wiring** — the actual identity path. `netlify/functions/mcp.ts`'s
+`getAuthResult` is now `async`: it resolves a verified per-agent bearer
+token FIRST, independently of the shared `MCP_HTTP_AUTH_TOKEN` gate — a
+verified token satisfies the gate on its own, even against an unset or
+mismatched shared secret. When no verified token is present, the existing
+shared-secret decision tree runs byte-identical to before (deprecated
+fallback, not a forced cutover, per the brief's own non-goals). The
+resolved `verifiedAgentName` rides on the Lambda event and, in `callTool`,
+overrides self-declared `agent_name` — but ONLY for an explicit allowlist
+of 7 CMS attribution tools (`CMS_AGENT_NAME_ATTRIBUTION_TOOLS`:
+`object_create`, `object_create_variant`, `object_instantiate_template`,
+`object_instantiate_section_template`, `site_apply_theme`,
+`product_set_price`, `order_reissue`). **A blanket override was the first
+draft and was caught and fixed before ever running a test**: `agent_name`
+also means workflow-pipeline STAGE identity for
+`save_json_blob_mark_agent_complete`/`patch_agent_output` (validated
+against a completely different fixed enum — research/draft/reader_insight/
+etc.) — an unscoped override would have broken every legitimate
+workflow-stage call whenever a verified bearer token happened to be
+presented. 7 tests in `mcp-agent-keys-auth.test.ts`, run against the REAL
+handler + a real isolated local-blob-backed governance store: verified
+token beats the wrong shared secret; revoked token fails closed; forged
+token never verifies; cross-site key never leaks; open dev-mode
+unaffected; verified identity overrides a forged `agent_name` on
+`object_create`; and — the critical carve-out proof — verified identity
+does NOT touch `save_json_blob_mark_agent_complete`'s enum-validated
+`agent_name`.
+
+**Per-site posture files** — `sites/drlurie/config/approval-policy.ts` +
+`creation-policy.ts` (new), verbatim relocation of the committed values
+from `src/config/`, matching T11.7's `create-site.mjs` scaffold shape for
+the next client. `src/config/policy-bindings.ts` now imports from the new
+location; the old `src/config/approval-policy.ts`/`creation-policy.ts` are
+deleted (only 2 real importers existed, both updated — verified by
+exhaustive grep before deletion, not assumed).
+
+**`docs/cms-architecture/secrets-runbook.md`** (new) — the brief's explicit
+deliverable: a one-page inventory of every secret in the fleet (scope,
+what it gates, storage, rotation procedure), the project's random-token
+generation convention, and — the standing debt the brief calls out by
+name — the `PUBLISH_SECRET` rotation, exposed 2026-07-11 and never
+rotated since, now also a hard shop-launch blocker per
+`06-shop-module-plan.md` §0.5. T11.10 does NOT rotate it (still a
+human/Wolf-scheduled act) or retire it (the per-agent mechanism is an
+attribution layer on top of the object-store proxy's existing
+`PUBLISH_SECRET`-gated write path, not a replacement for it) — the runbook
+just makes executing that rotation a known five-step procedure.
+
+**`object_review_decide`'s TODO comment** (mcp.ts, ~line 1548) updated to
+reflect that a verified-agent mechanism now exists, while being explicit
+that this verb's own authorization is DELIBERATELY unchanged — M-6
+approvals stay human-only (no agent-approves-agent review), per this
+task's own non-goals. Wiring verified identity into approval authority
+would be a capability change, not an attribution one, and stays out of
+scope until a future task explicitly ratifies it.
+
+**M-6 posture unchanged, proven by absence of change**: no approval-decision
+logic was touched anywhere in this task; the full suite staying green
+(1698/1698, unchanged pass count from before this task's own +18 new tests
+were added) is the proof that nothing about `object_review_decide`'s
+authorization behavior shifted. No new dedicated regression test was
+written asserting this specifically, since it is a "nothing changed here"
+claim already covered by the full suite's continued green state.
+
+**Gates:** `astro check` 0 errors; `eslint .`/`prettier --check` clean
+(including the new `packages/core/server/lib/agent-keys.*`,
+`packages/core/server/functions/admin-governance.test.ts`,
+`tests/netlify/mcp-agent-keys-auth.test.ts`, `sites/drlurie/config/*.ts` —
+none of these paths are covered by the project's own `check:prettier`
+glob, checked separately; 6 files needed a manual `prettier --write` pass,
+re-verified clean afterward); full test suite **1698/1698 + 85/85** (up
+from 1673/1673 + 85/85: +25 co-located — 13 agent-keys + 5
+admin-governance + 7 mcp-agent-keys-auth); `build-diff.mjs --self-test`
+PASS; `build-diff.mjs --base origin/main --site sites/drlurie` (working
+tree vs `origin/main`) — EMPTY, 74/74 (unaffected — nothing here touches
+render/build output). Committed `T11.10: …`; no PR (per the brief).
+
+**Next in queue:** T11.11 (Second-site acceptance proof, sonnet/medium,
+human_gate — HALT only on the step needing account authority).
+
 ## Session 2026-07-24 (T11.9 — Schema-migration harness: registry/classify framework + `migrate-site` CLI + fleet CI gate; no real schema bump shipped)
 
 **Framework** — new `packages/core/server/migrations/registry.ts` +

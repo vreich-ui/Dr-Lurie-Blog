@@ -384,6 +384,45 @@ check:eslint`, `npm run check:prettier`, `npm run test`, `node
 scripts/build-diff.mjs --self-test`, `node scripts/build-diff.mjs HEAD
 origin/main --site sites/drlurie`) all pass/report EMPTY.
 
+## T11.10 execution amendment (2026-07-24 — per this file's amend clause)
+
+Not a move-map task in the file-relocation sense (no source→target package
+motion beyond the two per-site posture files below) — recorded here per this
+file's amend clause anyway, since it's the same session's next queue task
+and touches the same core/site boundary the rest of this file tracks.
+
+**Per-site posture files, the one real relocation this task performs**:
+`src/config/approval-policy.ts` + `creation-policy.ts` → `sites/drlurie/
+config/approval-policy.ts` + `creation-policy.ts`, verbatim (same committed
+values — `master: 'all-autonomous'`/`overrides: {product:
+'require-approval'}` for approval; `master: 'open'`/`overrides:
+{tracking_config: {agents: ['object-conversion-roundtrip']}}` for
+creation), matching the shape T11.7's `create-site.mjs` scaffold already
+generates for a NEW client — drlurie now matches its own scaffold instead
+of predating it. `src/config/policy-bindings.ts` (the T11.2-laid provider
+seam) now imports both from the new location; the two old files are
+deleted (`git rm`), verified first by exhaustive grep that only 2 real code
+importers existed (both updated: `policy-bindings.ts` itself, plus the two
+test files importing the old paths directly —
+`tests/netlify/creation-policy.test.ts` and
+`tests/netlify/publish-gate.test.ts`).
+
+**Everything else this task built is new, not moved**: the per-agent-
+credential framework (`packages/core/server/lib/agent-keys.ts`), its three
+`admin-governance.ts` verbs, and the MCP auth-gate wiring in
+`netlify/functions/mcp.ts` — see this session's `state-of-play.md` entry
+for the full design (the single-chokepoint mechanism: `callTool`'s `input`
+construction is the ONE place a verified identity needed to be injected,
+scoped by an explicit 7-tool allowlist so it never collides with the
+UNRELATED workflow-stage `agent_name` enum `save_json_blob_*` uses).
+`docs/cms-architecture/secrets-runbook.md` is a new doc, the brief's own
+explicit deliverable, not a relocation of anything existing.
+
+**No discrepancy to record this task** — unlike T11.3/T11.8/T11.9, nothing
+in the brief's file list conflicted with what was actually found in the
+tree; the per-site posture-file relocation was exactly as scoped, and the
+credential/auth work was net-new with no prior home to move from.
+
 ## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
 
 Landed as three gated step-commits (T9.24 precedent), each check+test+

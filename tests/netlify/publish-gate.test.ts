@@ -16,7 +16,7 @@ import {
   resolveRolesForPrincipal,
   type Role,
 } from '../../packages/core/server/lib/roles.js';
-import { approvalPolicyConfig } from '../../src/config/approval-policy.js';
+import { approvalPolicyConfig } from '../../sites/drlurie/config/approval-policy.js';
 import {
   activeApprovalPolicy,
   governedObjectTypes,
