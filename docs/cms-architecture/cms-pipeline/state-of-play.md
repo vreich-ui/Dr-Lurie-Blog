@@ -7,6 +7,70 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.11 prep — second-site acceptance run: agent-side readiness verified, HALTED on account authority)
+
+T11.11 is `human_gate` (queue.tsv) — "prepared by agents; executed with
+account authority (Netlify site creation, env, DNS optional for staging)"
+per the brief itself. Per the autonomous-run rule (human_gate tasks are
+prepared in full, never completed by the agent) and this session's own
+governing instruction ("HALT only on the step needing account authority"),
+this is exactly that halt point. Nothing was committed as `T11.11: …` —
+the task is not done; this is the prep-and-stop entry, matching the
+T9.16+T9.23 prep precedent (`775441fe`).
+
+**Verified agent-side (everything preparable without a real Netlify
+account):**
+
+- `node packages/core/cli/create-site.mjs --name staging --dry-run` runs
+  clean end-to-end: scaffolds a full plan (site-identity/site-binding/
+  site.config/netlify.toml/package.json, an empty committed-export tree,
+  the five-piece baseline seed pack) and prints the complete per-site env
+  checklist (core publish + repo binding, access/identity/governance,
+  pdf-tool + tracking tenancy axes, AI + integrations, the transitional
+  site-identity env overrides) grouped by `[per-site]` vs
+  `[fleet-shared]` — confirming T11.7's CLI and
+  `docs/cms-architecture/site-provisioning-runbook.md` are in sync and the
+  scaffold mechanism itself is sound. Dry-run touches neither disk nor
+  network, so this proof is safe and repeatable without committing
+  anything or needing a real account.
+- Re-read `site-provisioning-runbook.md` end to end: its own §4 already
+  says the quiet part out loud — "today exactly one Netlify build (Dr-Lurie's)
+  reads any `site.config.ts` at build time… pointing a REAL second Netlify
+  build at its own `sites/<client>/` tree… is T11.11's job… this section
+  exists so nobody mistakes 'the directory exists' for 'the site is live.'"
+  That is precisely the wall this session hit.
+
+**Why this genuinely cannot proceed further from this sandbox** — every
+remaining step in the brief's scope needs live external state this
+environment has no path to:
+
+1. `create-site --netlify-token …` needs a real Netlify API token with
+   site-create rights and actually calls the Netlify API to provision a
+   second site + probe its 8 blob stores — no such token/account access
+   exists in this sandbox (same posture this whole wave has recorded for
+   T11.7/T11.8/T11.9's "unverified in a live run" notes, but those tasks
+   could still fully verify their OWN mechanism locally; T11.11's
+   acceptance criteria explicitly requires "commit/deploy refs" from a
+   REAL second site, which by definition can't be produced locally).
+2. The baseline seed pack drive (`--production` against the new site's
+   real endpoint) and the agent MCP round-trip proof both require that
+   real, deployed second site to exist and be reachable first.
+3. The fleet-propagation proof needs two real Netlify builds (Dr-Lurie's
+   + the new site's) actually running in CI/on Netlify — this sandbox has
+   no path to trigger or observe a live GitHub Actions run or a live
+   Netlify build (recorded the same way for every prior W11 CI task).
+
+**What Wolf's action unblocks:** once a real second site exists (runbook
+§1–§2: `create-site --name <client>` for real, then `--netlify-token`, then
+the by-hand env items in §3), this same brief's steps 2–4 are directly
+executable by an agent session with that site's live URL and deploy access
+in hand — nothing about the mechanism itself is in question, only the
+account-authority half only Wolf can perform.
+
+**T11.12 is blocked behind this** (`depends_on: T11.11`) — the autonomous
+run stops here rather than fabricating a close-out over an incomplete
+fleet proof.
+
 ## Session 2026-07-24 (T11.10 — Per-site governance, secrets, and the minimal per-agent-credential slice)
 
 **Per-agent credentials (ratified in scope by OQ-W11-5 — verifiable tokens,
