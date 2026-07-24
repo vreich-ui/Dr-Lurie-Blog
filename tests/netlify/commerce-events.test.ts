@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,7 +12,7 @@ import {
   hashEmail,
   isClientCommerceEventType,
   newCommerceEvent,
-} from '../../netlify/lib/commerce-events.js';
+} from '../../packages/core/server/lib/commerce-events.js';
 
 const TS = '2026-07-12T12:00:00.000Z';
 const EVENT_ID = '3f1b1509-5ad7-4693-ae44-e25022ab270e';

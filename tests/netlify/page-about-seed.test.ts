@@ -10,10 +10,11 @@
  *   - each shared section validates clean on its own;
  *   - every effective section type is allowed by the `standard` PageType.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';

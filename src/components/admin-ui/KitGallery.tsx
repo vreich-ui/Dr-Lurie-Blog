@@ -44,9 +44,9 @@ import {
   IconChevronDown,
   type Column,
 } from './index';
-import type { ReadinessGroup } from '../../lib/admin/readiness-criteria';
+import type { ReadinessGroup } from '@core/lib/admin/readiness-criteria';
 import type { HistoryEntry, ObjectType } from '@core/schema/object-record-v1';
-import { objectDisplayName, objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
+import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 
 const FIXED_NOW = Date.parse('2026-07-17T12:00:00.000Z');
 

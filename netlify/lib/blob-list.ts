@@ -1,33 +1,9 @@
-export type BlobListItem = { key: string };
-
-export type BlobListResult = {
-  blobs?: BlobListItem[];
-  files?: BlobListItem[];
-  directories?: string[];
-};
-
-export type BlobListResponse = BlobListResult | AsyncIterable<BlobListResult>;
-
-const isObject = (value: unknown): value is Record<PropertyKey, unknown> => Boolean(value && typeof value === 'object');
-
-export const isAsyncBlobListResponse = (value: BlobListResponse): value is AsyncIterable<BlobListResult> => {
-  return (
-    isObject(value) && typeof (value as Partial<AsyncIterable<BlobListResult>>)[Symbol.asyncIterator] === 'function'
-  );
-};
-
-export const getBlobListItems = (page: BlobListResult): BlobListItem[] => page.blobs ?? page.files ?? [];
-
-export const collectBlobListItems = async (result: BlobListResponse): Promise<BlobListItem[]> => {
-  const items: BlobListItem[] = [];
-
-  if (isAsyncBlobListResponse(result)) {
-    for await (const page of result) {
-      items.push(...getBlobListItems(page));
-    }
-  } else {
-    items.push(...getBlobListItems(result));
-  }
-
-  return items;
-};
+/**
+ * Site-side re-export shim (W11 T11.3). The implementation moved to
+ * packages/core/server/lib/blob-list.ts; this shim exists so the OFF-LIMITS legacy
+ * functions (publish-article.ts, admin-workflow-lock.ts, save-json-blob.ts,
+ * verify-article-images.ts — byte-untouched by mandate) keep importing
+ * '../lib/blob-list.js' with identical wire behavior. New code imports core directly.
+ */
+import '../../src/config/policy-bindings.js'; // register site providers for the legacy path
+export * from '../../packages/core/server/lib/blob-list.js';

@@ -7,6 +7,47 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.3 — core extraction: server layer + SiteBinding seam; NOTIFY row run at fable/xhigh)
+
+**T11.3 DONE** (branch `claude/t11.3-core-extraction-server-layer`, on T11.2).
+Executed at the row's assigned model (owner switched the session to fable for
+it). `netlify/lib/**` (68 modules) now lives at `packages/core/server/lib/**`;
+the **SiteBinding** seam is in (env-var NAMES never values, live per-call
+reads, `PLATFORM_ENV_NAMES` chains pinned in order by test); Dr-Lurie's
+binding at `src/config/site-binding.ts`; `object-store.ts` verb auth resolves
+its secret through it. Adversarial set added
+(`tests/netlify/site-binding.test.ts`): cross-binding isolation with live
+rotation, fails-closed per binding, no shared store handles.
+
+**Hard stop upheld — and a T11.2 breach corrected.** T11.2's batch rewrite had
+touched 3 frozen files (import lines only). Restored to `main` bytes; their
+exact import paths now carry single-purpose re-export shims (10 at
+`netlify/lib/*`, 5 frozen-path stubs under `src/`), so the frozen set never
+needs touching again. All four frozen functions + `mcp/save-json-blob-mcp/`
+verified byte-identical to `main`.
+
+**Recorded discrepancy (functions stay put this task):** the move-map's "MCP
+factory" collides with the frozen legacy article MCP tools living INSIDE
+`mcp.ts` — a factory split of that file is the redesign the hard stop forbids.
+Function-body moves consolidate into T11.4's factory pass; the mcp split waits
+for the legacy path's retirement. `mcp.ts` carries only mechanical import
+rewrites (tool behavior test-pinned).
+
+**Test-harness gap found & fixed (reaches back to T11.2):**
+`tsconfig.test.json` never included `packages/core/**`, so ~193 co-located
+tests moved in T11.2 had been silently dropped from every run since. Revived
+(suite now 1624+67) — including `site-identity.test.ts`, kept as the drlurie
+byte-compat gate (registers real site bindings; tests are carve-out exempt).
+Five more pure modules pulled forward to core (display-name,
+readiness-criteria, paragraphs, assert-reader-safe, variant).
+
+**Gates:** `npm run check` 0 errors, eslint+prettier clean; `npm test`
+**1624/1624 + 67/67**; `build-diff --base <T11.2>` **EMPTY** (74 pages
+byte-identical); core purity verified (no app-code import escapes
+`packages/core`). **Pending:** deployed-preview `/mcp` ping smoke (no deploy
+access this session); binding threading for `deploy-status`/`save-artifact`/
+`admin-get-blob-pdf` rides T11.4/T11.5. Landing still blocked on push access.
+
 ## Session 2026-07-24 (T11.2 — core extraction: schema + registries + grammar/validation + pure policy libs)
 
 **T11.2 DONE** (branch `claude/t11.2-core-extraction-pure-libs`, stacked on the

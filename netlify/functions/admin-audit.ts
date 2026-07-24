@@ -9,11 +9,12 @@
  * aggregation over the `history[]` / `review` / `lock` / `publication` envelope
  * fields the verbs already persist.
  */
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
-import { listAllObjectRecords, type ObjectVerbStore } from '../lib/object-verbs.js';
-import { buildAuditFeed, buildAttentionInbox } from '../lib/audit-feed.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { getGovernanceBlobStore, resolveActivePolicies } from '../../packages/core/server/lib/governance-store.js';
+import { listAllObjectRecords, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildAuditFeed, buildAttentionInbox } from '../../packages/core/server/lib/audit-feed.js';
 
 type LambdaEvent = {
   httpMethod?: string;

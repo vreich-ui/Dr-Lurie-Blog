@@ -9,6 +9,7 @@
  * mirror is append-only/idempotent); GET ?mode=region answers from the
  * pinned geo accessor.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
@@ -27,7 +28,7 @@ import {
   sanitizeTrackingProps,
   trackingEventKey,
   resolveSinkConfig,
-} from '../../netlify/lib/tracking-events.js';
+} from '../../packages/core/server/lib/tracking-events.js';
 import {
   clientTrackingEventSchema,
   trackingBatchSchema,

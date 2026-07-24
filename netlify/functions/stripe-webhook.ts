@@ -26,20 +26,21 @@
  * artifact. A completed unlock session without a valid key records the order
  * with state 'none' (support case), never a token over the wrong blob.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { createHash } from 'node:crypto';
 import type Stripe from 'stripe';
 
-import { getCommerceBlobStore, getCommerceEventsBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { appendCommerceEvent, hashEmail, newCommerceEvent, type CommerceEventType } from '../lib/commerce-events.js';
-import { COMMERCE_ORDER_SCHEMA_VERSION, writeOrderIfAbsent, type OrderRecord } from '../lib/commerce-orders.js';
-import { loadPublishedProduct } from '../lib/commerce-products.js';
+import { getCommerceBlobStore, getCommerceEventsBlobStore, getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { appendCommerceEvent, hashEmail, newCommerceEvent, type CommerceEventType } from '../../packages/core/server/lib/commerce-events.js';
+import { COMMERCE_ORDER_SCHEMA_VERSION, writeOrderIfAbsent, type OrderRecord } from '../../packages/core/server/lib/commerce-orders.js';
+import { loadPublishedProduct } from '../../packages/core/server/lib/commerce-products.js';
 import {
   DEFAULT_PURCHASE_TOKEN_TTL_MS,
   mintPurchaseToken,
   purchaseTokenHash,
   purchaseTokenSecret,
-} from '../lib/purchase-tokens.js';
-import { getStripeClient, stripeWebhookSecret } from '../lib/stripe-env.js';
+} from '../../packages/core/server/lib/purchase-tokens.js';
+import { getStripeClient, stripeWebhookSecret } from '../../packages/core/server/lib/stripe-env.js';
 
 type LambdaEvent = {
   blobs?: string;

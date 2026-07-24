@@ -1,9 +1,10 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/admin-get-blob-pdf.js';
-import { getArtifactBlobStore } from '../../netlify/lib/blob-store.js';
+import { getArtifactBlobStore } from '../../packages/core/server/lib/blob-store.js';
 
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 

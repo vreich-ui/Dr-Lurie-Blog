@@ -1,7 +1,8 @@
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { isArtifactReference, isDeletedArtifactReference, type ArtifactReference } from '../lib/artifacts.js';
-import { listArtifactIndexKeys, resolveArtifactPointer, type ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore } from '../lib/blob-store.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { isArtifactReference, isDeletedArtifactReference, type ArtifactReference } from '../../packages/core/server/lib/artifacts.js';
+import { listArtifactIndexKeys, resolveArtifactPointer, type ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import { getArtifactIndexBlobStore } from '../../packages/core/server/lib/blob-store.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',

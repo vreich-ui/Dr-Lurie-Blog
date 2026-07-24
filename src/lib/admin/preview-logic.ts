@@ -10,7 +10,7 @@
  * the reader render doesn't.
  */
 import { renderArticleNodes } from '../article-object/render-nodes.js';
-import { objectDisplayName } from './display-name.js';
+import { objectDisplayName } from '../../../packages/core/lib/admin/display-name.js';
 import type { ContentItemBody } from '../../../packages/core/schema/bodies/content-item-v1.js';
 import type { ObjectRecord } from '../../../packages/core/schema/object-record-v1.js';
 

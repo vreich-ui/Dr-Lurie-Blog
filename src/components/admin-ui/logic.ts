@@ -5,7 +5,7 @@
  * components import these). Covers: DataTable sorting, CommandPalette
  * filtering/ranking, status → tone mapping, and relative-time phrasing.
  */
-import type { CriterionStatus } from '../../lib/admin/readiness-criteria.js';
+import type { CriterionStatus } from '../../../packages/core/lib/admin/readiness-criteria.js';
 
 // ─── status tone ──────────────────────────────────────────────────────────────
 

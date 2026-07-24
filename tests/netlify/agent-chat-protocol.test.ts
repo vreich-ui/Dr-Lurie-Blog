@@ -8,21 +8,22 @@
  * autonomy overrides (off/auto), the apply_theme Owner gate, edit-and-approve,
  * dry-run-first on creation tools, and stale-run takeover.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 process.env.ADMIN_EMAILS = process.env.ADMIN_EMAILS ?? 'wolf@example.com';
 
-import { handleObjectVerb, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import { handleObjectVerb, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
 import {
   loadChatDoc,
   saveChatDoc,
   type AgentChatStore,
   type ChatDoc,
   type ChatMsg,
-} from '../../netlify/lib/agent/chat-store.js';
-import { buildToolContext } from '../../netlify/lib/agent/context.js';
+} from '../../packages/core/server/lib/agent/chat-store.js';
+import { buildToolContext } from '../../packages/core/server/lib/agent/context.js';
 import {
   approvePendingTool,
   argsHash,
@@ -31,14 +32,14 @@ import {
   runAgentLoop,
   startRun,
   RUN_CAPS,
-} from '../../netlify/lib/agent/loop.js';
-import { emptyProfilesDoc, resolveProfile } from '../../netlify/lib/agent/profiles.js';
-import { resolveAutonomy } from '../../netlify/lib/agent/tools.js';
+} from '../../packages/core/server/lib/agent/loop.js';
+import { emptyProfilesDoc, resolveProfile } from '../../packages/core/server/lib/agent/profiles.js';
+import { resolveAutonomy } from '../../packages/core/server/lib/agent/tools.js';
 import {
   toAnthropicMessages,
   type ProviderAdapter,
   type ProviderTurnResult,
-} from '../../netlify/lib/agent/provider.js';
+} from '../../packages/core/server/lib/agent/provider.js';
 import { handler as chatHandler } from '../../netlify/functions/admin-agent-chat.js';
 import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 

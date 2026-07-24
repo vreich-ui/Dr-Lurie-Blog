@@ -15,7 +15,7 @@ import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers f
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkStructuralInvariants } from '../../netlify/lib/object-validate.js';
+import { checkStructuralInvariants } from '../../packages/core/server/lib/object-validate.js';
 import {
   applyPatchOps,
   deepEqualJson,

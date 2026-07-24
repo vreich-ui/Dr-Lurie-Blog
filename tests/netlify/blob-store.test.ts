@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -9,7 +10,7 @@ import {
   getSiteObjectsBlobStore,
   getWorkflowBlobStore,
   setNetlifyBlobsModuleForTesting,
-} from '../../netlify/lib/blob-store.js';
+} from '../../packages/core/server/lib/blob-store.js';
 
 const workflowEnvKeys = [
   'NETLIFY',

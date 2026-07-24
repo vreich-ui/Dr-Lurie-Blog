@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -5,7 +6,7 @@ import test from 'node:test';
 
 import Stripe from 'stripe';
 
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
 
 // Isolated local-blobs root (per-suite idiom).
 const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'stripe-webhook');
@@ -23,9 +24,9 @@ process.env.PURCHASE_TOKEN_SECRET = 'purchase-token-secret-0123456789abcdef';
 
 const { handler } = await import('../../netlify/functions/stripe-webhook.js');
 const { deterministicUuid } = await import('../../netlify/functions/stripe-webhook.js');
-const { verifyPurchaseToken } = await import('../../netlify/lib/purchase-tokens.js');
-const { createLocalBlobStore } = await import('../../netlify/lib/local-blobs.js');
-const { objectRecordKey } = await import('../../netlify/lib/object-store-keys.js');
+const { verifyPurchaseToken } = await import('../../packages/core/server/lib/purchase-tokens.js');
+const { createLocalBlobStore } = await import('../../packages/core/server/lib/local-blobs.js');
+const { objectRecordKey } = await import('../../packages/core/server/lib/object-store-keys.js');
 
 const stripe = new Stripe('sk_test_dummy_key_for_local_crypto');
 const WEBHOOK_SECRET = 'whsec_test_dummy_secret';
@@ -207,7 +208,7 @@ test('a webhook-issued token verifies and embeds the session as order_key', asyn
   // status-page equivalent and checking it against the recorded hash regime:
   // signature-valid tokens for this order_key/artifact are the capability.
   const verified = verifyPurchaseToken(
-    (await import('../../netlify/lib/purchase-tokens.js')).mintPurchaseToken(
+    (await import('../../packages/core/server/lib/purchase-tokens.js')).mintPurchaseToken(
       { order_key: SESSION_ID, artifact_ref: ARTIFACT_REF, exp: Date.now() + 1000 },
       'purchase-token-secret-0123456789abcdef'
     ),

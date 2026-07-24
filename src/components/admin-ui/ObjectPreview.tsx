@@ -18,7 +18,7 @@ import type { ReactNode } from 'react';
 
 import { EmptyState, Badge } from './primitives';
 import { IconInfo, IconExternalLink } from './icons';
-import { objectTypeLabel } from '../../lib/admin/display-name';
+import { objectTypeLabel } from '@core/lib/admin/display-name';
 import { contentItemPreview, productPreview, tokenSwatches, tokenFonts } from '../../lib/admin/preview-logic';
 import type { ObjectRecord } from '@core/schema/object-record-v1';
 

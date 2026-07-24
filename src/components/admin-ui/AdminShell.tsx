@@ -31,7 +31,7 @@ import {
   IconRocket,
   type IconProps,
 } from './icons';
-import { objectTypeLabel } from '../../lib/admin/display-name';
+import { objectTypeLabel } from '@core/lib/admin/display-name';
 import type { LibraryRow } from '../../lib/admin/library-logic';
 
 async function shellToken(): Promise<string> {

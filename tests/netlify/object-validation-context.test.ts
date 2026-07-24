@@ -1,7 +1,8 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
 
 // A minimal in-memory store matching the subset the context builder reads
 // (list by prefix + get by key), seeded with a few object records.

@@ -10,10 +10,11 @@
  * media video safety posture (provider + regex-pinned id only — the embed
  * URL is a code template in Media.astro).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkStructuralInvariants } from '../../netlify/lib/object-validate.js';
+import { checkStructuralInvariants } from '../../packages/core/server/lib/object-validate.js';
 import { brandRowDefinition } from '../../packages/core/lib/registry/components/brand-row.js';
 import { mediaDefinition } from '../../packages/core/lib/registry/components/media.js';
 import { statsDefinition } from '../../packages/core/lib/registry/components/stats.js';

@@ -14,14 +14,15 @@
  * `NETLIFY_PUBLISH_SECRET` or the `x-publish-key` header in any form — it has
  * no code path that touches the shared secret. Enforced by a dedicated test.
  */
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
-import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
-import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
-import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
-import { buildStoreValidationContext } from '../lib/object-validation-context.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import type { ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { resolveRolesForPrincipalAsync } from '../../packages/core/server/lib/roles.js';
+import { getUsersBlobStore, getUserRecord } from '../../packages/core/server/lib/users-store.js';
+import { getGovernanceBlobStore, resolveActivePolicies } from '../../packages/core/server/lib/governance-store.js';
+import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
 import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 

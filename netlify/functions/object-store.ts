@@ -14,13 +14,16 @@
  * shared publish key and builds the self-declared agent Principal (today's
  * trust model, C§2.0 — per-agent credentials are OQ-3, not built here).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { timingSafeEqual } from 'node:crypto';
+import { readBindingVar } from '../../packages/core/server/lib/site-binding.js';
+import { drlurieSiteBinding } from '../../src/config/site-binding.js';
 
-import { getHeader } from '../lib/admin-auth.js';
-import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
-import { buildStoreValidationContext } from '../lib/object-validation-context.js';
+import { getHeader } from '../../packages/core/server/lib/admin-auth.js';
+import type { ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
 import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
@@ -61,7 +64,7 @@ const secretsMatch = (provided: string, expected: string): boolean => {
 
 const verifyPublishKey = (event: LambdaEvent) => {
   const provided = getHeader(event.headers, 'x-publish-key');
-  const expected = process.env.PUBLISH_SECRET || process.env.NETLIFY_PUBLISH_SECRET || '';
+  const expected = readBindingVar(drlurieSiteBinding, 'publishSecret') ?? '';
   if (!provided || !expected || !secretsMatch(provided, expected)) {
     return jsonResponse(401, { error: 'Unauthorized' });
   }

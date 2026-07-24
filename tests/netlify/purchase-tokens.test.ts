@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
@@ -9,7 +10,7 @@ import {
   purchaseTokenSecret,
   verifyPurchaseToken,
   type PurchaseTokenPayload,
-} from '../../netlify/lib/purchase-tokens.js';
+} from '../../packages/core/server/lib/purchase-tokens.js';
 
 const SECRET = 'unit-test-secret-0123456789abcdef';
 const NOW = Date.parse('2026-07-12T12:00:00.000Z');

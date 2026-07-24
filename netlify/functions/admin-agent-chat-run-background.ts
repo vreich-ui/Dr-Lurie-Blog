@@ -8,17 +8,18 @@
  * comes from the RUN's stamped profile (provider/model never hardcoded);
  * writes execute under the run's HUMAN principal with freshly-resolved roles.
  */
-import { getHeader } from '../lib/admin-auth.js';
-import type { ArtifactIndexStore } from '../lib/artifact-index.js';
-import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { getGovernanceBlobStore } from '../lib/governance-store.js';
-import type { ObjectVerbStore } from '../lib/object-verbs.js';
-import { resolveRolesForPrincipalAsync } from '../lib/roles.js';
-import { getUsersBlobStore, getUserRecord } from '../lib/users-store.js';
-import { getAgentChatBlobStore, loadChatDoc } from '../lib/agent/chat-store.js';
-import { buildToolContext } from '../lib/agent/context.js';
-import { runAgentLoop } from '../lib/agent/loop.js';
-import { adapterForProfile } from '../lib/agent/provider.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getHeader } from '../../packages/core/server/lib/admin-auth.js';
+import type { ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { getGovernanceBlobStore } from '../../packages/core/server/lib/governance-store.js';
+import type { ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { resolveRolesForPrincipalAsync } from '../../packages/core/server/lib/roles.js';
+import { getUsersBlobStore, getUserRecord } from '../../packages/core/server/lib/users-store.js';
+import { getAgentChatBlobStore, loadChatDoc } from '../../packages/core/server/lib/agent/chat-store.js';
+import { buildToolContext } from '../../packages/core/server/lib/agent/context.js';
+import { runAgentLoop } from '../../packages/core/server/lib/agent/loop.js';
+import { adapterForProfile } from '../../packages/core/server/lib/agent/provider.js';
 import { z } from 'zod';
 
 type LambdaEvent = {

@@ -9,13 +9,14 @@
  * gates BOTH write paths into CustomStyles' inline <style> tag — theme tokens
  * and site.brandTokens.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { checkTheme, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import { checkTheme, summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';

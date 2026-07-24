@@ -12,11 +12,12 @@
  * token is minted per response — the HMAC signature is the authorization
  * (see get-purchase.ts); order records keep issuance hashes as audit trail.
  */
-import { getCommerceBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { readOrder } from '../lib/commerce-orders.js';
-import { loadPublishedProduct } from '../lib/commerce-products.js';
-import { DEFAULT_PURCHASE_TOKEN_TTL_MS, mintPurchaseToken, purchaseTokenSecret } from '../lib/purchase-tokens.js';
-import { getStripeClient } from '../lib/stripe-env.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getCommerceBlobStore, getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { readOrder } from '../../packages/core/server/lib/commerce-orders.js';
+import { loadPublishedProduct } from '../../packages/core/server/lib/commerce-products.js';
+import { DEFAULT_PURCHASE_TOKEN_TTL_MS, mintPurchaseToken, purchaseTokenSecret } from '../../packages/core/server/lib/purchase-tokens.js';
+import { getStripeClient } from '../../packages/core/server/lib/stripe-env.js';
 
 type LambdaEvent = {
   blobs?: string;

@@ -1,7 +1,8 @@
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { randomUUID } from 'node:crypto';
 
-import { getOptInBlobStore } from '../lib/blob-store.js';
-import { buildRecord, getHeader, isParseBodyFailure, parseBody } from '../lib/opt-in-record.js';
+import { getOptInBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { buildRecord, getHeader, isParseBodyFailure, parseBody } from '../../packages/core/server/lib/opt-in-record.js';
 
 type LambdaEvent = {
   blobs?: string;

@@ -13,10 +13,11 @@
  *     products (never touching the §3 price funnel keys);
  *   - page_product_detail declares its PageType-legal drillProbe.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { isRegisteredSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
 import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';

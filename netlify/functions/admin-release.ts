@@ -13,9 +13,10 @@
  * reads nor forwards the publish key — it has no article/object write path at
  * all, it only forces a build and reports on the resulting deploy.
  */
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
-import { releaseToProduction } from '../lib/production-release.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { resolveRolesFromEvent } from '../../packages/core/server/lib/request-roles.js';
+import { releaseToProduction } from '../../packages/core/server/lib/production-release.js';
 
 type LambdaEvent = {
   httpMethod?: string;

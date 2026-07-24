@@ -3,6 +3,7 @@
  * resolver feeds publish-gate and every Owner gate, so a precedence bug here
  * either locks Wolf out or over-grants. These pin the precedence rules.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -12,7 +13,7 @@ import {
   expandRole,
   isOwner,
   type Role,
-} from '../../netlify/lib/roles.js';
+} from '../../packages/core/server/lib/roles.js';
 import {
   getUserRecord,
   putUserRecord,
@@ -21,7 +22,7 @@ import {
   normalizeUserEmail,
   type UserRecord,
   type UsersBlobStore,
-} from '../../netlify/lib/users-store.js';
+} from '../../packages/core/server/lib/users-store.js';
 import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const human = (email: string): Principal => ({ kind: 'human', id: 'u1', email });

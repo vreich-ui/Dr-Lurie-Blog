@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -5,18 +6,18 @@ import sharp from 'sharp';
 
 import artifactUploadHandler from '../../netlify/functions/artifact-upload.js';
 import { handler as mcpHandler } from '../../netlify/functions/mcp.js';
-import { ArtifactKind } from '../../netlify/lib/artifacts.js';
+import { ArtifactKind } from '../../packages/core/server/lib/artifacts.js';
 import {
   createArtifactUploadToken,
   saveArtifactBytes,
   verifyArtifactUploadToken,
-} from '../../netlify/lib/artifact-upload.js';
+} from '../../packages/core/server/lib/artifact-upload.js';
 import {
   getArtifactBlobStore,
   getArtifactIndexBlobStore,
   setNetlifyBlobsModuleForTesting,
-} from '../../netlify/lib/blob-store.js';
-import { sha256Hex } from '../../netlify/lib/crypto.js';
+} from '../../packages/core/server/lib/blob-store.js';
+import { sha256Hex } from '../../packages/core/server/lib/crypto.js';
 
 type FakeStoreValue = Buffer | string;
 

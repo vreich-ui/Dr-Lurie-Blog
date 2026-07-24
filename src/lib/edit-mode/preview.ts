@@ -17,7 +17,11 @@
  * editor and validator enforce. This guards only the admin's own viewport —
  * the server-side validator at patch time is the real gate.
  */
-import { splitRichTextBlocks, splitRichTextParagraphs, type RichTextBlock } from '../richtext/paragraphs.js';
+import {
+  splitRichTextBlocks,
+  splitRichTextParagraphs,
+  type RichTextBlock,
+} from '../../../packages/core/lib/richtext/paragraphs.js';
 
 const ALLOWED_TAGS = new Set(['p', 'br', 'strong', 'em', 'a', 'ul', 'ol', 'li', 'h2', 'h3']);
 

@@ -3,12 +3,13 @@
  * product_set_price and order_reissue tool libs, and the claim-free path —
  * criterion-4 completeness for the product type.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { setLocalBlobsRootForTesting, createLocalBlobStore } from '../../netlify/lib/local-blobs.js';
+import { setLocalBlobsRootForTesting, createLocalBlobStore } from '../../packages/core/server/lib/local-blobs.js';
 
 const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'commerce-s3');
 setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
@@ -20,14 +21,14 @@ process.env.PURCHASE_TOKEN_SECRET = 'purchase-token-secret-0123456789abcdef';
 
 const { patchOpSchema } = await import('../../packages/core/schema/object-patch-ops.js');
 const { applyPatchOps, derivePatchInverse } = await import('../../packages/core/lib/object-patch-apply.js');
-const { productSetPrice } = await import('../../netlify/lib/product-set-price.js');
-const { orderReissue } = await import('../../netlify/lib/order-reissue.js');
-const { verifyPurchaseToken } = await import('../../netlify/lib/purchase-tokens.js');
+const { productSetPrice } = await import('../../packages/core/server/lib/product-set-price.js');
+const { orderReissue } = await import('../../packages/core/server/lib/order-reissue.js');
+const { verifyPurchaseToken } = await import('../../packages/core/server/lib/purchase-tokens.js');
 const { handler: claimFree } = await import('../../netlify/functions/claim-free.js');
-const { objectRecordKey } = await import('../../netlify/lib/object-store-keys.js');
-const { orderRecordSchema } = await import('../../netlify/lib/commerce-orders.js');
+const { objectRecordKey } = await import('../../packages/core/server/lib/object-store-keys.js');
+const { orderRecordSchema } = await import('../../packages/core/server/lib/commerce-orders.js');
 import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
-import type { ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
+import type { ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
 import type Stripe from 'stripe';
 
 const AGENT: Principal = { kind: 'agent', agent_name: 's3-test', auth: 'publish_key' };

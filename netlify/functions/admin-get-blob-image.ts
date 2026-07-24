@@ -1,21 +1,22 @@
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
 import {
   getImageArtifactReadDiagnostics,
   reconcileImageArtifactReference,
   type ArtifactReference,
-} from '../lib/artifacts.js';
+} from '../../packages/core/server/lib/artifacts.js';
 import {
   listArtifactIndexKeys,
   readArtifactReference,
   resolveArtifactPointer,
   type ArtifactIndexStore,
-} from '../lib/artifact-index.js';
+} from '../../packages/core/server/lib/artifact-index.js';
 import {
   getArtifactBlobStore,
   getArtifactIndexBlobStore,
   getCoreBlobStoreSourceDiagnostics,
-} from '../lib/blob-store.js';
-import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
+} from '../../packages/core/server/lib/blob-store.js';
+import { ImageValidationError, validatePublishImageBytes } from '../../packages/core/server/lib/image-validation.js';
 
 const allowedImageBlobKeyPattern = /^image\/[a-z0-9._-]+\/[a-f0-9]{64}(?:\.[a-z0-9]+)?$/i;
 const contentTypeByExtension: Record<string, string> = {

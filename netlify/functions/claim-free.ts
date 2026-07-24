@@ -12,6 +12,7 @@
  *   the order record, and into the existing opt-ins capture store (the
  *   lead-capture tie-in) — the event log gets only the hash.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { randomUUID, createHash } from 'node:crypto';
 
 import {
@@ -19,17 +20,17 @@ import {
   getCommerceEventsBlobStore,
   getOptInBlobStore,
   getSiteObjectsBlobStore,
-} from '../lib/blob-store.js';
-import { appendCommerceEvent, hashEmail, newCommerceEvent } from '../lib/commerce-events.js';
-import { COMMERCE_ORDER_SCHEMA_VERSION, writeOrderIfAbsent, type OrderRecord } from '../lib/commerce-orders.js';
-import { loadPublishedProduct } from '../lib/commerce-products.js';
+} from '../../packages/core/server/lib/blob-store.js';
+import { appendCommerceEvent, hashEmail, newCommerceEvent } from '../../packages/core/server/lib/commerce-events.js';
+import { COMMERCE_ORDER_SCHEMA_VERSION, writeOrderIfAbsent, type OrderRecord } from '../../packages/core/server/lib/commerce-orders.js';
+import { loadPublishedProduct } from '../../packages/core/server/lib/commerce-products.js';
 import {
   DEFAULT_PURCHASE_TOKEN_TTL_MS,
   mintPurchaseToken,
   purchaseTokenHash,
   purchaseTokenSecret,
-} from '../lib/purchase-tokens.js';
-import { buildRecord } from '../lib/opt-in-record.js';
+} from '../../packages/core/server/lib/purchase-tokens.js';
+import { buildRecord } from '../../packages/core/server/lib/opt-in-record.js';
 import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
 
 type LambdaEvent = {

@@ -12,10 +12,11 @@
  *     least one raw string (no orphan terms, no dangling mappings) — this map
  *     is the input for step 2's frontmatter normalization pass.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { taxonomyBodySchema, type TaxonomyBody } from '../../packages/core/schema/bodies/taxonomy-v1.js';
 import { CONVERSION_SEEDS, RAW_TO_CANONICAL, SEED_SITE, taxonomyBody } from '../../scripts/lib/taxonomy-seed-data.mjs';

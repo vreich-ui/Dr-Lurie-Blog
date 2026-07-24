@@ -6,6 +6,7 @@
  * - artifacts: final binary artifact bytes
  * - artifact-index: JSON request artifact reference indexes
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { timingSafeEqual } from 'node:crypto';
 
 import { z } from 'zod';
@@ -19,16 +20,16 @@ import {
   isSafeArtifactText,
   type ArtifactReference,
   type ArtifactUploadInput,
-} from '../lib/artifacts.js';
+} from '../../packages/core/server/lib/artifacts.js';
 import {
   readArtifactReference,
   writeArtifactReferenceIndexes,
   type ArtifactIndexStore,
-} from '../lib/artifact-index.js';
-import { getHeader } from '../lib/admin-auth.js';
-import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../lib/blob-store.js';
-import { sha256Hex } from '../lib/crypto.js';
-import { ImageValidationError, validatePublishImageBytes } from '../lib/image-validation.js';
+} from '../../packages/core/server/lib/artifact-index.js';
+import { getHeader } from '../../packages/core/server/lib/admin-auth.js';
+import { getArtifactBlobStore, getArtifactIndexBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { sha256Hex } from '../../packages/core/server/lib/crypto.js';
+import { ImageValidationError, validatePublishImageBytes } from '../../packages/core/server/lib/image-validation.js';
 
 // artifactStore holds binary blobs (final artifacts and obsolete temporary chunks); indexStore holds JSON references and indexes.
 

@@ -6,10 +6,11 @@
  * (which requires a Major Key reference and rejects arbitrary remote URLs). A
  * bio without a portrait is unchanged (the homepage bio has none).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 
 const bioWith = (extra: Record<string, unknown>) => ({

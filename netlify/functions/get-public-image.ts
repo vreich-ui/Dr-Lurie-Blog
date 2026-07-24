@@ -17,8 +17,9 @@
  * extension, read-only. Content-addressing also makes responses immutable, so
  * the cache header is aggressive.
  */
-import { getArtifactBlobStore } from '../lib/blob-store.js';
-import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getArtifactBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { normalizeArtifactBlobKey } from '../../packages/core/server/lib/artifacts.js';
 
 type LambdaEvent = {
   httpMethod?: string;

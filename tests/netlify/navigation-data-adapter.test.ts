@@ -12,6 +12,7 @@
  * (astrowind:config); if the source literals ever change, this test MUST be
  * updated in the same commit — it is the fidelity pin.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -21,7 +22,7 @@ import {
   navigationToHeaderProps,
   parseNavigationExport,
 } from '../../src/utils/navigation-data.js';
-import { materializeNavigation } from '../../netlify/lib/materializers/navigation.js';
+import { materializeNavigation } from '../../packages/core/server/lib/materializers/navigation.js';
 import { navigationBodySchema } from '../../packages/core/schema/bodies/navigation-v1.js';
 import { navFooterBody, navFooterHomeBody, navHeaderBody } from '../../scripts/lib/navigation-seed-data.mjs';
 

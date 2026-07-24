@@ -11,9 +11,9 @@
 import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { z } from 'zod';
 
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
-import { isOwner } from '../lib/roles.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { resolveRolesFromEvent } from '../../packages/core/server/lib/request-roles.js';
+import { isOwner } from '../../packages/core/server/lib/roles.js';
 import {
   getGovernanceBlobStore,
   getGovernanceDoc,
@@ -21,8 +21,8 @@ import {
   resolveActivePolicies,
   chatToolAutonomySchema,
   type GovernanceDoc,
-} from '../lib/governance-store.js';
-import { CHAT_TOOLS, defaultAutonomyFor } from '../lib/agent/tools.js';
+} from '../../packages/core/server/lib/governance-store.js';
+import { CHAT_TOOLS, defaultAutonomyFor } from '../../packages/core/server/lib/agent/tools.js';
 import { approvalPolicyConfigSchema, activeApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
 import { creationPolicyConfigSchema, activeCreationPolicy } from '../../packages/core/lib/creation-policy.js';
 

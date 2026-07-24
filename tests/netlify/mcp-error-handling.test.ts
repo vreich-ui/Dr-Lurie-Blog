@@ -1,8 +1,9 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
-import { setNetlifyBlobsModuleForTesting } from '../../netlify/lib/blob-store.js';
+import { setNetlifyBlobsModuleForTesting } from '../../packages/core/server/lib/blob-store.js';
 
 test('MCP handler reports parse errors only for request body parsing failures', async () => {
   const response = await handler({

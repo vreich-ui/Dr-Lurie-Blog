@@ -6,6 +6,7 @@
  * path receives zero writes — pinned by a source-level assertion alongside
  * the behavioral one.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -19,8 +20,8 @@ process.env.GITHUB_CONTENT_TOKEN = process.env.GITHUB_CONTENT_TOKEN ?? 'test-tok
 process.env.GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY ?? 'example/repo';
 
 import { publishArticleObject } from '../../netlify/functions/run-publisher-agent.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import type { ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
 import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const HUMAN: Principal = { kind: 'human', id: 'id-wolf', email: 'wolf@example.com' };

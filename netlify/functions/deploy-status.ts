@@ -1,15 +1,16 @@
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { timingSafeEqual } from 'node:crypto';
 
 import { z } from 'zod';
 
-import { getHeader } from '../lib/admin-auth.js';
+import { getHeader } from '../../packages/core/server/lib/admin-auth.js';
 import {
   getDeployReceiptByCommit,
   getDeployReceiptByDeployId,
   getPublishedProductionDeploy,
   isNetlifyDeployLookupConfigured,
   type DeployReceipt,
-} from '../lib/netlify-deploys.js';
+} from '../../packages/core/server/lib/netlify-deploys.js';
 
 type LambdaEvent = {
   body?: string | null;

@@ -1,10 +1,11 @@
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
-import { isOwner } from '../lib/roles.js';
-import { readArtifactReference, type ArtifactIndexStore } from '../lib/artifact-index.js';
-import { normalizeArtifactBlobKey } from '../lib/artifacts.js';
-import { getManagedBlobStore, listManagedBlobStores } from '../lib/blob-admin.js';
-import { collectBlobListItems } from '../lib/blob-list.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { resolveRolesFromEvent } from '../../packages/core/server/lib/request-roles.js';
+import { isOwner } from '../../packages/core/server/lib/roles.js';
+import { readArtifactReference, type ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import { normalizeArtifactBlobKey } from '../../packages/core/server/lib/artifacts.js';
+import { getManagedBlobStore, listManagedBlobStores } from '../../packages/core/server/lib/blob-admin.js';
+import { collectBlobListItems } from '../../packages/core/server/lib/blob-list.js';
 import type { Store } from '@netlify/blobs';
 
 type LambdaEvent = {

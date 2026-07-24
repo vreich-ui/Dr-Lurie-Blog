@@ -15,7 +15,7 @@ import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Select } from './forms';
 import { useToast } from './overlays';
 import { IconAlertTriangle } from './icons';
-import { objectTypeLabel } from '../../lib/admin/display-name';
+import { objectTypeLabel } from '@core/lib/admin/display-name';
 import { governedObjectTypes } from '@core/lib/approval-policy';
 import type { ObjectType } from '@core/schema/object-record-v1';
 import {

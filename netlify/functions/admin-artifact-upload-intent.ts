@@ -18,8 +18,9 @@
  * POST body: { object_id, content_type, size_bytes, sha256 }
  * Response:  { token, claims, maxBytes, publicPath }
  */
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { createCanvasUploadIntent, parseCanvasUploadIntentRequest } from '../lib/canvas-upload-intent.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { createCanvasUploadIntent, parseCanvasUploadIntentRequest } from '../../packages/core/server/lib/canvas-upload-intent.js';
 
 const jsonHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 

@@ -11,16 +11,17 @@
  * valid as the originally-issued one because the signature is the proof.
  * Expired links are a support case → `order_reissue` (S3), not a dead end.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import {
   getArtifactBlobStore,
   getCommerceBlobStore,
   getCommerceEventsBlobStore,
   getSiteObjectsBlobStore,
-} from '../lib/blob-store.js';
-import { appendCommerceEvent, hashEmail, newCommerceEvent } from '../lib/commerce-events.js';
-import { readOrder } from '../lib/commerce-orders.js';
-import { loadPublishedProduct } from '../lib/commerce-products.js';
-import { purchaseTokenSecret, verifyPurchaseToken } from '../lib/purchase-tokens.js';
+} from '../../packages/core/server/lib/blob-store.js';
+import { appendCommerceEvent, hashEmail, newCommerceEvent } from '../../packages/core/server/lib/commerce-events.js';
+import { readOrder } from '../../packages/core/server/lib/commerce-orders.js';
+import { loadPublishedProduct } from '../../packages/core/server/lib/commerce-products.js';
+import { purchaseTokenSecret, verifyPurchaseToken } from '../../packages/core/server/lib/purchase-tokens.js';
 
 type LambdaEvent = {
   blobs?: string;

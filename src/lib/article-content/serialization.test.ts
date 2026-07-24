@@ -5,7 +5,7 @@ import {
   normalizeArticleBodyFromLegacy,
 } from '../../../packages/core/lib/article-content/to-markdown.js';
 import type { ArticleBodyV1 } from '../../../packages/core/schema/article-content-v1.js';
-import { assertReaderSafe } from './assert-reader-safe.js';
+import { assertReaderSafe } from '../../../packages/core/lib/article-content/assert-reader-safe.js';
 
 describe('Article Body Serialization and Safety', () => {
   describe('articleBodyToMarkdown', () => {

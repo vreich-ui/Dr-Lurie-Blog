@@ -10,10 +10,11 @@
  *     cycle guard); deprecated without a successor rejects;
  *   - any string resolving to no term rejects, listing every offender.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { enforceTaxonomy } from '../../netlify/lib/taxonomy-enforcement.js';
+import { enforceTaxonomy } from '../../packages/core/server/lib/taxonomy-enforcement.js';
 
 const registry = (overrides: Record<string, unknown> = {}) =>
   JSON.stringify({

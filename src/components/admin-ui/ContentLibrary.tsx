@@ -24,7 +24,7 @@ import {
   type LibraryRow,
   type ReadinessDot,
 } from '../../lib/admin/library-logic';
-import { objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
+import { objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import type { ObjectType } from '@core/schema/object-record-v1';
 
 async function getToken(): Promise<string> {

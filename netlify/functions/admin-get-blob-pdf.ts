@@ -1,5 +1,6 @@
-import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
-import { getArtifactBlobStore } from '../lib/blob-store.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { getArtifactBlobStore } from '../../packages/core/server/lib/blob-store.js';
 
 type LambdaEvent = {
   headers?: Record<string, string | undefined>;

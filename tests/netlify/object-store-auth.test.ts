@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 import { handler as adminObjectHandler } from '../../netlify/functions/admin-object.js';
 import { handler as objectStoreHandler } from '../../netlify/functions/object-store.js';
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
 import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 /**
@@ -183,9 +184,9 @@ test('admin-object source references the publish key nowhere (never receives/rea
 // ═══ minting is centralized in one helper, not inlined per action ════════════
 
 test('object-verbs mints only through the shared mintId helper (no inline id generation)', () => {
-  const source = readFileSync(join(REPO_ROOT, 'netlify/lib/object-verbs.ts'), 'utf8');
+  const source = readFileSync(join(REPO_ROOT, 'packages/core/server/lib/object-verbs.ts'), 'utf8');
   assert.ok(
-    /from '\.\.\/\.\.\/packages\/core\/lib\/object-ids-mint\.js'/.test(source),
+    /from '\.\.\/\.\.\/lib\/object-ids-mint\.js'/.test(source),
     'must import the shared mintId helper',
   );
   assert.ok(/mintId\(/.test(source), 'must call mintId');

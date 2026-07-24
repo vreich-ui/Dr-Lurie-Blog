@@ -16,11 +16,12 @@
  * - success/cancel URLs are built from the SERVER's site URL (never a
  *   request header — a forged Origin must not steer the redirect).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { randomUUID } from 'node:crypto';
 
-import { getArtifactBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { checkBuyability, loadPublishedProduct } from '../lib/commerce-products.js';
-import { getStripeClient } from '../lib/stripe-env.js';
+import { getArtifactBlobStore, getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { checkBuyability, loadPublishedProduct } from '../../packages/core/server/lib/commerce-products.js';
+import { getStripeClient } from '../../packages/core/server/lib/stripe-env.js';
 import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
 
 type LambdaEvent = {

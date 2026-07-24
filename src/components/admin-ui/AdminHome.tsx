@@ -27,7 +27,7 @@ import {
   IconExternalLink,
 } from './icons';
 import { relativeTimeFromNow } from './logic';
-import { objectTypeLabel } from '../../lib/admin/display-name';
+import { objectTypeLabel } from '@core/lib/admin/display-name';
 import type { ObjectType } from '@core/schema/object-record-v1';
 import {
   fetchHomeData,

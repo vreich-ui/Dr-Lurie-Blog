@@ -14,7 +14,7 @@ import '../../src/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
+import { splitRichTextBlocks, splitRichTextParagraphs } from '../../packages/core/lib/richtext/paragraphs.js';
 import { bioDefinition } from '../../packages/core/lib/registry/components/bio.js';
 import { checklistDefinition } from '../../packages/core/lib/registry/components/checklist.js';
 import { contactFormDefinition } from '../../packages/core/lib/registry/components/contact-form.js';

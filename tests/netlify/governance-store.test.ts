@@ -15,7 +15,7 @@ import {
   GOVERNANCE_DOC_KEY,
   type GovernanceBlobStore,
   type GovernanceDoc,
-} from '../../netlify/lib/governance-store.js';
+} from '../../packages/core/server/lib/governance-store.js';
 import { activeApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
 import { activeCreationPolicy } from '../../packages/core/lib/creation-policy.js';
 

@@ -7,7 +7,7 @@ import {
   buildPdfToolStorageGrant,
   pdfToolStorageGrantTtlMs,
   pdfToolStorageStores,
-} from '../../netlify/lib/pdf-tool-storage-grant.js';
+} from '../../packages/core/server/lib/pdf-tool-storage-grant.js';
 import { activeMediaPolicy, mediaPolicyLimits } from '../../packages/core/lib/media-policy.js';
 
 type ToolCallResult = {

@@ -1,9 +1,10 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { setLocalBlobsRootForTesting, createLocalBlobStore } from '../../netlify/lib/local-blobs.js';
+import { setLocalBlobsRootForTesting, createLocalBlobStore } from '../../packages/core/server/lib/local-blobs.js';
 
 const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'checkout-session');
 setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
@@ -18,8 +19,8 @@ process.env.URL = 'https://drluriescience.netlify.app';
 const { handler: createSession } = await import('../../netlify/functions/create-checkout-session.js');
 const { handler: sessionStatus } = await import('../../netlify/functions/checkout-session-status.js');
 const { setStripeClientForTesting, resetStripeClientForTesting, stripeMode, stripeSecretKey, stripeLinkageForMode } =
-  await import('../../netlify/lib/stripe-env.js');
-const { objectRecordKey } = await import('../../netlify/lib/object-store-keys.js');
+  await import('../../packages/core/server/lib/stripe-env.js');
+const { objectRecordKey } = await import('../../packages/core/server/lib/object-store-keys.js');
 
 const SESSION_ID = 'cs_test_a1B2c3d4';
 const PRODUCT_ID = 'prod_barrier_repair_guide';

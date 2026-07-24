@@ -6,7 +6,7 @@
  * filtering is all this needs (no server-side search).
  */
 import type { ObjectType } from '../../../packages/core/schema/object-record-v1.js';
-import { objectTypeLabel } from './display-name.js';
+import { objectTypeLabel } from '../../../packages/core/lib/admin/display-name.js';
 
 /** The inventory-row fields the browse surface consumes (subset of InventoryRow). */
 export interface LibraryRow {

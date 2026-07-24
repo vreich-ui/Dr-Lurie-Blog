@@ -27,9 +27,9 @@ import { ObjectPreview } from './ObjectPreview';
 import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
 import { createObjectChat } from '../../lib/admin/chat-client';
 import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
-import { objectDisplayName, objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
+import { objectDisplayName, objectTypeLabel, idTooltip } from '@core/lib/admin/display-name';
 import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
-import type { ReadinessGroup, CriterionStatus } from '../../lib/admin/readiness-criteria';
+import type { ReadinessGroup, CriterionStatus } from '@core/lib/admin/readiness-criteria';
 
 async function getToken(): Promise<string> {
   const m = await import('../../utils/goTrueClient');

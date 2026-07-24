@@ -10,15 +10,16 @@
  *   - registry absent → covered by every pre-existing publish-article test
  *     (all 56 run storeless of taxonomy and take the skip path unchanged).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { handler as publishHandler } from '../../netlify/functions/publish-article.js';
-import { getSiteObjectsBlobStore } from '../../netlify/lib/blob-store.js';
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import { TAXONOMY_RECORD_KEY } from '../../netlify/lib/taxonomy-enforcement.js';
+import { getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { TAXONOMY_RECORD_KEY } from '../../packages/core/server/lib/taxonomy-enforcement.js';
 import { taxonomyBody } from '../../scripts/lib/taxonomy-seed-data.mjs';
 
 const publishSecret = 'taxonomy-publish-test-secret';

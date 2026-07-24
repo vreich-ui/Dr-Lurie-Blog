@@ -11,10 +11,10 @@ import {
   isNetlifyBuildHookConfigured,
   NetlifyBuildHookTriggerError,
   triggerNetlifyBuild,
-} from '../lib/netlify-deploys.js';
-import { releaseToProduction } from '../lib/production-release.js';
-import { buildPdfToolStorageGrant } from '../lib/pdf-tool-storage-grant.js';
-import { collectBlobListItems } from '../lib/blob-list.js';
+} from '../../packages/core/server/lib/netlify-deploys.js';
+import { releaseToProduction } from '../../packages/core/server/lib/production-release.js';
+import { buildPdfToolStorageGrant } from '../../packages/core/server/lib/pdf-tool-storage-grant.js';
+import { collectBlobListItems } from '../../packages/core/server/lib/blob-list.js';
 import {
   getArtifactBlobStore,
   getArtifactIndexBlobStore,
@@ -22,18 +22,18 @@ import {
   getCommerceEventsBlobStore,
   getSiteObjectsBlobStore,
   getWorkflowBlobStore,
-} from '../lib/blob-store.js';
-import { getOrderDetail, listOrders } from '../lib/commerce-admin.js';
-import { orderReissue } from '../lib/order-reissue.js';
-import { productSetPrice } from '../lib/product-set-price.js';
-import { getStripeClient } from '../lib/stripe-env.js';
-import type { ObjectVerbStore } from '../lib/object-verbs.js';
+} from '../../packages/core/server/lib/blob-store.js';
+import { getOrderDetail, listOrders } from '../../packages/core/server/lib/commerce-admin.js';
+import { orderReissue } from '../../packages/core/server/lib/order-reissue.js';
+import { productSetPrice } from '../../packages/core/server/lib/product-set-price.js';
+import { getStripeClient } from '../../packages/core/server/lib/stripe-env.js';
+import type { ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
 import {
   createArtifactUploadToken,
   defaultArtifactUploadTokenTtlMs,
   getDirectArtifactUploadMaxBytes,
-} from '../lib/artifact-upload.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
+} from '../../packages/core/server/lib/artifact-upload.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
 import { allowedAgentNames, workflowStatuses } from '../../packages/core/schema/workflow-contract.js';
 import {
   artifactKindValues,
@@ -47,7 +47,7 @@ import {
   safePathSegment,
   type ArtifactKind,
   type ArtifactReference,
-} from '../lib/artifacts.js';
+} from '../../packages/core/server/lib/artifacts.js';
 import {
   listArtifactIndexKeys,
   listArtifactReferencesForRequest,
@@ -56,8 +56,8 @@ import {
   resolveArtifactPointer,
   writeArtifactReferenceIndexes,
   type ArtifactIndexStore,
-} from '../lib/artifact-index.js';
-import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
+} from '../../packages/core/server/lib/artifact-index.js';
+import { saveArtifactFromUrl } from '../../packages/core/server/lib/artifact-url-ingest.js';
 import { validateFilename, validateRequestId } from '../../packages/core/lib/agents-naming.js';
 import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
 import {

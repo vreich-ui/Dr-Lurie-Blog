@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -19,8 +20,8 @@ import {
   type ObjectValidationContext,
   type ReadinessCriterion,
   type ReadinessGroup,
-} from '../../netlify/lib/object-validate.js';
-import { publicPathForArtifactRef } from '../../netlify/lib/artifact-trust.js';
+} from '../../packages/core/server/lib/object-validate.js';
+import { publicPathForArtifactRef } from '../../packages/core/server/lib/artifact-trust.js';
 import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 // ── shared helpers ───────────────────────────────────────────────────────────

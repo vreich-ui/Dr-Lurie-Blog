@@ -1,7 +1,8 @@
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { getCoreBlobStoreSourceDiagnostics } from '../lib/blob-store.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
-import { isOwner } from '../lib/roles.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { getCoreBlobStoreSourceDiagnostics } from '../../packages/core/server/lib/blob-store.js';
+import { resolveRolesFromEvent } from '../../packages/core/server/lib/request-roles.js';
+import { isOwner } from '../../packages/core/server/lib/roles.js';
 
 type LambdaEvent = {
   blobs?: unknown;

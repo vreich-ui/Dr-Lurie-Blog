@@ -7,15 +7,16 @@
  * speaks the ASSIGNED profile's provider — both transports mocked and
  * conformance-checked (Anthropic forced-tool vs OpenAI function-calling).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
 process.env.ADMIN_EMAILS = 'wolf@example.com';
 
 import { handler as chatHandler } from '../../netlify/functions/admin-agent-chat.js';
-import { askAiForObject, type AskAiObjectStore } from '../../netlify/lib/ask-ai-object.js';
-import { getUsersBlobStore, putUserRecord } from '../../netlify/lib/users-store.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import { askAiForObject, type AskAiObjectStore } from '../../packages/core/server/lib/ask-ai-object.js';
+import { getUsersBlobStore, putUserRecord } from '../../packages/core/server/lib/users-store.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
 import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 const RUN = Date.now().toString(36);

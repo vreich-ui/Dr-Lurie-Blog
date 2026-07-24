@@ -12,12 +12,13 @@
  *     the documented contract requireObject previously violated, which is
  *     why manual picks always blocked.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseContentItemIds } from '../../netlify/lib/content-item-index.js';
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import type { ObjectValidationContext } from '../../netlify/lib/object-validate.js';
+import { parseContentItemIds } from '../../packages/core/server/lib/content-item-index.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import type { ObjectValidationContext } from '../../packages/core/server/lib/object-validate.js';
 
 test('parseContentItemIds: files minus extension; dirs and non-markdown ignored', () => {
   const ids = parseContentItemIds([

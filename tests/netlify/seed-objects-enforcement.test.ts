@@ -6,8 +6,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 // Every committed derived export is a body that the production publish will

@@ -64,6 +64,66 @@ admin/cli) -> T11.5 (de-hardcode + site.config/netlify.toml) -> T11.6 (seeds +
 exports relocation). Each is one commit, build-diff EMPTY, `packages/core` and
 `sites/drlurie` building green from root.
 
+## T11.3 execution amendment (2026-07-24 — per this file's amend clause)
+
+**Moved:** `netlify/lib/**` (68 modules incl. `agent/`, `materializers/`,
+`taxonomy-enforcement.ts` with its T11.5-deferred literal) → `packages/core/
+server/lib/**`. Five more PURE src modules pulled forward (same rationale as
+T11.2's pull-forwards; all had only core imports): `admin/display-name`,
+`admin/readiness-criteria` (+ their tests), `richtext/paragraphs`,
+`article-content/assert-reader-safe`, `article-object/variant` →
+`packages/core/lib/…`.
+
+**Frozen-file wiring (hard stop upheld):** the four off-limits functions
+import `../lib/*` and `../../src/{schema,lib}/*` paths; they are byte-
+untouched, so those exact paths now carry single-purpose re-export shims:
+10 at `netlify/lib/*` (admin-auth, artifacts, artifact-index, blob-store,
+taxonomy-enforcement, image-validation, pdf-validation, netlify-deploys,
+blob-list, artifact-trust — each also registers the site policy providers for
+the legacy path) and 5 frozen-path stubs (`src/schema/{schema-v1,
+workflow-contract,article-content-v1}.ts`, `src/lib/agents-naming.ts`,
+`src/lib/article-content/to-markdown.ts`). **Correction to T11.2:** its batch
+import-rewrite had touched publish-article/admin-workflow-lock/save-json-blob
+(import lines only); restored to `main` bytes here — the stubs exist so that
+never recurs. Delete the stubs when the legacy article path retires.
+
+**SiteBinding (the brief's factory seam):** `packages/core/server/lib/
+site-binding.ts` — a binding = site id + env-var NAMES (never values), read
+live per call (`readBoundEnv`; no module-scope caching). `PLATFORM_ENV_NAMES`
+pins the pre-W11 fallback chains byte-for-byte (order is wire behavior, now
+test-pinned). Threaded through: all blob-store getters (optional trailing
+`binding?`), object-git-committer, production-release, netlify-deploys
+(build hook + deploy lookup). The Dr-Lurie instance: `src/config/
+site-binding.ts` (platform names + `siteIdentityConfig.siteId`);
+`object-store.ts` (the verb auth entry) resolves its publish secret through
+it. Adversarial set: `tests/netlify/site-binding.test.ts` (cross-binding
+isolation, live rotation, fails-closed, chain-order pin, no shared store
+handles).
+
+**DISCREPANCY — functions did NOT move (recorded, not improvised):** the
+map's T11.3 row lists the non-admin `netlify/functions/*` set incl. the "MCP
+factory", but `mcp.ts` HOSTS the frozen legacy article MCP tools
+(`invokeSaveJsonBlob`/`callPublishArticle`/`invokeSaveArtifact` + their tool
+surfaces) — a factory split of that file is exactly the redesign the hard
+stop forbids. Function-body moves therefore consolidate into T11.4's factory
+pass (admin + non-admin in one reviewable mechanism), and the mcp factory
+split waits for the legacy article path's retirement or an explicit bounded
+sanction. `mcp.ts` this wave carries only mechanical `../lib/` →
+core-path import rewrites (its tool behavior is test-pinned).
+
+**Test-harness correction:** `tsconfig.test.json` had never gained
+`packages/core/**/*.ts`, so every co-located test moved in T11.2 was silently
+NOT running (~193 tests). Fixed; all revived and green. `site-identity.test.ts`
+is explicitly the drlurie byte-compat gate and registers the real site
+bindings (tests are lint-carve-out exempt). Policy-provider registration
+re-homed from lib modules to entry points: non-off-limits functions importing
+core server lib (32), the 10 shims, and core-importing test files.
+
+**Still pending from the brief:** deployed-preview `/mcp` ping + read-verb
+smoke (needs deploy access — recorded for the wave summary); binding
+threading for the remaining direct env readers (`deploy-status`,
+`save-artifact`, `admin-get-blob-pdf`) rides the T11.4/T11.5 function pass.
+
 ## T11.2 execution amendment (2026-07-24 — re-verified against `main`, per this file's amend clause)
 
 Tracing the real import graph before moving showed the pure-lib slice above is

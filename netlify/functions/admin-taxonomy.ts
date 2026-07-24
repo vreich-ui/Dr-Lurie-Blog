@@ -4,9 +4,10 @@
  *
  * GET /.netlify/functions/admin-taxonomy
  */
-import { getAdminStateFromEvent } from '../lib/admin-auth.js';
-import { collectBlobListItems } from '../lib/blob-list.js';
-import { getWorkflowBlobStore } from '../lib/blob-store.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getAdminStateFromEvent } from '../../packages/core/server/lib/admin-auth.js';
+import { collectBlobListItems } from '../../packages/core/server/lib/blob-list.js';
+import { getWorkflowBlobStore } from '../../packages/core/server/lib/blob-store.js';
 import type { WorkflowRecord } from '../../packages/core/schema/schema-v1.js';
 
 type LambdaEvent = {

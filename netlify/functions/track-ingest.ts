@@ -24,9 +24,9 @@
  * batch ≤25 events / ≤64KB body.
  */
 import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
-import { getSiteObjectsBlobStore, getTrackingEventsBlobStore } from '../lib/blob-store.js';
-import { objectRecordKey, objectStatusIndexPrefix } from '../lib/object-store-keys.js';
-import { collectBlobListItems, type BlobListResponse } from '../lib/blob-list.js';
+import { getSiteObjectsBlobStore, getTrackingEventsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { objectRecordKey, objectStatusIndexPrefix } from '../../packages/core/server/lib/object-store-keys.js';
+import { collectBlobListItems, type BlobListResponse } from '../../packages/core/server/lib/blob-list.js';
 import {
   appendTrackingEvent,
   buildTrackingEvent,
@@ -35,7 +35,7 @@ import {
   resolveSinkConfig,
   toNdjson,
   type SinkConfig,
-} from '../lib/tracking-events.js';
+} from '../../packages/core/server/lib/tracking-events.js';
 import { trackingBatchSchema, type TrackingEvent } from '../../packages/core/schema/tracking-event-v1.js';
 import { resolveSiteIdentity } from '../../packages/core/lib/site-identity.js';
 

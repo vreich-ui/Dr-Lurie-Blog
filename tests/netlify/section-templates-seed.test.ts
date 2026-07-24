@@ -13,10 +13,11 @@
  *   - every blueprint is self-contained (no shared_ref / object / asset refs),
  *     the templates-seed rule.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import {
   isRegisteredSectionType,
   isStandalonePlaceableSectionType,

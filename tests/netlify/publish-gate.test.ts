@@ -2,20 +2,20 @@ import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers f
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkinObjectLock, checkoutObjectLock } from '../../netlify/lib/object-lock.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
+import { checkinObjectLock, checkoutObjectLock } from '../../packages/core/server/lib/object-lock.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
 import {
   checkPublishGate,
   type PublishGateResult,
   type RequestedPublishAction,
-} from '../../netlify/lib/publish-gate.js';
+} from '../../packages/core/server/lib/publish-gate.js';
 import {
   canDecideReview,
   canExecutePublish,
   resolveHumanRoles,
   resolveRolesForPrincipal,
   type Role,
-} from '../../netlify/lib/roles.js';
+} from '../../packages/core/server/lib/roles.js';
 import { approvalPolicyConfig } from '../../src/config/approval-policy.js';
 import {
   activeApprovalPolicy,

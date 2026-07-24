@@ -1,4 +1,5 @@
-import { artifactKindSet, type ArtifactKind } from '../lib/artifacts.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { artifactKindSet, type ArtifactKind } from '../../packages/core/server/lib/artifacts.js';
 import { validateFilename, validateRequestId } from '../../packages/core/lib/agents-naming.js';
 import {
   getDirectArtifactUploadMaxBytes,
@@ -6,7 +7,7 @@ import {
   saveArtifactBytes,
   verifyArtifactUploadToken,
   type ArtifactUploadTokenClaims,
-} from '../lib/artifact-upload.js';
+} from '../../packages/core/server/lib/artifact-upload.js';
 
 export const config = {
   path: '/api/artifacts/upload',

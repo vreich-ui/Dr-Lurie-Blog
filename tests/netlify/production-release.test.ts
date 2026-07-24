@@ -1,7 +1,8 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { releaseToProduction } from '../../netlify/lib/production-release.js';
+import { releaseToProduction } from '../../packages/core/server/lib/production-release.js';
 
 // The lib composes triggerNetlifyBuild + the GitHub ref API + pollDeployReceipt,
 // all of which use the global fetch. Each test stubs global fetch by URL and

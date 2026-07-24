@@ -14,9 +14,9 @@ import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers f
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
-import { checkStructuralInvariants } from '../../netlify/lib/object-validate.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
+import { checkStructuralInvariants } from '../../packages/core/server/lib/object-validate.js';
 import {
   applyPatchOps,
   deepEqualJson,

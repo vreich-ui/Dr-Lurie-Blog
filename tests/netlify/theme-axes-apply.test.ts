@@ -13,10 +13,10 @@ import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers f
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { checkTheme, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import { checkTheme, summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
 import { buildObjectContract } from '../../packages/core/lib/registry/object-contract.js';
 import { THEME_AXIS_KEYS } from '../../packages/core/lib/registry/theme-tokens.js';

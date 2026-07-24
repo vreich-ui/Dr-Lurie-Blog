@@ -14,7 +14,7 @@ import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers f
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
 import { creationPolicyConfig } from '../../src/config/creation-policy.js';
 import {
   activeCreationPolicy,

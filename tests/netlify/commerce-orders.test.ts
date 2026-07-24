@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -9,7 +10,7 @@ import {
   readOrder,
   writeOrderIfAbsent,
   type OrderRecord,
-} from '../../netlify/lib/commerce-orders.js';
+} from '../../packages/core/server/lib/commerce-orders.js';
 
 const TOKEN_HASH = `sha256:${'a'.repeat(64)}`;
 

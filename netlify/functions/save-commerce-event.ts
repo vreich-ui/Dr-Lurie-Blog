@@ -18,9 +18,10 @@
  * - sendBeacon can't always set content-type, so JSON is parsed regardless
  *   of the header (unlike save-opt-in, which is form-aware).
  */
-import { getCommerceEventsBlobStore } from '../lib/blob-store.js';
-import { appendCommerceEvent, isClientCommerceEventType, newCommerceEvent } from '../lib/commerce-events.js';
-import { getHeader } from '../lib/opt-in-record.js';
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
+import { getCommerceEventsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { appendCommerceEvent, isClientCommerceEventType, newCommerceEvent } from '../../packages/core/server/lib/commerce-events.js';
+import { getHeader } from '../../packages/core/server/lib/opt-in-record.js';
 import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
 
 type LambdaEvent = {

@@ -24,12 +24,13 @@
  * canvas paths; see netlify/lib/ask-ai-object.ts.)
  * Requires OPENAI_API_KEY; model override via OPENAI_MODEL (default gpt-4o).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { z } from 'zod';
 
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { getSiteObjectsBlobStore } from '../lib/blob-store.js';
-import { askAiForObject, type AskAiObjectStore } from '../lib/ask-ai-object.js';
-import { getAgentProfilesBlobStore, getProfilesDoc, resolveProfile } from '../lib/agent/profiles.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { getSiteObjectsBlobStore } from '../../packages/core/server/lib/blob-store.js';
+import { askAiForObject, type AskAiObjectStore } from '../../packages/core/server/lib/ask-ai-object.js';
+import { getAgentProfilesBlobStore, getProfilesDoc, resolveProfile } from '../../packages/core/server/lib/agent/profiles.js';
 
 const jsonHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 

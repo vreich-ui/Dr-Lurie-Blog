@@ -13,13 +13,14 @@
  *   - a missing defaultNavigation target is a real blocker (the reference
  *     check is live for site objects, not decorative).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
 import { siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
 import { CONVERSION_SEEDS, SEED_SITE, siteBody } from '../../scripts/lib/site-seed-data.mjs';

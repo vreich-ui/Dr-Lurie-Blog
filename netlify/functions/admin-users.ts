@@ -8,10 +8,11 @@
  * the async resolver (users store + ADMIN_EMAILS bootstrap owners); owner-only
  * verbs 403 for a non-owner. Every mutation appends to the member's audit array.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site policy/identity providers before core server use
 import { z } from 'zod';
 
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesForPrincipalAsync, isOwner } from '../lib/roles.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { resolveRolesForPrincipalAsync, isOwner } from '../../packages/core/server/lib/roles.js';
 import {
   getUsersBlobStore,
   getUserRecord,
@@ -21,9 +22,9 @@ import {
   userRoleSchema,
   type UserRecord,
   type UsersBlobStore,
-} from '../lib/users-store.js';
-import { MAJOR_KEY_ARTIFACT_REF_RE } from '../lib/artifact-trust.js';
-import { inviteUser, activateOnLogin, type GoTrueIdentity } from '../lib/user-invite.js';
+} from '../../packages/core/server/lib/users-store.js';
+import { MAJOR_KEY_ARTIFACT_REF_RE } from '../../packages/core/server/lib/artifact-trust.js';
+import { inviteUser, activateOnLogin, type GoTrueIdentity } from '../../packages/core/server/lib/user-invite.js';
 import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 /** An avatar must be an uploaded IMAGE artifact reference, not a URL/data URI. */
