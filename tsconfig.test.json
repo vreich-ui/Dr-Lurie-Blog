@@ -17,5 +17,11 @@
     "src/**/*.test.ts",
     "tests/netlify/**/*.ts",
     "packages/core/**/*.ts"
+  ],
+  "exclude": [
+    "packages/core/admin/**/*.tsx",
+    "packages/core/admin/index.ts",
+    "packages/core/components/**",
+    "packages/core/lib/registry/components/index.ts"
   ]
 }

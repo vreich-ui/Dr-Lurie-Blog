@@ -103,13 +103,13 @@ test('the write path is the Owner-only governance endpoint (the T9.15 boundary â
   const { fileURLToPath } = await import('node:url');
   let root = path.dirname(fileURLToPath(import.meta.url));
   while (root !== path.dirname(root)) {
-    if (existsSync(path.join(root, 'netlify.toml')) && existsSync(path.join(root, 'src/components/admin-ui'))) break;
+    if (existsSync(path.join(root, 'netlify.toml')) && existsSync(path.join(root, 'packages/core/admin'))) break;
     root = path.dirname(root);
   }
   const source = readFileSync(path.join(root, 'netlify/functions/admin-governance.ts'), 'utf8');
   assert.match(source, /owner/i, 'the governance function carries the Owner gate');
   assert.match(source, /403/, 'non-owners are rejected');
-  const card = readFileSync(path.join(root, 'src/components/admin-ui/GovernancePage.tsx'), 'utf8');
+  const card = readFileSync(path.join(root, 'packages/core/admin/GovernancePage.tsx'), 'utf8');
   assert.match(
     card,
     /setApprovalOverride\(getToken, withTrackingPublishMode/,

@@ -23,7 +23,7 @@ const repoRoot = (): string => {
   throw new Error('could not locate the repo root');
 };
 
-const LOOKUP_SOURCES = ['src/components/admin-ui/ObjectWorkspace.tsx', 'packages/core/lib/edit-mode/ui.ts'];
+const LOOKUP_SOURCES = ['packages/core/admin/ObjectWorkspace.tsx', 'packages/core/lib/edit-mode/ui.ts'];
 
 for (const source of LOOKUP_SOURCES) {
   test(`${source} resolves the taxonomy registry id through the site-identity seam`, () => {

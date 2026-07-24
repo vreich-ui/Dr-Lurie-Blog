@@ -95,3 +95,21 @@ test('comments and doctype pass through untouched', () => {
   assert.ok(normalized.includes('<!DOCTYPE html>'));
   assert.ok(normalized.includes('<!-- keep -->'));
 });
+
+test('astro-island uid values collapse (path-derived hash, W11): moves are not content changes', () => {
+  const a =
+    '<astro-island component-export="default" props="{}" renderer-url="/_astro/client.Aa1Bb2Cc.js" ssr uid="Z1374CN"><div>x</div></astro-island>';
+  const b =
+    '<astro-island component-export="default" props="{}" renderer-url="/_astro/client.Aa1Bb2Cc.js" ssr uid="ZiIM8B"><div>x</div></astro-island>';
+  assert.equal(normalizeHtml(a), normalizeHtml(b));
+});
+
+test('astro-island uid normalization does NOT mask real island differences', () => {
+  const a = '<astro-island ssr uid="Zaaa"><div>x</div></astro-island>';
+  const changedProps = '<astro-island props=\'{"k":1}\' ssr uid="Zbbb"><div>x</div></astro-island>';
+  const removed = '<div>x</div>';
+  assert.notEqual(normalizeHtml(a), normalizeHtml(changedProps));
+  assert.notEqual(normalizeHtml(a), normalizeHtml(removed));
+  // uid on any other element is untouched (scoped to astro-island only)
+  assert.notEqual(normalizeHtml('<div uid="Zaaa"></div>'), normalizeHtml('<div uid="Zbbb"></div>'));
+});

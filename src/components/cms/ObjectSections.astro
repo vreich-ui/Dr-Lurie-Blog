@@ -1,4 +1,5 @@
 ---
+import '~/config/policy-bindings'; // W11: register site providers before @core registry (bio.ts reads site identity at module load)
 /**
  * ObjectSections (W6) — renders a bare list of page-object sections through
  * the component registry, for surfaces that own their page shell (the listing
@@ -18,7 +19,7 @@
  * generated — visitor-facing layout is untouched.
  */
 import { buildSectionResolveDeps, type SectionResolveContext } from '~/components/cms/section-resolve-deps';
-import { getRegisteredComponent } from '~/lib/registry/components/index';
+import { getRegisteredComponent } from '@core/lib/registry/components/index';
 import { resolveSections } from '@core/lib/renderer/resolve';
 import { sectionAnnotationAttrs } from '@core/lib/renderer/section-annotations';
 import type { SectionInstance } from '@core/schema/bodies/section-v1';

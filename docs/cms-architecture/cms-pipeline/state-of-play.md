@@ -7,6 +7,40 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.4 step 2/3 — sections + registry barrel + admin workspace into core)
+
+**Step 2 committed.** Moved: the 24 `src/components/sections/*.astro` →
+`packages/core/components/sections/`; the registry barrel
+`registry/components/index.ts` (T11.2-deferred) rejoined its dir in core —
+its 24 `.astro` imports are now intra-core; `src/components/admin-ui/**`
+(23 files, W9 workspace) → `packages/core/admin/**`. Admin pages/layouts
+import `@core/admin/*`.
+
+**The site-shell seam (brief's "no core file may glob a site path"):** ALL
+site coupling concentrated in exactly two render-entry files —
+`PageObjectRenderer.astro` + `section-resolve-deps.ts` (astro:content +
+permalinks + site-object + PageLayout/Footer) — plus `ObjectSections.astro`,
+`CustomStyles.astro`, `EditMode.astro`. These STAY site-side as the shell
+that loads site data and injects it into core (`ResolvePageDeps` was already
+the injection seam by design). Recorded as the boundary interpretation of the
+brief's "PageObjectRenderer moves" line, which would otherwise violate its
+own no-globbing invariant. Both cms shells register the site providers ahead
+of the `@core` barrel (bio.ts reads site identity at module load).
+
+**Harness extension (disclosed):** the move exposed that `<astro-island uid>`
+values are hashes of the component FILE PATH — the attribute-level twin of
+the hashed chunk filenames `html-normalize` already collapses. 10 admin
+shell pages differed ONLY in uid strings. Added `normalizeIslandUids`
+(scoped to astro-island; add/remove/props/reorder still differ; uid on other
+elements untouched) + 2 harness tests; build-diff then EMPTY — proving uids
+were the only delta. Self-test still PASS.
+
+Gates (step 2): check 0 errors, eslint+prettier clean; tests 1624/1624 +
+67/67 (+16 harness incl. 2 new); build-diff vs step 1 EMPTY; self-test PASS.
+Remaining: step 3 — function-factory pass + cli relocation (+ pages shells /
+data-root seam with T11.5-T11.6's site.config work, where they naturally
+compose).
+
 ## Session 2026-07-24 (T11.4 IN PROGRESS — step 1/3: pure .ts remainders into core; gated step-commits per the T9.24 precedent)
 
 **T11.4 step 1 committed** (branch `claude/t11.4-core-extraction-renderer-admin`).
