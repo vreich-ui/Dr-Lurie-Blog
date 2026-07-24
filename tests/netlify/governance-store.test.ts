@@ -4,6 +4,7 @@
  * always falls back to the committed policy (the disaster fallback). An
  * invalid override can never take effect.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -14,9 +15,9 @@ import {
   GOVERNANCE_DOC_KEY,
   type GovernanceBlobStore,
   type GovernanceDoc,
-} from '../../netlify/lib/governance-store.js';
-import { activeApprovalPolicy } from '../../src/lib/approval-policy.js';
-import { activeCreationPolicy } from '../../src/lib/creation-policy.js';
+} from '../../packages/core/server/lib/governance-store.js';
+import { activeApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import { activeCreationPolicy } from '../../packages/core/lib/creation-policy.js';
 
 const memStore = (): GovernanceBlobStore & { map: Map<string, string> } => {
   const map = new Map<string, string>();

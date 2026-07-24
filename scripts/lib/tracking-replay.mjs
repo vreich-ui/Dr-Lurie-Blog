@@ -4,7 +4,7 @@
  * are unit-testable without a network or a blob store.
  *
  * The mirror keys events at `events/<yyyy-mm-dd>/<compactTs>-<event_id>.json`
- * (netlify/lib/tracking-events.ts trackingEventKey). Replay reads a date
+ * (packages/core/server/lib/tracking-events.ts trackingEventKey). Replay reads a date
  * range, dedupes within the run on `event_id` (the mirror itself is
  * append-only-unique, but a range can be replayed twice), and POSTs NDJSON
  * batches with Bearer auth — the sink's `event_id UNIQUE` column makes the

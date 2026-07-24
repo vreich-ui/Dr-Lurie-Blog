@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -7,8 +8,8 @@ import {
   objectStatusIndexKey,
   objectStatusIndexPrefix,
   type ObjectRecordStatus,
-} from '../../netlify/lib/object-store-keys.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/server/lib/object-store-keys.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 const cases: Array<[ObjectType, string, string]> = [
   ['site', 'site_drlurie', 'objects/site/by-id/site_drlurie.json'],

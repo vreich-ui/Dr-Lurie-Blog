@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -8,8 +9,8 @@ import {
   patchCanonicalInput,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
-import { writeArtifactReferenceIndexes, type ArtifactIndexStore } from '../../netlify/lib/artifact-index.js';
-import type { ArtifactReference } from '../../netlify/lib/artifacts.js';
+import { writeArtifactReferenceIndexes, type ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import type { ArtifactReference } from '../../packages/core/server/lib/artifacts.js';
 
 // ---------------------------------------------------------------------------
 // In-memory blob store (same shape used by all save-json-blob tests). Serves as

@@ -1,9 +1,10 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { setLocalBlobsRootForTesting, createLocalBlobStore } from '../../netlify/lib/local-blobs.js';
+import { setLocalBlobsRootForTesting, createLocalBlobStore } from '../../packages/core/server/lib/local-blobs.js';
 
 const LOCAL_BLOBS_ROOT = join(process.cwd(), '.netlify', 'local-blobs-test', 'get-purchase');
 setLocalBlobsRootForTesting(LOCAL_BLOBS_ROOT);
@@ -15,8 +16,8 @@ const SECRET = 'purchase-token-secret-0123456789abcdef';
 process.env.PURCHASE_TOKEN_SECRET = SECRET;
 
 const { handler } = await import('../../netlify/functions/get-purchase.js');
-const { mintPurchaseToken } = await import('../../netlify/lib/purchase-tokens.js');
-const { objectRecordKey } = await import('../../netlify/lib/object-store-keys.js');
+const { mintPurchaseToken } = await import('../../packages/core/server/lib/purchase-tokens.js');
+const { objectRecordKey } = await import('../../packages/core/server/lib/object-store-keys.js');
 
 const SESSION_ID = 'cs_test_a1B2c3d4';
 const PRODUCT_ID = 'prod_barrier_repair_guide';

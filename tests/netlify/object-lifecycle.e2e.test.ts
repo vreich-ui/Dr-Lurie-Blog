@@ -1,13 +1,14 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import { derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
-import type { PatchOp } from '../../src/schema/object-patch-ops.js';
-import type { HistoryEntry, ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
+import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';
+import type { HistoryEntry, ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 /**
  * T0.11 — Phase 0 exit drill.

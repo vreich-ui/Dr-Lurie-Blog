@@ -35,7 +35,7 @@
  * Dev-stage default: all-autonomous, with `product` pinned to
  * require-approval (commerce never publishes without a human eye).
  */
-import type { ApprovalPolicyConfig } from '../lib/approval-policy.js';
+import type { ApprovalPolicyConfig } from '../../packages/core/lib/approval-policy.js';
 
 export const approvalPolicyConfig = {
   master: 'all-autonomous',

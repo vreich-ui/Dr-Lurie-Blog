@@ -14,21 +14,22 @@
  *   - the T3.1 `home` PageType constraints hold (hero required, every
  *     section type allowed — shared_ref targets counted by effective type).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import {
   homeAudienceGridData,
   homeBioData,
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../src/lib/registry/components/home-fixture-data.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
+} from '../../src/fixtures/home-fixture-data.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { sectionBodySchema, type SectionInstance, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';
 import {
   PAGE_HOME_ID,
   PAGE_HOME_SEEDS,
@@ -39,7 +40,7 @@ import {
   sectionHomeAudienceGridBody,
   sectionHomeStartGridBody,
   sectionNewsletterSignupBody,
-} from '../../scripts/lib/page-home-seed-data.mjs';
+} from '../../sites/drlurie/seeds/page-home-seed-data.mjs';
 
 const SECTION_SEEDS = [
   { id: SECTION_NEWSLETTER_SIGNUP_ID, body: sectionNewsletterSignupBody, type: 'newsletter_signup' as const },

@@ -13,24 +13,24 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { ga4Adapter } from '../../src/lib/tracking/adapters/ga4.js';
-import { googleAdsAdapter, gtagLoaderHead } from '../../src/lib/tracking/adapters/google-ads.js';
-import { AdapterIdError } from '../../src/lib/tracking/adapters/types.js';
+import { ga4Adapter } from '../../packages/core/lib/tracking/adapters/ga4.js';
+import { googleAdsAdapter, gtagLoaderHead } from '../../packages/core/lib/tracking/adapters/google-ads.js';
+import { AdapterIdError } from '../../packages/core/lib/tracking/adapters/types.js';
 import {
   assembleAdapterHeads,
   buildGoalMap,
   buildTrackerClientConfig,
   parseTrackingExport,
-} from '../../src/lib/tracking/assemble.js';
+} from '../../packages/core/lib/tracking/assemble.js';
 import {
   EVENT_ACTIVITY,
   matchActivityGoals,
   matchNamedGoals,
   providerCalls,
   type GoalMapLike,
-} from '../../src/lib/tracking/loader/bridge.js';
-import { createTracker, type TrackerEnv } from '../../src/lib/tracking/loader/core.js';
-import { consentRuntime, type ConsentWindowLike } from '../../src/lib/tracking/consent/runtime.js';
+} from '../../packages/core/lib/tracking/loader/bridge.js';
+import { createTracker, type TrackerEnv } from '../../packages/core/lib/tracking/loader/core.js';
+import { consentRuntime, type ConsentWindowLike } from '../../packages/core/lib/tracking/consent/runtime.js';
 
 const PROVIDERS = { google_ads: { id: 'AW-123456789' }, ga4: { id: 'G-ABCD1234' } };
 

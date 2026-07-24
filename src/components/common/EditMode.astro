@@ -18,7 +18,7 @@
     } catch {
       return;
     }
-    import('~/lib/edit-mode/index').then((module) => module.bootEditMode());
+    import('@core/lib/edit-mode/index').then((module) => module.bootEditMode());
   };
   boot();
   document.addEventListener('astro:page-load', boot);

@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -8,7 +9,7 @@ import {
   commitMaterializedFiles,
   ObjectGitCommitError,
   type CommitMaterializedFilesInput,
-} from '../../netlify/lib/object-git-committer.js';
+} from '../../packages/core/server/lib/object-git-committer.js';
 
 const FILES = [
   { path: 'src/data/site/navigation/nav_footer.json', content: '{"role":"footer"}\n' },
@@ -297,7 +298,7 @@ test('GITHUB_BRANCH overrides the default branch in ref paths', async () => {
 const findRepoRoot = () => {
   let dir = process.cwd();
   for (let depth = 0; depth < 8; depth += 1) {
-    if (existsSync(path.join(dir, 'netlify/lib/object-git-committer.ts'))) return dir;
+    if (existsSync(path.join(dir, 'packages/core/server/lib/object-git-committer.ts'))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -313,7 +314,7 @@ const importSpecifiers = (source: string): string[] => [
 
 test('object committer and article publisher share zero import edges (OQ-12)', () => {
   const root = findRepoRoot();
-  const committerSource = readFileSync(path.join(root, 'netlify/lib/object-git-committer.ts'), 'utf-8');
+  const committerSource = readFileSync(path.join(root, 'packages/core/server/lib/object-git-committer.ts'), 'utf-8');
   const articleSource = readFileSync(path.join(root, 'netlify/functions/publish-article.ts'), 'utf-8');
 
   const committerImports = importSpecifiers(committerSource);

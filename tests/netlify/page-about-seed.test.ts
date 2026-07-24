@@ -10,15 +10,16 @@
  *   - each shared section validates clean on its own;
  *   - every effective section type is allowed by the `standard` PageType.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { sectionBodySchema, type SectionType } from '../../src/schema/bodies/section-v1.js';
-import { CONVERSION_SEEDS, PAGE_ABOUT_ID, pageAboutBody } from '../../scripts/lib/page-about-seed-data.mjs';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { sectionBodySchema, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';
+import { CONVERSION_SEEDS, PAGE_ABOUT_ID, pageAboutBody } from '../../sites/drlurie/seeds/page-about-seed-data.mjs';
 
 const sectionSeeds = CONVERSION_SEEDS.filter((seed) => seed.objectType === 'section');
 const sharedTypes = new Map<string, SectionType>(

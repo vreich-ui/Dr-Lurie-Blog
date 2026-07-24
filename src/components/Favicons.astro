@@ -1,5 +1,6 @@
 ---
-import { getSiteIdentity } from '~/lib/site-identity';
+import '~/config/policy-bindings'; // W11 T11.2: register site-identity provider before module-load getSiteIdentity()
+import { getSiteIdentity } from '@core/lib/site-identity';
 
 const favIcon = `${getSiteIdentity().assetHost}/favicon.png`;
 ---

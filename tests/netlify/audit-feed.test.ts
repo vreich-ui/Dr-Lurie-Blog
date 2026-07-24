@@ -7,11 +7,12 @@
  *   - stats count published / in-review / unpublished / locked;
  *   - a corrupt record can never break the sweep.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildAuditFeed, buildAttentionInbox } from '../../netlify/lib/audit-feed.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { buildAuditFeed, buildAttentionInbox } from '../../packages/core/server/lib/audit-feed.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-17T12:00:00.000Z');
 

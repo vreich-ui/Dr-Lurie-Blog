@@ -6,8 +6,8 @@ import {
   navigationBodySchema,
   navTargetSchema,
   type NavigationBody,
-} from '../../src/schema/bodies/navigation-v1.js';
-import { PAGE_SCHEMA_VERSION, pageBodySchema, pageTypeIds, type PageBody } from '../../src/schema/bodies/page-v1.js';
+} from '../../packages/core/schema/bodies/navigation-v1.js';
+import { PAGE_SCHEMA_VERSION, pageBodySchema, pageTypeIds, type PageBody } from '../../packages/core/schema/bodies/page-v1.js';
 import {
   SECTION_SCHEMA_VERSION,
   contentGridSourceSchema,
@@ -15,11 +15,11 @@ import {
   sectionInstanceSchema,
   sectionTypes,
   type SectionInstance,
-} from '../../src/schema/bodies/section-v1.js';
-import { PRODUCT_SCHEMA_VERSION, productBodySchema, type ProductBody } from '../../src/schema/bodies/product-v1.js';
-import { SITE_SCHEMA_VERSION, siteBodySchema, type SiteBody } from '../../src/schema/bodies/site-v1.js';
-import { TAXONOMY_SCHEMA_VERSION, taxonomyBodySchema, type TaxonomyBody } from '../../src/schema/bodies/taxonomy-v1.js';
-import { TEMPLATE_SCHEMA_VERSION, templateBodySchema, type TemplateBody } from '../../src/schema/bodies/template-v1.js';
+} from '../../packages/core/schema/bodies/section-v1.js';
+import { PRODUCT_SCHEMA_VERSION, productBodySchema, type ProductBody } from '../../packages/core/schema/bodies/product-v1.js';
+import { SITE_SCHEMA_VERSION, siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
+import { TAXONOMY_SCHEMA_VERSION, taxonomyBodySchema, type TaxonomyBody } from '../../packages/core/schema/bodies/taxonomy-v1.js';
+import { TEMPLATE_SCHEMA_VERSION, templateBodySchema, type TemplateBody } from '../../packages/core/schema/bodies/template-v1.js';
 
 // ---------------------------------------------------------------------------
 // Navigation ('navigation.v1', D§3.8 + amendments M-1/M-2/M-5/M-7 and the

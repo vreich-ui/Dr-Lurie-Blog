@@ -10,23 +10,24 @@
  * tracking_config_ready criterion split (hard blocks vs publish-gated
  * warnings), and the engine-enforced singleton create-refusal.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
-import { checkStructuralInvariants } from '../../netlify/lib/object-validate.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { buildStoreValidationContext } from '../../packages/core/server/lib/object-validation-context.js';
+import { checkStructuralInvariants } from '../../packages/core/server/lib/object-validate.js';
 import {
   applyPatchOps,
   deepEqualJson,
   derivePatchInverse,
   type PatchOpCapture,
-} from '../../src/lib/object-patch-apply.js';
-import { buildObjectContract } from '../../src/lib/registry/object-contract.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { mintId } from '../../src/lib/object-ids-mint.js';
-import { trackingConfigBodySchema, type TrackingConfigBody } from '../../src/schema/bodies/tracking-config-v1.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/object-patch-apply.js';
+import { buildObjectContract } from '../../packages/core/lib/registry/object-contract.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { mintId } from '../../packages/core/lib/object-ids-mint.js';
+import { trackingConfigBodySchema, type TrackingConfigBody } from '../../packages/core/schema/bodies/tracking-config-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const AGENT: Principal = { kind: 'agent', agent_name: 'trk-test', auth: 'publish_key' };
 const HUMAN: Principal = { kind: 'human', id: 'wolf', email: 'wolf@example.com' };

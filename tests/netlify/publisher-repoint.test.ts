@@ -6,6 +6,7 @@
  * path receives zero writes — pinned by a source-level assertion alongside
  * the behavioral one.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -19,9 +20,9 @@ process.env.GITHUB_CONTENT_TOKEN = process.env.GITHUB_CONTENT_TOKEN ?? 'test-tok
 process.env.GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY ?? 'example/repo';
 
 import { publishArticleObject } from '../../netlify/functions/run-publisher-agent.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import type { ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const HUMAN: Principal = { kind: 'human', id: 'id-wolf', email: 'wolf@example.com' };
 
@@ -54,7 +55,7 @@ const NODES = [
     public: { body: 'Start slow, patch test, be patient.' },
     private: { strategy: 'resolution', intent: 'reassure' },
   },
-] as const satisfies readonly unknown[] as unknown as import('../../src/schema/article-content-v1.js').ArticleBodyNode[];
+] as const satisfies readonly unknown[] as unknown as import('../../packages/core/schema/article-content-v1.js').ArticleBodyNode[];
 
 // The T1.2 committer speaks the GitHub git-data API — mock it (the same
 // harness shape object-verbs-review.test.ts uses).
@@ -160,7 +161,7 @@ test('the legacy markdown path receives ZERO writes from this flow (source-level
       root = join(root, '..');
     }
   }
-  const source = await readFile(join(root, 'netlify/functions/run-publisher-agent.ts'), 'utf8');
+  const source = await readFile(join(root, 'packages/core/server/functions/run-publisher-agent.ts'), 'utf8');
   assert.ok(!source.includes('NETLIFY_PUBLISH_ENDPOINT'), 'no publish endpoint env');
   assert.ok(!/fetch\([^)]*publish-article/.test(source), 'no fetch to publish-article');
   assert.ok(!source.includes("'x-publish-key': publishSecret"), 'no forwarded publish secret');

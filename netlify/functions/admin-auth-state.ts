@@ -1,52 +1,12 @@
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
-import { isOwner } from '../lib/roles.js';
+/**
+ * Site shim (W11 T11.4): instantiates the core `admin-auth-state` handler with the
+ * Dr-Lurie SiteBinding. The implementation is fleet law in
+ * packages/core/server/functions/admin-auth-state.ts; this file is the per-site wire.
+ */
+import '../../src/config/policy-bindings.js';
+import { createHandler } from '../../packages/core/server/functions/admin-auth-state.js';
+import { drlurieSiteBinding } from '../../src/config/site-binding.js';
 
-type LambdaEvent = {
-  headers?: Record<string, string | undefined>;
-  httpMethod?: string;
-};
+export * from '../../packages/core/server/functions/admin-auth-state.js';
 
-const jsonHeaders = {
-  'Content-Type': 'application/json',
-  'Cache-Control': 'no-store',
-};
-
-const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
-  statusCode,
-  headers: jsonHeaders,
-  body: JSON.stringify(body),
-});
-
-export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
-  if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') {
-    return jsonResponse(405, { error: 'Method not allowed' });
-  }
-
-  const adminState = await getAdminStateFromEvent(event, context);
-
-  // T9.4: resolve the full workspace tier via the async resolver (users store +
-  // ADMIN_EMAILS bootstrap owners). `isAdmin` now reflects the resolved roles —
-  // a superset of the old ADMIN_EMAILS check (store admins gain access; no one
-  // who had access loses it). Still read-only display info; publish-gate.ts is
-  // the sole enforcement point for publishing.
-  const roles =
-    adminState.authenticated && adminState.email
-      ? await resolveRolesFromEvent(event, {
-          kind: 'human',
-          id: adminState.userId ?? '',
-          email: adminState.email,
-        })
-      : [];
-  const tier = isOwner(roles) ? 'owner' : roles.includes('admin') ? 'admin' : null;
-
-  return jsonResponse(200, {
-    authenticated: adminState.authenticated,
-    isAdmin: roles.includes('admin'),
-    tier,
-    email: adminState.email,
-    userId: adminState.userId,
-    error: adminState.error,
-    roles,
-  });
-};
+export const handler = createHandler(drlurieSiteBinding);

@@ -1,7 +1,8 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildRecord, isParseBodyFailure, parseBody } from '../../netlify/lib/opt-in-record.js';
+import { buildRecord, isParseBodyFailure, parseBody } from '../../packages/core/server/lib/opt-in-record.js';
 
 test('URL-encoded Netlify form-name payload builds a valid opt-in record', () => {
   const input = parseBody({

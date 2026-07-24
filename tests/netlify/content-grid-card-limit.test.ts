@@ -5,10 +5,11 @@
  * sees no change. Validation surfaces this as a WARNING (never a blocker — a
  * short render is legal), for both page bodies and shared `section` wrappers.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkContentGridCardLimits, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
+import { checkContentGridCardLimits, summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
 
 const gridSection = (cardCount: number, limit: number) => ({
   section: {

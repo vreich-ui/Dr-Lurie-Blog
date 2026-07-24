@@ -10,40 +10,41 @@
  * schema fields; the rich-text paragraph splitter is faithful and refuses
  * to drop content.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
-import { bioDefinition } from '../../src/lib/registry/components/bio.js';
-import { checklistDefinition } from '../../src/lib/registry/components/checklist.js';
-import { contactFormDefinition } from '../../src/lib/registry/components/contact-form.js';
-import { contentEmbedDefinition } from '../../src/lib/registry/components/content-embed.js';
-import { contentGridDefinition } from '../../src/lib/registry/components/content-grid.js';
-import { ctaBannerDefinition } from '../../src/lib/registry/components/cta-banner.js';
-import { faqDefinition } from '../../src/lib/registry/components/faq.js';
-import { heroDefinition } from '../../src/lib/registry/components/hero.js';
-import { ledeDefinition } from '../../src/lib/registry/components/lede.js';
-import { linkListDefinition } from '../../src/lib/registry/components/link-list.js';
-import { newsletterSignupDefinition } from '../../src/lib/registry/components/newsletter-signup.js';
-import { productPreviewDefinition } from '../../src/lib/registry/components/product-preview.js';
-import { proseDefinition } from '../../src/lib/registry/components/prose.js';
-import { formConfirmationDefinition } from '../../src/lib/registry/components/form-confirmation.js';
-import { searchDefinition } from '../../src/lib/registry/components/search.js';
-import { brandRowDefinition } from '../../src/lib/registry/components/brand-row.js';
-import { comparisonTableDefinition } from '../../src/lib/registry/components/comparison-table.js';
-import { timelineDefinition } from '../../src/lib/registry/components/timeline.js';
-import { mediaDefinition } from '../../src/lib/registry/components/media.js';
-import { statsDefinition } from '../../src/lib/registry/components/stats.js';
-import { testimonialDefinition } from '../../src/lib/registry/components/testimonial.js';
-import { sectionVariantDataSchema } from '../../src/lib/registry/components/types.js';
+import { splitRichTextBlocks, splitRichTextParagraphs } from '../../packages/core/lib/richtext/paragraphs.js';
+import { bioDefinition } from '../../packages/core/lib/registry/components/bio.js';
+import { checklistDefinition } from '../../packages/core/lib/registry/components/checklist.js';
+import { contactFormDefinition } from '../../packages/core/lib/registry/components/contact-form.js';
+import { contentEmbedDefinition } from '../../packages/core/lib/registry/components/content-embed.js';
+import { contentGridDefinition } from '../../packages/core/lib/registry/components/content-grid.js';
+import { ctaBannerDefinition } from '../../packages/core/lib/registry/components/cta-banner.js';
+import { faqDefinition } from '../../packages/core/lib/registry/components/faq.js';
+import { heroDefinition } from '../../packages/core/lib/registry/components/hero.js';
+import { ledeDefinition } from '../../packages/core/lib/registry/components/lede.js';
+import { linkListDefinition } from '../../packages/core/lib/registry/components/link-list.js';
+import { newsletterSignupDefinition } from '../../packages/core/lib/registry/components/newsletter-signup.js';
+import { productPreviewDefinition } from '../../packages/core/lib/registry/components/product-preview.js';
+import { proseDefinition } from '../../packages/core/lib/registry/components/prose.js';
+import { formConfirmationDefinition } from '../../packages/core/lib/registry/components/form-confirmation.js';
+import { searchDefinition } from '../../packages/core/lib/registry/components/search.js';
+import { brandRowDefinition } from '../../packages/core/lib/registry/components/brand-row.js';
+import { comparisonTableDefinition } from '../../packages/core/lib/registry/components/comparison-table.js';
+import { timelineDefinition } from '../../packages/core/lib/registry/components/timeline.js';
+import { mediaDefinition } from '../../packages/core/lib/registry/components/media.js';
+import { statsDefinition } from '../../packages/core/lib/registry/components/stats.js';
+import { testimonialDefinition } from '../../packages/core/lib/registry/components/testimonial.js';
+import { sectionVariantDataSchema } from '../../packages/core/lib/registry/components/types.js';
 import {
   homeAudienceGridData,
   homeBioData,
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../src/lib/registry/components/home-fixture-data.js';
-import { sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
+} from '../../src/fixtures/home-fixture-data.js';
+import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 
 const DEFINITIONS = [
   heroDefinition,

@@ -14,6 +14,8 @@ import type { AstroIntegration } from 'astro';
 
 import astrowind from './vendor/integration';
 
+import { siteConfig } from './sites/drlurie/site.config';
+
 import { readingTimeRemarkPlugin, responsiveTablesRehypePlugin, lazyImagesRehypePlugin } from './src/utils/frontmatter';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +25,7 @@ const whenExternalScripts = (items: (() => AstroIntegration) | (() => AstroInteg
   hasExternalScripts ? (Array.isArray(items) ? items.map((item) => item()) : [items()]) : [];
 
 export default defineConfig({
-  site: 'https://drluriescience.netlify.app',
+  site: siteConfig.canonicalHost, // W11 T11.5: from sites/drlurie/site.config.ts
   output: 'static',
 
   integrations: [
@@ -78,7 +80,7 @@ export default defineConfig({
 
   image: {
     service: passthroughImageService(),
-    domains: ['cdn.pixabay.com'],
+    domains: siteConfig.imageDomains, // W11 T11.5: from sites/drlurie/site.config.ts
   },
 
   markdown: {
@@ -90,6 +92,7 @@ export default defineConfig({
     resolve: {
       alias: {
         '~': path.resolve(__dirname, './src'),
+        '@core': path.resolve(__dirname, './packages/core'),
       },
     },
   },

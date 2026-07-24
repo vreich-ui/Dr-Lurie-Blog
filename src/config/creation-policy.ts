@@ -14,7 +14,7 @@
  * per-agent credentials land: treat this as coordination, not security (full
  * caveat in src/lib/creation-policy.ts).
  */
-import type { CreationPolicyConfig } from '../lib/creation-policy.js';
+import type { CreationPolicyConfig } from '../../packages/core/lib/creation-policy.js';
 
 export const creationPolicyConfig = {
   master: 'open',

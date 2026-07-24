@@ -6,13 +6,14 @@
  * role only; no Site object yet → overrides still computable with an
  * honest note.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { computeObjectImpact, type ObjectImpactStore } from '../../netlify/lib/object-impact.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { pageHomeBody, sectionNewsletterSignupBody } from '../../scripts/lib/page-home-seed-data.mjs';
-import type { ObjectRecord, ObjectType } from '../../src/schema/object-record-v1.js';
+import { computeObjectImpact, type ObjectImpactStore } from '../../packages/core/server/lib/object-impact.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import { pageHomeBody, sectionNewsletterSignupBody } from '../../sites/drlurie/seeds/page-home-seed-data.mjs';
+import type { ObjectRecord, ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();

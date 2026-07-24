@@ -1,11 +1,12 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import { REGISTERED_SECTION_TYPES } from '../../src/lib/registry/components/registered-types.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import { REGISTERED_SECTION_TYPES } from '../../packages/core/lib/registry/components/registered-types.js';
 
 // Object-verb MCP tools (T0.9). The tools proxy to object-store.ts with the
 // publish key injected; object-store falls back to the local file store when no

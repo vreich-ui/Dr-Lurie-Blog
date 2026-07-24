@@ -1,0 +1,90 @@
+---
+/**
+ * `content_grid` section component (T3.2/T3.9) — the one reusable grid.
+ * `manual`/`query` sources render article cards from `resolved.cards`,
+ * computed by the renderer (src/lib/renderer/resolve.ts via
+ * resolve-content-grid.ts, M-8). A `cards` source renders its curated cells
+ * directly from data — title and/or description, optionally linked via
+ * `resolved.cardHrefs` (aligned by cell index). This component stays a pure
+ * layout consumer of data + already-resolved values, same discipline as every
+ * other registry component.
+ */
+import { Icon } from 'astro-icon/components';
+
+import { splitRichTextParagraphs } from '@core/lib/richtext/paragraphs';
+import type { ContentGridResolved, RenderCtx, SectionDataOf } from '@core/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'content_grid'>;
+  resolved: ContentGridResolved;
+  ctx: RenderCtx;
+};
+
+const { data, resolved } = Astro.props;
+// An empty manual list with no fallback is an intentionally short grid
+// (resolve-content-grid.ts's own documented rule) — render nothing, not an error.
+const articleCards = data.source.kind === 'cards' ? [] : (resolved.cards ?? []).slice(0, data.limit);
+const curatedCells =
+  data.source.kind === 'cards'
+    ? data.source.cards.map((cell, index) => ({ ...cell, href: resolved.cardHrefs?.[index] })).slice(0, data.limit)
+    : [];
+const intro = splitRichTextParagraphs(data.body ?? '');
+// Tiles per row (2026-07-13): default 2 → unset grids stay byte-identical.
+// Literal class strings so Tailwind's JIT emits them (no dynamic interpolation).
+const gridColsClass =
+  { 1: 'md:grid-cols-1', 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[data.columns ?? 2] ??
+  'md:grid-cols-2';
+---
+
+<section id={data.anchor} class="mx-auto max-w-5xl border-t border-gray-200 px-4 py-14 sm:px-6 dark:border-gray-800">
+  <div class="max-w-2xl">
+    {data.kicker && <p class="text-sm font-medium uppercase tracking-[0.16em] text-accent">{data.kicker}</p>}
+    {data.heading && <h2 class="mt-3 text-2xl font-bold tracking-tight text-heading sm:text-3xl">{data.heading}</h2>}
+    {intro.map((paragraph) => <p class="mt-4 text-muted" set:html={paragraph} />)}
+  </div>
+  <div class:list={['mt-8 grid grid-cols-1 gap-4', gridColsClass]}>
+    {
+      articleCards.map((card, index) => (
+        <article class="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-slate-900">
+          <p class="text-sm font-medium text-accent">Article {index + 1}</p>
+          {/* `related` grids (the "other articles" block) link their titles —
+              that block exists to be clicked through. query/manual grids keep
+              the audited unlinked markup (byte-identical cutover surfaces). */}
+          {data.source.kind === 'related' && card.href ? (
+            <h3 class="mt-3 text-xl font-semibold text-heading">
+              <a href={card.href} class="hover:text-accent">
+                {card.title}
+              </a>
+            </h3>
+          ) : (
+            <h3 class="mt-3 text-xl font-semibold text-heading">{card.title}</h3>
+          )}
+          <p class="mt-3 text-muted">{card.description}</p>
+        </article>
+      ))
+    }
+    {
+      curatedCells.map((cell) => (
+        <article class="rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-gray-800 dark:bg-slate-900">
+          {cell.icon && <Icon name={cell.icon} class="mb-4 h-10 w-10 text-primary" />}
+          {cell.title &&
+            (cell.href ? (
+              <h3 class="text-xl font-semibold text-heading">
+                <a href={cell.href} class="hover:text-accent">
+                  {cell.title}
+                </a>
+              </h3>
+            ) : (
+              <h3 class="text-xl font-semibold text-heading">{cell.title}</h3>
+            ))}
+          {cell.description && <p class={cell.title ? 'mt-3 text-muted' : 'text-default'}>{cell.description}</p>}
+          {!cell.title && cell.href && cell.link && (
+            <a href={cell.href} class="mt-3 inline-block font-medium text-accent hover:underline">
+              {cell.link.label}
+            </a>
+          )}
+        </article>
+      ))
+    }
+  </div>
+</section>

@@ -9,14 +9,15 @@
  *     system PageType allows prose + cta_banner; standard allows any);
  *   - the batch is all pages (objectType 'page'), site site_drlurie.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-interior-seed-data.mjs';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/pages-interior-seed-data.mjs';
 
 type Seed = { objectType: string; objectId: string; body: { pageType: string } };
 const seeds = CONVERSION_SEEDS as Seed[];

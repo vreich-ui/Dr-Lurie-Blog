@@ -3,11 +3,12 @@
  * these run offline: invite success/failure/idempotency, and the invited →
  * active flip on first login.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { inviteUser, activateOnLogin } from '../../netlify/lib/user-invite.js';
-import { getUserRecord, putUserRecord, listUserRecords, type UsersBlobStore } from '../../netlify/lib/users-store.js';
+import { inviteUser, activateOnLogin } from '../../packages/core/server/lib/user-invite.js';
+import { getUserRecord, putUserRecord, listUserRecords, type UsersBlobStore } from '../../packages/core/server/lib/users-store.js';
 
 const AT = '2026-07-17T12:00:00.000Z';
 const IDENTITY = { url: 'https://site/.netlify/identity', token: 'admin-token' };

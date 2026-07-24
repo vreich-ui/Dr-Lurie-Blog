@@ -5,14 +5,15 @@
  * additive guarantee that keeps pre-W8.3b records (the 3 production tpl_*)
  * parsing.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkRecipeMetadata, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
-import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
-import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import { checkRecipeMetadata, summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { sectionTemplateBodySchema } from '../../packages/core/schema/bodies/section-template-v1.js';
+import { templateBodySchema } from '../../packages/core/schema/bodies/template-v1.js';
+import { themeBodySchema } from '../../packages/core/schema/bodies/theme-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 const META = {
   description: 'A probe recipe.',

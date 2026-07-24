@@ -10,6 +10,7 @@
  * src/lib/registry/components/registered-types.ts), so these rules cannot
  * drift from each other or from the renderer's dispatch registry.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -21,7 +22,7 @@ import {
   summarizeValidation,
   validateObject,
   type ReadinessCriterion,
-} from '../../netlify/lib/object-validate.js';
+} from '../../packages/core/server/lib/object-validate.js';
 
 const statusOf = (criteria: ReadinessCriterion[], id: string): string | undefined =>
   criteria.find((criterion) => criterion.id === id)?.status;

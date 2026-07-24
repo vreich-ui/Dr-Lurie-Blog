@@ -37,7 +37,7 @@
  * content_revision (+ M-6 publish action) — that step is T3.4/T3.6's flow,
  * not this script's. Nothing on the live site changes here.
  */
-import { PAGE_HOME_SEEDS, PAGE_HOME_SEED_SITE } from './lib/page-home-seed-data.mjs';
+import { PAGE_HOME_SEEDS, PAGE_HOME_SEED_SITE } from '../sites/drlurie/seeds/page-home-seed-data.mjs';
 import { createObjectStoreClient, sameBody, blockerMessages, warningIds } from './lib/object-store-client.mjs';
 
 const AGENT_NAME = 'phase-3-page-home-seed';

@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -12,9 +13,9 @@ import {
   objectLockStatus,
   refreshObjectLock,
   sanitizeObjectLock,
-} from '../../netlify/lib/object-lock.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { objectRecordSchema, type ObjectRecord, type Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/server/lib/object-lock.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import { objectRecordSchema, type ObjectRecord, type Principal } from '../../packages/core/schema/object-record-v1.js';
 
 // Parity spec: netlify/functions/admin-workflow-lock.ts as documented in
 // docs/cms-architecture/01-audit.md §1.2, plus the D§3.1 counter rule

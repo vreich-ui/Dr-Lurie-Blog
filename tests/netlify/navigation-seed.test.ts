@@ -13,19 +13,20 @@
  * The online half — create + validate against the deployed store — is the
  * script itself under --execute.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { materializeNavigation } from '../../netlify/lib/materializers/navigation.js';
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
+import { materializeNavigation } from '../../packages/core/server/lib/materializers/navigation.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { navigationBodySchema } from '../../packages/core/schema/bodies/navigation-v1.js';
 import {
   NAVIGATION_SEEDS,
   NAVIGATION_SEED_SITE,
   navFooterBody,
   navFooterHomeBody,
   navHeaderBody,
-} from '../../scripts/lib/navigation-seed-data.mjs';
+} from '../../sites/drlurie/seeds/navigation-seed-data.mjs';
 
 type Seed = { objectId: string; body: unknown; expectedWarningIds: string[] };
 const seeds = NAVIGATION_SEEDS as Seed[];

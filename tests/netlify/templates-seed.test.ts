@@ -10,17 +10,18 @@
  *     that parses under page.v1 and validates clean under its PageType —
  *     including tpl_legal's registry-defaultData fallback path.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { isRegisteredSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { buildPageBodyFromTemplate } from '../../src/lib/template-instantiate.js';
-import { pageBodySchema, type PageTypeId } from '../../src/schema/bodies/page-v1.js';
-import { templateBodySchema, type TemplateBody } from '../../src/schema/bodies/template-v1.js';
-import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/templates-seed-data.mjs';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { isRegisteredSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { buildPageBodyFromTemplate } from '../../packages/core/lib/template-instantiate.js';
+import { pageBodySchema, type PageTypeId } from '../../packages/core/schema/bodies/page-v1.js';
+import { templateBodySchema, type TemplateBody } from '../../packages/core/schema/bodies/template-v1.js';
+import { CONVERSION_SEEDS, SEED_SITE } from '../../sites/drlurie/seeds/templates-seed-data.mjs';
 
 type Seed = { objectType: string; objectId: string; body: TemplateBody };
 const seeds = CONVERSION_SEEDS as Seed[];

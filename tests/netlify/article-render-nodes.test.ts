@@ -8,8 +8,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { renderArticleNodes } from '../../src/lib/article-object/render-nodes.js';
-import { contentItemBodySchema, type ContentItemBody } from '../../src/schema/bodies/content-item-v1.js';
+import { renderArticleNodes } from '../../packages/core/lib/article-object/render-nodes.js';
+import { contentItemBodySchema, type ContentItemBody } from '../../packages/core/schema/bodies/content-item-v1.js';
 
 // Overrides are plain JSON (the zod parse validates them) — literal strings
 // for nodeType/marks don't unify with the enum-pinned output types otherwise.

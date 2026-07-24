@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 
 import { handler as saveArtifactHandler } from './save-artifact.js';
@@ -10,10 +11,10 @@ import {
   isNetlifyBuildHookConfigured,
   NetlifyBuildHookTriggerError,
   triggerNetlifyBuild,
-} from '../lib/netlify-deploys.js';
-import { releaseToProduction } from '../lib/production-release.js';
-import { buildPdfToolStorageGrant } from '../lib/pdf-tool-storage-grant.js';
-import { collectBlobListItems } from '../lib/blob-list.js';
+} from '../../packages/core/server/lib/netlify-deploys.js';
+import { releaseToProduction } from '../../packages/core/server/lib/production-release.js';
+import { buildPdfToolStorageGrant } from '../../packages/core/server/lib/pdf-tool-storage-grant.js';
+import { collectBlobListItems } from '../../packages/core/server/lib/blob-list.js';
 import {
   getArtifactBlobStore,
   getArtifactIndexBlobStore,
@@ -21,19 +22,19 @@ import {
   getCommerceEventsBlobStore,
   getSiteObjectsBlobStore,
   getWorkflowBlobStore,
-} from '../lib/blob-store.js';
-import { getOrderDetail, listOrders } from '../lib/commerce-admin.js';
-import { orderReissue } from '../lib/order-reissue.js';
-import { productSetPrice } from '../lib/product-set-price.js';
-import { getStripeClient } from '../lib/stripe-env.js';
-import type { ObjectVerbStore } from '../lib/object-verbs.js';
+} from '../../packages/core/server/lib/blob-store.js';
+import { getOrderDetail, listOrders } from '../../packages/core/server/lib/commerce-admin.js';
+import { orderReissue } from '../../packages/core/server/lib/order-reissue.js';
+import { productSetPrice } from '../../packages/core/server/lib/product-set-price.js';
+import { getStripeClient } from '../../packages/core/server/lib/stripe-env.js';
+import type { ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
 import {
   createArtifactUploadToken,
   defaultArtifactUploadTokenTtlMs,
   getDirectArtifactUploadMaxBytes,
-} from '../lib/artifact-upload.js';
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { allowedAgentNames, workflowStatuses } from '../../src/schema/workflow-contract.js';
+} from '../../packages/core/server/lib/artifact-upload.js';
+import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { allowedAgentNames, workflowStatuses } from '../../packages/core/schema/workflow-contract.js';
 import {
   artifactKindValues,
   artifactReferenceLimits,
@@ -46,7 +47,7 @@ import {
   safePathSegment,
   type ArtifactKind,
   type ArtifactReference,
-} from '../lib/artifacts.js';
+} from '../../packages/core/server/lib/artifacts.js';
 import {
   listArtifactIndexKeys,
   listArtifactReferencesForRequest,
@@ -55,22 +56,22 @@ import {
   resolveArtifactPointer,
   writeArtifactReferenceIndexes,
   type ArtifactIndexStore,
-} from '../lib/artifact-index.js';
-import { saveArtifactFromUrl } from '../lib/artifact-url-ingest.js';
-import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
-import { getSiteIdentity } from '../../src/lib/site-identity.js';
+} from '../../packages/core/server/lib/artifact-index.js';
+import { saveArtifactFromUrl } from '../../packages/core/server/lib/artifact-url-ingest.js';
+import { validateFilename, validateRequestId } from '../../packages/core/lib/agents-naming.js';
+import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
 import {
   listPageTypeDefinitions,
   pageTypeDefinitionJsonSchema,
   unimplementedPageTypeIds,
-} from '../../src/lib/registry/page-types.js';
+} from '../../packages/core/lib/registry/page-types.js';
 import {
   buildObjectContract,
   listSectionTypeContracts,
   OBJECT_CONTRACT_TYPES,
-} from '../../src/lib/registry/object-contract.js';
-import { objectTypes, type ObjectType } from '../../src/schema/object-record-v1.js';
-import { pageTypeIds } from '../../src/schema/bodies/page-v1.js';
+} from '../../packages/core/lib/registry/object-contract.js';
+import { objectTypes, type ObjectType } from '../../packages/core/schema/object-record-v1.js';
+import { pageTypeIds } from '../../packages/core/schema/bodies/page-v1.js';
 
 const mediaPortabilityWarning =
   'Media portability constraint: repo-style paths (src/assets/.../uploads/<slug>/...) are scoped to the specific article slug they were generated for and must NEVER be copied into a different request public_media_src or artifactReferences. portable:false and scoped_to_slug/scoped_to_request_id metadata are machine-readable hard constraints, not suggestions. Only artifact pointers freshly resolved for the CURRENT request (image/{requestId}/{sha}.{ext} or pdf/{requestId}/{sha}.{ext}) are safe inputs for a new or repair request. See docs/agents/naming-convention.md for canonical naming rules.';

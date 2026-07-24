@@ -23,7 +23,7 @@
  * Site URLs/routing stay in src/config.yaml (Wolf B2 — config.yaml is
  * authoritative there); this file deliberately does not duplicate them.
  */
-import type { SiteIdentityConfig } from '../lib/site-identity.js';
+import type { SiteIdentityConfig } from '../../packages/core/lib/site-identity.js';
 
 export const siteIdentityConfig = {
   siteId: 'site_drlurie',
@@ -33,4 +33,8 @@ export const siteIdentityConfig = {
   mcpDiagnosticName: 'Dr_Lurie_Science_MCP',
   assetHost: 'https://kugelmedia.netlify.app',
   assetFolder: 'drlurieblog',
+  // W11 T11.5: pinned so the de-hardcoded core resolves byte-identically.
+  adminLabel: 'Dr. Lurié admin',
+  committerName: 'Dr. Lurié Publisher',
+  committerEmail: 'publisher@drlurie.local',
 } satisfies SiteIdentityConfig;

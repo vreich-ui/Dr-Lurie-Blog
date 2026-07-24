@@ -1,10 +1,11 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import test from 'node:test';
 
 import { handler } from '../../netlify/functions/save-commerce-event.js';
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
 
 // Isolated local-blobs root (the established per-suite idiom — sibling suites
 // run concurrently and must not share an on-disk store).

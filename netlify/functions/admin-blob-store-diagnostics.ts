@@ -1,50 +1,12 @@
-import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
-import { getCoreBlobStoreSourceDiagnostics } from '../lib/blob-store.js';
-import { resolveRolesFromEvent } from '../lib/request-roles.js';
-import { isOwner } from '../lib/roles.js';
+/**
+ * Site shim (W11 T11.4): instantiates the core `admin-blob-store-diagnostics` handler with the
+ * Dr-Lurie SiteBinding. The implementation is fleet law in
+ * packages/core/server/functions/admin-blob-store-diagnostics.ts; this file is the per-site wire.
+ */
+import '../../src/config/policy-bindings.js';
+import { createHandler } from '../../packages/core/server/functions/admin-blob-store-diagnostics.js';
+import { drlurieSiteBinding } from '../../src/config/site-binding.js';
 
-type LambdaEvent = {
-  blobs?: unknown;
-  headers?: Record<string, string | undefined>;
-  httpMethod?: string;
-};
+export * from '../../packages/core/server/functions/admin-blob-store-diagnostics.js';
 
-const jsonResponse = (statusCode: number, body: Record<string, unknown>) => ({
-  statusCode,
-  headers: {
-    'Content-Type': 'application/json',
-    'Cache-Control': 'no-store',
-  },
-  body: JSON.stringify({ ok: statusCode >= 200 && statusCode < 300, status: statusCode, ...body }),
-});
-
-export const handler = async (event: LambdaEvent, context?: LambdaContext) => {
-  if (event.httpMethod !== 'GET') {
-    return jsonResponse(405, { error: 'Method not allowed' });
-  }
-
-  const adminState = await getAdminStateFromEvent(event, context);
-  if (!adminState.authenticated) {
-    return jsonResponse(401, {
-      error: adminState.error || 'Authentication is required.',
-    });
-  }
-
-  if (!adminState.isAdmin) {
-    return jsonResponse(403, { error: 'This user is not authorized to inspect blob store diagnostics.' });
-  }
-
-  // T9.4: maintenance/diagnostics tools are Owner-only.
-  const roles = await resolveRolesFromEvent(event, {
-    kind: 'human',
-    id: adminState.userId ?? '',
-    email: adminState.email ?? '',
-  });
-  if (!isOwner(roles)) {
-    return jsonResponse(403, { error: 'Owner access is required for maintenance diagnostics.' });
-  }
-
-  return jsonResponse(200, {
-    diagnostics: getCoreBlobStoreSourceDiagnostics(event),
-  });
-};
+export const handler = createHandler(drlurieSiteBinding);

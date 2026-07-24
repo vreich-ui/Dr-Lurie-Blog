@@ -10,17 +10,18 @@
  * media video safety posture (provider + regex-pinned id only — the embed
  * URL is a code template in Media.astro).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkStructuralInvariants } from '../../netlify/lib/object-validate.js';
-import { brandRowDefinition } from '../../src/lib/registry/components/brand-row.js';
-import { mediaDefinition } from '../../src/lib/registry/components/media.js';
-import { statsDefinition } from '../../src/lib/registry/components/stats.js';
-import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { resolveSections, type ResolvePageDeps } from '../../src/lib/renderer/resolve.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { MEDIA_VIDEO_ID_RE, sectionInstanceSchema, sectionTypes } from '../../src/schema/bodies/section-v1.js';
+import { checkStructuralInvariants } from '../../packages/core/server/lib/object-validate.js';
+import { brandRowDefinition } from '../../packages/core/lib/registry/components/brand-row.js';
+import { mediaDefinition } from '../../packages/core/lib/registry/components/media.js';
+import { statsDefinition } from '../../packages/core/lib/registry/components/stats.js';
+import { isStandalonePlaceableSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
+import { resolveSections, type ResolvePageDeps } from '../../packages/core/lib/renderer/resolve.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { MEDIA_VIDEO_ID_RE, sectionInstanceSchema, sectionTypes } from '../../packages/core/schema/bodies/section-v1.js';
 
 const instance = (type: string, data: unknown, index = 1) => ({ id: `s_mint${index}`, type, data });
 const parses = (type: string, data: unknown, index = 1): boolean =>

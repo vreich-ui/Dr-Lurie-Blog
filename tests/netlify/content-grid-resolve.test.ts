@@ -9,12 +9,13 @@
  * fallback declared → short grid, no query; validation rejects unknown
  * fallback-query terms.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { resolveContentGridCards } from '../../src/lib/renderer/resolve-content-grid.js';
-import type { ContentQuery } from '../../src/schema/bodies/section-v1.js';
+import { summarizeValidation, validateObject } from '../../packages/core/server/lib/object-validate.js';
+import { resolveContentGridCards } from '../../packages/core/lib/renderer/resolve-content-grid.js';
+import type { ContentQuery } from '../../packages/core/schema/bodies/section-v1.js';
 
 type Card = { id: string; title: string };
 

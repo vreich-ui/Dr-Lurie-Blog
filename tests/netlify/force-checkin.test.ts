@@ -3,12 +3,13 @@
  * gate and the lock semantics: non-owner is refused, an owner takeover writes
  * previous-owner history and bumps `version` but never `content_revision`.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { handleObjectVerb, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-17T12:00:00.000Z');
 const EDITOR: Principal = { kind: 'human', id: 'ed1', email: 'editor@example.com' };

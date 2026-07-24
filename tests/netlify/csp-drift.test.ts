@@ -13,13 +13,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
-import { GA4_CSP_HOSTS } from '../../src/lib/tracking/adapters/ga4.js';
-import { GOOGLE_ADS_CSP_HOSTS } from '../../src/lib/tracking/adapters/google-ads.js';
-import { META_PIXEL_CSP_HOSTS } from '../../src/lib/tracking/adapters/meta-pixel.js';
-import { MGID_CSP_HOSTS } from '../../src/lib/tracking/adapters/mgid.js';
-import { OUTBRAIN_CSP_HOSTS } from '../../src/lib/tracking/adapters/outbrain.js';
-import { TABOOLA_CSP_HOSTS } from '../../src/lib/tracking/adapters/taboola.js';
-import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
+import { GA4_CSP_HOSTS } from '../../packages/core/lib/tracking/adapters/ga4.js';
+import { GOOGLE_ADS_CSP_HOSTS } from '../../packages/core/lib/tracking/adapters/google-ads.js';
+import { META_PIXEL_CSP_HOSTS } from '../../packages/core/lib/tracking/adapters/meta-pixel.js';
+import { MGID_CSP_HOSTS } from '../../packages/core/lib/tracking/adapters/mgid.js';
+import { OUTBRAIN_CSP_HOSTS } from '../../packages/core/lib/tracking/adapters/outbrain.js';
+import { TABOOLA_CSP_HOSTS } from '../../packages/core/lib/tracking/adapters/taboola.js';
+import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
 
 type HostSets = {
   script: readonly string[];
@@ -51,7 +51,7 @@ const BASE = {
 const repoRoot = (): string => {
   let root = path.dirname(fileURLToPath(import.meta.url));
   while (root !== path.dirname(root)) {
-    if (existsSync(path.join(root, 'netlify.toml')) && existsSync(path.join(root, 'src/lib/tracking'))) break;
+    if (existsSync(path.join(root, 'netlify.toml')) && existsSync(path.join(root, 'packages/core/lib/tracking'))) break;
     root = path.dirname(root);
   }
   return root;

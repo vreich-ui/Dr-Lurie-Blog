@@ -9,7 +9,7 @@ import {
   getRequest,
   type WorkflowRecord,
 } from '../../netlify/functions/save-json-blob.js';
-import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
+import { articleBodyToMarkdown } from '../../packages/core/lib/article-content/to-markdown.js';
 
 // Build a request_id that conforms to the req_<flow>_<topic>_<yyyymmdd>_<nn> naming
 // contract now enforced by requireRequestId. Each test uses an isolated store, so a

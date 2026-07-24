@@ -1,0 +1,35 @@
+---
+/**
+ * `brand_row` section component (W10 T10.5). A quiet horizontal strip of
+ * small logos with an optional label. Links come pre-resolved through the
+ * standard action policy (`resolved.logoHrefs`, index-aligned) — the
+ * component never touches a raw target.
+ */
+import type { BrandRowResolved } from '@core/lib/registry/components/brand-row';
+import type { RenderCtx, SectionDataOf } from '@core/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'brand_row'>;
+  resolved: BrandRowResolved;
+  ctx: RenderCtx;
+};
+
+const { data, resolved } = Astro.props;
+---
+
+<section id={data.anchor} class="mx-auto max-w-5xl border-t border-gray-200 px-4 py-10 sm:px-6 dark:border-gray-800">
+  {data.heading && <p class="text-center text-sm font-medium uppercase tracking-[0.16em] text-muted">{data.heading}</p>}
+  <div class="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-6">
+    {
+      data.logos.map((logo, index) =>
+        resolved.logoHrefs[index] ? (
+          <a href={resolved.logoHrefs[index]} class="opacity-70 transition hover:opacity-100">
+            <img src={logo.src} alt={logo.alt} loading="lazy" class="h-8 w-auto" />
+          </a>
+        ) : (
+          <img src={logo.src} alt={logo.alt} loading="lazy" class="h-8 w-auto opacity-70" />
+        )
+      )
+    }
+  </div>
+</section>

@@ -1,0 +1,37 @@
+---
+/**
+ * `faq` section component — an optional heading over a question/answer list.
+ * Each answer is TipTap richtext (paragraphs). A general-purpose FAQ block an
+ * agent can place on any page; no references to resolve (EmptyResolved). It
+ * owns only layout, receiving {data, resolved, ctx} like every registry
+ * component.
+ */
+import { splitRichTextParagraphs } from '@core/lib/richtext/paragraphs';
+import type { EmptyResolved, RenderCtx, SectionDataOf } from '@core/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'faq'>;
+  resolved: EmptyResolved;
+  ctx: RenderCtx;
+};
+
+const { data } = Astro.props;
+---
+
+<section class="dl-section">
+  {data.heading && <h2 class="text-3xl font-bold tracking-tight text-heading sm:text-4xl">{data.heading}</h2>}
+  <dl class="mt-8 max-w-3xl space-y-8">
+    {
+      data.items.map((item) => (
+        <div>
+          <dt class="text-lg font-semibold text-heading">{item.q}</dt>
+          <dd class="mt-2 space-y-2">
+            {splitRichTextParagraphs(item.a).map((paragraph) => (
+              <p class="text-lg text-muted" set:html={paragraph} />
+            ))}
+          </dd>
+        </div>
+      ))
+    }
+  </dl>
+</section>

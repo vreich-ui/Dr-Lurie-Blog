@@ -5,11 +5,12 @@
  * rich-text renderability), and the reader-safety projection (the annotation
  * layer is legitimate record data; the leak rule guards the RENDERED surface).
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import { test } from 'node:test';
 import assert from 'node:assert';
 
-import { buildVariantBody } from '../../src/lib/article-object/variant.js';
-import { contentItemBodySchema, type ContentItemBody } from '../../src/schema/bodies/content-item-v1.js';
+import { buildVariantBody } from '../../packages/core/lib/article-object/variant.js';
+import { contentItemBodySchema, type ContentItemBody } from '../../packages/core/schema/bodies/content-item-v1.js';
 import {
   checkReaderSafety,
   checkReferenceIntegrity,
@@ -19,9 +20,9 @@ import {
   summarizeValidation,
   type ObjectValidationContext,
   type ReadinessCriterion,
-} from '../../netlify/lib/object-validate.js';
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/server/lib/object-validate.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const AGENT: Principal = { kind: 'agent', agent_name: 'tester', auth: 'publish_key' };
 

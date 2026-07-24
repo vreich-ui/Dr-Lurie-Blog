@@ -1,10 +1,11 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../packages/core/server/lib/object-verbs.js';
+import { objectRecordKey } from '../../packages/core/server/lib/object-store-keys.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 // Integration suite for the shared object-verb core (T0.8) against an in-memory
 // store — the local blob fallback for tests. Both auth paths funnel through

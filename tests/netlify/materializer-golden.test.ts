@@ -1,7 +1,8 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { materialize } from '../../netlify/lib/materialize.js';
+import { materialize } from '../../packages/core/server/lib/materialize.js';
 
 const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 3 };
 

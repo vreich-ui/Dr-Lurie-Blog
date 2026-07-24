@@ -1,0 +1,81 @@
+---
+/**
+ * `form_confirmation` section component — the reusable post-submit confirmation
+ * block (today's /thank-you is one instance). Markup verbatim from the audited
+ * page: a centered eyebrow + fallback title/message + two CTAs, plus the inline
+ * script that swaps in a per-form title/message from the `?form=` query param
+ * (and a length-capped `?message=` override). Copy is data
+ * (eyebrow/heading/message/formMessages, CTA labels); the swap script is fixed
+ * furniture owned here. Action hrefs arrive resolved by the renderer
+ * (HeroResolved), like hero/lede. Renamed from `thank_you` (2026-07-11).
+ */
+import type { HeroResolved, RenderCtx, SectionDataOf } from '@core/lib/registry/components/types';
+
+type Props = {
+  data: SectionDataOf<'form_confirmation'>;
+  resolved: HeroResolved;
+  ctx: RenderCtx;
+};
+
+const { data, resolved } = Astro.props;
+const actionClass = (style?: 'primary' | 'secondary' | 'link') =>
+  style === 'secondary' ? 'btn-secondary' : style === 'link' ? 'btn-link' : 'btn-primary';
+// The client script keys per-form overrides by `?form=` value; rebuild the
+// {form: {title, message}} map the audited page passed via define:vars.
+const thankYouMessages = Object.fromEntries(
+  data.formMessages.map((entry) => [entry.form, { title: entry.heading, message: entry.message }])
+);
+const fallbackTitle = data.heading;
+const fallbackMessage = data.message;
+---
+
+<section class="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
+  {data.eyebrow && <p class="text-sm font-semibold uppercase tracking-[0.18em] text-accent">{data.eyebrow}</p>}
+  <h1 id="thank-you-title" class="mt-4 text-3xl font-bold tracking-tight text-heading sm:text-5xl">
+    {fallbackTitle}
+  </h1>
+  <p id="thank-you-message" class="mx-auto mt-6 max-w-2xl text-lg text-muted">
+    {fallbackMessage}
+  </p>
+
+  <noscript>
+    <p class="mx-auto mt-4 max-w-2xl text-sm text-muted">
+      If you expected form-specific instructions, JavaScript is required to show them on this static confirmation page.
+    </p>
+  </noscript>
+
+  <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+    {
+      data.actions.map((action, index) => (
+        <Fragment>
+          {index > 0 && ' '}
+          <a class={actionClass(action.style)} href={resolved.actionHrefs[index]} set:text={action.label} />
+        </Fragment>
+      ))
+    }
+  </div>
+</section>
+
+<script is:inline define:vars={{ thankYouMessages, fallbackTitle, fallbackMessage }}>
+  const params = new URLSearchParams(window.location.search);
+  const formKey = params.get('form') || '';
+  const passedMessage = params.get('message') || '';
+  const knownMessage = thankYouMessages[formKey];
+  const titleElement = document.getElementById('thank-you-title');
+  const messageElement = document.getElementById('thank-you-message');
+
+  const getSafePassedMessage = (message) => {
+    const trimmedMessage = message.trim();
+
+    if (!trimmedMessage) {
+      return '';
+    }
+
+    return trimmedMessage.length > 240 ? `${trimmedMessage.slice(0, 237)}...` : trimmedMessage;
+  };
+
+  if (titleElement && messageElement) {
+    titleElement.textContent = knownMessage?.title || fallbackTitle;
+    messageElement.textContent = getSafePassedMessage(passedMessage) || knownMessage?.message || fallbackMessage;
+  }
+</script>

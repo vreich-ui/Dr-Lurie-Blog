@@ -5,13 +5,14 @@
  * like an admin, existing role sets behave as before, and owner does NOT
  * bypass an approval requirement.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { checkPublishGate } from '../../netlify/lib/publish-gate.js';
-import { expandRole, type Role } from '../../netlify/lib/roles.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { checkPublishGate } from '../../packages/core/server/lib/publish-gate.js';
+import { expandRole, type Role } from '../../packages/core/server/lib/roles.js';
+import type { ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const HUMAN: Principal = { kind: 'human', id: 'u1', email: 'x@y.com' };
 const AGENT: Principal = { kind: 'agent', agent_name: 'writer', auth: 'publish_key' };

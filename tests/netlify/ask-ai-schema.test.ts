@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -11,7 +12,7 @@ import {
   isAskAiObjectType,
   isProtectedAskAiField,
   sectionDataSchemaForType,
-} from '../../netlify/lib/ask-ai-schema.js';
+} from '../../packages/core/server/lib/ask-ai-schema.js';
 
 // Every registered object type produces a valid Anthropic tool: partial (no
 // top-level `required`), $schema stripped, additionalProperties:false, and a

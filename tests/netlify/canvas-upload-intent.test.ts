@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -5,8 +6,8 @@ import {
   canvasUploadRequestId,
   createCanvasUploadIntent,
   parseCanvasUploadIntentRequest,
-} from '../../netlify/lib/canvas-upload-intent.js';
-import { verifyArtifactUploadToken } from '../../netlify/lib/artifact-upload.js';
+} from '../../packages/core/server/lib/canvas-upload-intent.js';
+import { verifyArtifactUploadToken } from '../../packages/core/server/lib/artifact-upload.js';
 
 const SECRET = 'canvas-intent-test-secret';
 const NOW_MS = Date.parse('2026-07-12T12:00:00Z');

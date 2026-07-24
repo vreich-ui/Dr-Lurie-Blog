@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { articleBodyToMarkdown } from '../../src/lib/article-content/to-markdown.js';
+import { articleBodyToMarkdown } from '../../packages/core/lib/article-content/to-markdown.js';
 
 // Regression: a hero/featured node (id === 'n_hero' OR rendering.presentation === 'hero')
 // with rendering.placement === 'inline' must NOT produce an ![]() embed in the body markdown,

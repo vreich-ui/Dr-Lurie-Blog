@@ -48,6 +48,17 @@ const CSS_CHUNK_STEM_RE = /(\/_astro\/)[A-Za-z0-9_-]+(\.HASH\.css)/g;
 
 export const normalizeCssChunkStems = (html) => html.replace(CSS_CHUNK_STEM_RE, '$1CHUNK$2');
 
+// Astro island `uid` attributes are content hashes OF THE COMPONENT'S FILE
+// PATH (the attribute-level twin of the hashed chunk filenames above): they
+// pair an <astro-island> element with its hydration entry within one page and
+// change whenever a component file MOVES, with zero rendered/behavioral
+// difference. Collapse them so file relocations (W11 core extraction) don't
+// read as content changes — a real island add/remove/reorder still differs
+// structurally. Scoped to the astro-island tag; nothing else carries uid=.
+const ASTRO_ISLAND_UID_RE = /(<astro-island\b[^>]*?\buid=)(["']?)[A-Za-z0-9]+\2/g;
+
+export const normalizeIslandUids = (html) => html.replace(ASTRO_ISLAND_UID_RE, (_m, pre, q) => `${pre}${q}UID${q}`);
+
 // Attribute grammar: name, optionally =value (double-, single-, or unquoted).
 const ATTR_RE = /([^\s"'>/=]+)(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/g;
 
@@ -86,7 +97,7 @@ const SEGMENT_RE = /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>
 const TOKEN_RE = /(<[^>]*>)|([^<]+)/g;
 
 export const normalizeHtml = (html) => {
-  const withStableAssets = normalizeCssChunkStems(normalizeAssetHashes(html));
+  const withStableAssets = normalizeIslandUids(normalizeCssChunkStems(normalizeAssetHashes(html)));
   const out = [];
   const segments = withStableAssets.split(SEGMENT_RE);
   for (const segment of segments) {

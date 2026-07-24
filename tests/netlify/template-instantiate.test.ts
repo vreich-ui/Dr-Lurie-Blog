@@ -1,9 +1,10 @@
+import '../../src/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildPageBodyFromTemplate } from '../../src/lib/template-instantiate.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import type { TemplateBody } from '../../src/schema/bodies/template-v1.js';
+import { buildPageBodyFromTemplate } from '../../packages/core/lib/template-instantiate.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import type { TemplateBody } from '../../packages/core/schema/bodies/template-v1.js';
 
 // The pure half of the `instantiate` verb (W2.5): template slots → page body.
 // The verb-level flow (load template → build → create) is covered in

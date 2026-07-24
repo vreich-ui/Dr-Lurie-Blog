@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { workflowStatuses } from '../../src/schema/workflow-contract.js';
-import { contentSourceV1Schema } from '../../src/schema/schema-v1.js';
+import { workflowStatuses } from '../../packages/core/schema/workflow-contract.js';
+import { contentSourceV1Schema } from '../../packages/core/schema/schema-v1.js';
 
 /**
  * Repo root, anchored to this test file's own compiled location rather than

@@ -1,4 +1,5 @@
 ---
+import '~/config/policy-bindings'; // W11: register site providers before @core registry (bio.ts reads site identity at module load)
 /**
  * PageObjectRenderer (T4.2) — the one thin loader every migrated page route
  * delegates to, so 12 route files don't each re-implement load → resolve →
@@ -20,9 +21,9 @@ import { getEntry } from 'astro:content';
 import PageLayout from '~/layouts/PageLayout.astro';
 import Footer from '~/components/widgets/Footer.astro';
 import { buildSectionResolveDeps } from '~/components/cms/section-resolve-deps';
-import { getRegisteredComponent } from '~/lib/registry/components/index';
-import { parsePageExport, resolvePage } from '~/lib/renderer/resolve';
-import { sectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
+import { getRegisteredComponent } from '@core/lib/registry/components/index';
+import { parsePageExport, resolvePage } from '@core/lib/renderer/resolve';
+import { sectionAnnotationAttrs } from '@core/lib/renderer/section-annotations';
 import { createNavTargetResolver, navigationToFooterProps, parseNavigationExport } from '~/utils/navigation-data';
 import { getBlogPermalink } from '~/utils/permalinks';
 import { getSiteObject } from '~/utils/site-object';

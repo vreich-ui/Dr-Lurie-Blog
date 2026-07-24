@@ -28,8 +28,8 @@ import {
   slugify,
   hostOf,
   type TrackerEnv,
-} from '../../src/lib/tracking/loader/core.js';
-import { classifyClick, trackableRefOf, type ElementLike } from '../../src/lib/tracking/loader/dom.js';
+} from '../../packages/core/lib/tracking/loader/core.js';
+import { classifyClick, trackableRefOf, type ElementLike } from '../../packages/core/lib/tracking/loader/dom.js';
 
 const DEFAULTS = {
   page: ['pageview', 'scroll_depth', 'engagement'],
@@ -368,13 +368,13 @@ test('SIZE BUDGET: the built loader chunk is ≤5KB min+gzip (hard ceiling 6KB)'
   while (root !== path.dirname(root)) {
     if (
       existsSync(path.join(root, 'package.json')) &&
-      existsSync(path.join(root, 'src/lib/tracking/loader/index.ts'))
+      existsSync(path.join(root, 'packages/core/lib/tracking/loader/index.ts'))
     ) {
       break;
     }
     root = path.dirname(root);
   }
-  const entry = path.join(root, 'src/lib/tracking/loader/index.ts');
+  const entry = path.join(root, 'packages/core/lib/tracking/loader/index.ts');
   assert.ok(existsSync(entry), `loader entry not found from ${here}`);
   const built = buildSync({
     entryPoints: [entry],

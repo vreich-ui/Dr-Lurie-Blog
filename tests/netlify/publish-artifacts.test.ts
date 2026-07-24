@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
@@ -739,7 +740,7 @@ test('publish-article rejects corrupt PDF artifact bytes before GitHub writes', 
     encoding: 'base64',
     payload: pdfBytes.toString('base64'),
   });
-  const { getArtifactBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const { getArtifactBlobStore } = await import('../../packages/core/server/lib/blob-store.js');
   const artifactStore = await getArtifactBlobStore({});
   await artifactStore.set(String(upload.artifact.blobKey), Buffer.from('not-pdf'.padEnd(pdfBytes.byteLength, '!')));
   const requestedUrls: string[] = [];
@@ -1099,7 +1100,7 @@ test('publish-article normalizes stale artifact blobKeys and corrects the artifa
   });
   const artifact = upload.artifact as Record<string, string | number>;
   const staleBlobKey = `artifacts/${artifact.blobKey}`;
-  const { getArtifactIndexBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const { getArtifactIndexBlobStore } = await import('../../packages/core/server/lib/blob-store.js');
   const indexStore = await getArtifactIndexBlobStore({});
   await indexStore.setJSON(`request-artifacts/${encodeURIComponent(requestId)}/${artifact.sha256}.json`, {
     ...upload.artifact,
@@ -1192,7 +1193,7 @@ test('publish-article reports stale saved image references instead of a generic 
     payload: (await createImageBytes('png')).toString('base64'),
   });
   const artifact = upload.artifact as { blobKey: string };
-  const { getArtifactBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const { getArtifactBlobStore } = await import('../../packages/core/server/lib/blob-store.js');
   const artifactStore = await getArtifactBlobStore({});
   await artifactStore.del(artifact.blobKey);
 
@@ -1351,7 +1352,7 @@ test('publish-article rejects corrupt artifact bytes before GitHub writes', asyn
     originalFilename: 'corrupt.png',
     label: 'corrupt.png',
   };
-  const { getArtifactBlobStore, getArtifactIndexBlobStore } = await import('../../netlify/lib/blob-store.js');
+  const { getArtifactBlobStore, getArtifactIndexBlobStore } = await import('../../packages/core/server/lib/blob-store.js');
   const artifactStore = await getArtifactBlobStore({});
   const indexStore = await getArtifactIndexBlobStore({});
   await artifactStore.set(artifact.blobKey, corruptBytes, {

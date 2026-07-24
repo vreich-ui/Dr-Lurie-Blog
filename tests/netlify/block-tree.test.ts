@@ -7,7 +7,7 @@ import {
   isLegalBlockTree,
   validateBlockTree,
   type BlockNode,
-} from '../../src/lib/registry/block-tree.js';
+} from '../../packages/core/lib/registry/block-tree.js';
 
 // A grid an agent composed from card leaves — the worked example in
 // docs/cms-architecture/block-tree.md.

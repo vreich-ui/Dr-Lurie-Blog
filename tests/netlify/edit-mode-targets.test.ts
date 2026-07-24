@@ -6,8 +6,8 @@ import {
   deriveEditTarget,
   suggestionToOps,
   summarizeFieldChanges,
-} from '../../src/lib/edit-mode/targets.js';
-import { blockText, richTextToBlocks } from '../../src/lib/edit-mode/preview.js';
+} from '../../packages/core/lib/edit-mode/targets.js';
+import { blockText, richTextToBlocks } from '../../packages/core/lib/edit-mode/preview.js';
 
 // ── target routing (the shared_ref rule) ─────────────────────────────────────
 
@@ -118,7 +118,7 @@ test('blockText strips markup down to comparable text', () => {
 // ── article node targets (W7.8) ──────────────────────────────────────────────
 
 test('an annotated article node routes to its content_item object, scoped by node id', async () => {
-  const { deriveNodeTarget } = await import('../../src/lib/edit-mode/targets.js');
+  const { deriveNodeTarget } = await import('../../packages/core/lib/edit-mode/targets.js');
   const target = deriveNodeTarget({
     cmsObjectId: 'req_agent_barrier_myths_20260713_01',
     cmsNodeId: 'n_a1',
@@ -136,7 +136,7 @@ test('an annotated article node routes to its content_item object, scoped by nod
 });
 
 test('a node suggestion persists as update_node with fields under public', async () => {
-  const { deriveNodeTarget } = await import('../../src/lib/edit-mode/targets.js');
+  const { deriveNodeTarget } = await import('../../packages/core/lib/edit-mode/targets.js');
   const target = deriveNodeTarget({
     cmsObjectId: 'req_agent_barrier_myths_20260713_01',
     cmsNodeId: 'n_a1',

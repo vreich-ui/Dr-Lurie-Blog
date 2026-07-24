@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
@@ -7,8 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 import { handler as adminObjectHandler } from '../../netlify/functions/admin-object.js';
 import { handler as objectStoreHandler } from '../../netlify/functions/object-store.js';
-import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { setLocalBlobsRootForTesting } from '../../packages/core/server/lib/local-blobs.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 /**
  * Repo root, anchored to this test file's own compiled location rather than
@@ -172,7 +173,7 @@ test('both paths share one store: an agent-created record is readable through th
 // ═══ security invariant: the browser path never sees the publish key ═════════
 
 test('admin-object source references the publish key nowhere (never receives/reads/forwards it)', () => {
-  const source = readFileSync(join(REPO_ROOT, 'netlify/functions/admin-object.ts'), 'utf8');
+  const source = readFileSync(join(REPO_ROOT, 'packages/core/server/functions/admin-object.ts'), 'utf8');
   // Allow the doc-comment sentence that NAMES the invariant; strip comments first.
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.ok(!/PUBLISH_SECRET/i.test(code), 'admin-object must not reference PUBLISH_SECRET');
@@ -183,8 +184,11 @@ test('admin-object source references the publish key nowhere (never receives/rea
 // ═══ minting is centralized in one helper, not inlined per action ════════════
 
 test('object-verbs mints only through the shared mintId helper (no inline id generation)', () => {
-  const source = readFileSync(join(REPO_ROOT, 'netlify/lib/object-verbs.ts'), 'utf8');
-  assert.ok(/from '\.\.\/\.\.\/src\/lib\/object-ids-mint\.js'/.test(source), 'must import the shared mintId helper');
+  const source = readFileSync(join(REPO_ROOT, 'packages/core/server/lib/object-verbs.ts'), 'utf8');
+  assert.ok(
+    /from '\.\.\/\.\.\/lib\/object-ids-mint\.js'/.test(source),
+    'must import the shared mintId helper',
+  );
   assert.ok(/mintId\(/.test(source), 'must call mintId');
   assert.ok(!/randomUUID/.test(source), 'no inline UUID id generation');
   assert.ok(!/createHash/.test(source), 'no inline hashing — that belongs to mintId');

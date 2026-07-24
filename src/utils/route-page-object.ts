@@ -27,11 +27,14 @@
  */
 import { getEntry } from 'astro:content';
 
-import { applyListingTerm } from '~/lib/renderer/listing-term';
-import { parsePageExport } from '~/lib/renderer/resolve';
-import { sectionAnnotationAttrs, type SectionAnnotationAttrs } from '~/lib/renderer/section-annotations';
-import { splitRichTextParagraphs } from '~/lib/richtext/paragraphs';
-import type { PageBody } from '~/schema/bodies/page-v1';
+import { applyListingTerm } from '../../packages/core/lib/renderer/listing-term';
+import { parsePageExport } from '../../packages/core/lib/renderer/resolve';
+import {
+  sectionAnnotationAttrs,
+  type SectionAnnotationAttrs,
+} from '../../packages/core/lib/renderer/section-annotations';
+import { splitRichTextParagraphs } from '@core/lib/richtext/paragraphs';
+import type { PageBody } from '../../packages/core/schema/bodies/page-v1';
 
 export type RoutePageHeader = {
   kicker?: string;

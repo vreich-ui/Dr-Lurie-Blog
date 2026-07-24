@@ -63,3 +63,145 @@ T11.2 (pure libs) -> T11.3 (server layer, NOTIFY) -> T11.4 (renderer/components/
 admin/cli) -> T11.5 (de-hardcode + site.config/netlify.toml) -> T11.6 (seeds +
 exports relocation). Each is one commit, build-diff EMPTY, `packages/core` and
 `sites/drlurie` building green from root.
+
+## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
+
+Landed as three gated step-commits (T9.24 precedent), each check+test+
+build-diff-EMPTY green. Step 1: pure .ts remainders (renderer, edit-mode,
+admin libs, richtext/article remainders, contentSource*,
+publishArticleFromPayload, goTrueClient → core/lib/admin/). Step 2: 24
+section components → `core/components/sections/`, the registry barrel
+rejoined `core/lib/registry/components/`, admin workspace →
+`core/admin/**`; the SITE-SHELL SEAM stays site-side by the brief's own
+no-globbing invariant (PageObjectRenderer.astro, section-resolve-deps.ts,
+ObjectSections.astro, CustomStyles.astro, EditMode.astro — all
+astro:content/site-util coupling lives there). Harness extension (disclosed +
+test-pinned): astro-island `uid` values are path-derived hashes; normalized
+like chunk names. Step 3: the consolidated function-factory pass — 32
+functions (all but the 4 frozen + mcp.ts) → `core/server/functions/*` as
+`createHandler(binding)` factories; `netlify/functions/*` are now per-site
+shims (policy-bindings + `createHandler(drlurieSiteBinding)`; `export *`
+keeps named internals for tests). Direct secret reads in
+object-store/admin-get-blob-pdf/deploy-status/run-publisher-agent/
+save-artifact now route through `readBoundEnv(PLATFORM_ENV_NAMES.publishSecret)`.
+Source-scan invariants repointed at the implementations (admin-object
+publish-key absence, admin-governance Owner gate, publisher-repoint absence
+scans).
+
+**Residuals (recorded, not dropped):** `mcp.ts` split still waits on the
+legacy article path's retirement (T11.3 amendment); pages-as-shells + the
+`src/data/site` loader seam compose with T11.5–T11.6 (site.config/netlify.toml
+and exports relocation — moving pages twice would churn); `cli/` relocation
+rides T11.7 where site-parameterization makes the move meaningful (today it
+would only churn CI paths + package.json).
+
+## T11.3 execution amendment (2026-07-24 — per this file's amend clause)
+
+**Moved:** `netlify/lib/**` (68 modules incl. `agent/`, `materializers/`,
+`taxonomy-enforcement.ts` with its T11.5-deferred literal) → `packages/core/
+server/lib/**`. Five more PURE src modules pulled forward (same rationale as
+T11.2's pull-forwards; all had only core imports): `admin/display-name`,
+`admin/readiness-criteria` (+ their tests), `richtext/paragraphs`,
+`article-content/assert-reader-safe`, `article-object/variant` →
+`packages/core/lib/…`.
+
+**Frozen-file wiring (hard stop upheld):** the four off-limits functions
+import `../lib/*` and `../../src/{schema,lib}/*` paths; they are byte-
+untouched, so those exact paths now carry single-purpose re-export shims:
+10 at `netlify/lib/*` (admin-auth, artifacts, artifact-index, blob-store,
+taxonomy-enforcement, image-validation, pdf-validation, netlify-deploys,
+blob-list, artifact-trust — each also registers the site policy providers for
+the legacy path) and 5 frozen-path stubs (`src/schema/{schema-v1,
+workflow-contract,article-content-v1}.ts`, `src/lib/agents-naming.ts`,
+`src/lib/article-content/to-markdown.ts`). **Correction to T11.2:** its batch
+import-rewrite had touched publish-article/admin-workflow-lock/save-json-blob
+(import lines only); restored to `main` bytes here — the stubs exist so that
+never recurs. Delete the stubs when the legacy article path retires.
+
+**SiteBinding (the brief's factory seam):** `packages/core/server/lib/
+site-binding.ts` — a binding = site id + env-var NAMES (never values), read
+live per call (`readBoundEnv`; no module-scope caching). `PLATFORM_ENV_NAMES`
+pins the pre-W11 fallback chains byte-for-byte (order is wire behavior, now
+test-pinned). Threaded through: all blob-store getters (optional trailing
+`binding?`), object-git-committer, production-release, netlify-deploys
+(build hook + deploy lookup). The Dr-Lurie instance: `src/config/
+site-binding.ts` (platform names + `siteIdentityConfig.siteId`);
+`object-store.ts` (the verb auth entry) resolves its publish secret through
+it. Adversarial set: `tests/netlify/site-binding.test.ts` (cross-binding
+isolation, live rotation, fails-closed, chain-order pin, no shared store
+handles).
+
+**DISCREPANCY — functions did NOT move (recorded, not improvised):** the
+map's T11.3 row lists the non-admin `netlify/functions/*` set incl. the "MCP
+factory", but `mcp.ts` HOSTS the frozen legacy article MCP tools
+(`invokeSaveJsonBlob`/`callPublishArticle`/`invokeSaveArtifact` + their tool
+surfaces) — a factory split of that file is exactly the redesign the hard
+stop forbids. Function-body moves therefore consolidate into T11.4's factory
+pass (admin + non-admin in one reviewable mechanism), and the mcp factory
+split waits for the legacy article path's retirement or an explicit bounded
+sanction. `mcp.ts` this wave carries only mechanical `../lib/` →
+core-path import rewrites (its tool behavior is test-pinned).
+
+**Test-harness correction:** `tsconfig.test.json` had never gained
+`packages/core/**/*.ts`, so every co-located test moved in T11.2 was silently
+NOT running (~193 tests). Fixed; all revived and green. `site-identity.test.ts`
+is explicitly the drlurie byte-compat gate and registers the real site
+bindings (tests are lint-carve-out exempt). Policy-provider registration
+re-homed from lib modules to entry points: non-off-limits functions importing
+core server lib (32), the 10 shims, and core-importing test files.
+
+**Still pending from the brief:** deployed-preview `/mcp` ping + read-verb
+smoke (needs deploy access — recorded for the wave summary); binding
+threading for the remaining direct env readers (`deploy-status`,
+`save-artifact`, `admin-get-blob-pdf`) rides the T11.4/T11.5 function pass.
+
+## T11.2 execution amendment (2026-07-24 — re-verified against `main`, per this file's amend clause)
+
+Tracing the real import graph before moving showed the pure-lib slice above is
+NOT cleanly separable from T11.4 at several value-import points. Corrections
+made and executed (build-diff EMPTY, full suite green):
+
+**Ratified alias:** `@core/*` -> `packages/core/*` (tsconfig paths + astro vite
+alias). Two import worlds, as the tree already split them: `.astro`/`.tsx`
+(Vite-only) use the `@core` alias; all `.ts` (in the tsc/Node test graph) use
+relative `packages/core/...` paths (tsc does not rewrite path aliases and the
+test runtime resolves the emitted relative specifiers). netlify/tests/scripts
+keep their existing relative style, `src/...` -> `packages/core/...`.
+
+**DEFERRED to T11.4** (value-imports into T11.4 modules — moving now would force
+a core->src back-dep, which the "core imports no site code" rule forbids, or a
+directory split, which "git mv only / no redesign" forbids):
+
+- `src/lib/registry/components/index.ts` — value-imports 24 `~/components/
+  sections/*.astro`; it is renderer glue (imported only by `PageObjectRenderer`/
+  `ObjectSections`), not law. Stays in `src`; its sibling-def imports now point
+  at `@core`/relative core. object-contract does NOT import it.
+- `src/lib/publishArticleFromPayload.ts` — imports `~/utils/goTrueClient`.
+- `src/lib/contentSourceBody.ts` — imports `article-content/` (T11.4);
+  `src/lib/contentSourceImportFormData.ts` — imports the former.
+
+**PULLED INTO T11.2** (pure files the schema law genuinely needs; moved as
+single files, the rest of their dirs stay for T11.4):
+
+- `lib/richtext/rich-text-v1.ts` (+ test) — pure zod; `schema/bodies/
+  content-item-v1.ts` needs it. `render-html.ts`/`prosemirror.ts`/`paragraphs.ts`
+  stay in `src/lib/richtext/` (T11.4).
+- `lib/article-content/to-markdown.ts` — pure (schema-only dep);
+  `schema/article-content-helpers.ts` needs it. Rest of `article-content/`
+  stays (T11.4).
+
+**Config-injection (the one real refactor; behavior unchanged).** Four core
+modules imported `../config/*` site config: `approval-policy`, `creation-policy`,
+`media-policy`, `site-identity` (the last two were NOT named in the brief —
+found during execution; same fix). Core now exposes a provider seam
+(`setActive*Provider` / `activeApprovalPolicy()`+`activeCreationPolicy()`+
+`activeMediaPolicy()` throw if unset; `resolveSiteIdentity`'s `config` default
+comes from a `setSiteIdentityConfigProvider`). The site registers all four in
+the new `src/config/policy-bindings.ts`, imported for its side effect at every
+entry point that reaches a singleton (netlify verb/store/publish/inventory/
+governance + module-load `getSiteIdentity` callers, the registry barrel for the
+Astro path, and the tests that hit the singletons). `bio.ts` (core) reads
+`getSiteIdentity()` at module load, so the barrel's binding import is ordered
+first. `src/config/*-policy.ts` + `site-identity.ts` stay site-side per the
+brief. Verified: no `packages/core` module imports `src/`, `netlify/`, or a site
+config.

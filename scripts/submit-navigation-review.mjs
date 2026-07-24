@@ -39,7 +39,7 @@
  * http://localhost:8888). The human steps live in
  * docs/cms-architecture/cms-pipeline/phase-2-runbook.md.
  */
-import { NAVIGATION_SEEDS } from './lib/navigation-seed-data.mjs';
+import { NAVIGATION_SEEDS } from '../sites/drlurie/seeds/navigation-seed-data.mjs';
 import { checkValidationAgainstSeed, createObjectStoreClient, sameBody } from './lib/object-store-client.mjs';
 
 const AGENT_NAME = 'phase-2-navigation-seed';

@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
@@ -9,8 +10,8 @@ import {
   isArtifactReference,
   type ArtifactReference,
   type ReadableArtifactBlobStore,
-} from '../../netlify/lib/artifacts.js';
-import { sha256Hex } from '../../netlify/lib/crypto.js';
+} from '../../packages/core/server/lib/artifacts.js';
+import { sha256Hex } from '../../packages/core/server/lib/crypto.js';
 
 test('sha256Hex returns lowercase hexadecimal digests', () => {
   assert.equal(sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
@@ -188,7 +189,7 @@ const makeImageReference = (requestId: string, bytes = Buffer.from('image bytes'
 test('reconcileImageArtifactReference reads a valid reference with valid blob bytes', async () => {
   const reference = makeImageReference('req_test_validref_20260605_01');
   const { store } = createFakeArtifactStore({ [reference.blobKey]: Buffer.from('image bytes') });
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileImageArtifactReference(reference, store);
 
@@ -203,7 +204,7 @@ test('reconcileArtifactReference normalizes stale blobKeys and corrects artifact
   const { store } = createFakeArtifactStore({ [reference.blobKey]: Buffer.from('normalized bytes') });
   const { values, store: indexStore } = createFakeIndexStore();
   const loggedCorrections: unknown[] = [];
-  const { reconcileArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileArtifactReference(staleReference, store, indexStore, {
     logger: { warn: (...args: unknown[]) => loggedCorrections.push(args) },
@@ -226,7 +227,7 @@ test('reconcileImageArtifactReference reads from stores that only support arrayB
     'arraybuffer.jpg'
   );
   const values = new Map([[reference.blobKey, Buffer.from('array buffer bytes')]]);
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
   const store: ReadableArtifactBlobStore = {
     async get(key: string, options: { type: 'arrayBuffer' }) {
       assert.equal(options.type, 'arrayBuffer');
@@ -244,7 +245,7 @@ test('reconcileImageArtifactReference reads from stores that only support arrayB
 test('reconcileImageArtifactReference reports valid JSON with missing blob bytes as missing', async () => {
   const reference = makeImageReference('req_test_missingref_20260605_01');
   const { store } = createFakeArtifactStore();
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileImageArtifactReference(reference, store);
 
@@ -257,7 +258,7 @@ test('reconcileImageArtifactReference recovers a blob stored under duplicated ar
   const correctedKey = `artifacts/${reference.blobKey}`;
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('prefixed bytes') });
   const { values, store: indexStore } = createFakeIndexStore();
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileImageArtifactReference(reference, store, indexStore);
 
@@ -275,7 +276,7 @@ test('reconcileImageArtifactReference recovers a blob stored under a leading sla
   const reference = makeImageReference('req_test_leadingslash_20260605_01');
   const correctedKey = `/${reference.blobKey}`;
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('slash bytes') });
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileImageArtifactReference(reference, store);
 
@@ -291,7 +292,7 @@ test('reconcileImageArtifactReference recovers a same-filename blob stored under
   );
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('moved bytes') });
   const { values, store: indexStore } = createFakeIndexStore();
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileImageArtifactReference(reference, store, indexStore);
 
@@ -306,7 +307,7 @@ test('reconcileImageArtifactReference falls back across jpg jpeg png webp extens
   const reference = makeImageReference('req_test_extfallback_20260605_01', Buffer.from('extension bytes'), 'hero.jpg');
   const correctedKey = reference.blobKey.replace(/\.jpg$/, '.jpeg');
   const { store } = createFakeArtifactStore({ [correctedKey]: Buffer.from('extension bytes') });
-  const { reconcileImageArtifactReference } = await import('../../netlify/lib/artifacts.js');
+  const { reconcileImageArtifactReference } = await import('../../packages/core/server/lib/artifacts.js');
 
   const result = await reconcileImageArtifactReference(reference, store);
 

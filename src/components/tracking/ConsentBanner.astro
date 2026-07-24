@@ -12,8 +12,8 @@
  */
 import { getCollection } from 'astro:content';
 
-import { parseTrackingExport } from '~/lib/tracking/assemble';
-import { buildConsentBannerHtml } from '~/lib/tracking/consent/banner-html';
+import { parseTrackingExport } from '@core/lib/tracking/assemble';
+import { buildConsentBannerHtml } from '@core/lib/tracking/consent/banner-html';
 
 const isAdmin = Astro.url.pathname.startsWith('/admin');
 

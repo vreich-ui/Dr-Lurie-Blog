@@ -1,83 +1,9 @@
-import path from 'node:path';
-
-export class PdfValidationError extends Error {
-  code: 'invalid-pdf-bytes' | 'pdf-type-mismatch' | 'pdf-size-mismatch';
-  documentName: string;
-  path: string;
-  reason: string;
-
-  constructor({
-    code,
-    documentName,
-    path: repoPath,
-    reason,
-  }: {
-    code: PdfValidationError['code'];
-    documentName: string;
-    path: string;
-    reason: string;
-  }) {
-    super(`Invalid PDF artifact: ${documentName} ${reason}. Re-upload or replace this document.`);
-    this.name = 'PdfValidationError';
-    this.code = code;
-    this.documentName = documentName;
-    this.path = repoPath;
-    this.reason = reason;
-  }
-}
-
-const normalizeContentType = (contentType: string | undefined) => contentType?.toLowerCase().split(';')[0]?.trim();
-
-export const validatePublishPdfBytes = ({
-  bytes,
-  contentType,
-  expectedSizeBytes,
-  filename,
-  path: repoPath,
-}: {
-  bytes: Buffer;
-  contentType?: string;
-  expectedSizeBytes?: number;
-  filename?: string;
-  path: string;
-}) => {
-  const documentName = filename || repoPath;
-  const normalizedContentType = normalizeContentType(contentType);
-  const extension = path.extname(repoPath).toLowerCase();
-
-  if (normalizedContentType && normalizedContentType !== 'application/pdf') {
-    throw new PdfValidationError({
-      code: 'pdf-type-mismatch',
-      documentName,
-      path: repoPath,
-      reason: `declared unsupported content type ${normalizedContentType}`,
-    });
-  }
-
-  if (extension && extension !== '.pdf') {
-    throw new PdfValidationError({
-      code: 'pdf-type-mismatch',
-      documentName,
-      path: repoPath,
-      reason: 'must use a .pdf file extension',
-    });
-  }
-
-  if (expectedSizeBytes !== undefined && bytes.byteLength !== expectedSizeBytes) {
-    throw new PdfValidationError({
-      code: 'pdf-size-mismatch',
-      documentName,
-      path: repoPath,
-      reason: `size ${bytes.byteLength} bytes did not match expected ${expectedSizeBytes} bytes`,
-    });
-  }
-
-  if (bytes.subarray(0, 5).toString('utf8') !== '%PDF-') {
-    throw new PdfValidationError({
-      code: 'invalid-pdf-bytes',
-      documentName,
-      path: repoPath,
-      reason: 'bytes must start with %PDF-',
-    });
-  }
-};
+/**
+ * Site-side re-export shim (W11 T11.3). The implementation moved to
+ * packages/core/server/lib/pdf-validation.ts; this shim exists so the OFF-LIMITS legacy
+ * functions (publish-article.ts, admin-workflow-lock.ts, save-json-blob.ts,
+ * verify-article-images.ts — byte-untouched by mandate) keep importing
+ * '../lib/pdf-validation.js' with identical wire behavior. New code imports core directly.
+ */
+import '../../src/config/policy-bindings.js'; // register site providers for the legacy path
+export * from '../../packages/core/server/lib/pdf-validation.js';

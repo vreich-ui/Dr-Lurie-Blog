@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 /**
  * Provision / verify the six Netlify Blob stores that pdf-tool writes into
  * through Dr-Lurie storage grants (see docs/agents/pdf-tool-storage-grant.md
- * and netlify/lib/pdf-tool-storage-grant.ts, the canonical store list).
+ * and packages/core/server/lib/pdf-tool-storage-grant.ts, the canonical store list).
  *
  * Netlify Blob stores are created implicitly on first write, so "provision"
  * means proving each store is writable with the SAME credentials the grant
@@ -20,7 +20,7 @@ import { pathToFileURL } from 'node:url';
  */
 
 // Keyed by grant field name; values are the store names pdf-tool opens.
-// Must match pdfToolStorageStores in netlify/lib/pdf-tool-storage-grant.ts
+// Must match pdfToolStorageStores in packages/core/server/lib/pdf-tool-storage-grant.ts
 // (tests pin both to the grant contract).
 export const PDF_TOOL_STORES = {
   artifacts: 'artifacts',

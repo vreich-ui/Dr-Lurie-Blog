@@ -11,20 +11,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { renderArticleNodes } from '../../src/lib/article-object/render-nodes.js';
-import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.js';
+import { renderArticleNodes } from '../../packages/core/lib/article-object/render-nodes.js';
+import { contentItemBodySchema } from '../../packages/core/schema/bodies/content-item-v1.js';
 import {
   assembleAdapterHeads,
   buildGoalMap,
   buildTrackerClientConfig,
   parseTrackingExport,
-} from '../../src/lib/tracking/assemble.js';
-import { ownAdapter } from '../../src/lib/tracking/adapters/own.js';
-import { plausibleAdapter } from '../../src/lib/tracking/adapters/plausible.js';
-import { AdapterIdError, reassertId } from '../../src/lib/tracking/adapters/types.js';
-import { resolveSections, type ResolvePageDeps } from '../../src/lib/renderer/resolve.js';
-import { sectionAnnotationAttrs } from '../../src/lib/renderer/section-annotations.js';
-import type { TrackingConfigBody } from '../../src/schema/bodies/tracking-config-v1.js';
+} from '../../packages/core/lib/tracking/assemble.js';
+import { ownAdapter } from '../../packages/core/lib/tracking/adapters/own.js';
+import { plausibleAdapter } from '../../packages/core/lib/tracking/adapters/plausible.js';
+import { AdapterIdError, reassertId } from '../../packages/core/lib/tracking/adapters/types.js';
+import { resolveSections, type ResolvePageDeps } from '../../packages/core/lib/renderer/resolve.js';
+import { sectionAnnotationAttrs } from '../../packages/core/lib/renderer/section-annotations.js';
+import type { TrackingConfigBody } from '../../packages/core/schema/bodies/tracking-config-v1.js';
 
 const trackingBody = (overrides: Partial<TrackingConfigBody['providers']> = {}): TrackingConfigBody =>
   parseTrackingExport({

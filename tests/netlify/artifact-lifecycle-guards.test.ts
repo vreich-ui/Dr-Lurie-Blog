@@ -1,12 +1,13 @@
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import { handler as saveArtifactLegacyHandler } from '../../netlify/functions/save-artifact.js';
-import { saveArtifactBytes } from '../../netlify/lib/artifact-upload.js';
-import { listArtifactReferencesForRequest, type ArtifactIndexStore } from '../../netlify/lib/artifact-index.js';
-import { getArtifactIndexBlobStore, setNetlifyBlobsModuleForTesting } from '../../netlify/lib/blob-store.js';
-import { ArtifactKind, type ArtifactReference } from '../../netlify/lib/artifacts.js';
+import { saveArtifactBytes } from '../../packages/core/server/lib/artifact-upload.js';
+import { listArtifactReferencesForRequest, type ArtifactIndexStore } from '../../packages/core/server/lib/artifact-index.js';
+import { getArtifactIndexBlobStore, setNetlifyBlobsModuleForTesting } from '../../packages/core/server/lib/blob-store.js';
+import { ArtifactKind, type ArtifactReference } from '../../packages/core/server/lib/artifacts.js';
 
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 

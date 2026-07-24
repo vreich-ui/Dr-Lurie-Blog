@@ -7,6 +7,251 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.6 step 1/3 — seeds into sites/drlurie/seeds/)
+
+**T11.6 step 1 committed.** All 17 `scripts/lib/*-seed-data.mjs` modules +
+`sync-site-seed.mjs` → `sites/drlurie/seeds/` (git mv; seeds are client data —
+copy semantics, never fleet-propagated). ~40 importers rewritten
+(tests/scripts); sync-site-seed's repo-root/seed paths updated; CI's
+seed-drift step now runs `sites/drlurie/seeds/sync-site-seed.mjs --check`
+(green from the new home). One regex miss caught by the suite
+(`pages-w5-seed-data` — digit in the name) and fixed.
+
+Gates: check 0 errors; tests 1627/1627 + 70/70; seed drift-guard green;
+build-diff EMPTY. Remaining T11.6 steps: (2) committed exports →
+`sites/drlurie/data/site/` with collection-glob/utils/materializer-path
+parameterization (the production write-path slice); (3) driver-script CLI
+move with `--site`.
+
+## Session 2026-07-24 (T11.5 — de-hardcode site identity; NOTIFY row run at fable/high)
+
+**T11.5 DONE** (branch `claude/t11.5-desite-hardcodes`). Core is site-agnostic,
+**lint-enforced**: new `tests/scripts/core-no-site-literals.test.mjs` fails on
+any `drlurie|kugelmedia|Lurié` literal in `packages/core` APPLICATION code
+(comments + `*.test.ts` exempt per the ratified carve-out) — passing.
+
+**De-hardcoded through the identity seam (byte-identical for Dr-Lurie):**
+`TAXONOMY_RECORD_KEY` (→ `taxonomyId`), git-committer fallback author (→ new
+`committerName/committerEmail` config fields, env still wins), AdminShell
+label (→ new `adminLabel` field pinned to 'Dr. Lurié admin'), goTrueClient
+browser-storage keys (→ lazy `${siteSlug}-…`, sessions survive), agent persona
+(brandName), tools/object-contract example ids (resolver-derived
+`site_drlurie`/`tax_drlurie` at runtime), storage-grant copy neutralized,
+KitGallery samples via identity. `strategy_drlurie` was already comment-only
+(front-load verified). All 11 FRONT-LOADED census items verified absent.
+
+**New architecture pieces:** `sites/drlurie/site.config.ts` (zod-validated:
+canonical host, image domains, the 10-row redirect table, site id + binding
+re-export — the FIRST real sites/ module); `astro.config.ts` reads
+host/domains from it; **drift guards** instead of generation
+(`tests/netlify/site-config-drift.test.ts`: netlify.toml redirect table ==
+site.config, config.yaml site URL == canonicalHost). **Island-entry seam:**
+10 site wrappers under `src/admin/*` register providers then re-export core
+admin components — fixing 3 pre-existing core→site `~/config` imports the
+step-2 purity grep missed (it only checked relative paths).
+
+**Gates:** check 0 errors; tests **1627/1627 + 70/70** (incl. the new lint,
+drift guards, extended byte-compat gate); build-diff: **73/74 byte-identical —
+ONE intentional diff**, `/admin/kit` (dev component gallery): sample theme
+name 'Dr. Lurié default' → 'Default theme', one `<td>`. Server-rendered
+sample copy cannot be de-hardcoded byte-identically; accepted + disclosed
+rather than faked with brand-string surgery. All admin pages otherwise
+identical (proves adminLabel/fixtures resolve byte-exactly).
+
+**Residuals (enumerated per the brief):** `publish-article.ts` +
+`save-json-blob.ts` + `verify-article-images.ts` + `admin-workflow-lock.ts`
+stay drlurie-bound (frozen; retire with the legacy path);
+`mcp/save-json-blob-mcp/` untouched (OQ-W11-6); `mcp.ts` example ids stay
+(formally a SITE file now — its future core factory split must neutralize);
+`verify-section-components.mjs`'s `~` import was already unresolvable outside
+Vite (manual tool; rides T11.7 cli work) — out-of-scope finding.
+
+## Session 2026-07-24 (T11.4 step 3/3 — function-factory pass; T11.4 CLOSED with recorded residuals)
+
+**T11.4 is DONE** (3 gated step-commits). Step 3: 32 functions →
+`packages/core/server/functions/*` as `createHandler(binding)` factories;
+`netlify/functions/*` reduced to per-site shims (site providers +
+`createHandler(drlurieSiteBinding)`; `export *` preserves named internals).
+The 4 frozen functions + mcp.ts stay byte-identical/site-side. Direct
+publish-secret reads in 5 functions now resolve through the binding module.
+Security source-scans repointed at implementations (admin-object secret
+absence, admin-governance Owner gate, publisher-repoint absences).
+
+Residuals recorded in the move-map amendment: mcp split (waits on legacy
+retirement), pages-shells + data-root seam (compose with T11.5–T11.6), cli
+relocation (T11.7). Gates: check 0 errors; tests 1624/1624 + 69/69;
+build-diff EMPTY vs step 2; frozen files byte-identical to main; core app
+code imports nothing from src/netlify.
+
+## Session 2026-07-24 (T11.4 step 2/3 — sections + registry barrel + admin workspace into core)
+
+**Step 2 committed.** Moved: the 24 `src/components/sections/*.astro` →
+`packages/core/components/sections/`; the registry barrel
+`registry/components/index.ts` (T11.2-deferred) rejoined its dir in core —
+its 24 `.astro` imports are now intra-core; `src/components/admin-ui/**`
+(23 files, W9 workspace) → `packages/core/admin/**`. Admin pages/layouts
+import `@core/admin/*`.
+
+**The site-shell seam (brief's "no core file may glob a site path"):** ALL
+site coupling concentrated in exactly two render-entry files —
+`PageObjectRenderer.astro` + `section-resolve-deps.ts` (astro:content +
+permalinks + site-object + PageLayout/Footer) — plus `ObjectSections.astro`,
+`CustomStyles.astro`, `EditMode.astro`. These STAY site-side as the shell
+that loads site data and injects it into core (`ResolvePageDeps` was already
+the injection seam by design). Recorded as the boundary interpretation of the
+brief's "PageObjectRenderer moves" line, which would otherwise violate its
+own no-globbing invariant. Both cms shells register the site providers ahead
+of the `@core` barrel (bio.ts reads site identity at module load).
+
+**Harness extension (disclosed):** the move exposed that `<astro-island uid>`
+values are hashes of the component FILE PATH — the attribute-level twin of
+the hashed chunk filenames `html-normalize` already collapses. 10 admin
+shell pages differed ONLY in uid strings. Added `normalizeIslandUids`
+(scoped to astro-island; add/remove/props/reorder still differ; uid on other
+elements untouched) + 2 harness tests; build-diff then EMPTY — proving uids
+were the only delta. Self-test still PASS.
+
+Gates (step 2): check 0 errors, eslint+prettier clean; tests 1624/1624 +
+67/67 (+16 harness incl. 2 new); build-diff vs step 1 EMPTY; self-test PASS.
+Remaining: step 3 — function-factory pass + cli relocation (+ pages shells /
+data-root seam with T11.5-T11.6's site.config work, where they naturally
+compose).
+
+## Session 2026-07-24 (T11.4 IN PROGRESS — step 1/3: pure .ts remainders into core; gated step-commits per the T9.24 precedent)
+
+**T11.4 step 1 committed** (branch `claude/t11.4-core-extraction-renderer-admin`).
+Moved (55 renames): `src/lib/{renderer,edit-mode}/**`, the `src/lib/admin/**`
+remainder (clients, node-editor/renderer, review-ui, diffs, lock-manager…),
+`article-object/render-nodes`, `article-content` remainder (input-bank +
+tests), `richtext` remainder (prosemirror, render-html + tests), the
+T11.2-deferred `contentSourceBody`/`contentSourceImportFormData`/
+`publishArticleFromPayload`, and `src/utils/goTrueClient` →
+`packages/core/lib/admin/goTrueClient.ts` (self-contained Identity client —
+admin machinery). `src/lib` now holds ONLY the 2 frozen-path stubs + the
+registry barrel (moves in step 2 with the components).
+
+Seam fixes en route: `edit-mode/ui.ts` dropped its raw `mediaPolicyConfig`
+import for `activeMediaPolicy()` (the T11.2 provider); provider registration
+re-homed from moved libs to entry points; `object-review-ui.test` registers
+the site bindings as a live-policy gate (carve-out); `taxonomy-lookup-guard`
+source-scan path updated.
+
+Gates (step 1): check 0 errors, eslint+prettier clean; tests **1624/1624 +
+67/67**; build-diff vs T11.3 **EMPTY** (74 pages). Remaining T11.4 steps:
+(2) components/PageObjectRenderer/canvas + admin-ui islands + pages shells +
+the `src/data/site` loader seam + registry barrel; (3) the consolidated
+function-factory pass + cli relocation.
+
+## Session 2026-07-24 (T11.3 — core extraction: server layer + SiteBinding seam; NOTIFY row run at fable/xhigh)
+
+**T11.3 DONE** (branch `claude/t11.3-core-extraction-server-layer`, on T11.2).
+Executed at the row's assigned model (owner switched the session to fable for
+it). `netlify/lib/**` (68 modules) now lives at `packages/core/server/lib/**`;
+the **SiteBinding** seam is in (env-var NAMES never values, live per-call
+reads, `PLATFORM_ENV_NAMES` chains pinned in order by test); Dr-Lurie's
+binding at `src/config/site-binding.ts`; `object-store.ts` verb auth resolves
+its secret through it. Adversarial set added
+(`tests/netlify/site-binding.test.ts`): cross-binding isolation with live
+rotation, fails-closed per binding, no shared store handles.
+
+**Hard stop upheld — and a T11.2 breach corrected.** T11.2's batch rewrite had
+touched 3 frozen files (import lines only). Restored to `main` bytes; their
+exact import paths now carry single-purpose re-export shims (10 at
+`netlify/lib/*`, 5 frozen-path stubs under `src/`), so the frozen set never
+needs touching again. All four frozen functions + `mcp/save-json-blob-mcp/`
+verified byte-identical to `main`.
+
+**Recorded discrepancy (functions stay put this task):** the move-map's "MCP
+factory" collides with the frozen legacy article MCP tools living INSIDE
+`mcp.ts` — a factory split of that file is the redesign the hard stop forbids.
+Function-body moves consolidate into T11.4's factory pass; the mcp split waits
+for the legacy path's retirement. `mcp.ts` carries only mechanical import
+rewrites (tool behavior test-pinned).
+
+**Test-harness gap found & fixed (reaches back to T11.2):**
+`tsconfig.test.json` never included `packages/core/**`, so ~193 co-located
+tests moved in T11.2 had been silently dropped from every run since. Revived
+(suite now 1624+67) — including `site-identity.test.ts`, kept as the drlurie
+byte-compat gate (registers real site bindings; tests are carve-out exempt).
+Five more pure modules pulled forward to core (display-name,
+readiness-criteria, paragraphs, assert-reader-safe, variant).
+
+**Gates:** `npm run check` 0 errors, eslint+prettier clean; `npm test`
+**1624/1624 + 67/67**; `build-diff --base <T11.2>` **EMPTY** (74 pages
+byte-identical); core purity verified (no app-code import escapes
+`packages/core`). **Pending:** deployed-preview `/mcp` ping smoke (no deploy
+access this session); binding threading for `deploy-status`/`save-artifact`/
+`admin-get-blob-pdf` rides T11.4/T11.5. Landing still blocked on push access.
+
+## Session 2026-07-24 (T11.2 — core extraction: schema + registries + grammar/validation + pure policy libs)
+
+**T11.2 DONE** (branch `claude/t11.2-core-extraction-pure-libs`, stacked on the
+lockfix). The pure-law layer now lives in `packages/core/` (88 `.ts` files);
+Dr-Lurie builds + tests green against it; **build-diff EMPTY** (74 pages
+byte-identical vs the pre-move base). 88 `git mv` renames (history preserved);
+310 files changed total (moves + import rewrites).
+
+**Moved to core:** all of `schema/**`; `lib/registry/**` (minus the renderer-glue
+barrel `components/index.ts`); `lib/tracking/**`; `object-ids*`, `object-patch-
+apply*`, `agents-naming*`, `approval-policy`, `creation-policy`, `media-policy`,
+`site-identity*`, `template-instantiate`; plus the two pure schema deps
+`richtext/rich-text-v1.ts` and `article-content/to-markdown.ts`.
+
+**Alias ratified:** `@core/*` -> `packages/core/*`. `.astro`/`.tsx` use the
+`@core` Vite alias; all `.ts` use relative `packages/core/...` (Node test-runtime
+resolution — tsc doesn't rewrite path aliases). `tsconfig.test.json` include +
+astro vite alias + tsconfig paths wired.
+
+**Config-injection (behavior-identical).** Four core modules imported site
+config (`approval`, `creation`, `media` policies + `site-identity`; the latter
+two were discovered in execution, not named in the brief). Core now uses a
+provider seam; the site registers all four in the new
+`src/config/policy-bindings.ts`, imported for side effect at every entry that
+reaches a singleton. No `packages/core` module imports `src/`/`netlify/`/site
+config (verified).
+
+**Boundary correction (move-map amended, per its re-verify clause).** The
+brief's pure-lib slice had value-imports into T11.4 modules. DEFERRED to T11.4:
+`registry/components/index.ts` (24 `.astro` imports; renderer glue),
+`publishArticleFromPayload.ts` (`~/utils`), `contentSource{Body,ImportFormData}.ts`
+(article-content). PULLED the two pure schema deps forward. Full rationale in
+`w11-move-map.md` "T11.2 execution amendment".
+
+**In-scope test fixes (moved-path references):** `tracking-loader.test.ts`
+(loader entry path), `object-store-auth.test.ts` (mintId import-path assertion),
+`csp-drift.test.ts` (repo-root marker was `src/lib/tracking`). Gates:
+`npm run check` 0 errors / eslint+prettier clean; `npm test` 1473/1473 +
+67/67; build-diff EMPTY.
+
+**Landing status:** committed locally only — this session has **no push/PR
+access** (read-only git proxy). The lockfix + T11.2 await push credentials to
+land; both were delivered as patches / are on local branches.
+
+## Session 2026-07-23 (W11 scaffold repair — package-lock out of sync with T11.1 workspaces; `main` was red)
+
+**Discrepancy found and fixed (prerequisite to the W11 extraction wave).** The
+T11.1 scaffold added `workspaces: ["packages/*", "sites/*"]` to `package.json`
+plus the two placeholder manifests (`@drlurie/core`, `@drlurie/site-drlurie`)
+but did NOT update `package-lock.json` in the same change (the T11.1 commit
+body deferred its gates — "gates … to be run on apply"). Consequence: **every
+CI job on `main` was failing at `npm ci`** ("Missing: @drlurie/core@0.0.0 from
+lock file"), across all three jobs (`build`, `check`, `fleet`) — all run
+`npm ci`. This blocks green CI on any W11 wave-chunk PR.
+
+**Fix (this change):** `npm install` lock sync only — adds the root
+`workspaces` array and the two workspace link/package entries to
+`package-lock.json` (23 insertions, 0 deletions, **no dependency version
+changes**). No source touched. Verified green on the synced tree: `npm run
+check` (0 errors/0 warnings/4 pre-existing hints, eslint + prettier clean),
+`npm test` (all suites pass), `node scripts/build-diff.mjs --self-test` PASS,
+`node scripts/sync-site-seed.mjs --check` clean. So `main`'s only defect was
+the lockfile; with this, the scaffold actually installs.
+
+**Governance note:** landed as its own isolated repair commit (not bundled
+into any queue task), per autonomous-run "land [missing scaffold pieces]
+first" + "one task, one commit." Recorded here per E5. Does not advance the
+queue; the next not-done row remains **T11.2**.
+
 ## Session 2026-07-23 (T11.0 checkpoint close — platform rulings + W9 completion gate)
 
 **T11.0 is DONE.** Both gates verified against `main` (not docs):

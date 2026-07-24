@@ -9,6 +9,7 @@
  * table with route-kind targets per T2.2): it must validate with ZERO hard
  * failures and EXACTLY ONE warning — the Solutions duplicate-target warning.
  */
+import '../../src/config/policy-bindings.js'; // W11: register site providers (tests exercise the drlurie-bound core)
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -19,7 +20,7 @@ import {
   validateObject,
   type ObjectValidationContext,
   type ReadinessCriterion,
-} from '../../netlify/lib/object-validate.js';
+} from '../../packages/core/server/lib/object-validate.js';
 
 const statusOf = (criteria: ReadinessCriterion[], id: string): string | undefined =>
   criteria.find((criterion) => criterion.id === id)?.status;

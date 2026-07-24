@@ -41,7 +41,7 @@
  * Seeding creates DRAFT records only. Nothing on the live site changes until
  * the Tier 3 publish (T2.3), which is human-executed by design (C§2.2).
  */
-import { NAVIGATION_SEEDS, NAVIGATION_SEED_SITE } from './lib/navigation-seed-data.mjs';
+import { NAVIGATION_SEEDS, NAVIGATION_SEED_SITE } from '../sites/drlurie/seeds/navigation-seed-data.mjs';
 import { checkValidationAgainstSeed, createObjectStoreClient, sameBody } from './lib/object-store-client.mjs';
 
 const AGENT_NAME = 'phase-2-navigation-seed';
