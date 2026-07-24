@@ -1,0 +1,110 @@
+/**
+ * Committed fixture: the exact create-site --dry-run report for a fixed
+ * example client ('acme') — T11.7's acceptance criterion 'dry-run output
+ * committed as a fixture'. An .mjs module (not a plain .txt) so it gets
+ * pulled into the compiled test tree the same way sites/drlurie's seed
+ * .mjs files do (a relative JS import from an included .test.ts file),
+ * without a fragile repoRoot/cwd guess for locating a raw text asset.
+ * Regenerate with:
+ *   node packages/core/cli/create-site.mjs --name acme --dry-run
+ * and paste the output into the template literal below verbatim.
+ */
+export const expectedAcmeDryRun = `
+create-site plan for 'acme' (Acme)
+  site id:        site_acme
+  taxonomy id:    tax_acme
+  theme id:       thm_acme_default
+  canonical host: https://acme.netlify.app
+
+Files to create under sites/acme/ (18):
+  + sites/acme/config/site-identity.ts
+  + sites/acme/config/site-binding.ts
+  + sites/acme/site.config.ts
+  + sites/acme/netlify.toml
+  + sites/acme/package.json
+  + sites/acme/seeds/site-seed-data.mjs
+  + sites/acme/seeds/navigation-seed-data.mjs
+  + sites/acme/seeds/taxonomy-seed-data.mjs
+  + sites/acme/seeds/themes-seed-data.mjs
+  + sites/acme/seeds/section-templates-seed-data.mjs
+  + sites/acme/data/site/navigation/.gitkeep
+  + sites/acme/data/site/pages/.gitkeep
+  + sites/acme/data/site/products/.gitkeep
+  + sites/acme/data/site/section-templates/.gitkeep
+  + sites/acme/data/site/sections/.gitkeep
+  + sites/acme/data/site/templates/.gitkeep
+  + sites/acme/data/site/themes/.gitkeep
+  + sites/acme/data/site/articles/.gitkeep
+
+Netlify actions: none (no --netlify-token supplied — scaffold only).
+
+Env checklist:
+  Core publish + repo binding:
+    PUBLISH_SECRET                   [per-site]  ☐ human-supplied — see the provisioning runbook
+      Publish/release gate secret.
+    NETLIFY_SITE_ID                  [per-site]  ☐ human-supplied — see the provisioning runbook
+      Filled in from the created Netlify site (SITE_ID is the Netlify-injected alias — do not set by hand).
+    NETLIFY_BUILD_HOOK_URL           [per-site]  ☐ human-supplied — see the provisioning runbook
+      Create a build hook on the new site, then paste its URL here.
+    GITHUB_REPOSITORY                [per-site]  ☐ human-supplied — see the provisioning runbook
+      The client's content repo (owner/name).
+    GITHUB_BRANCH                    [per-site]  ☐ human-supplied — see the provisioning runbook
+      Content branch (defaults to main if unset).
+    GITHUB_CONTENT_TOKEN             [per-site]  ☐ human-supplied — see the provisioning runbook
+      Write token scoped to the client's content repo (may be a fleet machine account, per-repo scoped — T11.10).
+    GITHUB_COMMIT_AUTHOR_EMAIL       [per-site]  ☐ human-supplied — see the provisioning runbook
+      Git committer identity fallback (site-config-derived).
+    GITHUB_COMMIT_AUTHOR_NAME        [per-site]  ☐ human-supplied — see the provisioning runbook
+      As above.
+  Access, identity, governance:
+    MCP_HTTP_AUTH_TOKEN              [per-site]  ☐ human-supplied — see the provisioning runbook
+      Shared MCP auth key (deprecated-fallback once T11.10 per-agent tokens land).
+    ADMIN_EMAILS                     [per-site]  ☐ human-supplied — see the provisioning runbook
+      Admin allowlist (Identity bootstrap) — human-owned.
+    ROLE_EMAILS_ADMIN                [per-site]  ☐ human-supplied — see the provisioning runbook
+      Role allowlist — human-owned.
+    ROLE_EMAILS_EDITOR               [per-site]  ☐ human-supplied — see the provisioning runbook
+      Role allowlist — human-owned.
+    ROLE_EMAILS_PUBLISHER            [per-site]  ☐ human-supplied — see the provisioning runbook
+      Role allowlist — human-owned.
+    IDENTITY_URL                     [per-site]  ☐ human-supplied — see the provisioning runbook
+      Netlify Identity endpoint for the new site.
+    ARTIFACT_UPLOAD_TOKEN_SECRET     [per-site]  ☐ human-supplied — see the provisioning runbook
+      Signs artifact-upload intents.
+    ARTIFACT_URL_INGEST_ALLOWED_HOSTS [per-site]  ☐ human-supplied — see the provisioning runbook
+      Allowed hosts for URL-based artifact ingest — human-owned policy choice.
+  pdf-tool + tracking tenancy axes:
+    PDF_TOOL_PROJECT_ID              [per-site]  ☐ human-supplied — see the provisioning runbook
+      Defaults to the site slug if unset — override only if it must differ.
+    PDF_TOOL_STORAGE_SITE_ID         [fleet-shared]  reuse the fleet value — do not create a new one
+      Points at the ONE shared pdf-tool storage service — reuse the fleet value, do not create a new one.
+    PDF_TOOL_STORAGE_TOKEN           [fleet-shared]  reuse the fleet value — do not create a new one
+      Auth for that shared service — reuse the fleet value.
+    TRACKING_PROJECT_ID              [per-site]  ☐ human-supplied — see the provisioning runbook
+      This client's partition in the tracking owner-DB (trk_<shortId> convention).
+    TRACKING_SALT                    [per-site]  ☐ human-supplied — see the provisioning runbook
+      Hashing salt — MUST differ per site for cross-client privacy isolation.
+    TRACKING_SINK_URL                [per-site (may be fleet-shared)]  ☐ human-supplied — see the provisioning runbook
+      Owner-DB sink endpoint — one shared DB is allowed with TRACKING_PROJECT_ID as the partition.
+    TRACKING_SINK_TOKEN              [per-site (may be fleet-shared)]  ☐ human-supplied — see the provisioning runbook
+      Bearer for the sink; pairs with TRACKING_SINK_URL.
+  AI + integrations:
+    ANTHROPIC_API_KEY                [fleet-shared]  reuse the fleet value — do not create a new one
+      AI provider key — reuse the fleet value.
+    OPENAI_API_KEY                   [fleet-shared]  reuse the fleet value — do not create a new one
+      AI provider key — reuse the fleet value.
+    OPENAI_CHATKIT_WORKFLOW_ID       [per-site]  ☐ human-supplied — see the provisioning runbook
+      ChatKit workflow id for this site's admin chat.
+    NETLIFY_AUTH_TOKEN               [fleet-shared]  reuse the fleet value — do not create a new one
+      Netlify account API token (provisioning/build automation) — reuse the fleet value.
+    STRIPE_SECRET_KEY                [per-site, optional]  ☐ human-supplied — see the provisioning runbook
+      Shop module only, if this client sells — the client's own Stripe account.
+    STRIPE_SECRET_KEY_TEST           [per-site, optional]  ☐ human-supplied — see the provisioning runbook
+      Shop test key.
+    STRIPE_WEBHOOK_SECRET            [per-site, optional]  ☐ human-supplied — see the provisioning runbook
+      Shop webhook signing secret.
+    STRIPE_WEBHOOK_SECRET_TEST       [per-site, optional]  ☐ human-supplied — see the provisioning runbook
+      Shop test webhook secret.
+  Transitional site-identity env overrides (escape hatch only; prefer the config file):
+    SITE_OBJECT_ID, SITE_SLUG, SITE_BRAND_NAME, SITE_TAXONOMY_ID, SITE_TRACKING_PROJECT_ID, MCP_SERVER_NAME, MCP_SERVER_DIAGNOSTIC_NAME, SITE_ASSET_HOST, SITE_ASSET_FOLDER, PDF_TOOL_PROJECT_ID
+`;

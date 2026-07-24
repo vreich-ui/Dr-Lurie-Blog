@@ -19,11 +19,11 @@ import type { ObjectType } from '../../packages/core/schema/object-record-v1.js'
 const findSiteData = (): string => {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 10; i += 1) {
-    const candidate = join(dir, 'src', 'data', 'site');
+    const candidate = join(dir, 'sites', 'drlurie', 'data', 'site');
     if (existsSync(candidate)) return candidate;
     dir = dirname(dir);
   }
-  throw new Error('could not locate src/data/site');
+  throw new Error('could not locate sites/drlurie/data/site');
 };
 const SITE_DATA = findSiteData();
 const DIRS: Array<{ dir: string; type: ObjectType }> = [

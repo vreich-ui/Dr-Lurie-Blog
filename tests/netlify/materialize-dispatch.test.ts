@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { materialize, type MaterializableObjectType } from '../../packages/core/server/lib/materialize.js';
 
-const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 1 };
+const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 1, exportRoot: 'sites/drlurie/data/site' };
 
 const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
   [
@@ -20,32 +20,32 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
       defaultNavigation: { header: 'nav_header', footer: 'nav_footer' },
       blog: { listPath: '/blog', postsPerPage: 10, categoryBase: '/category', tagBase: '/tag' },
     },
-    'src/data/site/site.json',
+    'sites/drlurie/data/site/site.json',
   ],
   [
     'page',
     'page_home',
     { route: '/', pageType: 'home', title: 'Home', seo: {}, sections: [] },
-    'src/data/site/pages/page_home.json',
+    'sites/drlurie/data/site/pages/page_home.json',
   ],
-  ['navigation', 'nav_footer', { role: 'footer', groups: [] }, 'src/data/site/navigation/nav_footer.json'],
+  ['navigation', 'nav_footer', { role: 'footer', groups: [] }, 'sites/drlurie/data/site/navigation/nav_footer.json'],
   [
     'taxonomy',
     'tax_drlurie',
     { kinds: { category: { terms: [] }, tag: { terms: [] } } },
-    'src/data/site/taxonomy.json',
+    'sites/drlurie/data/site/taxonomy.json',
   ],
   [
     'template',
     'tpl_home',
     { name: 'Home template', appliesTo: [], slots: [] },
-    'src/data/site/templates/tpl_home.json',
+    'sites/drlurie/data/site/templates/tpl_home.json',
   ],
   [
     'section_template',
     'stpl_cta',
     { name: 'CTA recipe', blueprint: { id: 's_bp', type: 'cta_banner', data: { heading: 'Go', actions: [] } } },
-    'src/data/site/section-templates/stpl_cta.json',
+    'sites/drlurie/data/site/section-templates/stpl_cta.json',
   ],
   [
     'theme',
@@ -54,13 +54,13 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
       name: 'Default',
       tokens: { colors: { primary: '#112233' }, fonts: { sans: 'Inter', serif: 'Lora', heading: 'Inter' } },
     },
-    'src/data/site/themes/thm_default.json',
+    'sites/drlurie/data/site/themes/thm_default.json',
   ],
   [
     'section',
     'sec_cta',
     { section: { id: 's_cta1', type: 'prose', data: { body: 'Hello' } } },
-    'src/data/site/sections/sec_cta.json',
+    'sites/drlurie/data/site/sections/sec_cta.json',
   ],
   [
     'product',
@@ -81,7 +81,7 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
         filename: 'barrier-repair-guide.pdf',
       },
     },
-    'src/data/site/products/prod_barrier_repair_guide.json',
+    'sites/drlurie/data/site/products/prod_barrier_repair_guide.json',
   ],
   [
     'tracking_config',
@@ -100,7 +100,7 @@ const cases: Array<[MaterializableObjectType, string, unknown, string]> = [
         utm_capture: true,
       },
     },
-    'src/data/site/tracking.json',
+    'sites/drlurie/data/site/tracking.json',
   ],
 ];
 
@@ -122,7 +122,7 @@ test('materialize routes content_item to the article export path (W7.3)', () => 
     },
     meta
   );
-  assert.equal(result.path, 'src/data/site/articles/req_agent_probe_20260713_01.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/articles/req_agent_probe_20260713_01.json');
   // The annotation layer is exported verbatim (the leak rule lives at the renderer).
   assert.match(result.content, /"strategy": "summary"/);
 });

@@ -7,6 +7,511 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.11 prep — second-site acceptance run: agent-side readiness verified, HALTED on account authority)
+
+T11.11 is `human_gate` (queue.tsv) — "prepared by agents; executed with
+account authority (Netlify site creation, env, DNS optional for staging)"
+per the brief itself. Per the autonomous-run rule (human_gate tasks are
+prepared in full, never completed by the agent) and this session's own
+governing instruction ("HALT only on the step needing account authority"),
+this is exactly that halt point. Nothing was committed as `T11.11: …` —
+the task is not done; this is the prep-and-stop entry, matching the
+T9.16+T9.23 prep precedent (`775441fe`).
+
+**Verified agent-side (everything preparable without a real Netlify
+account):**
+
+- `node packages/core/cli/create-site.mjs --name staging --dry-run` runs
+  clean end-to-end: scaffolds a full plan (site-identity/site-binding/
+  site.config/netlify.toml/package.json, an empty committed-export tree,
+  the five-piece baseline seed pack) and prints the complete per-site env
+  checklist (core publish + repo binding, access/identity/governance,
+  pdf-tool + tracking tenancy axes, AI + integrations, the transitional
+  site-identity env overrides) grouped by `[per-site]` vs
+  `[fleet-shared]` — confirming T11.7's CLI and
+  `docs/cms-architecture/site-provisioning-runbook.md` are in sync and the
+  scaffold mechanism itself is sound. Dry-run touches neither disk nor
+  network, so this proof is safe and repeatable without committing
+  anything or needing a real account.
+- Re-read `site-provisioning-runbook.md` end to end: its own §4 already
+  says the quiet part out loud — "today exactly one Netlify build (Dr-Lurie's)
+  reads any `site.config.ts` at build time… pointing a REAL second Netlify
+  build at its own `sites/<client>/` tree… is T11.11's job… this section
+  exists so nobody mistakes 'the directory exists' for 'the site is live.'"
+  That is precisely the wall this session hit.
+
+**Why this genuinely cannot proceed further from this sandbox** — every
+remaining step in the brief's scope needs live external state this
+environment has no path to:
+
+1. `create-site --netlify-token …` needs a real Netlify API token with
+   site-create rights and actually calls the Netlify API to provision a
+   second site + probe its 8 blob stores — no such token/account access
+   exists in this sandbox (same posture this whole wave has recorded for
+   T11.7/T11.8/T11.9's "unverified in a live run" notes, but those tasks
+   could still fully verify their OWN mechanism locally; T11.11's
+   acceptance criteria explicitly requires "commit/deploy refs" from a
+   REAL second site, which by definition can't be produced locally).
+2. The baseline seed pack drive (`--production` against the new site's
+   real endpoint) and the agent MCP round-trip proof both require that
+   real, deployed second site to exist and be reachable first.
+3. The fleet-propagation proof needs two real Netlify builds (Dr-Lurie's
+   + the new site's) actually running in CI/on Netlify — this sandbox has
+   no path to trigger or observe a live GitHub Actions run or a live
+   Netlify build (recorded the same way for every prior W11 CI task).
+
+**What Wolf's action unblocks:** once a real second site exists (runbook
+§1–§2: `create-site --name <client>` for real, then `--netlify-token`, then
+the by-hand env items in §3), this same brief's steps 2–4 are directly
+executable by an agent session with that site's live URL and deploy access
+in hand — nothing about the mechanism itself is in question, only the
+account-authority half only Wolf can perform.
+
+**T11.12 is blocked behind this** (`depends_on: T11.11`) — the autonomous
+run stops here rather than fabricating a close-out over an incomplete
+fleet proof.
+
+## Session 2026-07-24 (T11.10 — Per-site governance, secrets, and the minimal per-agent-credential slice)
+
+**Per-agent credentials (ratified in scope by OQ-W11-5 — verifiable tokens,
+not a full IAM)** — new `packages/core/server/lib/agent-keys.ts`: a
+`agent-keys.v1` doc living as a SIBLING key in the SAME `governance` blob
+store `admin-governance.ts` already owns (no new blob store, T11.7's
+`CORE_BLOB_STORES` pin untouched). Records are `{agent_name, token_hash
+(sha256), status, site, created_by, created_at, revoked_at?}` — the raw
+token is minted (`crypto.randomBytes(32).toString('base64url')`), returned
+exactly once to the caller, and never persisted or logged. One ACTIVE key
+per `(agent_name, site)`: minting a replacement auto-revokes the prior one.
+`resolveVerifiedAgentName(token, site, doc)` is a PURE function (no store
+access, timing-safe hash compare) — fails closed on every adversarial case:
+forged token, revoked key, wrong site, null doc, empty-string token. 13
+tests in `agent-keys.test.ts`.
+
+**Admin surface** — `admin-governance.ts` gained three verbs:
+`agent_keys_list` (Admin, strips `token_hash` via `describeAgentKeys`),
+`agent_keys_create`/`agent_keys_revoke` (Owner-only, same bar as every
+other governance write there). `create` is the only response in the whole
+handler that ever carries a raw token. `requestSchema` is now exported so
+the request CONTRACT is testable directly; the owner-gating WIRING is
+proven with a source-level regex assertion, matching this file's own
+established `tracking-governance.test.ts` precedent (no test-injection seam
+exists for `getAdminStateFromEvent`, the same gap that file already worked
+around). 5 tests in `admin-governance.test.ts`.
+
+**MCP auth wiring** — the actual identity path. `netlify/functions/mcp.ts`'s
+`getAuthResult` is now `async`: it resolves a verified per-agent bearer
+token FIRST, independently of the shared `MCP_HTTP_AUTH_TOKEN` gate — a
+verified token satisfies the gate on its own, even against an unset or
+mismatched shared secret. When no verified token is present, the existing
+shared-secret decision tree runs byte-identical to before (deprecated
+fallback, not a forced cutover, per the brief's own non-goals). The
+resolved `verifiedAgentName` rides on the Lambda event and, in `callTool`,
+overrides self-declared `agent_name` — but ONLY for an explicit allowlist
+of 7 CMS attribution tools (`CMS_AGENT_NAME_ATTRIBUTION_TOOLS`:
+`object_create`, `object_create_variant`, `object_instantiate_template`,
+`object_instantiate_section_template`, `site_apply_theme`,
+`product_set_price`, `order_reissue`). **A blanket override was the first
+draft and was caught and fixed before ever running a test**: `agent_name`
+also means workflow-pipeline STAGE identity for
+`save_json_blob_mark_agent_complete`/`patch_agent_output` (validated
+against a completely different fixed enum — research/draft/reader_insight/
+etc.) — an unscoped override would have broken every legitimate
+workflow-stage call whenever a verified bearer token happened to be
+presented. 7 tests in `mcp-agent-keys-auth.test.ts`, run against the REAL
+handler + a real isolated local-blob-backed governance store: verified
+token beats the wrong shared secret; revoked token fails closed; forged
+token never verifies; cross-site key never leaks; open dev-mode
+unaffected; verified identity overrides a forged `agent_name` on
+`object_create`; and — the critical carve-out proof — verified identity
+does NOT touch `save_json_blob_mark_agent_complete`'s enum-validated
+`agent_name`.
+
+**Per-site posture files** — `sites/drlurie/config/approval-policy.ts` +
+`creation-policy.ts` (new), verbatim relocation of the committed values
+from `src/config/`, matching T11.7's `create-site.mjs` scaffold shape for
+the next client. `src/config/policy-bindings.ts` now imports from the new
+location; the old `src/config/approval-policy.ts`/`creation-policy.ts` are
+deleted (only 2 real importers existed, both updated — verified by
+exhaustive grep before deletion, not assumed).
+
+**`docs/cms-architecture/secrets-runbook.md`** (new) — the brief's explicit
+deliverable: a one-page inventory of every secret in the fleet (scope,
+what it gates, storage, rotation procedure), the project's random-token
+generation convention, and — the standing debt the brief calls out by
+name — the `PUBLISH_SECRET` rotation, exposed 2026-07-11 and never
+rotated since, now also a hard shop-launch blocker per
+`06-shop-module-plan.md` §0.5. T11.10 does NOT rotate it (still a
+human/Wolf-scheduled act) or retire it (the per-agent mechanism is an
+attribution layer on top of the object-store proxy's existing
+`PUBLISH_SECRET`-gated write path, not a replacement for it) — the runbook
+just makes executing that rotation a known five-step procedure.
+
+**`object_review_decide`'s TODO comment** (mcp.ts, ~line 1548) updated to
+reflect that a verified-agent mechanism now exists, while being explicit
+that this verb's own authorization is DELIBERATELY unchanged — M-6
+approvals stay human-only (no agent-approves-agent review), per this
+task's own non-goals. Wiring verified identity into approval authority
+would be a capability change, not an attribution one, and stays out of
+scope until a future task explicitly ratifies it.
+
+**M-6 posture unchanged, proven by absence of change**: no approval-decision
+logic was touched anywhere in this task; the full suite staying green
+(1698/1698, unchanged pass count from before this task's own +18 new tests
+were added) is the proof that nothing about `object_review_decide`'s
+authorization behavior shifted. No new dedicated regression test was
+written asserting this specifically, since it is a "nothing changed here"
+claim already covered by the full suite's continued green state.
+
+**Gates:** `astro check` 0 errors; `eslint .`/`prettier --check` clean
+(including the new `packages/core/server/lib/agent-keys.*`,
+`packages/core/server/functions/admin-governance.test.ts`,
+`tests/netlify/mcp-agent-keys-auth.test.ts`, `sites/drlurie/config/*.ts` —
+none of these paths are covered by the project's own `check:prettier`
+glob, checked separately; 6 files needed a manual `prettier --write` pass,
+re-verified clean afterward); full test suite **1698/1698 + 85/85** (up
+from 1673/1673 + 85/85: +25 co-located — 13 agent-keys + 5
+admin-governance + 7 mcp-agent-keys-auth); `build-diff.mjs --self-test`
+PASS; `build-diff.mjs --base origin/main --site sites/drlurie` (working
+tree vs `origin/main`) — EMPTY, 74/74 (unaffected — nothing here touches
+render/build output). Committed `T11.10: …`; no PR (per the brief).
+
+**Next in queue:** T11.11 (Second-site acceptance proof, sonnet/medium,
+human_gate — HALT only on the step needing account authority).
+
+## Session 2026-07-24 (T11.9 — Schema-migration harness: registry/classify framework + `migrate-site` CLI + fleet CI gate; no real schema bump shipped)
+
+**Framework** — new `packages/core/server/migrations/registry.ts` +
+`classify.ts`. A migration is `{objectType, from, to, description, migrate,
+toPatchOps?, inverse?, irreversible?}`; `findMigrationChain` (BFS) composes
+one-hop migrations into an arbitrary chain; `classifyRecord` decides
+per-record disposition — `parses-as-is` (wins over a version-string
+technicality), `migratable` (`writable` iff every hop carries `toPatchOps`),
+or `blocked` (no path, OR a chain exists but the migrated body still fails —
+distinguished from "no path" as a broken-migration signal); `classifySiteRecords`
+fails a whole scan on a single blocked record. **`toPatchOps` is optional by
+design**: not every object type has a generic replace-body op (page/section
+have narrower field-scoped ops) — a migration without one is preview-only,
+never an unsafe workaround around the existing patch grammar. 23 unit
+tests, including the brief's own required adversarial case: a synthetic
+v1→v2 required-field addition blocks with no migration registered, passes
+once one is.
+
+**CLI** — new `packages/core/cli/migrate-site.mjs`. `--dry-run` (default)
+scans a site's COMMITTED exports and classifies every record — pure disk +
+the registry. Since a committed export carries no real `schema_version` tag
+at all, every scanned record's version is assumed to be the current head
+version for its type (`CURRENT_SCHEMA_VERSIONS` — the one map a real bump
+would update, mirroring `object-verbs.ts`'s own hardcode) — a recorded,
+deliberate assumption, correct as long as nothing has drifted (true today).
+`--write` applies migratable+writable records through the STANDARD verb
+path only — `get` → `checkout` → `patch` (the chain's own `toPatchOps`) → a
+best-effort republish only when the record was already live → `checkin`
+(always attempted) — never a raw blob write; real production writes need
+real Netlify credentials this sandbox doesn't have, so `--write` without
+`--local` refuses explicitly rather than silently no-op'ing (same posture
+as T11.7's `--netlify-token` path). 13 tests, including the real
+`sites/drlurie` export tree passing the gate today (64 records, 0 blocked)
+and the write orchestration proven against an in-memory store with a
+migration compatible with the REAL page schema (proving the mechanism; the
+adversarial schema-blocking logic already has its own fully-synthetic proof
+in `classify.test.ts`).
+
+**CI gate** — new `scripts/ci/schema-migration-gate.mjs`, extending T11.8's
+fleet discovery so a second client needs zero edits here: per discovered
+site, a throwaway `tsc` pass into its own outDir, dynamic import of the
+compiled CLI, scan, fail if any site is blocked. **Verified for real**: ran
+it directly in this sandbox — compiled, imported, scanned the real
+`sites/drlurie` tree, reported PASS, cleaned up, exit 0. Wired into the
+`check` job as a new named step in `.github/workflows/actions.yaml` (time-
+budget comment updated); same "unverified in a live GH Actions run" posture
+as T11.7/T11.8 (no way to execute Actions from this sandbox) — everything
+the step actually runs was proven locally instead.
+
+**Gates:** `astro check` 0 errors; `eslint .`/`prettier --check` clean
+(including the new `packages/core/server/migrations/**`,
+`packages/core/cli/migrate-site.*`, `scripts/ci/schema-migration-gate.mjs`,
+and `tests/scripts/schema-migration-gate.test.mjs`, checked separately —
+none of these paths are covered by the project's own `check:prettier`
+glob); full test suite **1673/1673 + 85/85** (up from 1637/1637 + 82/82:
++36 co-located — 23 registry/classify + 13 migrate-site — and +3 in
+`tests/scripts` — schema-migration-gate's aggregation logic);
+`build-diff.mjs --self-test` PASS; `build-diff.mjs HEAD origin/main --site
+sites/drlurie` — EMPTY, 74/74 (unaffected — nothing here touches build
+output). Committed `T11.9: …`; no PR (per the brief).
+
+**Next in queue:** T11.10 (Per-site governance + credentials inventory,
+NOTIFY, fable/high).
+
+## Session 2026-07-24 (T11.8 — Fleet CI: dynamic per-site matrix + change-scoped fan-out; live GH Actions run unverified)
+
+**Replaced the T11.1 placeholder `fleet` job** (hardcoded `matrix: site:
+[drlurie]`) with real dynamic discovery. New
+`scripts/ci/discover-fleet-matrix.mjs`: `discoverSites()` lists every
+`sites/<name>/` carrying its own `site.config.ts` (today: exactly
+`['drlurie']`); `computeFleetMatrix()` is a pure function deciding, from a
+list of changed paths, whether the fleet fans out fully or scopes to just
+the touched site(s) — deliberately conservative: a diff confined ENTIRELY to
+`sites/**` scopes down, anything else (`packages/core`, root config, an
+unresolvable diff) fans out to everyone. A new `discover-fleet` job runs
+this once per CI run and feeds its outputs (`sites`, `fan_out`) to both the
+`fleet` job's matrix and a new `fleet-build-diff` job.
+
+`fleet` now runs, per discovered site: install, `astro check`, build, full
+suite, and the site-seed drift guard (moved here from the `check` job,
+where it was hardcoded to `sites/drlurie` — now it runs per-site,
+best-effort skipped rather than failed for a site with no
+`sync-site-seed.mjs` yet, since T11.7's `create-site.mjs` scaffold doesn't
+generate one today — a recorded residual, not silently papered over).
+`fleet-build-diff` (new) runs only on PRs where the fleet fanned out: per
+site, `build-diff.mjs <base> <head> --site sites/<site>` piped to a file
+with `|| true` (never fails the job — a non-empty diff is a review artifact
+per design-principles rule 4, not an automatic failure) and uploaded via
+`actions/upload-artifact@v4`.
+
+**Verified against real git history, not just unit tests:** `HEAD~1..HEAD`
+and `origin/main..HEAD` both correctly report `fanOut: true` (T11.6/T11.7
+touch `packages/core`); a throwaway demo commit touching only
+`sites/drlurie/data/site/.demo-touch-tmp` correctly reported `{"sites":
+["drlurie"],"fanOut":false}` before being reverted (`git reset --hard`) —
+proving the filter side of the acceptance criteria, not just the fan-out
+side. 12 new unit tests
+(`tests/scripts/discover-fleet-matrix.test.mjs`) cover discovery (including
+a half-scaffolded site with no `site.config.ts` — correctly excluded) and
+every fan-out/scope-down branch of `computeFleetMatrix`, plus the
+`$GITHUB_OUTPUT`-writing helper (`sites=`/`fan_out=` lines, no bash-side
+JSON parsing needed in the workflow step).
+
+**Mid-task incident, self-caught and fixed:** while manually proving the
+filter behavior against real git history (the demo-commit test above), a
+`git reset --hard $BASE` used to revert the throwaway demo commit also
+discarded the (uncommitted, unstaged) `actions.yaml` edit sitting in the
+working tree at the time — `git reset --hard` resets the working tree to
+match the target commit, not just HEAD, and does not distinguish "changes
+from the commit being undone" from "unrelated uncommitted work." Caught
+immediately by re-checking `git diff --stat` /grepping for the new job
+names post-revert; the file was still fully in context from having just
+written it, so it was rewritten byte-for-byte rather than redone from
+scratch. Lesson recorded here rather than just silently fixed: `git stash`
+(or committing the actual change FIRST) is the safe move before any
+`reset --hard`-based demo/revert dance, not `reset --hard` while unrelated
+edits are still unstaged.
+
+**Recorded, not a halt:** this is a GitHub Actions workflow file; there is
+no way to execute GitHub Actions from inside this sandboxed session.
+Verified instead: the YAML parses (`js-yaml`), every command a step invokes
+runs correctly against real repo state locally (`npm run
+check:astro`/`build`/`test`, `discover-fleet-matrix.mjs` against real SHA
+ranges, `build-diff.mjs`'s existing `<base> <head> --site <path>` interface).
+The GitHub-Actions-specific plumbing (`github.event.pull_request.base.sha`,
+`fromJson()` over a job output, whether the default PR-merge-commit checkout
+still carries the head SHA's commit object for `git worktree add` to
+resolve) is standard/documented but unverified live — same posture as
+T11.7's Netlify API calls. A real PR against this branch is the first true
+proof; flagged for whoever lands this to watch the first Actions run
+closely.
+
+**Gates:** `astro check` 0 errors; `eslint .`/`prettier --check` clean
+(including the new `scripts/ci/**` and the workflow YAML, checked
+separately); full test suite **1637/1637 + 82/82** (12 new); `build-diff.mjs
+--self-test --site sites/drlurie` PASS; `build-diff.mjs HEAD origin/main
+--site sites/drlurie` — EMPTY, 74/74 (unaffected — nothing here touches
+build output). Committed `T11.8: …`; no PR (per the brief).
+
+**Next in queue:** T11.9 (Schema-migration harness, NOTIFY, fable/high).
+
+## Session 2026-07-24 (T11.7 — provisioning CLI: `create-site`; scaffold + runbook committed, live Netlify path unverified — no credential)
+
+**Built `packages/core/cli/create-site.mjs`** per the standalone brief's
+Scope (not the move-map's `cli/` row, which additionally assigns the
+physical relocation of `build-diff.mjs`/`home-conversion-roundtrip.mjs` to
+land here — the brief itself doesn't ask for that move; see the recorded
+discrepancy in the T11.7 move-map amendment, left for T11.12 to reconcile).
+`--name <client>` scaffolds `sites/<client>/`: its own self-contained
+`config/site-identity.ts` + `config/site-binding.ts` + `site.config.ts`
+(importing only from `packages/core` — cleaner than Dr-Lurie's own shell,
+which re-exports singletons from `src/config/*`, a location that's
+Dr-Lurie's alone), `netlify.toml`, `package.json`, an empty committed-export
+tree (`data/site/**/.gitkeep`), and a baseline seed pack: a starter site
+singleton (generic branding/palette), a two-item nav skeleton, an empty
+taxonomy registry, a default theme, and the five canonical starter
+section-template recipes (same ids as Dr-Lurie's `stpl_*` — their blueprint
+copy carries no client-specific content). `--dry-run` prints the full plan
+touching neither disk nor network; `--netlify-token` additionally creates
+the Netlify site, probes this site's 8 blob stores (write→read→delete, the
+`provision-pdf-tool-stores.mjs` pattern), and pushes generated per-site
+secrets (`PUBLISH_SECRET`, `MCP_HTTP_AUTH_TOKEN`,
+`ARTIFACT_UPLOAD_TOKEN_SECRET`, `TRACKING_SALT`) straight to the new site's
+env store — never printed. Idempotent: an existing `sites/<client>/` is
+detected and left untouched.
+
+**Two real bugs caught by validating the baseline pack's seed bodies
+against the actual `packages/core/schema/bodies/*` zod schemas** (not
+assumed valid): `content_grid`'s `related` source needs an `algorithm`
+field, not a bare `related_articles` kind literal; `newsletter_signup`
+needs `formName`, not `formAction`. Both fixed before commit.
+
+**Unit tests** (`packages/core/cli/create-site.test.ts`, co-located per the
+`packages/core` precedent so schema-validating assertions get a normal
+relative import instead of reaching into `.tmp/ci-test` by a fragile path):
+id-scoping (`site_<client>`/`tax_<client>`/`thm_<client>_default`, no
+cross-client collision), the full baseline-pack file list, the 8-store list
+pinned against `blob-store.ts`/`governance-store.ts`/`users-store.ts`/
+`chat-store.ts`'s literals, the env checklist covers every per-site row from
+the brief's table (not an illustrative subset), no secret-shaped value ever
+appears in dry-run output or in files actually written to disk (a real
+scratch-scaffold-then-read-back check, cleaned up after), and the dry-run
+report byte-matches a committed fixture
+(`tests/fixtures/create-site-dry-run-acme.mjs` — an `.mjs` module wrapping
+the text, not a raw `.txt`, so it gets pulled into the compiled test tree
+the same way `sites/drlurie`'s seed `.mjs` files do for other tests, instead
+of needing a real-repo-root guess from a compiled test's `import.meta.url`).
+10 new tests, all passing.
+
+**`docs/cms-architecture/site-provisioning-runbook.md`** (new): the human
+half — scaffold, create+provision, then the by-hand steps (GitHub repo
+binding, build hook, Identity/roles, tenancy axes, AI keys — reuse the
+fleet's, Stripe if the client sells, DNS, secret-rotation debt pointer to
+T11.10) — plus an explicit note that wiring an actual SECOND live deployment
+to read from its own `sites/<client>/` (rather than `sites/drlurie/`) is
+T11.11's job, not this scaffold's: today exactly one Netlify build (Dr-Lurie's)
+reads any `site.config.ts` at build time.
+
+**Recorded limitation, not a halt:** the `--netlify-token` path (real site
+creation, the store probe, generated-secret push) is built against the
+documented Netlify API shape (`POST /api/v1/sites`, `POST
+/api/v1/accounts/:id/env`) but has never run against a live account —
+`NETLIFY_API_TOKEN` isn't available in this session, exactly the prerequisite
+autonomous-run.md already flags as "needed from T11.7 on." Per the standing
+instruction that credential unavailability doesn't block building, this is
+recorded rather than treated as a stop: the brief's actual acceptance
+criteria (unit tests over scaffold output, a committed dry-run fixture, no
+secret material in any artifact) don't require a live run, and the brief's
+own non-goals rule out creating a real second site here. The control flow
+(`executeNetlifyProvisioning`) takes an injectable `fetchImpl`/`getStoreImpl`
+seam (the `object-publish.ts`/`provision-pdf-tool-stores.mjs` testing-seam
+precedent) so it's unit-testable without credentials, but the live wire
+shapes are only as verified as Netlify's current public docs — T11.11's
+provisioning step is this path's real first proof.
+
+**Gates:** `astro check` 0 errors; `eslint .` / `prettier --check` clean
+(including `packages/core/cli/**` — not covered by the project's
+`check:prettier` npm script glob, verified separately); full test suite
+**1637/1637 + 70/70** (10 new); `build-diff.mjs --self-test --site
+sites/drlurie` PASS; `build-diff.mjs HEAD origin/main --site sites/drlurie`
+— **74/74 pages byte-identical, EMPTY diff** (unaffected — nothing in
+Dr-Lurie's own build path imports anything new here). Committed `T11.7: …`;
+no PR (per the brief).
+
+**Next in queue:** T11.8 (Fleet CI, opus/medium, auto).
+
+## Session 2026-07-24 (T11.6 step 3/3 — driver-script `--site` parameterization; T11.6 CLOSED)
+
+**T11.6 step 3 committed, closing T11.6.** Scope call recorded up front: the
+brief's literal "move driver scripts to `packages/core/cli/`" bullet was
+DEFERRED to T11.7, not executed here — the T11.4 amendment had already set
+this precedent ("rides T11.7 where site-parameterization makes the move
+meaningful"), and ~40 other task briefs across the queue reference
+`node scripts/build-diff.mjs` / `scripts/home-conversion-roundtrip.mjs` at
+their current literal path; moving the files now, before T11.7 builds
+whatever makes the new location meaningful, would silently break every one of
+those references for zero compensating benefit. What T11.6 genuinely
+required — `--site` parameterization, since step 2's `git mv` had actively
+broken both scripts — was done in place.
+
+`scripts/build-diff.mjs` gained `--site <path>` (default `sites/drlurie`);
+`SELF_TEST_FILE` now derives from it instead of a hardcoded
+`src/data/site/...` literal. `scripts/home-conversion-roundtrip.mjs` gained
+the same flag; `siteRoot`/`siteExportRoot` feed the default `--seeds` path,
+the navigation reference-target seed lookup, and the `--write-exports`
+materialize meta's `exportRoot`; production-mode endpoint resolution now
+reads `canonicalHost` from the site's compiled `site.config.js` rather than a
+hardcoded host (falling back to the old hardcoded endpoint if that compiled
+file is absent).
+
+**Found and fixed in passing** — latent, pre-existing breakage in
+`home-conversion-roundtrip.mjs` that this driver's exclusion from `npm test`
+had let sit undetected, but which blocked proving the acceptance criterion so
+it had to be fixed: (1) the default `--seeds` path still pointed at the
+pre-T11.6-step-1 `scripts/lib/page-home-seed-data.mjs` (the step-1 import
+rewrite only caught static `import` statements, not this `path.join()`);
+(2) the navigation reference-target seed path still built from
+`repoRoot + 'src/data/site/navigation'`, broken by this session's own step-2
+move; (3) the materializer/`local-blobs` compiled-path imports still pointed
+at the defunct `netlify/lib/...` location, an unnoticed T11.3 regression.
+Also fixed: `sites/drlurie/seeds/sync-site-seed.mjs`'s `EXPORT_PATH` still
+pointed at the pre-step-2 `src/data/site/site.json` (step 1 couldn't have
+caught this — the export hadn't moved yet at step-1 time); now points at
+`sites/drlurie/data/site/site.json`, verified `--check` reports "seed already
+matches the production export."
+
+**Gates (final, all green):** `astro check` 0 errors; `eslint .` clean;
+`prettier --check` clean; full test suite **1627/1627 + 70/70**;
+`build-diff.mjs --self-test --site sites/drlurie` PASS (both sub-checks);
+`build-diff.mjs HEAD origin/main --site sites/drlurie` — **74/74 pages
+byte-identical, EMPTY diff**; `home-conversion-roundtrip.mjs --local --site
+sites/drlurie` SUCCESS (run twice, once with `--write-exports` — both runs'
+working-tree pollution of the real committed exports reverted via
+`git checkout --` immediately after, per the flag's documented behavior).
+
+**T11.6 is CLOSED** — all three steps landed, full acceptance criteria met.
+Next in queue: T11.7 (Provisioning CLI).
+
+## Session 2026-07-24 (T11.6 step 2/3 — committed exports → sites/drlurie/data/site/, materializer paths parameterized)
+
+**Also this session:** the T11.6-step-1 branch's 8 commits landed on `main`
+via PR #471 (merged by Wolf using the delivered `w11-land.zip` bundle+scripts —
+push access for this session remains read-only as established; nothing
+changed on that front, the user applied it with their own credentials).
+Confirmed via `git merge-base HEAD origin/main` == `f2569175` before
+continuing — this branch's step-1 commit is exactly `main`'s tip's parent, so
+step 2 builds cleanly on the real landed state, not a stale local guess.
+
+**T11.6 step 2 committed.** `git mv src/data/site sites/drlurie/data/site`
+(verbatim tree, only the root moved) plus the parameterization the brief
+calls for ("update the export-root loader seam ... and materializer output
+paths via the site binding") — NOT built in T11.4 as the brief's phrasing
+implies (verified: no `exportRoot`/loader-seam existed anywhere pre-this-
+session; T11.4's amendment explicitly deferred it to compose with T11.5-6).
+Built now: `MaterializeMeta.exportRoot` (required, no core default) + an
+`exportPath()` helper in `materializers/shared.ts`; all 11 materializers
+route through it. `SiteBinding.dataRoot` (T11.3's seam) carries the value;
+`src/config/site-binding.ts` sets it to `sites/drlurie/data/site`;
+`object-publish.ts`'s `PublishObjectDeps.exportRoot` threads from there
+through every publish-reaching factory (object-store, admin-object,
+run-publisher-agent, both agent-chat functions via `agent/context.ts`) — the
+5 of ~32 T11.4 `createHandler(_binding)` factories that actually reach
+`publish_by_time` now use their binding instead of discarding it. Fixed in
+passing: T11.5 had left a second, unused, divergent `SiteBinding` reconstructed
+in `sites/drlurie/site.config.ts` — now re-exports the real one from
+`src/config/site-binding.ts` instead (the exact drift this seam exists to
+prevent, caught before it could diverge further).
+
+Two hard-stop-adjacent findings, both fixed rather than worked around: (1) the
+zero-drlurie lint (T11.5) failed on a literal `sites/drlurie/data/site` EXAMPLE
+inside a thrown-error string in `object-publish.ts` — the lint is working
+exactly as designed; genericized the message. (2) the T11.5 apostrophe-in-
+single-quoted-string bug (an unescaped `'` inside a description string breaks
+the TS parser with a wall of cascading errors) recurred verbatim in
+`object-contract.ts`'s tracking_config description — same fix pattern, reworded
+until zero apostrophes remained.
+
+Full move-map detail: see the T11.6 amendment above. Readers updated: 1
+`import.meta.glob`, 11 `astro:content` collection globs, 6 comment-only path
+mentions. Test fixtures updated: 19 files (path assertions, real-file
+directory walks, or bare `{at, record_version}` meta/publishDeps objects that
+now need `exportRoot`).
+
+**Gates:** `astro check` 0 errors; `tsc -p tsconfig.test.json` clean;
+`eslint .` clean; `prettier --check` (project's covered globs) clean; full
+test suite **1627/1627 + 70/70**; `build-diff.mjs --self-test` PASS;
+`build-diff.mjs --base origin/main` (working tree, all step-2 changes
+included) — **74/74 pages byte-identical, EMPTY diff**.
+
+**Remaining for T11.6 (at the time this entry was written):** step 3 (driver
+scripts — `--site` parameterization; per-site seed drift-guard). **Update:**
+step 3 landed the same day — see the newer entry above ("T11.6 step 3/3 —
+... T11.6 CLOSED") for the completed work and final gate results.
+
 ## Session 2026-07-24 (T11.6 step 1/3 — seeds into sites/drlurie/seeds/)
 
 **T11.6 step 1 committed.** All 17 `scripts/lib/*-seed-data.mjs` modules +

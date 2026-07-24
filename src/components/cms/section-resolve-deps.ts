@@ -63,7 +63,7 @@ export const buildSectionResolveDeps = async (
     const sectionEntry = await getEntry('sectionObject', refId);
     if (!sectionEntry) {
       throw new Error(
-        `section-resolve-deps: shared section export '${refId}' is missing (src/data/site/sections/${refId}.json).`
+        `section-resolve-deps: shared section export '${refId}' is missing (sites/drlurie/data/site/sections/${refId}.json).`
       );
     }
     sharedSectionCache.set(refId, parseSharedSectionExport(sectionEntry.data));

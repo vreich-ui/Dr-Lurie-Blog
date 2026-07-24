@@ -148,12 +148,12 @@ test('the real committed exports emit ZERO paths today — every page object is 
   // Walk up from this file (source OR its .tmp/ci-test compiled copy) to the
   // repo root — the test runner's cwd is not guaranteed.
   let repoRoot = path.dirname(fileURLToPath(import.meta.url));
-  while (!fs.existsSync(path.join(repoRoot, 'src', 'data', 'site', 'pages'))) {
+  while (!fs.existsSync(path.join(repoRoot, 'sites', 'drlurie', 'data', 'site', 'pages'))) {
     const parent = path.dirname(repoRoot);
-    if (parent === repoRoot) throw new Error('repo root with src/data/site/pages not found');
+    if (parent === repoRoot) throw new Error('repo root with sites/drlurie/data/site/pages not found');
     repoRoot = parent;
   }
-  const pagesDir = path.join(repoRoot, 'src', 'data', 'site', 'pages');
+  const pagesDir = path.join(repoRoot, 'sites', 'drlurie', 'data', 'site', 'pages');
   const pageExports = fs
     .readdirSync(pagesDir)
     .filter((file) => file.endsWith('.json'))

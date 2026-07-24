@@ -496,7 +496,7 @@ const getAgentMetadata = (agentResult: unknown) => {
   };
 };
 
-const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
+const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, {
       status: 'error',
@@ -602,7 +602,12 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
       artifactRefSources: [input],
     });
     const { approval, creation } = await resolveActivePolicies(await getGovernanceBlobStore(event));
-    const verbOptions = { validationContext, approvalPolicy: approval, creationPolicy: creation };
+    const verbOptions = {
+      validationContext,
+      approvalPolicy: approval,
+      creationPolicy: creation,
+      publishDeps: { exportRoot: binding.dataRoot },
+    };
 
     const agent = createPublisherAgent({
       defaultInput: input,
@@ -667,5 +672,5 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   }
 };
 
-/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. */
-export const createHandler = (_binding: SiteBinding) => handlerImpl;
+/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. T11.6: threads dataRoot to the publish path. */
+export const createHandler = (binding: SiteBinding) => buildHandlerImpl(binding);

@@ -176,8 +176,8 @@ test('the committed /object-showcase export passes the new placeability rule', (
   // The CI harness compiles into .tmp/ci-test and runs from there — walk up to
   // the repo root (the seed-objects-enforcement idiom).
   let dir = process.cwd();
-  for (let i = 0; i < 10 && !existsSync(join(dir, 'src', 'data', 'site')); i += 1) dir = dirname(dir);
-  const exportPath = join(dir, 'src/data/site/pages/page_object_showcase.json');
+  for (let i = 0; i < 10 && !existsSync(join(dir, 'sites', 'drlurie', 'data', 'site')); i += 1) dir = dirname(dir);
+  const exportPath = join(dir, 'sites/drlurie/data/site/pages/page_object_showcase.json');
   const raw = JSON.parse(readFileSync(exportPath, 'utf8')) as Record<string, unknown>;
   const { __generated: _marker, ...body } = raw;
   void _marker;

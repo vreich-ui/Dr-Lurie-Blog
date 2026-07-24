@@ -26,6 +26,14 @@ export interface ToolContextDeps {
   principal: Principal;
   roles: readonly Role[];
   nowMs?: () => number;
+  /**
+   * The site's committed-export root (SiteBinding.dataRoot, W11 T11.6) —
+   * forwarded to a `publish_by_time` verb's materialize step. Optional here
+   * only so callers that never reach publish (e.g. `cancel`) need not thread
+   * it; a chat session that DOES publish without it fails loudly at
+   * `publishObject`, same as every other exportRoot-required call site.
+   */
+  exportRoot?: string;
 }
 
 export const buildToolContext = (deps: ToolContextDeps): ToolContext => {
@@ -63,6 +71,7 @@ export const buildToolContext = (deps: ToolContextDeps): ToolContext => {
         roles: deps.roles,
         approvalPolicy: approval,
         creationPolicy: creation,
+        ...(deps.exportRoot ? { publishDeps: { exportRoot: deps.exportRoot } } : {}),
       });
     },
 

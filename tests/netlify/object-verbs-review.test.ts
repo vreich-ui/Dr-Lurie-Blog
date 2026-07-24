@@ -366,7 +366,7 @@ test('publish_by_time: under the default (committed) policy, an agent publishes 
       store,
       { action: 'publish_by_time', object_type: 'page', object_id: objectId, lock_token: lockToken },
       AGENT,
-      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} } }
+      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {}, exportRoot: 'sites/drlurie/data/site' } }
     );
 
     assert.equal(result.status, 200, JSON.stringify(result.body));
@@ -388,7 +388,7 @@ test('publish_by_time: with navigation overridden to require-approval, an unappr
       store,
       { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: lockToken },
       AGENT,
-      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} }, approvalPolicy: GATE_NAVIGATION }
+      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {}, exportRoot: 'sites/drlurie/data/site' }, approvalPolicy: GATE_NAVIGATION }
     );
 
     assert.equal(result.status, 403);
@@ -434,7 +434,7 @@ test('publish_by_time: with navigation overridden to require-approval, an APPROV
       store,
       { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock },
       AGENT,
-      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} }, approvalPolicy: GATE_NAVIGATION }
+      { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {}, exportRoot: 'sites/drlurie/data/site' }, approvalPolicy: GATE_NAVIGATION }
     );
 
     assert.equal(result.status, 200, JSON.stringify(result.body));
@@ -473,7 +473,7 @@ test('publish_by_time: with navigation overridden to require-approval, a human a
         store,
         { action: 'publish_by_time', object_type: 'navigation', object_id: objectId, lock_token: relock },
         HUMAN_ADMIN,
-        { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} }, approvalPolicy: GATE_NAVIGATION }
+        { publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {}, exportRoot: 'sites/drlurie/data/site' }, approvalPolicy: GATE_NAVIGATION }
       );
 
       assert.equal(result.status, 200, JSON.stringify(result.body));
@@ -523,7 +523,7 @@ test('publish_by_time: an approval that pins artifact_set + release_build is sat
 
     const github = createGitHubApiMock();
     const deps = {
-      publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {} },
+      publishDeps: { fetchImpl: github.fetchImpl, sleep: async () => {}, exportRoot: 'sites/drlurie/data/site' },
       approvalPolicy: GATE_NAVIGATION,
     };
 

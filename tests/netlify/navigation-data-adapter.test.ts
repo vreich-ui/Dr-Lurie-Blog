@@ -186,7 +186,7 @@ test('social links stay icon-only: no text key, ariaLabel carries the label', ()
 // ── the full pipeline: seed → materialize → parse export → props ────────────
 
 test('materialized export round-trips through parseNavigationExport to the same props', () => {
-  const meta = { at: '2026-07-06T00:00:00.000Z', record_version: 1 };
+  const meta = { at: '2026-07-06T00:00:00.000Z', record_version: 1, exportRoot: 'sites/drlurie/data/site' };
   const exported = JSON.parse(materializeNavigation('nav_header', navHeaderBody, meta).content) as unknown;
   const body = parseNavigationExport(exported);
   assert.deepStrictEqual(navigationToHeaderProps(body, resolve), expectedHeaderData);

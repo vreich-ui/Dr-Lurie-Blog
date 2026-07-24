@@ -158,7 +158,11 @@ const createGitHubApiMock = (options: { refPatchOutcomes?: RefPatchOutcome[] } =
   return { fetchImpl, calls, getHead: () => head, readFileAtHead };
 };
 
-const publishDeps = (fetchImpl: typeof fetch) => ({ fetchImpl, sleep: async () => {} });
+const publishDeps = (fetchImpl: typeof fetch) => ({
+  fetchImpl,
+  sleep: async () => {},
+  exportRoot: 'sites/drlurie/data/site',
+});
 
 /**
  * Proves the committed export at head is byte-identical to what T1.1's
@@ -175,15 +179,25 @@ const assertCommittedExportMatchesMaterializer = (
   objectId: string,
   body: unknown
 ) => {
-  // Path never depends on meta/body — safe to compute with a throwaway meta
-  // (a VALID one: the materializer now guards meta at runtime, by design).
-  const { path } = materialize(objectType, objectId, body, { at: '1970-01-01T00:00:00.000Z', record_version: 0 });
+  // Path never depends on at/record_version/body — safe to compute with a
+  // throwaway meta (a VALID one: the materializer now guards meta at runtime,
+  // by design). exportRoot DOES drive the path, so it must match the real
+  // publish's binding (sites/drlurie/data/site).
+  const { path } = materialize(objectType, objectId, body, {
+    at: '1970-01-01T00:00:00.000Z',
+    record_version: 0,
+    exportRoot: 'sites/drlurie/data/site',
+  });
   const committed = github.readFileAtHead(path);
   assert.ok(committed, `expected a committed export at ${path}`);
   const marker = (JSON.parse(committed as string) as { __generated: { at: string; record_version: number } })
     .__generated;
 
-  const expected = materialize(objectType, objectId, body, { at: marker.at, record_version: marker.record_version });
+  const expected = materialize(objectType, objectId, body, {
+    at: marker.at,
+    record_version: marker.record_version,
+    exportRoot: 'sites/drlurie/data/site',
+  });
   assert.equal(
     committed,
     expected.content,

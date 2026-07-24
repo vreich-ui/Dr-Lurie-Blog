@@ -34,6 +34,12 @@ import {
   getDirectArtifactUploadMaxBytes,
 } from '../../packages/core/server/lib/artifact-upload.js';
 import { getAdminStateFromEvent, type LambdaContext } from '../../packages/core/server/lib/admin-auth.js';
+import { getGovernanceBlobStore } from '../../packages/core/server/lib/governance-store.js';
+import {
+  getAgentKeysDoc,
+  resolveVerifiedAgentName,
+  type AgentKeysBlobStore,
+} from '../../packages/core/server/lib/agent-keys.js';
 import { allowedAgentNames, workflowStatuses } from '../../packages/core/schema/workflow-contract.js';
 import {
   artifactKindValues,
@@ -98,6 +104,8 @@ type LambdaEvent = {
   rpcMethod?: string | null;
   requestId?: string;
   slug?: string | null;
+  /** W11 T11.10: set once per request when the Authorization bearer token resolves to a VERIFIED per-agent credential. */
+  verifiedAgentName?: string;
 };
 
 type JsonRpcRequest = {
@@ -1537,7 +1545,7 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     name: 'object_review_decide',
     description:
-      'Approve or request changes on an open review. Fully agentic: a detached approval agent may decide over the shared MCP publish key, so an object can go edit → approve → publish with no human; a human decides through the admin UI with a configured role. Same shared logic, one path. On approve, publish_action pins the authorized action (M-6) that an agent-executed publish must then match exactly (publish-gate.ts), so an agentic approval is still explicit and pinned; publish_action is ignored for request_changes. For a live-publish approval you may additionally pass approval_pin to bind agent execution to the exact content-item/request id, artifact set, and release/build behavior reviewed. Bumps version, never content_revision. TODO: agent approval currently rides the shared publish key and will move to a separate gate/credential dedicated to approval/editor agents.',
+      'Approve or request changes on an open review. Fully agentic: a detached approval agent may decide over the shared MCP publish key, so an object can go edit → approve → publish with no human; a human decides through the admin UI with a configured role. Same shared logic, one path. On approve, publish_action pins the authorized action (M-6) that an agent-executed publish must then match exactly (publish-gate.ts), so an agentic approval is still explicit and pinned; publish_action is ignored for request_changes. For a live-publish approval you may additionally pass approval_pin to bind agent execution to the exact content-item/request id, artifact set, and release/build behavior reviewed. Bumps version, never content_revision. NOTE (W11 T11.10): a verified-agent-token mechanism now exists (packages/core/server/lib/agent-keys.ts) and could back a future dedicated approval/editor-agent credential, but this verb\'s own authorization is deliberately UNCHANGED here — it still rides the shared MCP publish key, and M-6 approvals stay human-only (no agent-approves-agent review) per T11.10\'s own non-goals. Wiring a verified identity into approval authority is a capability change, not an attribution one, and is out of scope until a future task explicitly ratifies it.',
     inputSchema: objectSchema(
       {
         object_type: objectTypeEnumSchema(),
@@ -1783,18 +1791,51 @@ const parseBody = (event: LambdaEvent) => {
 };
 
 type AuthResult =
-  | { ok: true }
+  | { ok: true; verifiedAgentName?: string }
   | { ok: false; reason: 'missing_token' | 'missing_authorization' | 'invalid_authorization' };
 
-const getAuthResult = (event: LambdaEvent): AuthResult => {
-  const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
-  if (!token) {
-    return process.env.MCP_HTTP_AUTH_TOKEN === undefined ? { ok: true } : { ok: false, reason: 'missing_token' };
+/**
+ * W11 T11.10: resolves a verified per-agent identity from the Authorization
+ * bearer token, independent of the shared-secret gate below — a store read
+ * that throws (governance store unreachable/corrupt) degrades to "not
+ * verified" rather than crashing the request, the same resilience posture
+ * `resolveRolesForPrincipalAsync` already uses for the users-store read.
+ */
+const resolveVerifiedAgentNameForRequest = async (event: LambdaEvent, token: string): Promise<string | undefined> => {
+  try {
+    const store = await getGovernanceBlobStore(event);
+    const doc = await getAgentKeysDoc(store as unknown as AgentKeysBlobStore);
+    return resolveVerifiedAgentName(token, getSiteIdentity().siteId, doc) ?? undefined;
+  } catch {
+    return undefined;
   }
+};
 
-  const dedicatedToken = toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'));
+/**
+ * The shared `MCP_HTTP_AUTH_TOKEN` gate (unchanged decision tree below) PLUS
+ * the new verified-per-agent-token path (W11 T11.10): a bearer token that
+ * resolves to an ACTIVE per-agent key satisfies the gate on its own — the
+ * `Authorization: Bearer <agent token>` path the OQ-W11-5 ruling asks for —
+ * and its resolved `agent_name` is carried on `verifiedAgentName` so
+ * `callTool` can override the self-declared `agent_name` for every tool
+ * call in this request. An unresolved/absent/revoked agent token changes
+ * nothing: the shared-secret gate still runs exactly as it did before this
+ * task (the deprecated fallback the brief keeps, not a forced cutover).
+ */
+const getAuthResult = async (event: LambdaEvent): Promise<AuthResult> => {
   const authorization = toNonEmptyString(getHeader(event.headers, 'authorization'));
   const bearerToken = getBearerToken(authorization);
+  const verifiedAgentName = bearerToken ? await resolveVerifiedAgentNameForRequest(event, bearerToken) : undefined;
+
+  const token = toNonEmptyString(process.env.MCP_HTTP_AUTH_TOKEN);
+  if (!token) {
+    if (process.env.MCP_HTTP_AUTH_TOKEN === undefined) return { ok: true, verifiedAgentName };
+    return verifiedAgentName ? { ok: true, verifiedAgentName } : { ok: false, reason: 'missing_token' };
+  }
+
+  if (verifiedAgentName) return { ok: true, verifiedAgentName };
+
+  const dedicatedToken = toNonEmptyString(getHeader(event.headers, 'x-mcp-auth-token'));
   const providedTokens = [dedicatedToken, bearerToken].filter((provided): provided is string => Boolean(provided));
 
   if (providedTokens.length === 0) return { ok: false, reason: 'missing_authorization' };
@@ -3806,8 +3847,32 @@ const reconcileArtifactIndexes = async (event: LambdaEvent, input: Record<string
   });
 };
 
+// W11 T11.10: tool names whose `agent_name` argument is the free-form CMS
+// object-store attribution string (creation-policy allowlists, object
+// history) — the ONLY place a verified per-agent token should override it.
+// Deliberately EXCLUDES save_json_blob_mark_agent_complete/
+// patch_agent_output: their `agent_name` is a DIFFERENT axis entirely (the
+// workflow-pipeline STAGE identity, validated against `allowedAgentNames`'
+// fixed enum by `normalizeAgentName`) — overriding it with an arbitrary
+// verified CMS agent name would break those calls, not secure them.
+const CMS_AGENT_NAME_ATTRIBUTION_TOOLS = new Set([
+  'object_create',
+  'object_create_variant',
+  'object_instantiate_template',
+  'object_instantiate_section_template',
+  'site_apply_theme',
+  'product_set_price',
+  'order_reissue',
+]);
+
 const callTool = async (event: LambdaEvent, name: unknown, args: unknown) => {
   const input = args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
+  // A verified per-agent token (see getAuthResult) overrides whatever
+  // self-declared agent_name the CMS-attribution tool arguments carried —
+  // the one place that attribution becomes trustworthy for those tools.
+  if (event.verifiedAgentName && typeof name === 'string' && CMS_AGENT_NAME_ATTRIBUTION_TOOLS.has(name)) {
+    input.agent_name = event.verifiedAgentName;
+  }
 
   switch (name) {
     case 'ping':
@@ -4415,7 +4480,7 @@ export const handler = async (rawEvent: LambdaEvent, context?: LambdaContext) =>
     return response(405, rpcError(null, -32000, 'Method not allowed.'), { ...jsonHeaders, Allow: 'POST' });
   }
 
-  const authResult = getAuthResult(event);
+  const authResult = await getAuthResult(event);
   if (!authResult.ok) {
     const diagnosticReason = getAuthDiagnosticReason(authResult.reason);
     event.log?.({
@@ -4430,6 +4495,10 @@ export const handler = async (rawEvent: LambdaEvent, context?: LambdaContext) =>
 
     return response(401, rpcError(null, -32001, 'Unauthorized', { reason: diagnosticReason }));
   }
+  // W11 T11.10: a verified per-agent bearer token overrides self-declared
+  // `agent_name` for every tool call in this request — see callTool's use
+  // of `event.verifiedAgentName` below.
+  if (authResult.verifiedAgentName) event.verifiedAgentName = authResult.verifiedAgentName;
 
   let body: JsonRpcRequest | JsonRpcRequest[];
 

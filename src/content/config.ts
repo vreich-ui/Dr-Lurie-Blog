@@ -96,51 +96,52 @@ const generatedMarker = z.object({
 // The shape every derived JSON export carries: the marker plus the body fields.
 const derivedExportSchema = z.object({ __generated: generatedMarker }).passthrough();
 
-// Singletons live directly under src/data/site/ (one per site); the rest are
+// Singletons live directly under sites/drlurie/data/site/ (one per site;
+// W11 T11.6 relocated the committed exports here); the rest are
 // one-file-per-object directories. Specific filenames for the singletons keep
 // the singleton globs from also matching the per-type directories' contents.
 const siteObjectCollection = defineCollection({
-  loader: glob({ pattern: 'site.json', base: 'src/data/site' }),
+  loader: glob({ pattern: 'site.json', base: 'sites/drlurie/data/site' }),
   schema: derivedExportSchema,
 });
 
 const trackingConfigObjectCollection = defineCollection({
-  loader: glob({ pattern: 'tracking.json', base: 'src/data/site' }),
+  loader: glob({ pattern: 'tracking.json', base: 'sites/drlurie/data/site' }),
   schema: derivedExportSchema,
 });
 
 const taxonomyObjectCollection = defineCollection({
-  loader: glob({ pattern: 'taxonomy.json', base: 'src/data/site' }),
+  loader: glob({ pattern: 'taxonomy.json', base: 'sites/drlurie/data/site' }),
   schema: derivedExportSchema,
 });
 
 const pageObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/pages' }),
+  loader: glob({ pattern: '*.json', base: 'sites/drlurie/data/site/pages' }),
   schema: derivedExportSchema,
 });
 
 const navigationObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/navigation' }),
+  loader: glob({ pattern: '*.json', base: 'sites/drlurie/data/site/navigation' }),
   schema: derivedExportSchema,
 });
 
 const sectionObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/sections' }),
+  loader: glob({ pattern: '*.json', base: 'sites/drlurie/data/site/sections' }),
   schema: derivedExportSchema,
 });
 
 const templateObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/templates' }),
+  loader: glob({ pattern: '*.json', base: 'sites/drlurie/data/site/templates' }),
   schema: derivedExportSchema,
 });
 
 const sectionTemplateObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/section-templates' }),
+  loader: glob({ pattern: '*.json', base: 'sites/drlurie/data/site/section-templates' }),
   schema: derivedExportSchema,
 });
 
 const themeObjectCollection = defineCollection({
-  loader: glob({ pattern: '*.json', base: 'src/data/site/themes' }),
+  loader: glob({ pattern: '*.json', base: 'sites/drlurie/data/site/themes' }),
   schema: derivedExportSchema,
 });
 
@@ -154,7 +155,7 @@ const productObjectCollection = defineCollection({
   // so their ids were already the filename.
   loader: glob({
     pattern: '*.json',
-    base: 'src/data/site/products',
+    base: 'sites/drlurie/data/site/products',
     generateId: ({ entry }) => entry.replace(/\.json$/, ''),
   }),
   schema: derivedExportSchema,
@@ -166,7 +167,7 @@ const articleObjectCollection = defineCollection({
   // slug; the pin keeps entry.id = filename = the req_* object id (W7.3).
   loader: glob({
     pattern: '*.json',
-    base: 'src/data/site/articles',
+    base: 'sites/drlurie/data/site/articles',
     generateId: ({ entry }) => entry.replace(/\.json$/, ''),
   }),
   schema: derivedExportSchema,

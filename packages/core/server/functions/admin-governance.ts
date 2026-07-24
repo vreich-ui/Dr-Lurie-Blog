@@ -7,6 +7,14 @@
  * Verbs: get (doc + committed defaults + resolved active), set (Owner — write
  * an override), revert (Owner — clear an override so the committed default
  * stands). Every write appends to the doc history.
+ *
+ * W11 T11.10: `agent_keys_*` verbs manage the per-agent-credential doc
+ * (`agent-keys.v1`, packages/core/server/lib/agent-keys.ts) in this SAME
+ * governance blob store — a sibling doc, not a new store. `agent_keys_list`
+ * is Admin (read, never returns a token hash); `agent_keys_create`/
+ * `agent_keys_revoke` are Owner-only, same bar as every other governance
+ * write here. `agent_keys_create` is the ONLY response that ever carries a
+ * raw token — it is minted here and returned exactly once.
  */
 import type { SiteBinding } from '../lib/site-binding.js';
 import { z } from 'zod';
@@ -22,6 +30,15 @@ import {
   chatToolAutonomySchema,
   type GovernanceDoc,
 } from '../lib/governance-store.js';
+import {
+  getAgentKeysDoc,
+  putAgentKeysDoc,
+  emptyAgentKeysDoc,
+  createAgentKey,
+  revokeAgentKey,
+  describeAgentKeys,
+  type AgentKeysBlobStore,
+} from '../lib/agent-keys.js';
 import { CHAT_TOOLS, defaultAutonomyFor } from '../lib/agent/tools.js';
 import { approvalPolicyConfigSchema, activeApprovalPolicy } from '../../lib/approval-policy.js';
 import { creationPolicyConfigSchema, activeCreationPolicy } from '../../lib/creation-policy.js';
@@ -40,7 +57,11 @@ const jsonResponse = (status: number, body: Record<string, unknown>) => ({
   body: JSON.stringify({ ok: status >= 200 && status < 300, status, ...body }),
 });
 
-const requestSchema = z.discriminatedUnion('verb', [
+// Exported for admin-governance.test.ts — the request CONTRACT is worth
+// testing directly; the owner-gating wiring around it is checked by a
+// source-level assertion (this file's established pattern, see
+// tests/netlify/tracking-governance.test.ts's own admin-governance check).
+export const requestSchema = z.discriminatedUnion('verb', [
   z.object({ verb: z.literal('get') }),
   z.object({
     verb: z.literal('set'),
@@ -49,6 +70,9 @@ const requestSchema = z.discriminatedUnion('verb', [
     chat_tools: chatToolAutonomySchema.optional(),
   }),
   z.object({ verb: z.literal('revert'), target: z.enum(['approval', 'creation', 'chat_tools', 'all']) }),
+  z.object({ verb: z.literal('agent_keys_list') }),
+  z.object({ verb: z.literal('agent_keys_create'), agent_name: z.string().min(1), site: z.string().min(1) }),
+  z.object({ verb: z.literal('agent_keys_revoke'), agent_name: z.string().min(1), site: z.string().min(1) }),
 ]);
 
 const safeJsonParse = (event: LambdaEvent): { ok: true; value: unknown } | { ok: false } => {
@@ -102,6 +126,44 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
         active: await resolveActivePolicies(store),
         chat_tools_catalog: chatToolsCatalog,
       });
+    }
+
+    if (req.verb === 'agent_keys_list') {
+      const doc = await getAgentKeysDoc(store as unknown as AgentKeysBlobStore);
+      return jsonResponse(200, { keys: describeAgentKeys(doc) });
+    }
+
+    if (req.verb === 'agent_keys_create' || req.verb === 'agent_keys_revoke') {
+      if (!owner) return jsonResponse(403, { error: 'Owner access required' });
+      const agentKeysStore = store as unknown as AgentKeysBlobStore;
+      const existingDoc = (await getAgentKeysDoc(agentKeysStore)) ?? emptyAgentKeysDoc(email, nowIso());
+
+      if (req.verb === 'agent_keys_create') {
+        const {
+          doc: nextDoc,
+          token,
+          record,
+        } = createAgentKey(existingDoc, {
+          agent_name: req.agent_name,
+          site: req.site,
+          created_by: email,
+          now: nowIso(),
+        });
+        await putAgentKeysDoc(agentKeysStore, nextDoc);
+        // The only response in this whole handler that ever carries a raw
+        // secret — shown once, never logged, never re-derivable afterward.
+        const { token_hash: _tokenHash, ...recordWithoutHash } = record;
+        return jsonResponse(200, { token, record: recordWithoutHash });
+      }
+
+      const nextDoc = revokeAgentKey(existingDoc, {
+        agent_name: req.agent_name,
+        site: req.site,
+        revoked_by: email,
+        now: nowIso(),
+      });
+      await putAgentKeysDoc(agentKeysStore, nextDoc);
+      return jsonResponse(200, { keys: describeAgentKeys(nextDoc) });
     }
 
     if (!owner) return jsonResponse(403, { error: 'Owner access required' });

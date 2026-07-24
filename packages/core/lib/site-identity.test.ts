@@ -7,7 +7,8 @@
  *     pdf-tool grant wire format pins projectId; GitHub UA prefixes and the
  *     kugelmedia asset URLs feed the byte-identical build);
  *   - the committed config stays in lockstep with the site export
- *     (src/data/site/site.json) — same stance as the site-seed drift guard;
+ *     (sites/drlurie/data/site/site.json — W11 T11.6 relocated this from
+ *     src/data/site/site.json) — same stance as the site-seed drift guard;
  *   - a second tenant gets the id conventions (tax_/trk_<shortId>, slug as
  *     pdf projectId) and every env override wins over the config.
  */
@@ -29,11 +30,11 @@ import { getSiteIdentity, resolveSiteIdentity } from './site-identity.js';
 const findExport = (): string => {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 10; i += 1) {
-    const candidate = join(dir, 'src', 'data', 'site', 'site.json');
+    const candidate = join(dir, 'sites', 'drlurie', 'data', 'site', 'site.json');
     if (existsSync(candidate)) return candidate;
     dir = dirname(dir);
   }
-  throw new Error('could not locate src/data/site/site.json');
+  throw new Error('could not locate sites/drlurie/data/site/site.json');
 };
 
 test('Dr-Lurie values resolve exactly to the pre-parameterization literals (byte-compat gate)', () => {

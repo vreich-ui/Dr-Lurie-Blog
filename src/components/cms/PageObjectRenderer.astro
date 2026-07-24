@@ -37,7 +37,7 @@ const pageEntry = await getEntry('pageObject', objectId);
 if (!pageEntry) {
   throw new Error(
     `PageObjectRenderer: the published page export '${objectId}' is missing ` +
-      `(src/data/site/pages/${objectId}.json). The T3.5/T4.3 publish must land before this page builds.`
+      `(sites/drlurie/data/site/pages/${objectId}.json). The T3.5/T4.3 publish must land before this page builds.`
   );
 }
 const page = parsePageExport(pageEntry.data);

@@ -10,11 +10,17 @@
  *
  * Dev-stage default: fully open — the seam exists (enforced in the create/
  * instantiate verbs, surfaced in every object_contract), the restrictions
- * arrive when Wolf writes them. ⚠️ agent names are SELF-DECLARED until OQ-3
- * per-agent credentials land: treat this as coordination, not security (full
- * caveat in src/lib/creation-policy.ts).
+ * arrive when Wolf writes them. ⚠️ agent names are SELF-DECLARED unless a
+ * per-agent credential (W11 T11.10, `packages/core/server/lib/agent-keys.ts`)
+ * verified this call — treat an unverified name as coordination, not
+ * security (full caveat in packages/core/lib/creation-policy.ts).
+ *
+ * W11 T11.10: relocated from `src/config/creation-policy.ts` — this IS
+ * Dr-Lurie's per-site posture file now (values unchanged, verbatim); a
+ * freshly-scaffolded client (T11.7's create-site.mjs) gets its own copy at
+ * this same `sites/<client>/config/` path from day one.
  */
-import type { CreationPolicyConfig } from '../../packages/core/lib/creation-policy.js';
+import type { CreationPolicyConfig } from '../../../packages/core/lib/creation-policy.js';
 
 export const creationPolicyConfig = {
   master: 'open',
@@ -24,7 +30,7 @@ export const creationPolicyConfig = {
   // covers it); the posture gains an owner UI toggle in T13.12.
   // T13.10: 'object-conversion-roundtrip' IS the sanctioned seed identity —
   // the ruling's "seeds mint" needs a name, and the conversion-factory
-  // driver is the seed machinery (self-declared until OQ-3: coordination,
-  // not security). Casual agents remain excluded.
+  // driver is the seed machinery (self-declared until verified — T11.10 —
+  // proves it). Casual agents remain excluded.
   overrides: { tracking_config: { agents: ['object-conversion-roundtrip'] } },
 } satisfies CreationPolicyConfig;

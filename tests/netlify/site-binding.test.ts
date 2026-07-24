@@ -37,6 +37,7 @@ const bindingA: SiteBinding = {
     blobToken: ['ALPHA_BLOB_TOKEN'],
     publishSecret: ['ALPHA_PUBLISH_SECRET'],
   },
+  dataRoot: 'sites/alpha/data/site',
 };
 
 const bindingB: SiteBinding = {
@@ -47,6 +48,7 @@ const bindingB: SiteBinding = {
     blobToken: ['BETA_BLOB_TOKEN'],
     publishSecret: ['BETA_PUBLISH_SECRET'],
   },
+  dataRoot: 'sites/beta/data/site',
 };
 
 const TEST_VARS = [

@@ -32,7 +32,7 @@ type LambdaContext = { getRemainingTimeInMillis?: () => number };
 
 const bodySchema = z.object({ chat_id: z.string().min(1), trigger_token: z.string().min(1) });
 
-const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
+const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method not allowed' };
   if (!getHeader(event.headers, 'content-type').includes('application/json')) {
     return { statusCode: 415, body: 'application/json required' };
@@ -61,6 +61,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
       | undefined,
     principal,
     roles,
+    exportRoot: binding.dataRoot,
   });
 
   const result = await runAgentLoop(
@@ -77,5 +78,5 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   return { statusCode: result.ok ? 200 : 409, body: JSON.stringify(result) };
 };
 
-/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. */
-export const createHandler = (_binding: SiteBinding) => handlerImpl;
+/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. T11.6: threads dataRoot to the publish path. */
+export const createHandler = (binding: SiteBinding) => buildHandlerImpl(binding);

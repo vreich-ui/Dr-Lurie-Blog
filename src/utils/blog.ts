@@ -10,8 +10,9 @@ import { seededShuffle } from './seeded-shuffle';
 
 /**
  * Display labels for category/tag slugs, from the taxonomy registry export
- * (src/data/site/taxonomy.json — the derived export of the converted
- * tax_drlurie object; W3 step 2, "slugs + label lookup"). Post frontmatter
+ * (sites/drlurie/data/site/taxonomy.json — W11 T11.6 relocated the export
+ * root; the derived export of the converted tax_drlurie object; W3 step 2,
+ * "slugs + label lookup"). Post frontmatter
  * carries canonical SLUGS; the registry owns how a term is DISPLAYED — rename
  * a term's label in the registry and every card, tag chip, listing title, and
  * topics page updates on the next build. A slug not in the registry falls back
@@ -143,7 +144,8 @@ const getNormalizedPost = async (post: CollectionEntry<'post'>): Promise<Post> =
 
 /**
  * Object-backed articles (W7.3): published content_item objects materialize
- * to src/data/site/articles/*.json and join the SAME post list as the
+ * to sites/drlurie/data/site/articles/*.json (W11 T11.6 relocated the export
+ * root) and join the SAME post list as the
  * committed .md posts — one list, so listings, categories, tags, related
  * scoring, RSS, and search cover both families with no per-surface wiring.
  * The export's __generated.at is the effective published_time (T1.3), so the

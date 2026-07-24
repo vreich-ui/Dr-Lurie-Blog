@@ -4,9 +4,9 @@ import test from 'node:test';
 
 import { materialize } from '../../packages/core/server/lib/materialize.js';
 
-const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 3 };
+const meta = { at: '2026-07-03T12:00:00.000Z', record_version: 3, exportRoot: 'sites/drlurie/data/site' };
 
-test('golden: site materializes to src/data/site/site.json with __generated marker', () => {
+test('golden: site materializes to sites/drlurie/data/site/site.json with __generated marker', () => {
   const body = {
     name: 'Dr. Lurié',
     logo: { text: 'Dr. Lurié' },
@@ -27,14 +27,14 @@ test('golden: site materializes to src/data/site/site.json with __generated mark
 
   const result = materialize('site', 'site_drlurie', body, meta);
 
-  assert.equal(result.path, 'src/data/site/site.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/site.json');
   assert.deepStrictEqual(JSON.parse(result.content), {
     __generated: { from: 'objects/site/by-id/site_drlurie.json', at: meta.at, record_version: meta.record_version },
     ...body,
   });
 });
 
-test('golden: page materializes to src/data/site/pages/{page_id}.json with inline sections', () => {
+test('golden: page materializes to sites/drlurie/data/site/pages/{page_id}.json with inline sections', () => {
   const body = {
     route: '/about',
     pageType: 'standard',
@@ -51,14 +51,14 @@ test('golden: page materializes to src/data/site/pages/{page_id}.json with inlin
 
   const result = materialize('page', 'page_about', body, meta);
 
-  assert.equal(result.path, 'src/data/site/pages/page_about.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/pages/page_about.json');
   assert.deepStrictEqual(JSON.parse(result.content), {
     __generated: { from: 'objects/page/by-id/page_about.json', at: meta.at, record_version: meta.record_version },
     ...body,
   });
 });
 
-test('golden: navigation materializes to src/data/site/navigation/{nav_id}.json', () => {
+test('golden: navigation materializes to sites/drlurie/data/site/navigation/{nav_id}.json', () => {
   const body = {
     role: 'footer',
     groups: [
@@ -73,14 +73,14 @@ test('golden: navigation materializes to src/data/site/navigation/{nav_id}.json'
 
   const result = materialize('navigation', 'nav_footer', body, meta);
 
-  assert.equal(result.path, 'src/data/site/navigation/nav_footer.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/navigation/nav_footer.json');
   assert.deepStrictEqual(JSON.parse(result.content), {
     __generated: { from: 'objects/navigation/by-id/nav_footer.json', at: meta.at, record_version: meta.record_version },
     ...body,
   });
 });
 
-test('golden: template materializes to src/data/site/templates/{tpl_id}.json', () => {
+test('golden: template materializes to sites/drlurie/data/site/templates/{tpl_id}.json', () => {
   const body = {
     name: 'Standard Page',
     appliesTo: ['standard'],
@@ -89,14 +89,14 @@ test('golden: template materializes to src/data/site/templates/{tpl_id}.json', (
 
   const result = materialize('template', 'tpl_standard', body, meta);
 
-  assert.equal(result.path, 'src/data/site/templates/tpl_standard.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/templates/tpl_standard.json');
   assert.deepStrictEqual(JSON.parse(result.content), {
     __generated: { from: 'objects/template/by-id/tpl_standard.json', at: meta.at, record_version: meta.record_version },
     ...body,
   });
 });
 
-test('golden: shared section materializes to src/data/site/sections/{sec_id}.json', () => {
+test('golden: shared section materializes to sites/drlurie/data/site/sections/{sec_id}.json', () => {
   const body = {
     section: {
       id: 's_newsletter1',
@@ -107,7 +107,7 @@ test('golden: shared section materializes to src/data/site/sections/{sec_id}.jso
 
   const result = materialize('section', 'sec_newsletter1', body, meta);
 
-  assert.equal(result.path, 'src/data/site/sections/sec_newsletter1.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/sections/sec_newsletter1.json');
   assert.deepStrictEqual(JSON.parse(result.content), {
     __generated: {
       from: 'objects/section/by-id/sec_newsletter1.json',
@@ -118,7 +118,7 @@ test('golden: shared section materializes to src/data/site/sections/{sec_id}.jso
   });
 });
 
-test('golden: taxonomy materializes to src/data/site/taxonomy.json — exact byte-for-byte output', () => {
+test('golden: taxonomy materializes to sites/drlurie/data/site/taxonomy.json — exact byte-for-byte output', () => {
   const body = {
     kinds: {
       category: { terms: [{ term_id: 't_skincare', slug: 'skincare', label: 'Skincare', status: 'active' }] },
@@ -126,9 +126,13 @@ test('golden: taxonomy materializes to src/data/site/taxonomy.json — exact byt
     },
   };
 
-  const result = materialize('taxonomy', 'tax_drlurie', body, { at: '2026-07-03T12:00:00.000Z', record_version: 1 });
+  const result = materialize('taxonomy', 'tax_drlurie', body, {
+    at: '2026-07-03T12:00:00.000Z',
+    record_version: 1,
+    exportRoot: 'sites/drlurie/data/site',
+  });
 
-  assert.equal(result.path, 'src/data/site/taxonomy.json');
+  assert.equal(result.path, 'sites/drlurie/data/site/taxonomy.json');
   assert.equal(
     result.content,
     `{
@@ -164,5 +168,8 @@ test('meta guard: a camelCase recordVersion (or missing at) fails loudly at mate
     () => materialize('section', 'sec_x', body, { at: '2026-07-09T00:00:00.000Z', recordVersion: 3 } as never),
     /record_version must be a non-negative integer/
   );
-  assert.throws(() => materialize('section', 'sec_x', body, { at: '', record_version: 3 }), /meta\.at must be/);
+  assert.throws(
+    () => materialize('section', 'sec_x', body, { at: '', record_version: 3, exportRoot: 'sites/drlurie/data/site' }),
+    /meta\.at must be/
+  );
 });

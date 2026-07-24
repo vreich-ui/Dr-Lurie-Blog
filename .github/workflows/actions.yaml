@@ -1,3 +1,23 @@
+# Fleet CI (W11 T11.8). Cache strategy: every job uses actions/setup-node's
+# `cache: npm`, keyed off package-lock.json — one cache entry serves every
+# job in a run (build's 3 node-version legs, check, discover-fleet, fleet's
+# N site legs, fleet-build-diff's N site legs) since they all install the
+# SAME root lockfile today (no per-site lockfiles exist yet — sites/<client>
+# stays data + bindings, no independent dependency tree). Revisit this note
+# if/when a site ever ships its own package-lock.json.
+#
+# Time budget (today's single-site fleet, jobs run in parallel except where
+# `needs:` serializes): build ~2-4 min per node-version leg (3 legs, wall-
+# clock ≈ the slowest one, not the sum) + check ~1-2 min (+ ~20-40s more,
+# W11 T11.9, for the schema-migration gate's own throwaway tsc pass) +
+# discover-fleet ~20-40s (git diff + a tiny script; nothing else depends on
+# it running long) + fleet ~2-4 min per site leg (1 leg today) +
+# fleet-build-diff (PR-only, core-impacting changes only) ~1-2 min per site
+# leg (a 74-page normalize-and-diff, per scripts/build-diff.mjs's own
+# self-test timings). Total PR wall-clock today: roughly 3-6 minutes,
+# dominated by `build`'s node-version matrix, not the fleet — the
+# fleet/build-diff/schema-migration-gate jobs scale with SITE COUNT, not
+# commit size, and stay small until a second site is real (T11.11).
 name: GitHub Actions
 
 on:
@@ -41,26 +61,69 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      # The site-seed drift guard: seed module must match the committed export
-      # (run sites/drlurie/seeds/sync-site-seed.mjs after any sanctioned site change;
-      # relocated in T11.6 — seeds are client data).
-      - run: node sites/drlurie/seeds/sync-site-seed.mjs --check
       # The T2.0 cutover-diff harness self-test (cheap; the full two-build diff
-      # stays a manual per-cutover gate).
+      # stays the fleet job's per-site gate, below).
       - run: node scripts/build-diff.mjs --self-test
+      # The per-site seed drift guard moved to the `fleet` job below (W11
+      # T11.8) — it now runs once per DISCOVERED site, not hardcoded to
+      # drlurie, so a second client's own drift guard is covered for free.
+      # W11 T11.9: every discovered site's committed exports must parse
+      # under the head schemas (or carry a migration + a green dry-run
+      # report) — see scripts/ci/schema-migration-gate.mjs's own header.
+      # Runs its own throwaway tsc pass (a different outDir than `npm
+      # test`'s `.tmp/ci-test`, so it can't collide with a concurrent test
+      # run in this same job) — a real cost (~20-40s), accepted for a
+      # named, independently-attributable gate step rather than burying
+      # this check inside the full suite's pass/fail count.
+      - run: node scripts/ci/schema-migration-gate.mjs
 
-  # --- T11.1: placeholder fleet matrix ---
-  # Currently one site (drlurie), built from the existing root layout — this is
-  # the SAME build the `build` job runs, so it stays green and behavior-neutral.
-  # T11.8 replaces this with the real per-site matrix (build + test + build-diff +
-  # seed-drift) once sites/<client> carry their own build. Do not add sites here
-  # until they exist as buildable workspaces.
+  # --- W11 T11.8: fleet matrix discovery ---
+  # Discovers sites/*/site.config.ts dynamically (adding a client is a zero
+  # workflow-file-edit change to the fleet) and decides, from this run's
+  # diff, whether the fleet fans out fully or scopes to just the touched
+  # site(s) — see scripts/ci/discover-fleet-matrix.mjs's own header for the
+  # exact (deliberately conservative) rule. `fetch-depth: 0` is required:
+  # the default shallow (depth-1) checkout can't resolve a `base...head`
+  # three-dot diff range.
+  discover-fleet:
+    runs-on: ubuntu-latest
+    outputs:
+      sites: ${{ steps.discover.outputs.sites }}
+      fan_out: ${{ steps.discover.outputs.fan_out }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: discover
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/ci/discover-fleet-matrix.mjs --base "$BASE_SHA" --head "$HEAD_SHA"
+
+  # --- W11 T11.8: the real per-site fleet matrix ---
+  # Per discovered site: install, astro check, build, full suite, site-seed
+  # drift guard (best-effort — skipped for a site that doesn't ship its own
+  # sync-site-seed.mjs yet; T11.7's create-site.mjs scaffold doesn't
+  # generate one today, a recorded residual, not silently papered over).
+  # Today's fleet is exactly [drlurie] (the T11.1 placeholder's single
+  # entry) — this job is the SAME build `build`/`check` already run, so it
+  # stays green and behavior-neutral until a second site's build is
+  # actually wired (T11.11). `fail-fast: false` so one site's failure
+  # doesn't hide another's result.
   fleet:
+    needs: discover-fleet
+    if: needs.discover-fleet.outputs.sites != '[]'
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        site:
-          - drlurie
+        site: ${{ fromJson(needs.discover-fleet.outputs.sites) }}
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js 22
@@ -69,4 +132,51 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run check:astro
       - run: npm run build
+      - run: npm test
+      - name: Site-seed drift guard (${{ matrix.site }})
+        run: |
+          SCRIPT="sites/${{ matrix.site }}/seeds/sync-site-seed.mjs"
+          if [ -f "$SCRIPT" ]; then
+            node "$SCRIPT" --check
+          else
+            echo "no $SCRIPT for this site yet — skipping (not every scaffolded site ships one)."
+          fi
+
+  # --- W11 T11.8: per-site build-diff on core-impacting PRs ---
+  # "Canonical changes update all clients" is only provable if a core PR
+  # shows the actual diff for every client before merge. Runs only when the
+  # fleet fanned out (this run's diff touches something outside sites/**,
+  # e.g. packages/core — see discover-fleet-matrix.mjs) on a pull_request
+  # (a push to main has no "before" comparison worth reviewing post-merge).
+  # A non-empty diff is a REVIEW ARTIFACT, not an automatic failure —
+  # intentional visual changes get reviewed, not blocked (design-principles
+  # rule 4) — so the build-diff step never fails the job (`|| true`); only
+  # the uploaded report matters.
+  fleet-build-diff:
+    needs: discover-fleet
+    if: github.event_name == 'pull_request' && needs.discover-fleet.outputs.fan_out == 'true' && needs.discover-fleet.outputs.sites != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        site: ${{ fromJson(needs.discover-fleet.outputs.sites) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: build-diff (${{ matrix.site }}) — base vs head, review artifact only
+        run: |
+          node scripts/build-diff.mjs "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+            --site "sites/${{ matrix.site }}" > "build-diff-${{ matrix.site }}.txt" 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-diff-${{ matrix.site }}
+          path: build-diff-${{ matrix.site }}.txt

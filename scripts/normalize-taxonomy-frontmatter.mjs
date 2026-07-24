@@ -16,7 +16,7 @@
  *     list style (block list vs inline array) is preserved per file.
  *
  * Display is unaffected by slug-form frontmatter: the blog renderer looks up
- * display labels from the registry export (src/data/site/taxonomy.json) by
+ * display labels from the registry export (sites/drlurie/data/site/taxonomy.json) by
  * slug. Routes are already slugified, so kept terms keep their URLs; merged
  * terms consolidate onto the canonical term's page (intended).
  *

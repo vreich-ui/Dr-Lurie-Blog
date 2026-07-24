@@ -32,11 +32,11 @@ const body = siteBody as SiteBody;
 const findExport = (): string => {
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 10; i += 1) {
-    const candidate = join(dir, 'src', 'data', 'site', 'site.json');
+    const candidate = join(dir, 'sites', 'drlurie', 'data', 'site', 'site.json');
     if (existsSync(candidate)) return candidate;
     dir = dirname(dir);
   }
-  throw new Error('could not locate src/data/site/site.json');
+  throw new Error('could not locate sites/drlurie/data/site/site.json');
 };
 
 // Order-independent deep equality (the export sorts object keys).

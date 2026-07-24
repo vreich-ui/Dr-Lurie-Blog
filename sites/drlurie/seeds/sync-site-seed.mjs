@@ -9,7 +9,8 @@
  * `home-conversion-roundtrip --seeds site-seed-data.mjs --production` run would
  * have "healed" the live branding back to the stale seed. This script closes
  * that gap: it rewrites the seed's `siteBody` from the COMMITTED production
- * export (`src/data/site/site.json`, the byte-for-byte materialization of the
+ * export (`sites/drlurie/data/site/site.json` — W11 T11.6 relocated this from
+ * `src/data/site/site.json` — the byte-for-byte materialization of the
  * released store record), so seed === production and a reconcile is a no-op.
  *
  * The export is the right source of truth: it is what the release materialized
@@ -32,7 +33,8 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const EXPORT_PATH = path.join(repoRoot, 'src', 'data', 'site', 'site.json');
+// W11 T11.6: the export moved from src/data/site/ to sites/drlurie/data/site/.
+const EXPORT_PATH = path.join(repoRoot, 'sites', 'drlurie', 'data', 'site', 'site.json');
 const SEED_PATH = path.join(repoRoot, 'sites', 'drlurie', 'seeds', 'site-seed-data.mjs');
 
 const checkOnly = process.argv.slice(2).includes('--check');

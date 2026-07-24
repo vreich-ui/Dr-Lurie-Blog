@@ -76,7 +76,7 @@ const fullReceipt = (contentRevision: number) => ({
   tree_sha: 'def456',
   no_op: false,
   attempts: 1,
-  files: ['src/data/site/pages/page_sample.json'],
+  files: ['sites/drlurie/data/site/pages/page_sample.json'],
   content_revision: contentRevision,
   exported_at: '2026-07-05T00:00:00.000Z',
 });

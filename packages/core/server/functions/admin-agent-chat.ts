@@ -165,7 +165,7 @@ const chatSummary = (doc: ChatDoc, idleProfile?: AgentProfile) => ({
 const idleProfileFor = (profilesDoc: AgentProfilesDoc, doc: ChatDoc): AgentProfile | undefined =>
   doc.run ? undefined : resolveProfile(profilesDoc, { objectId: doc.object_id, objectType: doc.object_type });
 
-const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
+const buildHandlerImpl = (binding: SiteBinding) => async (event: LambdaEvent, context?: LambdaContext) => {
   if (event.httpMethod !== 'POST') return jsonResponse(405, { error: 'Method not allowed' });
   const adminState = await getAdminStateFromEvent(event, context);
   if (!adminState.authenticated) return jsonResponse(401, { error: adminState.error ?? 'Unauthorized' });
@@ -313,6 +313,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
             | undefined,
           principal,
           roles,
+          exportRoot: binding.dataRoot,
         });
         const result = await startRun(
           { chatStore, toolContext },
@@ -353,6 +354,7 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
             | undefined,
           principal: runPrincipal,
           roles,
+          exportRoot: binding.dataRoot,
         });
         const result =
           request.data.action === 'approve_tool'
@@ -445,5 +447,5 @@ const handlerImpl = async (event: LambdaEvent, context?: LambdaContext) => {
   }
 };
 
-/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. */
-export const createHandler = (_binding: SiteBinding) => handlerImpl;
+/** W11 T11.4: per-site factory — the site shim instantiates this with its binding. T11.6: threads dataRoot to the publish path. */
+export const createHandler = (binding: SiteBinding) => buildHandlerImpl(binding);

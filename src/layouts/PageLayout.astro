@@ -30,7 +30,8 @@ const footerNavId = site?.defaultNavigation.footer ?? 'nav_footer';
 const chrome = site?.chrome ?? { showRssFeed: true, showThemeToggle: true };
 
 // T2.5 cutover: header/footer render from the published navigation exports
-// (src/data/site/navigation/*.json, committed by the Tier 3 publish) through
+// (sites/drlurie/data/site/navigation/*.json — W11 T11.6 relocated the export
+// root — committed by the Tier 3 publish) through
 // the T2.4 prop adapter — same Header/Footer markup, new feed. There is
 // deliberately NO fallback to a hardcoded source: a missing export must fail
 // the build loudly, not half-feed the site (04 Part 2, "never leaves a
@@ -39,7 +40,7 @@ const headerEntry = await getEntry('navigationObject', headerNavId);
 const footerEntry = await getEntry('navigationObject', footerNavId);
 if (!headerEntry || !footerEntry) {
   throw new Error(
-    `PageLayout: published navigation exports are missing (src/data/site/navigation/${headerNavId}.json / ` +
+    `PageLayout: published navigation exports are missing (sites/drlurie/data/site/navigation/${headerNavId}.json / ` +
       `${footerNavId}.json). The T2.3 Tier 3 publish must land on this branch before the T2.5 cutover builds — ` +
       'see docs/cms-architecture/cms-pipeline/phase-2-runbook.md §4.'
   );
