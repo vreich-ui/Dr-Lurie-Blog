@@ -36,7 +36,7 @@ import {
   type NavigationBody,
   type NavItem,
   type NavTarget,
-} from '../schema/bodies/navigation-v1.js';
+} from '../../packages/core/schema/bodies/navigation-v1.js';
 
 export type NavTargetResolver = (target: NavTarget) => string;
 

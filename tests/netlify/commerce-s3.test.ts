@@ -18,15 +18,15 @@ for (const key of ['NETLIFY', 'NETLIFY_SITE_ID', 'NETLIFY_BLOBS_TOKEN', 'NETLIFY
 process.env.STRIPE_MODE = 'test';
 process.env.PURCHASE_TOKEN_SECRET = 'purchase-token-secret-0123456789abcdef';
 
-const { patchOpSchema } = await import('../../src/schema/object-patch-ops.js');
-const { applyPatchOps, derivePatchInverse } = await import('../../src/lib/object-patch-apply.js');
+const { patchOpSchema } = await import('../../packages/core/schema/object-patch-ops.js');
+const { applyPatchOps, derivePatchInverse } = await import('../../packages/core/lib/object-patch-apply.js');
 const { productSetPrice } = await import('../../netlify/lib/product-set-price.js');
 const { orderReissue } = await import('../../netlify/lib/order-reissue.js');
 const { verifyPurchaseToken } = await import('../../netlify/lib/purchase-tokens.js');
 const { handler: claimFree } = await import('../../netlify/functions/claim-free.js');
 const { objectRecordKey } = await import('../../netlify/lib/object-store-keys.js');
 const { orderRecordSchema } = await import('../../netlify/lib/commerce-orders.js');
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 import type { ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import type Stripe from 'stripe';
 

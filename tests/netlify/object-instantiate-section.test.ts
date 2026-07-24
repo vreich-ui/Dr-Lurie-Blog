@@ -15,10 +15,10 @@ import test from 'node:test';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
-import type { PatchOp } from '../../src/schema/object-patch-ops.js';
-import type { PageBody } from '../../src/schema/bodies/page-v1.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
+import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';
+import type { PageBody } from '../../packages/core/schema/bodies/page-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-14T12:00:00.000Z');
 const AGENT: Principal = { kind: 'agent', agent_name: 'stamp-test', auth: 'publish_key' };

@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -5,12 +6,12 @@ import {
   buildObjectContract,
   OBJECT_CONTRACT_TYPES,
   type ObjectContract,
-} from '../../src/lib/registry/object-contract.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
-import { REGISTERED_SECTION_TYPES } from '../../src/lib/registry/components/registered-types.js';
-import { sectionTypes } from '../../src/schema/bodies/section-v1.js';
-import { patchOpNamesByObjectType } from '../../src/schema/object-patch-ops.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/registry/object-contract.js';
+import type { ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import { REGISTERED_SECTION_TYPES } from '../../packages/core/lib/registry/components/registered-types.js';
+import { sectionTypes } from '../../packages/core/schema/bodies/section-v1.js';
+import { patchOpNamesByObjectType } from '../../packages/core/schema/object-patch-ops.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 const GOVERNED: ObjectType[] = [
   'page',

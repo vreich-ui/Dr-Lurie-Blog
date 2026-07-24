@@ -62,7 +62,7 @@ import {
 import { isObjectLockActive, sanitizeObjectLock, type ObjectLockStore } from './object-lock.js';
 import { objectRecordKey } from './object-store-keys.js';
 import { summarizeValidation, validateObject, type ObjectValidationContext } from './object-validate.js';
-import type { ObjectRecord, ObjectType, Principal, PublishReceipt } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType, Principal, PublishReceipt } from '../../packages/core/schema/object-record-v1.js';
 
 /** Tolerance for caller-computed "now" timestamps before a time counts as future. */
 const SCHEDULING_SKEW_MS = 30_000;

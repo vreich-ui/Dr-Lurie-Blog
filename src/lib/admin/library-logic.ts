@@ -5,7 +5,7 @@
  * plain TS. The corpus is ~50 objects, so one inventory fetch + client
  * filtering is all this needs (no server-side search).
  */
-import type { ObjectType } from '../../schema/object-record-v1.js';
+import type { ObjectType } from '../../../packages/core/schema/object-record-v1.js';
 import { objectTypeLabel } from './display-name.js';
 
 /** The inventory-row fields the browse surface consumes (subset of InventoryRow). */

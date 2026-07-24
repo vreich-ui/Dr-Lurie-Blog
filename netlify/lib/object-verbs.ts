@@ -25,6 +25,7 @@
  * checks report `optional` and the schema / id / reader-safety / artifact-trust
  * / structural checks still run in full.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { z } from 'zod';
 
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
@@ -50,26 +51,26 @@ import {
   validateObject,
   type ObjectValidationContext,
 } from './object-validate.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { mintId, MintIdError } from '../../src/lib/object-ids-mint.js';
-import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { mintId, MintIdError } from '../../packages/core/lib/object-ids-mint.js';
+import { applyPatchOps, PatchApplyError } from '../../packages/core/lib/object-patch-apply.js';
 import { buildVariantBody } from '../../src/lib/article-object/variant.js';
-import { buildPageBodyFromTemplate } from '../../src/lib/template-instantiate.js';
-import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.js';
-import { pageBodySchema, pageTypeIdSchema } from '../../src/schema/bodies/page-v1.js';
-import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
-import type { SectionInstance } from '../../src/schema/bodies/section-v1.js';
-import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
-import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
-import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
-import { THEME_AXIS_GROUPS, THEME_COLOR_KEYS } from '../../src/lib/registry/theme-tokens.js';
+import { buildPageBodyFromTemplate } from '../../packages/core/lib/template-instantiate.js';
+import { contentItemBodySchema } from '../../packages/core/schema/bodies/content-item-v1.js';
+import { pageBodySchema, pageTypeIdSchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { sectionTemplateBodySchema } from '../../packages/core/schema/bodies/section-template-v1.js';
+import type { SectionInstance } from '../../packages/core/schema/bodies/section-v1.js';
+import { siteBodySchema } from '../../packages/core/schema/bodies/site-v1.js';
+import { templateBodySchema } from '../../packages/core/schema/bodies/template-v1.js';
+import { themeBodySchema } from '../../packages/core/schema/bodies/theme-v1.js';
+import { THEME_AXIS_GROUPS, THEME_COLOR_KEYS } from '../../packages/core/lib/registry/theme-tokens.js';
 import {
   objectTypes,
   objectTypeSchema,
   type ObjectRecord,
   type ObjectType,
   type Principal,
-} from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/schema/object-record-v1.js';
 import {
   compareInventoryRows,
   inventoryDetailFromRecord,
@@ -81,13 +82,13 @@ import {
 import { publishObject, type PublishObjectDeps } from './object-publish.js';
 import { checkPublishGate } from './publish-gate.js';
 import { resolveRolesForPrincipal } from './roles.js';
-import { isGovernedObjectType, type ApprovalPolicy } from '../../src/lib/approval-policy.js';
+import { isGovernedObjectType, type ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
 import {
   activeCreationPolicy,
   creationRuleFor,
   isCreationAllowed,
   type CreationPolicy,
-} from '../../src/lib/creation-policy.js';
+} from '../../packages/core/lib/creation-policy.js';
 import { approvalPinSchema, decideReview, discardProposal, publishActionSchema, submitReview } from './review-state.js';
 
 // ─── store shape ──────────────────────────────────────────────────────────────

@@ -18,7 +18,7 @@ import test from 'node:test';
 
 import { materializeNavigation } from '../../netlify/lib/materializers/navigation.js';
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
+import { navigationBodySchema } from '../../packages/core/schema/bodies/navigation-v1.js';
 import {
   NAVIGATION_SEEDS,
   NAVIGATION_SEED_SITE,

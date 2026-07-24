@@ -42,49 +42,50 @@
  * has exactly one owner. T0.8 calls one or the other; this module still never
  * touches the blob store.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { assertReaderSafe } from '../../src/lib/article-content/assert-reader-safe.js';
 import type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
-import { validateObjectIdForType, validateSectionInstanceId } from '../../src/lib/object-ids.js';
-import { applyPatchOps, PatchApplyError } from '../../src/lib/object-patch-apply.js';
-import { navigationBodySchema, type NavigationBody } from '../../src/schema/bodies/navigation-v1.js';
-import { navActionCapacity, type CapacityRule } from '../../src/lib/registry/structural-capacity.js';
+import { validateObjectIdForType, validateSectionInstanceId } from '../../packages/core/lib/object-ids.js';
+import { applyPatchOps, PatchApplyError } from '../../packages/core/lib/object-patch-apply.js';
+import { navigationBodySchema, type NavigationBody } from '../../packages/core/schema/bodies/navigation-v1.js';
+import { navActionCapacity, type CapacityRule } from '../../packages/core/lib/registry/structural-capacity.js';
 import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
 import {
   PROSE_GRAMMAR,
   richTextV1Schema,
   validateRichTextGrammar,
   type RichTextGrammar,
-} from '../../src/lib/richtext/rich-text-v1.js';
+} from '../../packages/core/lib/richtext/rich-text-v1.js';
 import { BLOCKS, INLINES } from '@contentful/rich-text-types';
 import {
   contentItemBodySchema,
   type ContentItemBody,
   type ContentItemNode,
-} from '../../src/schema/bodies/content-item-v1.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
-import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
-import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
-import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
-import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
+} from '../../packages/core/schema/bodies/content-item-v1.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { productBodySchema } from '../../packages/core/schema/bodies/product-v1.js';
+import { sectionBodySchema, type SectionInstance, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';
+import { sectionTemplateBodySchema } from '../../packages/core/schema/bodies/section-template-v1.js';
+import { themeBodySchema } from '../../packages/core/schema/bodies/theme-v1.js';
+import { isStandalonePlaceableSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
 import {
   checkBrandTokenValue,
   THEME_AXES,
   THEME_AXIS_GROUPS,
   THEME_COLOR_KEYS,
-} from '../../src/lib/registry/theme-tokens.js';
+} from '../../packages/core/lib/registry/theme-tokens.js';
 import {
   CONVERSION_LABEL_RE,
   GOAL_KEY_RE,
   TRACKABLE_ACTIVITIES_BY_TYPE,
-} from '../../src/schema/bodies/tracking-attribute-v1.js';
-import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
-import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
-import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
-import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
-import type { ObjectRecord, ObjectType, Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/schema/bodies/tracking-attribute-v1.js';
+import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
+import { siteBodySchema } from '../../packages/core/schema/bodies/site-v1.js';
+import { taxonomyBodySchema } from '../../packages/core/schema/bodies/taxonomy-v1.js';
+import { templateBodySchema } from '../../packages/core/schema/bodies/template-v1.js';
+import type { ObjectRecord, ObjectType, Principal } from '../../packages/core/schema/object-record-v1.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE, publicPathForArtifactRef, rawArtifactRefForPublicPath } from './artifact-trust.js';
-import { activeMediaPolicy, type MediaPolicy } from '../../src/lib/media-policy.js';
+import { activeMediaPolicy, type MediaPolicy } from '../../packages/core/lib/media-policy.js';
 
 export type { CriterionStatus, ReadinessCriterion, ReadinessGroup } from '../../src/lib/admin/readiness-criteria.js';
 

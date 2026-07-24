@@ -3,7 +3,7 @@
  * Singleton export: one Taxonomy registry per site, so the path carries no
  * object id.
  */
-import { taxonomyBodySchema } from '../../../src/schema/bodies/taxonomy-v1.js';
+import { taxonomyBodySchema } from '../../../packages/core/schema/bodies/taxonomy-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeTaxonomy = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

@@ -35,7 +35,6 @@
  */
 import { z } from 'zod';
 
-import { approvalPolicyConfig } from '../config/approval-policy.js';
 import type { ObjectType } from '../schema/object-record-v1.js';
 
 /** Every object type the generic publish gate governs — all nine (W7.3). */
@@ -107,13 +106,31 @@ export const publishRequiresApproval = (objectType: GovernedObjectType, policy: 
   return policy.master === 'all-require-approval';
 };
 
-let activePolicy: ApprovalPolicy | undefined;
+/**
+ * Provider-injection seam (W11 T11.2). `packages/core` is fleet law and must
+ * not import a site's committed config (`src/config/approval-policy.ts` stays
+ * site-side). The site registers the active-policy provider once at startup
+ * via `setActiveApprovalPolicyProvider` (see `src/config/policy-bindings.ts`),
+ * which binds `resolveApprovalPolicy(approvalPolicyConfig)`. Behavior is
+ * unchanged from the previous committed-config singleton — only the config
+ * source is injected instead of imported.
+ */
+let activeApprovalPolicyProvider: (() => ApprovalPolicy) | undefined;
+
+export const setActiveApprovalPolicyProvider = (provider: () => ApprovalPolicy): void => {
+  activeApprovalPolicyProvider = provider;
+};
 
 /**
- * The committed config, validated once and cached. This is what the server
- * gate and the admin UI use when no policy is injected (tests inject).
+ * The active policy, resolved through the site-registered provider. This is
+ * what the server gate and the admin UI use when no policy is injected
+ * explicitly (tests inject a policy directly into the pure functions).
  */
 export const activeApprovalPolicy = (): ApprovalPolicy => {
-  if (!activePolicy) activePolicy = resolveApprovalPolicy(approvalPolicyConfig);
-  return activePolicy;
+  if (!activeApprovalPolicyProvider) {
+    throw new Error(
+      'Active approval policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeApprovalPolicy().',
+    );
+  }
+  return activeApprovalPolicyProvider();
 };

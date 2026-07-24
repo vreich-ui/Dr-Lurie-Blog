@@ -12,7 +12,7 @@ import test from 'node:test';
 import { computeObjectImpact, type ObjectImpactStore } from '../../netlify/lib/object-impact.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
 import { pageHomeBody, sectionNewsletterSignupBody } from '../../scripts/lib/page-home-seed-data.mjs';
-import type { ObjectRecord, ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 const createMemoryStore = () => {
   const blobs = new Map<string, string>();

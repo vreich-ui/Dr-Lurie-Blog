@@ -12,18 +12,19 @@
  * can never widen authority — it fails validation and the committed policy
  * stands.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { z } from 'zod';
 
 import {
   approvalPolicyConfigSchema,
   activeApprovalPolicy,
   type ApprovalPolicy,
-} from '../../src/lib/approval-policy.js';
+} from '../../packages/core/lib/approval-policy.js';
 import {
   creationPolicyConfigSchema,
   activeCreationPolicy,
   type CreationPolicy,
-} from '../../src/lib/creation-policy.js';
+} from '../../packages/core/lib/creation-policy.js';
 import { getNetlifyBlobStore } from './blob-store.js';
 
 export const GOVERNANCE_DOC_KEY = 'overrides.v1';

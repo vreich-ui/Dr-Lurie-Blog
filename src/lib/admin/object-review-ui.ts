@@ -17,12 +17,13 @@
  * `effectiveApproval` makes, over fields the client already received in the
  * `object_get` response).
  */
+import '../../config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import {
   activeApprovalPolicy,
   publishRequiresApproval,
   type ApprovalPolicy,
   type GovernedObjectType,
-} from '../approval-policy.js';
+} from '../../../packages/core/lib/approval-policy.js';
 
 export type PrincipalKind = 'human' | 'agent';
 export type Role = 'admin' | 'publisher' | 'editor';

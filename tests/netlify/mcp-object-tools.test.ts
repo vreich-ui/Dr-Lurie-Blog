@@ -5,7 +5,7 @@ import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
 import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import { REGISTERED_SECTION_TYPES } from '../../src/lib/registry/components/registered-types.js';
+import { REGISTERED_SECTION_TYPES } from '../../packages/core/lib/registry/components/registered-types.js';
 
 // Object-verb MCP tools (T0.9). The tools proxy to object-store.ts with the
 // publish key injected; object-store falls back to the local file store when no

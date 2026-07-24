@@ -30,7 +30,28 @@
  */
 import { z } from 'zod';
 
-import { siteIdentityConfig } from '../config/site-identity.js';
+/**
+ * Provider-injection seam (W11 T11.2). Core law must not import the site's
+ * committed config (`src/config/site-identity.ts` stays site-side); the site
+ * registers the provider once at startup (see `src/config/policy-bindings.ts`).
+ * `resolveSiteIdentity` still takes `config` explicitly (tests pass it); when
+ * omitted it comes from the provider — byte-identical to the previous default
+ * that read the committed config directly.
+ */
+let siteIdentityConfigProvider: (() => unknown) | undefined;
+
+export const setSiteIdentityConfigProvider = (provider: () => unknown): void => {
+  siteIdentityConfigProvider = provider;
+};
+
+const activeSiteIdentityConfig = (): unknown => {
+  if (!siteIdentityConfigProvider) {
+    throw new Error(
+      'Site identity config provider not configured — import the site policy bindings (src/config/policy-bindings) before resolving site identity without an explicit config.',
+    );
+  }
+  return siteIdentityConfigProvider();
+};
 
 const nonEmpty = z.string().trim().min(1);
 
@@ -81,7 +102,7 @@ const envValue = (env: EnvSource, key: string): string | undefined => {
  */
 export const resolveSiteIdentity = (
   env: EnvSource = processEnv(),
-  config: unknown = siteIdentityConfig
+  config: unknown = activeSiteIdentityConfig()
 ): SiteIdentity => {
   const parsed = siteIdentityConfigSchema.safeParse(config);
   if (!parsed.success) {

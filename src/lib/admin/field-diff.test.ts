@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { computeFieldDiffEntries, fieldDiffLeaves, isProseField } from './field-diff.js';
-import type { HistoryEntry, Principal } from '../../schema/object-record-v1.js';
+import type { HistoryEntry, Principal } from '../../../packages/core/schema/object-record-v1.js';
 
 const actor: Principal = { kind: 'agent', agent_name: 'codex', auth: 'publish_key' };
 const AT = '2026-07-06T00:00:00.000Z';

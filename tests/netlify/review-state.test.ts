@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { decideReview, discardProposal, effectiveApproval, submitReview } from '../../netlify/lib/review-state.js';
-import { applyPatchOps } from '../../src/lib/object-patch-apply.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { applyPatchOps } from '../../packages/core/lib/object-patch-apply.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const AT = '2026-07-04T12:00:00.000Z';
 const LATER = '2026-07-04T12:05:00.000Z';

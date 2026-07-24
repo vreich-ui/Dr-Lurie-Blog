@@ -56,6 +56,7 @@
  * publishObject (which by design assumes it is already authorized). The
  * policy defaults to the committed config; tests inject their own.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { effectiveApproval, type ApprovalPin, type PublishAction } from './review-state.js';
 import { canExecutePublish, type Role } from './roles.js';
 import {
@@ -63,8 +64,8 @@ import {
   isGovernedObjectType,
   publishRequiresApproval,
   type ApprovalPolicy,
-} from '../../src/lib/approval-policy.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/approval-policy.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 export type RequestedPublishAction = {
   /** As the publish call supplies it: ISO string, null (unpublish), or omitted (= immediate). */

@@ -18,8 +18,8 @@
  * are draft records agents build, judge, and score; publishing a winner is an
  * ordinary object_publish.
  */
-import { mintId } from '../object-ids-mint.js';
-import type { ContentItemBody } from '../../schema/bodies/content-item-v1.js';
+import { mintId } from '../../../packages/core/lib/object-ids-mint.js';
+import type { ContentItemBody } from '../../../packages/core/schema/bodies/content-item-v1.js';
 
 export type VariantOptions = {
   sourceObjectId: string;

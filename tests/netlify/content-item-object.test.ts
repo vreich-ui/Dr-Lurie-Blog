@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 
 import { buildVariantBody } from '../../src/lib/article-object/variant.js';
-import { contentItemBodySchema, type ContentItemBody } from '../../src/schema/bodies/content-item-v1.js';
+import { contentItemBodySchema, type ContentItemBody } from '../../packages/core/schema/bodies/content-item-v1.js';
 import {
   checkReaderSafety,
   checkReferenceIntegrity,
@@ -21,7 +21,7 @@ import {
   type ReadinessCriterion,
 } from '../../netlify/lib/object-validate.js';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const AGENT: Principal = { kind: 'agent', agent_name: 'tester', auth: 'publish_key' };
 

@@ -21,7 +21,11 @@
  */
 import { BLOCKS, INLINES, MARKS } from '@contentful/rich-text-types';
 
-import type { RichTextV1Document, RichTextV1Hyperlink, RichTextV1Text } from './rich-text-v1.js';
+import type {
+  RichTextV1Document,
+  RichTextV1Hyperlink,
+  RichTextV1Text,
+} from '../../../packages/core/lib/richtext/rich-text-v1.js';
 
 // ---------- ProseMirror JSON shapes (structural, not @tiptap types: the
 // mapper is data-level and must not drag editor packages into the build) ----

@@ -20,8 +20,8 @@ import {
   type DeployReceipt,
   type DeployStatus,
 } from '../lib/netlify-deploys.js';
-import { publishPayloadSchema, type ContentSourceV1 } from '../../src/schema/schema-v1.js';
-import { articleBodyToMarkdown, getPublicPdfUrlForArtifactBlobKey } from '../../src/lib/article-content/to-markdown.js';
+import { publishPayloadSchema, type ContentSourceV1 } from '../../packages/core/schema/schema-v1.js';
+import { articleBodyToMarkdown, getPublicPdfUrlForArtifactBlobKey } from '../../packages/core/lib/article-content/to-markdown.js';
 
 type LambdaEvent = {
   body?: string | null;

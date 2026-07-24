@@ -21,8 +21,8 @@ import type { ArtifactIndexStore } from '../lib/artifact-index.js';
 import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from '../lib/object-verbs.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 type LambdaEvent = {
   httpMethod?: string;

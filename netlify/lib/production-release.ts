@@ -28,6 +28,7 @@
  * `release_to_production` MCP tool (agents) and the admin dashboard
  * "Release to Production" button (humans) both call this function.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import {
   getPublishedProductionDeploy,
   isNetlifyBuildHookConfigured,
@@ -36,7 +37,7 @@ import {
   triggerNetlifyBuild,
   type DeployReceipt,
 } from './netlify-deploys.js';
-import { getSiteIdentity } from '../../src/lib/site-identity.js';
+import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
 
 const GITHUB_API_ROOT = 'https://api.github.com';
 const USER_AGENT = `${getSiteIdentity().siteSlug}-production-release`;

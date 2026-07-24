@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 import { objectDisplayName, objectTypeLabel, deSlug, principalName, verbToPhrase, idTooltip } from './display-name.js';
-import type { ObjectType } from '../../schema/object-record-v1.js';
+import type { ObjectType } from '../../../packages/core/schema/object-record-v1.js';
 
 /**
  * Fixtures mirror the real seed bodies under src/data/site/* (values copied

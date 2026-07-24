@@ -37,16 +37,16 @@ import {
   workflowStatuses,
   type AllowedAgentName,
   type WorkflowStatus,
-} from '../../src/schema/workflow-contract.js';
+} from '../../packages/core/schema/workflow-contract.js';
 import {
   parseContentSourceV1,
   publishPayloadSchema,
   imageAssetSchema,
   type ContentSourceV1,
   type ImageAssetRecord,
-} from '../../src/schema/schema-v1.js';
-import { type ArticleBodyNode, type ArticleBodyV1 } from '../../src/schema/article-content-v1.js';
-import { normalizeSlug, validateSlug, validateRequestId } from '../../src/lib/agents-naming.js';
+} from '../../packages/core/schema/schema-v1.js';
+import { type ArticleBodyNode, type ArticleBodyV1 } from '../../packages/core/schema/article-content-v1.js';
+import { normalizeSlug, validateSlug, validateRequestId } from '../../packages/core/lib/agents-naming.js';
 
 const jsonHeaders = {
   'Content-Type': 'application/json',

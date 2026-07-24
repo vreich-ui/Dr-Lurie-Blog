@@ -37,9 +37,9 @@ import {
   derivePatchInverse,
   PatchApplyError,
   type PatchOpCapture,
-} from '../../src/lib/object-patch-apply.js';
-import { patchOpSchema, PRIVILEGED_PATCH_OPS, type PatchOp } from '../../src/schema/object-patch-ops.js';
-import type { ObjectRecord, Principal, ReviewState } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/object-patch-apply.js';
+import { patchOpSchema, PRIVILEGED_PATCH_OPS, type PatchOp } from '../../packages/core/schema/object-patch-ops.js';
+import type { ObjectRecord, Principal, ReviewState } from '../../packages/core/schema/object-record-v1.js';
 import { canDecideReview, type Role } from './roles.js';
 
 export const publishActionSchema = z.strictObject({

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { handler as adminObjectHandler } from '../../netlify/functions/admin-object.js';
 import { handler as objectStoreHandler } from '../../netlify/functions/object-store.js';
 import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 /**
  * Repo root, anchored to this test file's own compiled location rather than
@@ -184,7 +184,10 @@ test('admin-object source references the publish key nowhere (never receives/rea
 
 test('object-verbs mints only through the shared mintId helper (no inline id generation)', () => {
   const source = readFileSync(join(REPO_ROOT, 'netlify/lib/object-verbs.ts'), 'utf8');
-  assert.ok(/from '\.\.\/\.\.\/src\/lib\/object-ids-mint\.js'/.test(source), 'must import the shared mintId helper');
+  assert.ok(
+    /from '\.\.\/\.\.\/packages\/core\/lib\/object-ids-mint\.js'/.test(source),
+    'must import the shared mintId helper',
+  );
   assert.ok(/mintId\(/.test(source), 'must call mintId');
   assert.ok(!/randomUUID/.test(source), 'no inline UUID id generation');
   assert.ok(!/createHash/.test(source), 'no inline hashing — that belongs to mintId');

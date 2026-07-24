@@ -22,9 +22,9 @@ import {
   deepEqualJson,
   derivePatchInverse,
   type PatchOpCapture,
-} from '../../src/lib/object-patch-apply.js';
-import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
-import { objectTypes, type ObjectType, type Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/object-patch-apply.js';
+import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
+import { objectTypes, type ObjectType, type Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const ACTOR: Principal = { kind: 'agent', agent_name: 'object-conversion-roundtrip', auth: 'publish_key' };
 const AT = '2026-07-20T00:00:00.000Z';

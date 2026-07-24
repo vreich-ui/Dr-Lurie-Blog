@@ -10,6 +10,7 @@
  * ⚠️ agent_name is self-declared until OQ-3 — these tests pin the seam's
  * mechanics, not a security boundary.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -21,8 +22,8 @@ import {
   isCreationAllowed,
   resolveCreationPolicy,
   type CreationPolicy,
-} from '../../src/lib/creation-policy.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/creation-policy.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-14T12:00:00.000Z');
 const HUMAN: Principal = { kind: 'human', id: 'u1', email: 'wolf@example.com' };

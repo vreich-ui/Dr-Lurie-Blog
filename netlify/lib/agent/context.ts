@@ -6,6 +6,7 @@
  * governance policies. Nothing here touches the publish key (A§1.2 posture:
  * the chat surface is an identity-authenticated HUMAN path).
  */
+import '../../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import type { ArtifactIndexStore } from '../artifact-index.js';
 import { listArtifactReferencesForRequest } from '../artifact-index.js';
 import { resolveActivePolicies, type GovernanceBlobStore } from '../governance-store.js';
@@ -13,10 +14,10 @@ import { handleObjectVerb, objectVerbRequestSchema, type ObjectVerbStore } from 
 import { buildStoreValidationContext } from '../object-validation-context.js';
 import { summarizeValidation, validateObject } from '../object-validate.js';
 import type { Role } from '../roles.js';
-import { buildObjectContract } from '../../../src/lib/registry/object-contract.js';
-import { mintId, MintIdError } from '../../../src/lib/object-ids-mint.js';
-import { validateObjectIdForType } from '../../../src/lib/object-ids.js';
-import type { ObjectType, Principal } from '../../../src/schema/object-record-v1.js';
+import { buildObjectContract } from '../../../packages/core/lib/registry/object-contract.js';
+import { mintId, MintIdError } from '../../../packages/core/lib/object-ids-mint.js';
+import { validateObjectIdForType } from '../../../packages/core/lib/object-ids.js';
+import type { ObjectType, Principal } from '../../../packages/core/schema/object-record-v1.js';
 import type { ToolContext } from './tools.js';
 
 export interface ToolContextDeps {

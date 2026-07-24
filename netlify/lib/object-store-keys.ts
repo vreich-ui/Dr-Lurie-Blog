@@ -1,4 +1,4 @@
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 export type ObjectRecordStatus = 'active' | 'archived';
 

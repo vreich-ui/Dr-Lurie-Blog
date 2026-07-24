@@ -13,9 +13,9 @@
  * before sorting once that store exists — no shape change needed here.
  */
 import { inventoryRowFromRecord } from './object-inventory.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
+import type { ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
 import { objectDisplayName, verbToPhrase, idTooltip } from '../../src/lib/admin/display-name.js';
-import type { ObjectRecord, ObjectType, HistoryEntry } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType, HistoryEntry } from '../../packages/core/schema/object-record-v1.js';
 
 // ─── activity feed ────────────────────────────────────────────────────────────
 

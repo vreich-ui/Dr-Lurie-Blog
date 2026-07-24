@@ -30,7 +30,8 @@
  * GITHUB_REPOSITORY, GITHUB_BRANCH (?? BRANCH ?? 'main'),
  * GITHUB_COMMIT_AUTHOR_NAME/EMAIL.
  */
-import { getSiteIdentity } from '../../src/lib/site-identity.js';
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
+import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
 import type { MaterializedFile } from './materialize.js';
 
 const GITHUB_API_ROOT = 'https://api.github.com';

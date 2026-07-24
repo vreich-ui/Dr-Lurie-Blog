@@ -48,8 +48,8 @@ import {
   sectionDataSchemaForType,
   type AskAiTool,
 } from './ask-ai-schema.js';
-import { contentItemNodePublicSchema, type ContentItemNode } from '../../src/schema/bodies/content-item-v1.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { contentItemNodePublicSchema, type ContentItemNode } from '../../packages/core/schema/bodies/content-item-v1.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';

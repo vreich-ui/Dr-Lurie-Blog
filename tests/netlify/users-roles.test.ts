@@ -22,7 +22,7 @@ import {
   type UserRecord,
   type UsersBlobStore,
 } from '../../netlify/lib/users-store.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const human = (email: string): Principal => ({ kind: 'human', id: 'u1', email });
 const agent: Principal = { kind: 'agent', agent_name: 'writer', auth: 'mcp_token' };

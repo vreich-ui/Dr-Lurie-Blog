@@ -46,7 +46,7 @@ import {
 import { isOwner } from '../lib/roles.js';
 import { randomUUID } from 'node:crypto';
 import { resolveAutonomy, type ToolAutonomy } from '../lib/agent/tools.js';
-import { objectTypeSchema, type Principal } from '../../src/schema/object-record-v1.js';
+import { objectTypeSchema, type Principal } from '../../packages/core/schema/object-record-v1.js';
 import { z } from 'zod';
 
 type LambdaEvent = {

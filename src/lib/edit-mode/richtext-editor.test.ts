@@ -18,7 +18,7 @@ import {
   deserializeFromRichTextV1,
   GRAMMAR_MARKS,
 } from './richtext-editor.js';
-import { richTextV1Schema } from '../richtext/rich-text-v1.js';
+import { richTextV1Schema } from '../../../packages/core/lib/richtext/rich-text-v1.js';
 import type { ProseMirrorNode } from '../richtext/prosemirror.js';
 import { BLOCKS, INLINES, MARKS } from '@contentful/rich-text-types';
 

@@ -10,14 +10,15 @@
  * whose current revision is ahead of its receipt has changes the live site
  * has not seen.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { isObjectLockActive, sanitizeObjectLock } from './object-lock.js';
 import {
   activeApprovalPolicy,
   isGovernedObjectType,
   publishRequiresApproval,
   type ApprovalPolicy,
-} from '../../src/lib/approval-policy.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/approval-policy.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 import { objectDisplayName } from '../../src/lib/admin/display-name.js';
 
 export type InventoryReviewState = 'none' | 'open' | 'changes_requested' | 'approved';

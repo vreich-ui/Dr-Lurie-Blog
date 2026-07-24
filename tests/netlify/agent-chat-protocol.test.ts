@@ -40,7 +40,7 @@ import {
   type ProviderTurnResult,
 } from '../../netlify/lib/agent/provider.js';
 import { handler as chatHandler } from '../../netlify/functions/admin-agent-chat.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-19T12:00:00.000Z');
 const HUMAN = { id: 'identity-wolf', email: 'wolf@example.com' };

@@ -20,8 +20,8 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { siteBodySchema, type SiteBody } from '../../src/schema/bodies/site-v1.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
 import { CONVERSION_SEEDS, SEED_SITE, siteBody } from '../../scripts/lib/site-seed-data.mjs';
 
 const body = siteBody as SiteBody;

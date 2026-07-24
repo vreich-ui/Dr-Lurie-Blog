@@ -24,7 +24,7 @@ import {
 } from '../lib/users-store.js';
 import { MAJOR_KEY_ARTIFACT_REF_RE } from '../lib/artifact-trust.js';
 import { inviteUser, activateOnLogin, type GoTrueIdentity } from '../lib/user-invite.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 /** An avatar must be an uploaded IMAGE artifact reference, not a URL/data URI. */
 export const isTrustedAvatarRef = (ref: string): boolean =>

@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11 T11.2
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import test from 'node:test';
 
 import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 // Every committed derived export is a body that the production publish will
 // re-validate under the now-LIVE resolvers (Part B). This guards that wiring

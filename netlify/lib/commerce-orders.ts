@@ -20,7 +20,7 @@
  */
 import { z } from 'zod';
 
-import { productModes } from '../../src/schema/bodies/product-v1.js';
+import { productModes } from '../../packages/core/schema/bodies/product-v1.js';
 
 export const COMMERCE_ORDER_SCHEMA_VERSION = 'commerce_order.v1';
 

@@ -5,9 +5,9 @@ import test from 'node:test';
 
 import { handler } from '../../netlify/functions/mcp.js';
 import { setLocalBlobsRootForTesting } from '../../netlify/lib/local-blobs.js';
-import { derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
-import type { PatchOp } from '../../src/schema/object-patch-ops.js';
-import type { HistoryEntry, ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
+import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';
+import type { HistoryEntry, ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 /**
  * T0.11 — Phase 0 exit drill.

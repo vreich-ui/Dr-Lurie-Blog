@@ -21,7 +21,7 @@ import {
   type ReadinessGroup,
 } from '../../netlify/lib/object-validate.js';
 import { publicPathForArtifactRef } from '../../netlify/lib/artifact-trust.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 // ── shared helpers ───────────────────────────────────────────────────────────
 

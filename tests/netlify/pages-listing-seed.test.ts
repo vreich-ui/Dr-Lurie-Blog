@@ -18,11 +18,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { isRegisteredSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
+import { isRegisteredSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import { applyListingTerm } from '../../src/lib/renderer/listing-term.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-listing-seed-data.mjs';
 
 type Seed = {

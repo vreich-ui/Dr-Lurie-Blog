@@ -4,7 +4,7 @@
  * suffix when uniqueness cannot be guaranteed from the slug alone.
  */
 
-import { normalizeSlug } from '../agents-naming.js';
+import { normalizeSlug } from '../../../packages/core/lib/agents-naming.js';
 
 const MAX_SLUG = 80;
 

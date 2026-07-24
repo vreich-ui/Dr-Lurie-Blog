@@ -1,14 +1,15 @@
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { getAdminStateFromEvent, getHeader, type LambdaContext } from '../lib/admin-auth.js';
 import { uploadImagesWithIntegrity, type UploadableImage } from '../lib/publisher-artifact-upload-client.js';
 import { requireArtifactReferenceArray, type ArtifactReference } from '../lib/artifacts.js';
-import { articleBodyV1Schema, type ArticleBodyNode } from '../../src/schema/article-content-v1.js';
-import { getSiteIdentity } from '../../src/lib/site-identity.js';
+import { articleBodyV1Schema, type ArticleBodyNode } from '../../packages/core/schema/article-content-v1.js';
+import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
 import { getArtifactIndexBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { getGovernanceBlobStore, resolveActivePolicies } from '../lib/governance-store.js';
 import type { ArtifactIndexStore } from '../lib/artifact-index.js';
 import { handleObjectVerb, type ObjectVerbStore } from '../lib/object-verbs.js';
 import { buildStoreValidationContext } from '../lib/object-validation-context.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 import { Agent, run, tool } from '@openai/agents';
 import { z } from 'zod';
 

@@ -18,8 +18,8 @@
 import { z } from 'zod';
 
 import { sha256Hex } from './crypto.js';
-import { isObjectIdForType } from '../../src/lib/object-ids.js';
-import { objectTypes, type ObjectType } from '../../src/schema/object-record-v1.js';
+import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { objectTypes, type ObjectType } from '../../packages/core/schema/object-record-v1.js';
 import {
   clientTrackingEventSchema,
   trackingEventSchema,
@@ -27,7 +27,7 @@ import {
   type ClientTrackingEvent,
   type TrackingEvent,
   type TrackingEventKind,
-} from '../../src/schema/tracking-event-v1.js';
+} from '../../packages/core/schema/tracking-event-v1.js';
 
 // ─── per-event props allowlist (12-plan §5.2 — allowlist, not passthrough) ───
 

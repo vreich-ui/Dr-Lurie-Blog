@@ -32,7 +32,6 @@
  */
 import { z } from 'zod';
 
-import { creationPolicyConfig } from '../config/creation-policy.js';
 import type { ObjectType, Principal } from '../schema/object-record-v1.js';
 import { isGovernedObjectType, type GovernedObjectType } from './approval-policy.js';
 
@@ -93,13 +92,28 @@ export const isCreationAllowed = (objectType: ObjectType, principal: Principal, 
   return rule === 'open' || rule.agents.includes(principal.agent_name);
 };
 
-let activePolicy: CreationPolicy | undefined;
+/**
+ * Provider-injection seam (W11 T11.2). Mirrors approval-policy: core law must
+ * not import the site's committed config (`src/config/creation-policy.ts`
+ * stays site-side). The site registers the provider once at startup via
+ * `setActiveCreationPolicyProvider` (see `src/config/policy-bindings.ts`).
+ * Behavior unchanged — only the config source is injected instead of imported.
+ */
+let activeCreationPolicyProvider: (() => CreationPolicy) | undefined;
+
+export const setActiveCreationPolicyProvider = (provider: () => CreationPolicy): void => {
+  activeCreationPolicyProvider = provider;
+};
 
 /**
- * The committed config, validated once and cached. This is what the verbs
- * use when no policy is injected (tests inject).
+ * The active policy, resolved through the site-registered provider. This is
+ * what the verbs use when no policy is injected explicitly (tests inject).
  */
 export const activeCreationPolicy = (): CreationPolicy => {
-  if (!activePolicy) activePolicy = resolveCreationPolicy(creationPolicyConfig);
-  return activePolicy;
+  if (!activeCreationPolicyProvider) {
+    throw new Error(
+      'Active creation policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeCreationPolicy().',
+    );
+  }
+  return activeCreationPolicyProvider();
 };

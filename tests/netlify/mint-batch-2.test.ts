@@ -10,10 +10,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { comparisonTableDefinition } from '../../src/lib/registry/components/comparison-table.js';
-import { timelineDefinition } from '../../src/lib/registry/components/timeline.js';
-import { isStandalonePlaceableSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { sectionInstanceSchema, sectionTypes } from '../../src/schema/bodies/section-v1.js';
+import { comparisonTableDefinition } from '../../packages/core/lib/registry/components/comparison-table.js';
+import { timelineDefinition } from '../../packages/core/lib/registry/components/timeline.js';
+import { isStandalonePlaceableSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
+import { sectionInstanceSchema, sectionTypes } from '../../packages/core/schema/bodies/section-v1.js';
 
 const instance = (type: string, data: unknown) => ({ id: 's_mintb2', type, data });
 const parses = (type: string, data: unknown): boolean => sectionInstanceSchema.safeParse(instance(type, data)).success;

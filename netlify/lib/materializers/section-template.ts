@@ -6,7 +6,7 @@
  * the verb, and no build consumer reads these exports yet (a future
  * palette-derivation slice may).
  */
-import { sectionTemplateBodySchema } from '../../../src/schema/bodies/section-template-v1.js';
+import { sectionTemplateBodySchema } from '../../../packages/core/schema/bodies/section-template-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeSectionTemplate = (

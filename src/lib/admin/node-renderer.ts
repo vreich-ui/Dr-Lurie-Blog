@@ -4,7 +4,7 @@
  * Output is purely for display/read mode; TipTap overlays this in edit mode.
  */
 
-import type { ArticleBodyNode } from '../../schema/article-content-v1.ts';
+import type { ArticleBodyNode } from '../../../packages/core/schema/article-content-v1.ts';
 import type { ArtifactPreviewLoader } from './artifact-preview.ts';
 
 // Optional authenticated loader (configured by publish.astro via setArtifactPreviewLoader)

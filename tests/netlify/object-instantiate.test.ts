@@ -4,8 +4,8 @@ import test from 'node:test';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { PageBody } from '../../src/schema/bodies/page-v1.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { PageBody } from '../../packages/core/schema/bodies/page-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 // The `instantiate` verb (W2.5): template recipe → new page THROUGH the
 // existing create path, so route uniqueness / PageType law / reference

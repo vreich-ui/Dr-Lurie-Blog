@@ -25,18 +25,18 @@
  */
 import { z } from 'zod';
 
-import { contentItemBodySchema } from '../../src/schema/bodies/content-item-v1.js';
-import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
-import { sectionBodySchema, sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
-import { sectionTemplateBodySchema } from '../../src/schema/bodies/section-template-v1.js';
-import { siteBodySchema } from '../../src/schema/bodies/site-v1.js';
-import { taxonomyBodySchema } from '../../src/schema/bodies/taxonomy-v1.js';
-import { templateBodySchema } from '../../src/schema/bodies/template-v1.js';
-import { trackingConfigBodySchema } from '../../src/schema/bodies/tracking-config-v1.js';
-import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import { contentItemBodySchema } from '../../packages/core/schema/bodies/content-item-v1.js';
+import { navigationBodySchema } from '../../packages/core/schema/bodies/navigation-v1.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { productBodySchema } from '../../packages/core/schema/bodies/product-v1.js';
+import { sectionBodySchema, sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
+import { sectionTemplateBodySchema } from '../../packages/core/schema/bodies/section-template-v1.js';
+import { siteBodySchema } from '../../packages/core/schema/bodies/site-v1.js';
+import { taxonomyBodySchema } from '../../packages/core/schema/bodies/taxonomy-v1.js';
+import { templateBodySchema } from '../../packages/core/schema/bodies/template-v1.js';
+import { trackingConfigBodySchema } from '../../packages/core/schema/bodies/tracking-config-v1.js';
+import { themeBodySchema } from '../../packages/core/schema/bodies/theme-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 export type JsonSchema = Record<string, unknown>;
 

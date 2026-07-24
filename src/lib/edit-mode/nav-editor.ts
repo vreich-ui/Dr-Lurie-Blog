@@ -17,7 +17,7 @@
  *     navigation patch grammar, one minimal op per change (meta writes
  *     coalesce into a single set_nav_meta).
  */
-import type { NavGroup, NavigationBody, NavItem } from '../../schema/bodies/navigation-v1.js';
+import type { NavGroup, NavigationBody, NavItem } from '../../../packages/core/schema/bodies/navigation-v1.js';
 
 export type NavEditField = {
   /** Stable form key, e.g. `brand.text`, `group.g_products.title`, `item.g_products.i_shop.label`, `action.0.label`. */

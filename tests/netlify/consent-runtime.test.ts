@@ -12,18 +12,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildConsentBannerHtml, escapeHtml } from '../../src/lib/tracking/consent/banner-html.js';
+import { buildConsentBannerHtml, escapeHtml } from '../../packages/core/lib/tracking/consent/banner-html.js';
 import {
   consentBootstrapScript,
   consentRuntime,
   type ConsentWindowLike,
-} from '../../src/lib/tracking/consent/runtime.js';
-import { createTracker, type TrackerEnv } from '../../src/lib/tracking/loader/core.js';
+} from '../../packages/core/lib/tracking/consent/runtime.js';
+import { createTracker, type TrackerEnv } from '../../packages/core/lib/tracking/loader/core.js';
 import {
   clearPersistentId,
   PERSISTENT_ID_TTL_MS,
   readOrMintPersistentId,
-} from '../../src/lib/tracking/loader/persistent-id.js';
+} from '../../packages/core/lib/tracking/loader/persistent-id.js';
 
 // ═══ the fake window ══════════════════════════════════════════════════════════
 

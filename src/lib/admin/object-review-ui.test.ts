@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { reviewerAvailableActions } from './object-review-ui.js';
-import { governedObjectTypes, type ApprovalPolicy } from '../approval-policy.js';
+import { governedObjectTypes, type ApprovalPolicy } from '../../../packages/core/lib/approval-policy.js';
 
 const ALL_AUTONOMOUS: ApprovalPolicy = { master: 'all-autonomous', overrides: {} };
 const ALL_REQUIRE: ApprovalPolicy = { master: 'all-require-approval', overrides: {} };

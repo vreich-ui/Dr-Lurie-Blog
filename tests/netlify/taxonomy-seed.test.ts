@@ -16,8 +16,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { taxonomyBodySchema, type TaxonomyBody } from '../../src/schema/bodies/taxonomy-v1.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { taxonomyBodySchema, type TaxonomyBody } from '../../packages/core/schema/bodies/taxonomy-v1.js';
 import { CONVERSION_SEEDS, RAW_TO_CANONICAL, SEED_SITE, taxonomyBody } from '../../scripts/lib/taxonomy-seed-data.mjs';
 
 const body = taxonomyBody as TaxonomyBody;

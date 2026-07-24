@@ -5,7 +5,7 @@ import test from 'node:test';
 import { materialize } from '../../netlify/lib/materialize.js';
 import { publishObject, type PublishObjectDeps } from '../../netlify/lib/object-publish.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { publishReceiptSchema, type ObjectRecord, type Principal } from '../../src/schema/object-record-v1.js';
+import { publishReceiptSchema, type ObjectRecord, type Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-04T12:00:00.000Z');
 const iso = (ms: number) => new Date(ms).toISOString();

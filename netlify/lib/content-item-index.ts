@@ -18,7 +18,8 @@
  * deduplicated.
  */
 
-import { getSiteIdentity } from '../../src/lib/site-identity.js';
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
+import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
 
 const CONTENT_DIR = 'src/data/post';
 const GITHUB_API_ROOT = 'https://api.github.com';

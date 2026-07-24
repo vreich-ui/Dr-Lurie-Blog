@@ -23,10 +23,10 @@ import { collectBlobListItems } from './blob-list.js';
 import { loadContentItemIds } from './content-item-index.js';
 import type { ArtifactRefResolution, ObjectValidationContext, PageTypeConstraint } from './object-validate.js';
 import type { ObjectVerbStore } from './object-verbs.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
-import { isRegisteredSectionType } from '../../src/lib/registry/components/registered-types.js';
-import { objectTypes, type ObjectRecord, type ObjectType } from '../../src/schema/object-record-v1.js';
-import type { SectionType } from '../../src/schema/bodies/section-v1.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
+import { isRegisteredSectionType } from '../../packages/core/lib/registry/components/registered-types.js';
+import { objectTypes, type ObjectRecord, type ObjectType } from '../../packages/core/schema/object-record-v1.js';
+import type { SectionType } from '../../packages/core/schema/bodies/section-v1.js';
 
 type SelfRef = {
   selfObjectId?: string;

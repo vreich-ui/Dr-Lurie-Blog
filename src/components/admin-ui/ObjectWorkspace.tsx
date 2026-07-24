@@ -13,10 +13,11 @@
  * (the brief's scripted per-type drive) — until then the inspector generates a
  * read view and points visual edits at the canvas.
  */
+import '~/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
-import { getSiteIdentity } from '../../lib/site-identity';
+import { getSiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, StatusPill, Skeleton, IconButton } from './primitives';
 import { Tabs } from './menus';
 import { Input, Select, Textarea } from './forms';
@@ -27,7 +28,7 @@ import { AgentChip, ChatComposer, ChatThread, useChat } from './chat';
 import { createObjectChat } from '../../lib/admin/chat-client';
 import { IconAlertTriangle, IconExternalLink, IconPlus, IconRocket, IconWrench } from './icons';
 import { objectDisplayName, objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
-import type { ObjectType, ObjectRecord, HistoryEntry } from '../../schema/object-record-v1';
+import type { ObjectType, ObjectRecord, HistoryEntry } from '@core/schema/object-record-v1';
 import type { ReadinessGroup, CriterionStatus } from '../../lib/admin/readiness-criteria';
 
 async function getToken(): Promise<string> {

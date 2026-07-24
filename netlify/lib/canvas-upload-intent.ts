@@ -16,7 +16,7 @@
  * object being edited, so canvas uploads are traceable per object and an
  * intent can never write outside `image/req_canvas_*` keys.
  */
-import { normalizeMachineSafeId, validateRequestId } from '../../src/lib/agents-naming.js';
+import { normalizeMachineSafeId, validateRequestId } from '../../packages/core/lib/agents-naming.js';
 import {
   createArtifactUploadToken,
   defaultArtifactUploadTokenTtlMs,

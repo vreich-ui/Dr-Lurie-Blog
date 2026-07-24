@@ -9,7 +9,7 @@ import {
   type ArtifactKind,
   type ArtifactReference,
 } from './artifacts.js';
-import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
+import { validateFilename, validateRequestId } from '../../packages/core/lib/agents-naming.js';
 import { readArtifactReference, writeArtifactReferenceIndexes, type ArtifactIndexStore } from './artifact-index.js';
 import { getArtifactBlobStore, getArtifactIndexBlobStore } from './blob-store.js';
 import { sha256Hex } from './crypto.js';

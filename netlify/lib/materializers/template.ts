@@ -4,7 +4,7 @@
  * copies them into a Page (D§3.6) — this materializer does not resolve or
  * expand anything, it exports the record's body verbatim.
  */
-import { templateBodySchema } from '../../../src/schema/bodies/template-v1.js';
+import { templateBodySchema } from '../../../packages/core/schema/bodies/template-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeTemplate = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

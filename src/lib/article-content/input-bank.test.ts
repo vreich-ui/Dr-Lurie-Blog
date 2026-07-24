@@ -6,7 +6,7 @@ import {
   createLegacyBodyNode,
   createOpaqueNodeId,
 } from './input-bank.js';
-import { articleBodyNodeSchema } from '../../schema/article-content-v1.js';
+import { articleBodyNodeSchema } from '../../../packages/core/schema/article-content-v1.js';
 
 describe('Article Content Input Bank', () => {
   describe('createOpaqueNodeId', () => {

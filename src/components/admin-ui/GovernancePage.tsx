@@ -6,17 +6,18 @@
  * shown with provenance; chat-tool autonomy activates with the chat loop
  * (T9.13).
  */
+import '~/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { useEffect, useMemo, useState } from 'react';
 
 import { AdminShell } from './AdminShell';
-import { getSiteIdentity } from '../../lib/site-identity';
+import { getSiteIdentity } from '@core/lib/site-identity';
 import { Badge, Button, Card, EmptyState, Skeleton } from './primitives';
 import { Select } from './forms';
 import { useToast } from './overlays';
 import { IconAlertTriangle } from './icons';
 import { objectTypeLabel } from '../../lib/admin/display-name';
-import { governedObjectTypes } from '../../lib/approval-policy';
-import type { ObjectType } from '../../schema/object-record-v1';
+import { governedObjectTypes } from '@core/lib/approval-policy';
+import type { ObjectType } from '@core/schema/object-record-v1';
 import {
   fetchGovernance,
   setApprovalOverride,

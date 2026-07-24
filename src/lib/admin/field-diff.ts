@@ -15,7 +15,7 @@
  * network calls — Accept/Discard wiring lives in the page that mounts this.
  */
 import { diffWords, type Change } from 'diff';
-import type { HistoryEntry } from '../../schema/object-record-v1.js';
+import type { HistoryEntry } from '../../../packages/core/schema/object-record-v1.js';
 
 const PROSE_LENGTH_THRESHOLD = 80;
 

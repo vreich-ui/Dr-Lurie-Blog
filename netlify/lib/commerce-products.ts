@@ -5,8 +5,8 @@
  * exports: an unpublished draft or a retired product must not be buyable the
  * instant before the next build.
  */
-import { productBodySchema, type ProductBody } from '../../src/schema/bodies/product-v1.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import { productBodySchema, type ProductBody } from '../../packages/core/schema/bodies/product-v1.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 import { objectRecordKey } from './object-store-keys.js';
 import { stripeLinkageForMode } from './stripe-env.js';
 

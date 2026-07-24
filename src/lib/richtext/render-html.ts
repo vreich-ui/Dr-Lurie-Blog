@@ -20,7 +20,7 @@
 import { documentToHtmlString, type Options } from '@contentful/rich-text-html-renderer';
 import { BLOCKS, MARKS, type Document } from '@contentful/rich-text-types';
 
-import { parseRichTextV1, type RichTextV1Document } from './rich-text-v1.js';
+import { parseRichTextV1, type RichTextV1Document } from '../../../packages/core/lib/richtext/rich-text-v1.js';
 
 export type RenderRichTextOptions = {
   /** Resolve an embedded-entry-block target (an object id) to HTML. */

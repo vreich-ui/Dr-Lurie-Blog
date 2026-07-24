@@ -8,7 +8,7 @@ import {
   objectStatusIndexPrefix,
   type ObjectRecordStatus,
 } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 const cases: Array<[ObjectType, string, string]> = [
   ['site', 'site_drlurie', 'objects/site/by-id/site_drlurie.json'],

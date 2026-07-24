@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { getArtifactBlobStore, getSiteObjectsBlobStore } from '../lib/blob-store.js';
 import { checkBuyability, loadPublishedProduct } from '../lib/commerce-products.js';
 import { getStripeClient } from '../lib/stripe-env.js';
-import { isObjectIdForType } from '../../src/lib/object-ids.js';
+import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
 
 type LambdaEvent = {
   blobs?: string;

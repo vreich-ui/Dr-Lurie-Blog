@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { applyPatchOps } from '../object-patch-apply.js';
+import { applyPatchOps } from '../../../packages/core/lib/object-patch-apply.js';
 import { computeStructuralDiff, isStructuralCapture, pendingHistory } from './structural-diff.js';
-import type { HistoryEntry, ObjectRecord, Principal } from '../../schema/object-record-v1.js';
+import type { HistoryEntry, ObjectRecord, Principal } from '../../../packages/core/schema/object-record-v1.js';
 
 const actor: Principal = { kind: 'agent', agent_name: 'codex', auth: 'publish_key' };
 const AT = '2026-07-06T00:00:00.000Z';

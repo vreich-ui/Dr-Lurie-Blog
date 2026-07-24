@@ -20,11 +20,11 @@ import { summarizeValidation, validateObject } from '../../netlify/lib/object-va
 import {
   isRegisteredSectionType,
   isStandalonePlaceableSectionType,
-} from '../../src/lib/registry/components/registered-types.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { sectionTemplateBodySchema, type SectionTemplateBody } from '../../src/schema/bodies/section-template-v1.js';
+} from '../../packages/core/lib/registry/components/registered-types.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { sectionTemplateBodySchema, type SectionTemplateBody } from '../../packages/core/schema/bodies/section-template-v1.js';
 import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/section-templates-seed-data.mjs';
 
 type Seed = { objectType: string; objectId: string; body: SectionTemplateBody };

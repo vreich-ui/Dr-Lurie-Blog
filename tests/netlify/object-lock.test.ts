@@ -14,7 +14,7 @@ import {
   sanitizeObjectLock,
 } from '../../netlify/lib/object-lock.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import { objectRecordSchema, type ObjectRecord, type Principal } from '../../src/schema/object-record-v1.js';
+import { objectRecordSchema, type ObjectRecord, type Principal } from '../../packages/core/schema/object-record-v1.js';
 
 // Parity spec: netlify/functions/admin-workflow-lock.ts as documented in
 // docs/cms-architecture/01-audit.md §1.2, plus the D§3.1 counter rule

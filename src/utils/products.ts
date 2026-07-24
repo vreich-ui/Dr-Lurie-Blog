@@ -10,7 +10,7 @@
  */
 import { getCollection } from 'astro:content';
 
-import { productBodySchema, type ProductBody } from '~/schema/bodies/product-v1';
+import { productBodySchema, type ProductBody } from '../../packages/core/schema/bodies/product-v1';
 
 /** Strip the `__generated` marker and validate a product export. */
 export const parseProductExport = (data: unknown): ProductBody => {

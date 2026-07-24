@@ -10,8 +10,8 @@ import test from 'node:test';
 
 import { checkPublishGate } from '../../netlify/lib/publish-gate.js';
 import { expandRole, type Role } from '../../netlify/lib/roles.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const HUMAN: Principal = { kind: 'human', id: 'u1', email: 'x@y.com' };
 const AGENT: Principal = { kind: 'agent', agent_name: 'writer', auth: 'publish_key' };

@@ -20,8 +20,6 @@
  */
 import { z } from 'zod';
 
-import { mediaPolicyConfig } from '../config/media-policy.js';
-
 /** How Dr-Lurie reacts to an image over the byte budget. Sits next to the limit. */
 const overBudgetModeSchema = z.enum(['warn', 'block']);
 export type OverBudgetMode = z.infer<typeof overBudgetModeSchema>;
@@ -75,10 +73,24 @@ export const mediaPolicyLimits = (policy: MediaPolicy): MediaPolicyLimits => ({
   overBudget: policy.overBudget,
 });
 
-let activePolicy: MediaPolicy | undefined;
+/**
+ * Provider-injection seam (W11 T11.2). Core law must not import the site's
+ * committed config (`src/config/media-policy.ts` stays site-side); the site
+ * registers the provider once at startup (see `src/config/policy-bindings.ts`).
+ * Behavior unchanged — lazy validate-once, only the config source is injected.
+ */
+let activeMediaPolicyProvider: (() => MediaPolicy) | undefined;
 
-/** The committed config, validated once and cached (tests inject their own). */
+export const setActiveMediaPolicyProvider = (provider: () => MediaPolicy): void => {
+  activeMediaPolicyProvider = provider;
+};
+
+/** The active media policy, resolved through the site-registered provider (tests inject their own). */
 export const activeMediaPolicy = (): MediaPolicy => {
-  if (!activePolicy) activePolicy = resolveMediaPolicy(mediaPolicyConfig);
-  return activePolicy;
+  if (!activeMediaPolicyProvider) {
+    throw new Error(
+      'Active media policy provider not configured — import the site policy bindings (src/config/policy-bindings) before calling activeMediaPolicy().',
+    );
+  }
+  return activeMediaPolicyProvider();
 };

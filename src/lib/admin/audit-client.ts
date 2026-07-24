@@ -3,7 +3,7 @@
  * inbox and the activity feed. Any admin may read; the server enforces it.
  */
 import type { GetToken } from '../edit-mode/verbs-client.js';
-import type { ObjectType } from '../../schema/object-record-v1.js';
+import type { ObjectType } from '../../../packages/core/schema/object-record-v1.js';
 
 const ENDPOINT = '/.netlify/functions/admin-audit';
 

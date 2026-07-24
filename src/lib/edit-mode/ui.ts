@@ -23,6 +23,7 @@
  * DOM-heavy by nature — the routing/merge logic it drives lives in the pure,
  * unit-tested modules (targets.ts, preview.ts, verbs-client.ts).
  */
+import '../../config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { captureObjectSelection } from '../admin/ask-ai-object-selection.js';
 import { SECTION_PALETTE, insertPositionFor } from './sections-palette.js';
 import { NODE_PALETTE } from './nodes-palette.js';
@@ -37,9 +38,9 @@ import {
   type FieldChange,
 } from './targets.js';
 import { applyNavChangesToBody, navChangesToOps, navEditFieldsFor, type NavEditField } from './nav-editor.js';
-import type { NavigationBody } from '../../schema/bodies/navigation-v1.js';
+import type { NavigationBody } from '../../../packages/core/schema/bodies/navigation-v1.js';
 import { mediaPolicyConfig } from '../../config/media-policy.js';
-import { getSiteIdentity } from '../site-identity.js';
+import { getSiteIdentity } from '../../../packages/core/lib/site-identity.js';
 import { previewFieldChange, restoreRegion, snapshotRegion, type RegionSnapshot } from './preview.js';
 import {
   askAiSuggestion,

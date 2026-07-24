@@ -24,8 +24,8 @@ import { objectRecordKey } from './object-store-keys.js';
 import { handleObjectVerb, type ObjectVerbStore } from './object-verbs.js';
 import { buildStoreValidationContext } from './object-validation-context.js';
 import { stripeMode, type StripeMode } from './stripe-env.js';
-import { productBodySchema } from '../../src/schema/bodies/product-v1.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { productBodySchema } from '../../packages/core/schema/bodies/product-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 export type ProductSetPriceInput = {
   product_id: string;

@@ -16,15 +16,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { Role } from '../../netlify/lib/roles.js';
-import { pageTypeIds } from '../../src/schema/bodies/page-v1.js';
-import { sectionTypeSchema } from '../../src/schema/bodies/section-v1.js';
+import { pageTypeIds } from '../../packages/core/schema/bodies/page-v1.js';
+import { sectionTypeSchema } from '../../packages/core/schema/bodies/section-v1.js';
 import {
   getPageTypeDefinition,
   listPageTypeDefinitions,
   pageTypeDefinitionJsonSchema,
   unimplementedPageTypeIds,
   type PublishRole,
-} from '../../src/lib/registry/page-types.js';
+} from '../../packages/core/lib/registry/page-types.js';
 
 test('all five PageTypeIds are defined (W6); unknown ids still fail loudly', () => {
   for (const id of ['home', 'standard', 'system', 'listing', 'content_detail']) {

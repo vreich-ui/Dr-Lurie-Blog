@@ -21,7 +21,7 @@ process.env.GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY ?? 'example/repo';
 import { publishArticleObject } from '../../netlify/functions/run-publisher-agent.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
 import type { ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const HUMAN: Principal = { kind: 'human', id: 'id-wolf', email: 'wolf@example.com' };
 
@@ -54,7 +54,7 @@ const NODES = [
     public: { body: 'Start slow, patch test, be patient.' },
     private: { strategy: 'resolution', intent: 'reassure' },
   },
-] as const satisfies readonly unknown[] as unknown as import('../../src/schema/article-content-v1.js').ArticleBodyNode[];
+] as const satisfies readonly unknown[] as unknown as import('../../packages/core/schema/article-content-v1.js').ArticleBodyNode[];
 
 // The T1.2 committer speaks the GitHub git-data API — mock it (the same
 // harness shape object-verbs-review.test.ts uses).

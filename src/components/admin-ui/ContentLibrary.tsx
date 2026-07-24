@@ -25,7 +25,7 @@ import {
   type ReadinessDot,
 } from '../../lib/admin/library-logic';
 import { objectTypeLabel, idTooltip } from '../../lib/admin/display-name';
-import type { ObjectType } from '../../schema/object-record-v1';
+import type { ObjectType } from '@core/schema/object-record-v1';
 
 async function getToken(): Promise<string> {
   const m = await import('../../utils/goTrueClient');

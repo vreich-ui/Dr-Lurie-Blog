@@ -24,7 +24,7 @@
 import { BLOCKS } from '@contentful/rich-text-types';
 
 import { renderRichTextV1Html } from '../richtext/render-html.js';
-import type { ContentItemBody, ContentItemNode } from '../../schema/bodies/content-item-v1.js';
+import type { ContentItemBody, ContentItemNode } from '../../../packages/core/schema/bodies/content-item-v1.js';
 
 export type RenderedArticle = {
   /** The article body HTML (annotated node wrappers included). */

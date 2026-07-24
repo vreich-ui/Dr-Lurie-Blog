@@ -23,6 +23,7 @@
  * and enum/regex gates bound the damage), instance-local token bucket,
  * batch ≤25 events / ≤64KB body.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
 import { getSiteObjectsBlobStore, getTrackingEventsBlobStore } from '../lib/blob-store.js';
 import { objectRecordKey, objectStatusIndexPrefix } from '../lib/object-store-keys.js';
 import { collectBlobListItems, type BlobListResponse } from '../lib/blob-list.js';
@@ -35,8 +36,8 @@ import {
   toNdjson,
   type SinkConfig,
 } from '../lib/tracking-events.js';
-import { trackingBatchSchema, type TrackingEvent } from '../../src/schema/tracking-event-v1.js';
-import { resolveSiteIdentity } from '../../src/lib/site-identity.js';
+import { trackingBatchSchema, type TrackingEvent } from '../../packages/core/schema/tracking-event-v1.js';
+import { resolveSiteIdentity } from '../../packages/core/lib/site-identity.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const SINK_TIMEOUT_MS = 2000;

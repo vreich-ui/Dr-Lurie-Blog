@@ -26,7 +26,7 @@ import {
   type ProseMirrorNode,
   type ProseMirrorMark,
 } from '../richtext/prosemirror.js';
-import type { RichTextV1Document } from '../richtext/rich-text-v1.js';
+import type { RichTextV1Document } from '../../../packages/core/lib/richtext/rich-text-v1.js';
 
 // ─── grammar allowlist (ProseMirror/TipTap side) ───────────────────────────────
 

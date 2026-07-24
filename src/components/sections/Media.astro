@@ -6,8 +6,8 @@
  * videoId — data never carries a URL; a drifted id fails the schema before
  * it reaches this interpolation, and the template re-asserts the regex.
  */
-import { MEDIA_VIDEO_ID_RE } from '~/schema/bodies/section-v1';
-import type { EmptyResolved, RenderCtx, SectionDataOf } from '~/lib/registry/components/types';
+import { MEDIA_VIDEO_ID_RE } from '@core/schema/bodies/section-v1';
+import type { EmptyResolved, RenderCtx, SectionDataOf } from '@core/lib/registry/components/types';
 
 type Props = {
   data: SectionDataOf<'media'>;

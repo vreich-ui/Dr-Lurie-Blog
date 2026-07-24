@@ -1,6 +1,6 @@
 import { basename, extname } from 'node:path';
 import { requestArtifactReferenceKey } from './artifact-index.js';
-import { validateRequestId } from '../../src/lib/agents-naming.js';
+import { validateRequestId } from '../../packages/core/lib/agents-naming.js';
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
 import { sha256Hex } from './crypto.js';
 

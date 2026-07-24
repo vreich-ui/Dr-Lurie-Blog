@@ -6,7 +6,7 @@
  * theme/template precedent — the export is a registry snapshot; the T13.5
  * renderer seam is its build consumer).
  */
-import { trackingConfigBodySchema } from '../../../src/schema/bodies/tracking-config-v1.js';
+import { trackingConfigBodySchema } from '../../../packages/core/schema/bodies/tracking-config-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeTrackingConfig = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

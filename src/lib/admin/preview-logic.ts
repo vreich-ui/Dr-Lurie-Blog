@@ -11,8 +11,8 @@
  */
 import { renderArticleNodes } from '../article-object/render-nodes.js';
 import { objectDisplayName } from './display-name.js';
-import type { ContentItemBody } from '../../schema/bodies/content-item-v1.js';
-import type { ObjectRecord } from '../../schema/object-record-v1.js';
+import type { ContentItemBody } from '../../../packages/core/schema/bodies/content-item-v1.js';
+import type { ObjectRecord } from '../../../packages/core/schema/object-record-v1.js';
 
 const asBag = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};

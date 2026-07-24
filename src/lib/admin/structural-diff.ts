@@ -19,9 +19,9 @@
  * the T0.6 inverse from it (C§2.4) — this module does not compute inverses
  * itself, only describes what happened for the reviewer to read.
  */
-import type { ElementSnapshot, MoveSnapshot, PatchOpCapture } from '../object-patch-apply.js';
-import type { PatchOp } from '../../schema/object-patch-ops.js';
-import type { HistoryEntry } from '../../schema/object-record-v1.js';
+import type { ElementSnapshot, MoveSnapshot, PatchOpCapture } from '../../../packages/core/lib/object-patch-apply.js';
+import type { PatchOp } from '../../../packages/core/schema/object-patch-ops.js';
+import type { HistoryEntry } from '../../../packages/core/schema/object-record-v1.js';
 
 export type StructuralDiffKind = 'added' | 'removed' | 'replaced' | 'moved';
 

@@ -11,18 +11,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { metaPixelAdapter } from '../../src/lib/tracking/adapters/meta-pixel.js';
-import { mgidAdapter } from '../../src/lib/tracking/adapters/mgid.js';
-import { outbrainAdapter } from '../../src/lib/tracking/adapters/outbrain.js';
-import { taboolaAdapter } from '../../src/lib/tracking/adapters/taboola.js';
-import { AdapterIdError } from '../../src/lib/tracking/adapters/types.js';
+import { metaPixelAdapter } from '../../packages/core/lib/tracking/adapters/meta-pixel.js';
+import { mgidAdapter } from '../../packages/core/lib/tracking/adapters/mgid.js';
+import { outbrainAdapter } from '../../packages/core/lib/tracking/adapters/outbrain.js';
+import { taboolaAdapter } from '../../packages/core/lib/tracking/adapters/taboola.js';
+import { AdapterIdError } from '../../packages/core/lib/tracking/adapters/types.js';
 import {
   assembleAdapterHeads,
   buildTrackerClientConfig,
   parseTrackingExport,
-} from '../../src/lib/tracking/assemble.js';
-import { nativeCalls, type GoalMapLike } from '../../src/lib/tracking/loader/bridge.js';
-import { createTracker, type TrackerEnv } from '../../src/lib/tracking/loader/core.js';
+} from '../../packages/core/lib/tracking/assemble.js';
+import { nativeCalls, type GoalMapLike } from '../../packages/core/lib/tracking/loader/bridge.js';
+import { createTracker, type TrackerEnv } from '../../packages/core/lib/tracking/loader/core.js';
 
 // ═══ adapters ═════════════════════════════════════════════════════════════════
 

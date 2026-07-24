@@ -22,7 +22,7 @@ import {
   parseNavigationExport,
 } from '../../src/utils/navigation-data.js';
 import { materializeNavigation } from '../../netlify/lib/materializers/navigation.js';
-import { navigationBodySchema } from '../../src/schema/bodies/navigation-v1.js';
+import { navigationBodySchema } from '../../packages/core/schema/bodies/navigation-v1.js';
 import { navFooterBody, navFooterHomeBody, navHeaderBody } from '../../scripts/lib/navigation-seed-data.mjs';
 
 const resolve = createNavTargetResolver({ blogPermalink: '/learn/library' });

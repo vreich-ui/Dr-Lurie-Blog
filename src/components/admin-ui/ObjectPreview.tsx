@@ -20,7 +20,7 @@ import { EmptyState, Badge } from './primitives';
 import { IconInfo, IconExternalLink } from './icons';
 import { objectTypeLabel } from '../../lib/admin/display-name';
 import { contentItemPreview, productPreview, tokenSwatches, tokenFonts } from '../../lib/admin/preview-logic';
-import type { ObjectRecord } from '../../schema/object-record-v1';
+import type { ObjectRecord } from '@core/schema/object-record-v1';
 
 type Rec = ObjectRecord<Record<string, unknown>>;
 

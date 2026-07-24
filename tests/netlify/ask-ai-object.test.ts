@@ -4,7 +4,7 @@ import test from 'node:test';
 import { askAiForObject, type AskAiObjectStore } from '../../netlify/lib/ask-ai-object.js';
 import { handleObjectVerb, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-06T12:00:00.000Z');
 const AGENT: Principal = { kind: 'agent', agent_name: 'draft-agent', auth: 'publish_key' };

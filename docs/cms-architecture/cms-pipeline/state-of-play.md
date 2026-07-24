@@ -7,6 +7,50 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.2 — core extraction: schema + registries + grammar/validation + pure policy libs)
+
+**T11.2 DONE** (branch `claude/t11.2-core-extraction-pure-libs`, stacked on the
+lockfix). The pure-law layer now lives in `packages/core/` (88 `.ts` files);
+Dr-Lurie builds + tests green against it; **build-diff EMPTY** (74 pages
+byte-identical vs the pre-move base). 88 `git mv` renames (history preserved);
+310 files changed total (moves + import rewrites).
+
+**Moved to core:** all of `schema/**`; `lib/registry/**` (minus the renderer-glue
+barrel `components/index.ts`); `lib/tracking/**`; `object-ids*`, `object-patch-
+apply*`, `agents-naming*`, `approval-policy`, `creation-policy`, `media-policy`,
+`site-identity*`, `template-instantiate`; plus the two pure schema deps
+`richtext/rich-text-v1.ts` and `article-content/to-markdown.ts`.
+
+**Alias ratified:** `@core/*` -> `packages/core/*`. `.astro`/`.tsx` use the
+`@core` Vite alias; all `.ts` use relative `packages/core/...` (Node test-runtime
+resolution — tsc doesn't rewrite path aliases). `tsconfig.test.json` include +
+astro vite alias + tsconfig paths wired.
+
+**Config-injection (behavior-identical).** Four core modules imported site
+config (`approval`, `creation`, `media` policies + `site-identity`; the latter
+two were discovered in execution, not named in the brief). Core now uses a
+provider seam; the site registers all four in the new
+`src/config/policy-bindings.ts`, imported for side effect at every entry that
+reaches a singleton. No `packages/core` module imports `src/`/`netlify/`/site
+config (verified).
+
+**Boundary correction (move-map amended, per its re-verify clause).** The
+brief's pure-lib slice had value-imports into T11.4 modules. DEFERRED to T11.4:
+`registry/components/index.ts` (24 `.astro` imports; renderer glue),
+`publishArticleFromPayload.ts` (`~/utils`), `contentSource{Body,ImportFormData}.ts`
+(article-content). PULLED the two pure schema deps forward. Full rationale in
+`w11-move-map.md` "T11.2 execution amendment".
+
+**In-scope test fixes (moved-path references):** `tracking-loader.test.ts`
+(loader entry path), `object-store-auth.test.ts` (mintId import-path assertion),
+`csp-drift.test.ts` (repo-root marker was `src/lib/tracking`). Gates:
+`npm run check` 0 errors / eslint+prettier clean; `npm test` 1473/1473 +
+67/67; build-diff EMPTY.
+
+**Landing status:** committed locally only — this session has **no push/PR
+access** (read-only git proxy). The lockfix + T11.2 await push credentials to
+land; both were delivered as patches / are on local branches.
+
 ## Session 2026-07-23 (W11 scaffold repair — package-lock out of sync with T11.1 workspaces; `main` was red)
 
 **Discrepancy found and fixed (prerequisite to the W11 extraction wave).** The

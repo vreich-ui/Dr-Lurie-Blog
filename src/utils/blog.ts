@@ -4,7 +4,7 @@ import type { CollectionEntry } from 'astro:content';
 import type { Post } from '~/types';
 import { APP_BLOG } from 'astrowind:config';
 import { cleanSlug, trimSlash, BLOG_BASE, POST_PERMALINK_PATTERN, CATEGORY_BASE, TAG_BASE } from './permalinks';
-import { contentItemBodySchema } from '~/schema/bodies/content-item-v1';
+import { contentItemBodySchema } from '../../packages/core/schema/bodies/content-item-v1';
 import { renderArticleNodes } from '~/lib/article-object/render-nodes';
 import { seededShuffle } from './seeded-shuffle';
 

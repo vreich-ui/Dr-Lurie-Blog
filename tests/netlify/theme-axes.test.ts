@@ -17,9 +17,9 @@ import {
   THEME_AXIS_GROUPS,
   THEME_AXIS_KEYS,
   resolveAxisVars,
-} from '../../src/lib/registry/theme-tokens.js';
-import { brandTokensSchema } from '../../src/schema/bodies/site-v1.js';
-import { themeBodySchema } from '../../src/schema/bodies/theme-v1.js';
+} from '../../packages/core/lib/registry/theme-tokens.js';
+import { brandTokensSchema } from '../../packages/core/schema/bodies/site-v1.js';
+import { themeBodySchema } from '../../packages/core/schema/bodies/theme-v1.js';
 
 const baseTokens = {
   colors: { primary: 'rgb(46 111 149)' },

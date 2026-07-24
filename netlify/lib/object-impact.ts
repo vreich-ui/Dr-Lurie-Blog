@@ -21,7 +21,7 @@
  * remaining half of T3.10.
  */
 import { collectBlobListItems, type BlobListResponse } from './blob-list.js';
-import type { ObjectRecord, ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, ObjectType } from '../../packages/core/schema/object-record-v1.js';
 
 export type ObjectImpactStore = {
   get(key: string): Promise<string | null>;

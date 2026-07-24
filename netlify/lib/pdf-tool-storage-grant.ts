@@ -27,8 +27,9 @@
  * slug — 'dr-lurie' here), read at call time like the credentials; the wire
  * format is unchanged.
  */
-import { getSiteIdentity } from '../../src/lib/site-identity.js';
-import { activeMediaPolicy, mediaPolicyLimits, type MediaPolicyLimits } from '../../src/lib/media-policy.js';
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy/identity providers before use
+import { getSiteIdentity } from '../../packages/core/lib/site-identity.js';
+import { activeMediaPolicy, mediaPolicyLimits, type MediaPolicyLimits } from '../../packages/core/lib/media-policy.js';
 
 /** Store handles pdf-tool writes through a grant, keyed by grant field name. */
 export const pdfToolStorageStores = {

@@ -20,7 +20,7 @@
  */
 import type Stripe from 'stripe';
 
-import type { ProductCommerce, StripeLinkage } from '../../src/schema/bodies/product-v1.js';
+import type { ProductCommerce, StripeLinkage } from '../../packages/core/schema/bodies/product-v1.js';
 
 export type StripeMode = 'live' | 'test';
 

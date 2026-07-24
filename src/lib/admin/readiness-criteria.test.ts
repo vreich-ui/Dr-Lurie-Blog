@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { evaluateReadiness, readinessLevel, isValidSlug } from './readiness-criteria.js';
-import type { ArticleBodyNode } from '../../schema/article-content-v1.js';
+import type { ArticleBodyNode } from '../../../packages/core/schema/article-content-v1.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

@@ -8,6 +8,7 @@
  * an override), revert (Owner — clear an override so the committed default
  * stands). Every write appends to the doc history.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register site policy providers before active*Policy() runs
 import { z } from 'zod';
 
 import { getAdminStateFromEvent, type LambdaContext } from '../lib/admin-auth.js';
@@ -22,8 +23,8 @@ import {
   type GovernanceDoc,
 } from '../lib/governance-store.js';
 import { CHAT_TOOLS, defaultAutonomyFor } from '../lib/agent/tools.js';
-import { approvalPolicyConfigSchema, activeApprovalPolicy } from '../../src/lib/approval-policy.js';
-import { creationPolicyConfigSchema, activeCreationPolicy } from '../../src/lib/creation-policy.js';
+import { approvalPolicyConfigSchema, activeApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import { creationPolicyConfigSchema, activeCreationPolicy } from '../../packages/core/lib/creation-policy.js';
 
 type LambdaEvent = {
   httpMethod?: string;

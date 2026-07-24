@@ -23,7 +23,7 @@
  *     until a task needs them.
  */
 import { parseAdminEmails } from './admin-auth.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 import type { UserRecord, UserRole } from './users-store.js';
 
 export type Role = 'owner' | 'admin' | 'publisher' | 'editor';

@@ -16,12 +16,12 @@ import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '
 import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
 import { checkTheme, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import type { PatchOp } from '../../src/schema/object-patch-ops.js';
-import { themeBodySchema, type ThemeBody } from '../../src/schema/bodies/theme-v1.js';
-import type { SiteBody } from '../../src/schema/bodies/site-v1.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';
+import { themeBodySchema, type ThemeBody } from '../../packages/core/schema/bodies/theme-v1.js';
+import type { SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 import { CONVERSION_SEEDS, themeDefaultBody } from '../../scripts/lib/themes-seed-data.mjs';
 import { siteBody } from '../../scripts/lib/site-seed-data.mjs';
 

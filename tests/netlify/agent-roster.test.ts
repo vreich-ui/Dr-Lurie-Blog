@@ -16,7 +16,7 @@ import { handler as chatHandler } from '../../netlify/functions/admin-agent-chat
 import { askAiForObject, type AskAiObjectStore } from '../../netlify/lib/ask-ai-object.js';
 import { getUsersBlobStore, putUserRecord } from '../../netlify/lib/users-store.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectRecord } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord } from '../../packages/core/schema/object-record-v1.js';
 
 const RUN = Date.now().toString(36);
 const OWNER_CTX = { clientContext: { user: { sub: 'id-wolf', email: 'wolf@example.com' } } };

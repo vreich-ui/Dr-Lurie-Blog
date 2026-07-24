@@ -9,6 +9,7 @@
  * inert on unknown axis keys), and object_contract advertises the axis keys —
  * derived from THEME_AXES, never hand-written.
  */
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -16,13 +17,13 @@ import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '
 import { buildStoreValidationContext } from '../../netlify/lib/object-validation-context.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
 import { checkTheme, summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../src/lib/object-patch-apply.js';
-import { buildObjectContract } from '../../src/lib/registry/object-contract.js';
-import { THEME_AXIS_KEYS } from '../../src/lib/registry/theme-tokens.js';
-import type { PatchOp } from '../../src/schema/object-patch-ops.js';
-import type { ThemeBody } from '../../src/schema/bodies/theme-v1.js';
-import type { SiteBody } from '../../src/schema/bodies/site-v1.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import { applyPatchOps, derivePatchInverse, type PatchOpCapture } from '../../packages/core/lib/object-patch-apply.js';
+import { buildObjectContract } from '../../packages/core/lib/registry/object-contract.js';
+import { THEME_AXIS_KEYS } from '../../packages/core/lib/registry/theme-tokens.js';
+import type { PatchOp } from '../../packages/core/schema/object-patch-ops.js';
+import type { ThemeBody } from '../../packages/core/schema/bodies/theme-v1.js';
+import type { SiteBody } from '../../packages/core/schema/bodies/site-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 import { siteBody } from '../../scripts/lib/site-seed-data.mjs';
 
 const NOW = Date.parse('2026-07-19T12:00:00.000Z');

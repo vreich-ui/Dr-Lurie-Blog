@@ -13,9 +13,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
 import { CONVERSION_SEEDS, SEED_SITE } from '../../scripts/lib/pages-interior-seed-data.mjs';
 
 type Seed = { objectType: string; objectId: string; body: { pageType: string } };

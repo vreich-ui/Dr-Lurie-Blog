@@ -3,7 +3,7 @@
  * One file per Page, inline sections included verbatim (D§3.3) — a Page owns
  * its sections the way an article owns its nodes: one record, one export.
  */
-import { pageBodySchema } from '../../../src/schema/bodies/page-v1.js';
+import { pageBodySchema } from '../../../packages/core/schema/bodies/page-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializePage = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

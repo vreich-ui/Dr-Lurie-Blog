@@ -28,7 +28,7 @@ import {
 } from './icons';
 import { relativeTimeFromNow } from './logic';
 import { objectTypeLabel } from '../../lib/admin/display-name';
-import type { ObjectType } from '../../schema/object-record-v1';
+import type { ObjectType } from '@core/schema/object-record-v1';
 import {
   fetchHomeData,
   objectHref,

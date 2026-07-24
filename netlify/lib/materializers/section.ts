@@ -4,7 +4,7 @@
  * Page record and are exported as part of the page materializer's output,
  * never as their own file.
  */
-import { sectionBodySchema } from '../../../src/schema/bodies/section-v1.js';
+import { sectionBodySchema } from '../../../packages/core/schema/bodies/section-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeSection = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

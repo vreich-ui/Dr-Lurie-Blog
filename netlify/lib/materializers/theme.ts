@@ -6,7 +6,7 @@
  * theme was applied to (site_apply_theme copies the tokens; nothing
  * live-binds to a theme).
  */
-import { themeBodySchema } from '../../../src/schema/bodies/theme-v1.js';
+import { themeBodySchema } from '../../../packages/core/schema/bodies/theme-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeTheme = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 import { contentItemPreview, productPreview, tokenSwatches, tokenFonts } from './preview-logic.js';
-import type { ObjectRecord } from '../../schema/object-record-v1.js';
+import type { ObjectRecord } from '../../../packages/core/schema/object-record-v1.js';
 
 const rec = (object_type: ObjectRecord['object_type'], body: unknown, object_id = 'obj_1') =>
   ({ object_id, object_type, body }) as Pick<ObjectRecord, 'object_id' | 'object_type' | 'body'>;

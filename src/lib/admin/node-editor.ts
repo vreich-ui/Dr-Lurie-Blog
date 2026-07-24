@@ -7,7 +7,7 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
-import type { ArticleBodyNode } from '../../schema/article-content-v1.ts';
+import type { ArticleBodyNode } from '../../../packages/core/schema/article-content-v1.ts';
 
 type EditorConfig = {
   /** Resolved after save; receives fields that actually changed (subset of public). */

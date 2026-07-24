@@ -13,7 +13,7 @@
  * deterministic across two calls.
  */
 import { objectRecordKey } from '../object-store-keys.js';
-import type { ObjectType } from '../../../src/schema/object-record-v1.js';
+import type { ObjectType } from '../../../packages/core/schema/object-record-v1.js';
 
 export interface MaterializeMeta {
   /** ISO timestamp of this materialization. An input, not generated here. */

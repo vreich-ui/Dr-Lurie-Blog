@@ -4,7 +4,7 @@
  * Structured so a future scoring algorithm can be added by adding weights.
  */
 
-import type { ArticleBodyNode } from '../../schema/article-content-v1.js';
+import type { ArticleBodyNode } from '../../../packages/core/schema/article-content-v1.js';
 
 export type CriterionStatus = 'complete' | 'warning' | 'missing' | 'optional';
 

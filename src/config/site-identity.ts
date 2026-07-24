@@ -23,7 +23,7 @@
  * Site URLs/routing stay in src/config.yaml (Wolf B2 — config.yaml is
  * authoritative there); this file deliberately does not duplicate them.
  */
-import type { SiteIdentityConfig } from '../lib/site-identity.js';
+import type { SiteIdentityConfig } from '../../packages/core/lib/site-identity.js';
 
 export const siteIdentityConfig = {
   siteId: 'site_drlurie',

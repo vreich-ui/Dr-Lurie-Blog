@@ -25,7 +25,7 @@ import {
 import { Avatar, EmptyState } from './primitives';
 import { renderFieldDiff } from '../../lib/admin/field-diff';
 import type { ReadinessGroup, ReadinessCriterion, CriterionStatus } from '../../lib/admin/readiness-criteria';
-import type { HistoryEntry } from '../../schema/object-record-v1';
+import type { HistoryEntry } from '@core/schema/object-record-v1';
 import { verbToPhrase, principalName } from '../../lib/admin/display-name';
 
 // ─── DataTable ────────────────────────────────────────────────────────────────

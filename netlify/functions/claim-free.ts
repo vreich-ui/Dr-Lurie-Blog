@@ -30,7 +30,7 @@ import {
   purchaseTokenSecret,
 } from '../lib/purchase-tokens.js';
 import { buildRecord } from '../lib/opt-in-record.js';
-import { isObjectIdForType } from '../../src/lib/object-ids.js';
+import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
 
 type LambdaEvent = {
   blobs?: string;

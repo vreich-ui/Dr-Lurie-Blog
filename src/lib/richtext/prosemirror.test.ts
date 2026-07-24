@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 
 import { proseMirrorToRichTextV1, richTextV1ToProseMirror, type ProseMirrorNode } from './prosemirror.js';
-import { parseRichTextV1 } from './rich-text-v1.js';
+import { parseRichTextV1 } from '../../../packages/core/lib/richtext/rich-text-v1.js';
 
 const pmText = (text: string, marks?: Array<{ type: string; attrs?: Record<string, unknown> }>): ProseMirrorNode => ({
   type: 'text',

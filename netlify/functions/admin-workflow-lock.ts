@@ -16,7 +16,7 @@ import { z } from 'zod';
 
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
-import type { WorkflowRecord } from '../../src/schema/schema-v1.js';
+import type { WorkflowRecord } from '../../packages/core/schema/schema-v1.js';
 
 const jsonHeaders = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 

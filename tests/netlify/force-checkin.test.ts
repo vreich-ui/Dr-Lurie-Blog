@@ -8,7 +8,7 @@ import test from 'node:test';
 
 import { handleObjectVerb, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-17T12:00:00.000Z');
 const EDITOR: Principal = { kind: 'human', id: 'ed1', email: 'editor@example.com' };

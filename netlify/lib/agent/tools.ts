@@ -27,7 +27,7 @@
 import { z } from 'zod';
 
 import type { Role } from '../roles.js';
-import { objectTypeSchema, type ObjectType } from '../../../src/schema/object-record-v1.js';
+import { objectTypeSchema, type ObjectType } from '../../../packages/core/schema/object-record-v1.js';
 
 export type ToolClass = 'read' | 'draft' | 'creation' | 'publication' | 'privileged';
 export type ToolAutonomy = 'auto' | 'ask' | 'off';

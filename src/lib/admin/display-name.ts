@@ -11,7 +11,12 @@
  * Pure, dependency-free, and unit-tested against real seed bodies so the
  * derivation cannot silently drift from the shapes on disk.
  */
-import type { ObjectRecord, ObjectType, HistoryEntry, Principal } from '../../schema/object-record-v1.js';
+import type {
+  ObjectRecord,
+  ObjectType,
+  HistoryEntry,
+  Principal,
+} from '../../../packages/core/schema/object-record-v1.js';
 
 /** Human label for each object type — used for fallbacks and type badges. */
 export const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {

@@ -7,7 +7,7 @@
 import { getAdminStateFromEvent } from '../lib/admin-auth.js';
 import { collectBlobListItems } from '../lib/blob-list.js';
 import { getWorkflowBlobStore } from '../lib/blob-store.js';
-import type { WorkflowRecord } from '../../src/schema/schema-v1.js';
+import type { WorkflowRecord } from '../../packages/core/schema/schema-v1.js';
 
 type LambdaEvent = {
   blobs?: string;

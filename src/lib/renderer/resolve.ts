@@ -20,14 +20,14 @@
  * curated cells from data (only cell links resolve, to hrefs); `manual`/
  * `query` sources resolve here (T3.9) via resolve-content-grid.ts (M-8).
  */
-import type { NavTarget } from '../../schema/bodies/navigation-v1.js';
-import { pageBodySchema, type PageBody } from '../../schema/bodies/page-v1.js';
+import type { NavTarget } from '../../../packages/core/schema/bodies/navigation-v1.js';
+import { pageBodySchema, type PageBody } from '../../../packages/core/schema/bodies/page-v1.js';
 import {
   sectionBodySchema,
   type ContentGridSource,
   type ProductPreviewSource,
   type ProductQuery,
-} from '../../schema/bodies/section-v1.js';
+} from '../../../packages/core/schema/bodies/section-v1.js';
 import type {
   ContentEmbedCard,
   ContentGridCard,
@@ -35,7 +35,7 @@ import type {
   ProductPreviewCard,
   RenderCtx,
   SectionType,
-} from '../registry/components/types.js';
+} from '../../../packages/core/lib/registry/components/types.js';
 import { resolveContentGridCards, type ContentGridResolvers } from './resolve-content-grid.js';
 
 /** A section ready for component-registry dispatch: `{data, resolved, ctx}` plus its stable page key. */

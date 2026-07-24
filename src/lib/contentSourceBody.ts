@@ -1,4 +1,4 @@
-import { articleBodyToMarkdown } from './article-content/to-markdown.js';
+import { articleBodyToMarkdown } from '../../packages/core/lib/article-content/to-markdown.js';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object');
 

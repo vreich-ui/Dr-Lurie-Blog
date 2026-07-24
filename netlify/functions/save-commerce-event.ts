@@ -21,7 +21,7 @@
 import { getCommerceEventsBlobStore } from '../lib/blob-store.js';
 import { appendCommerceEvent, isClientCommerceEventType, newCommerceEvent } from '../lib/commerce-events.js';
 import { getHeader } from '../lib/opt-in-record.js';
-import { isObjectIdForType } from '../../src/lib/object-ids.js';
+import { isObjectIdForType } from '../../packages/core/lib/object-ids.js';
 
 type LambdaEvent = {
   blobs?: string;

@@ -17,7 +17,7 @@
  * `<use>` and breaks the byte-identical cutover gate. The glob matches zero
  * or one file, so a missing export is an empty object, not a build error.
  */
-import { siteBodySchema, type SiteBody } from '~/schema/bodies/site-v1';
+import { siteBodySchema, type SiteBody } from '../../packages/core/schema/bodies/site-v1';
 
 const exports = import.meta.glob('../data/site/site.json', { eager: true, import: 'default' }) as Record<
   string,

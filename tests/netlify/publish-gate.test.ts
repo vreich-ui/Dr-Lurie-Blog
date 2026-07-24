@@ -1,3 +1,4 @@
+import '../../src/config/policy-bindings.js'; // W11 T11.2: register providers for tests hitting active*/getSiteIdentity
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -23,9 +24,9 @@ import {
   resolveApprovalPolicy,
   type ApprovalPolicy,
   type GovernedObjectType,
-} from '../../src/lib/approval-policy.js';
-import { applyPatchOps } from '../../src/lib/object-patch-apply.js';
-import type { ObjectRecord, ObjectType, Principal, ReviewState } from '../../src/schema/object-record-v1.js';
+} from '../../packages/core/lib/approval-policy.js';
+import { applyPatchOps } from '../../packages/core/lib/object-patch-apply.js';
+import type { ObjectRecord, ObjectType, Principal, ReviewState } from '../../packages/core/schema/object-record-v1.js';
 
 // The configurable-approval-policy gate matrix. Hand-written truth tables
 // throughout — deliberately NOT computed from the gate's own logic, so a

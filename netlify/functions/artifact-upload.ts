@@ -1,5 +1,5 @@
 import { artifactKindSet, type ArtifactKind } from '../lib/artifacts.js';
-import { validateFilename, validateRequestId } from '../../src/lib/agents-naming.js';
+import { validateFilename, validateRequestId } from '../../packages/core/lib/agents-naming.js';
 import {
   getDirectArtifactUploadMaxBytes,
   normalizeArtifactContentType,

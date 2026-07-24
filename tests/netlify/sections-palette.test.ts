@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { SECTION_PALETTE, insertPositionFor, paletteEntry } from '../../src/lib/edit-mode/sections-palette.js';
 import { splitRichTextBlocks, splitRichTextParagraphs } from '../../src/lib/richtext/paragraphs.js';
-import { sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
+import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 
 // Every palette starter must be insertable as-is: schema-valid under the REAL
 // section.v1 union, and its rich-text fields must survive the real splitters

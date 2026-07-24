@@ -9,7 +9,7 @@
  * RENDERER (node.private/commercial internals never reach HTML), not here.
  * Committed legacy posts (src/data/post/*.md) are untouched by this path.
  */
-import { contentItemBodySchema } from '../../../src/schema/bodies/content-item-v1.js';
+import { contentItemBodySchema } from '../../../packages/core/schema/bodies/content-item-v1.js';
 import { renderExport, type MaterializeMeta, type MaterializedFile } from './shared.js';
 
 export const materializeContentItem = (objectId: string, body: unknown, meta: MaterializeMeta): MaterializedFile => {

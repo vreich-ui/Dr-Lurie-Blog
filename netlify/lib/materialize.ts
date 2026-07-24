@@ -14,7 +14,7 @@
  * committed posts (src/data/post/*.md) and their to-markdown materializer are
  * untouched — the two families coexist; only object-backed articles flow here.
  */
-import type { ObjectType } from '../../src/schema/object-record-v1.js';
+import type { ObjectType } from '../../packages/core/schema/object-record-v1.js';
 import { materializeContentItem } from './materializers/content-item.js';
 import { materializeNavigation } from './materializers/navigation.js';
 import { materializePage } from './materializers/page.js';

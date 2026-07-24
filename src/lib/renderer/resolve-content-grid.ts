@@ -21,7 +21,7 @@
  * `cards` never reaches here: its curated cells live in the section data and
  * the component renders them directly (only cell links resolve, in resolve.ts).
  */
-import type { ContentQuery, RelatedAlgorithm } from '../../schema/bodies/section-v1.js';
+import type { ContentQuery, RelatedAlgorithm } from '../../../packages/core/schema/bodies/section-v1.js';
 
 // The structural source shape shared by every M-8 grid (content_grid over
 // posts, product_preview over products — S2): the query type is generic, the

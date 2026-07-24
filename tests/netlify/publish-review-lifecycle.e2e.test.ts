@@ -5,8 +5,8 @@ import test from 'node:test';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { materialize, type MaterializableObjectType } from '../../netlify/lib/materialize.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
-import type { HistoryEntry, ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import type { HistoryEntry, ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 /**
  * T1.8 — Phase 1 exit drill.

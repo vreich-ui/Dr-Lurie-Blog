@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { sectionInstanceSchema } from '../../src/schema/bodies/section-v1.js';
+import { sectionInstanceSchema } from '../../packages/core/schema/bodies/section-v1.js';
 
 const bioWith = (extra: Record<string, unknown>) => ({
   id: 's_bio',

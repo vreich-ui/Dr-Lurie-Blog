@@ -18,7 +18,7 @@
  * each site's repo sets its own; a future per-site override can layer on via the
  * site object's `media` field without changing this shape.
  */
-import type { MediaPolicyConfig } from '../lib/media-policy.js';
+import type { MediaPolicyConfig } from '../../packages/core/lib/media-policy.js';
 
 export const mediaPolicyConfig = {
   maxImageBytes: 153_600, // 150 KB — web-optimized budget

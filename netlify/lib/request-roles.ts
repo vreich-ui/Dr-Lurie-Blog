@@ -6,7 +6,7 @@
  */
 import { resolveRolesForPrincipalAsync, type Role } from './roles.js';
 import { getUsersBlobStore, getUserRecord } from './users-store.js';
-import type { Principal } from '../../src/schema/object-record-v1.js';
+import type { Principal } from '../../packages/core/schema/object-record-v1.js';
 
 export const resolveRolesFromEvent = async (event: unknown, principal: Principal): Promise<Role[]> =>
   resolveRolesForPrincipalAsync(principal, {

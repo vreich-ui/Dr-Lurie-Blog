@@ -31,7 +31,7 @@ import { randomUUID } from 'node:crypto';
 
 import { z } from 'zod';
 
-import type { ObjectRecord, Principal, WorkflowLockRecord } from '../../src/schema/object-record-v1.js';
+import type { ObjectRecord, Principal, WorkflowLockRecord } from '../../packages/core/schema/object-record-v1.js';
 
 export const DEFAULT_LEASE_SECONDS = 900; // 15 min, matches the article lock default
 export const MAX_LEASE_SECONDS = 3600;

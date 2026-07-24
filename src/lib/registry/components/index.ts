@@ -11,6 +11,7 @@
  * (prose, faq, …) fail lookup loudly — they gain entries when a migration
  * needs them, one module + one binding each.
  */
+import '../../../config/policy-bindings.js'; // W11 T11.2: register policy/site-identity providers before core registry defs (bio.ts et al. read getSiteIdentity at module load)
 import type { AstroComponentFactory } from 'astro/runtime/server/index.js';
 
 import Bio from '~/components/sections/Bio.astro';
@@ -38,32 +39,35 @@ import Stats from '~/components/sections/Stats.astro';
 import Timeline from '~/components/sections/Timeline.astro';
 import Testimonial from '~/components/sections/Testimonial.astro';
 
-import { bioDefinition } from './bio.js';
-import { checklistDefinition } from './checklist.js';
-import { contactFormDefinition } from './contact-form.js';
-import { contentEmbedDefinition } from './content-embed.js';
-import { contentGridDefinition } from './content-grid.js';
-import { contentSplitDefinition } from './content-split.js';
-import { ctaBannerDefinition } from './cta-banner.js';
-import { faqDefinition } from './faq.js';
-import { heroDefinition } from './hero.js';
-import { ledeDefinition } from './lede.js';
-import { linkListDefinition } from './link-list.js';
-import { newsletterSignupDefinition } from './newsletter-signup.js';
-import { productPreviewDefinition } from './product-preview.js';
-import { pricingTableDefinition } from './pricing-table.js';
-import { proseDefinition } from './prose.js';
-import { formConfirmationDefinition } from './form-confirmation.js';
-import { searchDefinition } from './search.js';
-import { stepsDefinition } from './steps.js';
-import { brandRowDefinition } from './brand-row.js';
-import { comparisonTableDefinition } from './comparison-table.js';
-import { mediaDefinition } from './media.js';
-import { statsDefinition } from './stats.js';
-import { timelineDefinition } from './timeline.js';
-import { testimonialDefinition } from './testimonial.js';
-import type { RegisteredSectionType } from './registered-types.js';
-import type { SectionComponentDefinition, SectionType } from './types.js';
+import { bioDefinition } from '../../../../packages/core/lib/registry/components/bio.js';
+import { checklistDefinition } from '../../../../packages/core/lib/registry/components/checklist.js';
+import { contactFormDefinition } from '../../../../packages/core/lib/registry/components/contact-form.js';
+import { contentEmbedDefinition } from '../../../../packages/core/lib/registry/components/content-embed.js';
+import { contentGridDefinition } from '../../../../packages/core/lib/registry/components/content-grid.js';
+import { contentSplitDefinition } from '../../../../packages/core/lib/registry/components/content-split.js';
+import { ctaBannerDefinition } from '../../../../packages/core/lib/registry/components/cta-banner.js';
+import { faqDefinition } from '../../../../packages/core/lib/registry/components/faq.js';
+import { heroDefinition } from '../../../../packages/core/lib/registry/components/hero.js';
+import { ledeDefinition } from '../../../../packages/core/lib/registry/components/lede.js';
+import { linkListDefinition } from '../../../../packages/core/lib/registry/components/link-list.js';
+import { newsletterSignupDefinition } from '../../../../packages/core/lib/registry/components/newsletter-signup.js';
+import { productPreviewDefinition } from '../../../../packages/core/lib/registry/components/product-preview.js';
+import { pricingTableDefinition } from '../../../../packages/core/lib/registry/components/pricing-table.js';
+import { proseDefinition } from '../../../../packages/core/lib/registry/components/prose.js';
+import { formConfirmationDefinition } from '../../../../packages/core/lib/registry/components/form-confirmation.js';
+import { searchDefinition } from '../../../../packages/core/lib/registry/components/search.js';
+import { stepsDefinition } from '../../../../packages/core/lib/registry/components/steps.js';
+import { brandRowDefinition } from '../../../../packages/core/lib/registry/components/brand-row.js';
+import { comparisonTableDefinition } from '../../../../packages/core/lib/registry/components/comparison-table.js';
+import { mediaDefinition } from '../../../../packages/core/lib/registry/components/media.js';
+import { statsDefinition } from '../../../../packages/core/lib/registry/components/stats.js';
+import { timelineDefinition } from '../../../../packages/core/lib/registry/components/timeline.js';
+import { testimonialDefinition } from '../../../../packages/core/lib/registry/components/testimonial.js';
+import type { RegisteredSectionType } from '../../../../packages/core/lib/registry/components/registered-types.js';
+import type {
+  SectionComponentDefinition,
+  SectionType,
+} from '../../../../packages/core/lib/registry/components/types.js';
 
 export type RegisteredComponent = {
   definition: SectionComponentDefinition<SectionType, unknown>;

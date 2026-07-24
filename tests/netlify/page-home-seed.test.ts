@@ -18,17 +18,17 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { summarizeValidation, validateObject } from '../../netlify/lib/object-validate.js';
-import { getPageTypeDefinition } from '../../src/lib/registry/page-types.js';
+import { getPageTypeDefinition } from '../../packages/core/lib/registry/page-types.js';
 import {
   homeAudienceGridData,
   homeBioData,
   homeHeroData,
   homeNewsletterSignupData,
   homeStartGridData,
-} from '../../src/lib/registry/components/home-fixture-data.js';
-import { validateObjectIdForType } from '../../src/lib/object-ids.js';
-import { pageBodySchema } from '../../src/schema/bodies/page-v1.js';
-import { sectionBodySchema, type SectionInstance, type SectionType } from '../../src/schema/bodies/section-v1.js';
+} from '../../packages/core/lib/registry/components/home-fixture-data.js';
+import { validateObjectIdForType } from '../../packages/core/lib/object-ids.js';
+import { pageBodySchema } from '../../packages/core/schema/bodies/page-v1.js';
+import { sectionBodySchema, type SectionInstance, type SectionType } from '../../packages/core/schema/bodies/section-v1.js';
 import {
   PAGE_HOME_ID,
   PAGE_HOME_SEEDS,

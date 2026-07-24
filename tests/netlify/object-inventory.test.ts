@@ -22,8 +22,8 @@ import {
 } from '../../netlify/lib/object-inventory.js';
 import { handleObjectVerb, type ObjectVerbRequest, type ObjectVerbStore } from '../../netlify/lib/object-verbs.js';
 import { objectRecordKey } from '../../netlify/lib/object-store-keys.js';
-import type { ApprovalPolicy } from '../../src/lib/approval-policy.js';
-import type { ObjectRecord, Principal } from '../../src/schema/object-record-v1.js';
+import type { ApprovalPolicy } from '../../packages/core/lib/approval-policy.js';
+import type { ObjectRecord, Principal } from '../../packages/core/schema/object-record-v1.js';
 
 const NOW = Date.parse('2026-07-06T12:00:00.000Z');
 const AGENT: Principal = { kind: 'agent', agent_name: 'inventory-agent', auth: 'publish_key' };
