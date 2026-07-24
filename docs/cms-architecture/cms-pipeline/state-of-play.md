@@ -7,6 +7,83 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.8 — Fleet CI: dynamic per-site matrix + change-scoped fan-out; live GH Actions run unverified)
+
+**Replaced the T11.1 placeholder `fleet` job** (hardcoded `matrix: site:
+[drlurie]`) with real dynamic discovery. New
+`scripts/ci/discover-fleet-matrix.mjs`: `discoverSites()` lists every
+`sites/<name>/` carrying its own `site.config.ts` (today: exactly
+`['drlurie']`); `computeFleetMatrix()` is a pure function deciding, from a
+list of changed paths, whether the fleet fans out fully or scopes to just
+the touched site(s) — deliberately conservative: a diff confined ENTIRELY to
+`sites/**` scopes down, anything else (`packages/core`, root config, an
+unresolvable diff) fans out to everyone. A new `discover-fleet` job runs
+this once per CI run and feeds its outputs (`sites`, `fan_out`) to both the
+`fleet` job's matrix and a new `fleet-build-diff` job.
+
+`fleet` now runs, per discovered site: install, `astro check`, build, full
+suite, and the site-seed drift guard (moved here from the `check` job,
+where it was hardcoded to `sites/drlurie` — now it runs per-site,
+best-effort skipped rather than failed for a site with no
+`sync-site-seed.mjs` yet, since T11.7's `create-site.mjs` scaffold doesn't
+generate one today — a recorded residual, not silently papered over).
+`fleet-build-diff` (new) runs only on PRs where the fleet fanned out: per
+site, `build-diff.mjs <base> <head> --site sites/<site>` piped to a file
+with `|| true` (never fails the job — a non-empty diff is a review artifact
+per design-principles rule 4, not an automatic failure) and uploaded via
+`actions/upload-artifact@v4`.
+
+**Verified against real git history, not just unit tests:** `HEAD~1..HEAD`
+and `origin/main..HEAD` both correctly report `fanOut: true` (T11.6/T11.7
+touch `packages/core`); a throwaway demo commit touching only
+`sites/drlurie/data/site/.demo-touch-tmp` correctly reported `{"sites":
+["drlurie"],"fanOut":false}` before being reverted (`git reset --hard`) —
+proving the filter side of the acceptance criteria, not just the fan-out
+side. 12 new unit tests
+(`tests/scripts/discover-fleet-matrix.test.mjs`) cover discovery (including
+a half-scaffolded site with no `site.config.ts` — correctly excluded) and
+every fan-out/scope-down branch of `computeFleetMatrix`, plus the
+`$GITHUB_OUTPUT`-writing helper (`sites=`/`fan_out=` lines, no bash-side
+JSON parsing needed in the workflow step).
+
+**Mid-task incident, self-caught and fixed:** while manually proving the
+filter behavior against real git history (the demo-commit test above), a
+`git reset --hard $BASE` used to revert the throwaway demo commit also
+discarded the (uncommitted, unstaged) `actions.yaml` edit sitting in the
+working tree at the time — `git reset --hard` resets the working tree to
+match the target commit, not just HEAD, and does not distinguish "changes
+from the commit being undone" from "unrelated uncommitted work." Caught
+immediately by re-checking `git diff --stat` /grepping for the new job
+names post-revert; the file was still fully in context from having just
+written it, so it was rewritten byte-for-byte rather than redone from
+scratch. Lesson recorded here rather than just silently fixed: `git stash`
+(or committing the actual change FIRST) is the safe move before any
+`reset --hard`-based demo/revert dance, not `reset --hard` while unrelated
+edits are still unstaged.
+
+**Recorded, not a halt:** this is a GitHub Actions workflow file; there is
+no way to execute GitHub Actions from inside this sandboxed session.
+Verified instead: the YAML parses (`js-yaml`), every command a step invokes
+runs correctly against real repo state locally (`npm run
+check:astro`/`build`/`test`, `discover-fleet-matrix.mjs` against real SHA
+ranges, `build-diff.mjs`'s existing `<base> <head> --site <path>` interface).
+The GitHub-Actions-specific plumbing (`github.event.pull_request.base.sha`,
+`fromJson()` over a job output, whether the default PR-merge-commit checkout
+still carries the head SHA's commit object for `git worktree add` to
+resolve) is standard/documented but unverified live — same posture as
+T11.7's Netlify API calls. A real PR against this branch is the first true
+proof; flagged for whoever lands this to watch the first Actions run
+closely.
+
+**Gates:** `astro check` 0 errors; `eslint .`/`prettier --check` clean
+(including the new `scripts/ci/**` and the workflow YAML, checked
+separately); full test suite **1637/1637 + 82/82** (12 new); `build-diff.mjs
+--self-test --site sites/drlurie` PASS; `build-diff.mjs HEAD origin/main
+--site sites/drlurie` — EMPTY, 74/74 (unaffected — nothing here touches
+build output). Committed `T11.8: …`; no PR (per the brief).
+
+**Next in queue:** T11.9 (Schema-migration harness, NOTIFY, fable/high).
+
 ## Session 2026-07-24 (T11.7 — provisioning CLI: `create-site`; scaffold + runbook committed, live Netlify path unverified — no credential)
 
 **Built `packages/core/cli/create-site.mjs`** per the standalone brief's

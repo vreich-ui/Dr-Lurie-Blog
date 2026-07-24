@@ -242,6 +242,60 @@ are only as verified as the current public docs describe; a first live
 `--netlify-token` run (naturally, T11.11's provisioning step) is this path's
 real proof.
 
+## T11.8 execution amendment (2026-07-24 — per this file's amend clause)
+
+Replaced the T11.1 placeholder `fleet` job (hardcoded `matrix: site:
+[drlurie]`) with real dynamic discovery: `scripts/ci/discover-fleet-matrix.mjs`
+(new — `discoverSites()` lists every `sites/<name>/` carrying its own
+`site.config.ts`; `computeFleetMatrix()` is a pure decision function, unit-
+tested against fixture diffs with no real git/filesystem access) feeds a new
+`discover-fleet` job's outputs into both the `fleet` job's matrix and a new
+`fleet-build-diff` job.
+
+**The fan-out rule is deliberately conservative**, matching this project's
+"no half measures" posture applied to CI correctness: a diff confined
+ENTIRELY to `sites/**` paths only rebuilds the touched site(s); anything
+else (`packages/core`, root config, the workflow file itself, docs, an
+unresolvable diff) fans out to the WHOLE fleet. Silently under-building on
+an ambiguous change would be the actual bug — over-building is just a
+slower green. Verified against real git history (not just the unit tests):
+`HEAD~1..HEAD` and `origin/main..HEAD` both correctly report `fanOut: true`
+(T11.6/T11.7's changes touch `packages/core`); a throwaway demo commit
+touching only `sites/drlurie/data/site/` correctly reported `fanOut: false,
+sites: ['drlurie']` before being reverted with `git reset --hard`.
+
+**The site-seed drift guard** (`node sites/<site>/seeds/sync-site-seed.mjs
+--check`) moved out of the `check` job (where it was hardcoded to
+`sites/drlurie`) into the `fleet` job's per-site steps, so a second client
+gets its own drift guard automatically — best-effort: skipped (not failed)
+for a site with no `sync-site-seed.mjs` yet, since T11.7's `create-site.mjs`
+scaffold doesn't generate one today (a recorded residual for a future task,
+not silently papered over here).
+
+**The `fleet-build-diff` job** (new) runs only on `pull_request` events
+where the fleet fanned out — the brief's "on PRs touching packages/core"
+condition, generalized to the same conservative fan-out signal rather than
+a narrower packages/core-only path filter, since the whole point of this
+stage is exactly the changes the fan-out rule already flags as risky. Per
+site: `build-diff.mjs <base> <head> --site sites/<site>` redirected to a
+file with `|| true` (never fails the job — a non-empty diff is a REVIEW
+ARTIFACT per design-principles rule 4, not an automatic failure) and
+uploaded via `actions/upload-artifact@v4`.
+
+**Unverified in a live run:** this is a GitHub Actions workflow file; there
+is no way to actually execute GitHub Actions from inside this sandboxed
+session. What WAS verified: the YAML parses (`js-yaml`), every script
+invoked by a step runs correctly against real repo state (`npm run
+check:astro`/`build`/`test` all pass locally; `discover-fleet-matrix.mjs`
+correctly resolves real SHA ranges via `git diff`, including the demo-commit
+proof above), and `scripts/build-diff.mjs`'s own positional `<base> <head>
+--site <path>` interface already works against real refs (used throughout
+T11.6/T11.7's gates). The specific GitHub-Actions-context plumbing (`github.
+event.pull_request.base.sha`, the default `refs/pull/N/merge` checkout still
+carrying the head SHA's commit object for `git worktree add` to resolve,
+`fromJson()` over a job output) is standard/documented but — same posture as
+T11.7's Netlify API calls — its first real proof is a live PR.
+
 ## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
 
 Landed as three gated step-commits (T9.24 precedent), each check+test+
