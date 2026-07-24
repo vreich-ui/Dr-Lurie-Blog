@@ -7,6 +7,70 @@ updates the standing tables. **Rule inherited from the mandate: never trust
 this file over real state — verify against main / test output / the live
 store before building on anything below.**
 
+## Session 2026-07-24 (T11.9 — Schema-migration harness: registry/classify framework + `migrate-site` CLI + fleet CI gate; no real schema bump shipped)
+
+**Framework** — new `packages/core/server/migrations/registry.ts` +
+`classify.ts`. A migration is `{objectType, from, to, description, migrate,
+toPatchOps?, inverse?, irreversible?}`; `findMigrationChain` (BFS) composes
+one-hop migrations into an arbitrary chain; `classifyRecord` decides
+per-record disposition — `parses-as-is` (wins over a version-string
+technicality), `migratable` (`writable` iff every hop carries `toPatchOps`),
+or `blocked` (no path, OR a chain exists but the migrated body still fails —
+distinguished from "no path" as a broken-migration signal); `classifySiteRecords`
+fails a whole scan on a single blocked record. **`toPatchOps` is optional by
+design**: not every object type has a generic replace-body op (page/section
+have narrower field-scoped ops) — a migration without one is preview-only,
+never an unsafe workaround around the existing patch grammar. 23 unit
+tests, including the brief's own required adversarial case: a synthetic
+v1→v2 required-field addition blocks with no migration registered, passes
+once one is.
+
+**CLI** — new `packages/core/cli/migrate-site.mjs`. `--dry-run` (default)
+scans a site's COMMITTED exports and classifies every record — pure disk +
+the registry. Since a committed export carries no real `schema_version` tag
+at all, every scanned record's version is assumed to be the current head
+version for its type (`CURRENT_SCHEMA_VERSIONS` — the one map a real bump
+would update, mirroring `object-verbs.ts`'s own hardcode) — a recorded,
+deliberate assumption, correct as long as nothing has drifted (true today).
+`--write` applies migratable+writable records through the STANDARD verb
+path only — `get` → `checkout` → `patch` (the chain's own `toPatchOps`) → a
+best-effort republish only when the record was already live → `checkin`
+(always attempted) — never a raw blob write; real production writes need
+real Netlify credentials this sandbox doesn't have, so `--write` without
+`--local` refuses explicitly rather than silently no-op'ing (same posture
+as T11.7's `--netlify-token` path). 13 tests, including the real
+`sites/drlurie` export tree passing the gate today (64 records, 0 blocked)
+and the write orchestration proven against an in-memory store with a
+migration compatible with the REAL page schema (proving the mechanism; the
+adversarial schema-blocking logic already has its own fully-synthetic proof
+in `classify.test.ts`).
+
+**CI gate** — new `scripts/ci/schema-migration-gate.mjs`, extending T11.8's
+fleet discovery so a second client needs zero edits here: per discovered
+site, a throwaway `tsc` pass into its own outDir, dynamic import of the
+compiled CLI, scan, fail if any site is blocked. **Verified for real**: ran
+it directly in this sandbox — compiled, imported, scanned the real
+`sites/drlurie` tree, reported PASS, cleaned up, exit 0. Wired into the
+`check` job as a new named step in `.github/workflows/actions.yaml` (time-
+budget comment updated); same "unverified in a live GH Actions run" posture
+as T11.7/T11.8 (no way to execute Actions from this sandbox) — everything
+the step actually runs was proven locally instead.
+
+**Gates:** `astro check` 0 errors; `eslint .`/`prettier --check` clean
+(including the new `packages/core/server/migrations/**`,
+`packages/core/cli/migrate-site.*`, `scripts/ci/schema-migration-gate.mjs`,
+and `tests/scripts/schema-migration-gate.test.mjs`, checked separately —
+none of these paths are covered by the project's own `check:prettier`
+glob); full test suite **1673/1673 + 85/85** (up from 1637/1637 + 82/82:
++36 co-located — 23 registry/classify + 13 migrate-site — and +3 in
+`tests/scripts` — schema-migration-gate's aggregation logic);
+`build-diff.mjs --self-test` PASS; `build-diff.mjs HEAD origin/main --site
+sites/drlurie` — EMPTY, 74/74 (unaffected — nothing here touches build
+output). Committed `T11.9: …`; no PR (per the brief).
+
+**Next in queue:** T11.10 (Per-site governance + credentials inventory,
+NOTIFY, fable/high).
+
 ## Session 2026-07-24 (T11.8 — Fleet CI: dynamic per-site matrix + change-scoped fan-out; live GH Actions run unverified)
 
 **Replaced the T11.1 placeholder `fleet` job** (hardcoded `matrix: site:

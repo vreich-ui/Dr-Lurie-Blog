@@ -8,15 +8,16 @@
 #
 # Time budget (today's single-site fleet, jobs run in parallel except where
 # `needs:` serializes): build ~2-4 min per node-version leg (3 legs, wall-
-# clock ≈ the slowest one, not the sum) + check ~1-2 min + discover-fleet
-# ~20-40s (git diff + a tiny script; nothing else depends on it running
-# long) + fleet ~2-4 min per site leg (1 leg today) + fleet-build-diff
-# (PR-only, core-impacting changes only) ~1-2 min per site leg (a 74-page
-# normalize-and-diff, per scripts/build-diff.mjs's own self-test timings).
-# Total PR wall-clock today: roughly 3-6 minutes, dominated by `build`'s
-# node-version matrix, not the fleet — the fleet/build-diff jobs scale with
-# SITE COUNT, not commit size, and stay small until a second site is real
-# (T11.11).
+# clock ≈ the slowest one, not the sum) + check ~1-2 min (+ ~20-40s more,
+# W11 T11.9, for the schema-migration gate's own throwaway tsc pass) +
+# discover-fleet ~20-40s (git diff + a tiny script; nothing else depends on
+# it running long) + fleet ~2-4 min per site leg (1 leg today) +
+# fleet-build-diff (PR-only, core-impacting changes only) ~1-2 min per site
+# leg (a 74-page normalize-and-diff, per scripts/build-diff.mjs's own
+# self-test timings). Total PR wall-clock today: roughly 3-6 minutes,
+# dominated by `build`'s node-version matrix, not the fleet — the
+# fleet/build-diff/schema-migration-gate jobs scale with SITE COUNT, not
+# commit size, and stay small until a second site is real (T11.11).
 name: GitHub Actions
 
 on:
@@ -66,6 +67,15 @@ jobs:
       # The per-site seed drift guard moved to the `fleet` job below (W11
       # T11.8) — it now runs once per DISCOVERED site, not hardcoded to
       # drlurie, so a second client's own drift guard is covered for free.
+      # W11 T11.9: every discovered site's committed exports must parse
+      # under the head schemas (or carry a migration + a green dry-run
+      # report) — see scripts/ci/schema-migration-gate.mjs's own header.
+      # Runs its own throwaway tsc pass (a different outDir than `npm
+      # test`'s `.tmp/ci-test`, so it can't collide with a concurrent test
+      # run in this same job) — a real cost (~20-40s), accepted for a
+      # named, independently-attributable gate step rather than burying
+      # this check inside the full suite's pass/fail count.
+      - run: node scripts/ci/schema-migration-gate.mjs
 
   # --- W11 T11.8: fleet matrix discovery ---
   # Discovers sites/*/site.config.ts dynamically (adding a client is a zero

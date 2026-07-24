@@ -296,6 +296,94 @@ carrying the head SHA's commit object for `git worktree add` to resolve,
 `fromJson()` over a job output) is standard/documented but — same posture as
 T11.7's Netlify API calls — its first real proof is a live PR.
 
+## T11.9 execution amendment (2026-07-24 — per this file's amend clause)
+
+Built the schema-migration harness in three layers, none of which ships a
+real schema bump (T11.9's own non-goal — the acceptance criteria only asks
+for the synthetic case to be proven end-to-end):
+
+**Framework** — `packages/core/server/migrations/registry.ts` (`SchemaMigration`
+type: `objectType, from, to, description, migrate, toPatchOps?, inverse?,
+irreversible?`; `findMigrationChain` — BFS composing one-hop migrations into
+an arbitrary `(from, to)` chain; `applyMigrationChain`; `reverseChain`/
+`applyReverseChain` — rollback preview, blocked at the first irreversible/
+no-inverse step) + `classify.ts` (`classifyRecord` — parses-as-is wins over
+a version-string technicality; migratable reports `writable` per whether
+every hop in the chain carries `toPatchOps`; blocked distinguishes "no path"
+from "a chain exists but the migration itself is broken"; `classifySiteRecords`
+— a single blocked record fails the whole scan). 23 unit tests, including
+the brief's explicitly-required adversarial case: a synthetic v1→v2
+required-field addition blocks with no migration registered and passes once
+one is.
+
+**`toPatchOps` is optional by design** — not every object type has a generic
+"replace the whole body" patch op (page/section have narrower field-scoped
+ops; only some types have a `set_<type>_fields` deep-merge op) — a migration
+without one is preview-only: `migrate-site.mjs --write` reports its records
+as migratable-in-dry-run but blocked for a real write, rather than reaching
+around the existing patch grammar with something unsafe.
+
+**CLI** — `packages/core/cli/migrate-site.mjs`. `--dry-run` (default) scans a
+site's COMMITTED exports (`sites/<site>/data/site/**`, mapping each
+directory/single-file to its objectType, deriving the real objectId from
+`__generated.from`'s basename since a filename alone doesn't carry it for
+the two singleton types) and classifies every record — pure disk + the
+registry, safe on every PR. A recorded, deliberate assumption: since a
+committed export carries NO real `schema_version` tag at all (materializers
+only emit `{__generated, ...body}`), every scanned record's version is
+assumed to be the CURRENT head version for its type
+(`CURRENT_SCHEMA_VERSIONS` — the one map a real bump would update, mirroring
+`object-verbs.ts`'s own `${objectType}.v1` hardcode) — correct as long as
+nothing has drifted, true today, and the harness's own real-repo test proves
+it holds. `--write` applies migratable+writable records through the
+STANDARD verb path only — `get` (current body/publish state) → `checkout` →
+`patch` (the chain's own `toPatchOps`) → a best-effort republish ONLY when
+the record was already live (preserves publish state; a gated/blocked
+republish is reported, not fatal — the store body is already migrated
+either way) → `checkin` (always attempted, even after a failure, so no lock
+is ever left stuck) — never a raw blob write. Real production writes need
+real Netlify Blobs credentials this sandbox doesn't have (same posture as
+T11.7's `--netlify-token` path); `--write` without `--local` refuses with an
+explicit message rather than silently no-op'ing. 13 tests: disk-scan
+plumbing, the real `sites/drlurie` export tree passing the gate today
+(gracefully skipped, not false-failed, if the compiled test's cwd assumption
+about locating the real repo root ever stops holding), and the write
+orchestration (checkout/patch/checkin sequencing, the already-published
+republish branch, the record-not-found failure path) against an in-memory
+store — using a migration compatible with the REAL (strict) page schema, so
+these tests prove the write MECHANISM; the adversarial schema-blocking logic
+already has its own fully-synthetic proof in `classify.test.ts` and needs no
+re-proving here.
+
+**CI gate** — `scripts/ci/schema-migration-gate.mjs`, extending T11.8's fleet
+discovery (`discoverSites()`, so a second client is covered with zero edits
+here): for every discovered site, runs a throwaway `tsc -p
+tsconfig.test.json` pass into its OWN outDir (`.tmp/ci-schema-gate` —
+deliberately different from `npm test`'s `.tmp/ci-test`, so it can run as an
+independent CI step without racing a concurrent test run), dynamically
+imports the compiled `migrate-site.mjs` (tsc copies a `.mjs` source through
+as `.mjs`, not `.js` — it can't rename an ESM-mode file's extension the way
+it emits `.ts` → `.js`; this cost a first debugging pass), and fails if any
+site is blocked. Wired into the `check` job as a new named step (a real
+~20-40s cost, accepted for an independently-attributable gate rather than
+burying this check inside the full suite's pass/fail count) — the top-of-file
+time-budget comment updated to match. **Verified for real, not just
+unit-tested**: ran `node scripts/ci/schema-migration-gate.mjs` directly in
+this sandbox — compiled, imported, scanned the real `sites/drlurie` tree (64
+records), reported `PASS`, cleaned up its own compiled tree, exit code 0.
+The aggregation logic (`aggregateFleetGate` — one blocked site fails the
+whole gate) has its own 3-test pure-logic suite in
+`tests/scripts/schema-migration-gate.test.mjs`, matching
+`discover-fleet-matrix.test.mjs`'s established plain-`.mjs`-test convention.
+
+**Unverified in a live run:** same posture as T11.7/T11.8 — no way to
+actually execute GitHub Actions from inside this sandbox. What WAS verified:
+the YAML parses; the gate script runs correctly end-to-end against real
+repo state (above); the full local suite (`npx astro check`, `npm run
+check:eslint`, `npm run check:prettier`, `npm run test`, `node
+scripts/build-diff.mjs --self-test`, `node scripts/build-diff.mjs HEAD
+origin/main --site sites/drlurie`) all pass/report EMPTY.
+
 ## T11.4 execution amendment (2026-07-24 — per this file's amend clause)
 
 Landed as three gated step-commits (T9.24 precedent), each check+test+
